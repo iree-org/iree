@@ -4,6 +4,7 @@ hide:
 tags:
   - Python
   - PyTorch
+icon: simple/pytorch
 ---
 
 # PyTorch Integration

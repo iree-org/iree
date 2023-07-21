@@ -4,6 +4,7 @@ hide:
 tags:
   - Python
   - JAX
+icon: simple/python
 ---
 
 # JAX Integration

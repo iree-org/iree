@@ -4,6 +4,7 @@ hide:
 tags:
   - Python
   - TensorFlow
+icon: simple/tensorflow
 ---
 
 # TensorFlow Integration

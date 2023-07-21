@@ -1,3 +1,7 @@
+---
+icon: octicons/code-16
+---
+
 # C API bindings
 
 ## Overview

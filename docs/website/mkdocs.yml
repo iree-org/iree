@@ -71,6 +71,9 @@ extra:
       link: https://groups.google.com/forum/#!forum/iree-discuss
       name: IREE Discuss Google Group
 
+  status:
+    new: Recently added
+
 extra_css:
   - assets/stylesheets/extra.css
   - assets/stylesheets/openxla.css

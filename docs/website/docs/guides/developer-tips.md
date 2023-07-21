@@ -1,3 +1,8 @@
+---
+status: new
+icon: material/lightbulb-on
+---
+
 # IREE developer tips and tricks
 
 The IREE compiler is built using [MLIR](https://mlir.llvm.org/), so it naturally
@@ -62,11 +67,11 @@ then be loaded and executed using IREE's runtime.
     C source modules provide low level connection points for constrained
     environments like bare metal platforms.
 
-By default, `.vmfb` files can be opened as zip files:
+By default, `.vmfb` files can be opened as zip files: (1)
+{ .annotate }
 
-<!-- TODO(scotttodd): add annotation (insiders only), qualifying "default" with
-                      `--iree-vm-emit-polyglot-zip=true`
--->
+1. Setting `--iree-vm-emit-polyglot-zip=false` will disable this feature and
+   decrease file size slightly
 
 ```console
 $ unzip -d simple_abs_cpu ./simple_abs_cpu.vmfb
