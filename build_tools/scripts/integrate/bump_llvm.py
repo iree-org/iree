@@ -64,6 +64,7 @@ def main(args):
         branch_name,
         checkout=True,
         ref=f"{args.upstream_remote}/main",
+        remote=f"{args.upstream_remote}",
         force=args.reuse_branch,
     )
 
