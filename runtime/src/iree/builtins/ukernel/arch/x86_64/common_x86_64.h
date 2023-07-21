@@ -56,7 +56,6 @@ static inline __m256i iree_uk_avx2_load_8x4xi8_strided(
 static inline __m128i iree_uk_avx2_load_8x2xi8_strided(
     const iree_uk_int8_t* src, iree_uk_index_t stride) {
   __m128i result = _mm_setzero_si128();
-  const iree_uk_int16_t* src_i16 = (const iree_uk_int16_t*)src;
   result =
       _mm_insert_epi16(result, *(const iree_uk_int16_t*)(src + 0 * stride), 0);
   result =
@@ -79,7 +78,6 @@ static inline __m128i iree_uk_avx2_load_8x2xi8_strided(
 static inline __m256i iree_uk_avx2_load_16x2xi8_strided(
     const iree_uk_int8_t* src, iree_uk_index_t stride) {
   __m256i result = _mm256_setzero_si256();
-  const iree_uk_int16_t* src_i16 = (const iree_uk_int16_t*)src;
   result = _mm256_insert_epi16(result,
                                *(const iree_uk_int16_t*)(src + 0 * stride), 0);
   result = _mm256_insert_epi16(result,
