@@ -56,9 +56,25 @@ CUDA or ROCm environment. It can be verified by the following steps:
     [Python Bindings](../../reference/bindings/python.md) page for more details.
     The core `iree-compiler` package includes the CUDA compiler:
 
-    ``` shell
-    python -m pip install iree-compiler
-    ```
+    === "Stable releases"
+
+        Stable release packages are
+        [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
+
+        ``` shell
+        python -m pip install iree-compiler
+        ```
+
+    === ":material-alert: Nightly releases"
+
+        Nightly releases are published on
+        [GitHub releases](https://github.com/openxla/iree/releases).
+
+        ``` shell
+        python -m pip install \
+          --find-links https://openxla.github.io/iree/pip-release-links.html \
+          --upgrade iree-compiler
+        ```
 
     !!! tip
         `iree-compile` is installed to your python module installation path. If you

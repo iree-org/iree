@@ -38,25 +38,46 @@ graph LR
   C --> D
 ```
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
-Install TensorFlow by following the
-[official documentation](https://www.tensorflow.org/install):
+1. Install TensorFlow by following the
+    [official documentation](https://www.tensorflow.org/install):
 
-```shell
-python -m pip install tf-nightly
-```
+    ```shell
+    python -m pip install tf-nightly
+    ```
 
-Install TensorFlow-Lite specific dependencies using pip:
+2. Install IREE packages, either by
+    [building from source](../../building-from-source/getting-started.md#python-bindings)
+    or from pip:
 
-```shell
-python -m pip install \
-  iree-compiler \
-  iree-runtime \
-  iree-tools-tflite
-```
+    === "Stable releases"
 
-## Importing and Compiling
+        Stable release packages are
+        [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
+
+        ``` shell
+        python -m pip install \
+          iree-compiler \
+          iree-runtime \
+          iree-tools-tflite
+        ```
+
+    === ":material-alert: Nightly releases"
+
+        Nightly releases are published on
+        [GitHub releases](https://github.com/openxla/iree/releases).
+
+        ``` shell
+        python -m pip install \
+          --find-links https://openxla.github.io/iree/pip-release-links.html \
+          --upgrade \
+          iree-compiler \
+          iree-runtime \
+          iree-tools-tflite
+        ```
+
+## :octicons-package-dependents-16: Importing and Compiling
 
 IREE's tooling is divided into two components: import and compilation.
 
@@ -173,15 +194,7 @@ iree_results = invoke(*args)
 print(iree_results)
 ```
 
-## Troubleshooting
-
-Failures during the import step usually indicate a failure to lower from
-TensorFlow Lite's operations to TOSA, the intermediate representation used by
-IREE. Many TensorFlow Lite operations are not fully supported, particularly
-those than use dynamic shapes. File an issue to IREE's TFLite model support
-[project](https://github.com/openxla/iree/projects/42).
-
-## Additional Samples
+## :octicons-code-16: Samples
 
 * The
 [tflitehub folder](https://github.com/iree-org/iree-samples/tree/main/tflitehub)
@@ -198,10 +211,11 @@ is available
 | -- | -- |
 Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
 
-!!! todo
+## :octicons-question-16: Troubleshooting
 
-    [Issue#3954](https://github.com/openxla/iree/issues/3954): Add documentation
-    for an Android demo using the
-    [Java TFLite bindings](https://github.com/openxla/iree/tree/main/runtime/bindings/tflite/java),
-    once it is complete at
-    [not-jenni/iree-android-tflite-demo](https://github.com/not-jenni/iree-android-tflite-demo).
+Failures during the import step usually indicate a failure to lower from
+TensorFlow Lite's operations to TOSA, the intermediate representation used by
+IREE. Many TensorFlow Lite operations are not fully supported, particularly
+those than use dynamic shapes. Please reach out on one of IREE's
+[communication channels](../../index.md#communication-channels) if you notice
+something missing.
