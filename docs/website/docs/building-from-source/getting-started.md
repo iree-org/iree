@@ -1,3 +1,7 @@
+---
+icon: octicons/bookmark-16
+---
+
 # Getting started
 
 ## :octicons-download-16: Prerequisites

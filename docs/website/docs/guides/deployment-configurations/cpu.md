@@ -3,6 +3,7 @@ hide:
   - tags
 tags:
   - CPU
+icon: octicons/cpu-16
 ---
 
 # CPU Deployment

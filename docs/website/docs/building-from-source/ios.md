@@ -3,6 +3,7 @@ hide:
   - tags
 tags:
   - iOS
+icon: simple/apple
 ---
 
 # iOS cross-compilation

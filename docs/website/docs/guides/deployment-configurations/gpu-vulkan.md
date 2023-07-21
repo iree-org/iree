@@ -4,6 +4,7 @@ hide:
 tags:
   - GPU
   - Vulkan
+icon: octicons/server-16
 ---
 
 # GPU Deployment using Vulkan

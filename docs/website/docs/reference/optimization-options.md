@@ -1,3 +1,7 @@
+---
+icon: octicons/rocket-16
+---
+
 # Optimization options
 
 This page documents various supported flags for optimizing IREE programs. Each

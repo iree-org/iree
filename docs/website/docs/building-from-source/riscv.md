@@ -3,6 +3,7 @@ hide:
   - tags
 tags:
   - CPU
+icon: octicons/cpu-16
 ---
 
 # RISC-V cross-compilation

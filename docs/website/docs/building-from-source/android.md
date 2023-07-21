@@ -3,6 +3,7 @@ hide:
   - tags
 tags:
   - Android
+icon: simple/android
 ---
 
 # Android cross-compilation

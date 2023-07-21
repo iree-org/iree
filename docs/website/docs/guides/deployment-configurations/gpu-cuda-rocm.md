@@ -4,6 +4,7 @@ hide:
 tags:
   - GPU
   - CUDA
+icon: octicons/server-16
 ---
 
 # GPU Deployment using CUDA and ROCm
