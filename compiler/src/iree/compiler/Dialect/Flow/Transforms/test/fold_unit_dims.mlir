@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-fold-unit-extent-dims %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-fold-unit-extent-dims))" %s | FileCheck %s
 
 func.func @no_fold_unit_dims_in_dispatches(%arg0 : tensor<1x1x10xf32>) -> tensor<1x1x10xf32> {
   %0 = tensor.empty() : tensor<1x1x10xf32>
