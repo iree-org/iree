@@ -48,28 +48,47 @@ graph LR
   C --> D
 ```
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
-Install IREE pip packages, either from pip or by
-[building from source](../../building-from-source/getting-started.md#python-bindings):
+1. Install IREE packages, either by
+    [building from source](../../building-from-source/getting-started.md#python-bindings)
+    or from pip:
 
-```shell
-pip install \
-  iree-compiler \
-  iree-runtime
-```
+    === "Stable releases"
 
-Install [`torch-mlir`](https://github.com/llvm/torch-mlir), necessary for
-compiling PyTorch models to a format IREE is able to execute:
+        Stable release packages are
+        [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
 
-```shell
-pip install --pre torch-mlir \
-  -f https://llvm.github.io/torch-mlir/package-index/
-  --extra-index-url https://download.pytorch.org/whl/nightly/cpu
-```
+        ``` shell
+        python -m pip install \
+          iree-compiler \
+          iree-runtime
+        ```
 
-The command will also install the right version of `torch` that has been tested
-with the version of `torch-mlir` being installed.
+    === ":material-alert: Nightly releases"
+
+        Nightly releases are published on
+        [GitHub releases](https://github.com/openxla/iree/releases).
+
+        ``` shell
+        python -m pip install \
+          --find-links https://openxla.github.io/iree/pip-release-links.html \
+          --upgrade \
+          iree-compiler \
+          iree-runtime
+        ```
+
+2. Install [`torch-mlir`](https://github.com/llvm/torch-mlir), necessary for
+    compiling PyTorch models to a format IREE is able to execute:
+
+    ```shell
+    pip install --pre torch-mlir \
+      -f https://llvm.github.io/torch-mlir/package-index/
+      --extra-index-url https://download.pytorch.org/whl/nightly/cpu
+    ```
+
+    The command will also install the right version of `torch` that has been tested
+    with the version of `torch-mlir` being installed.
 
 ## Running a model
 
@@ -171,7 +190,7 @@ resource-constrained environments. An example illustrating this can be found in
 [this example](https://github.com/iree-org/iree-torch/tree/main/examples/native_training).
 This binary runs a model without a Python interpreter.
 
-## Samples
+## :octicons-code-16: Samples
 
 | Colab notebooks |  |
 | -- | -- |
