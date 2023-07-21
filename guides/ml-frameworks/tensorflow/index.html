@@ -732,14 +732,14 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#importing-models" class="md-nav__link">
-    Importing models
+     Importing models
   </a>
   
     <nav class="md-nav" aria-label="Importing models">
@@ -772,14 +772,14 @@
       
         <li class="md-nav__item">
   <a href="#samples" class="md-nav__link">
-    Samples
+     Samples
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
-    Troubleshooting
+     Troubleshooting
   </a>
   
     <nav class="md-nav" aria-label="Troubleshooting">
@@ -1753,14 +1753,14 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#importing-models" class="md-nav__link">
-    Importing models
+     Importing models
   </a>
   
     <nav class="md-nav" aria-label="Importing models">
@@ -1793,14 +1793,14 @@
       
         <li class="md-nav__item">
   <a href="#samples" class="md-nav__link">
-    Samples
+     Samples
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
-    Troubleshooting
+     Troubleshooting
   </a>
   
     <nav class="md-nav" aria-label="Troubleshooting">
@@ -1887,25 +1887,45 @@ or stored in the <code>SavedModel</code>
   A -- iree-import-tf --&gt; B
   B --&gt; C
   C --&gt; D</code></pre>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
+<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
+<ol>
+<li>
 <p>Install TensorFlow by following the
-<a href="https://www.tensorflow.org/install">official documentation</a>:</p>
+    <a href="https://www.tensorflow.org/install">official documentation</a>:</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>tf-nightly
 </code></pre></div>
-<p>Install IREE pip packages, either from pip or by
-<a href="../../../building-from-source/getting-started/#python-bindings">building from source</a>:</p>
+</li>
+<li>
+<p>Install IREE packages, either by
+    <a href="../../../building-from-source/getting-started/#python-bindings">building from source</a>
+    or from pip:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Stable releases</label><label for="__tabbed_1_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Stable release packages are
+<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-runtime<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-tools-tf
 </code></pre></div>
-<div class="admonition caution">
-<p class="admonition-title">Caution</p>
-<p>The TensorFlow package is currently only available on Linux and macOS. It
-is not available on Windows yet (see
-<a href="https://github.com/openxla/iree/issues/6417">this issue</a>).</p>
 </div>
-<h2 id="importing-models">Importing models<a class="headerlink" href="#importing-models" title="Permanent link">link</a></h2>
+<div class="tabbed-block">
+<p>Nightly releases are published on
+<a href="https://github.com/openxla/iree/releases">GitHub releases</a>.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>https://openxla.github.io/iree/pip-release-links.html<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--upgrade<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-runtime<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-tools-tf
+</code></pre></div>
+</div>
+</div>
+</div>
+</li>
+</ol>
+<h2 id="importing-models"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.122.392a1.75 1.75 0 0 1 1.756 0l5.25 3.045c.54.313.872.89.872 1.514V7.25a.75.75 0 0 1-1.5 0V5.677L7.75 8.432v6.384a1 1 0 0 1-1.502.865L.872 12.563A1.75 1.75 0 0 1 0 11.049V4.951c0-.624.332-1.2.872-1.514ZM7.125 1.69a.248.248 0 0 0-.25 0l-4.63 2.685L7 7.133l4.755-2.758ZM1.5 11.049a.25.25 0 0 0 .125.216l4.625 2.683V8.432L1.5 5.677Zm10.828 3.684 1.173-1.233H10.25a.75.75 0 0 1 0-1.5h3.251l-1.173-1.233a.75.75 0 1 1 1.087-1.034l2.378 2.5a.75.75 0 0 1 0 1.034l-2.378 2.5a.75.75 0 0 1-1.087-1.034Z"/></svg></span> Importing models<a class="headerlink" href="#importing-models" title="Permanent link">link</a></h2>
 <p>IREE compilers transform a model into its final deployable format in several
 sequential steps. The first step for a TensorFlow model is to use either the
 <code>iree-import-tf</code> command-line tool or IREE's Python APIs to import the model
@@ -1953,7 +1973,7 @@ supported targets by following one of the
 <a href="../../deployment-configurations/">deployment configuration guides</a>.</p>
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
 
-<h2 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h2>
+<h2 id="samples"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h2>
 <table>
 <thead>
 <tr>
@@ -1983,7 +2003,7 @@ supported targets by following one of the
 <p>End-to-end execution tests can be found in IREE's
 <a href="https://github.com/openxla/iree/tree/main/integrations/tensorflow/e2e">integrations/tensorflow/e2e/</a>
 directory.</p>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">link</a></h2>
+<h2 id="troubleshooting"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.195l-.006.004a6.24 6.24 0 0 0-.26.16.952.952 0 0 0-.276.245.75.75 0 0 1-1.248-.832c.184-.264.42-.489.692-.661.103-.067.207-.132.313-.195l.007-.004c.1-.061.182-.11.258-.161a.969.969 0 0 0 .277-.245C8.96 6.514 9 6.427 9 6.25a.612.612 0 0 0-.262-.525A1.27 1.27 0 0 0 8 5.5c-.369 0-.595.09-.74.187a1.01 1.01 0 0 0-.34.398ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg></span> Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">link</a></h2>
 <h3 id="missing-serving-signature-in-savedmodel">Missing serving signature in SavedModel<a class="headerlink" href="#missing-serving-signature-in-savedmodel" title="Permanent link">link</a></h3>
 <p>Sometimes SavedModels are exported without explicit
 <a href="https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export">serving signatures</a>.

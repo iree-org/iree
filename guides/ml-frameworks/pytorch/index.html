@@ -774,7 +774,7 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
@@ -836,7 +836,7 @@
       
         <li class="md-nav__item">
   <a href="#samples" class="md-nav__link">
-    Samples
+     Samples
   </a>
   
 </li>
@@ -1755,7 +1755,7 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
 </li>
@@ -1817,7 +1817,7 @@
       
         <li class="md-nav__item">
   <a href="#samples" class="md-nav__link">
-    Samples
+     Samples
   </a>
   
 </li>
@@ -1896,21 +1896,46 @@ as well as models defined using <a href="https://pytorch.org/functorch/"><code>f
   A -- torch_mlir --&gt; B
   B --&gt; C
   C --&gt; D</code></pre>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>Install IREE pip packages, either from pip or by
-<a href="../../../building-from-source/getting-started/#python-bindings">building from source</a>:</p>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
+<ol>
+<li>
+<p>Install IREE packages, either by
+    <a href="../../../building-from-source/getting-started/#python-bindings">building from source</a>
+    or from pip:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Stable releases</label><label for="__tabbed_1_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Stable release packages are
+<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree-runtime
 </code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Nightly releases are published on
+<a href="https://github.com/openxla/iree/releases">GitHub releases</a>.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>https://openxla.github.io/iree/pip-release-links.html<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--upgrade<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-compiler<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>iree-runtime
+</code></pre></div>
+</div>
+</div>
+</div>
+</li>
+<li>
 <p>Install <a href="https://github.com/llvm/torch-mlir"><code>torch-mlir</code></a>, necessary for
-compiling PyTorch models to a format IREE is able to execute:</p>
+    compiling PyTorch models to a format IREE is able to execute:</p>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>torch-mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-f<span class="w"> </span>https://llvm.github.io/torch-mlir/package-index/
 <span class="w">  </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cpu
 </code></pre></div>
 <p>The command will also install the right version of <code>torch</code> that has been tested
 with the version of <code>torch-mlir</code> being installed.</p>
+</li>
+</ol>
 <h2 id="running-a-model">Running a model<a class="headerlink" href="#running-a-model" title="Permanent link">link</a></h2>
 <p>Going from a loaded PyTorch model to one that's executing on IREE happens in
 four steps:</p>
@@ -1989,7 +2014,7 @@ training with it, and running inference on it
 resource-constrained environments. An example illustrating this can be found in
 <a href="https://github.com/iree-org/iree-torch/tree/main/examples/native_training">this example</a>.
 This binary runs a model without a Python interpreter.</p>
-<h2 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h2>
+<h2 id="samples"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h2>
 <table>
 <thead>
 <tr>

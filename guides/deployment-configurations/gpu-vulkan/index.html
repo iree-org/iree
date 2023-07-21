@@ -1997,8 +1997,24 @@ the model must be compiled into.</p>
 <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the
 <a href="../../../reference/bindings/python/">Python Bindings</a> page for more details.
 The core <code>iree-compiler</code> package includes the SPIR-V compiler:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Stable releases</label><label for="__tabbed_2_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 14h-2V9h2m0 9h-2v-2h2M1 21h22L12 2 1 21Z"/></svg></span> Nightly releases</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Stable release packages are
+<a href="https://pypi.org/user/google-iree-pypi-deploy/">published to PyPI</a>.</p>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-compiler
 </code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Nightly releases are published on
+<a href="https://github.com/openxla/iree/releases">GitHub releases</a>.</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>https://openxla.github.io/iree/pip-release-links.html<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--upgrade<span class="w"> </span>iree-compiler
+</code></pre></div>
+</div>
+</div>
+</div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
 <p><code>iree-compile</code> is installed to your python module installation path. If you
