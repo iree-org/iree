@@ -49,6 +49,7 @@ iree_cc_library(
     "FormDispatchWorkgroups.cpp"
     "FormScalarDispatches.cpp"
     "FusionOfTensorOps.cpp"
+    "GeneralizeLinalgNamedOps.cpp"
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
