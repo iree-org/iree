@@ -42,7 +42,6 @@ iree_lit_test_suite(
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"
     "reductions.mlir"
-    "rematerialize_parallel_ops.mlir"
     "remove_dead_allocs.mlir"
     "remove_trivial_loops.mlir"
     "repeated_matcher_use.mlir"

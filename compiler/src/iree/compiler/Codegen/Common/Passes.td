@@ -318,12 +318,6 @@ def PolynomialApproximationPass :
       "mlir::iree_compiler::createPolynomialApproximationPass()";
 }
 
-def RematerializeParallelOps :
-    Pass<"iree-codegen-rematerialize-parallel-ops", "func::FuncOp"> {
-  let summary = "Pass to rematerialize and merge parallel ops to avoid creating temporary allocs.";
-  let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
-}
-
 def RemoveSingleIterationLoop :
     Pass<"iree-codegen-remove-single-iteration-loop", "func::FuncOp"> {
   let summary = "Remove distributed loop with single iteration.";

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
@@ -214,33 +214,9 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
-      %3 = tensor.empty() : tensor<12x128xf32>
-      %4 = tensor.empty() : tensor<12x128x40960xf32>
-      %5 = linalg.fill ins(%cst : f32) outs(%3 : tensor<12x128xf32>) -> tensor<12x128xf32>
-      %6 = linalg.fill ins(%cst_0 : f32) outs(%3 : tensor<12x128xf32>) -> tensor<12x128xf32>
-      %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<12x128x40960xf32>) outs(%5 : tensor<12x128xf32>) {
-      ^bb0(%in: f32, %out: f32):
-        %11 = arith.maxf %in, %out : f32
-        linalg.yield %11 : f32
-      } -> tensor<12x128xf32>
-      %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%2, %7 : tensor<12x128x40960xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x40960xf32>) {
-      ^bb0(%in: f32, %in_2: f32, %out: f32):
-        %11 = arith.subf %in, %in_2 : f32
-        %12 = math.exp %11 : f32
-        linalg.yield %12 : f32
-      } -> tensor<12x128x40960xf32>
-      %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%8 : tensor<12x128x40960xf32>) outs(%6 : tensor<12x128xf32>) {
-      ^bb0(%in: f32, %out: f32):
-        %11 = arith.addf %in, %out : f32
-        linalg.yield %11 : f32
-      } -> tensor<12x128xf32>
-      %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%8, %9 : tensor<12x128x40960xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x40960xf32>) {
-      ^bb0(%in: f32, %in_2: f32, %out: f32):
-        %11 = arith.divf %cst_1, %in_2 : f32
-        %12 = arith.mulf %in, %11 : f32
-        linalg.yield %12 : f32
-      } -> tensor<12x128x40960xf32>
-      flow.dispatch.tensor.store %10, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+      %3 = tensor.empty() : tensor<12x128x40960xf32>
+      %4 = iree_linalg_ext.softmax dimension(2) ins(%2 : tensor<12x128x40960xf32>) outs(%3 : tensor<12x128x40960xf32>) -> tensor<12x128x40960xf32>
+      flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       return
     }
   }
@@ -317,12 +293,11 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
 //         CHECK:    arith.addf
 //         CHECK:    vector.splat
 //         CHECK:    vector.splat
-//         CHECK:    arith.divf
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
 //         CHECK:      math.exp
-//         CHECK:      arith.mulf
+//         CHECK:      arith.divf
 //         CHECK:      vector.transfer_write
 //         CHECK:    }
 //         CHECK:    return
