@@ -102,22 +102,19 @@ def git_checkout(ref, *, repo_dir=None):
 
 
 def git_check_if_branch_exists(branch_name, remote=None):
-    args=["branch", "--all", "-l"]
-    full_name=branch_name
+    args = ["branch", "--all", "-l"]
+    full_name = branch_name
     if remote is not None:
         args.append("--remote")
-        full_name=f"{remote}/{full_name}"
+        full_name = f"{remote}/{full_name}"
     args.append(full_name)
     output = git_exec(args, capture_output=True, quiet=True).strip()
     if output:
-        raise SystemExit(
-            f"ERROR: {full_name} already exists.\n"
-        )
+	raise SystemExit( f"ERROR: {full_name} already exists.\n")
 
 
 def git_create_branch(
-    branch_name, *, checkout=True, ref=None, force=False, repo_dir=None,
-    remote=None
+    branch_name, *, checkout=True, ref=None, force=False, repo_dir=None, remote=None
 ):
     git_check_if_branch_exists(branch_name)
     git_check_if_branch_exists(branch_name, remote=remote)
