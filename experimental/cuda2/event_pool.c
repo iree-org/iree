@@ -191,6 +191,7 @@ iree_status_t iree_hal_cuda2_event_pool_acquire(
   IREE_ASSERT_ARGUMENT(event_pool);
   if (!event_count) return iree_ok_status();
   IREE_ASSERT_ARGUMENT(out_events);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // We'll try to get what we can from the pool and fall back to initializing
   // new iree_hal_cuda2_event_t objects.
@@ -212,7 +213,7 @@ iree_status_t iree_hal_cuda2_event_pool_acquire(
 
   // Allocate the rest of the events.
   if (remaining_count > 0) {
-    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "event-pool-unpooled-acquire");
     iree_status_t status = iree_ok_status();
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
       status = iree_hal_cuda2_event_create(event_pool->symbols, event_pool,
@@ -222,13 +223,15 @@ iree_status_t iree_hal_cuda2_event_pool_acquire(
         // Must release all events we've acquired so far.
         iree_hal_cuda2_event_pool_release(event_pool, from_pool_count + i,
                                           out_events);
+        IREE_TRACE_ZONE_END(z1);
         IREE_TRACE_ZONE_END(z0);
         return status;
       }
     }
-    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_ZONE_END(z1);
   }
 
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -238,6 +241,7 @@ static void iree_hal_cuda2_event_pool_release(
   IREE_ASSERT_ARGUMENT(event_pool);
   if (!event_count) return;
   IREE_ASSERT_ARGUMENT(events);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // We'll try to release all we can back to the pool and then deinitialize
   // the ones that won't fit.
@@ -264,10 +268,11 @@ static void iree_hal_cuda2_event_pool_release(
   // Deallocate the rest of the events. We don't bother resetting them as we are
   // getting rid of them.
   if (remaining_count > 0) {
-    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "event-pool-unpooled-release");
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
       iree_hal_cuda2_event_destroy(events[to_pool_count + i]);
     }
-    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_ZONE_END(z1);
   }
+  IREE_TRACE_ZONE_END(z0);
 }

@@ -168,6 +168,7 @@ static iree_status_t iree_hal_cuda2_timepoint_pool_acquire_internal(
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   if (!timepoint_count) return iree_ok_status();
   IREE_ASSERT_ARGUMENT(out_timepoints);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // We'll try to get what we can from the pool and fall back to initializing
   // new iree_hal_cuda2_timepoint_t objects.
@@ -189,7 +190,7 @@ static iree_status_t iree_hal_cuda2_timepoint_pool_acquire_internal(
 
   // Allocate the rest of the timepoints.
   if (remaining_count > 0) {
-    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "timepoint-pool-unpooled-acquire");
     iree_status_t status = iree_ok_status();
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
       status = iree_hal_cuda2_timepoint_create(
@@ -199,13 +200,15 @@ static iree_status_t iree_hal_cuda2_timepoint_pool_acquire_internal(
         // Must release all timepoints we've acquired so far.
         iree_hal_cuda2_timepoint_pool_release(
             timepoint_pool, from_pool_count + i, out_timepoints);
+        IREE_TRACE_ZONE_END(z1);
         IREE_TRACE_ZONE_END(z0);
         return status;
       }
     }
-    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_ZONE_END(z1);
   }
 
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -293,6 +296,7 @@ void iree_hal_cuda2_timepoint_pool_release(
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   if (!timepoint_count) return;
   IREE_ASSERT_ARGUMENT(timepoints);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Release the wrapped host/device events. This should happen before acquiring
   // the timepoint pool's lock given that the host/device event pool its
@@ -339,11 +343,12 @@ void iree_hal_cuda2_timepoint_pool_release(
   // Deallocate the rest of the timepoints. We don't bother resetting them as we
   // are getting rid of them.
   if (remaining_count > 0) {
-    IREE_TRACE_ZONE_BEGIN(z0);
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "timepoint-pool-unpooled-release");
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
       iree_hal_cuda2_timepoint_clear(timepoints[to_pool_count + i]);
       iree_hal_cuda2_timepoint_destroy(timepoints[to_pool_count + i]);
     }
-    IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_ZONE_END(z1);
   }
+  IREE_TRACE_ZONE_END(z0);
 }
