@@ -346,8 +346,7 @@ void iree_compiler::gpu::buildConvolutionImplicitGemmStrategy(
   // TODO: assumes a single func::FuncOp to transform, needs hardening.
   // TODO: extract info from strategy.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads,
-                                    strategy.numWarps);
+  funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads);
   funcH = b.create<EliminateGpuBarriersOp>(funcH);
 
   // Step 9. Convert to tensor core ops.

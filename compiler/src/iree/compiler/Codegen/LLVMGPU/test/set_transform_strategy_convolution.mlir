@@ -49,8 +49,8 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: %[[LHS:.+]] = get_producer_of_operand %{{.*}}[0]
 // CHECK: %[[RHS:.+]] = get_producer_of_operand %{{.*}}[1]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[LHS]]
-// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [32, 4] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
-// CHECK: transform.structured.tile_to_forall_op %[[RHS]]   num_threads [1, 4, 32] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
+// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_to_forall_op %[[RHS]]   num_threads [1, 4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
@@ -61,7 +61,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.iree.bufferize {target_gpu}
 // CHECK: transform.iree.apply_buffer_optimizations
 // CHECK: transform.iree.forall_to_workgroup
-// CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
+// CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1]
 // CHECK: transform.iree.hoist_static_alloc %{{.*}}
 // CHECK: transform.apply_patterns.memref.fold_memref_alias_ops
 // CHECK: transform.apply_patterns.memref.extract_address_computations
@@ -108,11 +108,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: %[[LHS:.+]] = get_producer_of_operand %{{.*}}[0]
 // CHECK: %[[RHS:.+]] = get_producer_of_operand %{{.*}}[1]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RHS]]
-// CHECK: transform.structured.tile_to_forall_op %[[LHS]]   num_threads [1, 32, 4] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
-// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.linear<y>, #gpu.linear<x>])
+// CHECK: transform.structured.tile_to_forall_op %[[LHS]]   num_threads [1, 32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
-// CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
+// CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1]
 
 
 // -----

@@ -89,14 +89,12 @@ def MapNestedForallToGpuThreadsOp :
 
   let arguments = (ins TransformHandleTypeInterface:$target,
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims,
-                   DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$warp_dims,
                    OptionalAttr<I64Attr>:$subgroup_size);
   let results = (outs);
 
   let assemblyFormat = [{
     $target
     `workgroup_dims` `=` $workgroup_dims
-    (`warp_dims` `=` $warp_dims^)?
     (`subgroup_size` `=` $subgroup_size^)?
     attr-dict
     `:` functional-type($target, results)
@@ -105,11 +103,9 @@ def MapNestedForallToGpuThreadsOp :
 
   let builders = [
     OpBuilder<(ins "Value":$target,
-                   "ArrayRef<int64_t>":$workgroup_dims,
-                   "ArrayRef<int64_t>":$warp_dims)>,
+                   "ArrayRef<int64_t>":$workgroup_dims)>,
     OpBuilder<(ins "Value":$target,
                    "ArrayRef<int64_t>":$workgroup_dims,
-                   "ArrayRef<int64_t>":$warp_dims,
                    "int64_t":$subgroupSize)>
   ];
   let extraClassDeclaration = [{
