@@ -27,7 +27,7 @@ struct iree_hal_cuda2_event_t {
   // The symbols used to create and destroy CUevent objects.
   const iree_hal_cuda2_dynamic_symbols_t* symbols;
 
-  // The event pool that owns this event.
+  // The event pool that owns this event. This cannot be NULL.
   iree_hal_cuda2_event_pool_t* pool;
   // The underlying CUevent object.
   CUevent cu_event;
