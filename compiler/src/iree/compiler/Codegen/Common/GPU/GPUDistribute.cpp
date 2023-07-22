@@ -36,8 +36,7 @@ struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
     rewriter.setInsertionPointToStart(&funcOp.getBody().front());
     DiagnosedSilenceableFailure result =
         mlir::transform::gpu::mapNestedForallToThreadsImpl(
-            rewriter, std::nullopt, funcOp, workgroupSize, /*warpDims=*/{},
-            false);
+            rewriter, std::nullopt, funcOp, workgroupSize, false);
     if (!result.succeeded())
       return signalPassFailure();
   }

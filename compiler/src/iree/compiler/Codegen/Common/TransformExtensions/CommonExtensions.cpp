@@ -458,9 +458,9 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   MLIRContext *ctx = forallOp->getContext();
   Location loc = forallOp->getLoc();
   // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
-  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimX);
-  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimY);
-  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
+  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimX);
+  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimY);
+  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimZ);
   if (forallOp.getNumResults() > 0)
     return forallOp->emitError(
         "only bufferized scf.forall lowers to workgroup");

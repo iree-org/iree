@@ -114,8 +114,8 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   %[[RHS_DPS:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS]]
 
 // CHECK:   transform.structured.tile_to_forall_op %[[LHS]] 
-// DEFAULT:  num_threads [1, 32, 4] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
-// OPTIONS:  num_threads [1, 64, 2] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
+// DEFAULT:  num_threads [1, 32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// OPTIONS:  num_threads [1, 64, 2] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
@@ -123,15 +123,15 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.scf.take_assumed_branch %{{.*}} take_else_branch
 
 // CHECK:   transform.structured.tile_to_forall_op %[[RHS_DPS]]  
-// DEFAULT:  num_threads [8, 16, 1] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
-// OPTIONS:  num_threads [2, 8, 8] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
+// DEFAULT:  num_threads [8, 16, 1] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// OPTIONS:  num_threads [2, 8, 8] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns 
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
 // CHECK:   transform.structured.tile_to_forall_op
-// DEFAULT:  num_threads [2, 64, 1] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
-// OPTIONS:  num_threads [1, 16, 8] tile_sizes [](mapping = [#gpu.linear<z>, #gpu.linear<y>, #gpu.linear<x>])
+// DEFAULT:  num_threads [2, 64, 1] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// OPTIONS:  num_threads [1, 16, 8] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
@@ -175,8 +175,8 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.apply_buffer_optimizations
 // CHECK:   transform.iree.forall_to_workgroup
 // CHECK:   transform.iree.map_nested_forall_to_gpu_threads
-// DEFAULT:  workgroup_dims = [64, 2, 1] warp_dims = [2, 2, 1]
-// OPTIONS:  workgroup_dims = [32, 4, 1] warp_dims = [1, 4, 1]
+// DEFAULT:  workgroup_dims = [64, 2, 1]
+// OPTIONS:  workgroup_dims = [32, 4, 1]
 // CHECK:   transform.iree.eliminate_gpu_barriers
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm

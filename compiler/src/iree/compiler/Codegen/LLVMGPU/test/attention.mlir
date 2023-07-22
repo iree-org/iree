@@ -76,7 +76,7 @@ transform.sequence failures(propagate) {
 
   // Tile and fuse attention ops
   // ==========================================
-  %forall, %tiled_matmul = transform.structured.tile_to_forall_op %promoted_second_matmul tile_sizes [32] (mapping = [#gpu.warp<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %forall, %tiled_matmul = transform.structured.tile_to_forall_op %promoted_second_matmul tile_sizes [32, 64, 128] (mapping = [#gpu.warp<linear_dim_0>, #gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_2>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   %f0, %loop0 = transform.structured.fuse_into_containing_op %scale_acc into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
   %f1, %loop1 = transform.structured.fuse_into_containing_op %truncate into %loop0 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -101,7 +101,7 @@ transform.sequence failures(propagate) {
   // Distribute fills and last truncate
   // ==========================================
   %fills = transform.merge_handles %acc_fill, %max_fill, %sum_fill, %last_truncate : !transform.any_op
-  %fill_grid, %tiled_fill = transform.structured.tile_to_forall_op %fills tile_sizes[32] (mapping = [#gpu.warp<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %fill_grid, %tiled_fill = transform.structured.tile_to_forall_op %fills tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Vectorize function
   // ==========================================
@@ -137,7 +137,7 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
   transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
-  transform.iree.map_nested_forall_to_gpu_threads %func_7 workgroup_dims = [4, 8, 4] warp_dims = [4, 1, 1] : (!transform.any_op) -> ()
+  transform.iree.map_nested_forall_to_gpu_threads %func_7 workgroup_dims = [4, 8, 4] : (!transform.any_op) -> ()
 
   transform.apply_patterns to %func_7 {
      transform.apply_patterns.memref.fold_memref_alias_ops

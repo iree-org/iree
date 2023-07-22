@@ -238,8 +238,7 @@ buildCommonMatmulLikeThreadSchedule(ImplicitLocOpBuilder &b, Value variantH,
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, needs hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads,
-                                    strategy.numWarps);
+  funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads);
   funcH = b.create<EliminateGpuBarriersOp>(funcH);
 
   // Step 9. Convert to tensor core ops.

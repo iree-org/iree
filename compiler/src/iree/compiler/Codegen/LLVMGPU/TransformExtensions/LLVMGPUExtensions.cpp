@@ -102,8 +102,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
-          rewriter, transformOp, target, getWorkgroupDims(), getWarpDims(),
-          true);
+          rewriter, transformOp, target, getWorkgroupDims(), true);
   if (!diag.succeeded())
     return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
@@ -119,15 +118,14 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
 void transform_dialect::MapNestedForallToGpuThreadsOp::build(
     OpBuilder &builder, OperationState &state, Value target,
-    ArrayRef<int64_t> workgroupDims, ArrayRef<int64_t> warpDims) {
-  build(builder, state, {}, target, workgroupDims, warpDims, IntegerAttr());
+    ArrayRef<int64_t> workgroupDims) {
+  build(builder, state, {}, target, workgroupDims, IntegerAttr());
 }
 
 void transform_dialect::MapNestedForallToGpuThreadsOp::build(
     OpBuilder &builder, OperationState &state, Value target,
-    ArrayRef<int64_t> workgroupDims, ArrayRef<int64_t> warpDims,
-    int64_t subgroupSize) {
-  build(builder, state, {}, target, workgroupDims, warpDims,
+    ArrayRef<int64_t> workgroupDims, int64_t subgroupSize) {
+  build(builder, state, {}, target, workgroupDims,
         builder.getI64IntegerAttr(subgroupSize));
 }
 
