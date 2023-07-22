@@ -209,8 +209,11 @@ static iree_status_t iree_hal_cuda2_semaphore_timepoint_host_wait_callback(
 static iree_status_t iree_hal_cuda2_semaphore_acquire_timepoint_host_wait(
     iree_hal_cuda2_semaphore_t* semaphore, uint64_t min_value,
     iree_timeout_t timeout, iree_hal_cuda2_timepoint_t** out_timepoint) {
-  IREE_RETURN_IF_ERROR(iree_hal_cuda2_timepoint_pool_acquire_host_wait(
-      semaphore->timepoint_pool, 1, out_timepoint));
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_cuda2_timepoint_pool_acquire_host_wait(
+              semaphore->timepoint_pool, 1, out_timepoint));
   // Initialize the timepoint with the value and callback, and connect it to
   // this semaphore.
   iree_hal_semaphore_acquire_timepoint(
@@ -220,6 +223,8 @@ static iree_status_t iree_hal_cuda2_semaphore_acquire_timepoint_host_wait(
           .user_data = *out_timepoint,
       },
       &(*out_timepoint)->base);
+
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -228,21 +233,25 @@ static iree_status_t iree_hal_cuda2_semaphore_wait(
     iree_timeout_t timeout) {
   iree_hal_cuda2_semaphore_t* semaphore =
       iree_hal_cuda2_semaphore_cast(base_semaphore);
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_slim_mutex_lock(&semaphore->mutex);
   if (!iree_status_is_ok(semaphore->failure_status)) {
     // Fastest path: failed; return an error to tell callers to query for it.
     iree_slim_mutex_unlock(&semaphore->mutex);
+    IREE_TRACE_ZONE_END(z0);
     return iree_status_from_code(IREE_STATUS_ABORTED);
   }
   if (semaphore->current_value >= value) {
     // Fast path: already satisfied.
     iree_slim_mutex_unlock(&semaphore->mutex);
+    IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
   if (iree_timeout_is_immediate(timeout)) {
     // Not satisfied but a poll, so can avoid the expensive wait handle work.
     iree_slim_mutex_unlock(&semaphore->mutex);
+    IREE_TRACE_ZONE_END(z0);
     return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   }
   iree_slim_mutex_unlock(&semaphore->mutex);
@@ -254,7 +263,10 @@ static iree_status_t iree_hal_cuda2_semaphore_wait(
   iree_hal_cuda2_timepoint_t* timepoint = NULL;
   iree_status_t status = iree_hal_cuda2_semaphore_acquire_timepoint_host_wait(
       semaphore, value, timeout, &timepoint);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) return status;
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
 
   // Wait until the timepoint resolves.
   // If satisfied the timepoint is automatically cleaned up and we are done. If
@@ -265,6 +277,7 @@ static iree_status_t iree_hal_cuda2_semaphore_wait(
   }
   iree_hal_cuda2_timepoint_pool_release(semaphore->timepoint_pool, 1,
                                         &timepoint);
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -292,9 +305,11 @@ iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_signal(
   iree_hal_cuda2_semaphore_t* semaphore =
       iree_hal_cuda2_semaphore_cast(base_semaphore);
   iree_hal_cuda2_timepoint_t* signal_timepoint = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_RETURN_IF_ERROR(iree_hal_cuda2_timepoint_pool_acquire_device_signal(
-      semaphore->timepoint_pool, 1, &signal_timepoint));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_cuda2_timepoint_pool_acquire_device_signal(
+              semaphore->timepoint_pool, 1, &signal_timepoint));
 
   // Initialize the timepoint with the value and callback, and connect it to
   // this semaphore.
@@ -325,6 +340,7 @@ iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_signal(
   iree_slim_mutex_unlock(&semaphore->base.timepoint_mutex);
 
   *out_event = iree_hal_cuda2_event_handle(event);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -351,9 +367,11 @@ iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
   iree_hal_cuda2_semaphore_t* semaphore =
       iree_hal_cuda2_semaphore_cast(base_semaphore);
   iree_hal_cuda2_timepoint_t* wait_timepoint = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_RETURN_IF_ERROR(iree_hal_cuda2_timepoint_pool_acquire_device_wait(
-      semaphore->timepoint_pool, 1, &wait_timepoint));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_cuda2_timepoint_pool_acquire_device_wait(
+              semaphore->timepoint_pool, 1, &wait_timepoint));
 
   // Initialize the timepoint with the value and callback, and connect it to
   // this semaphore.
@@ -383,6 +401,7 @@ iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
 
   *out_event =
       iree_hal_cuda2_event_handle(wait_timepoint->timepoint.device_wait);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
