@@ -23,6 +23,8 @@ from ._binding import (
     HalDevice,
     HalDriver,
     HalElementType,
+    HalFence,
+    HalSemaphore,
     MemoryAccess,
     MemoryType,
     PyModuleInterface,

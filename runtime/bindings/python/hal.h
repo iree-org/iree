@@ -76,9 +76,30 @@ struct ApiPtrAdapter<iree_hal_buffer_view_t> {
   }
 };
 
+template <>
+struct ApiPtrAdapter<iree_hal_semaphore_t> {
+  static void Retain(iree_hal_semaphore_t* sem) {
+    iree_hal_semaphore_retain(sem);
+  }
+  static void Release(iree_hal_semaphore_t* sem) {
+    iree_hal_semaphore_release(sem);
+  }
+};
+
+template <>
+struct ApiPtrAdapter<iree_hal_fence_t> {
+  static void Retain(iree_hal_fence_t* fence) { iree_hal_fence_retain(fence); }
+  static void Release(iree_hal_fence_t* fence) {
+    iree_hal_fence_release(fence);
+  }
+};
+
 //------------------------------------------------------------------------------
 // ApiRefCounted types
 //------------------------------------------------------------------------------
+
+class HalBuffer;
+class HalSemaphore;
 
 class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
  public:
@@ -89,6 +110,11 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
   void BeginProfiling(std::optional<std::string> mode,
                       std::optional<std::string> file_path);
   void EndProfiling();
+  HalSemaphore CreateSemaphore(uint64_t initial_value);
+  HalBuffer QueueAlloca(uint64_t allocation_size, py::handle wait_semaphores,
+                        py::handle signal_semaphores);
+  void QueueDealloca(HalBuffer& buffer, py::handle wait_semaphores,
+                     py::handle signal_semaphores);
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
@@ -160,28 +186,35 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
   py::str Repr();
 };
 
-// Wrapper around an iree_hal_buffer_mapping_t and iree_hal_buffer_view_t
+class HalSemaphore : public ApiRefCounted<HalSemaphore, iree_hal_semaphore_t> {
+ public:
+};
+
+class HalFence : public ApiRefCounted<HalFence, iree_hal_fence_t> {
+ public:
+};
+
+// Wrapper around an iree_hal_buffer_mapping_t and iree_hal_buffer_t
 // which retains the latter and unmaps/releases on deallocation.
 class HalMappedMemory {
  public:
   HalMappedMemory(iree_hal_buffer_mapping_t mapped_memory,
-                  iree_hal_buffer_view_t* bv)
-      : mapped_memory_(mapped_memory), bv_(bv) {
-    iree_hal_buffer_view_retain(bv_);
+                  iree_hal_buffer_t* buffer)
+      : mapped_memory_(mapped_memory), buffer_(buffer) {
+    iree_hal_buffer_retain(buffer_);
   }
   ~HalMappedMemory() {
-    if (bv_) {
+    if (buffer_) {
       iree_hal_buffer_unmap_range(&mapped_memory_);
-      iree_hal_buffer_view_release(bv_);
+      iree_hal_buffer_release(buffer_);
     }
   }
   HalMappedMemory(HalMappedMemory&& other)
-      : mapped_memory_(other.mapped_memory_), bv_(other.bv_) {
-    other.bv_ = nullptr;
+      : mapped_memory_(other.mapped_memory_), buffer_(other.buffer_) {
+    other.buffer_ = nullptr;
   }
 
-  static HalMappedMemory Create(HalBufferView& bv) {
-    iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bv.raw_ptr());
+  static HalMappedMemory Create(iree_hal_buffer_t* buffer) {
     iree_device_size_t byte_length = iree_hal_buffer_byte_length(buffer);
     iree_hal_buffer_mapping_t mapped_memory = {{0}};
     CheckApiStatus(
@@ -189,14 +222,20 @@ class HalMappedMemory {
                                   IREE_HAL_MEMORY_ACCESS_READ, 0, byte_length,
                                   &mapped_memory),
         "Could not map memory");
-    return HalMappedMemory(mapped_memory, bv.raw_ptr());
+    return HalMappedMemory(mapped_memory, buffer);
+  }
+  static HalMappedMemory CreateFromBuffer(HalBuffer& b) {
+    return Create(b.raw_ptr());
+  }
+  static HalMappedMemory CreateFromBufferView(HalBufferView& bv) {
+    return Create(iree_hal_buffer_view_buffer(bv.raw_ptr()));
   }
 
   iree_hal_buffer_mapping_t& mapped_memory() { return mapped_memory_; }
 
  private:
   iree_hal_buffer_mapping_t mapped_memory_ = {{0}};
-  iree_hal_buffer_view_t* bv_ = nullptr;
+  iree_hal_buffer_t* buffer_ = nullptr;
 };
 
 void SetupHalBindings(nanobind::module_ m);
