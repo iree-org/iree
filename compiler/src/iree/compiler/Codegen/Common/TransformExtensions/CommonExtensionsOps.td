@@ -519,4 +519,38 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
   }];
 }
 
+def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Swizzle workgroup ids";
+  let description = [{
+    Swizzle workgroup ids for better cache reuse.
+
+    #### Return modes
+    This transform replaces the old workgroup ids inside the given operation's
+    region with siwzzled workgroup ids.
+
+    It does not consume the target handle and always return success.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          I64Attr:$log_tile
+  );
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::func::FuncOp funcOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS
