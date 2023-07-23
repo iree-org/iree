@@ -20,6 +20,7 @@ from ._binding import (
     HalAllocator,
     HalBuffer,
     HalBufferView,
+    HalCommandBuffer,
     HalDevice,
     HalDriver,
     HalElementType,

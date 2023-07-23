@@ -45,6 +45,17 @@ Returns:
   HalBuffer.
 )";
 
+static const char kHalDeviceQueueExecute[] =
+    R"(Executes a sequence of command buffers.
+
+Args:
+  command_buffers: Sequence of command buffers to enqueue.
+  wait_semaphores: `List[Tuple[HalSemaphore, int]]` of semaphore values or
+    a HalFence. The allocation will be made once these semaphores are
+    satisfied.
+  signal_semaphores: Semaphores/Fence to signal.
+)";
+
 static const char kHalFenceWait[] =
     R"(Waits until the fence is signalled or errored.
 
@@ -399,6 +410,69 @@ void HalDevice::QueueDealloca(HalBuffer& buffer, py::handle wait_semaphores,
       "deallocating memory on queue");
 }
 
+void HalDevice::QueueExecute(py::handle command_buffers,
+                             py::handle wait_semaphores,
+                             py::handle signal_semaphores) {
+  iree_hal_semaphore_list_t wait_list;
+  iree_hal_semaphore_list_t signal_list;
+
+  // Wait list.
+  if (py::isinstance<HalFence>(wait_semaphores)) {
+    wait_list = iree_hal_fence_semaphore_list(
+        py::cast<HalFence*>(wait_semaphores)->raw_ptr());
+  } else {
+    size_t wait_count = py::len(wait_semaphores);
+    wait_list = {
+        wait_count,
+        /*semaphores=*/
+        static_cast<iree_hal_semaphore_t**>(
+            alloca(sizeof(iree_hal_semaphore_t*) * wait_count)),
+        /*payload_values=*/
+        static_cast<uint64_t*>(alloca(sizeof(uint64_t) * wait_count)),
+    };
+    for (size_t i = 0; i < wait_count; ++i) {
+      py::tuple pair = wait_semaphores[i];
+      wait_list.semaphores[i] = py::cast<HalSemaphore*>(pair[0])->raw_ptr();
+      wait_list.payload_values[i] = py::cast<uint64_t>(pair[1]);
+    }
+  }
+
+  // Signal list.
+  if (py::isinstance<HalFence>(signal_semaphores)) {
+    signal_list = iree_hal_fence_semaphore_list(
+        py::cast<HalFence*>(signal_semaphores)->raw_ptr());
+  } else {
+    size_t signal_count = py::len(signal_semaphores);
+    signal_list = {
+        signal_count,
+        /*semaphores=*/
+        static_cast<iree_hal_semaphore_t**>(
+            alloca(sizeof(iree_hal_semaphore_t*) * signal_count)),
+        /*payload_values=*/
+        static_cast<uint64_t*>(alloca(sizeof(uint64_t) * signal_count)),
+    };
+    for (size_t i = 0; i < signal_count; ++i) {
+      py::tuple pair = signal_semaphores[i];
+      signal_list.semaphores[i] = py::cast<HalSemaphore*>(pair[0])->raw_ptr();
+      signal_list.payload_values[i] = py::cast<uint64_t>(pair[1]);
+    }
+  }
+
+  // Unpack command buffers.
+  size_t cb_count = py::len(command_buffers);
+  iree_hal_command_buffer_t** cb_list =
+      static_cast<iree_hal_command_buffer_t**>(
+          alloca(sizeof(iree_hal_command_buffer_t*) * cb_count));
+  for (size_t i = 0; i < cb_count; ++i) {
+    cb_list[i] = py::cast<HalCommandBuffer*>(command_buffers[i])->raw_ptr();
+  }
+
+  CheckApiStatus(
+      iree_hal_device_queue_execute(raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY,
+                                    wait_list, signal_list, cb_count, cb_list),
+      "executing command buffers");
+}
+
 //------------------------------------------------------------------------------
 // HalDriver
 //------------------------------------------------------------------------------
@@ -729,6 +803,9 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("queue_dealloca", &HalDevice::QueueDealloca, py::arg("buffer"),
            py::arg("wait_semaphores"), py::arg("signal_semaphores"),
            kHalDeviceQueueDealloca)
+      .def("queue_execute", &HalDevice::QueueExecute,
+           py::arg("command_buffers"), py::arg("wait_semaphores"),
+           py::arg("signal_semaphores"), kHalDeviceQueueExecute)
       .def("__repr__", [](HalDevice& self) {
         auto id_sv = iree_hal_device_id(self.raw_ptr());
         return std::string(id_sv.data, id_sv.size);
@@ -984,6 +1061,73 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__init__", [](HalShape* self, std::vector<iree_hal_dim_t> indices) {
         new (self) HalShape(indices);
       });
+
+  py::class_<HalCommandBuffer>(m, "HalCommandBuffer")
+      .def(
+          "__init__",
+          [](HalCommandBuffer* new_self, HalDevice& device,
+             iree_host_size_t binding_capacity, bool begin) {
+            iree_hal_command_buffer_t* out_cb;
+            CheckApiStatus(iree_hal_command_buffer_create(
+                               device.raw_ptr(),
+                               /*mode=*/IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                               /*categories=*/IREE_HAL_COMMAND_CATEGORY_ANY,
+                               /*queue_affinity=*/IREE_HAL_QUEUE_AFFINITY_ANY,
+                               binding_capacity, &out_cb),
+                           "creating command buffer");
+            HalCommandBuffer cb = HalCommandBuffer::StealFromRawPtr(out_cb);
+            if (begin) {
+              CheckApiStatus(iree_hal_command_buffer_begin(cb.raw_ptr()),
+                             "command buffer begin");
+            }
+            new (new_self) HalCommandBuffer();
+            *new_self = std::move(cb);
+          },
+          py::arg("device"), py::arg("binding_capacity") = 0,
+          py::arg("begin") = true)
+      .def("begin",
+           [](HalCommandBuffer& self) {
+             CheckApiStatus(iree_hal_command_buffer_begin(self.raw_ptr()),
+                            "command buffer begin");
+           })
+      .def("end",
+           [](HalCommandBuffer& self) {
+             CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
+                            "command buffer end");
+           })
+      .def(
+          "fill",
+          [](HalCommandBuffer& self, HalBuffer& target_buffer,
+             py::handle pattern, iree_device_size_t target_offset,
+             std::optional<iree_device_size_t> length, bool end) {
+            Py_buffer pattern_view;
+            int flags = PyBUF_FORMAT | PyBUF_ND;
+            if (PyObject_GetBuffer(pattern.ptr(), &pattern_view, flags) != 0) {
+              // The GetBuffer call is required to set an appropriate error.
+              throw py::python_error();
+            }
+            PyBufferReleaser py_pattern_releaser(pattern_view);
+
+            iree_device_size_t resolved_length;
+            if (length) {
+              resolved_length = *length;
+            } else {
+              resolved_length =
+                  iree_hal_buffer_byte_length(target_buffer.raw_ptr());
+            }
+            CheckApiStatus(
+                iree_hal_command_buffer_fill_buffer(
+                    self.raw_ptr(), target_buffer.raw_ptr(), target_offset,
+                    resolved_length, pattern_view.buf, pattern_view.len),
+                "command buffer fill");
+            if (end) {
+              CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
+                             "command buffer end");
+            }
+          },
+          py::arg("target_buffer"), py::arg("pattern"),
+          py::arg("target_offset") = 0, py::arg("length") = py::none(),
+          py::arg("end") = false);
 }
 
 }  // namespace python

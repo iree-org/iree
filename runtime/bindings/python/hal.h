@@ -94,6 +94,16 @@ struct ApiPtrAdapter<iree_hal_fence_t> {
   }
 };
 
+template <>
+struct ApiPtrAdapter<iree_hal_command_buffer_t> {
+  static void Retain(iree_hal_command_buffer_t* cb) {
+    iree_hal_command_buffer_retain(cb);
+  }
+  static void Release(iree_hal_command_buffer_t* cb) {
+    iree_hal_command_buffer_release(cb);
+  }
+};
+
 //------------------------------------------------------------------------------
 // ApiRefCounted types
 //------------------------------------------------------------------------------
@@ -115,6 +125,8 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
                         py::handle signal_semaphores);
   void QueueDealloca(HalBuffer& buffer, py::handle wait_semaphores,
                      py::handle signal_semaphores);
+  void QueueExecute(py::handle command_buffers, py::handle wait_semaphores,
+                    py::handle signal_semaphores);
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
@@ -237,6 +249,9 @@ class HalMappedMemory {
   iree_hal_buffer_mapping_t mapped_memory_ = {{0}};
   iree_hal_buffer_t* buffer_ = nullptr;
 };
+
+class HalCommandBuffer
+    : public ApiRefCounted<HalCommandBuffer, iree_hal_command_buffer_t> {};
 
 void SetupHalBindings(nanobind::module_ m);
 
