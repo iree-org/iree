@@ -151,6 +151,7 @@ class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
   py::object AllocateBufferCopy(
       int memory_type, int allowed_usage, py::object buffer,
       std::optional<iree_hal_element_types_t> element_type);
+  HalBuffer AllocateHostStagingBufferCopy(py::handle buffer);
 };
 
 struct HalShape {

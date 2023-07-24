@@ -185,6 +185,42 @@ py::object HalAllocator::AllocateBufferCopy(
                   py::rv_policy::move);
 }
 
+HalBuffer HalAllocator::AllocateHostStagingBufferCopy(py::handle buffer) {
+  IREE_TRACE_SCOPE_NAMED("HalAllocator::AllocateHostStagingBufferCopy");
+  // Request a view of the buffer (use the raw python C API to avoid
+  // some allocation and copying at the pybind level).
+  Py_buffer py_view;
+  // Note that only C-Contiguous ND-arrays are presently supported, so
+  // only request that via PyBUF_ND. Long term, we should consult an
+  // "oracle" in the runtime to determine the precise required format
+  // and set flags accordingly (and fallback/copy on failure).
+  int flags = PyBUF_FORMAT | PyBUF_ND;
+
+  // Acquire the backing buffer and setup RAII release.
+  if (PyObject_GetBuffer(buffer.ptr(), &py_view, flags) != 0) {
+    // The GetBuffer call is required to set an appropriate error.
+    throw py::python_error();
+  }
+  PyBufferReleaser py_view_releaser(py_view);
+
+  iree_hal_buffer_params_t params = {0};
+  std::memset(&params, 0, sizeof(params));
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+
+  iree_hal_buffer_t* hal_buffer = nullptr;
+  iree_status_t status = iree_ok_status();
+  {
+    py::gil_scoped_release release;
+    status = iree_hal_allocator_allocate_buffer(
+        raw_ptr(), params, py_view.len,
+        iree_make_const_byte_span(py_view.buf, py_view.len), &hal_buffer);
+  }
+  CheckApiStatus(status, "Failed to allocate device visible buffer");
+
+  return HalBuffer::StealFromRawPtr(hal_buffer);
+}
+
 //------------------------------------------------------------------------------
 // HalBuffer
 //------------------------------------------------------------------------------
@@ -895,7 +931,15 @@ void SetupHalBindings(nanobind::module_ m) {
            "object. If an element type is specified, wraps in a BufferView "
            "matching the characteristics of the Python buffer. The format is "
            "requested as ND/C-Contiguous, which may incur copies if not "
-           "already in that format.");
+           "already in that format.")
+      .def("allocate_host_staging_buffer_copy",
+           &HalAllocator::AllocateHostStagingBufferCopy,
+           py::arg("initial_contents"), py::keep_alive<0, 1>(),
+           "Allocates a new buffer and initializes it from a Python buffer "
+           "object. The buffer is configured as optimal for use on the device "
+           "as a transfer buffer. For buffers of unknown providence, this is a "
+           "last resort method for making them compatible for transfer to "
+           "arbitrary devices.");
 
   py::class_<HalBuffer>(m, "HalBuffer")
       .def("fill_zero", &HalBuffer::FillZero, py::arg("byte_offset"),
@@ -1034,8 +1078,12 @@ void SetupHalBindings(nanobind::module_ m) {
             } else {
               t = iree_timeout_t{IREE_TIMEOUT_ABSOLUTE, *deadline};
             }
-            CheckApiStatus(iree_hal_fence_wait(self.raw_ptr(), t),
-                           "waiting for fence");
+            iree_status_t status;
+            {
+              py::gil_scoped_release release;
+              status = iree_hal_fence_wait(self.raw_ptr(), t);
+            }
+            CheckApiStatus(status, "waiting for fence");
           },
           py::arg("timeout") = py::none(), py::arg("deadline") = py::none(),
           kHalFenceWait);
@@ -1095,6 +1143,41 @@ void SetupHalBindings(nanobind::module_ m) {
              CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
                             "command buffer end");
            })
+      .def(
+          "copy",
+          [](HalCommandBuffer& self, HalBuffer& source_buffer,
+             HalBuffer& target_buffer, iree_device_size_t source_offset,
+             iree_device_size_t target_offset,
+             std::optional<iree_device_size_t> length, bool end) {
+            iree_device_size_t resolved_length;
+            if (length) {
+              resolved_length = *length;
+            } else {
+              resolved_length =
+                  iree_hal_buffer_byte_length(source_buffer.raw_ptr());
+              if (resolved_length !=
+                  iree_hal_buffer_byte_length(target_buffer.raw_ptr())) {
+                throw std::invalid_argument(
+                    "If length is not provided, source and target bufer length "
+                    "must match and it does not. Provide explicit length=");
+              }
+            }
+            CheckApiStatus(
+                iree_hal_command_buffer_copy_buffer(
+                    self.raw_ptr(), source_buffer.raw_ptr(), source_offset,
+                    target_buffer.raw_ptr(), target_offset, resolved_length),
+                "copy command");
+            if (end) {
+              CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
+                             "command buffer end");
+            }
+          },
+          py::arg("source_buffer"), py::arg("target_buffer"),
+          py::arg("source_offset") = 0, py::arg("target_offset") = 0,
+          py::arg("length") = py::none(), py::arg("end") = false,
+          "Copies a range from a source to target buffer. If the length is "
+          "not specified, then it is taken from the source/target buffer, "
+          "which must match.")
       .def(
           "fill",
           [](HalCommandBuffer& self, HalBuffer& target_buffer,
