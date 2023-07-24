@@ -66,6 +66,16 @@ static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     llvm::cl::desc("Enables reassociation for FP reductions"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clSkipIntermediateRoundings(
+    "iree-llvmcpu-skip-intermediate-roundings",
+    llvm::cl::desc(
+        "Allow skipping intermediate roundings. For example, in f16 matmul "
+        "kernels on targets with only f32 arithmetic, we have to perform each "
+        "multiply-accumulate in f32, and if this flag is false, then we have "
+        "to round those f32 accumulators to the nearest f16 every time, which "
+        "is slow."),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
     "iree-llvmcpu-instrument-memory-accesses",
     llvm::cl::desc("Instruments memory accesses in dispatches when dispatch "
@@ -407,7 +417,8 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   if (enableMicrokernels) {
-    passManager.nest<ModuleOp>().addPass(createLLVMCPULowerToUKernelsPass());
+    passManager.nest<ModuleOp>().addPass(
+        createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
 
   // Tensor-level micro-kernel optimizations.
@@ -599,7 +610,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
   if (enableMicrokernels) {
-    nestedModulePM.addPass(createLLVMCPULowerToUKernelsPass());
+    nestedModulePM.addPass(
+        createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   } else {
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
         static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
