@@ -98,7 +98,7 @@ void iree_uk_mmt4d_tile_f32f32f32_8x8x1_arm_64(
 // Shared implementation for f16f16f16 and f16f16f32.
 // In the f16f16f16 case, intermediate roundings are skipped. This function
 // should only be used if IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS is set.
-void iree_uk_mmt4d_tile_f16f16fXX_8x8x1_arm_64(
+static void iree_uk_mmt4d_tile_f16f16fXX_8x8x1_arm_64(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
     iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params,

@@ -43,10 +43,10 @@ public:
     if (failed(Pass::initializeOptions(options))) {
       return failure();
     }
-    // `skipIntermediateRoundings` may have been set to `true` in the
-    // constructor already. The |= is so we preserve that rather than overwrite
-    // it with the default value `false` of `optionSkipIntermediateRoundings`.
-    skipIntermediateRoundings |= optionSkipIntermediateRoundings;
+    // This option defaults to `true` both in Passes.td and in C++ code.
+    // If either side has `false`, that's a non-default choice, so we let that
+    // override a `true` on the other side.
+    skipIntermediateRoundings &= optionSkipIntermediateRoundings;
     return success();
   }
 
