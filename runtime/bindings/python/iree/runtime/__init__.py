@@ -26,6 +26,7 @@ from ._binding import (
     HalElementType,
     HalFence,
     HalSemaphore,
+    MappedMemory,
     MemoryAccess,
     MemoryType,
     PyModuleInterface,

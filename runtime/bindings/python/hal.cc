@@ -1047,6 +1047,11 @@ void SetupHalBindings(nanobind::module_ m) {
             return HalFence::StealFromRawPtr(out_fence);
           },
           py::arg("fences"))
+      .def_prop_ro(
+          "timepoint_count",
+          [](HalFence& self) {
+            return iree_hal_fence_timepoint_count(self.raw_ptr());
+          })
       .def(
           "insert",
           [](HalFence& self, HalSemaphore& sem, uint64_t value) {
