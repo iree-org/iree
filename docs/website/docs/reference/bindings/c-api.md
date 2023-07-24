@@ -143,7 +143,10 @@ options, passes, or pipelines.
 
 ### Usage
 
-!!! info "This snippet shows the general layout of the API. For working examples, see the samples below."
+!!! info ""
+
+    This snippet shows the general layout of the API. For working examples, see
+    the samples below.
 
 ```cmake
 # CMakeLists.txt
@@ -430,7 +433,10 @@ hardware devices like CPUs, GPUs and other accelerators.
 
 ### Usage
 
-!!! info "This snippet shows the general layout of the API. For working examples, see the samples below."
+!!! info ""
+
+    This snippet shows the general layout of the API. For working examples, see
+    the samples below.
 
 ```cmake
 # CMakeLists.txt
