@@ -24,7 +24,7 @@
 // iree_hal_cuda2_timepoint_t
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_cuda2_timepoint_create(
+static iree_status_t iree_hal_cuda2_timepoint_allocate(
     iree_hal_cuda2_timepoint_pool_t* pool, iree_allocator_t host_allocator,
     iree_hal_cuda2_timepoint_t** out_timepoint) {
   IREE_ASSERT_ARGUMENT(pool);
@@ -57,7 +57,7 @@ static void iree_hal_cuda2_timepoint_clear(
   timepoint->pool = pool;
 }
 
-static void iree_hal_cuda2_timepoint_destroy(
+static void iree_hal_cuda2_timepoint_free(
     iree_hal_cuda2_timepoint_t* timepoint) {
   iree_allocator_t host_allocator = timepoint->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -129,7 +129,7 @@ iree_status_t iree_hal_cuda2_timepoint_pool_allocate(
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < available_capacity; ++i) {
-    status = iree_hal_cuda2_timepoint_create(
+    status = iree_hal_cuda2_timepoint_allocate(
         timepoint_pool, host_allocator,
         &timepoint_pool->available_list[timepoint_pool->available_count++]);
     if (!iree_status_is_ok(status)) break;
@@ -150,7 +150,7 @@ void iree_hal_cuda2_timepoint_pool_free(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   for (iree_host_size_t i = 0; i < timepoint_pool->available_count; ++i) {
-    iree_hal_cuda2_timepoint_destroy(timepoint_pool->available_list[i]);
+    iree_hal_cuda2_timepoint_free(timepoint_pool->available_list[i]);
   }
   iree_slim_mutex_deinitialize(&timepoint_pool->timepoint_mutex);
   iree_allocator_free(host_allocator, timepoint_pool);
@@ -193,7 +193,7 @@ static iree_status_t iree_hal_cuda2_timepoint_pool_acquire_internal(
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "timepoint-pool-unpooled-acquire");
     iree_status_t status = iree_ok_status();
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
-      status = iree_hal_cuda2_timepoint_create(
+      status = iree_hal_cuda2_timepoint_allocate(
           timepoint_pool, timepoint_pool->host_allocator,
           &out_timepoints[from_pool_count + i]);
       if (!iree_status_is_ok(status)) {
@@ -346,7 +346,7 @@ void iree_hal_cuda2_timepoint_pool_release(
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "timepoint-pool-unpooled-release");
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
       iree_hal_cuda2_timepoint_clear(timepoints[to_pool_count + i]);
-      iree_hal_cuda2_timepoint_destroy(timepoints[to_pool_count + i]);
+      iree_hal_cuda2_timepoint_free(timepoints[to_pool_count + i]);
     }
     IREE_TRACE_ZONE_END(z1);
   }

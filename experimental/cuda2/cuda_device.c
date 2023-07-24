@@ -105,7 +105,7 @@ IREE_API_EXPORT void iree_hal_cuda2_device_params_initialize(
     iree_hal_cuda2_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
-  out_params->event_pool_capability = 32;
+  out_params->event_pool_capacity = 32;
   out_params->queue_count = 1;
   out_params->stream_tracing = false;
   out_params->async_allocations = true;
@@ -245,21 +245,21 @@ iree_status_t iree_hal_cuda2_device_create(
 
   iree_event_pool_t* host_event_pool = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_event_pool_allocate(params->event_pool_capability,
+    status = iree_event_pool_allocate(params->event_pool_capacity,
                                       host_allocator, &host_event_pool);
   }
 
   iree_hal_cuda2_event_pool_t* device_event_pool = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda2_event_pool_allocate(
-        cuda_symbols, params->event_pool_capability, host_allocator,
+        cuda_symbols, params->event_pool_capacity, host_allocator,
         &device_event_pool);
   }
 
   iree_hal_cuda2_timepoint_pool_t* timepoint_pool = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda2_timepoint_pool_allocate(
-        host_event_pool, device_event_pool, params->event_pool_capability,
+        host_event_pool, device_event_pool, params->event_pool_capacity,
         host_allocator, &timepoint_pool);
   }
 

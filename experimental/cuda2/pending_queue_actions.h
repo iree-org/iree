@@ -42,7 +42,7 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_create(
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_cuda2_pending_queue_actions_t** out_actions);
 
-// Destroys the pending actions queue.
+// Destroys the pending |actions| queue.
 void iree_hal_cuda2_pending_queue_actions_destroy(iree_hal_resource_t* actions);
 
 // Enqueues the given list of |command_buffers| that waits on
