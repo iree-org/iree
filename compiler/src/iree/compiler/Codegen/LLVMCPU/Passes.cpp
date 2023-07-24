@@ -444,9 +444,6 @@ void addMultiTilingExpertPassPipeline(
   // This is a temporary solution for handling aggressive fusion heuristics.
   // This rematerializes parallel ops into the consumers to avoid stack
   // allocation.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRematerializeParallelOpsPass());
-
   SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
   // Apply tile and fuse to all the non-distribution fusable levels. Skip
   // distribution level as that level has been fused already.

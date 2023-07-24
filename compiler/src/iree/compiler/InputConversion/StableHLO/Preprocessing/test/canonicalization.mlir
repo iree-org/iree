@@ -663,3 +663,19 @@ func.func @scatter_zero_ext(%arg0 : tensor<f32>, %arg1 : tensor<1x0xi32>, %arg2 
 // CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x0xi32>
 // CHECK:   %[[SCATTER:.+]] = "stablehlo.scatter"(%arg0, %0, %arg2)
 // CHECK:   return %[[SCATTER]] 
+
+// -----
+
+  func.func public @sort_zero_extent(%arg0: tensor<0xi16> {jax.arg_info = "a", mhlo.sharding = "{replicated}"}) -> (tensor<0xi32> {jax.result_info = ""}) {
+    %0 = stablehlo.iota dim = 0 : tensor<0xi32>
+    %1:2 = "stablehlo.sort"(%arg0, %0) ({
+    ^bb0(%arg1: tensor<i16>, %arg2: tensor<i16>, %arg3: tensor<i32>, %arg4: tensor<i32>):
+      %2 = stablehlo.compare  LT, %arg1, %arg2,  SIGNED : (tensor<i16>, tensor<i16>) -> tensor<i1>
+      stablehlo.return %2 : tensor<i1>
+    }) {dimension = 0 : i64, is_stable = true} : (tensor<0xi16>, tensor<0xi32>) -> (tensor<0xi16>, tensor<0xi32>)
+    return %1#1 : tensor<0xi32>
+  }
+
+// CHECK-LABEL: @sort_zero_extent
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<0xi32>
+// CHECK: return %[[EMPTY]]

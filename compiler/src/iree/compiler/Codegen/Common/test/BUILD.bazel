@@ -45,7 +45,6 @@ iree_lit_test_suite(
             "lower_ukernel_to_calls.mlir",
             "pad_dynamic_alloc.mlir",
             "polynomial_approximation.mlir",
-            "rematerialize_parallel_ops.mlir",
             "reductions.mlir",
             "remove_dead_allocs.mlir",
             "remove_trivial_loops.mlir",

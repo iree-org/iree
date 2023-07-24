@@ -1,4 +1,2 @@
-# TODO(scotttodd): pin versions to control how often we pull in updates?
-
-mkdocs-material
-mkdocs-redirects
+mkdocs-material==9.2.0b1
+mkdocs-redirects==1.2.1

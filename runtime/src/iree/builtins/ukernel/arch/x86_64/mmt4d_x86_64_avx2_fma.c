@@ -57,6 +57,138 @@ void iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma(
   _mm256_storeu_ps(out_ptr + 7 * 8, acc7);
 }
 
+void iree_uk_mmt4d_tile_f16f16f32_8x8x1_x86_64_avx2_fma(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
+    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
+  float* IREE_UK_RESTRICT out_ptr = out_tile;
+  const iree_uk_uint16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
+  const iree_uk_uint16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
+  __m256 acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7;
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    acc0 = _mm256_loadu_ps(out_ptr + 0 * 8);
+    acc1 = _mm256_loadu_ps(out_ptr + 1 * 8);
+    acc2 = _mm256_loadu_ps(out_ptr + 2 * 8);
+    acc3 = _mm256_loadu_ps(out_ptr + 3 * 8);
+    acc4 = _mm256_loadu_ps(out_ptr + 4 * 8);
+    acc5 = _mm256_loadu_ps(out_ptr + 5 * 8);
+    acc6 = _mm256_loadu_ps(out_ptr + 6 * 8);
+    acc7 = _mm256_loadu_ps(out_ptr + 7 * 8);
+  } else {
+    acc0 = _mm256_setzero_ps();
+    acc1 = _mm256_setzero_ps();
+    acc2 = _mm256_setzero_ps();
+    acc3 = _mm256_setzero_ps();
+    acc4 = _mm256_setzero_ps();
+    acc5 = _mm256_setzero_ps();
+    acc6 = _mm256_setzero_ps();
+    acc7 = _mm256_setzero_ps();
+  }
+  for (iree_uk_int32_t k = 0; k < K; ++k) {
+    __m256 rhs = _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)rhs_ptr));
+    rhs_ptr += 8;
+    acc0 =
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[0])), rhs, acc0);
+    acc1 =
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[1])), rhs, acc1);
+    acc2 =
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[2])), rhs, acc2);
+    acc3 =
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[3])), rhs, acc3);
+    acc4 =
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[4])), rhs, acc4);
+    acc5 =
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[5])), rhs, acc5);
+    acc6 =
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[6])), rhs, acc6);
+    acc7 =
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[7])), rhs, acc7);
+    lhs_ptr += 8;
+  }
+  _mm256_storeu_ps(out_ptr + 0 * 8, acc0);
+  _mm256_storeu_ps(out_ptr + 1 * 8, acc1);
+  _mm256_storeu_ps(out_ptr + 2 * 8, acc2);
+  _mm256_storeu_ps(out_ptr + 3 * 8, acc3);
+  _mm256_storeu_ps(out_ptr + 4 * 8, acc4);
+  _mm256_storeu_ps(out_ptr + 5 * 8, acc5);
+  _mm256_storeu_ps(out_ptr + 6 * 8, acc6);
+  _mm256_storeu_ps(out_ptr + 7 * 8, acc7);
+}
+
+void iree_uk_mmt4d_tile_f16f16f16_8x8x1_x86_64_avx2_fma(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
+    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
+  iree_uk_uint16_t* IREE_UK_RESTRICT out_ptr = out_tile;
+  const iree_uk_uint16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
+  const iree_uk_uint16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
+  __m128i acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7;
+  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    acc0 = _mm_loadu_si128((const __m128i*)(out_ptr + 0 * 8));
+    acc1 = _mm_loadu_si128((const __m128i*)(out_ptr + 1 * 8));
+    acc2 = _mm_loadu_si128((const __m128i*)(out_ptr + 2 * 8));
+    acc3 = _mm_loadu_si128((const __m128i*)(out_ptr + 3 * 8));
+    acc4 = _mm_loadu_si128((const __m128i*)(out_ptr + 4 * 8));
+    acc5 = _mm_loadu_si128((const __m128i*)(out_ptr + 5 * 8));
+    acc6 = _mm_loadu_si128((const __m128i*)(out_ptr + 6 * 8));
+    acc7 = _mm_loadu_si128((const __m128i*)(out_ptr + 7 * 8));
+  } else {
+    acc0 = _mm_setzero_si128();
+    acc1 = _mm_setzero_si128();
+    acc2 = _mm_setzero_si128();
+    acc3 = _mm_setzero_si128();
+    acc4 = _mm_setzero_si128();
+    acc5 = _mm_setzero_si128();
+    acc6 = _mm_setzero_si128();
+    acc7 = _mm_setzero_si128();
+  }
+  for (iree_uk_int32_t k = 0; k < K; ++k) {
+    __m256 rhs = _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)rhs_ptr));
+    rhs_ptr += 8;
+    acc0 = _mm256_cvtps_ph(
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[0])), rhs,
+                        _mm256_cvtph_ps(acc0)),
+        _MM_FROUND_TO_NEAREST_INT);
+    acc1 = _mm256_cvtps_ph(
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[1])), rhs,
+                        _mm256_cvtph_ps(acc1)),
+        _MM_FROUND_TO_NEAREST_INT);
+    acc2 = _mm256_cvtps_ph(
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[2])), rhs,
+                        _mm256_cvtph_ps(acc2)),
+        _MM_FROUND_TO_NEAREST_INT);
+    acc3 = _mm256_cvtps_ph(
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[3])), rhs,
+                        _mm256_cvtph_ps(acc3)),
+        _MM_FROUND_TO_NEAREST_INT);
+    acc4 = _mm256_cvtps_ph(
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[4])), rhs,
+                        _mm256_cvtph_ps(acc4)),
+        _MM_FROUND_TO_NEAREST_INT);
+    acc5 = _mm256_cvtps_ph(
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[5])), rhs,
+                        _mm256_cvtph_ps(acc5)),
+        _MM_FROUND_TO_NEAREST_INT);
+    acc6 = _mm256_cvtps_ph(
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[6])), rhs,
+                        _mm256_cvtph_ps(acc6)),
+        _MM_FROUND_TO_NEAREST_INT);
+    acc7 = _mm256_cvtps_ph(
+        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[7])), rhs,
+                        _mm256_cvtph_ps(acc7)),
+        _MM_FROUND_TO_NEAREST_INT);
+    lhs_ptr += 8;
+  }
+  _mm_storeu_si128((__m128i*)(out_ptr + 0 * 8), acc0);
+  _mm_storeu_si128((__m128i*)(out_ptr + 1 * 8), acc1);
+  _mm_storeu_si128((__m128i*)(out_ptr + 2 * 8), acc2);
+  _mm_storeu_si128((__m128i*)(out_ptr + 3 * 8), acc3);
+  _mm_storeu_si128((__m128i*)(out_ptr + 4 * 8), acc4);
+  _mm_storeu_si128((__m128i*)(out_ptr + 5 * 8), acc5);
+  _mm_storeu_si128((__m128i*)(out_ptr + 6 * 8), acc6);
+  _mm_storeu_si128((__m128i*)(out_ptr + 7 * 8), acc7);
+}
+
 void iree_uk_mmt4d_tile_i8i8i32_8x8x2_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,

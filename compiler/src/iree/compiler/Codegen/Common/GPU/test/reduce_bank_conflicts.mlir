@@ -31,3 +31,14 @@ func.func @pad_alloc_negative(%a: memref<1024x1024xf32>, %i: index, %v: vector<4
     vector<4xf32>, memref<?x32x64xf32, #gpu.address_space<workgroup>>
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @pad_alloc_rank_zero
+func.func @pad_alloc_rank_zero() {
+  %cst = arith.constant dense<-3.40282347E+38> : vector<f32>
+// CHECK: memref.alloc() : memref<f32, #gpu.address_space<workgroup>
+  %0 = memref.alloc() : memref<f32, #gpu.address_space<workgroup>>
+  vector.transfer_write %cst, %0[] : vector<f32>, memref<f32, #gpu.address_space<workgroup>>
+  return
+}

@@ -35,7 +35,6 @@ iree_cc_library(
     internal_headers
   HDRS
     "common.h"
-    "elementwise.h"
     "exported_bits.h"
     "mmt4d.h"
     "mmt4d_internal.h"
@@ -58,8 +57,6 @@ iree_cc_library(
     "api.h"
   SRCS
     "common.h"
-    "elementwise.c"
-    "elementwise.h"
     "exported_bits.h"
     "mmt4d.c"
     "mmt4d.h"

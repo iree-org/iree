@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/elementwise.h"
+#include "iree/modules/vmvx/elementwise.h"
 
 // TODO: We should only be including/using this in standalone builds. In others,
 // we have to emulate or use other mechanisms. Since this file only contains

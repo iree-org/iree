@@ -152,7 +152,6 @@ iree_cc_library(
     "PadDynamicAlloc.cpp"
     "Passes.cpp"
     "PolynomialApproximationPass.cpp"
-    "RematerializeParallelOps.cpp"
     "RemoveTrivialLoops.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TestExecutablePreprocessing.cpp"

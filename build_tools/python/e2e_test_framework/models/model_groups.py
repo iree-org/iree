@@ -122,14 +122,16 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, threads=[8]
     ),
-    # Disabled due to https://github.com/openxla/iree/issues/12772.
-    # common_definitions.CpuBenchmarkConfig(model=torch_models.EFFICIENTNET_V2_S_FP32_TORCH, threads=[8]),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.EFFICIENTNET_V2_S_FP32_TORCH, threads=[8]
+    ),
     # Large models.
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[8]
     ),
-    # Disabled due to https://github.com/openxla/iree/issues/12772.
-    # common_definitions.CpuBenchmarkConfig(model=torch_models.EFFICIENTNET_B7_FP32_TORCH, threads=[8]),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.EFFICIENTNET_B7_FP32_TORCH, threads=[8]
+    ),
 ]
 
 X86_64_BENCHMARK_CONFIG_LONG = [

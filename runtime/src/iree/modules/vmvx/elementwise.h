@@ -7,7 +7,7 @@
 #ifndef IREE_BUILTINS_UKERNEL_ELEMENTWISE_H_
 #define IREE_BUILTINS_UKERNEL_ELEMENTWISE_H_
 
-#include "iree/builtins/ukernel/common.h"
+#include "iree/builtins/ukernel/api.h"
 
 #ifdef __cplusplus
 extern "C" {

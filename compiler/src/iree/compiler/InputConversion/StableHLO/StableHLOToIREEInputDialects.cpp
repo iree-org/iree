@@ -336,6 +336,28 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
   }
 };
 
+struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
+  using OpConversionPattern<tensor::EmptyOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tensor::EmptyOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto oldType = cast<ShapedType>(op.getType());
+    auto newType = getTypeConverter()->convertType(oldType);
+    if (newType == oldType)
+      return failure();
+
+    if (!newType)
+      return rewriter.notifyMatchFailure(op, "result type conversion failed");
+
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
+        op, oldType.getShape(),
+        getTypeConverter()->convertType(oldType.getElementType()),
+        op.getDynamicSizes());
+    return success();
+  }
+};
+
 struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
   using OpConversionPattern<ml_program::GlobalOp>::OpConversionPattern;
 
@@ -494,7 +516,7 @@ struct ConvertStableHloToIreeInputDialects final
 
     // Structural patterns (functions, cfg, terminators).
     patterns.add<BuiltinFuncOpPattern>(*typeConverter, context);
-    patterns.add<GlobalOpPattern>(*typeConverter, context);
+    patterns.add<GlobalOpPattern, TensorEmptyPattern>(*typeConverter, context);
 
     for (StringRef opName :
          {func::ReturnOp::getOperationName(), func::CallOp::getOperationName(),
@@ -559,6 +581,10 @@ struct ConvertStableHloToIreeInputDialects final
         [&](ml_program::GlobalOp op) {
           return typeConverter->isLegal(op.getType());
         });
+
+    target.addDynamicallyLegalOp<tensor::EmptyOp>([&](tensor::EmptyOp op) {
+      return typeConverter->isLegal(op.getType());
+    });
 
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();

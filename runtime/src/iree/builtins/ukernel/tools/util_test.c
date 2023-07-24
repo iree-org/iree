@@ -41,7 +41,8 @@ static void iree_uk_test_make_cpu_data_for_features(iree_uk_test_t* test,
   iree_uk_test_make_cpu_data_for_features_case(test, "avx,avx2,fma", expected);
   // Named x86-64 feature sets.
   iree_uk_uint64_t avx2_fma =
-      IREE_CPU_DATA0_X86_64_AVX2 | IREE_CPU_DATA0_X86_64_FMA;
+      IREE_CPU_DATA0_X86_64_AVX | IREE_CPU_DATA0_X86_64_AVX2 |
+      IREE_CPU_DATA0_X86_64_FMA | IREE_CPU_DATA0_X86_64_F16C;
   iree_uk_uint64_t avx512_base =
       avx2_fma | IREE_CPU_DATA0_X86_64_AVX512F |
       IREE_CPU_DATA0_X86_64_AVX512BW | IREE_CPU_DATA0_X86_64_AVX512DQ |

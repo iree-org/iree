@@ -1766,22 +1766,30 @@ module {
 }
 // CHECK-LABEL: func @softmax(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<12x128x128xf32>
-//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
 //  CHECK-SAME:       (%[[ARG0]])
 //  CHECK-NEXT:     %[[ARG1:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>
+//  CHECK-SAME:     %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128xf32>>
 //       CHECK:     %[[LOAD0:.+]] = flow.dispatch.tensor.load %[[ARG1]]
 //       CHECK:     %[[FILL0:.+]] = linalg.fill
-//       CHECK:     %[[FILL1:.+]] = linalg.fill
 //       CHECK:     %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[LOAD0]] : tensor<12x128x128xf32>) outs(%[[FILL0]] : tensor<12x128xf32>)
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC0]], %[[ARG2]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+//  CHECK-NEXT:     %[[ARG3:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>
+//  CHECK-SAME:     %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128xf32>>
+//  CHECK-SAME:     %[[ARG5:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128x128xf32>>
+//   CHECK-DAG:     %[[LOAD1:.+]] = flow.dispatch.tensor.load %[[ARG3]]
+//   CHECK-DAG:     %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG4]]
+//       CHECK:     %[[FILL1:.+]] = linalg.fill
 //       CHECK:     %[[GENERIC1:.+]]:2 = linalg.generic
-//  CHECK-SAME:         ins(%[[LOAD0]], %[[GENERIC0]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
+//  CHECK-SAME:         ins(%[[LOAD1]], %[[LOAD2]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
 //  CHECK-SAME:         outs(%{{.*}}, %[[FILL1]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
 //       CHECK:     %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[GENERIC1]]#0, %[[GENERIC1]]#1 :
 //       CHECK:     flow.dispatch.tensor.store %[[GENERIC2]]
 //       CHECK:     flow.return
-//       CHECK:   return %[[DISPATCH]]
+//       CHECK:   return %[[DISPATCH1]]
 
 // -----
 
@@ -2205,28 +2213,37 @@ func.func @softmax(%source : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
 }
 // CHECK-LABEL: func @softmax(
 //  CHECK-SAME:     %[[INPUT:.+]]: tensor<12x128x128xf32>)
-//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
 //  CHECK-SAME:       (%[[INPUT]])
 //  CHECK-NEXT:     (%[[ARG0:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>,
 //  CHECK-SAME:      %[[ARG1:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128x128xf32>>)
-//   CHECK-DAG:     %[[CST1:.+]] = arith.constant -3.4
-//   CHECK-DAG:     %[[CST2:.+]] = arith.constant 0.0
+//   CHECK-DAG:     %[[CST:.+]] = arith.constant -3.4
 //       CHECK:     %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //   CHECK-DAG:     %[[EMPTY0:.+]] = tensor.empty() : tensor<12x128xf32>
 //   CHECK-DAG:     %[[EMPTY1:.+]] = tensor.empty() : tensor<12x128x128xf32>
-//       CHECK:     %[[FILL0:.+]] = linalg.fill ins(%[[CST1]] : f32) outs(%[[EMPTY0]] :
-//       CHECK:     %[[FILL1:.+]] = linalg.fill ins(%[[CST2]] : f32) outs(%[[EMPTY0]] :
-//       CHECK:     %[[GENERIC1:.+]] = linalg.generic
+//       CHECK:     %[[FILL0:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[EMPTY0]] :
+//       CHECK:     %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[SOURCE]] :
 //  CHECK-SAME:         outs(%[[FILL0]] :
+//       CHECK:     %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[SOURCE]], %[[GENERIC0]] :
+//  CHECK-SAME:         outs(%[[EMPTY1]] :
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC1]], %[[ARG1]]
+//       CHECK:     flow.return
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups(%[[DISPATCH0]])
+//  CHECK-NEXT:     (%[[ARG2:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>,
+//  CHECK-SAME:      %[[ARG3:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128x128xf32>>)
+//   CHECK-DAG:     %[[CST0:.+]] = arith.constant 0.0
+//   CHECK-DAG:     %[[CST1:.+]] = arith.constant 1.0
+//   CHECK-DAG:     %[[INPUT:.+]] = flow.dispatch.tensor.load %[[ARG2]]
+//   CHECK-DAG:     %[[EMPTY2:.+]] = tensor.empty() : tensor<12x128x128xf32>
+//   CHECK-DAG:     %[[EMPTY3:.+]] = tensor.empty() : tensor<12x128xf32>
+//       CHECK:     %[[FILL1:.+]] = linalg.fill ins(%[[CST0]] : f32) outs(%[[EMPTY3]] :
 //       CHECK:     %[[GENERIC2:.+]] = linalg.generic
-//  CHECK-SAME:         ins(%[[SOURCE]], %[[GENERIC1]] :
-//  CHECK-SAME:         outs(%[[EMPTY1]] :
-//       CHECK:     %[[GENERIC3:.+]] = linalg.generic
-//  CHECK-SAME:         ins(%[[GENERIC2]] :
+//  CHECK-SAME:         ins(%[[INPUT]] :
 //  CHECK-SAME:         outs(%[[FILL1]] :
-//       CHECK:     %[[GENERIC4:.+]] = linalg.generic
-//  CHECK-SAME:         ins(%[[GENERIC2]], %[[GENERIC3]] :
-//  CHECK-SAME:         outs(%[[EMPTY1]] :
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC4]], %[[ARG1]]
-//       CHECK:   return %[[RESULT]]
+//       CHECK:     %[[GENERIC3:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[INPUT]], %[[GENERIC2]] :
+//  CHECK-SAME:         outs(%[[EMPTY2]] :
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC3]], %[[ARG3]]
+//       CHECK:   return %[[DISPATCH1]]

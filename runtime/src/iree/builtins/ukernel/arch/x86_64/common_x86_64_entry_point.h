@@ -22,13 +22,15 @@
 
 static inline bool iree_uk_cpu_supports_avx2_fma(
     const iree_uk_uint64_t* cpu_data) {
-  return iree_uk_all_bits_set(
-      cpu_data[0], IREE_CPU_DATA0_X86_64_AVX2 | IREE_CPU_DATA0_X86_64_FMA);
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_X86_64_AVX2 |
+                                               IREE_CPU_DATA0_X86_64_FMA |
+                                               IREE_CPU_DATA0_X86_64_F16C);
 }
 
 static inline bool iree_uk_cpu_supports_avx512_base(
     const iree_uk_uint64_t* cpu_data) {
-  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_X86_64_AVX512F |
+  return iree_uk_cpu_supports_avx2_fma(cpu_data) &&
+         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_X86_64_AVX512F |
                                                IREE_CPU_DATA0_X86_64_AVX512BW |
                                                IREE_CPU_DATA0_X86_64_AVX512DQ |
                                                IREE_CPU_DATA0_X86_64_AVX512VL |

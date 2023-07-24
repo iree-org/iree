@@ -194,12 +194,12 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
   // Named feature sets.
 #if defined(IREE_ARCH_X86_64)
   iree_uk_uint64_t avx2_fma =
-      IREE_CPU_DATA0_X86_64_AVX2 | IREE_CPU_DATA0_X86_64_FMA;
+      IREE_CPU_DATA0_X86_64_AVX | IREE_CPU_DATA0_X86_64_AVX2 |
+      IREE_CPU_DATA0_X86_64_FMA | IREE_CPU_DATA0_X86_64_F16C;
   iree_uk_uint64_t avx512_base =
       avx2_fma | IREE_CPU_DATA0_X86_64_AVX512F |
       IREE_CPU_DATA0_X86_64_AVX512BW | IREE_CPU_DATA0_X86_64_AVX512DQ |
       IREE_CPU_DATA0_X86_64_AVX512VL | IREE_CPU_DATA0_X86_64_AVX512CD;
-  iree_uk_uint64_t avx512_vnni = avx512_base | IREE_CPU_DATA0_X86_64_AVX512VNNI;
   if (!strcmp(cpu_features, "avx2_fma")) {
     out_cpu_data_fields[0] = avx2_fma;
     return;
@@ -209,7 +209,7 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
     return;
   }
   if (!strcmp(cpu_features, "avx512_vnni")) {
-    out_cpu_data_fields[0] = avx512_vnni;
+    out_cpu_data_fields[0] = avx512_base | IREE_CPU_DATA0_X86_64_AVX512VNNI;
     return;
   }
 #endif  // defined(IREE_ARCH_X86_64)

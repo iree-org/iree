@@ -3,6 +3,7 @@ hide:
   - tags
 tags:
   - Python
+icon: simple/python
 ---
 
 # Python bindings

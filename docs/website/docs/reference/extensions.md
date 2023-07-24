@@ -1,3 +1,13 @@
+---
+hide:
+  - tags
+tags:
+  - JAX
+  - PyTorch
+  - TensorFlow
+icon: octicons/gear-16
+---
+
 # Extension mechanisms
 
 !!! Note
