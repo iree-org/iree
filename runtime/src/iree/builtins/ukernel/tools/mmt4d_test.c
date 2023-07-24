@@ -388,8 +388,11 @@ int main(int argc, char** argv) {
   // we use iree_uk_test_mmt4d_default_and_intrinsics to test both.
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
   iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
       IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "");
+  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "fp16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4, "dotprod");
   iree_uk_test_mmt4d_default_and_intrinsics(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8,

@@ -49,6 +49,11 @@ static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_arm_64_f16f16f32(
     const iree_uk_mmt4d_params_t* params) {
   if (params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
+#ifdef IREE_UK_BUILD_ARM_64_FP16FML
+    if (iree_uk_cpu_supports_fp16fml(params->cpu_data)) {
+      return iree_uk_mmt4d_tile_f16f16f32_8x8x1_arm_64_fp16fml;
+    }
+#endif
     return iree_uk_mmt4d_tile_f16f16f32_8x8x1_arm_64;
   }
   return 0;
@@ -57,9 +62,15 @@ iree_uk_mmt4d_select_tile_func_arm_64_f16f16f32(
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_arm_64_f16f16f16(
     const iree_uk_mmt4d_params_t* params) {
-  if ((params->flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) &&
-      params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
-    return iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64;
+  if (params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
+#ifdef IREE_UK_BUILD_ARM_64_FP16
+    if (iree_uk_cpu_supports_fp16(params->cpu_data)) {
+      return iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64_fp16;
+    }
+#endif
+    if (params->flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) {
+      return iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64;
+    }
   }
   return 0;
 }

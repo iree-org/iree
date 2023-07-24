@@ -67,6 +67,22 @@ iree_bitcode_library(
 )
 
 iree_bitcode_library(
+    name = "ukernel_bitcode_arm_64_fp16",
+    srcs = ["mmt4d_arm_64_fp16.c"],
+    arch = "arm_64",
+    copts = ["-march=armv8.2-a+fp16"],
+    internal_hdrs = UKERNEL_ARM_64_INTERNAL_HEADERS,
+)
+
+iree_bitcode_library(
+    name = "ukernel_bitcode_arm_64_fp16fml",
+    srcs = ["mmt4d_arm_64_fp16fml.c"],
+    arch = "arm_64",
+    copts = ["-march=armv8.2-a+fp16fml"],
+    internal_hdrs = UKERNEL_ARM_64_INTERNAL_HEADERS,
+)
+
+iree_bitcode_library(
     name = "ukernel_bitcode_arm_64_dotprod",
     srcs = ["mmt4d_arm_64_dotprod.c"],
     arch = "arm_64",
@@ -86,6 +102,8 @@ iree_link_bitcode(
     name = "ukernel_bitcode_arm_64",
     bitcode_files = [
         "ukernel_bitcode_arm_64_base.bc",
+        "ukernel_bitcode_arm_64_fp16.bc",
+        "ukernel_bitcode_arm_64_fp16fml.bc",
         "ukernel_bitcode_arm_64_dotprod.bc",
         "ukernel_bitcode_arm_64_i8mm.bc",
     ],
