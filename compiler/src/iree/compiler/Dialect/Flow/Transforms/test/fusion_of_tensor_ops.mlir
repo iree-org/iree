@@ -363,3 +363,46 @@ func.func @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<10x20xf3
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   return %[[RETURN]]
+
+// -----
+
+func.func @math_sin() {
+  %cst = arith.constant 2.000000e+00 : f32
+  %cst_0 = arith.constant dense<[0.000000e+00, 6.349640e-01, -6.349640e-01, 6.349640e-01]> : tensor<4xf32>
+  %cst_1 = arith.constant dense<[0.000000e+00, 1.298460e+00, 1.298460e+00, -1.298460e+00]> : tensor<4xf32>
+  %cst_2 = arith.constant dense<[0.000000e+00, 1.000000e+00, -1.000000e+00, 1.000000e+00]> : tensor<4xf32>
+  %cst_3 = arith.constant dense<[0.000000e+00, 1.000000e+00, 1.000000e+00, -1.000000e+00]> : tensor<4xf32>
+  %0 = util.optimization_barrier %cst_3 : tensor<4xf32>
+  %1 = util.optimization_barrier %cst_2 : tensor<4xf32>
+  %2 = tensor.empty() : tensor<4xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%1 : tensor<4xf32>) outs(%2 : tensor<4xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %6 = math.exp %in : f32
+    linalg.yield %6 : f32
+  } -> tensor<4xf32>
+  %4:2 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%0, %3, %1 : tensor<4xf32>, tensor<4xf32>, tensor<4xf32>) outs(%2, %2 : tensor<4xf32>, tensor<4xf32>) {
+  ^bb0(%in: f32, %in_4: f32, %in_5: f32, %out: f32, %out_6: f32):
+    %6 = arith.negf %in_5 : f32
+    %7 = math.exp %6 : f32
+    %8 = arith.addf %in_4, %7 : f32
+    %9 = math.sin %in : f32
+    %10 = arith.mulf %9, %8 : f32
+    %11 = arith.divf %10, %cst : f32
+    linalg.yield %7, %11 : f32, f32
+  } -> (tensor<4xf32>, tensor<4xf32>)
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%0, %3, %4#0 : tensor<4xf32>, tensor<4xf32>, tensor<4xf32>) outs(%2 : tensor<4xf32>) {
+  ^bb0(%in: f32, %in_4: f32, %in_5: f32, %out: f32):
+    %6 = arith.subf %in_4, %in_5 : f32
+    %7 = math.cos %in : f32
+    %8 = arith.mulf %7, %6 : f32
+    %9 = arith.divf %8, %cst : f32
+    linalg.yield %9 : f32
+  } -> tensor<4xf32>
+  check.expect_almost_eq(%4#1, %cst_1) : tensor<4xf32>
+  check.expect_almost_eq(%5, %cst_0) : tensor<4xf32>
+  return
+}
+// CHECK-LABEL: func @math_sin()
+//       CHECK:   %[[GENERIC:.+]]:2 = linalg.generic
+//   CHECK-DAG:   check.expect_almost_eq(%[[GENERIC]]#0,
+//   CHECK-DAG:   check.expect_almost_eq(%[[GENERIC]]#1,
