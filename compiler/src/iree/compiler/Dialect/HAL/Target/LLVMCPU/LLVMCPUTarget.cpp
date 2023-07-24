@@ -432,8 +432,9 @@ public:
     }
 
     // Link our libdevice after all codegen and user objects as they may
-    // reference it. Some of the functions in here are only known used after we
-    // perform LLVM ISel and need to be pulled in whether they are used or not.
+    // reference it. Some of the functions in here are only known used after
+    // we perform LLVM ISel and need to be pulled in whether they are used or
+    // not.
     if (failed(linkBitcodeModule(
             variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
             *targetMachine, "libdevice",
@@ -446,17 +447,19 @@ public:
              << targetTriple.str() << "'";
     }
 
-    // Link musl last and pull in all of it - this is sad but LLVM will take IR
-    // intrinsics and generate calls out to libc during code generation and we
-    // have no control over that - if we don't provide the symbols here then
-    // linking with ld will fail.
-    if (failed(linkBitcodeModule(
-            variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
-            *targetMachine, "libmusl",
-            loadMuslBitcode(targetMachine.get(), context)))) {
-      return mlir::emitError(variantOp.getLoc())
-             << "failed linking in builtin library for target triple '"
-             << targetTriple.str() << "'";
+    if (options_.linkEmbedded) {
+      // Link musl last and pull in all of it - this is sad but LLVM will take
+      // IR intrinsics and generate calls out to libc during code generation and
+      // we have no control over that - if we don't provide the symbols here
+      // then linking with ld will fail.
+      if (failed(linkBitcodeModule(
+              variantOp.getLoc(), moduleLinker, llvm::Linker::OverrideFromSrc,
+              *targetMachine, "libmusl",
+              loadMuslBitcode(targetMachine.get(), context)))) {
+        return mlir::emitError(variantOp.getLoc())
+               << "failed linking in builtin library for target triple '"
+               << targetTriple.str() << "'";
+      }
     }
 
     // Tracks ukernel functions, in order to set their linkage to internal
