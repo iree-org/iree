@@ -20,8 +20,6 @@ iree_hal_cts_test_suite(
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
-    # HAL semaphore is in the process of being implemented.
-    "semaphore"
   LABELS
     driver=cuda2
     requires-gpu-nvidia
