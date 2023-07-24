@@ -95,7 +95,10 @@ static void iree_uk_benchmark_register_mmt4d_impl(
   snprintf(name, sizeof name, "mmt4d_%s_tile_%dx%dx%d%s", type_str, M0, N0, K0,
            code_path_suffix);
   iree_uk_mmt4d_params_t params = {
-      .flags = flags, .M0 = M0, .N0 = N0, .K0 = K0};
+      .flags = flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS,
+      .M0 = M0,
+      .N0 = N0,
+      .K0 = K0};
   iree_uk_benchmark_register(name, iree_uk_benchmark_mmt4d, &params,
                              sizeof params, cpu_features);
 }

@@ -18,6 +18,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -26,12 +27,31 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMCPULowerToUKernelsPass
-    : LLVMCPULowerToUKernelsBase<LLVMCPULowerToUKernelsPass> {
+class LLVMCPULowerToUKernelsPass
+    : public LLVMCPULowerToUKernelsBase<LLVMCPULowerToUKernelsPass> {
+public:
+  LLVMCPULowerToUKernelsPass(bool skipIntermediateRoundings)
+      : skipIntermediateRoundings(skipIntermediateRoundings) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
+
   void runOnOperation() override;
+
+  LogicalResult initializeOptions(StringRef options) override {
+    if (failed(Pass::initializeOptions(options))) {
+      return failure();
+    }
+    // This option defaults to `true` both in Passes.td and in C++ code.
+    // If either side has `false`, that's a non-default choice, so we let that
+    // override a `true` on the other side.
+    skipIntermediateRoundings &= optionSkipIntermediateRoundings;
+    return success();
+  }
+
+private:
+  bool skipIntermediateRoundings;
 };
 } // namespace
 
@@ -86,7 +106,8 @@ getFnNameAndDefAttrs(const char *ukernelName, RewriterBase &rewriter,
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::UKernelOpInterface>
-matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op) {
+matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
+                   bool skipIntermediateRoundings) {
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
   Value out = op.getDpsInitOperand(0)->get();
@@ -131,6 +152,11 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op) {
     // Tell the mmt4d op to read the existing accumulator.
     flags |= IREE_UK_FLAG_MMT4D_ACCUMULATE;
   }
+
+  if (skipIntermediateRoundings) {
+    flags |= IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
+  }
+
   Location loc = op.getLoc();
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 0);
@@ -159,7 +185,8 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op) {
 }
 
 static FailureOr<IREE::Codegen::UKernelOpInterface>
-matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op) {
+matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
+                   bool /*skipIntermediateRoundings*/) {
   Value in = op.getSource();
   Value out = op.getDest();
   auto inType = llvm::cast<ShapedType>(in.getType());
@@ -275,7 +302,8 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op) {
 }
 
 static FailureOr<IREE::Codegen::UKernelOpInterface>
-matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op) {
+matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
+                   bool /*skipIntermediateRoundings*/) {
   Value in = op.getSource();
   Value out = op.getDest();
   auto inType = llvm::cast<ShapedType>(in.getType());
@@ -384,7 +412,8 @@ static uint32_t flagForRole(IREE::LinalgExt::EncodingRole role) {
 }
 
 static FailureOr<IREE::Codegen::UKernelOpInterface>
-matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op) {
+matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
+                   bool /*skipIntermediateRoundings*/) {
   auto tensorType = op.getTensorType().dyn_cast<RankedTensorType>();
   if (!tensorType) {
     return rewriter.notifyMatchFailure(op,
@@ -426,9 +455,10 @@ using TargetPredicate = std::function<bool(IREE::HAL::ExecutableTargetAttr)>;
 
 template <typename OpType>
 struct LowerToUKernelPattern : OpRewritePattern<OpType> {
-  LowerToUKernelPattern(MLIRContext *context,
-                        TargetPredicate targetPredicate = {})
-      : OpRewritePattern<OpType>(context), targetPredicate(targetPredicate) {}
+  LowerToUKernelPattern(MLIRContext *context, TargetPredicate targetPredicate,
+                        bool skipIntermediateRoundings = false)
+      : OpRewritePattern<OpType>(context), targetPredicate(targetPredicate),
+        skipIntermediateRoundings(skipIntermediateRoundings) {}
 
   LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
@@ -437,7 +467,7 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
       return failure();
     }
     FailureOr<IREE::Codegen::UKernelOpInterface> ukernelOp =
-        matchDAGForUKernel(rewriter, op);
+        matchDAGForUKernel(rewriter, op, skipIntermediateRoundings);
     if (failed(ukernelOp)) {
       return rewriter.notifyMatchFailure(
           op, "failed to find microkernel op to replace with");
@@ -447,6 +477,7 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
   }
 
   TargetPredicate targetPredicate;
+  bool skipIntermediateRoundings;
 };
 
 } // namespace
@@ -466,7 +497,9 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
   // that it is difficult for codegen to consistently approach microkernels
   // performance, and that consideration overrides the benefit of fusions for
   // these ops.
-  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>>(context);
+  auto allTargets = [](auto target) { return true; };
+  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>>(
+      context, allTargets, skipIntermediateRoundings);
   // These patterns could in principle be used on LLVMCPU, not just VMVX, but
   // we choose not to, for two reasons:
   // 1. Codegen for these ops is thought to be good enough, that we do not
@@ -488,8 +521,10 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass() {
-  return std::make_unique<LLVMCPULowerToUKernelsPass>();
+std::unique_ptr<OperationPass<>>
+createLLVMCPULowerToUKernelsPass(bool skipIntermediateRoundings) {
+  return std::make_unique<LLVMCPULowerToUKernelsPass>(
+      skipIntermediateRoundings);
 }
 
 } // namespace iree_compiler

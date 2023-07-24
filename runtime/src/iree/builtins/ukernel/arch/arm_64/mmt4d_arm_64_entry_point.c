@@ -57,7 +57,8 @@ iree_uk_mmt4d_select_tile_func_arm_64_f16f16f32(
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_arm_64_f16f16f16(
     const iree_uk_mmt4d_params_t* params) {
-  if (params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
+  if ((params->flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) &&
+      params->M0 == 8 && params->N0 == 8 && params->K0 == 1) {
     return iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64;
   }
   return 0;
