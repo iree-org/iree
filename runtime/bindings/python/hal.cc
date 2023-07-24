@@ -1094,7 +1094,8 @@ void SetupHalBindings(nanobind::module_ m) {
           [](HalMappedMemory* self, py::handle shape, py::object dtype_descr) {
             py::object py_mapped_memory = py::cast(self);
             size_t rank = py::len(shape);
-            intptr_t* dims = static_cast<intptr_t*>(alloca(rank));
+            intptr_t* dims =
+                static_cast<intptr_t*>(alloca(sizeof(intptr_t) * rank));
             for (size_t i = 0; i < rank; ++i) {
               dims[i] = py::cast<intptr_t>(shape[i]);
             }
