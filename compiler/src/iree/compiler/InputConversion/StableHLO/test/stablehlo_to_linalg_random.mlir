@@ -326,6 +326,44 @@ func.func @three_fry_i16(%arg0: tensor<2xi64>) -> (tensor<2xi64>, tensor<8xi16>)
 
 // CHECK: return %[[INSERTED]], %[[COLLAPSE]] : tensor<2xi64>, tensor<8xi16>
 
+// -----
+
+// CHECK-LABEL: func.func @three_fry_i8
+// CHECK-SAME:  %[[ARG0:.*]]: tensor<2xi64>
+func.func @three_fry_i8(%arg0: tensor<2xi64>) -> (tensor<2xi64>, tensor<8xi8>) {
+  %output_state, %output = "stablehlo.rng_bit_generator"(%arg0) {rng_algorithm = #stablehlo<rng_algorithm THREE_FRY>} : (tensor<2xi64>) -> (tensor<2xi64>, tensor<8xi8>)
+  return %output_state, %output : tensor<2xi64>, tensor<8xi8>
+}
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : i64
+
+// Check we update state correctly:
+// CHECK: %[[STATE:.+]] = tensor.extract %[[ARG0]][%[[C1]]] : tensor<2xi64>
+// CHECK: %[[NEWSTATE:.+]] = arith.addi %[[STATE]], %[[C4]] : i64
+
+// CHECK: %[[DEST0:.+]] = tensor.empty() : tensor<4xi8>
+// CHECK: %[[DEST1:.+]] = tensor.empty() : tensor<4xi8>
+// CHECK: %[[GENERIC:.+]]:2 = linalg.generic
+// CHECK-SAME: indexing_maps = [#map, #map]
+// CHECK-SAME: iterator_types = ["parallel"]}
+// CHECK-SAME: outs(%[[DEST0]], %[[DEST1]] : tensor<4xi8>, tensor<4xi8>)
+
+// CHECK: %expanded = tensor.expand_shape %[[GENERIC]]#0
+// CHECK-SAME{literal}: [[0, 1]] : tensor<4xi8> into tensor<4x1xi8>
+
+// CHECK: %expanded_1 = tensor.expand_shape %[[GENERIC]]#1
+// CHECK-SAME{literal}: [[0, 1]] : tensor<4xi8> into tensor<4x1xi8>
+
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<4x2xi8>
+// CHECK: %[[CONCAT:.+]] = linalg.generic
+// CHECK-SAME: outs(%[[EMPTY]] : tensor<4x2xi8>)
+
+// CHECK: %[[COLLAPSE:.+]] = tensor.collapse_shape %[[CONCAT]]
+// CHECK-SAME{literal}: [[0, 1]] : tensor<4x2xi8> into tensor<8xi8>
+// CHECK: %[[INSERTED:.+]] = tensor.insert %[[NEWSTATE]] into %[[ARG0]][%[[C1]]] : tensor<2xi64>
+
+// CHECK: return %[[INSERTED]], %[[COLLAPSE]] : tensor<2xi64>, tensor<8xi8>
 
 // -----
 
@@ -613,3 +651,34 @@ func.func @philox_i16(%arg0: tensor<2xi64>) -> (tensor<2xi64>, tensor<8xi16>) {
 // CHECK: %[[INSERTED:.+]] = tensor.insert %[[NEWSTATE]] into %[[ARG0]][%[[C1]]] : tensor<2xi64>
 
 // CHECK: return %[[INSERTED]], %[[COLLAPSE]]
+
+// -----
+
+func.func @philox_i8(%arg0: tensor<2xi64>) -> (tensor<2xi64>, tensor<8xi8>) {
+  %output_state, %output = "stablehlo.rng_bit_generator"(%arg0) {rng_algorithm = #stablehlo<rng_algorithm PHILOX>} : (tensor<2xi64>) -> (tensor<2xi64>, tensor<8xi8>)
+  return %output_state, %output : tensor<2xi64>, tensor<8xi8>
+}
+
+// CHECK-LABEL: func.func @philox_i8
+// CHECK-SAME:  %[[ARG0:.*]]: tensor<2xi64>
+
+ //CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+ //CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : i64
+
+// Check we update state correctly:
+// CHECK: %[[STATE:.+]] = tensor.extract %[[ARG0]][%[[C1]]] : tensor<2xi64>
+// CHECK: %[[NEWSTATE:.+]] = arith.addi %[[STATE]], %[[C2]] : i64
+
+// CHECK: %[[DEST0:.+]] = tensor.empty() : tensor<2xi8>
+// CHECK: %[[DEST1:.+]] = tensor.empty() : tensor<2xi8>
+// CHECK: %[[DEST2:.+]] = tensor.empty() : tensor<2xi8>
+// CHECK: %[[DEST3:.+]] = tensor.empty() : tensor<2xi8>
+// CHECK: %[[GENERIC:.+]]:4 = linalg.generic
+// CHECK-SAME: indexing_maps = [#map, #map, #map, #map]
+// CHECK-SAME: iterator_types = ["parallel"]}
+// CHECK-SAME: outs(%[[DEST0]], %[[DEST1]], %[[DEST2]], %[[DEST3]] : tensor<2xi8>, tensor<2xi8>, tensor<2xi8>, tensor<2xi8>)
+
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<2x4xi8>
+// CHECK: %[[CONCAT:.+]] = linalg.generic
+// CHECK-SAME: outs(%[[EMPTY]] : tensor<2x4xi8>)
