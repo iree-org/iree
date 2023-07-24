@@ -58,7 +58,6 @@ iree_cc_library(
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
     "Passes.cpp"
-    "Utils.cpp"
     "VectorReductionToGPU.cpp"
     "WorkGroupSwizzle.cpp"
     "WorkgroupSpecializationPass.cpp"
