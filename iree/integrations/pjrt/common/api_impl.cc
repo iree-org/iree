@@ -12,6 +12,11 @@
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/iree_helpers.h"
 #include "iree/integrations/pjrt/common/tensor_utils.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Allocator.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Process.h"
+#include "llvm/Support/StringSaver.h"
 #include "xla/pjrt/transpose.h"
 
 using iree::vm::retain_ref;
@@ -1302,6 +1307,18 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
     }
     if (!SetDefaultCompilerFlags(job.get())) {
       return MakeCompilerError(*job);
+    }
+    // Propagate all options set via environment variable.
+    if (std::optional<std::string> envValue = llvm::sys::Process::GetEnv(
+            llvm::StringRef("IREE_COMPILER_OPTIONS"))) {
+      llvm::SmallVector<const char*, 20> newArgv;
+      llvm::BumpPtrAllocator a;
+      llvm::StringSaver saver(a);
+
+      llvm::cl::TokenizeGNUCommandLine(*envValue, saver, newArgv);
+      // TODO: This could probably be combined into a SetFlags call.
+      for (auto arg : newArgv)
+        if (!job->SetFlag(arg)) return MakeCompilerError(*job);
     }
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
