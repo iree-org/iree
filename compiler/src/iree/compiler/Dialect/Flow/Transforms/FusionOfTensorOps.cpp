@@ -260,7 +260,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
           fusableProducer = producer;
           break;
         }
-        if (!fusableProducer) return;
+        if (!fusableProducer)
+          return;
 
         // If the `genericOp` is already part of a fusion group, just add the
         // the `fusableProducer` to the same group.
@@ -476,7 +477,8 @@ struct FusionOfTensorOpsPass
         funcOp->emitError("failed to fuse multi-use producers");
         return signalPassFailure();
       }
-      if (numOfFusableCandidates.value() == 0) break;
+      if (numOfFusableCandidates.value() == 0)
+        break;
     }
   }
 };
