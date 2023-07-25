@@ -55,7 +55,8 @@ static void makeSwizzledId(Location loc, OpBuilder b, Value workgroupIdX,
                                           unboundedSwizzledIdY);
 }
 
-LogicalResult swizzleWorkgroupsInFunc(func::FuncOp funcOp, unsigned swizzleLogTile) {
+LogicalResult swizzleWorkgroupsInFunc(func::FuncOp funcOp,
+                                      unsigned swizzleLogTile) {
   if (swizzleLogTile == 0)
     return success();
   unsigned swizzleTile = pow(2, swizzleLogTile);
