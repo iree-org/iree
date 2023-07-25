@@ -941,7 +941,7 @@ void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
-// HoistStaticAllocOp
+// WorkgroupSwizzleOp
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
