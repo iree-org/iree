@@ -11,6 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/cuda/cuda_buffer.h"  // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {
