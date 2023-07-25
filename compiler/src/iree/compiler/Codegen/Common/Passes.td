@@ -150,6 +150,12 @@ def EliminateEmptyTensors :
   let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
 }
 
+def EmulateNarrowType :
+    Pass<"iree-codegen-emulate-narrow-type", "ModuleOp"> {
+  let summary = "Emulate narrow integer operations using wide integer operations";
+  let constructor = "mlir::iree_compiler::createEmulateNarrowTypePass()";
+}
+
 def EraseDeadAllocAndStores :
     Pass<"iree-codegen-erase-dead-alloc-and-stores", "func::FuncOp"> {
   let summary = "Erase alloc ops if all the uses are just stores";
