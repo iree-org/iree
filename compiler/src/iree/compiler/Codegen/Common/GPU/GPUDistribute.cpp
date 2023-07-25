@@ -36,7 +36,8 @@ struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
     std::optional<llvm::APInt> maybeSubgroupSize =
         getEntryPoint(funcOp)->getSubgroupSize();
     // TODO: Don't hard code kCudaWarpSize here.
-    int64_t subgroupSize = maybeSubgroupSize ? maybeSubgroupSize->getSExtValue() : 32;
+    int64_t subgroupSize =
+        maybeSubgroupSize ? maybeSubgroupSize->getSExtValue() : 32;
 
     IRRewriter rewriter(funcOp->getContext());
     rewriter.setInsertionPointToStart(&funcOp.getBody().front());
