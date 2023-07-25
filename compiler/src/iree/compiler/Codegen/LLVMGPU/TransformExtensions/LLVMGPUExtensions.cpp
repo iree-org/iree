@@ -102,7 +102,8 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
-          rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(), true);
+          rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
+          true);
   if (!diag.succeeded())
     return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
