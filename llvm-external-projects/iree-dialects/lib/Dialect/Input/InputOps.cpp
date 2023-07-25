@@ -621,6 +621,25 @@ LogicalResult GlobalStoreIndirectOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// !iree_input.byte_vuffer
+//===----------------------------------------------------------------------===//
+
+void ByteBufferConstantOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), getName().value_or("bytes_cst"));
+}
+
+LogicalResult ByteBufferConstantOp::verify() {
+  if (auto minAlignmentAttr = getAlignmentAttr()) {
+    int64_t minAlignment = minAlignmentAttr.getInt();
+    if (minAlignment > 0 && !llvm::isPowerOf2_64(minAlignment)) {
+      return emitOpError("invalid alignment; must be a power of two");
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // iree_input.buffer_view.create
 //===----------------------------------------------------------------------===//
 

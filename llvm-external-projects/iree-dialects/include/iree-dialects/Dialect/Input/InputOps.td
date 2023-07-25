@@ -10,6 +10,7 @@
 include "iree-dialects/Dialect/Input/InputDialect.td"
 include "iree-dialects/Dialect/Input/InputInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -307,6 +308,46 @@ def IREEInput_BufferViewDimOp : IREEInput_PureOp<"buffer_view.dim"> {
 }
 
 } // OpGroupBufferAndBufferViewOps
+
+//===----------------------------------------------------------------------===//
+// Byte buffers
+//===----------------------------------------------------------------------===//
+
+def OpGroupByteBufferOps : OpDocGroup {
+  let summary = "Byte buffer ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupByteBufferOps in {
+
+def IREEInput_ByteBufferConstantOp : IREEInput_PureOp<"byte_buffer.constant", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{constant host-side byte buffer}];
+  let description = [{
+    Defines a compile-time byte buffer based on the given attribute value.
+    The attribute will be serialized into the canonical IREE format for the
+    chosen host target.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$name,
+    StrAttr:$value,
+    OptionalAttr<IndexAttr>:$alignment,
+    OptionalAttr<StrAttr>:$mime_type
+  );
+  let results = (outs
+    IREEInput_ByteBufferType:$result
+  );
+
+  let assemblyFormat = [{
+    ($name^)? attr-dict `:` type($result) `=` $value
+  }];
+
+  let hasVerifier = 1;
+}
+
+} // OpGroupByteBufferOps
 
 //===----------------------------------------------------------------------===//
 // Mutable Lists
