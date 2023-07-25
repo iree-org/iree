@@ -26,7 +26,7 @@ namespace iree_compiler {
 namespace {
 
 unsigned loadStoreEmulateBitwidth = 8;
-unsigned arithComputeBitwidth = 4;
+unsigned arithComputeBitwidth = 8;
 
 //===----------------------------------------------------------------------===//
 // Conversion patterns
