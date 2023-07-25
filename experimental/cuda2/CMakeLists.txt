@@ -36,8 +36,6 @@ iree_cc_library(
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
-    "nop_semaphore.c"
-    "nop_semaphore.h"
     "nccl_channel.c"
     "nccl_channel.h"
     "pending_queue_actions.c"
