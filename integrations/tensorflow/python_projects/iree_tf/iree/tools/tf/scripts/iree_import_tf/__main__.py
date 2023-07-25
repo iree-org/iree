@@ -65,21 +65,21 @@ def import_saved_model(
 ):
     # From here there be dragons.
     from tensorflow.mlir.experimental import (
-        convert_saved_model_to_mlir,
-        convert_saved_model_v1_to_mlir,
+        convert_saved_model,
+        convert_saved_model_v1,
         run_pass_pipeline,
         write_bytecode,
     )
 
     if import_type == "savedmodel_v2":
-        result = convert_saved_model_to_mlir(
+        result = convert_saved_model(
             saved_model_dir, exported_names=exported_names, show_debug_info=False
         )
     elif import_type == "savedmodel_v1":
         # You saw it here, folks: The TF team just adds random positional params
         # without explanation or default. So we detect and default them on our
         # own. Because this is normal and fine.
-        sig = inspect.signature(convert_saved_model_v1_to_mlir)
+        sig = inspect.signature(convert_saved_model_v1)
         dumb_extra_kwargs = {}
         if "include_variables_in_initializers" in sig.parameters:
             dumb_extra_kwargs["include_variables_in_initializers"] = False
@@ -87,7 +87,7 @@ def import_saved_model(
             dumb_extra_kwargs["upgrade_legacy"] = False
         if "lift_variables" in sig.parameters:
             dumb_extra_kwargs["lift_variables"] = True
-        result = convert_saved_model_v1_to_mlir(
+        result = convert_saved_model_v1(
             saved_model_dir,
             exported_names=exported_names,
             tags=tags,
