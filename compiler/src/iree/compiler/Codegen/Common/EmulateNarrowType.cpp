@@ -26,7 +26,7 @@ namespace iree_compiler {
 namespace {
 
 unsigned loadStoreEmulateBitwidth = 8;
-unsigned arithComputeBitwidth = 8;
+unsigned arithComputeBitwidth = 4;
 
 //===----------------------------------------------------------------------===//
 // Conversion patterns
@@ -88,10 +88,8 @@ struct EmulateNarrowTypePass
     // Convert scalar type.
     typeConverter.addConversion([](IntegerType ty) -> std::optional<Type> {
       unsigned width = ty.getWidth();
-      if (width < 2 || !llvm::isPowerOf2_32(width) ||
-          width >= arithComputeBitwidth)
+      if (width >= arithComputeBitwidth || width == 1)
         return ty;
-
       return IntegerType::get(ty.getContext(), arithComputeBitwidth);
     });
 
@@ -102,14 +100,14 @@ struct EmulateNarrowTypePass
         return ty;
 
       unsigned width = intTy.getWidth();
-      if (width < 2 || !llvm::isPowerOf2_32(width) ||
-          width >= arithComputeBitwidth)
+      if (width >= arithComputeBitwidth || width == 1)
         return ty;
-
       return VectorType::get(
           to_vector(ty.getShape()),
           IntegerType::get(ty.getContext(), arithComputeBitwidth));
     });
+
+    memref::populateMemRefNarrowTypeEmulationConversions(typeConverter);
 
     ConversionTarget target(*ctx);
     target.addDynamicallyLegalOp<func::FuncOp>([&typeConverter](Operation *op) {
