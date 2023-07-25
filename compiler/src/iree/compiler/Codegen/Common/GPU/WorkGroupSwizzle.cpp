@@ -54,6 +54,44 @@ static void makeSwizzledId(Location loc, OpBuilder b, Value workgroupIdX,
   SwizzledIdY = b.create<arith::SelectOp>(loc, condition3, workgroupIdY,
                                           unboundedSwizzledIdY);
 }
+
+LogicalResult swizzleWorkgroupsInFunc(func::FuncOp funcOp,
+                                      unsigned swizzleLogTile) {
+  if (swizzleLogTile == 0)
+    return success();
+  unsigned swizzleTile = pow(2, swizzleLogTile);
+  std::array<IREE::HAL::InterfaceWorkgroupIDOp, 2> oldWorkgroupIds;
+  bool xFound = false, yFound = false;
+  funcOp.walk([&](IREE::HAL::InterfaceWorkgroupIDOp idOp) {
+    unsigned index = idOp.getDimension().getZExtValue();
+    if (index == 0) {
+      oldWorkgroupIds[index] = idOp;
+      xFound = true;
+    } else if (index == 1) {
+      oldWorkgroupIds[index] = idOp;
+      yFound = true;
+    }
+  });
+  if (xFound == false || yFound == false)
+    return failure();
+  OpBuilder builder(funcOp);
+  builder.setInsertionPoint(&funcOp.front(), funcOp.front().begin());
+  Value workgroupIdX =
+      builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 0);
+  Value workgroupIdY =
+      builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 1);
+  Value gridSizeX =
+      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(funcOp.getLoc(), 0);
+  Value gridSizeY =
+      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(funcOp.getLoc(), 1);
+  Value SwizzledIdX, SwizzledIdY;
+  makeSwizzledId(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
+                 gridSizeX, gridSizeY, SwizzledIdX, SwizzledIdY, swizzleTile);
+  oldWorkgroupIds[0].replaceAllUsesWith(SwizzledIdX);
+  oldWorkgroupIds[1].replaceAllUsesWith(SwizzledIdY);
+  return success();
+}
+
 namespace {
 struct WorkGroupSwizzlePass
     : public WorkGroupSwizzleBase<WorkGroupSwizzlePass> {
@@ -71,39 +109,8 @@ struct WorkGroupSwizzlePass
     return success();
   }
   void runOnOperation() override {
-    if (swizzleLogTile == 0)
-      return;
-    unsigned swizzleTile = pow(2, swizzleLogTile);
     func::FuncOp funcOp = getOperation();
-    std::array<IREE::HAL::InterfaceWorkgroupIDOp, 2> oldWorkgroupIds;
-    bool xFound = false, yFound = false;
-    funcOp.walk([&](IREE::HAL::InterfaceWorkgroupIDOp idOp) {
-      unsigned index = idOp.getDimension().getZExtValue();
-      if (index == 0) {
-        oldWorkgroupIds[index] = idOp;
-        xFound = true;
-      } else if (index == 1) {
-        oldWorkgroupIds[index] = idOp;
-        yFound = true;
-      }
-    });
-    if (xFound == false || yFound == false)
-      return;
-    OpBuilder builder(funcOp);
-    builder.setInsertionPoint(&funcOp.front(), funcOp.front().begin());
-    Value workgroupIdX =
-        builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 0);
-    Value workgroupIdY =
-        builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 1);
-    Value gridSizeX = builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(
-        funcOp.getLoc(), 0);
-    Value gridSizeY = builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(
-        funcOp.getLoc(), 1);
-    Value SwizzledIdX, SwizzledIdY;
-    makeSwizzledId(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
-                   gridSizeX, gridSizeY, SwizzledIdX, SwizzledIdY, swizzleTile);
-    oldWorkgroupIds[0].replaceAllUsesWith(SwizzledIdX);
-    oldWorkgroupIds[1].replaceAllUsesWith(SwizzledIdY);
+    (void)swizzleWorkgroupsInFunc(funcOp, swizzleLogTile);
   }
 
 private:
