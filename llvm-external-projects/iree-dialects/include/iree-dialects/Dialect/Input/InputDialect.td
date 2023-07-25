@@ -58,8 +58,8 @@ def IREEInput_VariantType : IREEInput_Type<"Variant"> {
   }];
 }
 
-def IREEInput_BytesType : IREEInput_Type<"Bytes"> {
-  let mnemonic = "bytes";
+def IREEInput_ByteBufferType : IREEInput_Type<"ByteBuffer"> {
+  let mnemonic = "byte_buffer";
 
   let summary = [{a reference counted byte buffer}];
   let description = [{

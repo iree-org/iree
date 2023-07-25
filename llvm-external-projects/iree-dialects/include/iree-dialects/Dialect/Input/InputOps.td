@@ -313,14 +313,14 @@ def IREEInput_BufferViewDimOp : IREEInput_PureOp<"buffer_view.dim"> {
 // Byte buffers
 //===----------------------------------------------------------------------===//
 
-def OpGroupBytesOps : OpDocGroup {
-  let summary = "Bytes ops";
+def OpGroupByteBufferOps : OpDocGroup {
+  let summary = "Byte buffer ops";
   let description = "";
 }
 
-let opDocGroup = OpGroupBytesOps in {
+let opDocGroup = OpGroupByteBufferOps in {
 
-def IREEInput_BytesConstantOp : IREEInput_PureOp<"bytes.constant", [
+def IREEInput_ByteBufferConstantOp : IREEInput_PureOp<"byte_buffer.constant", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
   let summary = [{constant host-side byte buffer}];
@@ -337,7 +337,7 @@ def IREEInput_BytesConstantOp : IREEInput_PureOp<"bytes.constant", [
     OptionalAttr<StrAttr>:$mime_type
   );
   let results = (outs
-    IREEInput_BytesType:$result
+    IREEInput_ByteBufferType:$result
   );
 
   let assemblyFormat = [{
@@ -347,7 +347,7 @@ def IREEInput_BytesConstantOp : IREEInput_PureOp<"bytes.constant", [
   let hasVerifier = 1;
 }
 
-} // OpGroupBytesOps
+} // OpGroupByteBufferOps
 
 //===----------------------------------------------------------------------===//
 // Mutable Lists

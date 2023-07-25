@@ -146,12 +146,12 @@ func.func @buffer_view_rank(%arg0 : !iree_input.buffer_view) -> index {
 }
 
 // -----
-// CHECK-LABEL: func.func @bytes_constant
+// CHECK-LABEL: func.func @byte_buffer_constant
 // CHECK: %[[B:.*]] = util.buffer.constant "name" {alignment = 64 : index, mime_type = "text/plain"} : !util.buffer = "foo"
 // CHECK: return %[[B]] : !util.buffer
-func.func @bytes_constant() -> !iree_input.bytes {
-  %0 = iree_input.bytes.constant "name" {alignment = 64 : index, mime_type = "text/plain"} : !iree_input.bytes = "foo"
-  return %0 : !iree_input.bytes
+func.func @byte_buffer_constant() -> !iree_input.byte_buffer {
+  %0 = iree_input.byte_buffer.constant "name" {alignment = 64 : index, mime_type = "text/plain"} : !iree_input.byte_buffer = "foo"
+  return %0 : !iree_input.byte_buffer
 }
 
 // -----
