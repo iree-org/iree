@@ -528,9 +528,18 @@ def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
   let description = [{
     Swizzle workgroup ids for better cache reuse.
 
+    This transform implements the following swizzling logic (x, y here are the
+    workgroup ids and tiledx, tiledy are the swizzled workgroup ids) :
+
+    t_tiledx = (x + (y % tile) * grid_size_x) / tile;
+    t_tiledy = (y / tile) * tile + (x + (y % tile) * grid_size_x) % tile;
+    c = grid_size_y % tile != 0 && ((y / tile) * tile + tile) > grid_size_y;
+    tiledx = c ? x : t_tiledx;
+    tiledy = c ? y : t_tiledy;
+
     #### Return modes
     This transform replaces the old workgroup ids inside the given operation's
-    region with siwzzled workgroup ids.
+    region with swizzled workgroup ids.
 
     It does not consume the target handle and always return success.
   }];
