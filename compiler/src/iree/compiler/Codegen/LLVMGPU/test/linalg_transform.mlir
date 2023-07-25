@@ -34,7 +34,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           // CHECK-NEXT: return
 
           // workgroup_size is explicitly set to [10, 11].
-          // FOREACH-TO-GPU-DAG: hal.executable.export {{.*}}{translation_info = #translation, workgroup_size = [10 : index, 11 : index, 1 : index]}
+          // FOREACH-TO-GPU-DAG: hal.executable.export {{.*}}{subgroup_size = 32 : index, translation_info = #translation, workgroup_size = [10 : index, 11 : index, 1 : index]}
           // FOREACH-TO-GPU-DAG: %[[C0:.*]] = arith.constant 0 : index
           // FOREACH-TO-GPU-DAG: %[[C1:.*]] = arith.constant 1 : index
           // FOREACH-TO-GPU-DAG: %[[C5:.*]] = arith.constant 5 : index
