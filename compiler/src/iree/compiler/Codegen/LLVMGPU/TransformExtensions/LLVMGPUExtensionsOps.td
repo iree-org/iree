@@ -89,7 +89,7 @@ def MapNestedForallToGpuThreadsOp :
 
   let arguments = (ins TransformHandleTypeInterface:$target,
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims,
-                   OptionalAttr<I64Attr>:$subgroup_size);
+                   DefaultValuedOptionalAttr<I64Attr, "32">:$subgroup_size);
   let results = (outs);
 
   let assemblyFormat = [{
@@ -101,13 +101,6 @@ def MapNestedForallToGpuThreadsOp :
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let builders = [
-    OpBuilder<(ins "Value":$target,
-                   "ArrayRef<int64_t>":$workgroup_dims)>,
-    OpBuilder<(ins "Value":$target,
-                   "ArrayRef<int64_t>":$workgroup_dims,
-                   "int64_t":$subgroupSize)>
-  ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
