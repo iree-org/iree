@@ -38,6 +38,28 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
+    ukernel_bitcode_arm_64_fp16
+  ARCH
+    arm_64
+  SRCS
+    "mmt4d_arm_64_fp16.c"
+  COPTS
+    "-march=armv8.2-a+fp16"
+)
+
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_arm_64_fp16fml
+  ARCH
+    arm_64
+  SRCS
+    "mmt4d_arm_64_fp16fml.c"
+  COPTS
+    "-march=armv8.2-a+fp16fml"
+)
+
+iree_bitcode_library(
+  NAME
     ukernel_bitcode_arm_64_dotprod
   ARCH
     arm_64
@@ -64,6 +86,8 @@ iree_link_bitcode(
   SRCS
     "ukernel_bitcode_arm_64_base.bc"
     "ukernel_bitcode_arm_64_dotprod.bc"
+    "ukernel_bitcode_arm_64_fp16.bc"
+    "ukernel_bitcode_arm_64_fp16fml.bc"
     "ukernel_bitcode_arm_64_i8mm.bc"
 
 )
@@ -79,6 +103,16 @@ if (NOT (IREE_ARCH STREQUAL "arm_64"))
   return()
 endif()
 
+iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_FP16
+  CLANG_OR_GCC
+    "-march=armv8.2-a+fp16"
+)
+
+iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_FP16FML
+  CLANG_OR_GCC
+    "-march=armv8.2-a+fp16fml"
+)
+
 iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_DOTPROD
   CLANG_OR_GCC
     "-march=armv8.2-a+dotprod"
@@ -89,6 +123,8 @@ iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_I8MM
     "-march=armv8.2-a+i8mm"
 )
 
+check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_FP16}" IREE_UK_BUILD_ARM_64_FP16)
+check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_FP16FML}" IREE_UK_BUILD_ARM_64_FP16FML)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_DOTPROD}" IREE_UK_BUILD_ARM_64_DOTPROD)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_I8MM}" IREE_UK_BUILD_ARM_64_I8MM)
 configure_file("config_arm_64.h.in" "config_arm_64.h")
@@ -104,6 +140,34 @@ iree_cc_library(
 )
 
 set(IREE_UK_ARM_64_DEPS "")
+
+if(IREE_UK_BUILD_ARM_64_FP16)
+iree_cc_library(
+  NAME
+    arm_64_fp16
+  SRCS
+    "mmt4d_arm_64_fp16.c"
+  COPTS
+    "${IREE_UK_COPTS_ARM_64_FP16}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_ARM_64_DEPS "::arm_64_fp16")
+endif()  # IREE_UK_BUILD_ARM_64_FP16
+
+if(IREE_UK_BUILD_ARM_64_FP16FML)
+iree_cc_library(
+  NAME
+    arm_64_fp16fml
+  SRCS
+    "mmt4d_arm_64_fp16fml.c"
+  COPTS
+    "${IREE_UK_COPTS_ARM_64_FP16FML}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_ARM_64_DEPS "::arm_64_fp16fml")
+endif()  # IREE_UK_BUILD_ARM_64_FP16FML
 
 if(IREE_UK_BUILD_ARM_64_DOTPROD)
 iree_cc_library(
