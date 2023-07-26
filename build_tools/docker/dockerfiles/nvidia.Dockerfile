@@ -59,6 +59,3 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_install
 
 # Adding CUDA binaries to Path
 ENV PATH=${PATH}:/usr/local/cuda/bin/
-
-# Collectives: NCCL+OpenMPL
-RUN sudo apt-get -y install libnccl-dev=2.18.1-1+cuda12.1 libopenmpi-dev
