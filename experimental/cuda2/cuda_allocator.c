@@ -615,8 +615,29 @@ static iree_status_t iree_hal_cuda2_allocator_export_buffer(
     iree_hal_external_buffer_type_t requested_type,
     iree_hal_external_buffer_flags_t requested_flags,
     iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "exporting to external buffers not supported");
+  iree_hal_cuda_buffer_type_t buffer_type = iree_hal_cuda_buffer_type(buffer);
+
+  switch (requested_type) {
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION:
+      switch (buffer_type) {
+        case IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL:
+          out_external_buffer->flags = requested_flags;
+          out_external_buffer->type = requested_type;
+          out_external_buffer->handle.device_allocation.ptr =
+              iree_hal_cuda_buffer_device_pointer(buffer);
+          out_external_buffer->size = iree_hal_buffer_allocation_size(buffer);
+          return iree_ok_status();
+
+        default:
+          return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                                  "CUDA buffer type is not supported for "
+                                  "export as an external device allocation");
+      }
+
+    default:
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "external buffer type not supported");
+  }
 }
 
 static const iree_hal_allocator_vtable_t iree_hal_cuda2_allocator_vtable = {
