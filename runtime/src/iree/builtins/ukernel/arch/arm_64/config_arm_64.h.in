@@ -13,6 +13,7 @@
 
 #cmakedefine IREE_UK_BUILD_ARM_64_FP16
 #cmakedefine IREE_UK_BUILD_ARM_64_FP16FML
+#cmakedefine IREE_UK_BUILD_ARM_64_BF16
 #cmakedefine IREE_UK_BUILD_ARM_64_DOTPROD
 #cmakedefine IREE_UK_BUILD_ARM_64_I8MM
 
