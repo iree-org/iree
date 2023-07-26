@@ -78,6 +78,13 @@ iree_uk_mmt4d_select_tile_func_arm_64_f16f16f16(
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_arm_64_bf16bf16f32(
     const iree_uk_mmt4d_params_t* params) {
+  if (params->M0 == 8 && params->N0 == 8 && params->K0 == 4) {
+#ifdef IREE_UK_BUILD_ARM_64_BF16
+    if (iree_uk_cpu_supports_bf16(params->cpu_data)) {
+      return iree_uk_mmt4d_tile_bf16bf16f32_8x8x4_arm_64_bf16;
+    }
+#endif
+  }
   return 0;
 }
 
