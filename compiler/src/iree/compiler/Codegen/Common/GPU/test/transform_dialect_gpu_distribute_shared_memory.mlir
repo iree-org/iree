@@ -67,10 +67,14 @@ hal.executable private @shared_mem_cpy  {
   }
 
   transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !pdl.operation):
-    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!pdl.operation) -> !pdl.operation
-    transform.iree.gpu_distribute_shared_memory_copy %func : (!pdl.operation) -> ()
-    transform.iree.apply_patterns %func 
-      { fold_memref_aliases, canonicalization, tiling_canonicalization, cse } : (!pdl.operation) -> ()
+  ^bb1(%variant_op: !transform.any_op):
+    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.gpu_distribute_shared_memory_copy %func : (!transform.any_op) -> ()
+    transform.apply_patterns to %func { 
+      transform.apply_patterns.memref.fold_memref_alias_ops
+      transform.apply_patterns.canonicalization
+      transform.apply_patterns.linalg.tiling_canonicalization
+    } : !transform.any_op
+    transform.iree.apply_cse %func : !transform.any_op
   }
 }
