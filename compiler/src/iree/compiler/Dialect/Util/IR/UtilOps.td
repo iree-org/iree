@@ -805,6 +805,63 @@ def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect", [
 } // OpGroupGlobalOps
 
 //===----------------------------------------------------------------------===//
+// Constant folding ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupConstantFoldingOps : OpDocGroup {
+  let summary = "Ops for representing constant folding intermediates";
+  let description = [{
+    Ops for managing constant folding.
+  }];
+}
+
+let opDocGroup = OpGroupConstantFoldingOps in {
+
+def Util_ConstExprOp : Util_PureOp<"constexpr", [
+    IsolatedFromAbove,
+]> {
+  let summary = "Represents a set of operations that can be considered to yield a constant";
+  let description = [{
+    Contains ops which compute a value that should be considered a constant.
+    Typically, this is used to capture intermediate ops that are asserted
+    to be a constant expression tree so that they can be further transformed
+    and evaluated by a later pass. It is used for compute/memory dense
+    constants expressions (versus more simple scalar constants, which can
+    be directly folded).
+
+    The op is IsolatedFromAbove requiring explicit capture because it needs
+    to enforce the invariant that all producers are either contained in the
+    region or derived from constants.
+  }];
+  let regions = (region AnyRegion:$body);
+  let arguments = (ins
+    Variadic<AnyType>:$operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = "operands attr-dict `:` functional-type(operands, results) regions";
+}
+
+def Util_YieldConstOp : Util_PureOp<"yield_const", [
+  Terminator,
+]> {
+  let summary = "Terminates a constexpr body";
+  let arguments = (ins
+    Variadic<AnyType>:$operands
+  );
+
+  let builders = [OpBuilder<(ins), [{
+    build($_builder, $_state, std::nullopt);
+  }]>];
+
+  let assemblyFormat = "operands `:` type(operands) attr-dict";
+}
+
+} // OpGroupConstantFoldingOps
+
+//===----------------------------------------------------------------------===//
 // !util.list<T>
 //===----------------------------------------------------------------------===//
 // NOTE: this type is mostly just a placeholder. Ideally we'd make this

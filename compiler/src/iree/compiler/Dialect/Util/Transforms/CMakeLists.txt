@@ -21,6 +21,7 @@ iree_cc_library(
     "AnnotateOpOrdinals.cpp"
     "ApplyPatterns.cpp"
     "CombineInitializers.cpp"
+    "ConstExprFolding.cpp"
     "ConvertPrimitiveType.cpp"
     "DropCompilerHints.cpp"
     "FixedPointIterator.cpp"

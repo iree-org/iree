@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -40,6 +41,11 @@ static llvm::cl::opt<int64_t> clLinalgMaxConstantFoldElements(
     "iree-codegen-linalg-max-constant-fold-elements",
     llvm::cl::desc("Maximum number of elements to try to constant fold."),
     llvm::cl::init(INT64_MAX));
+
+static llvm::cl::opt<bool> clFuseIntoConstexpr(
+    "iree-codegen-fuse-into-constexpr",
+    llvm::cl::desc("Experimental: Fuse into util.constexpr."),
+    llvm::cl::init(false));
 
 /// Check if any of the use dominates all other uses of the operation.
 static std::optional<OpOperand *> getFusableUse(Operation *op,
@@ -367,23 +373,30 @@ struct FusionOfTensorOpsPass
           fusionPatterns, fuseByExpansionControlFn);
 
       // Constant fold Linalg operations.
-      auto constantFoldControlFn = [](OpOperand *fusedOperand) {
-        Operation *producer = fusedOperand->get().getDefiningOp();
-        Operation *consumer = fusedOperand->getOwner();
-        if (!isNonNullAndOutsideDispatch({producer, consumer})) {
-          return false;
-        }
-        if (auto shapedType =
-                dyn_cast<ShapedType>(fusedOperand->get().getType())) {
-          if (shapedType.hasStaticShape() &&
-              shapedType.getNumElements() > clLinalgMaxConstantFoldElements) {
+      // We either use the new constexpr fusion path or the old Linalg
+      // fuser.
+      if (clFuseIntoConstexpr) {
+        IREE::Util::populateTrivialLinalgConstexprFoldingOperations(
+            fusionPatterns);
+      } else if (clLinalgMaxConstantFoldElements > 0) {
+        auto constantFoldControlFn = [](OpOperand *fusedOperand) {
+          Operation *producer = fusedOperand->get().getDefiningOp();
+          Operation *consumer = fusedOperand->getOwner();
+          if (!isNonNullAndOutsideDispatch({producer, consumer})) {
             return false;
           }
-        }
-        return producer->hasOneUse();
-      };
-      linalg::populateConstantFoldLinalgOperations(fusionPatterns,
-                                                   constantFoldControlFn);
+          if (auto shapedType =
+                  dyn_cast<ShapedType>(fusedOperand->get().getType())) {
+            if (shapedType.hasStaticShape() &&
+                shapedType.getNumElements() > clLinalgMaxConstantFoldElements) {
+              return false;
+            }
+          }
+          return producer->hasOneUse();
+        };
+        linalg::populateConstantFoldLinalgOperations(fusionPatterns,
+                                                     constantFoldControlFn);
+      }
 
       affine::AffineApplyOp::getCanonicalizationPatterns(fusionPatterns,
                                                          context);

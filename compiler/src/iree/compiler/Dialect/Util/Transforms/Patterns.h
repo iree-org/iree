@@ -19,6 +19,15 @@ namespace Util {
 // upstreamed after some more exhaustive investigation.
 void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns);
 
+// Populates patterns that fold DAGs of linalg-based operations into
+// util.constexpr where the folding is guaranteed to be valid and
+// deemed cost-neutral. This is less sophisticated than a global
+// analysis/transform which can make trickier trade-offs, but it
+// should be sufficient/beneficial for iterative IR modification
+// and simplification as is done during fusion and other places.
+void populateTrivialLinalgConstexprFoldingOperations(
+    RewritePatternSet &patterns);
+
 } // namespace Util
 } // namespace IREE
 } // namespace iree_compiler

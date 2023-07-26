@@ -169,4 +169,11 @@ def TestFloatRangeAnalysis : Pass<"iree-util-test-float-range-analysis", ""> {
   }];
 }
 
+def TestTrivialConstExprFolding : Pass<"iree-util-test-trivial-constexpr-folding", ""> {
+  let summary = "Tests trivial constexpr folding patterns";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createTestTrivialConstExprFoldingPass()
+  }];
+}
+
 #endif  // IREE_DIALECT_UTIL_PASSES
