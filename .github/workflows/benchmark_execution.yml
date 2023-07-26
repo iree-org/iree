@@ -173,7 +173,7 @@ jobs:
       - name: "Determine Shard Suffix"
         id: sharding
         run: |
-          if [[ ${SHARD_COUNT} -gt 1 ]]; then
+          if (( SHARD_COUNT > 1 )); then
             echo "suffix=$(printf -- "-%02d-of-%02d" "${SHARD_INDEX}" "${SHARD_COUNT}")" >> "${GITHUB_OUTPUT}"
           else
             echo "suffix=" >> "${GITHUB_OUTPUT}"
