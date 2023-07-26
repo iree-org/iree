@@ -118,6 +118,32 @@ chooseMatmulTileParamsX86_64(EncodingUser user, ExecutableTargetAttr target) {
   }
 }
 
+static MatmulTileParams
+chooseMatmulTileParamsRISCV(EncodingUser user, ExecutableTargetAttr target) {
+  switch (user) {
+  case EncodingUser::MATMUL_F32F32F32:
+  case EncodingUser::MATMUL_F16F16F32:
+  case EncodingUser::MATMUL_F16F16F16:
+  case EncodingUser::MATMUL_BF16BF16F32:
+  case EncodingUser::MATMUL_BF16BF16BF16:
+  case EncodingUser::MATMUL_I8I8I32:
+    // Dummy tile size for example purpose. Tile sizes should be
+    // decided based on the element types (based on the `user` enum) and
+    // target features (based on hasFeature(target, "+SomeFeature") tests)
+    // as in chooseMatmulTileParamsX86_64 and chooseMatmulTileParamsAArch64.
+    //
+    // Note that tile sizes are subject to adjustment for narrow cases. For
+    // example, in a matrix-times-vector product of shape 128x128x1, so N=1,
+    // the tile size in the N dimension will be adjusted from 16 down to 1. The
+    // tile sizes here are what is used in the generic case, for sufficiently
+    // wide matrices. See adjustTileSizesToNarrowStaticShape.
+    return {16, 16, 16};
+  default:
+    assert(false);
+    return {};
+  }
+}
+
 static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
                                                ExecutableTargetAttr target) {
   if (isAArch64(target)) {
@@ -125,6 +151,9 @@ static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
   }
   if (isX86_64(target)) {
     return chooseMatmulTileParamsX86_64(user, target);
+  }
+  if (isRISCV(target)) {
+    return chooseMatmulTileParamsRISCV(user, target);
   }
   return chooseMatmulTileParamsGeneric(target);
 }
