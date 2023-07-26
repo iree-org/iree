@@ -1048,6 +1048,37 @@ struct ZeroExtentTensorCanon final : RewritePattern {
   }
 };
 
+template <typename ElementwiseOpT>
+struct ReorderElementwiseAndShapeOp final : OpRewritePattern<ElementwiseOpT> {
+  using OpRewritePattern<ElementwiseOpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(ElementwiseOpT op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    auto definingOp = op.getOperand().getDefiningOp();
+    if (!definingOp) {
+      return failure();
+    }
+
+    if (!isa<mlir::stablehlo::ReshapeOp>(definingOp) &&
+        !isa<mlir::stablehlo::TransposeOp>(definingOp) &&
+        !isa<mlir::stablehlo::BroadcastOp>(definingOp)) {
+      return failure();
+    }
+
+    Value input = definingOp->getOperand(0);
+    Value newEwiseVal =
+        rewriter.create<ElementwiseOpT>(loc, input.getType(), input)
+            .getResult();
+    auto newShapeOp = rewriter.clone(*definingOp);
+    newShapeOp->setOperands(newEwiseVal);
+    newShapeOp->setAttrs(definingOp->getAttrs());
+
+    rewriter.replaceOp(definingOp, newEwiseVal);
+    rewriter.replaceOp(op, newShapeOp->getResults());
+    return success();
+  }
+};
+
 struct StableHLOCanonicalize final
     : impl::StableHLOCanonicalizeBase<StableHLOCanonicalize> {
   void runOnOperation() override {
@@ -1087,5 +1118,31 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       ReshapeOpCanon, TransposeOpCanon,
       // Types.
       ZeroExtentTensorCanon>(context, benefit);
+  patterns
+      ->add<ReorderElementwiseAndShapeOp<mlir::stablehlo::AbsOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::CeilOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::CbrtOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::ConvertOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::ClzOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::CosineOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::ExpOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::Expm1Op>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::FloorOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::ImagOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::IsFiniteOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::LogOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::Log1pOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::LogisticOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::NotOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::NegOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::PopulationCountOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::RealOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::RoundOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::RoundNearestEvenOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::RsqrtOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::SignOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::SineOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::SqrtOp>,
+            ReorderElementwiseAndShapeOp<mlir::stablehlo::TanhOp>>(context);
 }
 } // namespace mlir::iree_compiler::stablehlo
