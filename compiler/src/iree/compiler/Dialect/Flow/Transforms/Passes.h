@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -33,6 +34,10 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   // Enables passes to perform numeric precision reduction.
   bool numericPrecisionReduction = false;
 
+  // Textual representation of a custom pass pipeline to run before dispatch
+  // formation.
+  std::string customFusionPassPipeline = "";
+
   // Hook to populate a constant evaluation pass pipeline. If nullptr, then
   // no passes are added for constant evaluation. This must be injected in
   // because constant-evaluators can depend on the whole compiler, of which
@@ -51,8 +56,9 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 //     - Directly passing supported flow plus core ops
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager,
-                                    const TransformOptions &transformOptions);
+void buildFlowTransformPassPipeline(
+    OpPassManager &passManager, const TransformOptions &transformOptions,
+    PipelineExtensions *pipelineExtensions = nullptr);
 
 void registerFlowTransformPassPipeline();
 

@@ -42,6 +42,10 @@ struct MySession : public PluginSession<MySession, MyOptions> {
   void extendPreprocessingPassPipeline(OpPassManager &pm) override {
     pm.addPass(IREE::SimpleIO::createLegalizeSimpleIOPass());
   }
+
+  void extendCustomFusionPassPipeline(OpPassManager &pm) override {
+    pm.addPass(IREE::SimpleIO::createLegalizeSimpleIOPass());
+  }
 };
 
 }  // namespace

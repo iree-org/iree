@@ -151,6 +151,8 @@ void buildIREEVMTransformPassPipeline(
       highLevelOptimizationOptions.constExprHoisting;
   flowOptions.numericPrecisionReduction =
       highLevelOptimizationOptions.numericPrecisionReduction;
+  flowOptions.customFusionPassPipeline =
+      highLevelOptimizationOptions.customFusionPassPipeline;
 
   // Enable const-eval via hook. For debug builds, we assert if enabled
   // without a hook. For release, we just silently skip enabling const-eval.
@@ -193,7 +195,8 @@ void buildIREEVMTransformPassPipeline(
 
     if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
-      IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
+      IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions,
+                                                 hooks.pipelineExtensions);
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Flow");
     }
     if (compileTo == IREEVMPipelinePhase::Flow)

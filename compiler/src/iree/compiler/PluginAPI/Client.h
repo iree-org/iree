@@ -69,6 +69,9 @@ public:
 
   // Adds passes to the |buildPreprocessingPassPipeline| pipeline at the end.
   virtual void extendPreprocessingPassPipeline(OpPassManager &passManager) {}
+
+  // Adds passes to the |buildCustomFusionPassPipeline| pipeline at the end.
+  virtual void extendCustomFusionPassPipeline(OpPassManager &passManager) {}
 };
 
 // Policy for how to activate the plugin.

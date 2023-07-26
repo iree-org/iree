@@ -126,6 +126,12 @@ public:
     }
   }
 
+  void extendCustomFusionPassPipeline(OpPassManager &passManager) override {
+    for (auto *s : initializedSessions) {
+      s->extendCustomFusionPassPipeline(passManager);
+    }
+  }
+
   // Populates the given list of HAL target backends for all initialized
   // plugins.
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &list);

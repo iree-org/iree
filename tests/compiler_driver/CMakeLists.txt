@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "custom_fusion_flags.mlir"
     "executable_benchmarks.mlir"
     "hal_executable.mlir"
     "inline_dynamic_hal_executable.mlir"

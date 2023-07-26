@@ -122,6 +122,11 @@ void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Strips debug assertions after any useful "
                                   "information has been extracted."),
                    llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-flow-custom-fusion-pass-pipeline", customFusionPassPipeline,
+      llvm::cl::desc("Textual description of the pass pipeline to run before "
+                     "running normal IREE dispatch formation"),
+      llvm::cl::cat(category));
 }
 
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {

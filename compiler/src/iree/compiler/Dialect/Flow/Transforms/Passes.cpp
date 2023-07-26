@@ -190,7 +190,8 @@ void buildGlobalOptimizationPassPipeline(
 } // namespace
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
-                                    const TransformOptions &transformOptions) {
+                                    const TransformOptions &transformOptions,
+                                    PipelineExtensions *pipelineExtensions) {
   // ML frontends have very uneven support for user-controlled types _and_ users
   // tend to use types not well suited for the work they are doing. These
   // demotions/promotions allow users to change the types after lowering out of
@@ -267,9 +268,21 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
       // Enable data tiling after all linalg level transformations.
-      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
-      ////////////////////////////////////////////////////////////////////////
-      // Dispatch region formation.
+      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass);
+
+  ////////////////////////////////////////////////////////////////////////
+  // Dispatch region formation.
+
+  // Custom module level pass pipelines.
+  if (!transformOptions.customFusionPassPipeline.empty()) {
+    extendWithTextPipeline(passManager,
+                           transformOptions.customFusionPassPipeline, "fusion");
+  }
+  if (pipelineExtensions) {
+    pipelineExtensions->extendCustomFusionPassPipeline(passManager);
+  }
+
+  FunctionLikeNest(passManager)
       .addPredicatedPass(!clDispatchTransformFileName.empty(),
                          [&]() {
                            return createDispatchWithTransformDialect(

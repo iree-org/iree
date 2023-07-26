@@ -89,6 +89,10 @@ struct HighLevelOptimizationOptions {
   // Strips debug assertions after any useful information has been extracted.
   bool stripAssertions = false;
 
+  // Specifies a set of passes to run immediately before dispatch formation
+  // intended for forming custom fusions.
+  std::string customFusionPassPipeline;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<HighLevelOptimizationOptions>;
 };

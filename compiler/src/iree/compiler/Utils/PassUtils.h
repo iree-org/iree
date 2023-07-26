@@ -83,6 +83,11 @@ private:
 // has been made which requires another iteration. No-op otherwise.
 void signalFixedPointModified(Operation *rootOp);
 
+// Extends the pass manager with the given textual pipeline, following standard
+// MLIR `--pass-pipeline` syntax.
+void extendWithTextPipeline(OpPassManager &passManager, StringRef textPipeline,
+                            StringRef pipelineDebugType);
+
 } // namespace iree_compiler
 } // namespace mlir
 

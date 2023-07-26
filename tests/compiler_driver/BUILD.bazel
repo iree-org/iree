@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "custom_fusion_flags.mlir",
             "executable_benchmarks.mlir",
             "hal_executable.mlir",
             "inline_dynamic_hal_executable.mlir",
