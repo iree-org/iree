@@ -142,13 +142,52 @@ def main(args):
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
+
     benchmark_group = benchmark_groups.get(args.target_device_name)
     if benchmark_group is None:
-        raise ValueError("Target device not found in the benchmark config.")
-    run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group["run_configs"],
-        root_type=typing.List[iree_definitions.E2EModelRunConfig],
-    )
+        raise ValueError(
+            "Target device '{}' not found in the benchmark config.".format(
+                args.target_device_name
+            )
+        )
+
+    if args.shard_index is None:
+        # In case no shard index was given we will run ALL benchmarks from ALL shards
+        packed_run_configs = [
+            shard["run_configs"] for shard in benchmark_group["shards"]
+        ]
+    else:
+        # Otherwise we will only run the benchmarks from the given shard
+        benchmark_shard = next(
+            (
+                shard
+                for shard in benchmark_group["shards"]
+                if shard["index"] == args.shard_index
+            ),
+            None,
+        )
+        if benchmark_shard is None:
+            raise ValueError(
+                "Given shard (index={}) not found in the benchmark config group. Available indexes: [{}].".format(
+                    args.shard_index,
+                    ", ".join(
+                        str(shard["index"]) for shard in benchmark_group["shards"]
+                    ),
+                )
+            )
+        packed_run_configs = [benchmark_shard["run_configs"]]
+
+    # When no `shard_index` is given we might have more than one shard to process.
+    # We do this by deserializing the `run_config` field from each shard separately
+    # and then merge the unpacked flat lists of `E2EModelRunConfig`.
+    run_configs = [
+        run_config
+        for packed_run_config in packed_run_configs
+        for run_config in serialization.unpack_and_deserialize(
+            data=packed_run_config,
+            root_type=typing.List[iree_definitions.E2EModelRunConfig],
+        )
+    ]
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs, root_benchmark_dir=benchmark_config.root_benchmark_dir
     )
