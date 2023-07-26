@@ -152,7 +152,10 @@ struct GlobalLoadOpExpansion
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(loadOp.getType()))
       return failure();
-    auto &expandedGlobal = expansionState->globalMap[adaptor.getGlobal()];
+    auto it = expansionState->globalMap.find(adaptor.getGlobal());
+    assert(it != expansionState->globalMap.end() &&
+           "global expansion not found");
+    auto &expandedGlobal = it->second;
 
     // Insert a load/transfer to the unknown resource lifetime.
     auto unknownType = IREE::Stream::ResourceType::get(rewriter.getContext());

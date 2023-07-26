@@ -1122,6 +1122,21 @@ LogicalResult GlobalStoreIndirectOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// Constant folding ops
+//===----------------------------------------------------------------------===//
+
+LogicalResult ConstExprOp::verify() {
+  for (Value operand : getOperands()) {
+    Operation *defOp = operand.getDefiningOp();
+    if (!defOp || !llvm::isa<ConstExprOp>(operand.getDefiningOp())) {
+      return emitOpError()
+             << "all operands to util.constexpr must be constexpr";
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // !util.list<T>
 //===----------------------------------------------------------------------===//
 

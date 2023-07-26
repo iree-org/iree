@@ -22,6 +22,7 @@ iree_cc_library(
     "ApplyPatterns.cpp"
     "CombineInitializers.cpp"
     "ConstExprFolding.cpp"
+    "ConstExprToGlobals.cpp"
     "ConvertPrimitiveType.cpp"
     "DropCompilerHints.cpp"
     "FixedPointIterator.cpp"

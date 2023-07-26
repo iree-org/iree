@@ -162,10 +162,10 @@ bool CompiledBinary::isSupportedResultType(Type type) {
   // TODO(laurenzo): Not currently supported. VMVX would need to support these
   // and today it doesn't. We could use alternative backends (LLVM CPU/etc) if
   // we wanted to handle f64, but f16 and bf16 often need special hardware.
-  if (llvm::isa<Float16Type>(type) || llvm::isa<BFloat16Type>(type) ||
-      llvm::isa<Float64Type>(type)) {
-    return false;
-  }
+  // if (llvm::isa<Float16Type>(type) || llvm::isa<BFloat16Type>(type) ||
+  //     llvm::isa<Float64Type>(type)) {
+  //   return false;
+  // }
 
   // Support scalar int and float type of byte aligned widths.
   if (type.isIntOrFloat() && type.getIntOrFloatBitWidth() % 8 == 0) {

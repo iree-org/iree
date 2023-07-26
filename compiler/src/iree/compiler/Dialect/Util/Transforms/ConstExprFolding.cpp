@@ -36,7 +36,7 @@ ConstExprOp formSingleRootConstExprOp(OpBuilder &builder, Operation *rootOp,
   auto constExprOp = builder.create<ConstExprOp>(
       rootOp->getLoc(), rootOp->getResultTypes(), ValueRange{});
   SmallVector<Value> constExprOperands;
-  Block *body = builder.createBlock(&constExprOp.getBody());
+  Block *body = builder.createBlock(&constExprOp.getBodyRegion());
 
   IRMapping mapping;
   mlir::computeTopologicalSorting(producers);

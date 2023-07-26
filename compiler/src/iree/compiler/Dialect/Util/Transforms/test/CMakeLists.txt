@@ -17,6 +17,8 @@ iree_lit_test_suite(
     "annotate_op_ordinals.mlir"
     "block_patterns.mlir"
     "combine_initializers.mlir"
+    "constexpr_folding.mlir"
+    "constexpr_to_globals.mlir"
     "demote_f32_to_f16.mlir"
     "demote_f64_to_f32.mlir"
     "demote_i64_to_i32.mlir"

@@ -72,6 +72,13 @@ def StripDebugOps : Pass<"iree-util-strip-debug-ops", ""> {
 // Globals
 //===----------------------------------------------------------------------===//
 
+def ConstExprToGlobals : Pass<"iree-util-constexpr-to-globals", "mlir::ModuleOp"> {
+  let summary = "Transforms util.constexpr ops into globals and module initializers";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createConstExprToGlobalsPass()
+  }];
+}
+
 def FoldGlobals : Pass<"iree-util-fold-globals", "mlir::ModuleOp"> {
   let summary = "Folds duplicate globals and propagates constants.";
   let constructor = [{

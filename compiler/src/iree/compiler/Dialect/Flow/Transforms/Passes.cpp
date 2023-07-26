@@ -164,6 +164,7 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
   pipeline.addPass(IREE::Util::createIPOPass());
 
+  pipeline.addPass(IREE::Util::createConstExprToGlobalsPass());
   if (transformOptions.constExprHoisting) {
     pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());
   }
@@ -228,6 +229,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // The more we are able to equate shape dimensions at this level the better
   // our fusions will be.
   passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
+
+  // Perform early optimization of globals in order to propagate globals
+  // and constants that are latent in the program structure.
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
   // Transform pad operations into linalg.fill + tensor.insert_slice.
@@ -310,6 +314,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass([&]() {
         return createInitializeEmptyTensorsPass(clZeroFillEmptyTensors);
       });
+
+  // Optimize globals again now that all high level optimizations have run
+  // (which could have introduced more things requiring global optimization).
+  passManager.addPass(IREE::Util::createConstExprToGlobalsPass());
+  if (transformOptions.buildConstEvalPassPipeline) {
+    transformOptions.buildConstEvalPassPipeline(passManager);
+  }
+
+  // buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.
