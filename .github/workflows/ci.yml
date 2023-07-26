@@ -284,7 +284,7 @@ jobs:
           - runner-type: gpu
             iree-ctest-extra-args:
               --label-regex ^requires-gpu|^driver=vulkan$|^driver=cuda$
-	      --label-exclude ^device-count=2$
+              --label-exclude ^device-count=2$
             iree-nvidia-sm80-tests-disable: 1
           - runner-type: a100
             iree-ctest-extra-args: --label-regex ^requires-gpu-sm80$
