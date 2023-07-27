@@ -102,6 +102,9 @@ public:
       Location loc = originalValue.getLoc();
       OpBuilder builder = getModuleEndBuilder();
       auto initializerOp = builder.create<InitializerOp>(loc);
+      // Signals that this initializer is eligible for constant evaluation
+      // at compile time.
+      initializerOp->setAttr("iree.compiler.consteval", builder.getUnitAttr());
       Block *entryBlock = initializerOp.addEntryBlock();
       OpBuilder initBuilder = OpBuilder::atBlockEnd(entryBlock);
       IRMapping valueMapping;
