@@ -732,8 +732,6 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   if (clCheckIRBeforeLLVMConversion) {
     passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
   }
-  passManager.addNestedPass<func::FuncOp>(
-      memref::createFoldMemRefAliasOpsPass());
 
   // SCF -> CF
   passManager.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());

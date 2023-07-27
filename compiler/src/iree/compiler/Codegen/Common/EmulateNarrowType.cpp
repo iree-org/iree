@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -24,9 +24,6 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-
-unsigned loadStoreEmulateBitwidth = 8;
-unsigned arithComputeBitwidth = 4;
 
 //===----------------------------------------------------------------------===//
 // Conversion patterns
@@ -74,39 +71,16 @@ struct EmulateNarrowTypePass
   }
 
   void runOnOperation() override {
-    if (!llvm::isPowerOf2_32(loadStoreEmulateBitwidth) ||
-        loadStoreEmulateBitwidth < 8) {
-      signalPassFailure();
-      return;
-    }
+    // The number of bits used in a load/store op.
+    constexpr unsigned kLoadStoreEmulateBitwidth = 8;
+    static_assert(
+        llvm::isPowerOf2_32(kLoadStoreEmulateBitwidth) &&
+        "only power of 2 is supported for narrow type load/store emulation");
 
-    ModuleOp op = getOperation();
     MLIRContext *ctx = &getContext();
 
-    arith::NarrowTypeEmulationConverter typeConverter(loadStoreEmulateBitwidth);
-
-    // Convert scalar type.
-    typeConverter.addConversion([](IntegerType ty) -> std::optional<Type> {
-      unsigned width = ty.getWidth();
-      if (width >= arithComputeBitwidth || width == 1)
-        return ty;
-      return IntegerType::get(ty.getContext(), arithComputeBitwidth);
-    });
-
-    // Convert vector type.
-    typeConverter.addConversion([](VectorType ty) -> std::optional<Type> {
-      auto intTy = dyn_cast<IntegerType>(ty.getElementType());
-      if (!intTy)
-        return ty;
-
-      unsigned width = intTy.getWidth();
-      if (width >= arithComputeBitwidth || width == 1)
-        return ty;
-      return VectorType::get(
-          to_vector(ty.getShape()),
-          IntegerType::get(ty.getContext(), arithComputeBitwidth));
-    });
-
+    arith::NarrowTypeEmulationConverter typeConverter(
+        kLoadStoreEmulateBitwidth);
     memref::populateMemRefNarrowTypeEmulationConversions(typeConverter);
 
     ConversionTarget target(*ctx);
@@ -119,18 +93,17 @@ struct EmulateNarrowTypePass
     target.addDynamicallyLegalOp<func::CallOp, func::ReturnOp>(opLegalCallback);
     target.addDynamicallyLegalDialect<
         arith::ArithDialect, vector::VectorDialect, memref::MemRefDialect,
-        affine::AffineDialect, IREE::HAL::HALDialect>(
-        [&typeConverter](Operation *op) { return typeConverter.isLegal(op); });
+        affine::AffineDialect, IREE::HAL::HALDialect>(opLegalCallback);
 
     RewritePatternSet patterns(ctx);
-
     arith::populateArithNarrowTypeEmulationPatterns(typeConverter, patterns);
     memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns);
     vector::populateVectorNarrowTypeEmulationPatterns(typeConverter, patterns);
     populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
 
-    if (failed(applyPartialConversion(op, target, std::move(patterns))))
-      signalPassFailure();
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns))))
+      return signalPassFailure();
   }
 };
 } // namespace

@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "decompose_linalg_generic.mlir"
     "decompose_pack_unpack_ops.mlir"
     "eliminate_empty_tensors.mlir"
+    "emulate_narrow_type.mlir"
     "erase_dead_alloc_and_stores.mlir"
     "erase_hal_descriptor_type.mlir"
     "extract_address_computation.mlir"
