@@ -15,9 +15,9 @@ namespace VM {
 // the vector to the type represented by the type ordinal.
 std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   llvm::DenseMap<Type, std::string> typeMap;
-  std::function<void(Type)> tryInsertType;
-  tryInsertType = [&](Type type) {
-    if (auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
+  std::function<void(Type, bool)> tryInsertType;
+  tryInsertType = [&](Type type, bool stripRef) {
+    if (auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(type); refPtrType && stripRef) {
       type = refPtrType.getObjectType();
     }
     if (typeMap.count(type))
@@ -29,15 +29,15 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
     typeMap.try_emplace(type, str);
     if (auto listType = llvm::dyn_cast<IREE::VM::ListType>(type)) {
       assert(listType.getElementType());
-      tryInsertType(listType.getElementType());
+      tryInsertType(listType.getElementType(), false);
     }
   };
   for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
     funcOp.walk([&](Operation *op) {
       for (auto type : op->getOperandTypes())
-        tryInsertType(type);
+        tryInsertType(type, true);
       for (auto type : op->getResultTypes())
-        tryInsertType(type);
+        tryInsertType(type, true);
     });
   }
 
