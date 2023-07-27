@@ -40,8 +40,9 @@ import json
 import shutil
 import subprocess
 import tarfile
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence, Tuple
 
+from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (
@@ -54,12 +55,7 @@ from common.benchmark_definition import (
     wait_for_iree_benchmark_module_start,
     parse_iree_benchmark_metrics,
 )
-from common.benchmark_suite import (
-    MODEL_FLAGFILE_NAME,
-    BenchmarkCase,
-    BenchmarkSuite,
-    get_run_configs_by_target_and_shard,
-)
+from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
 from common.android_device_utils import (
     get_android_device_model,
     get_android_device_info,
@@ -67,7 +63,6 @@ from common.android_device_utils import (
 )
 import common.common_arguments
 from e2e_test_artifacts import iree_artifacts
-from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_parameters
 
@@ -393,7 +388,7 @@ def main(args):
     commit = get_git_commit_hash("HEAD")
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    run_configs = get_run_configs_by_target_and_shard(
+    run_configs = benchmark_suite_module.get_run_configs_by_target_and_shard(
         benchmark_groups, args.target_device_name, args.shard_index
     )
 

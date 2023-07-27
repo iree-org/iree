@@ -13,19 +13,15 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 from typing import Any, List, Optional
-import typing
 import atexit
 import json
 import shutil
 import subprocess
 import tarfile
 
+from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_suite import (
-    BenchmarkCase,
-    BenchmarkSuite,
-    get_run_configs_by_target_and_shard,
-)
+from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import (
     execute_cmd,
@@ -36,8 +32,6 @@ from common.benchmark_definition import (
     parse_iree_benchmark_metrics,
 )
 from common.linux_device_utils import get_linux_device_info
-from e2e_test_framework.definitions import iree_definitions
-from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
 from e2e_model_tests import run_module_utils
 import common.common_arguments
@@ -146,7 +140,7 @@ def main(args):
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    run_configs = get_run_configs_by_target_and_shard(
+    run_configs = benchmark_suite_module.get_run_configs_by_target_and_shard(
         benchmark_groups, args.target_device_name, args.shard_index
     )
 
