@@ -54,7 +54,12 @@ from common.benchmark_definition import (
     wait_for_iree_benchmark_module_start,
     parse_iree_benchmark_metrics,
 )
-from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
+from common.benchmark_suite import (
+    MODEL_FLAGFILE_NAME,
+    BenchmarkCase,
+    BenchmarkSuite,
+    get_run_configs_by_target_and_shard,
+)
 from common.android_device_utils import (
     get_android_device_model,
     get_android_device_info,
@@ -388,50 +393,10 @@ def main(args):
     commit = get_git_commit_hash("HEAD")
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    benchmark_group = benchmark_groups.get(args.target_device_name)
-    if benchmark_group is None:
-        raise ValueError(
-            "Target device '{}' not found in the benchmark config.".format(
-                args.target_device_name
-            )
-        )
-    if args.shard_index is None:
-        # In case no shard index was given we will run ALL benchmarks from ALL shards
-        packed_run_configs = [
-            shard["run_configs"] for shard in benchmark_group["shards"]
-        ]
-    else:
-        # Otherwise we will only run the benchmarks from the given shard
-        benchmark_shard = next(
-            (
-                shard
-                for shard in benchmark_group["shards"]
-                if shard["index"] == args.shard_index
-            ),
-            None,
-        )
-        if benchmark_shard is None:
-            raise ValueError(
-                "Given shard (index={}) not found in the benchmark config group. Available indexes: [{}].".format(
-                    args.shard_index,
-                    ", ".join(
-                        str(shard["index"]) for shard in benchmark_group["shards"]
-                    ),
-                )
-            )
-        packed_run_configs = [benchmark_shard["run_configs"]]
+    run_configs = get_run_configs_by_target_and_shard(
+        benchmark_groups, args.target_device_name, args.shard_index
+    )
 
-    # When no `shard_index` is given we might have more than one shard to process.
-    # We do this by deserializing the `run_config` field from each shard separately
-    # and then merge the unpacked flat lists of `E2EModelRunConfig`.
-    run_configs = [
-        run_config
-        for packed_run_config in packed_run_configs
-        for run_config in serialization.unpack_and_deserialize(
-            data=packed_run_config,
-            root_type=List[iree_definitions.E2EModelRunConfig],
-        )
-    ]
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs, root_benchmark_dir=benchmark_config.root_benchmark_dir
     )
