@@ -39,6 +39,6 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
       "driver=cuda"
       # The NCCL collectives backend requires 1 GPU per rank.
       # To properly test for 2 ranks we need 2 GPUs.
-      "device-count=2"
+      "requires-multiple-devices"
   )
 endif()
