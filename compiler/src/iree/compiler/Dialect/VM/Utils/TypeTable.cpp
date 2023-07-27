@@ -17,7 +17,8 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   llvm::DenseMap<Type, std::string> typeMap;
   std::function<void(Type, bool)> tryInsertType;
   tryInsertType = [&](Type type, bool stripRef) {
-    if (auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(type); refPtrType && stripRef) {
+    if (auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(type);
+        refPtrType && stripRef) {
       type = refPtrType.getObjectType();
     }
     if (typeMap.count(type))
