@@ -307,13 +307,7 @@ static iree_status_t iree_hal_configure_allocator_from_flags(
 // Collectives configuration
 //===----------------------------------------------------------------------===//
 
-// Configures the |device| channel provider based on the current environment.
-// Today this simply checks to see if the process is running under MPI and
-// initializes that unconditionally.
-//
-// WARNING: not thread-safe and must only be called immediately after device
-// creation.
-static iree_status_t iree_hal_configure_collectives_from_flags(
+iree_status_t iree_hal_device_set_default_channel_provider(
     iree_hal_device_t* device) {
   if (!iree_hal_mpi_is_configured()) return iree_ok_status();
   iree_hal_channel_provider_t* channel_provider = NULL;
@@ -386,7 +380,7 @@ iree_status_t iree_hal_create_device_from_flags(
   // their default channels. Hosting libraries or applications can do the same
   // to interface with their own implementations.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_configure_collectives_from_flags(device);
+    status = iree_hal_device_set_default_channel_provider(device);
   }
 
   if (iree_status_is_ok(status)) {

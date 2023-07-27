@@ -103,15 +103,7 @@ def import_saved_model(
     result = re.sub(r"func @__inference_(.+)_[0-9]+\(", r"func @\1(", result)
     pipeline = ["tf-lower-to-mlprogram-and-hlo"]
     result = run_pass_pipeline(result, ",".join(pipeline), show_debug_info=False)
-
-    # TODO: The write_bytecode function does not register the
-    # stablehlo dialect. Once fixed, remove this bypass.
-    WRITE_BYTECODE = False
-    if WRITE_BYTECODE:
-        result = write_bytecode(output_path, result)
-    else:
-        with open(output_path, "wt") as f:
-            f.write(result)
+    write_bytecode(output_path, result)
 
 
 if __name__ == "__main__":
