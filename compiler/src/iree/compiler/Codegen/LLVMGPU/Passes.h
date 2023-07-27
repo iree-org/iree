@@ -18,6 +18,16 @@
 namespace mlir {
 namespace iree_compiler {
 
+//===----------------------------------------------------------------------===//
+// Definitions and Utilities
+//===----------------------------------------------------------------------===//
+
+void packSharedMemoryAlloc(func::FuncOp funcOp);
+
+//===----------------------------------------------------------------------===//
+// Passes
+//===----------------------------------------------------------------------===//
+
 /// Lowering using SIMT CUDA core operations.
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 

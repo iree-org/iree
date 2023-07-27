@@ -57,6 +57,35 @@ static void addBarrier(func::FuncOp funcOp, Operation *alloc,
   builder.create<gpu::BarrierOp>(alloc->getLoc());
 }
 
+void packSharedMemoryAlloc(func::FuncOp funcOp) {
+  DominanceInfo dominators(funcOp);
+  SmallVector<Operation *> allocs;
+  funcOp.walk([&](memref::AllocOp alloc) {
+    if (hasSharedMemoryAddressSpace(alloc.getType())) {
+      allocs.push_back(alloc);
+    }
+  });
+  // First sink the alloc as low as possible in the CFG.
+  sinkOpsInCFG(allocs, dominators);
+  SmallVector<AliasGroup> aliasGroups;
+  analyseAllocsForPacking(funcOp, allocs, aliasGroups);
+  // If there is 1 or less alias group there is nothing to do.
+  if (aliasGroups.size() <= 1)
+    return;
+
+  // Pack all the allocations into one i8 alloc.
+  // We may need to add extra barriers to make sure we are done writting or
+  // reading from the previous alias group before starting a new one.
+  for (size_t i = 0; i < aliasGroups.size(); i++) {
+    for (Operation *alloc : aliasGroups[i]) {
+      addBarrier(funcOp, alloc, aliasGroups[i]);
+    }
+  }
+
+  OpBuilder builder(funcOp.getContext());
+  packAllocs(builder, funcOp, aliasGroups);
+}
+
 namespace {
 
 struct LLVMGPUPackSharedMemoryAllocPass
@@ -67,35 +96,7 @@ public:
     registry.insert<nvgpu::NVGPUDialect>();
   }
 
-  void runOnOperation() override {
-    func::FuncOp funcOp = getOperation();
-    DominanceInfo dominators(funcOp);
-    SmallVector<Operation *> allocs;
-    funcOp.walk([&](memref::AllocOp alloc) {
-      if (hasSharedMemoryAddressSpace(alloc.getType())) {
-        allocs.push_back(alloc);
-      }
-    });
-    // First sink the alloc as low as possible in the CFG.
-    sinkOpsInCFG(allocs, dominators);
-    SmallVector<AliasGroup> aliasGroups;
-    analyseAllocsForPacking(funcOp, allocs, aliasGroups);
-    // If there is 1 or less alias group there is nothing to do.
-    if (aliasGroups.size() <= 1)
-      return;
-
-    // Pack all the allocations into one i8 alloc.
-    // We may need to add extra barriers to make sure we are done writting or
-    // reading from the previous alias group before starting a new one.
-    for (size_t i = 0; i < aliasGroups.size(); i++) {
-      for (Operation *alloc : aliasGroups[i]) {
-        addBarrier(funcOp, alloc, aliasGroups[i]);
-      }
-    }
-
-    OpBuilder builder(funcOp.getContext());
-    packAllocs(builder, funcOp, aliasGroups);
-  }
+  void runOnOperation() override { packSharedMemoryAlloc(getOperation()); }
 };
 } // namespace
 
