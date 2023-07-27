@@ -12,6 +12,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/utils/allocators.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tooling/device_util.h"
 
 namespace iree {
 namespace python {
@@ -605,6 +606,9 @@ static iree_status_t ConfigureDevice(iree_hal_device_t* device,
     IREE_RETURN_IF_ERROR(iree_hal_configure_allocator_from_specs(
         spec_views.size(), spec_views.data(), device));
   }
+
+  IREE_RETURN_IF_ERROR(iree_hal_device_set_default_channel_provider(device));
+
   return iree_ok_status();
 }
 
