@@ -87,7 +87,7 @@ public:
   LogicalResult encodeType(Type type) override {
     // HACK: it'd be nice to remove the implicit ref wrapper hiding.
     if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
-      if (llvm::isa<IREE::VM::ListType>(refType.getObjectType())) {
+      if (refType.getObjectType().isa<IREE::Util::ReferenceTypeInterface>()) {
         type = refType.getObjectType();
       }
     }
