@@ -182,12 +182,6 @@ class Parser(argparse.ArgumentParser):
             required=True,
             help="Target device in benchmark config to run",
         )
-        self.add_argument(
-            "--shard_index",
-            type=int,
-            default=None,
-            help="Shard in benchmark config to run",
-        )
 
 
 def expand_and_check_file_paths(paths: Sequence[str]) -> List[pathlib.Path]:

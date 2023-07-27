@@ -28,7 +28,6 @@ BUILD_DIR="${1:-${IREE_BUILD_E2E_TEST_ARTIFACTS_DIR:-build-e2e-test-artifacts}}"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 BENCHMARK_PRESETS="${IREE_BENCHMARK_PRESETS:-}"
 BUILD_DEFAULT_BENCHMARK_SUITES="${IREE_BUILD_DEFAULT_BENCHMARK_SUITES:-1}"
-SHARD_COUNT="${IREE_SHARD_COUNT:-default=1}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_tf_python.sh
@@ -102,8 +101,7 @@ FLAG_DUMP="${E2E_TEST_ARTIFACTS_DIR}/benchmark-flag-dump.txt"
 ./build_tools/benchmarks/export_benchmark_config.py \
   execution \
   --benchmark_presets="${EXECUTION_PRESETS}" \
-  --output="${EXECUTION_CONFIG}" \
-  --shard_count="${SHARD_COUNT}"
+  --output="${EXECUTION_CONFIG}"
 ./build_tools/benchmarks/benchmark_helper.py dump-cmds \
   --execution_benchmark_config="${EXECUTION_CONFIG}" \
   --compilation_benchmark_config="${COMPILATION_CONFIG}" \

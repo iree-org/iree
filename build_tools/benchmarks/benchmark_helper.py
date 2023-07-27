@@ -17,8 +17,7 @@ import json
 import os
 import shlex
 import subprocess
-from typing import Dict, List, Optional, Sequence
-import functools
+from typing import List, Optional, Sequence
 
 from e2e_test_artifacts import model_artifacts, iree_artifacts
 from e2e_test_framework import serialization
@@ -115,29 +114,23 @@ def _dump_cmds_handler(
     if execution_benchmark_config is not None:
         benchmark_groups = json.loads(execution_benchmark_config.read_text())
         for target_device, benchmark_group in benchmark_groups.items():
-            shard_count = len(benchmark_group["shards"])
-            for shard in benchmark_group["shards"]:
-                run_configs = serialization.unpack_and_deserialize(
-                    data=shard["run_configs"],
-                    root_type=List[iree_definitions.E2EModelRunConfig],
-                )
-                for run_config in run_configs:
-                    if (
-                        benchmark_id is not None
-                        and benchmark_id != run_config.composite_id
-                    ):
-                        continue
+            run_configs = serialization.unpack_and_deserialize(
+                data=benchmark_group["run_configs"],
+                root_type=List[iree_definitions.E2EModelRunConfig],
+            )
+            for run_config in run_configs:
+                if benchmark_id is not None and benchmark_id != run_config.composite_id:
+                    continue
 
-                    lines.append("################")
-                    lines.append("")
-                    lines.append(f"Execution Benchmark ID: {run_config.composite_id}")
-                    lines.append(f"Name: {run_config}")
-                    lines.append(f"Target Device: {target_device}")
-                    lines.append(f"Shard: {shard['index']} / {shard_count}")
-                    lines.append("")
-                    lines += _dump_cmds_from_run_config(
-                        run_config=run_config, root_path=e2e_test_artifacts_dir
-                    )
+                lines.append("################")
+                lines.append("")
+                lines.append(f"Execution Benchmark ID: {run_config.composite_id}")
+                lines.append(f"Name: {run_config}")
+                lines.append(f"Target Device: {target_device}")
+                lines.append("")
+                lines += _dump_cmds_from_run_config(
+                    run_config=run_config, root_path=e2e_test_artifacts_dir
+                )
 
     if compilation_benchmark_config is not None:
         benchmark_config = json.loads(compilation_benchmark_config.read_text())
@@ -161,78 +154,12 @@ def _dump_cmds_handler(
     print(*lines, sep="\n")
 
 
-# Represents a benchmark results file with the data already loaded from a JSON file.
-class JSONBackedBenchmarkData:
-    def __init__(self, source_filepath: pathlib.PurePath, data: Dict):
-        if not isinstance(data, dict):
-            raise ValueError(
-                f"'{source_filepath}' seems not to be a valid benchmark-results-file (No JSON struct as root element)."
-            )
-        if "commit" not in data:
-            raise ValueError(
-                f"'{source_filepath}' seems not to be a valid benchmark-results-file ('commit' field not found)."
-            )
-        if "benchmarks" not in data:
-            raise ValueError(
-                f"'{source_filepath}' seems not to be a valid benchmark-results-file ('benchmarks' field not found)."
-            )
-
-        self.source_filepath: pathlib.PurePath = source_filepath
-        self.data: Dict = data
-
-    # Parses a JSON benchmark results file and makes some sanity checks
-    @staticmethod
-    def load_from_file(filepath: pathlib.Path):
-        try:
-            data = json.loads(filepath.read_bytes())
-        except json.JSONDecodeError as e:
-            raise ValueError(f"'{filepath}' seems not to be a valid JSON file: {e.msg}")
-        return JSONBackedBenchmarkData(filepath, data)
-
-    # A convenience wrapper around `loadFromFile` that accepts a sequence of paths and returns a sequence of JSONBackedBenchmarkData objects as a generator.
-    @staticmethod
-    def load_many_from_files(filepaths: Sequence[pathlib.Path]):
-        return (
-            JSONBackedBenchmarkData.load_from_file(filepath) for filepath in filepaths
-        )
-
-
-# Merges the benchmark results from `right` into `left` and returns the updated `left`
-def _merge_two_resultsets(
-    left: JSONBackedBenchmarkData, right: JSONBackedBenchmarkData
-) -> JSONBackedBenchmarkData:
-    if left.data["commit"] != right.data["commit"]:
-        raise ValueError(
-            f"'{right.source_filepath}' and the previous files are based on different commits ({left.data['commit']} != {right.data['commit']}). Merging not supported."
-        )
-    left.data["benchmarks"].extend(right.data["benchmarks"])
-    return left
-
-
-def merge_results(benchmark_results: Sequence[JSONBackedBenchmarkData]):
-    return functools.reduce(_merge_two_resultsets, benchmark_results)
-
-
-def _merge_results_handler(
-    benchmark_results_files: Sequence[pathlib.Path], **_unused_args
-):
-    print(
-        json.dumps(
-            merge_results(
-                JSONBackedBenchmarkData.load_many_from_files(benchmark_results_files)
-            )
-        )
-    )
-
-
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Miscellaneous tool to help work with benchmark suite and benchmark CI."
     )
 
-    subparser = parser.add_subparsers(
-        required=True, title="operation", dest="operation"
-    )
+    subparser = parser.add_subparsers(required=True, title="operation")
     dump_cmds_parser = subparser.add_parser(
         "dump-cmds", help="Dump the commands to compile and run benchmarks manually."
     )
@@ -257,22 +184,9 @@ def _parse_arguments() -> argparse.Namespace:
     )
     dump_cmds_parser.set_defaults(handler=_dump_cmds_handler)
 
-    merge_results_parser = subparser.add_parser(
-        "merge-results",
-        help="Merges the results from multiple benchmark results JSON files into a single JSON structure.",
-    )
-    merge_results_parser.add_argument(
-        "benchmark_results_files",
-        type=pathlib.Path,
-        nargs="+",
-        help="One or more benchmark results JSON file paths",
-    )
-    merge_results_parser.set_defaults(handler=_merge_results_handler)
-
     args = parser.parse_args()
     if (
-        args.operation == "dump-cmds"
-        and args.execution_benchmark_config is None
+        args.execution_benchmark_config is None
         and args.compilation_benchmark_config is None
     ):
         parser.error(
