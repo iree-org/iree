@@ -12,15 +12,10 @@
 # the script to learn about the required setup.
 #
 # IREE_NORMAL_BENCHMARK_TOOLS_DIR needs to point to a directory contains IREE
-# benchmark tools. See benchmarks/README.md for more information.
-#
-# Command line arguments:
-# 1. The path of e2e test artifacts directory
-# 2. The path of IREE benchmark run config
-# 3. The target device name
-# 4. The shard index
-# 5. The path to write benchmark results
-# 6. The path to write benchmark traces
+# benchmark tools. See benchmarks/README.md for more information. The first
+# argument is the path of e2e test artifacts directory. The second argument is
+# the path of IREE benchmark run config. The third argument is the path to write
+# benchmark results.
 
 set -euo pipefail
 
@@ -31,9 +26,8 @@ TRACY_CAPTURE_TOOL="${IREE_TRACY_CAPTURE_TOOL}"
 E2E_TEST_ARTIFACTS_DIR="${1:-${IREE_E2E_TEST_ARTIFACTS_DIR}}"
 EXECUTION_BENCHMARK_CONFIG="${2:-${IREE_EXECUTION_BENCHMARK_CONFIG}}"
 TARGET_DEVICE_NAME="${3:-${IREE_TARGET_DEVICE_NAME}}"
-SHARD_INDEX="${4:-${IREE_SHARD_INDEX}}"
-BENCHMARK_RESULTS="${5:-${IREE_BENCHMARK_RESULTS}}"
-BENCHMARK_TRACES="${6:-${IREE_BENCHMARK_TRACES}}"
+BENCHMARK_RESULTS="${4:-${IREE_BENCHMARK_RESULTS}}"
+BENCHMARK_TRACES="${5:-${IREE_BENCHMARK_TRACES}}"
 
 if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
@@ -48,7 +42,6 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
         --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
         --target_device_name="${TARGET_DEVICE_NAME}" \
-        --shard_index="${SHARD_INDEX}" \
         --output="${BENCHMARK_RESULTS}" \
         --verbose
 elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
@@ -62,7 +55,6 @@ elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
         --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
         --target_device_name="${TARGET_DEVICE_NAME}" \
-        --shard_index="${SHARD_INDEX}" \
         --output="${BENCHMARK_RESULTS}" \
         --device_model=GCP-c2-standard-16 \
         --cpu_uarch=CascadeLake \
@@ -76,7 +68,6 @@ elif [[ "${TARGET_DEVICE_NAME}" =~ ^(pixel-4|pixel-6-pro|moto-edge-x30)$ ]]; the
     --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
     --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
     --target_device_name="${TARGET_DEVICE_NAME}" \
-    --shard_index="${SHARD_INDEX}" \
     --output="${BENCHMARK_RESULTS}" \
     --pin-cpu-freq \
     --pin-gpu-freq \

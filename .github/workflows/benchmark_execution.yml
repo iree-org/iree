@@ -69,38 +69,10 @@ jobs:
         id: generate
         run: |
           gcloud storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}"
-          # This jq command takes a benchmark config with the following structure:
-          #
-          #   { "target_device_name" : {
-          #      "host_environment" : { ... },
-          #      "shards" : [ { ... }, { ... } ]
-          #     },
-          #     "other_target_device_name" : { ... }
-          #
-          # and turns it into a flat list of benchmark jobs:
-          #
-          #   [
-          #     { "device_name" : "target_device_name",
-          #       "host_environment" : { ... },
-          #       "shard" : { index: 0, count: 2 }
-          #     },
-          #     { "device_name" : "target_device_name",
-          #       "host_environment" : { ... },
-          #       "shard" : { index: 1, count: 2 }
-          #     },
-          #     { "device_name" : "other_target_device_name",
-          #       "host_environment" : { ... },
-          #       "shard" : { index: 0, count: N }
-          #     },
-          #     ...
-          #   ]
-          echo benchmark-matrix="$(jq -c '[ . | to_entries[]
-            | .key as $device_name
-            | .value.host_environment as $host_environment
-            | (.value.shards | length) as $count
-            | .value.shards[]
-            | {$device_name, $host_environment, shard: {index, $count}}
-            ]' "${BENCHMARK_CONFIG}")" >> "${GITHUB_OUTPUT}"
+          echo benchmark-matrix=$(jq \
+              'to_entries | map({"device_name": .key, "host_environment": .value.host_environment})' \
+              "${BENCHMARK_CONFIG}") \
+            >> "${GITHUB_OUTPUT}"
 
   run_benchmarks:
     needs: [generate_matrix]
@@ -119,8 +91,6 @@ jobs:
       - machine-type=${{ matrix.benchmark.device_name }}
     env:
       DEVICE_NAME: ${{ matrix.benchmark.device_name }}
-      SHARD_INDEX: ${{ matrix.benchmark.shard.index }}
-      SHARD_COUNT: ${{ matrix.benchmark.shard.count }}
       PLATFORM_ARCH: ${{ matrix.benchmark.host_environment.platform }}-${{ matrix.benchmark.host_environment.architecture }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ inputs.e2e-test-artifacts-gcs-artifact-dir }}
       E2E_TEST_ARTIFACTS_DIR: ${{ inputs.e2e-test-artifacts-dir }}
@@ -152,9 +122,8 @@ jobs:
           mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
           jq -r \
             --arg DEVICE_NAME "${DEVICE_NAME}" \
-            --arg SHARD_INDEX "${SHARD_INDEX}" \
             --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
-            '.[$DEVICE_NAME].shards[($SHARD_INDEX | tonumber)] | .module_dir_paths[] | "\($GCS_ARTIFACT_DIR)/\(.)"' \
+            '.[$DEVICE_NAME] | .module_dir_paths | map("\($GCS_ARTIFACT_DIR)/\(.)") | join("\n")' \
             "${BENCHMARK_CONFIG}" | \
             gcloud storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
@@ -170,14 +139,6 @@ jobs:
           echo "normal-benchmark-tools-dir=${BENCHMARK_TOOLS_DIR}/build/tools" >> "${GITHUB_OUTPUT}"
           echo "traced-benchmark-tools-dir=${BENCHMARK_TOOLS_DIR}/build-traced/tools" >> "${GITHUB_OUTPUT}"
           echo "tracy-capture-tool=${BENCHMARK_TOOLS_DIR}/build-traced/tracy-capture" >> "${GITHUB_OUTPUT}"
-      - name: "Determine Shard Suffix"
-        id: sharding
-        run: |
-          if (( SHARD_COUNT > 1 )); then
-            echo "suffix=$(printf -- "-%02d-of-%02d" "${SHARD_INDEX}" "${SHARD_COUNT}")" >> "${GITHUB_OUTPUT}"
-          else
-            echo "suffix=" >> "${GITHUB_OUTPUT}"
-          fi
       - name: "Running benchmarks"
         env:
           IREE_EXECUTION_BENCHMARK_CONFIG: ${{ steps.download-assets.outputs.benchmark-config }}
@@ -186,10 +147,9 @@ jobs:
           IREE_TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
           IREE_TRACY_CAPTURE_TOOL: ${{ steps.unpack-tools.outputs.tracy-capture-tool }}
           IREE_TARGET_DEVICE_NAME: ${{ env.DEVICE_NAME }}
-          IREE_SHARD_INDEX: ${{ matrix.benchmark.shard.index }}
           IREE_E2E_TEST_ARTIFACTS_DIR: ${{ env.E2E_TEST_ARTIFACTS_DIR }}
-          IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}${{ steps.sharding.outputs.suffix }}.json
-          IREE_BENCHMARK_TRACES: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-traces-${{ matrix.benchmark.device_name }}${{ steps.sharding.outputs.suffix }}.tar.gz
+          IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}.json
+          IREE_BENCHMARK_TRACES: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-traces-${{ matrix.benchmark.device_name }}.tar.gz
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
           ./build_tools/benchmarks/run_benchmarks.sh

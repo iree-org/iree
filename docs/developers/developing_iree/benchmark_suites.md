@@ -305,9 +305,6 @@ Benchmark raw results and traces can be downloaded at:
 # Execution benchmark raw results
 gcloud storage cp "${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/benchmark-results-*.json" .
 
-# Optional: Merge raw results into a single file
-build_tools/benchmarks/benchmark_helper.py merge-results benchmark-results-*.json > benchmark_results.json
-
 # Execution benchmark traces
 gcloud storage cp "${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/benchmark-traces-*.tar.gz" .
 
