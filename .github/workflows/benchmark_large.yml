@@ -13,6 +13,16 @@ on:
     # Scheduled to run at 09:00 UTC and 21:00 UTC.
     - cron: '0 09,21 * * *'
   workflow_dispatch:
+    inputs:
+      shard-count:
+        description: |
+          A device-name to integer mapping as a comma separated list.
+          Allows to assign a distinct shard count for each target device.
+          The reserved keyword `default` assigns a shard count to all target devices
+          that are not explicitly listed.
+        # Please keep this default value in sync with the jobs.build_e2e_test_artifacts.with.shard-count field below
+        default: a2-highgpu-1g=1,c2-standard-16=2,default=1
+        type: string
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
@@ -65,6 +75,8 @@ jobs:
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       benchmark-presets: cuda-large,comp-stats-large,x86_64-large
       build-default-benchmark-suites: 0
+      # Please keep the shard count default value in sync with on.workflow_dispatch.shard-count.default
+      shard-count: ${{ inputs && inputs.shard_count || 'a2-highgpu-1g=1,c2-standard-16=2,default=1' }}
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]
