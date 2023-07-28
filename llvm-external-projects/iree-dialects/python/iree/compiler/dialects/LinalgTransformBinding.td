@@ -7,7 +7,6 @@
 #ifndef PYTHON_BINDINGS_IREE_LINALGTRANSFORM_BINDING
 #define PYTHON_BINDINGS_IREE_LINALGTRANSFORM_BINDING
 
-include "mlir/Bindings/Python/Attributes.td"
 include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.td"
 
 #endif // PYTHON_BINDINGS_IREE_LINALGTRANSFORM_BINDING
