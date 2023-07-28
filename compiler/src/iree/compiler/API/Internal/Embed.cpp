@@ -581,9 +581,11 @@ Invocation::Invocation(Session &session)
   // Since the jitter invokes much of the top-level compiler recursively,
   // it must be injected at the top-level here vs in the pass pipeline
   // (or else the circular dependency cannot be resolved).
-  pipelineHooks.buildConstEvalPassPipelineCallback = [](OpPassManager &pm) {
-    pm.addPass(ConstEval::createJitGlobalsPass());
-  };
+  auto &targetRegistry = session.targetRegistry;
+  pipelineHooks.buildConstEvalPassPipelineCallback =
+      [&targetRegistry](OpPassManager &pm) {
+        pm.addPass(ConstEval::createJitGlobalsPass(targetRegistry));
+      };
   // The PluginSession implements PipelineExtensions and delegates it to
   // activated plugins.
   pipelineHooks.pipelineExtensions = &session.pluginSession;

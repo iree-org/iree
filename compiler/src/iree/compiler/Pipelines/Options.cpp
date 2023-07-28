@@ -105,7 +105,7 @@ void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>(
       "iree-opt-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "
-                     "compiler and runtime."),
+                     "compiler and runtime (on by default)."),
       llvm::cl::cat(category));
   binder.opt<bool>(
       "iree-opt-const-expr-hoisting", constExprHoisting,

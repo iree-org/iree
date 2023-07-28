@@ -12,6 +12,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -28,16 +29,9 @@ public:
   using ResultsCallback = std::function<LogicalResult(iree_vm_list_t *outputs)>;
   virtual ~CompiledBinary();
 
-  // Invokes a nullary function.
-  LogicalResult invokeNullary(Location loc, StringRef name,
-                              ResultsCallback callback);
-
-  // Invokes a nullary function and returns its (presumed single) single result
-  // as an Attribute.
-  Attribute invokeNullaryAsAttribute(Location loc, StringRef name);
-
-  // Whether the given type is supported in *AsAttribute methods.
-  static bool isSupportedResultType(Type type);
+  iree_hal_allocator_t *getAllocator() {
+    return iree_hal_device_allocator(device.get());
+  }
 
 protected:
   CompiledBinary();
@@ -46,12 +40,32 @@ protected:
   // explicitly by subclasses, ensuring that any backing images remain valid
   // through the call to deinitialize().
   void deinitialize();
-  Attribute convertVariantToAttribute(Location loc, iree_vm_variant_t &variant);
+  TypedAttr convertVariantToAttribute(Location loc, iree_vm_variant_t &variant);
 
   iree::vm::ref<iree_hal_device_t> device;
   iree::vm::ref<iree_vm_module_t> hal_module;
   iree::vm::ref<iree_vm_module_t> main_module;
   iree::vm::ref<iree_vm_context_t> context;
+
+  friend class FunctionCall;
+};
+
+class FunctionCall {
+public:
+  FunctionCall(CompiledBinary &binary, iree_host_size_t argCapacity,
+               iree_host_size_t resultCapacity);
+
+  LogicalResult addArgument(Location loc, Attribute attr);
+  LogicalResult invoke(Location loc, StringRef name);
+  LogicalResult getResultAsAttr(Location loc, size_t index, TypedAttr &outAttr);
+
+private:
+  LogicalResult importBufferForRead(Location loc, const uint8_t *rawData,
+                                    iree_host_size_t length,
+                                    iree_hal_buffer_t **buffer);
+  CompiledBinary binary;
+  iree::vm::ref<iree_vm_list_t> inputs;
+  iree::vm::ref<iree_vm_list_t> outputs;
 };
 
 // An in-memory compiled binary and accessors for working with it.

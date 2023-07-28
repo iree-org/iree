@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-consteval-jit-globals %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-consteval-jit-use-vmvx=true --verify-diagnostics --iree-consteval-jit-debug --iree-consteval-jit-globals  %s | FileCheck %s
 
 // TODO(laurenzo): Full type matrix for tests.
 
@@ -22,7 +22,7 @@ module @linalg_tensor_jit {
     return %hoisted : tensor<5x6xf32>
   }
   // CHECK-NOT: util.initializer
-  util.initializer {
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<2.0e+02> : tensor<f32>
     %0 = tensor.empty() : tensor<5x6xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst : tensor<f32>) outs(%0 : tensor<5x6xf32>) {
@@ -49,7 +49,7 @@ module @eval_splat_detection {
     %hoisted = util.global.load @hoisted : tensor<2xi32>
     return %hoisted : tensor<2xi32>
   }
-  util.initializer {
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 2]> : tensor<2xi32>
     util.global.store %cst, @hoisted : tensor<2xi32>
     util.initializer.return
@@ -59,15 +59,14 @@ module @eval_splat_detection {
 
 // -----
 // CHECK-LABEL: @eval_f16_tensor
-// Not currently supported (initializer should remain)
-// CHECK: util.initializer
 module @eval_f16_tensor {
   util.global private @hoisted : tensor<5x6xf16>
   func.func @main() -> tensor<5x6xf16> {
     %hoisted = util.global.load @hoisted : tensor<5x6xf16>
     return %hoisted : tensor<5x6xf16>
   }
-  util.initializer {
+  // expected-warning @+1 {{unsupported type for current jit configuration}}
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<2.0e+2> : tensor<5x6xf16>
     util.global.store %cst, @hoisted : tensor<5x6xf16>
     util.initializer.return
@@ -77,14 +76,14 @@ module @eval_f16_tensor {
 // -----
 // CHECK-LABEL: @eval_bf16_tensor
 // Not currently supported (initializer should remain)
-// CHECK: util.initializer
 module @eval_bf16_tensor {
   util.global private @hoisted : tensor<5x6xbf16>
   func.func @main() -> tensor<5x6xbf16> {
     %hoisted = util.global.load @hoisted : tensor<5x6xbf16>
     return %hoisted : tensor<5x6xbf16>
   }
-  util.initializer {
+  // expected-warning @+1 {{unsupported type for current jit configuration}}
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<2.0e+2> : tensor<5x6xbf16>
     util.global.store %cst, @hoisted : tensor<5x6xbf16>
     util.initializer.return
@@ -100,7 +99,7 @@ module @eval_f32_tensor {
     %hoisted = util.global.load @hoisted : tensor<2xf32>
     return %hoisted : tensor<2xf32>
   }
-  util.initializer {
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2.0e+2, 3.2e+3]> : tensor<2xf32>
     util.global.store %cst, @hoisted : tensor<2xf32>
     util.initializer.return
@@ -109,15 +108,14 @@ module @eval_f32_tensor {
 
 // -----
 // CHECK-LABEL: @eval_f64_tensor
-// Not currently supported (initializer should remain)
-// CHECK: util.initializer
 module @eval_f64_tensor {
   util.global private @hoisted : tensor<2xf64>
   func.func @main() -> tensor<2xf64> {
     %hoisted = util.global.load @hoisted : tensor<2xf64>
     return %hoisted : tensor<2xf64>
   }
-  util.initializer {
+  // expected-warning @+1 {{unsupported type for current jit configuration}}
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2.0e+2, 3.2e+3]> : tensor<2xf64>
     util.global.store %cst, @hoisted : tensor<2xf64>
     util.initializer.return
@@ -133,7 +131,7 @@ module @eval_i1_tensor {
     %hoisted = util.global.load @hoisted : tensor<6xi1>
     return %hoisted : tensor<6xi1>
   }
-  util.initializer {
+  util.initializer attributes {iree.compiler.consteval} {
     // Note that the level we are testing at is a bit odd in the way i1 vs
     // i8 are handled.
     %cst = arith.constant dense<[0, 1, 0, 1, 1, 0]> : tensor<6xi8>
@@ -145,14 +143,14 @@ module @eval_i1_tensor {
 
 // -----
 // CHECK-LABEL: @eval_i4_tensor
-// CHECK: util.initializer
 module @eval_i4_tensor {
   util.global private @hoisted : tensor<5x6xi4>
   func.func @main() -> tensor<5x6xi4> {
     %hoisted = util.global.load @hoisted : tensor<5x6xi4>
     return %hoisted : tensor<5x6xi4>
   }
-  util.initializer {
+  // expected-warning @+1 {{unsupported type for current jit configuration}}
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<3> : tensor<5x6xi4>
     util.global.store %cst, @hoisted : tensor<5x6xi4>
     util.initializer.return
@@ -168,7 +166,7 @@ module @eval_i8_tensor {
     %hoisted = util.global.load @hoisted : tensor<2xi8>
     return %hoisted : tensor<2xi8>
   }
-  util.initializer {
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 3]> : tensor<2xi8>
     util.global.store %cst, @hoisted : tensor<2xi8>
     util.initializer.return
@@ -184,7 +182,7 @@ module @eval_i16_tensor {
     %hoisted = util.global.load @hoisted : tensor<2xi16>
     return %hoisted : tensor<2xi16>
   }
-  util.initializer {
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 3]> : tensor<2xi16>
     util.global.store %cst, @hoisted : tensor<2xi16>
     util.initializer.return
@@ -200,7 +198,7 @@ module @eval_i32_tensor {
     %hoisted = util.global.load @hoisted : tensor<2xi32>
     return %hoisted : tensor<2xi32>
   }
-  util.initializer {
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 3]> : tensor<2xi32>
     util.global.store %cst, @hoisted : tensor<2xi32>
     util.initializer.return
@@ -216,7 +214,7 @@ module @eval_i64_tensor {
     %hoisted = util.global.load @hoisted : tensor<2xi64>
     return %hoisted : tensor<2xi64>
   }
-  util.initializer {
+  util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 3]> : tensor<2xi64>
     util.global.store %cst, @hoisted : tensor<2xi64>
     util.initializer.return
