@@ -2564,6 +2564,65 @@ can be disassembled using
   C --&gt; D([Stream])
   D --&gt; E([HAL])
   E --&gt; F([VM])</code></pre>
+<details class="tip">
+<summary>Tip - available phases</summary>
+<p>These are the phase names available for use with the <code>--compile-to</code> and
+<code>--compile-from</code> flags described below:</p>
+<table>
+<thead>
+<tr>
+<th>Phase name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input</code></td>
+<td>Performs input processing and lowering into core IREE input dialects (linalg/etc)</td>
+</tr>
+<tr>
+<td><code>abi</code></td>
+<td>Adjusts the program ABI for the specified execution environment</td>
+</tr>
+<tr>
+<td><code>preprocessing</code></td>
+<td>Applies customizable <code>preprocessing</code> prior to FLow/Stream/HAL/VM</td>
+</tr>
+<tr>
+<td><code>flow</code></td>
+<td>Models execution data flow and partitioning using the <code>flow</code> dialect</td>
+</tr>
+<tr>
+<td><code>stream</code></td>
+<td>Models execution partitioning and scheduling using the <code>stream</code> dialect</td>
+</tr>
+<tr>
+<td><code>executable-sources</code></td>
+<td>Prepares <code>hal</code> dialect executables for translation, prior to codegen</td>
+</tr>
+<tr>
+<td><code>executable-targets</code></td>
+<td>Runs code generation for <code>hal</code> dialect executables</td>
+</tr>
+<tr>
+<td><code>hal</code></td>
+<td>Finishes <code>hal</code> dialect processing</td>
+</tr>
+<tr>
+<td><code>vm</code></td>
+<td>Lowers to IREE's abstract virtual machine using the <code>vm</code> dialect</td>
+</tr>
+<tr>
+<td><code>end</code></td>
+<td>Completes the full compilation pipeline</td>
+</tr>
+</tbody>
+</table>
+<p>For an accurate list of phases, see the source code or check the help output
+with a command such as:</p>
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>--help<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;/--compile-to/,/--/p&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span>-1
+</code></pre></div>
+</details>
 <p>You can output a program snapshot at intermediate phases with the
 <code>--compile-to=&lt;phase name&gt;</code> flag:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>cat<span class="w"> </span>simple_abs.mlir
