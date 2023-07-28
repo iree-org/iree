@@ -398,6 +398,31 @@ graph LR
   E --> F([VM])
 ```
 
+??? tip "Tip - available phases"
+
+    These are the phase names available for use with the `--compile-to` and
+    `--compile-from` flags described below:
+
+    | Phase name | Description |
+    | ---------- | ----------- |
+    `input` | Performs input processing and lowering into core IREE input dialects (linalg/etc)
+    `abi` | Adjusts the program ABI for the specified execution environment
+    `preprocessing` | Applies customizable `preprocessing` prior to FLow/Stream/HAL/VM
+    `flow` | Models execution data flow and partitioning using the `flow` dialect
+    `stream` | Models execution partitioning and scheduling using the `stream` dialect
+    `executable-sources` | Prepares `hal` dialect executables for translation, prior to codegen
+    `executable-targets` | Runs code generation for `hal` dialect executables
+    `hal` | Finishes `hal` dialect processing
+    `vm` | Lowers to IREE's abstract virtual machine using the `vm` dialect
+    `end` | Completes the full compilation pipeline
+
+    For an accurate list of phases, see the source code or check the help output
+    with a command such as:
+
+    ```shell
+    iree-compile --help | sed -n '/--compile-to/,/--/p' | head -n -1
+    ```
+
 You can output a program snapshot at intermediate phases with the
 `--compile-to=<phase name>` flag:
 
