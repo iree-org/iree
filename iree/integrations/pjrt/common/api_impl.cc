@@ -1320,6 +1320,24 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
       for (auto arg : newArgv)
         if (!job->SetFlag(arg)) return MakeCompilerError(*job);
     }
+    // Set extra options, overriding env variables if appropriate.
+    for (auto [option, option_override] : options.env_option_overrides) {
+      std::string override_string;
+      if (auto override_val = std::get_if<std::string>(&option_override)) {
+        override_string = *override_val;
+      } else if (auto override_val = std::get_if<bool>(&option_override)) {
+        override_string = *override_val ? "true" : "false";
+      } else if (auto override_val = std::get_if<int64_t>(&option_override)) {
+        override_string = std::to_string(*override_val);
+      } else {
+        assert(false &&
+               "option value should be of type string, bool, or int64");
+      }
+      if (!job->SetFlag(
+              absl::StrCat("--", option, "=", override_string).c_str())) {
+        return MakeCompilerError(*job);
+      }
+    }
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
           /*label=*/"flags", /*extension=*/"txt", /*index=*/-1,
