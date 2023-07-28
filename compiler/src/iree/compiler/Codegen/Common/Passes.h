@@ -92,6 +92,10 @@ createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 /// during bufferization.
 std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 
+/// A pass to emulate memref load operations that use narrow integer types
+/// with equivalent operations on supported wide integer types.
+std::unique_ptr<OperationPass<ModuleOp>> createEmulateNarrowTypePass();
+
 /// Creates a pass to erase dead alloc ops where all uses are just store ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseDeadAllocAndStoresPass();
