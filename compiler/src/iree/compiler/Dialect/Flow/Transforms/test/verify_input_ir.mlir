@@ -47,3 +47,15 @@ func.func @check_linalg_ok(%conv : tensor<1x112x112x16xf32>, %bias : tensor<16xf
       } -> tensor<1x112x112x16xf32>
   return %result : tensor<1x112x112x16xf32>
 }
+
+// -----
+
+// expected-error@below {{illegal operations still remain}}
+func.func @check_f64_not_ok() -> tensor<3xf64> {
+    // expected-error@+2 {{illegal op still exists}}
+    // expected-error@+1 {{uses partially supported type f64}}
+    %cst = arith.constant dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf64>
+    // expected-error@+2 {{illegal op still exists}}
+    // expected-error@+1 {{uses partially supported type f64}}
+    return %cst : tensor<3xf64>
+}

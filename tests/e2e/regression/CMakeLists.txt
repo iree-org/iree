@@ -210,6 +210,7 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "-iree-opt-demote-f64-to-f32=false"
+    "-iree-flow-verify-no-f64=false"
 )
 
 iree_check_single_backend_test_suite(
