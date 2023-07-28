@@ -28,22 +28,22 @@ namespace IREE {
 namespace HAL {
 
 std::unique_ptr<llvm::TargetMachine>
-createTargetMachine(const LLVMTarget &target,
-                    const LLVMTargetOptions &targetOptions) {
+createTargetMachine(const LLVMTarget &target) {
   std::string errorMessage;
   auto llvmTarget =
-      llvm::TargetRegistry::lookupTarget(target.triple, errorMessage);
+      llvm::TargetRegistry::lookupTarget(target.getTriple(), errorMessage);
   if (!llvmTarget)
     return nullptr;
   std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
-      target.triple, target.cpu /* cpu e.g k8*/,
-      target.cpuFeatures /* cpu features e.g avx512fma*/, targetOptions.options,
-      llvm::Reloc::Model::PIC_, {}, targetOptions.codeGenOptLevel,
+      target.getTriple(), target.getCpu() /* cpu e.g k8*/,
+      target.getCpuFeatures() /* cpu features e.g avx512fma*/,
+      target.llvmTargetOptions, llvm::Reloc::Model::PIC_, {},
+      target.codeGenOptLevel,
       /*JIT=*/false));
   return machine;
 }
 
-LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
+LogicalResult runLLVMIRPasses(const LLVMTarget &target,
                               llvm::TargetMachine *machine,
                               llvm::Module *module) {
   llvm::LoopAnalysisManager loopAnalysisManager;
@@ -57,7 +57,7 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
       /*DebugLogging=*/false);
   standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
 
-  llvm::PassBuilder passBuilder(machine, options.pipelineTuningOptions, {},
+  llvm::PassBuilder passBuilder(machine, target.pipelineTuningOptions, {},
                                 &passInstrumentationCallbacks);
   llvm::AAManager aa = passBuilder.buildDefaultAAPipeline();
   functionAnalysisManager.registerPass([&] { return std::move(aa); });
@@ -69,7 +69,7 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
   passBuilder.crossRegisterProxies(loopAnalysisManager, functionAnalysisManager,
                                    cGSCCAnalysisManager, moduleAnalysisManager);
 
-  switch (options.sanitizerKind) {
+  switch (target.sanitizerKind) {
   case SanitizerKind::kNone:
     break;
   case SanitizerKind::kAddress: {
@@ -100,11 +100,11 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
   } break;
   }
 
-  if (options.optimizerOptLevel != llvm::OptimizationLevel::O0 ||
-      options.sanitizerKind != SanitizerKind::kNone) {
+  if (target.optimizerOptLevel != llvm::OptimizationLevel::O0 ||
+      target.sanitizerKind != SanitizerKind::kNone) {
     llvm::ModulePassManager modulePassManager;
     modulePassManager =
-        passBuilder.buildPerModuleDefaultPipeline(options.optimizerOptLevel);
+        passBuilder.buildPerModuleDefaultPipeline(target.optimizerOptLevel);
     modulePassManager.run(*module, moduleAnalysisManager);
   }
 

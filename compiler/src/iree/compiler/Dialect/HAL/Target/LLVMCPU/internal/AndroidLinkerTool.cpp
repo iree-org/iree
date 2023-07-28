@@ -208,7 +208,7 @@ public:
     };
 
     // Strip debug information (only, no relocations) when not requested.
-    if (!targetOptions.debugSymbols) {
+    if (!targetOptions.target.debugSymbols) {
       flagsToPrefixForLinker.push_back("--strip-debug");
     }
 
