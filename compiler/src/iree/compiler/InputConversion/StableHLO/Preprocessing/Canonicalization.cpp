@@ -1020,7 +1020,7 @@ struct ZeroExtentTensorCanon final : RewritePattern {
     bool didUpdate = false;
     for (auto result : op->getResults()) {
       auto resultType = isZeroExtent(result.getType());
-      if (!resultType) {
+      if (!resultType || result.use_empty()) {
         continue;
       }
       rewriter.replaceAllUsesWith(result, rewriter.create<tensor::EmptyOp>(

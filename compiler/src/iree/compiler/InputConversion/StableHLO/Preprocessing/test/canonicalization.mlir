@@ -679,3 +679,27 @@ func.func @scatter_zero_ext(%arg0 : tensor<f32>, %arg1 : tensor<1x0xi32>, %arg2 
 // CHECK-LABEL: @sort_zero_extent
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<0xi32>
 // CHECK: return %[[EMPTY]]
+
+// -----
+
+// CHECK-LABEL: @while_zero_extent
+// CHECK: %[[R0:.+]] = tensor.empty() : tensor<75x0xf32>
+// CHECK: %[[R1:.+]] = tensor.empty() : tensor<75x0xf32>
+// CHECK: %[[R2:.+]]:2 = stablehlo.while
+// CHECK: return %[[R2]]#0, %[[R0]]
+
+
+func.func public @while_zero_extent(%arg0: tensor<i32>, %arg1: tensor<3xf32>, %arg2: tensor<75x0xf32>) -> (tensor<i32>, tensor<75x0xf32>) {
+  %0 = stablehlo.constant dense<1> : tensor<i32>
+  %1 = stablehlo.constant dense<75> : tensor<i32>
+  %2 = stablehlo.constant dense<0> : tensor<i32>
+  %3:2 = stablehlo.while(%iterArg = %2, %iterArg_2 = %arg2) : tensor<i32>, tensor<75x0xf32>
+   cond {
+    %4 = stablehlo.compare  LT, %iterArg, %1,  SIGNED : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    stablehlo.return %4 : tensor<i1>
+  } do {
+    %44 = stablehlo.add %iterArg, %0 : tensor<i32>
+    stablehlo.return %44, %iterArg_2 : tensor<i32>, tensor<75x0xf32>
+  }
+  return %3#0, %3#1 : tensor<i32>, tensor<75x0xf32>
+}
