@@ -11,12 +11,13 @@ import sys
 import iree.runtime
 from iree.runtime.array_interop import DeviceArray
 import os
-from numpy.typing import ArrayLike
-from typing import List, Tuple
+from typing import List, Tuple, TypeVar
 import numpy as np
 import tempfile
 import subprocess
 import test_utils
+
+ArrayLike = TypeVar("ArrayLike")
 
 
 def parse_args():

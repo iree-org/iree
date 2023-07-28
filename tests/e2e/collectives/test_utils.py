@@ -4,9 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from numpy.typing import ArrayLike
-from typing import List
+from typing import List, TypeVar
 import numpy as np
+
+ArrayLike = TypeVar("ArrayLike")
 
 
 def read_numpy_arrays_from_file(filepath: str) -> List[ArrayLike]:
