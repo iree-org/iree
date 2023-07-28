@@ -397,6 +397,8 @@ static uint32_t flagForUser(IREE::LinalgExt::EncodingUser user) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32;
   case IREE::LinalgExt::EncodingUser::MATMUL_BF16BF16BF16:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
+  default:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 }
 

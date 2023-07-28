@@ -38,7 +38,7 @@ void LLVMCPUTensorPadPass::runOnOperation() {
   auto funcOp = getOperation();
   // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so we
   // can kick canonicalization patterns to fold outer tensor.pad ops away.
-  bool nofold;
+  bool nofold = false;
   utils::IteratorType targetIterType;
   switch (option) {
   case LLVMCPUTensorPadOption::ParallelDims:
