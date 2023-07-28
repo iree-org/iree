@@ -43,9 +43,7 @@ td_library(
         "include/iree-dialects/Dialect/LinalgExt/Passes/*.td",
         "include/iree-dialects/Dialect/LinalgTransform/*.td",
         "python/iree/compiler/dialects/*.td",
-    ]) + [
-        "@llvm-project//mlir:include/mlir/Bindings/Python/Attributes.td",
-    ],
+    ]),
     includes = ["include"],
     deps = [
         "@llvm-project//mlir:BuiltinDialectTdFiles",
