@@ -169,6 +169,7 @@ _mlirBlockGetNumArguments
 _mlirBlockGetParentOperation
 _mlirBlockGetParentRegion
 _mlirBlockGetTerminator
+_mlirBlockInsertArgument
 _mlirBlockInsertOwnedOperation
 _mlirBlockInsertOwnedOperationAfter
 _mlirBlockInsertOwnedOperationBefore
@@ -184,6 +185,8 @@ _mlirComplexTypeGetTypeID
 _mlirContextAppendDialectRegistry
 _mlirContextAttachDiagnosticHandler
 _mlirContextCreate
+_mlirContextCreateWithRegistry
+_mlirContextCreateWithThreading
 _mlirContextDestroy
 _mlirContextDetachDiagnosticHandler
 _mlirContextEnableMultithreading
@@ -195,6 +198,7 @@ _mlirContextGetOrLoadDialect
 _mlirContextIsRegisteredOperation
 _mlirContextLoadAllAvailableDialects
 _mlirContextSetAllowUnregisteredDialects
+_mlirContextSetThreadPool
 _mlirCreateExternalPass
 _mlirDenseArrayAttrGetTypeID
 _mlirDenseArrayGetNumElements
@@ -378,6 +382,8 @@ _mlirIntegerTypeSignedGet
 _mlirIntegerTypeUnsignedGet
 _mlirIsGlobalDebugEnabled
 _mlirLinalgFillBuiltinNamedOpRegion
+_mlirLlvmThreadPoolCreate
+_mlirLlvmThreadPoolDestroy
 _mlirLocationCallSiteGet
 _mlirLocationEqual
 _mlirLocationFileLineColGet
@@ -465,6 +471,7 @@ _mlirOperationRemoveAttributeByName
 _mlirOperationRemoveFromParent
 _mlirOperationSetAttributeByName
 _mlirOperationSetOperand
+_mlirOperationSetOperands
 _mlirOperationStateAddAttributes
 _mlirOperationStateAddOperands
 _mlirOperationStateAddOwnedRegions
@@ -505,6 +512,7 @@ _mlirRegionGetNextInOperation
 _mlirRegionInsertOwnedBlock
 _mlirRegionInsertOwnedBlockAfter
 _mlirRegionInsertOwnedBlockBefore
+_mlirRegionTakeBody
 _mlirRegisterLinalgPasses
 _mlirShapedTypeGetDimSize
 _mlirShapedTypeGetDynamicSize
