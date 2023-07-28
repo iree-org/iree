@@ -189,7 +189,7 @@ LogicalResult FunctionCall::importBufferForRead(Location loc,
       return success();
     else if (!(iree_status_is_out_of_range(status) ||
                iree_status_is_unavailable(status)))
-      return failure();
+      return handleRuntimeError(loc, status);
   }
 
   // Buffer is not compatible with import. Snapshot.
@@ -299,33 +299,6 @@ LogicalResult FunctionCall::getResultAsAttr(Location loc, size_t index,
     return failure();
 
   return success();
-}
-
-bool CompiledBinary::isSupportedResultType(Type type) {
-  // TODO(laurenzo): Not currently supported. VMVX would need to support these
-  // and today it doesn't. We could use alternative backends (LLVM CPU/etc) if
-  // we wanted to handle f64, but f16 and bf16 often need special hardware.
-  // if (llvm::isa<Float16Type>(type) || llvm::isa<BFloat16Type>(type) ||
-  //     llvm::isa<Float64Type>(type)) {
-  //   return false;
-  // }
-
-  // Support scalar int and float type of byte aligned widths.
-  if (type.isIntOrFloat() && type.getIntOrFloatBitWidth() % 8 == 0) {
-    return true;
-  }
-
-  // Special support for i1.
-  if (llvm::isa<IntegerType>(type) && type.getIntOrFloatBitWidth() == 1) {
-    return true;
-  }
-
-  // Support tensors.
-  if (auto tt = llvm::dyn_cast<RankedTensorType>(type)) {
-    return isSupportedResultType(tt.getElementType());
-  }
-
-  return false;
 }
 
 TypedAttr

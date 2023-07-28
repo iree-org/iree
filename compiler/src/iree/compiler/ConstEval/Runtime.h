@@ -33,13 +33,6 @@ public:
     return iree_hal_device_allocator(device.get());
   }
 
-  // Invokes a nullary function.
-  LogicalResult invokeNullary(Location loc, StringRef name,
-                              ResultsCallback callback);
-
-  // Whether the given type is supported in *AsAttribute methods.
-  static bool isSupportedResultType(Type type);
-
 protected:
   CompiledBinary();
   void initialize(void *data, size_t length);
