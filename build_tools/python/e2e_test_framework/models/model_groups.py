@@ -232,7 +232,8 @@ CUDA_MODELS = [
     torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     torch_models.MODEL_UNET_2D_FP32_TORCH,
     torch_models.EFFICIENTNET_B7_FP32_TORCH,
-    torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES[1],
+    # TODO(#14515): Enable the benchmark suite after regenerating models.
+    # torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES[1],
     torch_models.EFFICIENTNET_V2_S_FP16_TORCH,
 ]
 

@@ -202,13 +202,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-BertLargefp16PTBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230709.894_1688992116/BERT_LARGE_FP16_PT_384XI32_BATCH1/linalg.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-EfficientNetV2Sfp16PT"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230522.846_1684831160/EFFICIENTNET_V2_S_FP16/batch_1/linalg.mlir"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2Sfp16PT.mlir"

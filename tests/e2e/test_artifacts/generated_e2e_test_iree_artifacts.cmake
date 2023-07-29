@@ -731,18 +731,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "BertLargefp16PTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-EfficientNetV2Sfp16PT_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2Sfp16PT.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNetV2Sfp16PT_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
@@ -3580,22 +3568,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargefp16PTBatch1.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=none"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "BertLargefp16PTBatch1(linalg) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-EfficientNetV2Sfp16PT_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2Sfp16PT.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNetV2Sfp16PT_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
@@ -6199,7 +6171,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-PoseNet_fp32_tflite_
   ${PACKAGE_NAME}_model-BertForMaskedLMTF
   ${PACKAGE_NAME}_model-BertLargeTF
-  ${PACKAGE_NAME}_model-BertLargefp16PTBatch1
   ${PACKAGE_NAME}_model-ClipTextSeqLen64PT
   ${PACKAGE_NAME}_model-EfficientNetB7PT
   ${PACKAGE_NAME}_model-EfficientNetV2SPT
@@ -6360,7 +6331,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
-  ${PACKAGE_NAME}_iree-module-BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___nvidia-ampere-vulkan_linux-vulkan_spirv__experimental-flags_tensorcore_compile-stats_
   ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___nvidia-pascal-vulkan_linux-vulkan_spirv__experimental-flags_simt_compile-stats_
@@ -6565,7 +6535,6 @@ add_dependencies(iree-benchmark-suites-comp-stats-large
 add_dependencies(iree-benchmark-suites-cuda
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNetB7PT_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
@@ -6657,7 +6626,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
-  ${PACKAGE_NAME}_iree-module-BertLargefp16PTBatch1_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___nvidia-ampere-vulkan_linux-vulkan_spirv__experimental-flags_tensorcore_
   ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___nvidia-pascal-vulkan_linux-vulkan_spirv__experimental-flags_simt_
