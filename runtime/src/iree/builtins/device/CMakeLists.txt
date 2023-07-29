@@ -13,6 +13,8 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     device
+  COPTS
+    "-fno-strict-aliasing"
   HDRS
     "device.h"
   SRCS

@@ -34,6 +34,9 @@ iree_runtime_cc_library(
     name = "device",
     srcs = BITCODE_SRCS,
     hdrs = BITCODE_HDRS,
+    copts = [
+        "-fno-strict-aliasing",
+    ],
 )
 
 #===------------------------------------------------------------------------===#
