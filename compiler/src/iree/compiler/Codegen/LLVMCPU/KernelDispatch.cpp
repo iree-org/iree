@@ -608,10 +608,8 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   int64_t numLoops = lbs.size();
   assert(numLoops == minTileSizes.size() && maxTileSizes.size() == numLoops &&
          "expected as many min/max tile sizes as number of loops");
-  assert(
-      vectorSizeHints.empty() ||
-      vectorSizeHints.size() == numLoops &&
-          "vector size hints should be empty or equal to the number of loops");
+  assert((vectorSizeHints.empty() || vectorSizeHints.size() == numLoops) &&
+         "vector size hints should be empty or equal to the number of loops");
 
   // Only set values when the loop is partitionable.
   SmallVector<int64_t> adjustedMinTileSizes(numLoops, 0);
