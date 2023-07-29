@@ -63,6 +63,10 @@ IREE_API_EXPORT void iree_allocator_free(iree_allocator_t allocator,
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Built-in iree_allocator_t implementations
+//===----------------------------------------------------------------------===//
+
 static iree_status_t iree_allocator_system_alloc(
     iree_allocator_command_t command,
     const iree_allocator_alloc_params_t* params, void** inout_ptr) {
@@ -127,6 +131,87 @@ iree_allocator_system_ctl(void* self, iree_allocator_command_t command,
           command, (const iree_allocator_alloc_params_t*)params, inout_ptr);
     case IREE_ALLOCATOR_COMMAND_FREE:
       return iree_allocator_system_free(inout_ptr);
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unsupported system allocator command");
+  }
+}
+
+static iree_status_t iree_allocator_inline_arena_alloc(
+    iree_allocator_inline_storage_t* storage, iree_allocator_command_t command,
+    const iree_allocator_alloc_params_t* params, void** inout_ptr) {
+  IREE_ASSERT_ARGUMENT(params);
+  IREE_ASSERT_ARGUMENT(inout_ptr);
+  iree_host_size_t byte_length = params->byte_length;
+  if (IREE_UNLIKELY(byte_length == 0)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocations must be >0 bytes");
+  }
+
+  // Check for reallocation of the entire in-use storage as is common in
+  // growable arrays and builders. If this is a realloc of the storage then we
+  // can reset the storage and allocate at the head again.
+  void* existing_ptr = *inout_ptr;
+  if (existing_ptr && command == IREE_ALLOCATOR_COMMAND_REALLOC) {
+    if (existing_ptr == storage->buffer &&
+        storage->head_size == storage->length) {
+      storage->length = 0;
+      storage->head_size = 0;
+    } else {
+      return iree_make_status(
+          IREE_STATUS_INTERNAL,
+          "arena reallocs must cover the entire allocated memory space");
+    }
+  }
+
+  iree_host_size_t begin = iree_host_align(storage->length, iree_max_align_t);
+  iree_host_size_t end = begin + byte_length;
+  if (end > storage->capacity) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "arena has reached capacity %" PRIhsz
+                            " and cannot service %" PRIhsz,
+                            storage->capacity, byte_length);
+  }
+  void* new_ptr = storage->buffer + begin;
+  storage->length = end;
+
+  if (begin == 0) {
+    storage->head_size = byte_length;
+  }
+
+  if (command == IREE_ALLOCATOR_COMMAND_CALLOC) {
+    memset(new_ptr, 0, byte_length);
+  }
+
+  *inout_ptr = new_ptr;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_allocator_inline_arena_free(
+    iree_allocator_inline_storage_t* storage, void** inout_ptr) {
+  IREE_ASSERT_ARGUMENT(inout_ptr);
+  void* ptr = *inout_ptr;
+  if (ptr == storage->buffer && storage->head_size == storage->length) {
+    // Freeing the entire storage buffer; reset the arena.
+    storage->length = 0;
+    storage->head_size = 0;
+  }
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t
+iree_allocator_inline_arena_ctl(void* self, iree_allocator_command_t command,
+                                const void* params, void** inout_ptr) {
+  switch (command) {
+    case IREE_ALLOCATOR_COMMAND_MALLOC:
+    case IREE_ALLOCATOR_COMMAND_CALLOC:
+    case IREE_ALLOCATOR_COMMAND_REALLOC:
+      return iree_allocator_inline_arena_alloc(
+          (iree_allocator_inline_storage_t*)self, command,
+          (const iree_allocator_alloc_params_t*)params, inout_ptr);
+    case IREE_ALLOCATOR_COMMAND_FREE:
+      return iree_allocator_inline_arena_free(
+          (iree_allocator_inline_storage_t*)self, inout_ptr);
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "unsupported system allocator command");
