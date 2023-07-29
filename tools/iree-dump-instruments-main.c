@@ -180,7 +180,8 @@ static iree_status_t iree_tooling_dump_dispatch_ringbuffer(
         const iree_instrument_dispatch_print_t* print =
             (const iree_instrument_dispatch_print_t*)header;
         fprintf(stream, "%016" PRIX64 " | PRINT %.*s\n",
-                print->workgroup_offset, (int)print->length, print->data);
+                (uint64_t)print->workgroup_offset, (int)print->length,
+                print->data);
         i += iree_host_align(sizeof(*print) + print->length, 16);
         break;
       }
