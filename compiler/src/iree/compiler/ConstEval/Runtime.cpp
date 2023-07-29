@@ -219,7 +219,7 @@ LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
     for (size_t i = 0; i < rank; ++i) {
       shape[i] = stShape[i];
     }
-    iree_hal_element_type_t elementType;
+    iree_hal_element_type_t elementType = IREE_HAL_ELEMENT_TYPE_NONE;
     if (failed(convertToElementType(loc, st.getElementType(), &elementType)))
       return failure();
 
