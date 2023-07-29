@@ -38,8 +38,8 @@ void LLVMCPUTensorPadPass::runOnOperation() {
   auto funcOp = getOperation();
   // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so we
   // can kick canonicalization patterns to fold outer tensor.pad ops away.
-  bool nofold;
-  utils::IteratorType targetIterType;
+  bool nofold = false;
+  utils::IteratorType targetIterType = utils::IteratorType::parallel;
   switch (option) {
   case LLVMCPUTensorPadOption::ParallelDims:
     LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
@@ -50,6 +50,9 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
     targetIterType = utils::IteratorType::reduction;
     nofold = true;
+    break;
+  default: // Unreachable.
+    assert(false);
     break;
   };
   SmallVector<linalg::LinalgOp> candidates;

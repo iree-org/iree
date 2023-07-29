@@ -397,6 +397,9 @@ static uint32_t flagForUser(IREE::LinalgExt::EncodingUser user) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32;
   case IREE::LinalgExt::EncodingUser::MATMUL_BF16BF16BF16:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
+  default: // Unreachable.
+    assert(false);
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 }
 
@@ -408,6 +411,9 @@ static uint32_t flagForRole(IREE::LinalgExt::EncodingRole role) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
   case IREE::LinalgExt::EncodingRole::RESULT:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
+  default: // Unreachable.
+    assert(false);
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
   }
 }
 
