@@ -225,8 +225,9 @@ Status ConfigureTargetBackends(iree_compiler_session_t* session,
     const char* compiler_argv[1] = {
         target_backends_flag.c_str(),
     };
-    if (auto error = ireeCompilerSessionSetFlags(
-            session, IREE_ARRAYSIZE(compiler_argv), compiler_argv)) {
+    auto error = ireeCompilerSessionSetFlags(
+        session, IREE_ARRAYSIZE(compiler_argv), compiler_argv);
+    if (error) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "unable to set inferred target backend flag to `%.*s`",
