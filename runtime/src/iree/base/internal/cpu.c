@@ -196,7 +196,7 @@ static inline iree_cpuid_regs_t iree_cpuid_raw(uint32_t eax, uint32_t ecx) {
   regs.ecx = regs_array[2];
   regs.edx = regs_array[3];
 #else
-#error What's the __cpuidex built-in for this compiler?
+#error What is the __cpuidex built-in for this compiler?
 #endif
   return regs;
 }
