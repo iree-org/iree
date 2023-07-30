@@ -19,12 +19,6 @@
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
 
-// The maximal number of descriptor bindings supported in the CUDA HAL driver.
-#define IREE_HAL_CUDA_MAX_BINDING_COUNT 64
-// The maximal number of kernel arguments supported in the CUDA HAL driver for
-// descriptor bindings and push constants.
-#define IREE_HAL_CUDA_MAX_KERNEL_ARG 128
-
 // Segmented submission management
 //
 // In a CUDA graph, buffer management and kernel launches are represented as
@@ -78,23 +72,30 @@ typedef struct iree_hal_cuda2_barrier_segment_t {
 
 // API data for dispatch command segments.
 typedef struct iree_hal_cuda2_dispatch_segment_t {
-  // Compute kernel information--kernel object, pipeline layout, threadgroup
-  // size, etc.
-  iree_hal_cuda2_kernel_params_t kernel_params;
+  // Compute kernel information--kernel function, pipeline layout, block
+  // dimensions, and so on.
+  iree_hal_cuda2_kernel_info_t kernel_info;
 
   // Workgroup count information.
   uint32_t workgroup_count[3];
 
-  // The number of descriptors bound for this dispatch.
-  iree_host_size_t descriptor_count;
-  // The list of bound descriptors, pointing to the end of the segment
+  // The list of kernel parameters, pointing to the end of the current segment
   // allocation.
-  // Note that in CUDA we don't have dedicated mechanisms for push constants, so
-  // they are passed in as descriptors too.
-  void** descriptors;
+  //
+  // This holds a flattened list of all bound descriptor set bindings, with push
+  // constants appended at the end.
+  //
+  // Also, per the CUDA API requirements, we need two levels of indirection
+  // for passing kernel arguments in--"If the kernel has N parameters, then
+  // kernelParams needs to be an array of N pointers. Each pointer, from
+  // kernelParams[0] to kernelParams[N-1], points to the region of memory from
+  // which the actual parameter will be copied." It means each kernel_params[i]
+  // is itself a pointer to the corresponding element at the *second* inline
+  // allocation at the end of the current segment.
+  void** kernel_params;
 } iree_hal_cuda2_dispatch_segment_t;
-// + Additional inline allocation for holding all bound descriptors.
-// + Additional inline allocation for holding all bound descriptor contents.
+// + Additional inline allocation for holding kernel arguments.
+// + Additional inline allocation for holding kernel argument payloads.
 
 // API data for fill buffer command segments.
 typedef struct iree_hal_cuda2_fill_buffer_segment_t {
@@ -206,12 +207,14 @@ typedef struct iree_hal_cuda2_graph_command_buffer_t {
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
 
-  int32_t push_constant[IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT];
+  // The current active push constants.
+  int32_t push_constants[IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT];
 
-  // The current set of kernel arguments.
-  void* current_descriptor[];
+  // The current bound descriptor sets.
+  struct {
+    CUdeviceptr bindings[IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT];
+  } descriptor_sets[IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_COUNT];
 } iree_hal_cuda2_graph_command_buffer_t;
-// + Additional inline allocation for holding all kernel arguments.
 
 static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda2_graph_command_buffer_vtable;
@@ -244,11 +247,8 @@ iree_status_t iree_hal_cuda2_graph_command_buffer_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_cuda2_graph_command_buffer_t* command_buffer = NULL;
-  size_t total_size = sizeof(*command_buffer) +
-                      IREE_HAL_CUDA_MAX_KERNEL_ARG * sizeof(void*) +
-                      IREE_HAL_CUDA_MAX_KERNEL_ARG * sizeof(CUdeviceptr);
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, total_size,
+      z0, iree_allocator_malloc(host_allocator, sizeof(*command_buffer),
                                 (void**)&command_buffer));
 
   iree_hal_command_buffer_initialize(
@@ -262,12 +262,6 @@ iree_status_t iree_hal_cuda2_graph_command_buffer_create(
   command_buffer->cu_graph = NULL;
   command_buffer->cu_graph_exec = NULL;
   command_buffer->last_node = NULL;
-
-  CUdeviceptr* device_ptrs = (CUdeviceptr*)(command_buffer->current_descriptor +
-                                            IREE_HAL_CUDA_MAX_KERNEL_ARG);
-  for (size_t i = 0; i < IREE_HAL_CUDA_MAX_KERNEL_ARG; i++) {
-    command_buffer->current_descriptor[i] = &device_ptrs[i];
-  }
 
   iree_status_t status =
       iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
@@ -708,27 +702,10 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_push_constants(
       iree_hal_cuda2_graph_command_buffer_cast(base_command_buffer);
   iree_host_size_t constant_base_index = offset / sizeof(int32_t);
   for (iree_host_size_t i = 0; i < values_length / sizeof(int32_t); i++) {
-    command_buffer->push_constant[i + constant_base_index] =
+    command_buffer->push_constants[i + constant_base_index] =
         ((uint32_t*)values)[i];
   }
   return iree_ok_status();
-}
-
-typedef struct {
-  // The original index into the iree_hal_descriptor_set_binding_t array.
-  uint32_t index;
-  // The descriptor binding number.
-  uint32_t binding;
-} iree_hal_cuda2_binding_mapping_t;
-
-// Compares two iree_hal_cuda2_binding_mapping_t according to the descriptor
-// binding number.
-static int compare_binding_index(const void* a, const void* b) {
-  const iree_hal_cuda2_binding_mapping_t buffer_a =
-      *(const iree_hal_cuda2_binding_mapping_t*)a;
-  const iree_hal_cuda2_binding_mapping_t buffer_b =
-      *(const iree_hal_cuda2_binding_mapping_t*)b;
-  return buffer_a.binding < buffer_b.binding ? -1 : 1;
 }
 
 static iree_status_t iree_hal_cuda2_graph_command_buffer_push_descriptor_set(
@@ -736,49 +713,33 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_push_descriptor_set(
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
-  IREE_ASSERT_LT(binding_count, IREE_HAL_CUDA_MAX_BINDING_COUNT,
-                 "binding count larger than the max expected");
+  if (binding_count > IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "exceeded available binding slots for push "
+                            "descriptor set #%u; requested %lu vs. maximal %d",
+                            set, binding_count,
+                            IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT);
+  }
+
   iree_hal_cuda2_graph_command_buffer_t* command_buffer =
       iree_hal_cuda2_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_host_size_t base_binding =
-      iree_hal_cuda2_pipeline_layout_base_binding_index(pipeline_layout, set);
-
-  // Convention with the compiler side. We map descriptor bindings to kernel
-  // argument. We compact the descriptor binding number ranges to get a dense
-  // set of kernel arguments and keep them ordered based on the descriptor
-  // binding index.
-  iree_hal_cuda2_binding_mapping_t
-      sorted_bindings[IREE_HAL_CUDA_MAX_BINDING_COUNT];
+  CUdeviceptr* current_bindings = command_buffer->descriptor_sets[set].bindings;
   for (iree_host_size_t i = 0; i < binding_count; i++) {
-    sorted_bindings[i].index = i;
-    sorted_bindings[i].binding = bindings[i].binding;
-  }
-  // Sort the binding based on the binding index and map the (base offset +
-  // array index) to the kernel argument index.
-  // TODO: remove this sort - it's thankfully small (1-8 on average) but we
-  // should be able to avoid it like we do on the CPU side with a bitmap.
-  qsort(sorted_bindings, binding_count,
-        sizeof(iree_hal_cuda2_binding_mapping_t), compare_binding_index);
-
-  for (iree_host_size_t i = 0; i < binding_count; i++) {
-    const iree_hal_descriptor_set_binding_t* binding =
-        &bindings[sorted_bindings[i].index];
+    const iree_hal_descriptor_set_binding_t* binding = &bindings[i];
     CUdeviceptr device_ptr = 0;
     if (binding->buffer) {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
+                                           &binding->buffer));
+
       CUdeviceptr device_buffer = iree_hal_cuda2_buffer_device_pointer(
           iree_hal_buffer_allocated_buffer(binding->buffer));
       iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
       device_ptr = device_buffer + offset + binding->offset;
     };
-    *((CUdeviceptr*)command_buffer->current_descriptor[base_binding + i]) =
-        device_ptr;
-    if (binding->buffer) {
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                           &binding->buffer));
-    }
+    current_bindings[binding->binding] = device_ptr;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -796,10 +757,10 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_dispatch(
 
   // Lookup kernel parameters used for side-channeling additional launch
   // information from the compiler.
-  iree_hal_cuda2_kernel_params_t kernel_params;
+  iree_hal_cuda2_kernel_info_t kernel_info;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda2_native_executable_entry_point_kernel_params(
-              executable, entry_point, &kernel_params));
+      z0, iree_hal_cuda2_native_executable_entry_point_kernel_info(
+              executable, entry_point, &kernel_info));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
@@ -808,9 +769,19 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_dispatch(
   // Allocate the command segment and keep track of all necessary API data.
   uint8_t* storage_base = NULL;
   iree_hal_cuda2_command_segment_t* segment = NULL;
-  iree_host_size_t descriptor_count = IREE_HAL_CUDA_MAX_KERNEL_ARG;
-  iree_host_size_t descriptor_length = descriptor_count * sizeof(void*);
-  iree_host_size_t total_size = sizeof(*segment) + descriptor_length * 2;
+  // The total number of descriptors across all descriptor sets.
+  iree_host_size_t descriptor_count =
+      iree_hal_cuda2_pipeline_layout_total_binding_count(kernel_info.layout);
+  // The total number of push constants.
+  iree_host_size_t push_constant_count =
+      iree_hal_cuda2_pipeline_layout_push_constant_count(kernel_info.layout);
+  // We append push constants to the end of descriptors to form a linear chain
+  // of kernel arguments.
+  iree_host_size_t kernel_params_count = descriptor_count + push_constant_count;
+  iree_host_size_t kernel_params_length = kernel_params_count * sizeof(void*);
+  // Per CUDA API requirements, we need two levels of indirection for passing
+  // kernel arguments in.
+  iree_host_size_t total_size = sizeof(*segment) + kernel_params_length * 2;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_arena_allocate(&command_buffer->arena, total_size,
                               (void**)&storage_base));
@@ -822,33 +793,42 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_dispatch(
   iree_hal_cuda2_command_segment_list_push_back(&command_buffer->segments,
                                                 segment);
 
-  segment->dispatch.kernel_params = kernel_params;
+  segment->dispatch.kernel_info = kernel_info;
   segment->dispatch.workgroup_count[0] = workgroup_count_x;
   segment->dispatch.workgroup_count[1] = workgroup_count_y;
   segment->dispatch.workgroup_count[2] = workgroup_count_z;
 
+  void** params_ptr = (void**)(storage_base + sizeof(*segment));
+  segment->dispatch.kernel_params = params_ptr;
+
+  // Set up kernel arguments to point to the payload slots.
+  CUdeviceptr* payload_ptr =
+      (CUdeviceptr*)((uint8_t*)params_ptr + kernel_params_length);
+  for (size_t i = 0; i < kernel_params_count; i++) {
+    params_ptr[i] = &payload_ptr[i];
+  }
+
   // Copy descriptors from all sets to the end of the current segment for later
   // access.
-  segment->dispatch.descriptor_count = descriptor_count;
-  void** descriptor_ptr = (void**)(storage_base + sizeof(*segment));
-  CUdeviceptr* deviceptr_ptr =
-      (CUdeviceptr*)((uint8_t*)descriptor_ptr + descriptor_length);
-  for (size_t i = 0; i < IREE_HAL_CUDA_MAX_KERNEL_ARG; i++) {
-    descriptor_ptr[i] = &deviceptr_ptr[i];
+  iree_host_size_t set_count =
+      iree_hal_cuda2_pipeline_layout_descriptor_set_count(kernel_info.layout);
+  for (iree_host_size_t i = 0; i < set_count; ++i) {
+    iree_host_size_t binding_count =
+        iree_hal_cuda2_descriptor_set_layout_binding_count(
+            iree_hal_cuda2_pipeline_layout_descriptor_set_layout(
+                kernel_info.layout, i));
+    iree_host_size_t index = iree_hal_cuda2_pipeline_layout_base_binding_index(
+        kernel_info.layout, i);
+    memcpy(payload_ptr + index, command_buffer->descriptor_sets[i].bindings,
+           binding_count * sizeof(CUdeviceptr));
   }
-  segment->dispatch.descriptors = descriptor_ptr;
-  memcpy(deviceptr_ptr,
-         command_buffer->current_descriptor + IREE_HAL_CUDA_MAX_KERNEL_ARG,
-         descriptor_length);
 
-  // Patch the push constants in the kernel arguments.
-  iree_host_size_t num_constants =
-      iree_hal_cuda2_pipeline_layout_push_constant_count(kernel_params.layout);
+  // Append the push constants to the kernel arguments.
   iree_host_size_t base_index =
-      iree_hal_cuda2_pipeline_layout_push_constant_index(kernel_params.layout);
-  for (iree_host_size_t i = 0; i < num_constants; i++) {
-    *((uint32_t*)descriptor_ptr[base_index + i]) =
-        command_buffer->push_constant[i];
+      iree_hal_cuda2_pipeline_layout_push_constant_index(kernel_info.layout);
+  for (iree_host_size_t i = 0; i < push_constant_count; i++) {
+    *((uint32_t*)params_ptr[base_index + i]) =
+        command_buffer->push_constants[i];
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -861,15 +841,15 @@ static iree_status_t iree_hal_cuda2_command_segment_record_dispatch(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   CUDA_KERNEL_NODE_PARAMS params = {
-      .func = segment->kernel_params.function,
-      .blockDimX = segment->kernel_params.block_size[0],
-      .blockDimY = segment->kernel_params.block_size[1],
-      .blockDimZ = segment->kernel_params.block_size[2],
+      .func = segment->kernel_info.function,
+      .blockDimX = segment->kernel_info.block_size[0],
+      .blockDimY = segment->kernel_info.block_size[1],
+      .blockDimZ = segment->kernel_info.block_size[2],
       .gridDimX = segment->workgroup_count[0],
       .gridDimY = segment->workgroup_count[1],
       .gridDimZ = segment->workgroup_count[2],
-      .kernelParams = segment->descriptors,
-      .sharedMemBytes = segment->kernel_params.shared_memory_size,
+      .kernelParams = segment->kernel_params,
+      .sharedMemBytes = segment->kernel_info.shared_memory_size,
   };
 
   // Serialize all the nodes for now.
