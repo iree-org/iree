@@ -184,7 +184,7 @@ def build_main_dist():
 
 
 def build_py_tf_compiler_tools_pkg():
-    """Builds the iree-install/python_packages/iree_tools_tf package."""
+    """Builds iree-install/python_packages/iree_tools_[tf, tflite] packages."""
     install_python_requirements()
     configure_bazel()
 

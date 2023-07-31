@@ -75,8 +75,10 @@ IREE_BINARY_DIR = None
 # We must do the intermediate installation to a fixed location that agrees
 # between what we pass to setup() and cmake. So hard-code it here.
 # Note that setup() needs a relative path (to the setup.py file).
+# We keep the path short ('i' instead of 'install') for platforms like Windows
+# that have file length limits.
 SETUPPY_DIR = os.path.realpath(os.path.dirname(__file__))
-CMAKE_INSTALL_DIR_REL = os.path.join("build", "cmake_install")
+CMAKE_INSTALL_DIR_REL = os.path.join("build", "i")
 CMAKE_INSTALL_DIR_ABS = os.path.join(SETUPPY_DIR, CMAKE_INSTALL_DIR_REL)
 
 IS_CONFIGURED = CONFIGURED_SOURCE_DIR[0] != "@"
@@ -96,7 +98,7 @@ else:
         # Note that setuptools always builds into a "build" directory that
         # is a sibling of setup.py, so we just colonize a sub-directory of that
         # by default.
-        IREE_BINARY_DIR = os.path.join(SETUPPY_DIR, "build", "cmake_build")
+        IREE_BINARY_DIR = os.path.join(SETUPPY_DIR, "build", "b")
     print(
         f"Running setup.py from source tree: "
         f"SOURCE_DIR = {IREE_SOURCE_DIR} "

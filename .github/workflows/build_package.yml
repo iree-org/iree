@@ -1,12 +1,16 @@
-# Builds packages for native (non cross-compiled) targets on supported
-# platforms.
-#
-# For these mainline distributions, we use cibuildwheel and drive the
-# packaging through python, extracting native assets. While this may seem
-# hopelessly round-about, it lets us leverage a lot of what cibuildwheel
-# does for free and get python packages to boot.
-name: Build Native Release Packages
+# Builds release packages on supported platforms:
+#   * main-dist-linux (CMake 'install')
+#   * py-compiler-pkg (`iree-compiler` Python package)
+#     * Linux, macOS, Windows
+#     * All supported Python versions (e.g. 3.8, 3.9, 3.10, 3.11)
+#   * py-runtime-pkg (`iree-runtime[-instrumented]` Python package)
+#     * Linux, macOS, Windows
+#     * All supported Python versions (e.g. 3.8, 3.9, 3.10, 3.11)
+#   * py-tf-compiler-tools-pkg (`iree-tools-[tf, tflite]`, pure Python packages)
 
+name: Build Release Packages
+
+# Note: this workflow is typically invoked by schedule_candidate_release.yml.
 on:
   workflow_dispatch:
     inputs:
@@ -26,7 +30,7 @@ on:
         default: ""
 
 jobs:
-  build_core:
+  build_packages:
     name: "${{ matrix.build-family }} :: Build ${{ matrix.build-package }} Package"
     runs-on: ${{ matrix.runs-on }}
     continue-on-error: ${{ matrix.experimental }}
@@ -67,6 +71,19 @@ jobs:
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
+
+          # Windows packages.
+          - runs-on:
+              - ${{ github.repository == 'openxla/iree' && 'windows-2022-64core' || 'windows-2022'}}
+            build-family: windows
+            build-package: py-compiler-pkg
+            experimental: true
+          - runs-on:
+              - ${{ github.repository == 'openxla/iree' && 'windows-2022-64core' || 'windows-2022'}}
+            build-family: windows
+            build-package: py-runtime-pkg
+            experimental: true
+
     env:
       MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:e83893d35be4ce3558c989e9d5ccc4ff88d058bc3e74a83181059cc76e2cf1f8
 
@@ -80,6 +97,14 @@ jobs:
       ##########################################################################
       # OS specific setup
       ##########################################################################
+
+      - name: Install dependencies (Windows)
+        if: "matrix.build-family == 'windows'"
+        shell: powershell
+        run: ./main_checkout/build_tools/python_deploy/install_windows_deps.ps1
+      - name: "Configure MSVC (Windows)"
+        if: "matrix.build-family == 'windows'"
+        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
 
       ##########################################################################
       # Write version_info.json
@@ -145,9 +170,20 @@ jobs:
         run: |
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
+      - name: Build runtime wheels (Windows)
+        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'windows'"
+        shell: bash
+        env:
+          package_suffix: ${{ github.event.inputs.package_suffix }}
+          packages: "iree-runtime iree-runtime-instrumented"
+          output_dir: "${{ github.workspace }}/bindist"
+          override_python_versions: "3.11"
+        run: |
+          ./main_checkout/build_tools/python_deploy/build_windows_packages.sh
+
       ##########################################################################
       # py-compiler-pkg
-      # Builds the iree-compielr wheel.
+      # Builds the iree-compiler wheel.
       # One step per OS.
       ##########################################################################
       - name: Build compiler wheels (Linux)
@@ -171,11 +207,21 @@ jobs:
         run: |
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
+      - name: Build compiler wheels (Windows)
+        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'windows'"
+        shell: bash
+        env:
+          package_suffix: ${{ github.event.inputs.package_suffix }}
+          packages: "iree-compiler"
+          output_dir: "${{ github.workspace }}/bindist"
+          override_python_versions: "3.11"
+        run: |
+          ./main_checkout/build_tools/python_deploy/build_windows_packages.sh
+
       ##########################################################################
       # TF Compiler Tools
-      # Compiler tools wheels are not python version specific, so just build
-      # for one examplar python version.
-      # TODO: This currently only builds on Linux and is hardcoded to do so.
+      # These wheels are not Python version specific and include only Python
+      # code (no C/C++), so just build for one examplar python version on Linux.
       ##########################################################################
 
       - name: Build TF Compiler Tools wheels
@@ -207,8 +253,8 @@ jobs:
           assets_path: ./bindist/iree*.*
 
   validate_and_publish:
-    name: "Invoke workflow to validate and publish release"
-    needs: build_core
+    name: "Trigger validate and publish release"
+    needs: build_packages
     if: github.event.inputs.release_id != ''
     runs-on: ubuntu-20.04
     steps:
