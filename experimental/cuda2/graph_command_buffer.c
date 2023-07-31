@@ -55,11 +55,11 @@
 
 // Command action kind of a command segment.
 typedef enum iree_hal_cuda2_command_segment_action_e {
-  IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_BARRIER,
-  IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_DISPATCH,
-  IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_FILL_BUFFER,
-  IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_COPY_BUFFER,
-  IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_UPDATE_BUFFER,
+  IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_BARRIER,
+  IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_DISPATCH,
+  IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_FILL_BUFFER,
+  IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_COPY_BUFFER,
+  IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_UPDATE_BUFFER,
 } iree_hal_cuda2_command_segment_action_t;
 
 // API data for execution/memory barrier command segments.
@@ -390,7 +390,7 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_barrier(
 
   // Compose and push the barrier segment.
   segment = (iree_hal_cuda2_command_segment_t*)storage_base;
-  segment->action = IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_BARRIER;
+  segment->action = IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_BARRIER;
   iree_hal_cuda2_command_segment_list_push_back(&command_buffer->segments,
                                                 segment);
 
@@ -487,7 +487,7 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_fill_buffer(
 
   // Compose and push the fill buffer segment.
   segment = (iree_hal_cuda2_command_segment_t*)storage_base;
-  segment->action = IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_FILL_BUFFER;
+  segment->action = IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_FILL_BUFFER;
   iree_hal_cuda2_command_segment_list_push_back(&command_buffer->segments,
                                                 segment);
 
@@ -569,7 +569,7 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_update_buffer(
 
   // Compose and push the barrier segment.
   segment = (iree_hal_cuda2_command_segment_t*)storage_base;
-  segment->action = IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_UPDATE_BUFFER;
+  segment->action = IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_UPDATE_BUFFER;
   iree_hal_cuda2_command_segment_list_push_back(&command_buffer->segments,
                                                 segment);
 
@@ -643,7 +643,7 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_copy_buffer(
 
   // Compose and push the barrier segment.
   segment = (iree_hal_cuda2_command_segment_t*)storage_base;
-  segment->action = IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_COPY_BUFFER;
+  segment->action = IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_COPY_BUFFER;
   iree_hal_cuda2_command_segment_list_push_back(&command_buffer->segments,
                                                 segment);
 
@@ -818,7 +818,7 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_dispatch(
   // Compose and push the dispatch segment.
   segment = (iree_hal_cuda2_command_segment_t*)storage_base;
   memset(segment, 0, sizeof(*segment));
-  segment->action = IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_DISPATCH;
+  segment->action = IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_DISPATCH;
   iree_hal_cuda2_command_segment_list_push_back(&command_buffer->segments,
                                                 segment);
 
@@ -917,27 +917,27 @@ static iree_status_t iree_hal_cuda2_command_segment_record(
            command_buffer->segments.head;
        segment; segment = segment->next_segment) {
     switch (segment->action) {
-      case IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_BARRIER: {
+      case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_BARRIER: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_cuda2_command_segment_record_barrier(
                     command_buffer, &segment->barrier));
       } break;
-      case IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_DISPATCH: {
+      case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_DISPATCH: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_cuda2_command_segment_record_dispatch(
                     command_buffer, &segment->dispatch));
       } break;
-      case IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_FILL_BUFFER: {
+      case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_FILL_BUFFER: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_cuda2_command_segment_record_fill_buffer(
                     command_buffer, &segment->fill_buffer));
       } break;
-      case IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_COPY_BUFFER: {
+      case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_COPY_BUFFER: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_cuda2_command_segment_record_copy_buffer(
                     command_buffer, &segment->copy_buffer));
       } break;
-      case IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_UPDATE_BUFFER: {
+      case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_UPDATE_BUFFER: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_cuda2_command_segment_record_update_buffer(
                     command_buffer, &segment->update_buffer));
