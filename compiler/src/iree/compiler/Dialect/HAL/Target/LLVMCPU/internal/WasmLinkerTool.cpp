@@ -123,7 +123,7 @@ public:
     };
 
     // Strip debug information when not requested.
-    if (!targetOptions.debugSymbols) {
+    if (!targetOptions.target.debugSymbols) {
       flags.push_back("--strip-debug");
     }
 

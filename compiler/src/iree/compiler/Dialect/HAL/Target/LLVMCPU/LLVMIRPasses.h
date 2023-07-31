@@ -21,10 +21,10 @@ namespace HAL {
 
 // Creates target machine form target options.
 std::unique_ptr<llvm::TargetMachine>
-createTargetMachine(const LLVMTarget &target, const LLVMTargetOptions &options);
+createTargetMachine(const LLVMTarget &target);
 
 // Creates and runs LLVMIR optimization passes defined in LLVMTargetOptions.
-LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
+LogicalResult runLLVMIRPasses(const LLVMTarget &target,
                               llvm::TargetMachine *machine,
                               llvm::Module *module);
 

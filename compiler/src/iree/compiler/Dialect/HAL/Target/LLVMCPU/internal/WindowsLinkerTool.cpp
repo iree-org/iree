@@ -75,7 +75,7 @@ public:
     // the downside of making some tooling (disassemblers/decompilers/binary
     // size analysis tools/etc) a bit harder to work with, though, so when
     // compiling in debug mode we export all the functions.
-    if (targetOptions.debugSymbols) {
+    if (targetOptions.target.debugSymbols) {
       for (auto *llvmFunc : exportedFuncs) {
         llvmFunc->setVisibility(
             llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
@@ -180,8 +180,8 @@ public:
         "/out:" + artifacts.libraryFile.path,
     };
 
-    if (targetOptions.optimizerOptLevel.getSpeedupLevel() >= 2 ||
-        targetOptions.optimizerOptLevel.getSizeLevel() >= 2) {
+    if (targetOptions.target.optimizerOptLevel.getSpeedupLevel() >= 2 ||
+        targetOptions.target.optimizerOptLevel.getSizeLevel() >= 2) {
       // https://docs.microsoft.com/en-us/cpp/build/reference/opt-optimizations?view=vs-2019
       // Enable all the fancy optimizations.
       flags.push_back("/opt:ref,icf,lbr");
@@ -235,12 +235,12 @@ public:
     // We need to link against different libraries based on our configuration
     // matrix (dynamic/static and debug/release).
     int libIndex = 0;
-    if (targetOptions.optimizerOptLevel.getSpeedupLevel() == 0) {
+    if (targetOptions.target.optimizerOptLevel.getSpeedupLevel() == 0) {
       libIndex += 0; // debug
     } else {
       libIndex += 2; // release
     }
-    libIndex += targetOptions.linkStatic ? 1 : 0;
+    libIndex += targetOptions.target.linkStatic ? 1 : 0;
 
     // The required libraries for linking DLLs:
     // https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features?view=msvc-160

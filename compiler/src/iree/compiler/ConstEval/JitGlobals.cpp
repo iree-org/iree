@@ -28,11 +28,10 @@ namespace mlir {
 namespace iree_compiler {
 namespace ConstEval {
 
-static llvm::cl::opt<bool> clUseVMVX(
-    "iree-consteval-jit-use-vmvx",
-    llvm::cl::desc(
-        "Uses VMVX (reference backend) instead of the full CPU compiler."),
-    llvm::cl::init(true));
+static llvm::cl::opt<std::string> clJitTargetBackend(
+    "iree-consteval-jit-target-backend",
+    llvm::cl::desc("Overrides the target backend used for JIT'ing."),
+    llvm::cl::init("vmvx"));
 
 static llvm::cl::opt<bool> clEnableDebug(
     "iree-consteval-jit-debug",
@@ -311,13 +310,17 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       : options(std::make_shared<CompileOptions>()),
         compilePipeline("builtin.module") {
     // Detect backend.
-    hasLLVMCPUBackend = targetRegistry.getTargetBackend("llvm-cpu") != nullptr;
-    if (clUseVMVX || !hasLLVMCPUBackend) {
-      options->executableOptions.targets.push_back("vmvx");
+    requestedTargetBackend = clJitTargetBackend;
+    hasRequestedTargetBackend =
+        targetRegistry.getTargetBackend(requestedTargetBackend) != nullptr;
+    options->executableOptions.targets.push_back(requestedTargetBackend);
+    if (requestedTargetBackend == "vmvx" || !hasRequestedTargetBackend) {
+      targetBackend = targetRegistry.getTargetBackend("vmvx");
       options->targetOptions.f32Extension = true;
       options->targetOptions.f64Extension = false; // not yet implemented
     } else {
-      options->executableOptions.targets.push_back("llvm-cpu");
+      targetBackend = targetRegistry.getTargetBackend(requestedTargetBackend);
+      // options->executableOptions.targets.push_back(requestedTargetBackend);
     }
 
     // Disable constant evaluation for our Jit compilation pipeline.
@@ -352,7 +355,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     s.addElementType(b.getIntegerType(32));
     s.addElementType(b.getIntegerType(64));
     s.addElementType(b.getF32Type());
-    if (!clUseVMVX && hasLLVMCPUBackend) {
+    if (requestedTargetBackend != "vmvx" && hasRequestedTargetBackend) {
       // The full compilers support additional types.
       // TODO: Enable support for i4 once it is worked out how to
       // transfer to and from ElementsAttr.
@@ -436,10 +439,17 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     llvm::TimerGroup tg("iree-consteval-jit", "Consteval Jit");
     auto outerModule = getOperation();
     auto supportedFeatures = getSupportedFeatures(&getContext());
-    if (!clUseVMVX && !hasLLVMCPUBackend) {
+    if (!hasRequestedTargetBackend) {
       emitWarning(UnknownLoc::get(&getContext()))
-          << "consteval jit requested with llvm-cpu backend, but it is not "
-             "available. Falling back to vmvx";
+          << "consteval jit requested with " << requestedTargetBackend
+          << " backend, but it is not available. Falling back to vmvx";
+    }
+    if (!targetBackend) {
+      emitError(UnknownLoc::get(&getContext()))
+          << "consteval jit could not find a usable backend (requested '"
+          << requestedTargetBackend << "')";
+      signalPassFailure();
+      return;
     }
 
     llvm::SmallVector<IREE::Util::InitializerOp> initOps;
@@ -450,6 +460,25 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
     // Build the program.
     ProgramBuilder programBuilder(outerModule, supportedFeatures);
+
+    // Set the target.
+    std::optional<IREE::HAL::DeviceTargetAttr> targetAttr =
+        targetBackend->getHostDeviceTarget(&getContext());
+    {
+      if (!targetAttr) {
+        emitError(UnknownLoc::get(&getContext()))
+            << "consteval requested backend " << requestedTargetBackend
+            << " cannot target the host";
+        signalPassFailure();
+        return;
+      }
+      SmallVector<Attribute> targetAttrs;
+      targetAttrs.push_back(*targetAttr);
+      programBuilder.getTargetModule()->setAttr(
+          "hal.device.targets", ArrayAttr::get(&getContext(), targetAttrs));
+    }
+
+    // Iterate over initializers.
     for (auto initOp : initOps) {
       if (!initOp->hasAttr("iree.compiler.consteval"))
         continue;
@@ -504,7 +533,9 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
   std::shared_ptr<CompileOptions> options;
   OpPassManager compilePipeline;
-  bool hasLLVMCPUBackend;
+  std::string requestedTargetBackend;
+  std::shared_ptr<IREE::HAL::TargetBackend> targetBackend;
+  bool hasRequestedTargetBackend;
 };
 
 } // namespace

@@ -71,6 +71,11 @@ public:
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
+  std::optional<IREE::HAL::DeviceTargetAttr>
+  getHostDeviceTarget(MLIRContext *context) const override {
+    return getDefaultDeviceTarget(context);
+  }
+
   IREE::VM::TargetOptions
   getTargetOptions(IREE::HAL::ExecutableTargetAttr targetAttr) {
     // TODO(benvanik): derive these from a vm target triple.
