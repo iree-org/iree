@@ -27,8 +27,10 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
   return t.isIntOrIndexOrFloat();
 }
 
-/// Merge elementwise operations into their consumers.
-struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
+/// Rematerialize all parallel elementwise operations into its users within a
+/// `flow.dispatch.region`.
+struct RematerializeParallelOpsPattern
+    : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
@@ -70,7 +72,7 @@ struct RematerializeParallelOpsPass
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
-    fusionPatterns.insert<MergeElementwiseOps>(funcOp.getContext());
+    fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
