@@ -22,6 +22,12 @@ namespace iree_compiler {
 // Definitions and Utilities
 //===----------------------------------------------------------------------===//
 
+/// Look for allocs in shared memory space with overlapping liveness,
+/// group them, and then pack all the allocations in each group into one i8
+/// alloc.
+///
+/// Also adds barriers to make sure we are done writing/reading
+/// from the previous alias group before starting a new one.
 void packSharedMemoryAlloc(func::FuncOp funcOp);
 
 //===----------------------------------------------------------------------===//

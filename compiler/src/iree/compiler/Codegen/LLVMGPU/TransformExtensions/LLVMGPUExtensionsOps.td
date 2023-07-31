@@ -668,7 +668,7 @@ def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_al
   let description = [{
     Looks for allocs in shared memory space with overlapping liveness and
     groups them, then packs all the allocations in each group into one i8
-    alloc. Also adds barriers to make sure we are done writingreading
+    alloc. Also adds barriers to make sure we are done writing/reading
     from the previous alias group before starting a new one.
 
     #### Return modes
