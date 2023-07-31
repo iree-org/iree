@@ -1,1 +1,0 @@
--r e2e/collectives/run_requirements.txt
