@@ -7,7 +7,6 @@
 #ifndef PYTHON_BINDINGS_IREE_TRANSFORMEXT_BINDING
 #define PYTHON_BINDINGS_IREE_TRANSFORMEXT_BINDING
 
-include "mlir/Bindings/Python/Attributes.td"
 include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.td"
 
 #endif // PYTHON_BINDINGS_IREE_TRANSFORMEXT_BINDING
