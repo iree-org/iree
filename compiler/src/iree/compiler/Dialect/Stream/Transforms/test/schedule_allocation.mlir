@@ -510,8 +510,8 @@ func.func @applyAsyncDispatchUnusedOp(%operand: !stream.resource<transient>, %si
 
 // -----
 
-// CHECK: stream.cmd.func private @asyncExtern(%arg0[%arg1 for %arg2]: !stream.resource<*>, %arg3: index, %arg4[%arg5 for %arg6]: !stream.resource<*>)
-stream.async.func private @asyncExtern(%arg0: !stream.resource<*>, %arg1: index) -> (%arg0, !stream.resource<*>)
+// CHECK: stream.cmd.func private @asyncExtern(%arg0[%arg1 for %arg2]: !stream.resource<transient>, %arg3: index, %arg4[%arg5 for %arg6]: !stream.resource<transient>)
+stream.async.func private @asyncExtern(%arg0: !stream.resource<transient>, %arg1: index) -> (%arg0, !stream.resource<transient>)
 
 // CHECK-LABEL: @applyAsyncCallOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
