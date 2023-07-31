@@ -132,8 +132,10 @@ typedef struct iree_hal_cuda2_update_buffer_segment_t {
 
 // A command segment.
 typedef struct iree_hal_cuda2_command_segment_t {
-  struct iree_hal_cuda2_command_segment_t* next_segment;
+  struct iree_hal_cuda2_command_segment_t* next;
+  struct iree_hal_cuda2_command_segment_t* prev;
   iree_hal_cuda2_command_segment_action_t action;
+  CUgraphNode cu_graph_node;
   union {
     iree_hal_cuda2_barrier_segment_t barrier;
     iree_hal_cuda2_dispatch_segment_t dispatch;
@@ -157,24 +159,17 @@ static void iree_hal_cuda2_command_segment_list_reset(
   memset(list, 0, sizeof(*list));
 }
 
-static void iree_hal_cuda2_command_segment_list_push_front(
-    iree_hal_cuda2_command_segment_list_t* list,
-    iree_hal_cuda2_command_segment_t* segment) {
-  segment->next_segment = list->head;
-  list->head = segment;
-  if (!list->tail) list->tail = segment;
-}
-
 static void iree_hal_cuda2_command_segment_list_push_back(
     iree_hal_cuda2_command_segment_list_t* list,
     iree_hal_cuda2_command_segment_t* segment) {
-  segment->next_segment = NULL;
   if (list->tail) {
-    list->tail->next_segment = segment;
-    list->tail = segment;
+    list->tail->next = segment;
   } else {
-    list->head = list->tail = segment;
+    list->head = segment;
   }
+  segment->next = NULL;
+  segment->prev = list->tail;
+  list->tail = segment;
 }
 
 //===----------------------------------------------------------------------===//
@@ -206,10 +201,21 @@ typedef struct iree_hal_cuda2_graph_command_buffer_t {
   CUgraph cu_graph;
   CUgraphExec cu_graph_exec;
 
-  // The last node added to the command buffer.
-  // We need to track it as we are currently serializing all the nodes (each
-  // node depends on the previous one).
-  CUgraphNode last_node;
+  // The previous and current batches of nodes.
+  //
+  // For now we just synchronize all nodes before and after a given barrier,
+  // regardless of the access scope. This is correct but not totally performant.
+  // It works for the current compiler though.
+  // TODO: Perform analysis to differentiate different access scopes and conduct
+  // more fine-grained barriers, when the compiler emits them.
+  //
+  // These are scratch fields used by barriers for dependent analysis. The
+  // previous batch includes the nodes before the last (but after the second to
+  // last) barrier command. The current batch includes the nodes after the last
+  // barrier command.
+  iree_host_size_t previous_batch_count;
+  iree_host_size_t current_batch_count;
+  CUgraphNode* previous_batch;
 
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
@@ -268,7 +274,6 @@ iree_status_t iree_hal_cuda2_graph_command_buffer_create(
   command_buffer->cu_context = context;
   command_buffer->cu_graph = NULL;
   command_buffer->cu_graph_exec = NULL;
-  command_buffer->last_node = NULL;
 
   iree_status_t status =
       iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
@@ -309,7 +314,9 @@ static void iree_hal_cuda2_graph_command_buffer_destroy(
                            cuGraphExecDestroy(command_buffer->cu_graph_exec));
     command_buffer->cu_graph_exec = NULL;
   }
-  command_buffer->last_node = NULL;
+  command_buffer->previous_batch_count = 0;
+  command_buffer->current_batch_count = 0;
+  command_buffer->previous_batch = NULL;
 
   iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);
@@ -408,8 +415,31 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_barrier(
 
 static iree_status_t iree_hal_cuda2_command_segment_record_barrier(
     iree_hal_cuda2_graph_command_buffer_t* command_buffer,
-    iree_hal_cuda2_barrier_segment_t* segment) {
-  // TODO: implement proper support for barriers.
+    iree_hal_cuda2_command_segment_t* base_segment) {
+  // We don't need to do anything if the barrier is the last node.
+  if (base_segment->next == NULL) return iree_ok_status();
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  CUgraphNode* nodes = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_arena_allocate(
+              &command_buffer->arena,
+              command_buffer->current_batch_count * sizeof(CUgraphNode),
+              (void**)&nodes));
+
+  command_buffer->previous_batch_count = command_buffer->current_batch_count;
+  command_buffer->previous_batch = nodes;
+
+  // Scan and collect all previous segments' graph nodes until we hit another
+  // barrier segment.
+  for (iree_hal_cuda2_command_segment_t* segment = base_segment->prev; segment;
+       segment = segment->prev) {
+    if (segment->action == IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_BARRIER) break;
+    nodes[--command_buffer->current_batch_count] = segment->cu_graph_node;
+  }
+  IREE_ASSERT(command_buffer->current_batch_count == 0);
+
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -508,7 +538,8 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_fill_buffer(
 
 static iree_status_t iree_hal_cuda2_command_segment_record_fill_buffer(
     iree_hal_cuda2_graph_command_buffer_t* command_buffer,
-    iree_hal_cuda2_fill_buffer_segment_t* segment) {
+    iree_hal_cuda2_command_segment_t* base_segment) {
+  iree_hal_cuda2_fill_buffer_segment_t* segment = &base_segment->fill_buffer;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   CUDA_MEMSET_NODE_PARAMS params = {
@@ -521,12 +552,12 @@ static iree_status_t iree_hal_cuda2_command_segment_record_fill_buffer(
   };
 
   // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->last_node};
-  size_t numNode = command_buffer->last_node ? 1 : 0;
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddMemsetNode(&command_buffer->last_node, command_buffer->cu_graph,
-                           dep, numNode, &params, command_buffer->cu_context),
+      cuGraphAddMemsetNode(
+          &base_segment->cu_graph_node, command_buffer->cu_graph,
+          command_buffer->previous_batch, command_buffer->previous_batch_count,
+          &params, command_buffer->cu_context),
       "cuGraphAddMemsetNode");
 
   IREE_TRACE_ZONE_END(z0);
@@ -585,7 +616,9 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_update_buffer(
 
 static iree_status_t iree_hal_cuda2_command_segment_record_update_buffer(
     iree_hal_cuda2_graph_command_buffer_t* command_buffer,
-    iree_hal_cuda2_update_buffer_segment_t* segment) {
+    iree_hal_cuda2_command_segment_t* base_segment) {
+  iree_hal_cuda2_update_buffer_segment_t* segment =
+      &base_segment->update_buffer;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   CUDA_MEMCPY3D params = {
@@ -599,14 +632,12 @@ static iree_status_t iree_hal_cuda2_command_segment_record_update_buffer(
       .Depth = 1,
   };
 
-  // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->last_node};
-  size_t numNode = command_buffer->last_node ? 1 : 0;
-
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddMemcpyNode(&command_buffer->last_node, command_buffer->cu_graph,
-                           dep, numNode, &params, command_buffer->cu_context),
+      cuGraphAddMemcpyNode(
+          &base_segment->cu_graph_node, command_buffer->cu_graph,
+          command_buffer->previous_batch, command_buffer->previous_batch_count,
+          &params, command_buffer->cu_context),
       "cuGraphAddMemcpyNode");
 
   IREE_TRACE_ZONE_END(z0);
@@ -660,7 +691,8 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_copy_buffer(
 
 static iree_status_t iree_hal_cuda2_command_segment_record_copy_buffer(
     iree_hal_cuda2_graph_command_buffer_t* command_buffer,
-    iree_hal_cuda2_copy_buffer_segment_t* segment) {
+    iree_hal_cuda2_command_segment_t* base_segment) {
+  iree_hal_cuda2_copy_buffer_segment_t* segment = &base_segment->copy_buffer;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   CUDA_MEMCPY3D params = {
@@ -675,14 +707,12 @@ static iree_status_t iree_hal_cuda2_command_segment_record_copy_buffer(
       .Depth = 1,
   };
 
-  // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->last_node};
-  size_t numNode = command_buffer->last_node ? 1 : 0;
-
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddMemcpyNode(&command_buffer->last_node, command_buffer->cu_graph,
-                           dep, numNode, &params, command_buffer->cu_context),
+      cuGraphAddMemcpyNode(
+          &base_segment->cu_graph_node, command_buffer->cu_graph,
+          command_buffer->previous_batch, command_buffer->previous_batch_count,
+          &params, command_buffer->cu_context),
       "cuGraphAddMemcpyNode");
 
   IREE_TRACE_ZONE_END(z0);
@@ -844,7 +874,8 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_prepare_dispatch(
 
 static iree_status_t iree_hal_cuda2_command_segment_record_dispatch(
     iree_hal_cuda2_graph_command_buffer_t* command_buffer,
-    iree_hal_cuda2_dispatch_segment_t* segment) {
+    iree_hal_cuda2_command_segment_t* base_segment) {
+  iree_hal_cuda2_dispatch_segment_t* segment = &base_segment->dispatch;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   CUDA_KERNEL_NODE_PARAMS params = {
@@ -860,13 +891,12 @@ static iree_status_t iree_hal_cuda2_command_segment_record_dispatch(
   };
 
   // Serialize all the nodes for now.
-  CUgraphNode dep[] = {command_buffer->last_node};
-  size_t numNodes = command_buffer->last_node ? 1 : 0;
-
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddKernelNode(&command_buffer->last_node, command_buffer->cu_graph,
-                           dep, numNodes, &params),
+      cuGraphAddKernelNode(&base_segment->cu_graph_node,
+                           command_buffer->cu_graph,
+                           command_buffer->previous_batch,
+                           command_buffer->previous_batch_count, &params),
       "cuGraphAddKernelNode");
 
   IREE_TRACE_ZONE_END(z0);
@@ -902,32 +932,37 @@ static iree_status_t iree_hal_cuda2_command_segment_record(
 
   for (iree_hal_cuda2_command_segment_t* segment =
            command_buffer->segments.head;
-       segment; segment = segment->next_segment) {
+       segment; segment = segment->next) {
     switch (segment->action) {
       case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_BARRIER: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
-            z0, iree_hal_cuda2_command_segment_record_barrier(
-                    command_buffer, &segment->barrier));
+            z0, iree_hal_cuda2_command_segment_record_barrier(command_buffer,
+                                                              segment));
+        command_buffer->current_batch_count = 0;
       } break;
       case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_DISPATCH: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
-            z0, iree_hal_cuda2_command_segment_record_dispatch(
-                    command_buffer, &segment->dispatch));
+            z0, iree_hal_cuda2_command_segment_record_dispatch(command_buffer,
+                                                               segment));
+        ++command_buffer->current_batch_count;
       } break;
       case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_FILL_BUFFER: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_cuda2_command_segment_record_fill_buffer(
-                    command_buffer, &segment->fill_buffer));
+                    command_buffer, segment));
+        ++command_buffer->current_batch_count;
       } break;
       case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_COPY_BUFFER: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_cuda2_command_segment_record_copy_buffer(
-                    command_buffer, &segment->copy_buffer));
+                    command_buffer, segment));
+        ++command_buffer->current_batch_count;
       } break;
       case IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_UPDATE_BUFFER: {
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             z0, iree_hal_cuda2_command_segment_record_update_buffer(
-                    command_buffer, &segment->update_buffer));
+                    command_buffer, segment));
+        ++command_buffer->current_batch_count;
       } break;
       default:
         IREE_ASSERT(false, "unhandled command segment kind");
@@ -967,7 +1002,9 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_end(
       cuGraphCreate(&command_buffer->cu_graph, /*flags=*/0), "cuGraphCreate");
 
   // Reset state used during recording.
-  command_buffer->last_node = NULL;
+  command_buffer->previous_batch_count = 0;
+  command_buffer->current_batch_count = 0;
+  command_buffer->previous_batch = NULL;
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda2_command_segment_record(command_buffer));
