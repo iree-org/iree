@@ -21,6 +21,8 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
+#include <cstdlib>
+
 #define DEBUG_TYPE "iree-const-eval"
 using llvm::dbgs;
 
@@ -31,7 +33,7 @@ namespace ConstEval {
 static llvm::cl::opt<std::string> clJitTargetBackend(
     "iree-consteval-jit-target-backend",
     llvm::cl::desc("Overrides the target backend used for JIT'ing."),
-    llvm::cl::init("vmvx"));
+    llvm::cl::init(""));
 
 static llvm::cl::opt<bool> clEnableDebug(
     "iree-consteval-jit-debug",
@@ -42,6 +44,14 @@ static llvm::cl::opt<bool> clEnableDebug(
     llvm::cl::init(false));
 
 namespace {
+
+static bool isDebugEnabled() {
+  if (clEnableDebug)
+    return true;
+  if (std::getenv("IREE_COMPILER_DEBUG_CONSTEVAL"))
+    return true;
+  return false;
+}
 
 // These options structs are not copy-constructable so we have to allocate them
 // shared.
@@ -310,7 +320,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       : options(std::make_shared<CompileOptions>()),
         compilePipeline("builtin.module") {
     // Detect backend.
-    requestedTargetBackend = clJitTargetBackend;
+    requestedTargetBackend = resolveTargetBackend(targetRegistry);
     hasRequestedTargetBackend =
         targetRegistry.getTargetBackend(requestedTargetBackend) != nullptr;
     options->executableOptions.targets.push_back(requestedTargetBackend);
@@ -338,6 +348,21 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     compilePipeline.getDependentDialects(registry);
+  }
+
+  static std::string
+  resolveTargetBackend(const IREE::HAL::TargetBackendRegistry &targetRegistry) {
+    if (clJitTargetBackend.empty()) {
+      // Default - choose something we have.
+      // First llvm-cpu then vmvx.
+      if (targetRegistry.getTargetBackend("llvm-cpu")) {
+        return std::string("llvm-cpu");
+      } else {
+        return std::string("vmvx");
+      }
+    }
+
+    return clJitTargetBackend;
   }
 
   const SupportedFeatures getSupportedFeatures(MLIRContext *context) {
@@ -374,7 +399,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     // Process each function through the runtime.
     for (JitFunctionDesc &jitFunction : jitFunctions) {
       std::optional<llvm::Timer> invokeTimer;
-      if (clEnableDebug) {
+      if (debugEnabled) {
         std::string timerName("Invoke ");
         timerName.append(jitFunction.name);
         invokeTimer.emplace(timerName, timerName, tg);
@@ -427,7 +452,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
         }
       }
 
-      if (clEnableDebug) {
+      if (debugEnabled) {
         invokeTimer->stopTimer();
       }
     }
@@ -485,6 +510,8 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
       if (succeeded(programBuilder.importInitializer(initOp))) {
         deadInitOps.push_back(initOp);
+      } else if (debugEnabled) {
+        dbgs() << "::: Rejected consteval initializer:\n" << initOp << "\n";
       }
     }
     if (programBuilder.getJitFunctions().empty()) {
@@ -493,9 +520,9 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     }
 
     std::optional<llvm::Timer> compileTimer;
-    if (clEnableDebug) {
-      dbgs() << "::: COMPILING JIT: " << programBuilder.getTargetModule()
-             << "\n";
+    if (debugEnabled) {
+      dbgs() << "::: COMPILING JIT (" << requestedTargetBackend
+             << "): " << programBuilder.getTargetModule() << "\n";
       compileTimer.emplace("iree-consteval-jit-compile", "Compiling", tg);
       compileTimer->startTimer();
     }
@@ -508,7 +535,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     if (failed(binary.translateFromModule(programBuilder.getTargetModule()))) {
       return signalPassFailure();
     }
-    if (clEnableDebug) {
+    if (debugEnabled) {
       compileTimer->stopTimer();
     }
 
@@ -536,6 +563,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
   std::string requestedTargetBackend;
   std::shared_ptr<IREE::HAL::TargetBackend> targetBackend;
   bool hasRequestedTargetBackend;
+  bool debugEnabled = isDebugEnabled();
 };
 
 } // namespace
