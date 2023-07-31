@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "conv2d_to_img2col.mlir"
     "pad_linalg_ops.mlir"
+    "rematerialize_parallel_ops.mlir"
   TOOLS
     FileCheck
     iree-opt
