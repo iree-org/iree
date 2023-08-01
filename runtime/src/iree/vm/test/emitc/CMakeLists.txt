@@ -121,7 +121,6 @@ iree_c_module(
     iree-compile
 )
 
-# TODO(#14507): Investigate the maybe-uninitialized warning.
 iree_c_module(
   NAME
     buffer_ops
@@ -131,6 +130,7 @@ iree_c_module(
     "buffer_ops.h"
   FLAGS
     "--compile-mode=vm"
+  # TODO(#14540): Investigate the maybe-uninitialized warning.
   COPTS
     "-Wno-uninitialized"
   COMPILE_TOOL
