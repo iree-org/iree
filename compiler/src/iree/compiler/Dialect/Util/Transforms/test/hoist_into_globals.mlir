@@ -202,3 +202,16 @@ module @hoist_implicit_capture {
   // CHECK:       util.initializer.return
   // CHECK: }
 }
+
+// -----
+// CHECK-LABEL: @do_not_hoist_non_value_type_results
+// CHECK-NOT: util.global
+// CHECK-NOT: util.initializer
+module @do_not_hoist_non_value_type_results {
+  func.func @main() -> (!iree_unregistered.unknown_type) {
+    %0 = arith.constant 0 : i32
+    %1 = arith.constant 1 : i32
+    %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> !iree_unregistered.unknown_type
+    return %2 : !iree_unregistered.unknown_type
+  }
+}
