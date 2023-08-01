@@ -10,10 +10,38 @@
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
-// Buffer attributes
+// #util.byte_pattern
+//===----------------------------------------------------------------------===//
+
+def Util_BytePatternAttr : AttrDef<Util_Dialect, "BytePattern", [
+  TypedAttrInterface,
+  DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
+    "serializeToBuffer",
+    "serializeToStream",
+  ]>,
+]> {
+  let mnemonic = "byte_pattern";
+  let summary = [{an attribute containing a filled byte pattern}];
+  let description = [{
+    A dense serializable attribute with the given byte pattern.
+  }];
+
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type,
+    AttrParameter<"int64_t", "">:$pattern
+  );
+
+  let assemblyFormat = [{
+    `<` $pattern `>`
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// #util.byte_range
 //===----------------------------------------------------------------------===//
 
 def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
@@ -30,6 +58,10 @@ def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
 
   let hasCustomAssemblyFormat = 1;
 }
+
+//===----------------------------------------------------------------------===//
+// #util.composite
+//===----------------------------------------------------------------------===//
 
 def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [

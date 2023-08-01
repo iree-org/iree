@@ -1,5 +1,17 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope %s | iree-opt --split-input-file --mlir-print-local-scope | FileCheck %s
 
+// CHECK-LABEL: @byte_pattern
+builtin.module @byte_pattern attributes {
+  // CHECK: r0 = #util.byte_pattern<0> : i8
+  util.r0 = #util.byte_pattern<0> : i8,
+  // CHECK: r1 = #util.byte_pattern<0> : tensor<28xi8>
+  util.r1 = #util.byte_pattern<0> : tensor<28xi8>,
+  // CHECK: r2 = #util.byte_pattern<6> : tensor<33x4xi4>
+  util.r2 = #util.byte_pattern<6> : tensor<33x4xi4>
+} {}
+
+// -----
+
 // CHECK-LABEL: @byte_range
 builtin.module @byte_range attributes {
   // CHECK: br0 = #util.byte_range<123, 456>
