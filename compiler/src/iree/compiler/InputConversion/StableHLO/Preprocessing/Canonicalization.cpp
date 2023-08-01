@@ -1056,19 +1056,22 @@ struct ReorderElementwiseAndShapeOp final : OpRewritePattern<ElementwiseOpT> {
     Location loc = op.getLoc();
     auto definingOp = op.getOperand().getDefiningOp();
     if (!definingOp) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          op, "expected to have an op before elementise op.");
     }
 
     if (!isa<mlir::stablehlo::ReshapeOp>(definingOp) &&
         !isa<mlir::stablehlo::TransposeOp>(definingOp) &&
         !isa<mlir::stablehlo::BroadcastOp>(definingOp)) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          op, "defining operation of unexpected type.");
     }
 
     Value input = definingOp->getOperand(0);
     if (getElementTypeOrSelf(op.getOperand()) !=
         getElementTypeOrSelf(op.getResult())) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          op, "input and result element types must be the same.");
     }
 
     Value newEwiseVal =
