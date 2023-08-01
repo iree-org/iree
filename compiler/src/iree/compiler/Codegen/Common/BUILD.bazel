@@ -196,10 +196,6 @@ iree_compiler_cc_library(
         "Transforms.h",
         "UserConfig.h",
     ],
-    copts = [
-        # GCC warning from LLVM library
-        "-Wno-uninitialized",
-    ],
     deps = [
         ":PassHeaders",
         ":PassesIncGen",

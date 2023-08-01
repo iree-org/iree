@@ -110,8 +110,6 @@ iree_cc_library(
 iree_cc_library(
   NAME
     Common
-  COPTS
-    "-Wno-uninitialized"
   HDRS
     "BufferizationAnalysis.h"
     "EncodingInfo.h"
