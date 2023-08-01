@@ -34,8 +34,6 @@ external_cc_library(
     "-DYAML_VERSION_MAJOR=0"
     "-DYAML_VERSION_MINOR=2"
     "-DYAML_VERSION_PATCH=5"
-    # GCC warning
-    "-Wno-unused-value"
   INCLUDES
     "${LIBYAML_ROOT}/include"
   PUBLIC
@@ -43,4 +41,7 @@ external_cc_library(
 
 if(MSVC)
   target_compile_options(yaml_yaml PRIVATE /wd4996)
+else()
+  # GCC warning.
+  target_compile_options(yaml_yaml PRIVATE "-Wno-unused-value")
 endif()
