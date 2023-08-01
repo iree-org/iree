@@ -727,10 +727,7 @@ LogicalResult generateLinalgThreeFry(OpBuilder &builder, Location loc,
   if (bitwidth == 64) {
     return generateLinalgThreeFry64(builder, loc, resultTy, state, result);
   }
-  if (bitwidth == 32) {
-    return generateLinalgThreeFry32(builder, loc, resultTy, state, result);
-  }
-  if (bitwidth == 16) {
+  if (bitwidth == 32 || bitwidth == 16 || bitwidth == 8) {
     return generateLinalgThreeFry32(builder, loc, resultTy, state, result);
   }
 
@@ -747,7 +744,7 @@ LogicalResult generateLinalgPhilox(OpBuilder &builder, Location loc,
   }
 
   // The 32 bit implementation trancates to result eTy.
-  if (bitwidth == 32 || bitwidth == 16) {
+  if (bitwidth == 32 || bitwidth == 16 || bitwidth == 8) {
     return generateLinalgPhilox32(builder, loc, resultTy, state, result);
   }
 
