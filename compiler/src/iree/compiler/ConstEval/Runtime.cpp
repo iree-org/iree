@@ -128,7 +128,6 @@ static TypedAttr createAttributeFromRawData(Location loc,
     llvm::SmallVector<bool> boolVector(rawBuffer.begin(), rawBuffer.end());
     ArrayRef<bool> boolArray(boolVector.data(), boolVector.size());
     return DenseElementsAttr::get(tensorType, boolArray);
-    // }
   }
 
   emitError(loc) << "unhandled case when converting raw buffer of "
@@ -338,9 +337,9 @@ LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
   } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
     iree_vm_value_t value;
     APFloat apValue = floatAttr.getValue();
+    // Note that there are many floating point semantics that LLVM knows about,
+    // but we restrict to only those that the VM natively supports here.
     switch (APFloat::SemanticsToEnum(apValue.getSemantics())) {
-    // case APFloat::S_IEEEhalf:
-    // case APFloat::S_BFloat:
     case APFloat::S_IEEEsingle:
       value = iree_vm_value_make_f32(apValue.convertToFloat());
       break;
