@@ -300,9 +300,9 @@ jobs:
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing all"
         env:
-          IREE_NVIDIA_SM80_TESTS_DISABLE: "1"
-          IREE_MULTI_DEVICE_TESTS_DISABLE: "1"
-          IREE_CTEST_LABEL_REGEX: "^requires-gpu|^driver=vulkan$|^driver=cuda$"
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 1
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
         run: |
           ./build_tools/github_actions/docker_run.sh \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
@@ -348,9 +348,9 @@ jobs:
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing all"
         env:
-          IREE_NVIDIA_SM80_TESTS_DISABLE: "0"
-          IREE_MULTI_DEVICE_TESTS_DISABLE: "1"
-          IREE_CTEST_LABEL_REGEX: "^requires-gpu-sm80$"
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 0
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 1
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu-sm80$
         run: |
           ./build_tools/github_actions/docker_run.sh \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
