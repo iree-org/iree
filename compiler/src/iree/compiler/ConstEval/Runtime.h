@@ -40,7 +40,8 @@ protected:
   // explicitly by subclasses, ensuring that any backing images remain valid
   // through the call to deinitialize().
   void deinitialize();
-  TypedAttr convertVariantToAttribute(Location loc, iree_vm_variant_t &variant);
+  TypedAttr convertVariantToAttribute(Location loc, iree_vm_variant_t &variant,
+                                      Type mlirType);
 
   iree::vm::ref<iree_hal_device_t> device;
   iree::vm::ref<iree_vm_module_t> hal_module;
@@ -57,12 +58,22 @@ public:
 
   LogicalResult addArgument(Location loc, Attribute attr);
   LogicalResult invoke(Location loc, StringRef name);
-  LogicalResult getResultAsAttr(Location loc, size_t index, TypedAttr &outAttr);
+  LogicalResult getResultAsAttr(Location loc, size_t index, Type mlirType,
+                                TypedAttr &outAttr);
 
 private:
+  // Imports or snapshots a raw host buffer, depending on whether import is
+  // possible. This should only be used when the MLIR and IREE layout
+  // agree.
   LogicalResult importBufferForRead(Location loc, const uint8_t *rawData,
                                     iree_host_size_t length,
                                     iree_hal_buffer_t **buffer);
+  // Imports a bit vector of rawData into a byte buffer, expanding 1->8bit
+  // during import.
+  LogicalResult
+  importBitwiseBoolI8BufferForRead(Location loc, const uint8_t *rawDataBits,
+                                   iree_host_size_t rawDataLengthBytes,
+                                   iree_hal_buffer_t **buffer);
   CompiledBinary binary;
   iree::vm::ref<iree_vm_list_t> inputs;
   iree::vm::ref<iree_vm_list_t> outputs;

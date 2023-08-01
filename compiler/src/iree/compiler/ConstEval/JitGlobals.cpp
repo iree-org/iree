@@ -324,13 +324,12 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     hasRequestedTargetBackend =
         targetRegistry.getTargetBackend(requestedTargetBackend) != nullptr;
     options->executableOptions.targets.push_back(requestedTargetBackend);
+    options->targetOptions.f32Extension = true;
+    options->targetOptions.f64Extension = true;
     if (requestedTargetBackend == "vmvx" || !hasRequestedTargetBackend) {
       targetBackend = targetRegistry.getTargetBackend("vmvx");
-      options->targetOptions.f32Extension = true;
-      options->targetOptions.f64Extension = false; // not yet implemented
     } else {
       targetBackend = targetRegistry.getTargetBackend(requestedTargetBackend);
-      // options->executableOptions.targets.push_back(requestedTargetBackend);
     }
 
     // Disable constant evaluation for our Jit compilation pipeline.
@@ -443,8 +442,9 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
         switch (resultBinding.getType()) {
         case ResultBinding::Type::GlobalOp: {
           TypedAttr attr;
-          if (failed(call.getResultAsAttr(resultBinding.getGlobalOp().getLoc(),
-                                          it.index(), attr)))
+          if (failed(call.getResultAsAttr(
+                  resultBinding.getGlobalOp().getLoc(), it.index(),
+                  resultBinding.getGlobalOp().getType(), attr)))
             return failure();
           resultBinding.getGlobalOp().setInitialValueAttr(attr);
           break;

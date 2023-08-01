@@ -56,6 +56,9 @@ LogicalResult convertToElementType(Location loc, Type baseType,
     case 4:
       *outElementType = IREE_HAL_ELEMENT_TYPE_INT_4;
       return success();
+    case 1:
+      *outElementType = IREE_HAL_ELEMENT_TYPE_BOOL_8;
+      return success();
     }
   } else if (baseType == builder.getF32Type()) {
     *outElementType = IREE_HAL_ELEMENT_TYPE_FLOAT_32;
@@ -118,20 +121,13 @@ static TypedAttr createAttributeFromRawData(Location loc,
 
   // For i1, IREE (currently) returns these as 8bit integer values and MLIR
   // has a loader that accepts bool arrays (the raw buffer loader also
-  // supports them but bit-packed, which is not convenient for us). So, if
-  // sizeof(bool) == 1, we just bit-cast. Otherwise, we go through a temporary.
+  // supports them but bit-packed, which is not convenient for us).
   if (elementType.isInteger(1)) {
-    if (sizeof(bool) == 1) {
-      ArrayRef<bool> boolArray(reinterpret_cast<bool *>(rawBuffer.data()),
-                               rawBuffer.size());
-      return DenseElementsAttr::get(tensorType, boolArray);
-    } else {
-      // Note: cannot use std::vector because it specializes bool in a way
-      // that is not compatible with ArrayRef.
-      llvm::SmallVector<bool> boolVector(rawBuffer.begin(), rawBuffer.end());
-      ArrayRef<bool> boolArray(boolVector.data(), boolVector.size());
-      return DenseElementsAttr::get(tensorType, boolArray);
-    }
+    // Note: cannot use std::vector because it specializes bool in a way
+    // that is not compatible with ArrayRef.
+    llvm::SmallVector<bool> boolVector(rawBuffer.begin(), rawBuffer.end());
+    ArrayRef<bool> boolArray(boolVector.data(), boolVector.size());
+    return DenseElementsAttr::get(tensorType, boolArray);
   }
 
   emitError(loc) << "unhandled case when converting raw buffer of "
@@ -163,8 +159,6 @@ FunctionCall::FunctionCall(CompiledBinary &binary, iree_host_size_t argCapacity,
                                     &outputs));
 }
 
-// Imports or snapshots a raw host buffer, depending on whether import is
-// possible.
 LogicalResult FunctionCall::importBufferForRead(Location loc,
                                                 const uint8_t *rawData,
                                                 iree_host_size_t length,
@@ -207,6 +201,44 @@ LogicalResult FunctionCall::importBufferForRead(Location loc,
   }
 }
 
+LogicalResult FunctionCall::importBitwiseBoolI8BufferForRead(
+    Location loc, const uint8_t *rawDataBits,
+    iree_host_size_t rawDataLengthBytes, iree_hal_buffer_t **buffer) {
+  iree_hal_buffer_params_t params;
+  std::memset(&params, 0, sizeof(params));
+  iree_host_size_t bufferLength = rawDataLengthBytes * 8;
+  params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  if (failed(handleRuntimeError(
+          loc, iree_hal_allocator_allocate_buffer(
+                   binary.getAllocator(), params, bufferLength,
+                   iree_const_byte_span_t{nullptr, 0}, buffer))))
+    return failure();
+
+  iree_hal_buffer_mapping_t mapping;
+  if (failed(handleRuntimeError(
+          loc, iree_hal_buffer_map_range(
+                   *buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                   IREE_HAL_MEMORY_ACCESS_WRITE, /*byte_offset=*/0,
+                   /*byte_length=*/bufferLength, &mapping))))
+    return failure();
+
+  // Copy.
+  for (iree_host_size_t i = 0; i < rawDataLengthBytes; ++i) {
+    uint8_t bits = rawDataBits[i];
+    mapping.contents.data[i * 8 + 0] = bits & 0x1;
+    mapping.contents.data[i * 8 + 1] = (bits & 0x2) >> 1;
+    mapping.contents.data[i * 8 + 2] = (bits & 0x4) >> 2;
+    mapping.contents.data[i * 8 + 3] = (bits & 0x8) >> 3;
+    mapping.contents.data[i * 8 + 4] = (bits & 0x10) >> 4;
+    mapping.contents.data[i * 8 + 5] = (bits & 0x20) >> 5;
+    mapping.contents.data[i * 8 + 6] = (bits & 0x40) >> 6;
+    mapping.contents.data[i * 8 + 7] = (bits & 0x80) >> 7;
+  }
+
+  return handleRuntimeError(loc, iree_hal_buffer_unmap_range(&mapping));
+}
+
 LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
   if (auto elementsAttr = llvm::dyn_cast<DenseElementsAttr>(attr)) {
     // Meta-data.
@@ -219,8 +251,10 @@ LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
     for (size_t i = 0; i < rank; ++i) {
       shape[i] = stShape[i];
     }
+    Type mlirElementType = st.getElementType();
+    bool isI1 = mlirElementType == IntegerType::get(loc.getContext(), 1);
     iree_hal_element_type_t elementType = IREE_HAL_ELEMENT_TYPE_NONE;
-    if (failed(convertToElementType(loc, st.getElementType(), &elementType)))
+    if (failed(convertToElementType(loc, mlirElementType, &elementType)))
       return failure();
 
     iree::vm::ref<iree_hal_buffer_t> buffer;
@@ -241,6 +275,19 @@ LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
                        buffer.get(), 0, bufferSize,
                        static_cast<const void *>(data.data()), data.size()))))
         return failure();
+    } else if (isI1) {
+      // Dense, non-splat i1.
+      // MLIR DenseElementsAttr made the interesting optimization choice to
+      // densely pack i1 as a bit-vector. It doesn't do this for any other
+      // sub-byte type, and it is aligned linearly (not row-wise), so is
+      // a complete special case.
+      // Since we map this to an 8bit bool on the IREE runtime side, we
+      // just do the best we can when allocating.
+      if (failed(importBitwiseBoolI8BufferForRead(
+              loc, reinterpret_cast<const uint8_t *>(data.data()), data.size(),
+              &buffer))) {
+        return failure();
+      }
     } else {
       // Dense, non-splat.
       if (failed(importBufferForRead(
@@ -260,6 +307,52 @@ LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
 
     return handleRuntimeError(
         loc, iree_vm_list_push_ref_move(inputs.get(), std::move(bv)));
+  } else if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
+    iree_vm_value_t value;
+    APInt apValue = integerAttr.getValue();
+    switch (apValue.getBitWidth()) {
+    case 8:
+      value =
+          iree_vm_value_make_i8(static_cast<uint8_t>(apValue.getZExtValue()));
+      break;
+    case 16:
+      value =
+          iree_vm_value_make_i16(static_cast<uint16_t>(apValue.getZExtValue()));
+      break;
+    case 32:
+      value =
+          iree_vm_value_make_i32(static_cast<uint32_t>(apValue.getZExtValue()));
+      break;
+    case 64:
+      value =
+          iree_vm_value_make_i64(static_cast<uint64_t>(apValue.getZExtValue()));
+      break;
+    default:
+      return emitError(loc) << "internal error: unsupported consteval jit "
+                               "function integer input type ("
+                            << attr << ")";
+    }
+    return handleRuntimeError(loc,
+                              iree_vm_list_push_value(inputs.get(), &value));
+  } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
+    iree_vm_value_t value;
+    APFloat apValue = floatAttr.getValue();
+    // Note that there are many floating point semantics that LLVM knows about,
+    // but we restrict to only those that the VM natively supports here.
+    switch (APFloat::SemanticsToEnum(apValue.getSemantics())) {
+    case APFloat::S_IEEEsingle:
+      value = iree_vm_value_make_f32(apValue.convertToFloat());
+      break;
+    case APFloat::S_IEEEdouble:
+      value = iree_vm_value_make_f64(apValue.convertToDouble());
+      break;
+    default:
+      return emitError(loc) << "internal error: unsupported consteval jit "
+                               "function float input type ("
+                            << attr << ")";
+    }
+    return handleRuntimeError(loc,
+                              iree_vm_list_push_value(inputs.get(), &value));
   }
 
   return emitError(loc)
@@ -288,34 +381,30 @@ LogicalResult FunctionCall::invoke(Location loc, StringRef name) {
 }
 
 LogicalResult FunctionCall::getResultAsAttr(Location loc, size_t index,
-                                            TypedAttr &outAttr) {
+                                            Type mlirType, TypedAttr &outAttr) {
   iree_vm_variant_t variant = iree_vm_variant_empty();
   if (failed(handleRuntimeError(loc, iree_vm_list_get_variant_assign(
                                          outputs.get(), index, &variant))))
     return failure();
 
-  outAttr = binary.convertVariantToAttribute(loc, variant);
+  outAttr = binary.convertVariantToAttribute(loc, variant, mlirType);
   if (!outAttr)
     return failure();
 
   return success();
 }
 
-TypedAttr
-CompiledBinary::convertVariantToAttribute(Location loc,
-                                          iree_vm_variant_t &variant) {
+TypedAttr CompiledBinary::convertVariantToAttribute(Location loc,
+                                                    iree_vm_variant_t &variant,
+                                                    Type mlirType) {
   auto context = loc.getContext();
   Builder builder(context);
   if (iree_vm_variant_is_value(variant)) {
     switch (iree_vm_type_def_as_value(variant.type)) {
-    case IREE_VM_VALUE_TYPE_I8:
-      return builder.getI8IntegerAttr(variant.i8);
-    case IREE_VM_VALUE_TYPE_I16:
-      return builder.getI16IntegerAttr(variant.i16);
     case IREE_VM_VALUE_TYPE_I32:
-      return builder.getI32IntegerAttr(variant.i32);
+      return builder.getIntegerAttr(mlirType, variant.i32);
     case IREE_VM_VALUE_TYPE_I64:
-      return builder.getI64IntegerAttr(variant.i64);
+      return builder.getIntegerAttr(mlirType, variant.i64);
     case IREE_VM_VALUE_TYPE_F32:
       return builder.getF32FloatAttr(variant.f32);
     case IREE_VM_VALUE_TYPE_F64:

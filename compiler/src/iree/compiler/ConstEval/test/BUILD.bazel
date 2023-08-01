@@ -16,7 +16,10 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "compile_regressions.mlir",
+            "failing.mlir",
             "jit_globals.mlir",
+            "scalar_values.mlir",
         ],
         include = ["*.mlir"],
     ),
