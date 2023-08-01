@@ -1066,6 +1066,10 @@ struct ReorderElementwiseAndShapeOp final : OpRewritePattern<ElementwiseOpT> {
     }
 
     Value input = definingOp->getOperand(0);
+    if (getElementTypeOrSelf(op.getOperand()) != getElementTypeOrSelf(op.getResult())) {
+      return failure();
+    }
+
     Value newEwiseVal =
         rewriter.create<ElementwiseOpT>(loc, input.getType(), input)
             .getResult();
