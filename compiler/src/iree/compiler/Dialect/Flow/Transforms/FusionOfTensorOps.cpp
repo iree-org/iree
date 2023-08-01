@@ -35,11 +35,12 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// TODO(#12033): solve for the slow linalg transpose folder and remove the flag.
+// TODO: Remove this and the backing code once consteval is beyond being
+// rolled back.
 static llvm::cl::opt<int64_t> clLinalgMaxConstantFoldElements(
     "iree-codegen-linalg-max-constant-fold-elements",
     llvm::cl::desc("Maximum number of elements to try to constant fold."),
-    llvm::cl::init(INT64_MAX));
+    llvm::cl::init(0));
 
 /// Check if any of the use dominates all other uses of the operation.
 static std::optional<OpOperand *> getFusableUse(Operation *op,
