@@ -12,11 +12,6 @@
 #include "iree/hal/api.h"
 #include "iree/integrations/pjrt/common/iree_helpers.h"
 #include "iree/integrations/pjrt/common/tensor_utils.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Allocator.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Process.h"
-#include "llvm/Support/StringSaver.h"
 #include "xla/pjrt/transpose.h"
 
 using iree::vm::retain_ref;
@@ -1215,44 +1210,17 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   // Partition.
   if (platform().partitioner()) {
     std::unique_ptr<CompilerJob> job = platform().partitioner()->StartJob();
+    if (!job) {
+      std::string message = platform().partitioner()->GetErrorMessage();
+      return MakeError(
+          iree_make_status(IREE_STATUS_CANCELLED, ": %s", message.c_str()));
+    }
     if (artifact_tx) {
       job->EnableCrashDumps(artifact_tx.get());
     }
 
     // Set flags.
-    int num_partitions = options.executable_build_options.num_partitions();
-    int num_replicas = options.executable_build_options.num_replicas();
-    bool use_spmd_partitioning =
-        options.executable_build_options.use_spmd_partitioning();
-    auto allow_spmd_sharding_propagation_to_output =
-        options.executable_build_options
-            .allow_spmd_sharding_propagation_to_output();
-    if (!job->SetFlag(
-            absl::StrCat("--openxla-partitioner-gspmd-num-partitions=",
-                         num_partitions)
-                .c_str())) {
-      return MakeCompilerError(*job);
-    }
-    if (!job->SetFlag(absl::StrCat("--openxla-partitioner-gspmd-replica-count=",
-                                   num_replicas)
-                          .c_str())) {
-      return MakeCompilerError(*job);
-    }
-    if (!job->SetFlag(
-            absl::StrCat("--openxla-partitioner-gspmd-use-spmd-partitioning=",
-                         use_spmd_partitioning)
-                .c_str())) {
-      return MakeCompilerError(*job);
-    }
-    if (!job->SetFlag(
-            absl::StrCat(
-                "--openxla-partitioner-gspmd-allow-spmd-"
-                "sharding-propagation-to-output=",
-                absl::StrJoin(allow_spmd_sharding_propagation_to_output, ","))
-                .c_str())) {
-      return MakeCompilerError(*job);
-    }
-
+    if (!job->SetFlags(options)) return MakeCompilerError(*job);
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
           /*label=*/"partitioner_flags", /*extension=*/"txt", /*index=*/-1,
@@ -1286,58 +1254,23 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
   // Main compilation.
   {
     std::unique_ptr<CompilerJob> job = platform().compiler().StartJob();
+    if (!job) {
+      std::string message = platform().compiler().GetErrorMessage();
+      return MakeError(
+          iree_make_status(IREE_STATUS_CANCELLED, ": %s", message.c_str()));
+    }
     if (artifact_tx) {
       job->EnableCrashDumps(artifact_tx.get());
     }
+
     // Set flags.
     // TODO: This should be done as part of session setup from a named pool.
     // TODO: The HAL backends and other flags should come from the assigned
     // devices.
-    // The input here should be stablehlo if coming from JAX and xla if
-    // importing from XLA HLO. Set to xla for now as it merely runs an
-    // additional pass. We can flip to auto post more testing.
-    if (!job->SetFlag("--iree-input-type=stablehlo_xla")) {
-      return MakeCompilerError(*job);
-    }
-    if (!job->SetFlag("--iree-input-demote-i64-to-i32=false")) {
-      return MakeCompilerError(*job);
-    }
-    if (!job->SetFlag("--iree-execution-model=async-external")) {
-      return MakeCompilerError(*job);
-    }
     if (!SetDefaultCompilerFlags(job.get())) {
       return MakeCompilerError(*job);
     }
-    // Propagate all options set via environment variable.
-    if (std::optional<std::string> envValue = llvm::sys::Process::GetEnv(
-            llvm::StringRef("IREE_COMPILER_OPTIONS"))) {
-      llvm::SmallVector<const char*, 20> newArgv;
-      llvm::BumpPtrAllocator a;
-      llvm::StringSaver saver(a);
-
-      llvm::cl::TokenizeGNUCommandLine(*envValue, saver, newArgv);
-      // TODO: This could probably be combined into a SetFlags call.
-      for (auto arg : newArgv)
-        if (!job->SetFlag(arg)) return MakeCompilerError(*job);
-    }
-    // Set extra options, overriding env variables if appropriate.
-    for (auto [option, option_override] : options.env_option_overrides) {
-      std::string override_string;
-      if (auto override_val = std::get_if<std::string>(&option_override)) {
-        override_string = *override_val;
-      } else if (auto override_val = std::get_if<bool>(&option_override)) {
-        override_string = *override_val ? "true" : "false";
-      } else if (auto override_val = std::get_if<int64_t>(&option_override)) {
-        override_string = std::to_string(*override_val);
-      } else {
-        assert(false &&
-               "option value should be of type string, bool, or int64");
-      }
-      if (!job->SetFlag(
-              absl::StrCat("--", option, "=", override_string).c_str())) {
-        return MakeCompilerError(*job);
-      }
-    }
+    if (!job->SetFlags(options)) return MakeCompilerError(*job);
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
           /*label=*/"flags", /*extension=*/"txt", /*index=*/-1,

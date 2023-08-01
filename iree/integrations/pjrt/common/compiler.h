@@ -11,6 +11,7 @@
 #include <string>
 
 #include "iree/integrations/pjrt/common/debugging.h"
+#include "xla/pjrt/pjrt_executable.h"
 
 namespace iree::pjrt {
 
@@ -35,6 +36,7 @@ class CompilerJob {
   // setup of a job (or if the underlying session will not be re-used).
   // Returns false on failure.
   virtual bool SetFlag(const char* flag) = 0;
+  virtual bool SetFlags(xla::CompileOptions options) = 0;
 
   // Gets all flags as a string. This is intended for debug printing a plausible
   // command line to reproduce compilation.
@@ -65,6 +67,10 @@ class AbstractCompiler {
   // Gets descriptive revision information which identifies the version of
   // the compiler and/or APIs of the compiler.
   virtual std::string GetRevision() = 0;
+
+  // If an operation failed, then an additional error message may be
+  // available.
+  virtual std::string GetErrorMessage() = 0;
 };
 
 // An AbstractCompiler based on IREE.
@@ -72,6 +78,10 @@ class IREECompiler : public AbstractCompiler {
  public:
   std::unique_ptr<CompilerJob> StartJob() override;
   std::string GetRevision() override;
+  std::string GetErrorMessage() override { return error_message_; }
+
+ private:
+  std::string error_message_;
 };
 
 // An AbstractCompiler based on the HLO partitioner.
@@ -79,6 +89,10 @@ class OpenXLAPartitioner : public AbstractCompiler {
  public:
   std::unique_ptr<CompilerJob> StartJob() override;
   std::string GetRevision() override;
+  std::string GetErrorMessage() override { return error_message_; }
+
+ private:
+  std::string error_message_;
 };
 
 }  // namespace iree::pjrt

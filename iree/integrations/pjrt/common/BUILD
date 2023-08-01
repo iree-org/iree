@@ -58,8 +58,6 @@ iree_pjrt_cc_library(
         "@iree_core//runtime/src/iree/vm/bytecode:module",
         "@xla//xla:shape_util",
         "@xla//xla/pjrt/c:pjrt_c_api_hdrs",
-        # For environment parsing.
-        "@llvm-project//llvm:Support",
         # For xla::CompileOptions.
         "@xla//xla/pjrt:pjrt_executable",
         "@xla//xla/pjrt:transpose",
@@ -99,6 +97,9 @@ iree_pjrt_cc_library(
         ":debugging",
         "//partitioner:c_headers",
         "@iree_core//compiler/bindings/c:headers",
+        "@xla//xla/pjrt:pjrt_executable",
+         # For environment parsing.
+        "@llvm-project//llvm:Support",
     ],
 )
 

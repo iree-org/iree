@@ -10,6 +10,11 @@
 
 #include "iree/compiler/embedding_api.h"
 #include "iree/integrations/pjrt/common/compiler.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Allocator.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Process.h"
+#include "llvm/Support/StringSaver.h"
 
 namespace iree::pjrt {
 
@@ -91,6 +96,27 @@ class IREECompilerJob : public CompilerJob {
     if (error) {
       SetError(error);
       return false;
+    }
+    return true;
+  }
+
+  bool SetFlags(xla::CompileOptions options) override {
+    // Set extra options, overriding env variables if appropriate.
+    for (auto [option, option_override] : options.env_option_overrides) {
+      std::string override_string;
+      if (auto override_val = std::get_if<std::string>(&option_override)) {
+        override_string = *override_val;
+      } else if (auto override_val = std::get_if<bool>(&option_override)) {
+        override_string = *override_val ? "true" : "false";
+      } else if (auto override_val = std::get_if<int64_t>(&option_override)) {
+        override_string = std::to_string(*override_val);
+      } else {
+        assert(false &&
+               "option value should be of type string, bool, or int64");
+      }
+      if (!SetFlag(absl::StrCat("--", option, "=", override_string).c_str())) {
+        return false;
+      }
     }
     return true;
   }
@@ -189,10 +215,37 @@ std::unique_ptr<CompilerJob> IREECompiler::StartJob() {
   // TODO: Capture diagnostics, etc vs spewing to stderr.
   ireeCompilerInvocationEnableConsoleDiagnostics(inv);
 
-  return std::make_unique<IREECompilerJob>(
+  auto job = std::make_unique<IREECompilerJob>(
       session, inv, [](iree_compiler_session_t* session) {
         ireeCompilerSessionDestroy(session);
       });
+
+  // The input here should be stablehlo if coming from JAX and xla if
+  // importing from XLA HLO. Set to xla for now as it merely runs an
+  // additional pass. We can flip to auto post more testing.
+  if (!job->SetFlag("--iree-input-type=stablehlo_xla") ||
+      !job->SetFlag("--iree-input-demote-i64-to-i32=false") ||
+      !job->SetFlag("--iree-execution-model=async-external")) {
+    error_message_ = job->GetErrorMessage();
+    return nullptr;
+  }
+
+  // Propagate all options set via environment variable.
+  if (std::optional<std::string> env_value = llvm::sys::Process::GetEnv(
+          llvm::StringRef("IREE_COMPILER_OPTIONS"))) {
+    llvm::SmallVector<const char*, 20> new_argv;
+    llvm::BumpPtrAllocator a;
+    llvm::StringSaver saver(a);
+
+    llvm::cl::TokenizeGNUCommandLine(*env_value, saver, new_argv);
+    for (auto arg : new_argv)
+      if (!job->SetFlag(arg)) {
+        error_message_ = job->GetErrorMessage();
+        return nullptr;
+      }
+  }
+
+  return job;
 }
 
 std::string IREECompiler::GetRevision() {
