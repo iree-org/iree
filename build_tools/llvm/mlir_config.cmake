@@ -13,11 +13,7 @@
 #     -DCMAKE_C_COMPILER=clang \
 #     -DCMAKE_CXX_COMPILER=clang++ \
 #     -DCMAKE_LINKER=lld
-# TODO: For some reason Python sources aren't selectable as part of a
-# distribution and targets don't show up properly.
 # ninja -C $MLIR_BUILD_DIR install-mlirdevelopment-distribution
-# The full install target seems to get everything...
-# ninja -C $MLIR_BUILD_DIR install
 
 if(NOT EXISTS ${LLVM_DIR})
   message(FATAL_ERROR "LLVM_DIR (${LLVM_DIR}) does not exist")
@@ -49,10 +45,16 @@ set(LLVM_MLIR_TOOLS
       mlir-translate
     CACHE STRING "")
 
+set(LLVM_MLIR_Python_COMPONENTS
+      MLIRPythonModules
+      mlir-python-sources
+    CACHE STRING "")
+
 set(LLVM_MlirDevelopment_DISTRIBUTION_COMPONENTS
       mlir-cmake-exports
       mlir-headers
       mlir-libraries
       MLIRPythonModules
       ${LLVM_MLIR_TOOLS}
+      ${LLVM_MLIR_Python_COMPONENTS}
     CACHE STRING "")
