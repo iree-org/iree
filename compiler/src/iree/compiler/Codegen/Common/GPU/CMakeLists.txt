@@ -42,6 +42,8 @@ iree_cc_library(
 iree_cc_library(
   NAME
     CommonGPUPasses
+  COPTS
+    "-Wno-uninitialized"
   HDRS
     "GPUPatterns.h"
     "Passes.h"

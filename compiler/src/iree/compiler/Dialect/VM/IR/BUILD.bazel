@@ -53,6 +53,10 @@ iree_compiler_cc_library(
         "VMTraits.h",
         "VMTypes.h",
     ],
+    copts = [
+        # GCC warning from mlir DialectImplementation.h
+        "-Wno-uninitialized",
+    ],
     textual_hdrs = [
         "VMAttrs.cpp.inc",
         "VMAttrs.h.inc",

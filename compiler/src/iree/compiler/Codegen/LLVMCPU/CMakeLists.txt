@@ -41,6 +41,8 @@ iree_cc_library(
 iree_cc_library(
   NAME
     LLVMCPU
+  COPTS
+    "-Wno-uninitialized"
   HDRS
     "DispatchABI.h"
     "KernelDispatch.h"

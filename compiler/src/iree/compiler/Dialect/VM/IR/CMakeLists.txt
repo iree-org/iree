@@ -13,6 +13,8 @@ iree_add_all_subdirs()
 iree_cc_library(
   NAME
     IR
+  COPTS
+    "-Wno-uninitialized"
   HDRS
     "VMDialect.h"
     "VMFuncEncoder.h"

@@ -68,6 +68,10 @@ iree_compiler_cc_library(
         "GPUPatterns.h",
         "Passes.h",
     ],
+    copts = [
+        # GCC warning from LLVM library
+        "-Wno-uninitialized",
+    ],
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
