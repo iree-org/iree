@@ -103,9 +103,13 @@ iree_c_module(
     h_file_output = "assignment_ops_i64.h",
 )
 
+# TODO(#14507): Investigate the maybe-uninitialized warning.
 iree_c_module(
     name = "buffer_ops",
     src = "//runtime/src/iree/vm/test:buffer_ops.mlir",
+    copts = [
+        "-Wno-uninitialized",
+    ],
     flags = [
         "--compile-mode=vm",
     ],
