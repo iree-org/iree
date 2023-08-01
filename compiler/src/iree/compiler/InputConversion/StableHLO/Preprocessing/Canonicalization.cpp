@@ -1066,7 +1066,8 @@ struct ReorderElementwiseAndShapeOp final : OpRewritePattern<ElementwiseOpT> {
     }
 
     Value input = definingOp->getOperand(0);
-    if (getElementTypeOrSelf(op.getOperand()) != getElementTypeOrSelf(op.getResult())) {
+    if (getElementTypeOrSelf(op.getOperand()) !=
+        getElementTypeOrSelf(op.getResult())) {
       return failure();
     }
 
@@ -1126,7 +1127,6 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       ->add<ReorderElementwiseAndShapeOp<mlir::stablehlo::AbsOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::CeilOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::CbrtOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::ConvertOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::ClzOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::CosineOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::ExpOp>,
@@ -1139,7 +1139,6 @@ void populateCanonicalizationPatterns(MLIRContext *context,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::LogisticOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::NotOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::NegOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::PopulationCountOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::RealOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::RoundOp>,
             ReorderElementwiseAndShapeOp<mlir::stablehlo::RoundNearestEvenOp>,
