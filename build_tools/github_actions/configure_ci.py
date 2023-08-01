@@ -120,6 +120,7 @@ POSTSUBMIT_ONLY_JOBS = frozenset(
         "build_test_all_windows",
         "build_test_all_macos_arm64",
         "build_test_all_macos_x86_64",
+        "test_a100",
     ]
 )
 
