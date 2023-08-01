@@ -85,7 +85,7 @@ struct CaptureContractionDims
 
 /// Captures the convolution dimensions of the target operation.
 struct CaptureConvDims
-    : public CaptureStaticValue<mlir::linalg::detail::ConvolutionDimensions> {
+    : public CaptureStaticValue<mlir::linalg::ConvolutionDimensions> {
   using Base::Base;
 };
 
@@ -1132,7 +1132,7 @@ void makeSoftmaxMatcher(MatcherContext &context,
 
 struct MatchedConvolutionCaptures {
   Type inputElementType, filterElementType, outputElementType;
-  mlir::linalg::detail::ConvolutionDimensions convolutionDims = {};
+  mlir::linalg::ConvolutionDimensions convolutionDims = {};
   SmallVector<int64_t> convolutionOpSizes = {};
   SmallVector<int64_t> trailingOpSizes = {};
   int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
