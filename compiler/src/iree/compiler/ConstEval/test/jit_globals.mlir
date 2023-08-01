@@ -220,3 +220,20 @@ module @eval_i64_tensor {
     util.initializer.return
   }
 }
+
+// -----
+// Splat of an 8byte value ensures that large fills are possible.
+// CHECK-LABEL: @eval_i64_tensor_splat
+// CHECK: util.global private @{{.*}} = dense<2> : tensor<2xi64>
+module @eval_i64_tensor_splat {
+  util.global private @hoisted : tensor<2xi64>
+  func.func @main() -> tensor<2xi64> {
+    %hoisted = util.global.load @hoisted : tensor<2xi64>
+    return %hoisted : tensor<2xi64>
+  }
+  util.initializer attributes {iree.compiler.consteval} {
+    %cst = arith.constant dense<2> : tensor<2xi64>
+    util.global.store %cst, @hoisted : tensor<2xi64>
+    util.initializer.return
+  }
+}

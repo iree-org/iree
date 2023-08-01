@@ -587,10 +587,11 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
   IREE_ASSERT_ARGUMENT(pattern);
 
   if (IREE_UNLIKELY(pattern_length != 1 && pattern_length != 2 &&
-                    pattern_length != 4)) {
+                    pattern_length != 4) &&
+      pattern_length != 8) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "fill patterns must be 1, 2, or 4 bytes (got %" PRIhsz ")",
+        "fill patterns must be 1, 2, 4, or 8 bytes (got %" PRIhsz ")",
         pattern_length);
   }
 
@@ -620,8 +621,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
                             pattern_length, byte_offset, byte_length);
   }
 
-  const uint32_t zero_32 = 0;
-  if (memcmp(pattern, &zero_32, pattern_length) == 0) {
+  // Must be the maximum fill pattern size as checked above.
+  const uint64_t zero_64 = 0;
+  if (memcmp(pattern, &zero_64, pattern_length) == 0) {
     // We can turn all-zero values into single-byte fills as that can be much
     // faster on devices (doing a fill8 vs fill32).
     pattern_length = 1;
@@ -648,6 +650,14 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
       uint32_t* data = (uint32_t*)data_ptr;
       uint32_t value_bits = *(const uint32_t*)(pattern);
       for (iree_device_size_t i = 0; i < byte_length / sizeof(uint32_t); ++i) {
+        data[i] = value_bits;
+      }
+      break;
+    }
+    case 8: {
+      uint64_t* data = (uint64_t*)data_ptr;
+      uint64_t value_bits = *(const uint64_t*)(pattern);
+      for (iree_device_size_t i = 0; i < byte_length / sizeof(uint64_t); ++i) {
         data[i] = value_bits;
       }
       break;
