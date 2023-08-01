@@ -15,7 +15,6 @@
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVMPass.h"
 #include "mlir/Conversion/IndexToLLVM/IndexToLLVM.h"
-#include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToStandard/LinalgToStandard.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
@@ -415,8 +414,6 @@ DiagnosedSilenceableFailure transform_ext::LowerToLLVMOp::apply(
   // Sprinkle some cleanups.
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  // Blanket-convert any remaining linalg ops to LLVM if any remain.
-  pm.addPass(createConvertLinalgToLLVMPass());
   {
     auto options = ConvertVectorToLLVMPassOptions();
     options.reassociateFPReductions = getReassociateFpReductions();
