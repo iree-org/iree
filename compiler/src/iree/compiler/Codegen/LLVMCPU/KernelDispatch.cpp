@@ -2173,15 +2173,23 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   }
 }
 
+/// Helper method to set the dispatch to be lowered through the default
+/// pipeline.
+static LogicalResult lowerUsingDefaultPipeline(func::FuncOp entryPointFn) {
+  // If there is a translation info set, do nothing.
+  if (getTranslationInfo(entryPointFn)) {
+    return success();
+  }
+  // Otherwise lower using default pipeline.
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
+  return setTranslationInfo(entryPointFn, translationInfo);
+}
+
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult
 setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
                                 ArrayRef<Operation *> computeOps) {
-  if (computeOps.empty()) {
-    // No compute operations found. Allow to pass through without a config.
-    return success();
-  }
-
   // First check if the operations have a preset pipeline. If the config is
   // preset, do not overwrite it.
   for (auto computeOp : computeOps) {
@@ -2204,16 +2212,7 @@ setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
 
   // Handle the case with no known root operation.
   if (!rootOperation) {
-    // If there is no translation info set, just set it to default.
-    if (!getTranslationInfo(entryPointFn)) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
-      // Fall back, just set the translation to CPUDefault.
-      if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
-        return failure();
-      }
-    }
-    return success();
+    return lowerUsingDefaultPipeline(entryPointFn);
   }
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
