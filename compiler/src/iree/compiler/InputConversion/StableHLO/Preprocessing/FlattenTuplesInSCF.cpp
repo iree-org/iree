@@ -99,7 +99,7 @@ void DetupleRegion(Region &srcRegion, Region &destRegion, ArrayRef<Type> types,
   }
 }
 
-class DeTupleYieldOp : public OpRewritePattern<scf::YieldOp> {
+class DetupleYieldOp : public OpRewritePattern<scf::YieldOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mlir::scf::YieldOp op,
@@ -122,7 +122,7 @@ class DeTupleYieldOp : public OpRewritePattern<scf::YieldOp> {
   }
 };
 
-class DeTupleConditionOp : public OpRewritePattern<scf::ConditionOp> {
+class DetupleConditionOp : public OpRewritePattern<scf::ConditionOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mlir::scf::ConditionOp op,
@@ -146,7 +146,7 @@ class DeTupleConditionOp : public OpRewritePattern<scf::ConditionOp> {
   }
 };
 
-class DeTupleIfOp : public OpRewritePattern<scf::IfOp> {
+class DetupleIfOp : public OpRewritePattern<scf::IfOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mlir::scf::IfOp op,
@@ -189,7 +189,7 @@ class DeTupleIfOp : public OpRewritePattern<scf::IfOp> {
   }
 };
 
-class DeTupleWhileOp : public OpRewritePattern<scf::WhileOp> {
+class DetupleWhileOp : public OpRewritePattern<scf::WhileOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mlir::scf::WhileOp op,
@@ -253,7 +253,7 @@ struct FlattenTuplesInSCF final
     RewritePatternSet patterns(ctx);
     populateCanonicalizationPatterns(ctx, &patterns);
     patterns
-        .add<DeTupleYieldOp, DeTupleConditionOp, DeTupleIfOp, DeTupleWhileOp>(
+        .add<DetupleYieldOp, DetupleConditionOp, DetupleIfOp, DetupleWhileOp>(
             ctx);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
