@@ -182,8 +182,10 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   if (inputShape.size() != 4 || outputShape.size() != 4)
     return failure();
 
-  linalg::detail::ConvolutionDimensions convDims;
-  linalg::detail::isConvolutionInterfaceImpl(linalgOp, &convDims);
+  auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
+  if (failed(convDimsOrFailure))
+    return failure();
+  const mlir::linalg::ConvolutionDimensions &convDims = *convDimsOrFailure;
   LLVM_DEBUG({
     llvm::dbgs() << "conv: " << linalgOp;
     llvm::dbgs() << "\nconv batch dim: ";
