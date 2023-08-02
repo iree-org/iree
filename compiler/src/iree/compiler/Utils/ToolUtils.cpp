@@ -121,7 +121,7 @@ static std::string getCurrentDylibPath() {
     LLVM_DEBUG(llvm::dbgs() << "GetModuleHandleEx could not find the module\n");
     return {};
   }
-  llvm::SmallVector<char_t, MAX_PATH> dllPath;
+  llvm::SmallVector<char, MAX_PATH> dllPath;
   dllPath.resize_for_overwrite(dllPath.capacity());
   while (1) {
     auto size = ::GetModuleFileNameA(hm, dllPath.data(), dllPath.size());
