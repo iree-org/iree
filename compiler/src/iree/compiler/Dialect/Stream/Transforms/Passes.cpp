@@ -61,12 +61,16 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Verify we support the program.
   passManager.addPass(IREE::Stream::createVerifyInputPass());
 
+  // Cleanup the program prior to outlining constants in case there is
+  // propagation or fusion that needs to happen first.
+  addCleanupPatterns(passManager);
+
   // Turn all constant ops into global variables and fix up the IR.
   // As many locations change and constants are deduplicated we'll end up with
   // a lot of extraneous IR (mostly global loads) and clean those up here.
   passManager.addPass(IREE::Stream::createOutlineConstantsPass());
 
-  // Perform cleanup after constnat simplification as more canonicalizers may be
+  // Perform cleanup after constant simplification as more canonicalizers may be
   // able to kick in.
   addCleanupPatterns(passManager);
 
