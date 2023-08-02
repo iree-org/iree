@@ -20,6 +20,7 @@ def iree_c_module(
             "//runtime/src/iree/vm:shims_emitc",
         ],
         compile_tool = "//tools:iree-compile",
+        copts = None,
         no_runtime = None,
         static_lib_path = "",
         **kwargs):
@@ -31,6 +32,7 @@ def iree_c_module(
         h_file_output: The H header file to output.
         flags: additional flags to pass to the compile tool.
             `--output-format=vm-c` is included automatically.
+        copts: Optional additional c flags.
         deps: Optional. Dependencies to add to the generated library.
         compile_tool: the compiler to use to generate the module.
             Defaults to iree-compile.
@@ -74,13 +76,15 @@ def iree_c_module(
     if not no_runtime:
         deps_list = deps
 
+    copts_list = ["-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output]
+    if copts:
+        copts_list += copts
+
     iree_runtime_cc_library(
         name = name,
         hdrs = [h_file_output],
         srcs = ["//runtime/src/iree/vm:module_impl_emitc.c", h_file_output],
-        copts = [
-            "-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output,
-        ],
+        copts = copts_list,
         deps = deps_list,
         **kwargs
     )

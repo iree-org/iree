@@ -106,6 +106,10 @@ iree_c_module(
 iree_c_module(
     name = "buffer_ops",
     src = "//runtime/src/iree/vm/test:buffer_ops.mlir",
+    # TODO(#14540): Investigate the maybe-uninitialized warning.
+    copts = [
+        "-Wno-uninitialized",
+    ],
     flags = [
         "--compile-mode=vm",
     ],
