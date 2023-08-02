@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "add_fmfs.mlir"
     "affinemin_canonicalization.mlir"
     "batch_matmuls.mlir"
     "bubble_up_ordinal_ops.mlir"

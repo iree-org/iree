@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "add_fmfs.mlir",
             "affinemin_canonicalization.mlir",
             "batch_matmuls.mlir",
             "bubble_up_ordinal_ops.mlir",
