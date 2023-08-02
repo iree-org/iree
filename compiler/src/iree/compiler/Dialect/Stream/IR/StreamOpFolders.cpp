@@ -1350,8 +1350,8 @@ struct ConvertSplatConstantsIntoSplats
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto value = constantOp.getValue();
-    if (!value.isSplat())
+    auto value = dyn_cast<ElementsAttr>(constantOp.getValue());
+    if (!value || !value.isSplat())
       return failure();
 
     auto splatElementAttr =

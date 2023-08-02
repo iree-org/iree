@@ -150,4 +150,12 @@ vm.module @constants {
   // CHECK-NEXT:   0
   // CHECK-NEXT: ]
   vm.rodata private @elided_f32 dense_resource<__elided__> : tensor<3xf32>
+
+  // Tests #util.byte_pattern on sub-byte types.
+  //      CHECK: "embedded_data": [
+  // CHECK-NEXT:   1,
+  // CHECK-NEXT:   1,
+  // CHECK-NEXT:   1
+  // CHECK-NEXT: ]
+  vm.rodata private @byte_pattern_i2 #util.byte_pattern<1> : tensor<9xi2>
 }

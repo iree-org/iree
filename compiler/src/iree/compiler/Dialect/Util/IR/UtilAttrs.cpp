@@ -428,7 +428,42 @@ serializeGenericElementData(Location loc, DenseElementsAttr elementsAttr,
 }
 
 //===----------------------------------------------------------------------===//
-// Buffer attributes
+// #util.byte_pattern
+//===----------------------------------------------------------------------===//
+
+int64_t BytePatternAttr::getStorageSize() const {
+  if (auto shapedType = getType().dyn_cast<ShapedType>()) {
+    return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
+  } else {
+    return IREE::Util::getTypePhysicalStorageBitWidth(getType());
+  }
+}
+
+LogicalResult
+BytePatternAttr::serializeToBuffer(llvm::support::endianness endian,
+                                   ArrayRef<char> buffer) const {
+  const uint8_t byte = static_cast<uint8_t>(getPattern() % 256);
+  std::memset(const_cast<char *>(buffer.data()), byte, buffer.size());
+  return success();
+}
+
+LogicalResult
+BytePatternAttr::serializeToStream(llvm::support::endianness endian,
+                                   llvm::raw_ostream &os) const {
+  const uint8_t byte = static_cast<uint8_t>(getPattern() % 256);
+  const char bytes[256] = {static_cast<char>(byte)};
+  int64_t remaining = getStorageSize();
+  while (remaining) {
+    int64_t write_length =
+        std::min(remaining, static_cast<int64_t>(sizeof(bytes)));
+    os.write(bytes, static_cast<size_t>(write_length));
+    remaining -= write_length;
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// #util.byte_range
 //===----------------------------------------------------------------------===//
 
 Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
@@ -491,6 +526,10 @@ void ByteRangeAttr::print(AsmPrinter &p) const {
   os << getLength();
   os << ">";
 }
+
+//===----------------------------------------------------------------------===//
+// #util.composite
+//===----------------------------------------------------------------------===//
 
 // static
 CompositeAttr CompositeAttr::get(MLIRContext *context,
@@ -613,6 +652,10 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
   }
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// SerializableAttrInterface implementations
+//===----------------------------------------------------------------------===//
 
 // External interface applied to ElementsAttrs so that we can serialize them to
 // byte buffers.

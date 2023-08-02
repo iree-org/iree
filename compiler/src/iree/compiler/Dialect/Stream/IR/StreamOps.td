@@ -522,7 +522,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
   }];
 
   let arguments = (ins
-    TypedArrayAttrBase<ElementsAttr, "constant value array attribute">:$values,
+    TypedArrayAttrBase<AnyAttr, "constant value array attribute">:$values,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -834,7 +834,7 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
   }];
 
   let arguments = (ins
-    ElementsAttr:$value,
+    AnyAttr:$value,
     TypeAttr:$result_encoding,
     Stream_ShapeDynamicDims:$result_encoding_dims,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -1334,7 +1334,7 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   }];
 
   let arguments = (ins
-    ElementsAttr:$value,
+    AnyAttr:$value,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
