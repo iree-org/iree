@@ -65,6 +65,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::hal
     iree::hal::drivers::local_task::registration

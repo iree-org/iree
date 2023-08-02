@@ -1116,13 +1116,14 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToVector",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "SmallVectorImpl<char> &":$buffer
       ),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         buffer.resize($_attr.getStorageSize());
-        return $_attr.serializeToBuffer(endian, buffer);
+        return $_attr.serializeToBuffer(loc, endian, buffer);
       }]
     >,
     InterfaceMethod<
@@ -1133,6 +1134,7 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToBuffer",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "ArrayRef<char>":$buffer
       )
@@ -1145,13 +1147,14 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToStream",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "llvm::raw_ostream &":$os
       ),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         SmallVector<char> buffer;
-        if (failed($_attr.serializeToVector(endian, buffer))) {
+        if (failed($_attr.serializeToVector(loc, endian, buffer))) {
           return failure();
         }
         os.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());

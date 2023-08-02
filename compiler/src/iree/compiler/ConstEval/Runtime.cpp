@@ -6,6 +6,7 @@
 
 #include "iree/compiler/ConstEval/Runtime.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -159,154 +160,80 @@ FunctionCall::FunctionCall(CompiledBinary &binary, iree_host_size_t argCapacity,
                                     &outputs));
 }
 
-LogicalResult FunctionCall::importBufferForRead(Location loc,
-                                                const uint8_t *rawData,
-                                                iree_host_size_t length,
-                                                iree_hal_buffer_t **buffer) {
-  // TODO: Allow import when we have resources in the input where alignment
-  // can be guaranteed.
-  bool tryImport = false;
-  if (tryImport) {
-    iree_hal_buffer_params_t params;
-    std::memset(&params, 0, sizeof(params));
-    params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
-    iree_hal_external_buffer_t external_buffer;
-    std::memset(&external_buffer, 0, sizeof(external_buffer));
-    external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
-    external_buffer.size = length;
-    external_buffer.handle.host_allocation.ptr =
-        const_cast<void *>(static_cast<const void *>(rawData));
-    auto status = iree_hal_allocator_import_buffer(
-        binary.getAllocator(), params, &external_buffer,
-        /*release_callback=*/{nullptr, nullptr}, buffer);
-    if (iree_status_is_ok(status))
-      return success();
-    else if (!(iree_status_is_out_of_range(status) ||
-               iree_status_is_unavailable(status)))
-      return handleRuntimeError(loc, status);
+LogicalResult FunctionCall::addArgumentElementsAttr(Location loc,
+                                                    ElementsAttr elementsAttr) {
+  auto ser =
+      llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(elementsAttr);
+  if (!ser) {
+    return emitError(loc) << "internal error: ElementsAttr does not implement "
+                             "SerializableAttrInterface";
+  }
+  // Meta-data.
+  ShapedType st = llvm::cast<ShapedType>(elementsAttr.getType());
+  auto stShape = st.getShape();
+  auto rank = static_cast<size_t>(st.getRank());
+  iree_hal_dim_t *shape =
+      static_cast<iree_hal_dim_t *>(alloca(rank * sizeof(iree_hal_dim_t)));
+  for (size_t i = 0; i < rank; ++i) {
+    shape[i] = stShape[i];
+  }
+  Type mlirElementType = st.getElementType();
+  iree_hal_element_type_t elementType = IREE_HAL_ELEMENT_TYPE_NONE;
+  if (failed(convertToElementType(loc, mlirElementType, &elementType)))
+    return failure();
+
+  // Allocate buffer.
+  int64_t storageSize = ser.getStorageSize();
+  if (storageSize < 0) {
+    return emitError(loc) << "unsupported serializable attribute: "
+                          << elementsAttr;
   }
 
-  // Buffer is not compatible with import. Snapshot.
-  {
-    iree_hal_buffer_params_t params;
-    std::memset(&params, 0, sizeof(params));
-    params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
-    LLVM_DEBUG(
-        dbgs()
-        << "Cannot import consteval buffer. Falling back to snapshot.\n");
-    return handleRuntimeError(loc, iree_hal_allocator_allocate_buffer(
-                                       binary.getAllocator(), params, length,
-                                       iree_const_byte_span_t{rawData, length},
-                                       buffer));
-  }
-}
-
-LogicalResult FunctionCall::importBitwiseBoolI8BufferForRead(
-    Location loc, const uint8_t *rawDataBits,
-    iree_host_size_t rawDataLengthBytes, iree_hal_buffer_t **buffer) {
+  iree::vm::ref<iree_hal_buffer_t> buffer;
   iree_hal_buffer_params_t params;
   std::memset(&params, 0, sizeof(params));
-  iree_host_size_t bufferLength = rawDataLengthBytes * 8;
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   if (failed(handleRuntimeError(
           loc, iree_hal_allocator_allocate_buffer(
-                   binary.getAllocator(), params, bufferLength,
-                   iree_const_byte_span_t{nullptr, 0}, buffer))))
+                   binary.getAllocator(), params, storageSize,
+                   iree_const_byte_span_t{nullptr, 0}, &buffer))))
     return failure();
 
   iree_hal_buffer_mapping_t mapping;
   if (failed(handleRuntimeError(
           loc, iree_hal_buffer_map_range(
-                   *buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                   buffer.get(), IREE_HAL_MAPPING_MODE_SCOPED,
                    IREE_HAL_MEMORY_ACCESS_WRITE, /*byte_offset=*/0,
-                   /*byte_length=*/bufferLength, &mapping))))
+                   /*byte_length=*/storageSize, &mapping))))
     return failure();
 
   // Copy.
-  for (iree_host_size_t i = 0; i < rawDataLengthBytes; ++i) {
-    uint8_t bits = rawDataBits[i];
-    mapping.contents.data[i * 8 + 0] = bits & 0x1;
-    mapping.contents.data[i * 8 + 1] = (bits & 0x2) >> 1;
-    mapping.contents.data[i * 8 + 2] = (bits & 0x4) >> 2;
-    mapping.contents.data[i * 8 + 3] = (bits & 0x8) >> 3;
-    mapping.contents.data[i * 8 + 4] = (bits & 0x10) >> 4;
-    mapping.contents.data[i * 8 + 5] = (bits & 0x20) >> 5;
-    mapping.contents.data[i * 8 + 6] = (bits & 0x40) >> 6;
-    mapping.contents.data[i * 8 + 7] = (bits & 0x80) >> 7;
+  LogicalResult copyResult = ser.serializeToBuffer(
+      loc, llvm::support::endian::system_endianness(),
+      ArrayRef<char>(reinterpret_cast<char *>(mapping.contents.data),
+                     storageSize));
+
+  if (failed(handleRuntimeError(loc, iree_hal_buffer_unmap_range(&mapping))) ||
+      failed(copyResult)) {
+    return failure();
   }
 
-  return handleRuntimeError(loc, iree_hal_buffer_unmap_range(&mapping));
+  // Construct buffer view.
+  iree::vm::ref<iree_hal_buffer_view_t> bv;
+  if (failed(handleRuntimeError(loc, iree_hal_buffer_view_create(
+                                         buffer.get(), rank, shape, elementType,
+                                         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+                                         iree_allocator_system(), &bv))))
+    return failure();
+
+  return handleRuntimeError(
+      loc, iree_vm_list_push_ref_move(inputs.get(), std::move(bv)));
 }
 
 LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
-  if (auto elementsAttr = llvm::dyn_cast<DenseElementsAttr>(attr)) {
-    // Meta-data.
-    ArrayRef<char> data = elementsAttr.getRawData();
-    ShapedType st = elementsAttr.getType();
-    auto stShape = st.getShape();
-    auto rank = static_cast<size_t>(st.getRank());
-    iree_hal_dim_t *shape =
-        static_cast<iree_hal_dim_t *>(alloca(rank * sizeof(iree_hal_dim_t)));
-    for (size_t i = 0; i < rank; ++i) {
-      shape[i] = stShape[i];
-    }
-    Type mlirElementType = st.getElementType();
-    bool isI1 = mlirElementType == IntegerType::get(loc.getContext(), 1);
-    iree_hal_element_type_t elementType = IREE_HAL_ELEMENT_TYPE_NONE;
-    if (failed(convertToElementType(loc, mlirElementType, &elementType)))
-      return failure();
-
-    iree::vm::ref<iree_hal_buffer_t> buffer;
-    if (elementsAttr.isSplat()) {
-      // Handle splat. In this case, the data size is one element.
-      iree_device_size_t bufferSize = data.size() * st.getNumElements();
-      iree_hal_buffer_params_t params;
-      std::memset(&params, 0, sizeof(params));
-      params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
-      if (failed(handleRuntimeError(
-              loc, iree_hal_allocator_allocate_buffer(
-                       binary.getAllocator(), params, bufferSize,
-                       iree_const_byte_span_t{nullptr, 0}, &buffer))))
-        return failure();
-
-      if (failed(handleRuntimeError(
-              loc, iree_hal_buffer_map_fill(
-                       buffer.get(), 0, bufferSize,
-                       static_cast<const void *>(data.data()), data.size()))))
-        return failure();
-    } else if (isI1) {
-      // Dense, non-splat i1.
-      // MLIR DenseElementsAttr made the interesting optimization choice to
-      // densely pack i1 as a bit-vector. It doesn't do this for any other
-      // sub-byte type, and it is aligned linearly (not row-wise), so is
-      // a complete special case.
-      // Since we map this to an 8bit bool on the IREE runtime side, we
-      // just do the best we can when allocating.
-      if (failed(importBitwiseBoolI8BufferForRead(
-              loc, reinterpret_cast<const uint8_t *>(data.data()), data.size(),
-              &buffer))) {
-        return failure();
-      }
-    } else {
-      // Dense, non-splat.
-      if (failed(importBufferForRead(
-              loc, reinterpret_cast<const uint8_t *>(data.data()), data.size(),
-              &buffer)))
-        return failure();
-    }
-
-    // Construct buffer view.
-    iree::vm::ref<iree_hal_buffer_view_t> bv;
-    if (failed(handleRuntimeError(
-            loc,
-            iree_hal_buffer_view_create(buffer.get(), rank, shape, elementType,
-                                        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-                                        iree_allocator_system(), &bv))))
-      return failure();
-
-    return handleRuntimeError(
-        loc, iree_vm_list_push_ref_move(inputs.get(), std::move(bv)));
+  if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(attr)) {
+    return addArgumentElementsAttr(loc, elementsAttr);
   } else if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
     iree_vm_value_t value;
     APInt apValue = integerAttr.getValue();
@@ -337,8 +264,9 @@ LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
   } else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attr)) {
     iree_vm_value_t value;
     APFloat apValue = floatAttr.getValue();
-    // Note that there are many floating point semantics that LLVM knows about,
-    // but we restrict to only those that the VM natively supports here.
+    // Note that there are many floating point semantics that LLVM knows
+    // about, but we restrict to only those that the VM natively supports
+    // here.
     switch (APFloat::SemanticsToEnum(apValue.getSemantics())) {
     case APFloat::S_IEEEsingle:
       value = iree_vm_value_make_f32(apValue.convertToFloat());
