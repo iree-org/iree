@@ -669,6 +669,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   SmallVector<Value> newResourceOffsets;
   SmallVector<Value> newResourceLengths;
   SmallVector<Attribute> newResourceAccesses;
+  SmallVector<unsigned> readWriteResourceIndices;
 
   unsigned resourceIndex = 0;
   for (auto it : llvm::enumerate(asyncOp.getResourceOperands())) {
@@ -679,12 +680,13 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
       continue;
     }
 
-    // Read-only or read-write. Write-only are untied results below.
+    // Read-only. Write-only are untied results below and read-write are tied
+    // results.
     unsigned operandIdx =
         asyncOp.getTiedOperandsIndexAndLength().first + it.index();
-    auto accessBits = IREE::Stream::ResourceAccessBitfield::Read;
     if (asyncOp.isOperandTied(operandIdx)) {
-      accessBits = accessBits | IREE::Stream::ResourceAccessBitfield::Write;
+      readWriteResourceIndices.push_back(resourceIndex++);
+      continue;
     }
 
     auto resourceRange = scope.lookupResourceRange(operand);
@@ -693,7 +695,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
                   asyncOp.getResourceOperandOffsets()[resourceIndex]);
     auto resourceLength = asyncOp.getResourceOperandLengths()[resourceIndex];
     auto resourceAccess = IREE::Stream::ResourceAccessBitfieldAttr::get(
-        builder.getContext(), accessBits);
+        builder.getContext(), IREE::Stream::ResourceAccessBitfield::Read);
     newResources.push_back(resourceRange.resource);
     newResourceSizes.push_back(resourceRange.resourceSize);
     newResourceOffsets.push_back(resourceOffset);
@@ -702,17 +704,26 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     ++resourceIndex;
   }
 
+  unsigned readWriteResourceIndex = 0;
   for (auto result : asyncOp.getResults()) {
     auto tiedOperand = asyncOp.getTiedResultOperand(result);
-    if (tiedOperand) {
-      // All tied results are handled above as read-write.
-      continue;
-    }
+    auto accessBits = IREE::Stream::ResourceAccessBitfield::Write;
     auto resourceRange = scope.lookupResourceRange(result);
     auto resourceOffset = resourceRange.offset;
-    auto resourceLength = asyncOp.getResultSize(result.getResultNumber());
+    Value resourceLength;
+    if (tiedOperand) {
+      // All tied results are handled as read-write.
+      accessBits = accessBits | IREE::Stream::ResourceAccessBitfield::Read;
+      resourceIndex = readWriteResourceIndices[readWriteResourceIndex++];
+      resourceOffset =
+          scope.add(asyncOp.getLoc(), resourceOffset,
+                    asyncOp.getResourceOperandOffsets()[resourceIndex]);
+      resourceLength = asyncOp.getResourceOperandLengths()[resourceIndex];
+    } else {
+      resourceLength = asyncOp.getResultSize(result.getResultNumber());
+    }
     auto resourceAccess = IREE::Stream::ResourceAccessBitfieldAttr::get(
-        builder.getContext(), IREE::Stream::ResourceAccessBitfield::Write);
+        builder.getContext(), accessBits);
     newResources.push_back(resourceRange.resource);
     newResourceSizes.push_back(resourceRange.resourceSize);
     newResourceOffsets.push_back(resourceOffset);

@@ -555,3 +555,42 @@ func.func @asyncLoadStore(%operand: !stream.resource<staging>, %size: index) -> 
   // CHECK: return %[[RESULT]]
   return %1 : f32
 }
+
+// -----
+
+func.func @multi_result_emplace(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+  %c64 = arith.constant 64 : index 
+  %c16 = arith.constant 16 : index 
+  %c32 = arith.constant 32 : index 
+  %c0 = arith.constant 0 : index 
+  %c4 = arith.constant 4 : index 
+// CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<4x4xf32> in !stream.resource<external>{%c64}
+// CHECK: %[[SLICES:.+]]:2 = stream.resource.pack slices
+// CHECK: stream.cmd.execute
+// CHECK-SAME: as %[[ARG1:.+]]: !stream.resource<external>{%[[C64]]}
+// CHECK-SAME: as %[[ARG2:.+]]: !stream.resource<external>{%[[C32]]}
+// CHECK-SAME: as %[[ARG3:.+]]: !stream.resource<transient>{%[[SLICES]]#0})
+  %results, %result_timepoint = stream.async.execute with(%0 as %arg1: !stream.resource<external>{%c64}) -> !stream.resource<external>{%c32} {
+    %3 = stream.async.alloca : !stream.resource<external>{%c32}
+// CHECK: stream.cmd.dispatch @executable::@dispatch_0 {
+// CHECK:   ro %[[ARG1]][%[[C0]] for %[[C64]]] : !stream.resource<external>{%[[C64]]},
+// CHECK:   wo %[[ARG3]][%[[SLICES]]#1 for %[[C16]]] : !stream.resource<transient>{%[[SLICES]]#0},
+// CHECK:   rw %[[ARG2]][%[[C16]] for %[[C16]]] : !stream.resource<external>{%[[C32]]}
+// CHECK: }
+    %4:2 = stream.async.dispatch @executable::@dispatch_0(%arg1[%c0 to %c64 for %c64], %3[%c16 to %c32 for %c16]) : (!stream.resource<external>{%c64}, !stream.resource<external>{%c32}) -> (!stream.resource<transient>{%c16}, %3{%c32})
+// CHECK: stream.cmd.dispatch @executable::@dispatch_1 {
+// CHECK:   ro %[[ARG3]][%[[SLICES]]#1 for %[[C16]]] : !stream.resource<transient>{%[[SLICES]]#0},
+// CHECK:   rw %[[ARG2]][%[[C0]] for %[[C16]]] : !stream.resource<external>{%[[C32]]}
+// CHECK: }
+    %5 = stream.async.dispatch @executable::@dispatch_1(%4#0[%c0 to %c16 for %c16], %4#1[%c0 to %c16 for %c16]) : (!stream.resource<transient>{%c16}, !stream.resource<external>{%c32}) -> %4#1{%c32}
+    stream.yield %5 : !stream.resource<external>{%c32}
+  } => !stream.timepoint
+  %1 = stream.timepoint.await %result_timepoint => %results : !stream.resource<external>{%c32}
+  %2 = stream.tensor.export %1 : tensor<2x4xf32> in !stream.resource<external>{%c32} -> !hal.buffer_view
+  return %2 : !hal.buffer_view
+}
