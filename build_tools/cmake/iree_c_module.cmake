@@ -22,7 +22,6 @@ include(CMakeParseArguments)
 #     -DIREE_BUILD_TESTS=ON to CMake.
 # NO_RUNTIME: When added, this target will be built without the runtime library
 #     support.
-# COPTS: Extra c flags.
 #
 # Note:
 # By default, iree_c_module will create a library named ${NAME},
@@ -33,7 +32,7 @@ function(iree_c_module)
     _RULE
     "TESTONLY;NO_RUNTIME"
     "NAME;SRC;H_FILE_OUTPUT;COMPILE_TOOL;STATIC_LIB_PATH"
-    "FLAGS;COPTS"
+    "FLAGS"
     ${ARGN}
   )
 
@@ -100,7 +99,6 @@ function(iree_c_module)
     COPTS
       "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
       "${_TESTONLY_ARG}"
-      ${_RULE_COPTS}
     DEPS
       # Include paths and options for the runtime sources.
       iree::defs
