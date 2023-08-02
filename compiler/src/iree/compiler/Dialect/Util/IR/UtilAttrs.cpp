@@ -440,7 +440,8 @@ int64_t BytePatternAttr::getStorageSize() const {
 }
 
 LogicalResult
-BytePatternAttr::serializeToBuffer(llvm::support::endianness endian,
+BytePatternAttr::serializeToBuffer(Location loc,
+                                   llvm::support::endianness endian,
                                    ArrayRef<char> buffer) const {
   const uint8_t byte = static_cast<uint8_t>(getPattern() % 256);
   std::memset(const_cast<char *>(buffer.data()), byte, buffer.size());
@@ -448,7 +449,8 @@ BytePatternAttr::serializeToBuffer(llvm::support::endianness endian,
 }
 
 LogicalResult
-BytePatternAttr::serializeToStream(llvm::support::endianness endian,
+BytePatternAttr::serializeToStream(Location loc,
+                                   llvm::support::endianness endian,
                                    llvm::raw_ostream &os) const {
   const uint8_t byte = static_cast<uint8_t>(getPattern() % 256);
   const char bytes[256] = {static_cast<char>(byte)};
