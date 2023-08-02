@@ -78,9 +78,22 @@ static iree_status_t iree_allocator_system_alloc(
                             "allocations must be >0 bytes");
   }
 
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   void* existing_ptr = *inout_ptr;
+
+  IREE_TRACE(iree_zone_id_t z0 = 0);
+  IREE_TRACE({
+    if (existing_ptr && command == IREE_ALLOCATOR_COMMAND_REALLOC) {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0_named, "iree_allocator_system_realloc");
+      z0 = z0_named;
+    } else if (command == IREE_ALLOCATOR_COMMAND_CALLOC) {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0_named, "iree_allocator_system_calloc");
+      z0 = z0_named;
+    } else {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0_named, "iree_allocator_system_malloc");
+      z0 = z0_named;
+    }
+  });
+
   void* new_ptr = NULL;
   if (existing_ptr && command == IREE_ALLOCATOR_COMMAND_REALLOC) {
     new_ptr = realloc(existing_ptr, byte_length);
@@ -103,7 +116,7 @@ static iree_status_t iree_allocator_system_alloc(
   IREE_TRACE_ALLOC(new_ptr, byte_length);
 
   *inout_ptr = new_ptr;
-  IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE(IREE_TRACE_ZONE_END(z0));
   return iree_ok_status();
 }
 
