@@ -137,7 +137,12 @@ foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
   # another level of fix upstream if you like pain.
   list(APPEND _EXPORT_OBJECT_DEPS "$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<TARGET_PROPERTY:${_object_lib},LINK_LIBRARIES>>>>>")
 endforeach()
-file(GENERATE OUTPUT export_objects_debug.txt CONTENT "OBJECTS:${_EXPORT_OBJECT_SRCS}\n\nDEPS:${_EXPORT_OBJECT_DEPS}")
+if(NOT GENERATOR_IS_MULTI_CONFIG)
+  # NOTE: multi-config generators (xcode, visual studio, ninja in multi-config
+  # mode, etc) don't support writing files with fixed names with contents that
+  # differ based on the available variants.
+  file(GENERATE OUTPUT export_objects_debug.txt CONTENT "OBJECTS:${_EXPORT_OBJECT_SRCS}\n\nDEPS:${_EXPORT_OBJECT_DEPS}")
+endif()
 iree_cc_library(
   SHARED
   NAME

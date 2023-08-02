@@ -260,6 +260,7 @@ int main(int argc, char** argv) {
       "module:\n"
       "  type: bytecode\n"
       "  path: ../build/some_module.vmfb\n"
+      "  mmap: true\n"
       "---\n"
       "type: call\n"
       "function: module.mul\n"

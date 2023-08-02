@@ -13,11 +13,22 @@
 #include <sys/types.h>
 
 #if defined(IREE_PLATFORM_WINDOWS)
+
 #include <fcntl.h>
 #include <io.h>
+
 #define IREE_SET_BINARY_MODE(handle) _setmode(_fileno(handle), O_BINARY)
+
+#define iree_fseek64 _fseeki64
+#define iree_ftell64 _ftelli64
+
 #else
+
 #define IREE_SET_BINARY_MODE(handle) ((void)0)
+
+#define iree_fseek64 fseek
+#define iree_ftell64 ftell
+
 #endif  // IREE_PLATFORM_WINDOWS
 
 // We could take alignment as an arg, but roughly page aligned should be
@@ -25,13 +36,9 @@
 // be using this method.
 #define IREE_FILE_BASE_ALIGNMENT 4096
 
-#if defined(IREE_PLATFORM_WINDOWS)
-#define iree_fseek64 _fseeki64
-#define iree_ftell64 _ftelli64
-#else
-#define iree_fseek64 fseek
-#define iree_ftell64 ftell
-#endif  // IREE_PLATFORM_WINDOWS
+static iree_status_t iree_file_map_contents_readonly_platform(
+    const char* path, iree_file_contents_t* contents);
+static void iree_file_contents_free_platform(iree_file_contents_t* contents);
 
 iree_status_t iree_file_exists(const char* path) {
   IREE_ASSERT_ARGUMENT(path);
@@ -110,11 +117,26 @@ iree_allocator_t iree_file_contents_deallocator(
 void iree_file_contents_free(iree_file_contents_t* contents) {
   if (!contents) return;
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_file_contents_free_platform(contents);
   iree_allocator_free(contents->allocator, contents);
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_status_t iree_file_read_contents_impl(
+iree_status_t iree_file_read_contents(const char* path,
+                                      iree_file_read_flags_t flags,
+                                      iree_allocator_t allocator,
+                                      iree_file_contents_t** out_contents) {
+  if (iree_all_bits_set(flags, IREE_FILE_READ_FLAG_PRELOAD)) {
+    return iree_file_preload_contents(path, allocator, out_contents);
+  } else if (iree_all_bits_set(flags, IREE_FILE_READ_FLAG_MMAP)) {
+    return iree_file_map_contents_readonly(path, allocator, out_contents);
+  } else {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "invalid read flag mode");
+  }
+}
+
+static iree_status_t iree_file_preload_contents_impl(
     FILE* file, iree_allocator_t allocator,
     iree_file_contents_t** out_contents) {
   // Query total file length so we can preallocate storage.
@@ -156,9 +178,9 @@ static iree_status_t iree_file_read_contents_impl(
   return iree_ok_status();
 }
 
-iree_status_t iree_file_read_contents(const char* path,
-                                      iree_allocator_t allocator,
-                                      iree_file_contents_t** out_contents) {
+iree_status_t iree_file_preload_contents(const char* path,
+                                         iree_allocator_t allocator,
+                                         iree_file_contents_t** out_contents) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(path);
   IREE_ASSERT_ARGUMENT(out_contents);
@@ -173,7 +195,7 @@ iree_status_t iree_file_read_contents(const char* path,
 
   // Read the file contents into memory.
   iree_status_t status =
-      iree_file_read_contents_impl(file, allocator, out_contents);
+      iree_file_preload_contents_impl(file, allocator, out_contents);
   if (!iree_status_is_ok(status)) {
     status = iree_status_annotate_f(status, "reading file '%s'", path);
   }
@@ -183,6 +205,147 @@ iree_status_t iree_file_read_contents(const char* path,
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+iree_status_t iree_file_map_contents_readonly(
+    const char* path, iree_allocator_t allocator,
+    iree_file_contents_t** out_contents) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(path);
+  IREE_ASSERT_ARGUMENT(out_contents);
+  *out_contents = NULL;
+
+  iree_file_contents_t* contents = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(allocator, sizeof(*contents), (void**)&contents));
+  contents->allocator = allocator;
+
+  iree_status_t status =
+      iree_file_map_contents_readonly_platform(path, contents);
+
+  if (iree_status_is_ok(status)) {
+    *out_contents = contents;
+  } else {
+    iree_file_contents_free(contents);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_IOS) || \
+    defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_MACOS)
+
+#include <sys/mman.h>
+#include <unistd.h>
+
+static iree_status_t iree_file_map_contents_readonly_platform(
+    const char* path, iree_file_contents_t* contents) {
+  // Open file on disk.
+  FILE* file = fopen(path, "rb");
+  if (file == NULL) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND, "failed to open file '%s'",
+                            path);
+  }
+  contents->mapping = file;
+
+  // Query total file size and ensure the file will fit in memory.
+  uint64_t length = 0;
+  IREE_RETURN_IF_ERROR(iree_file_query_length(file, &length));
+  if (length > (uint64_t)IREE_HOST_SIZE_MAX) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "file size exceeds host pointer size capacity "
+                            "(64-bit file loaded into a 32-bit program)");
+  }
+
+  // Map the memory.
+  void* ptr =
+      mmap(NULL, (size_t)length, PROT_READ, MAP_SHARED, fileno(file), 0);
+  if (ptr == MAP_FAILED) {
+    return iree_make_status(iree_status_code_from_errno(errno), "mmap failed");
+  }
+
+  contents->const_buffer =
+      iree_make_const_byte_span(ptr, (iree_host_size_t)length);
+  return iree_ok_status();
+}
+
+static void iree_file_contents_free_platform(iree_file_contents_t* contents) {
+  if (contents->mapping) {
+    munmap(contents->buffer.data, (size_t)contents->buffer.data_length);
+    fclose((FILE*)contents->mapping);
+  }
+}
+
+#elif defined(IREE_PLATFORM_WINDOWS)
+
+static iree_status_t iree_file_map_contents_readonly_platform(
+    const char* path, iree_file_contents_t* contents) {
+  // Open the file.
+  HANDLE file =
+      CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                  FILE_ATTRIBUTE_READONLY | FILE_FLAG_RANDOM_ACCESS, NULL);
+  if (!file) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to open file '%s'", path);
+  }
+
+  // Query file size and ensure it will fit in the host address space.
+  LARGE_INTEGER file_size;
+  if (!GetFileSizeEx(file, &file_size) ||
+      (ULONGLONG)file_size.QuadPart > (ULONGLONG)IREE_HOST_SIZE_MAX) {
+    CloseHandle(file);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "file size exceeds host pointer size capacity "
+                            "(64-bit file loaded into a 32-bit program)");
+  }
+
+  // Create a mapping object associated with the file.
+  HANDLE mapping =
+      CreateFileMappingA(file, NULL, PAGE_READONLY, /*dwMaximumSizeHigh=*/0,
+                         /*dwMaximumSizeLow=*/0, /*lpName=*/NULL);
+  if (!mapping) {
+    CloseHandle(file);
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to create file mapping, possibly due to "
+                            "unaligned size or resource exhaustion");
+  }
+  contents->mapping = mapping;
+
+  // Retained by the mapping so safe to release now.
+  CloseHandle(file);
+
+  // Map the file into host memory.
+  void* ptr = MapViewOfFileEx(
+      mapping, FILE_MAP_READ, /*dwFileOffsetHigh=*/0, /*dwFileOffsetLow=*/0,
+      /*dwNumberOfBytesToMap=*/0, /*lpBaseAddress=*/NULL);
+  if (!ptr) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to map file into host memory");
+  }
+
+  contents->const_buffer =
+      iree_make_const_byte_span(ptr, (iree_host_size_t)file_size.QuadPart);
+  return iree_ok_status();
+}
+
+static void iree_file_contents_free_platform(iree_file_contents_t* contents) {
+  if (contents->mapping) {
+    UnmapViewOfFile(contents->buffer.data);
+    CloseHandle((HANDLE)contents->mapping);
+  }
+}
+
+#else
+
+static iree_status_t iree_file_map_contents_readonly_platform(
+    const char* path, iree_file_contents_t* contents) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "file mapping not supported on this platform");
+}
+
+static void iree_file_contents_free_platform(iree_file_contents_t* contents) {}
+
+#endif  // IREE_PLATFORM_*
 
 iree_status_t iree_file_write_contents(const char* path,
                                        iree_const_byte_span_t content) {
@@ -279,7 +442,7 @@ iree_status_t iree_stdin_read_contents(iree_allocator_t allocator,
 #else
 
 iree_status_t iree_file_exists(const char* path) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE, "File I/O is disabled");
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "file I/O is disabled");
 }
 
 iree_allocator_t iree_file_contents_deallocator(
@@ -290,19 +453,32 @@ iree_allocator_t iree_file_contents_deallocator(
 void iree_file_contents_free(iree_file_contents_t* contents) {}
 
 iree_status_t iree_file_read_contents(const char* path,
+                                      iree_file_read_flags_t flags,
                                       iree_allocator_t allocator,
                                       iree_file_contents_t** out_contents) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE, "File I/O is disabled");
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "file I/O is disabled");
+}
+
+iree_status_t iree_file_preload_contents(const char* path,
+                                         iree_allocator_t allocator,
+                                         iree_file_contents_t** out_contents) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "file I/O is disabled");
+}
+
+iree_status_t iree_file_map_contents_readonly(
+    const char* path, iree_allocator_t allocator,
+    iree_file_contents_t** out_contents) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "file I/O is disabled");
 }
 
 iree_status_t iree_file_write_contents(const char* path,
                                        iree_const_byte_span_t content) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE, "File I/O is disabled");
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "file I/O is disabled");
 }
 
 iree_status_t iree_stdin_read_contents(iree_allocator_t allocator,
                                        iree_file_contents_t** out_contents) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE, "File I/O is disabled");
+  return iree_make_status(IREE_STATUS_UNAVAILABLE, "file I/O is disabled");
 }
 
 #endif  // IREE_FILE_IO_ENABLE
