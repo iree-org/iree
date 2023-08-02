@@ -1,4 +1,4 @@
-// RUNi: iree-opt -iree-codegen-add-fast-math-flags --split-input-file %s | FileCheck %s
+// RUN: iree-opt -iree-codegen-add-fast-math-flags --split-input-file %s | FileCheck %s
 
 // LABEL: llvm.func @fmfs
 llvm.func @fmfs() -> f32 {
