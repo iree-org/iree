@@ -130,9 +130,6 @@ iree_c_module(
     "buffer_ops.h"
   FLAGS
     "--compile-mode=vm"
-  # TODO(#14540): Investigate the maybe-uninitialized warning.
-  COPTS
-    "-Wno-uninitialized"
   COMPILE_TOOL
     iree-compile
 )
