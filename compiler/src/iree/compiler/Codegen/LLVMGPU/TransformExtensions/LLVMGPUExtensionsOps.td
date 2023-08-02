@@ -648,4 +648,38 @@ def EliminateGpuBarriersOp :
   }];
 }
 
+def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_alloc",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Pack shared memory allocation to reduce memory usage";
+  let description = [{
+    Looks for allocs in shared memory space with overlapping liveness and
+    groups them, then packs all the allocations in each group into one i8
+    alloc. Also adds barriers to make sure we are done writing/reading
+    from the previous alias group before starting a new one.
+
+    #### Return modes
+
+    It does not consume the target handle and always return success.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target
+  );
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::func::FuncOp funcOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS

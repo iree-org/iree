@@ -25,6 +25,14 @@ void doLayoutAnalysisAndDistribution(RewriterBase &rewriter,
 /// Function to reorder transposes and elementwise ops.
 void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp);
 
+/// Look for allocs in shared memory space with overlapping liveness,
+/// group them, and then pack all the allocations in each group into one i8
+/// alloc.
+///
+/// Also adds barriers to make sure we are done writing/reading
+/// from the previous alias group before starting a new one.
+void packSharedMemoryAlloc(func::FuncOp funcOp);
+
 } // namespace iree_compiler
 } // namespace mlir
 
