@@ -17,13 +17,7 @@ using namespace mlir::iree_compiler;
 static void addContractFMF(Operation *op) {
   LLVM::FastmathFlags contract = LLVM::FastmathFlags::contract;
   TypeSwitch<Operation *>(op)
-      .Case<LLVM::FMulOp>(
-          [&](auto llvmOp) { llvmOp.setFastmathFlags(contract); })
-      .Case<LLVM::FAddOp>(
-          [&](auto llvmOp) { llvmOp.setFastmathFlags(contract); })
-      .Case<LLVM::FSubOp>(
-          [&](auto llvmOp) { llvmOp.setFastmathFlags(contract); })
-      .Case<LLVM::FNegOp>(
+      .Case<LLVM::FMulOp, LLVM::FAddOp, LLVM::FSubOp, LLVM::FNegOp>(
           [&](auto llvmOp) { llvmOp.setFastmathFlags(contract); });
 }
 
