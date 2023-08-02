@@ -25,7 +25,13 @@ gcloud storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/benchmark-flag-dump
 ```
 
 ```sh
-# Download all artifacts
+# Download MLIR input files and command lines
+mkdir /tmp/iree_e2e_test_inputs
+gcloud storage cp "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" /tmp/iree_e2e_test_inputs
+```
+
+```sh
+# Download all artifacts (MLIR input files and compiled VMFBs)
 mkdir /tmp/iree_e2e_test_artifacts
 gcloud storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" /tmp/iree_e2e_test_artifacts
 ```
