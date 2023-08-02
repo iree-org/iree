@@ -41,7 +41,4 @@ external_cc_library(
 
 if(MSVC)
   target_compile_options(yaml_yaml PRIVATE /wd4996)
-else()
-  # GCC warning.
-  target_compile_options(yaml_yaml PRIVATE "-Wno-unused-value")
 endif()

@@ -7,13 +7,7 @@
 #include <algorithm>
 #include <numeric>
 
-// The underlying llvm-project/llvm/include/llvm/ADT/DenseMap.h has incorrect
-// GCC warning.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#pragma GCC diagnostic pop
-
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
