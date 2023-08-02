@@ -32,12 +32,18 @@ struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
 
+    // TODO: Thread through subgroup size everywhere.
+    std::optional<llvm::APInt> maybeSubgroupSize =
+        getEntryPoint(funcOp)->getSubgroupSize();
+    // TODO: Don't hard code kCudaWarpSize here.
+    int64_t subgroupSize =
+        maybeSubgroupSize ? maybeSubgroupSize->getSExtValue() : 32;
+
     IRRewriter rewriter(funcOp->getContext());
     rewriter.setInsertionPointToStart(&funcOp.getBody().front());
     DiagnosedSilenceableFailure result =
         mlir::transform::gpu::mapNestedForallToThreadsImpl(
-            rewriter, std::nullopt, funcOp, workgroupSize, /*warpDims=*/{},
-            false);
+            rewriter, std::nullopt, funcOp, workgroupSize, subgroupSize, false);
     if (!result.succeeded())
       return signalPassFailure();
   }

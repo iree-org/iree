@@ -1713,14 +1713,14 @@ AsyncCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   };
   for (auto [calleeArg, expectedArg] :
        llvm::zip_equal(calleeType.getInputs(), expectedType.getInputs())) {
-    if (!typesCompatible) {
+    if (!typesCompatible(calleeArg, expectedArg)) {
       return emitOpError("function argument type mismatch; expected ")
              << expectedArg << " but callee provides " << calleeArg;
     }
   }
   for (auto [calleeResult, expectedResult] :
        llvm::zip_equal(calleeType.getResults(), expectedType.getResults())) {
-    if (!typesCompatible) {
+    if (!typesCompatible(calleeResult, expectedResult)) {
       return emitOpError("function result type mismatch; expected ")
              << expectedResult << " but callee provides " << calleeResult;
     }

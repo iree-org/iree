@@ -128,8 +128,8 @@ iree_compiler::gpu::MappingInfo iree_compiler::gpu::CopyMapping::getMappingInfo(
         std::tie(size, numThreads) = pair;
         return mlir::ceilDiv(size, numThreads);
       }));
-  SmallVector<Attribute> allThreadMappings{linearIdZ(ctx), linearIdY(ctx),
-                                           linearIdX(ctx)};
+  SmallVector<Attribute> allThreadMappings{linearId2(ctx), linearId1(ctx),
+                                           linearId0(ctx)};
   auto threadMapping =
       llvm::to_vector(ArrayRef(allThreadMappings).take_back(tileSizes.size()));
 

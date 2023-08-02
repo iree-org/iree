@@ -119,7 +119,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgPassIncGen",
-        "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MLProgramDialect",
         "@llvm-project//mlir:MathDialect",

@@ -14,7 +14,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "compile_regressions.mlir"
+    "failing.mlir"
     "jit_globals.mlir"
+    "scalar_values.mlir"
   TOOLS
     FileCheck
     iree-opt

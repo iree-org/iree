@@ -22,22 +22,32 @@ IREE_DEVICE_EXPORT float iree_h2f_ieee(short param) {
   if (expHalf16 == 0x7C00) {
     // nan
     if (mantissa16 > 0) {
-      int res = (0x7FC00000 | sign);
-      float fres = *((float *)(&res));
-      return fres;
+      union {
+        int i;
+        float f;
+      } res = {
+          .i = 0x7FC00000 | sign,
+      };
+      return res.f;
     }
     // inf
-    int res = (0x7F800000 | sign);
-    float fres = *((float *)(&res));
-    return fres;
+    union {
+      int i;
+      float f;
+    } res = {
+        .i = 0x7F800000 | sign,
+    };
+    return res.f;
   }
   if (expHalf16 != 0) {
     exp1 += ((127 - 15) << 10);  // exponents converted to float32 bias
-    int res = (exp1 | mantissa1);
-    res = res << 13;
-    res = (res | sign);
-    float fres = *((float *)(&res));
-    return fres;
+    union {
+      int i;
+      float f;
+    } res = {
+        .i = ((exp1 | mantissa1) << 13) | sign,
+    };
+    return res.f;
   }
 
   int xmm1 = exp1 > (1 << 10) ? exp1 : (1 << 10);
@@ -45,23 +55,31 @@ IREE_DEVICE_EXPORT float iree_h2f_ieee(short param) {
   xmm1 += ((127 - 15 - 10) << 23);  // add the bias difference to xmm1
   xmm1 = xmm1 | sign;               // Combine with the sign mask
 
-  float res = (float)mantissa1;  // Convert mantissa to float
-  res *= *((float *)(&xmm1));
-
-  return res;
+  union {
+    int i;
+    float f;
+  } res = {
+      .i = xmm1,
+  };
+  return mantissa1 * res.f;
 }
 
 IREE_DEVICE_EXPORT short iree_f2h_ieee(float param) {
-  unsigned int param_bit = *((unsigned int *)(&param));
-  int sign = param_bit >> 31;
-  int mantissa = param_bit & 0x007FFFFF;
-  int exp = ((param_bit & 0x7F800000) >> 23) + 15 - 127;
+  union {
+    unsigned int u;
+    float f;
+  } param_bits = {
+      .f = param,
+  };
+  int sign = param_bits.u >> 31;
+  int mantissa = param_bits.u & 0x007FFFFF;
+  int exp = ((param_bits.u & 0x7F800000) >> 23) + 15 - 127;
   short res;
   if (exp > 0 && exp < 30) {
     // use rte rounding mode, round the significand, combine sign, exponent and
     // significand into a short.
     res = (sign << 15) | (exp << 10) | ((mantissa + 0x00001000) >> 13);
-  } else if (param_bit == 0) {
+  } else if (param_bits.u == 0) {
     res = 0;
   } else {
     if (exp <= 0) {

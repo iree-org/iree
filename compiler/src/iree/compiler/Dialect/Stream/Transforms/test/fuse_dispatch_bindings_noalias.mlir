@@ -25,13 +25,13 @@ stream.executable private @deduplicateBindingsEx {
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_A]]
       util.optimization_barrier %subspan_a : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
 
-      // CHECK: %[[SUM_OFFSET_B:.+]] = arith.addi %c20, %[[OFFSET_B]]
+      // CHECK: %[[SUM_OFFSET_B:.+]] = arith.addi %[[OFFSET_B]], %c20
       // CHECK-NEXT: %[[SUBSPAN_B:.+]] = stream.binding.subspan %[[BINDING_A]][%[[SUM_OFFSET_B]]]
       %subspan_b = stream.binding.subspan %binding_b[%c20] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_B]]
       util.optimization_barrier %subspan_b : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
 
-      // CHECK: %[[SUM_OFFSET_C:.+]] = arith.addi %c40, %[[OFFSET_C]]
+      // CHECK: %[[SUM_OFFSET_C:.+]] = arith.addi %[[OFFSET_C]], %c40
       // CHECK-NEXT: %[[SUBSPAN_C:.+]] = stream.binding.subspan %[[BINDING_C]][%[[SUM_OFFSET_C]]]
       %subspan_c = stream.binding.subspan %binding_c[%c40] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_C]]

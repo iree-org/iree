@@ -285,9 +285,11 @@ jobs:
           - runner-type: gpu
             iree-ctest-label-regex: ^requires-gpu|^driver=vulkan$|^driver=cuda$
             iree-nvidia-sm80-tests-disable: 1
+            iree-multi-device-tests-disable: 1
           - runner-type: a100
             iree-ctest-label-regex: ^requires-gpu-sm80$
             iree-nvidia-sm80-tests-disable: 0
+            iree-multi-device-tests-disable: 1
       # Run other jobs even if one fails.
       fail-fast: false
     name: test_${{ matrix.target.runner-type }}
@@ -313,10 +315,12 @@ jobs:
       - name: "Testing all"
         env:
           IREE_NVIDIA_SM80_TESTS_DISABLE: ${{ matrix.target.iree-nvidia-sm80-tests-disable }}
+          IREE_MULTI_DEVICE_TESTS_DISABLE: ${{ matrix.target.iree-multi-device-tests-disable }}
           IREE_CTEST_LABEL_REGEX: ${{ matrix.target.iree-ctest-label-regex }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
+              --env IREE_MULTI_DEVICE_TESTS_DISABLE \
               --env IREE_CTEST_LABEL_REGEX \
               --env IREE_VULKAN_F16_DISABLE=0 \
               --env IREE_CUDA_DISABLE=0 \

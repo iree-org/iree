@@ -941,7 +941,7 @@ struct ElideEmptyFenceJoin : public OpRewritePattern<FenceJoinOp> {
 
 // Produces a deduplicated and null-elided operand list.
 // Returns std::nullopt if nothing changed.
-static std::optional<std::vector<Value>>
+static std::optional<SmallVector<Value, 0>>
 deduplicateFenceOperands(ValueRange operands) {
   SetVector<Value> newOperands;
   for (auto operand : operands) {

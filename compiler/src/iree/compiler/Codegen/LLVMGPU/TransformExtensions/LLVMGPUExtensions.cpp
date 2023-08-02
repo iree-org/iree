@@ -102,33 +102,17 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
-          rewriter, transformOp, target, getWorkgroupDims(), getWarpDims(),
+          rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
           true);
   if (!diag.succeeded())
     return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
+  auto subgroupSizeAttr = rewriter.getIndexAttr(getSubgroupSize());
   rewriter.startRootUpdate(exportOp);
   exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
-  if (std::optional<int64_t> subgroupSize = getSubgroupSize()) {
-    auto subgroupSizeAttr = rewriter.getIndexAttr(*subgroupSize);
-    exportOp->setAttr(exportOp.getSubgroupSizeAttrName(), subgroupSizeAttr);
-  }
+  exportOp->setAttr(exportOp.getSubgroupSizeAttrName(), subgroupSizeAttr);
   rewriter.finalizeRootUpdate(exportOp);
   return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::MapNestedForallToGpuThreadsOp::build(
-    OpBuilder &builder, OperationState &state, Value target,
-    ArrayRef<int64_t> workgroupDims, ArrayRef<int64_t> warpDims) {
-  build(builder, state, {}, target, workgroupDims, warpDims, IntegerAttr());
-}
-
-void transform_dialect::MapNestedForallToGpuThreadsOp::build(
-    OpBuilder &builder, OperationState &state, Value target,
-    ArrayRef<int64_t> workgroupDims, ArrayRef<int64_t> warpDims,
-    int64_t subgroupSize) {
-  build(builder, state, {}, target, workgroupDims, warpDims,
-        builder.getI64IntegerAttr(subgroupSize));
 }
 
 void transform_dialect::MapNestedForallToGpuThreadsOp::getEffects(

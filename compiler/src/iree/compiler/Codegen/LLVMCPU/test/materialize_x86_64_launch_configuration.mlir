@@ -1853,3 +1853,39 @@ hal.executable private @quant_model {
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+hal.executable private @no_compute_ops {
+  hal.executable.variant public @embedded_elf_x86_64, target = <
+      "llvm-cpu", "embedded-elf-x86_64",
+      {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+       native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = false}> {
+    hal.executable.export public @test ordinal(0)
+        layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device):
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @test() {
+        %c0 = arith.constant 0 : index
+        %c6364136223846793005_i64 = arith.constant 6364136223846793005 : i64
+        %c1442695040888963407_i64 = arith.constant 1442695040888963407 : i64
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<i64>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<i64>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<i64>> -> tensor<i64>
+        %extracted = tensor.extract %2[] : tensor<i64>
+        %3 = arith.muli %extracted, %c6364136223846793005_i64 : i64
+        %4 = arith.addi %3, %c1442695040888963407_i64 : i64
+        %inserted = tensor.insert %4 into %2[] : tensor<i64>
+        flow.dispatch.tensor.store %inserted, %1, offsets = [], sizes = [], strides = [] : tensor<i64> -> !flow.dispatch.tensor<writeonly:tensor<i64>>
+        return
+      }
+    }
+  }
+}
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault> 
+//      CHECK: hal.executable private @no_compute_ops
+//      CHECK:   hal.executable.export public @test
+// CHECK-SAME:       translation_info = #[[TRANSLATION]]

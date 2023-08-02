@@ -114,8 +114,7 @@ static Value getMaskValue(RewriterBase &rewriter, Operation *op) {
   vector::ExtractOp maybeExtractOp = maskResult.maybeExtractOp;
   if (maybeExtractOp) {
     assert(maybeExtractOp.getPosition().size() == 1 && "expected single pos");
-    int64_t sliceNum =
-        llvm::cast<IntegerAttr>(maybeExtractOp.getPosition()[0]).getInt();
+    int64_t sliceNum = maybeExtractOp.getPosition()[0];
     // TODO: to support >2-D mask + extract, and all the cmp.
     Location loc = op->getLoc();
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);

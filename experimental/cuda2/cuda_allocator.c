@@ -615,7 +615,7 @@ static iree_status_t iree_hal_cuda2_allocator_export_buffer(
     iree_hal_external_buffer_type_t requested_type,
     iree_hal_external_buffer_flags_t requested_flags,
     iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer) {
-  iree_hal_cuda_buffer_type_t buffer_type = iree_hal_cuda_buffer_type(buffer);
+  iree_hal_cuda2_buffer_type_t buffer_type = iree_hal_cuda2_buffer_type(buffer);
 
   switch (requested_type) {
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION:
@@ -624,7 +624,7 @@ static iree_status_t iree_hal_cuda2_allocator_export_buffer(
           out_external_buffer->flags = requested_flags;
           out_external_buffer->type = requested_type;
           out_external_buffer->handle.device_allocation.ptr =
-              iree_hal_cuda_buffer_device_pointer(buffer);
+              iree_hal_cuda2_buffer_device_pointer(buffer);
           out_external_buffer->size = iree_hal_buffer_allocation_size(buffer);
           return iree_ok_status();
 

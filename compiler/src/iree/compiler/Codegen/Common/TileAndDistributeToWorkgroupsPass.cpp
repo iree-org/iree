@@ -14,7 +14,13 @@
 //
 //===---------------------------------------------------------------------===//
 
+// The underlying llvm-project/llvm/include/llvm/ADT/DenseMap.h has incorrect
+// GCC warning.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#pragma GCC diagnostic pop
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"

@@ -171,6 +171,7 @@ VER_0 {
     mlirBlockGetParentOperation;
     mlirBlockGetParentRegion;
     mlirBlockGetTerminator;
+    mlirBlockInsertArgument;
     mlirBlockInsertOwnedOperation;
     mlirBlockInsertOwnedOperationAfter;
     mlirBlockInsertOwnedOperationBefore;
@@ -186,6 +187,8 @@ VER_0 {
     mlirContextAppendDialectRegistry;
     mlirContextAttachDiagnosticHandler;
     mlirContextCreate;
+    mlirContextCreateWithRegistry;
+    mlirContextCreateWithThreading;
     mlirContextDestroy;
     mlirContextDetachDiagnosticHandler;
     mlirContextEnableMultithreading;
@@ -197,6 +200,7 @@ VER_0 {
     mlirContextIsRegisteredOperation;
     mlirContextLoadAllAvailableDialects;
     mlirContextSetAllowUnregisteredDialects;
+    mlirContextSetThreadPool;
     mlirCreateExternalPass;
     mlirDenseArrayAttrGetTypeID;
     mlirDenseArrayGetNumElements;
@@ -380,6 +384,8 @@ VER_0 {
     mlirIntegerTypeUnsignedGet;
     mlirIsGlobalDebugEnabled;
     mlirLinalgFillBuiltinNamedOpRegion;
+    mlirLlvmThreadPoolCreate;
+    mlirLlvmThreadPoolDestroy;
     mlirLocationCallSiteGet;
     mlirLocationEqual;
     mlirLocationFileLineColGet;
@@ -467,6 +473,7 @@ VER_0 {
     mlirOperationRemoveFromParent;
     mlirOperationSetAttributeByName;
     mlirOperationSetOperand;
+    mlirOperationSetOperands;
     mlirOperationStateAddAttributes;
     mlirOperationStateAddOperands;
     mlirOperationStateAddOwnedRegions;
@@ -507,6 +514,7 @@ VER_0 {
     mlirRegionInsertOwnedBlock;
     mlirRegionInsertOwnedBlockAfter;
     mlirRegionInsertOwnedBlockBefore;
+    mlirRegionTakeBody;
     mlirRegisterLinalgPasses;
     mlirShapedTypeGetDimSize;
     mlirShapedTypeGetDynamicSize;

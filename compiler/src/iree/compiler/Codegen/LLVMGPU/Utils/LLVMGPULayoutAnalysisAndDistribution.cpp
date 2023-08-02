@@ -1149,7 +1149,8 @@ static Value resolveBatchVectorConflict(SmallVectorImpl<int> &mismatchedDims,
                                         const Layout &currentLayout,
                                         RewriterBase &rewriter, Location loc) {
   int numMismatchedVecDims{0};
-  int vecDim, batchDim;
+  int vecDim = DimType::VecIdX;
+  int batchDim = DimType::Batch0;
   for (auto dimType : mismatchedDims) {
     if (isVectorId(dimType)) {
       numMismatchedVecDims++;
@@ -1158,6 +1159,7 @@ static Value resolveBatchVectorConflict(SmallVectorImpl<int> &mismatchedDims,
     if (isBatchId(dimType))
       batchDim = dimType;
   }
+
   // Only support single vector mismatched dim
   if (numMismatchedVecDims > 1)
     return Value{};

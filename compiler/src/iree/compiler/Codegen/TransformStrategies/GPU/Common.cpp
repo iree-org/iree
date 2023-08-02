@@ -82,7 +82,7 @@ int64_t mlir::iree_compiler::gpu::scaleUpByBitWidth(int64_t value,
 int64_t mlir::iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle(
     int64_t numWarpsToUse, int64_t bitWidth) {
   // Try to scale down the number of warps to use 32b elements in warp shuffles.
-  assert((bitWidth & bitWidth - 1) == 0 && "bitWidth must be a power of 2");
+  assert(((bitWidth & (bitWidth - 1)) == 0) && "bitWidth must be a power of 2");
   int64_t factor;
   for (factor = scaleUpByBitWidth(1, bitWidth); factor > 1; factor >>= 1)
     if (numWarpsToUse % factor == 0)
@@ -141,10 +141,9 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
 Value mlir::iree_compiler::gpu::buildMapToBlockAndThreads(
-    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize,
-    ArrayRef<int64_t> warpDims) {
+    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize) {
   b.create<ForallToWorkgroupOp>(funcH);
-  b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize, warpDims);
+  b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize);
   return funcH;
 }
 

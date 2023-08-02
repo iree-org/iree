@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(iree-transform-dialect-interpreter,transform-dialect-drop-schedule))" | FileCheck %s
 
-// CHECK: #[[$DIV32MOD8:.*]] = affine_map<()[s0] -> ((s0 floordiv 32) mod 8)>
+// CHECK: #[[$DIV32:.*]] = affine_map<()[s0] -> (s0 floordiv 32)>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 #map = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<(d0) -> (d0)>
@@ -38,7 +38,7 @@ hal.executable private @distribute {
           {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
         } {mapping = [#gpu.thread<x>]}
 
-// CHECK: %[[WX:.+]] = affine.apply #[[$DIV32MOD8]]()[%[[TX]]]
+// CHECK: %[[WX:.+]] = affine.apply #[[$DIV32]]()[%[[TX]]]
 // CHECK: vector.transfer_write %{{.*}}, %{{.*}}[%[[WX]]] {in_bounds = [true]} : vector<1xf16>, memref<1xf16, strided<[1], offset: ?>>
         scf.forall (%arg0) in (%c8) {
           vector.transfer_write %cst_0, %subview[%arg0]
@@ -52,7 +52,7 @@ hal.executable private @distribute {
         %17 = transform.structured.match ops{["func.func"]} in %variant_op 
           : (!transform.any_op) -> !transform.any_op
         transform.iree.map_nested_forall_to_gpu_threads %17 
-          workgroup_dims = [256, 1, 1] warp_dims = [8, 1, 1] subgroup_size = 32 : (!transform.any_op) -> ()
+          workgroup_dims = [256, 1, 1] subgroup_size = 32 : (!transform.any_op) -> ()
 
         // Late canonicalizations to cleanup and pass the checks.
         // Needs to occur on the whole variant to perform cse on the workgroup_count region

@@ -4,7 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// The underlying llvm-project/llvm/include/llvm/ADT/DenseMap.h has incorrect
+// GCC warning.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#pragma GCC diagnostic pop
+
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
@@ -452,9 +458,6 @@ void addMultiTilingExpertPassPipeline(
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
-  // This is a temporary solution for handling aggressive fusion heuristics.
-  // This rematerializes parallel ops into the consumers to avoid stack
-  // allocation.
   SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
   // Apply tile and fuse to all the non-distribution fusable levels. Skip
   // distribution level as that level has been fused already.
