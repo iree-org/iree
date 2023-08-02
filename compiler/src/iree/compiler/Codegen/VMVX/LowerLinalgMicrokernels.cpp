@@ -122,7 +122,7 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
 }
 
 class StridedBufferDescriptor {
- public:
+public:
   // Size/offset/strides of the buffer.
   Value offset;
   SmallVector<Value> sizes;
@@ -144,7 +144,7 @@ class StridedBufferDescriptor {
   /// with element-based addressing.
   Value castToLinear(Location loc, OpBuilder &builder) { return baseBuffer; }
 
- private:
+private:
   // The base !util.buffer
   Value baseBuffer;
   friend class StridedBufferAnalysis;
