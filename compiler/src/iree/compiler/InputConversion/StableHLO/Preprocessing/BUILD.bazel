@@ -64,6 +64,7 @@ iree_compiler_cc_library(
         "DotGeneralToDot.cpp",
         "EinsumToDotGeneral.cpp",
         "FlattenTuplesInCFG.cpp",
+        "FlattenTuplesInSCF.cpp",
         "GatherToTorchIndexSelect.cpp",
         "LowerComplex.cpp",
         "Passes.cpp",
