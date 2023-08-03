@@ -237,3 +237,29 @@ module @eval_i64_tensor_splat {
     util.initializer.return
   }
 }
+
+// -----
+// CHECK-LABEL: @serializable_attrs
+// CHECK: util.global private @{{.*}} = dense<2> : tensor<5x6xi8>
+#map0 = affine_map<(d0, d1) -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+module @serializable_attrs {
+  util.global private @hoisted : tensor<5x6xi8>
+  func.func @main() -> tensor<5x6xi8> {
+    %hoisted = util.global.load @hoisted : tensor<5x6xi8>
+    return %hoisted : tensor<5x6xi8>
+  }
+  util.global private @constant = #util.byte_pattern<1> : tensor<5x6xi8>
+  // CHECK-NOT: util.initializer
+  util.initializer attributes {iree.compiler.consteval} {
+    %cst = util.global.load @constant : tensor<5x6xi8>
+    %0 = tensor.empty() : tensor<5x6xi8>
+    %1 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst, %cst : tensor<5x6xi8>, tensor<5x6xi8>) outs(%0 : tensor<5x6xi8>) {
+    ^bb0(%arg0: i8, %arg1: i8, %arg2: i8):  // no predecessors
+      %2 = arith.addi %arg0, %arg1 : i8
+      linalg.yield %2 : i8
+    } -> tensor<5x6xi8>
+    util.global.store %1, @hoisted : tensor<5x6xi8>
+    util.initializer.return
+  }
+}
