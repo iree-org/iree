@@ -1048,13 +1048,17 @@ struct ZeroExtentTensorCanon final : RewritePattern {
   }
 };
 
-template <typename ElementwiseOpT>
-struct ReorderElementwiseAndShapeOp final : OpRewritePattern<ElementwiseOpT> {
-  using OpRewritePattern<ElementwiseOpT>::OpRewritePattern;
-  LogicalResult matchAndRewrite(ElementwiseOpT op,
+struct ReorderElementwiseAndShapeOp final
+    : OpTraitRewritePattern<OpTrait::Elementwise> {
+  using OpTraitRewritePattern::OpTraitRewritePattern;
+
+  LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-    auto definingOp = op.getOperand().getDefiningOp();
+    if (op->getOperands().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "expected to be unary.");
+    }
+
+    auto definingOp = op->getOperand(0).getDefiningOp();
     if (!definingOp) {
       return rewriter.notifyMatchFailure(
           op, "expected to have an op before elementise op.");
@@ -1068,21 +1072,18 @@ struct ReorderElementwiseAndShapeOp final : OpRewritePattern<ElementwiseOpT> {
     }
 
     Value input = definingOp->getOperand(0);
-    if (getElementTypeOrSelf(op.getOperand()) !=
-        getElementTypeOrSelf(op.getResult())) {
+    Value result = op->getResult(0);
+    if (getElementTypeOrSelf(input) != getElementTypeOrSelf(result)) {
       return rewriter.notifyMatchFailure(
           op, "input and result element types must be the same.");
     }
 
-    Value newEwiseVal =
-        rewriter.create<ElementwiseOpT>(loc, input.getType(), input)
-            .getResult();
-    auto newShapeOp = rewriter.clone(*definingOp);
-    newShapeOp->setOperands(newEwiseVal);
-    newShapeOp->setAttrs(definingOp->getAttrs());
-
-    rewriter.replaceOp(definingOp, newEwiseVal);
-    rewriter.replaceOp(op, newShapeOp->getResults());
+    // Reorder the operation and rewire the inputs/outputs.
+    op->moveBefore(definingOp);
+    rewriter.replaceAllUsesWith(result, definingOp->getResult(0));
+    result.setType(input.getType());
+    op->setOperands(input);
+    definingOp->setOperands(result);
     return success();
   }
 };
@@ -1126,29 +1127,6 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       ReshapeOpCanon, TransposeOpCanon,
       // Types.
       ZeroExtentTensorCanon>(context, benefit);
-  patterns
-      ->add<ReorderElementwiseAndShapeOp<mlir::stablehlo::AbsOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::CeilOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::CbrtOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::ClzOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::CosineOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::ExpOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::Expm1Op>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::FloorOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::ImagOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::IsFiniteOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::LogOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::Log1pOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::LogisticOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::NotOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::NegOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::RealOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::RoundOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::RoundNearestEvenOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::RsqrtOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::SignOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::SineOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::SqrtOp>,
-            ReorderElementwiseAndShapeOp<mlir::stablehlo::TanhOp>>(context);
+  patterns->add<ReorderElementwiseAndShapeOp>(context);
 }
 } // namespace mlir::iree_compiler::stablehlo

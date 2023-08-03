@@ -723,3 +723,16 @@ func.func @push_shape_ops_to_end(%arg0 : tensor<12xf32>) -> tensor<3x4x2x1xf32> 
 // CHECK: %[[TRANSPOSE:.+]] = stablehlo.transpose %[[BROADCAST]], dims = [2, 3, 1, 0] : (tensor<1x2x3x4xf32>) -> tensor<3x4x2x1xf32>
 // CHECK: return %[[TRANSPOSE]]
 
+// -----
+
+func.func @no_reorder_on_etype_change(%arg0 : tensor<12xi32>) -> tensor<12xi64> {
+  %0 = stablehlo.convert %arg0 : (tensor<12xi32>) -> tensor<12xi64>
+  %1 = stablehlo.abs %0 : (tensor<12xi64>) -> tensor<12xi64>
+  return %1 : tensor<12xi64>
+}
+
+// CHECK-LABEL: @no_reorder_on_etype_change
+// CHECK: %[[CONVERT:.+]] = stablehlo.convert %arg0 : (tensor<12xi32>) -> tensor<12xi64>
+// CHECK: %[[ABS:.+]] = stablehlo.abs %[[CONVERT]] : tensor<12xi64>
+// CHECK: return %[[ABS]]
+
