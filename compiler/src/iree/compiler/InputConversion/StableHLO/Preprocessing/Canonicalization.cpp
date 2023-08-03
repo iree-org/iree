@@ -1073,15 +1073,15 @@ struct ReorderElementwiseAndShapeOp final
 
     Value input = definingOp->getOperand(0);
     Value result = op->getResult(0);
-    if (getElementTypeOrSelf(input) != getElementTypeOrSelf(result)) {
-      return rewriter.notifyMatchFailure(
-          op, "input and result element types must be the same.");
-    }
+    auto intermediateType =
+        cast<ShapedType>(input.getType())
+            .clone(cast<ShapedType>(result.getType()).getElementType());
 
     // Reorder the operation and rewire the inputs/outputs.
     op->moveBefore(definingOp);
+    definingOp->getResult(0).setType(result.getType());
     rewriter.replaceAllUsesWith(result, definingOp->getResult(0));
-    result.setType(input.getType());
+    result.setType(intermediateType);
     op->setOperands(input);
     definingOp->setOperands(result);
     return success();

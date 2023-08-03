@@ -725,14 +725,14 @@ func.func @push_shape_ops_to_end(%arg0 : tensor<12xf32>) -> tensor<3x4x2x1xf32> 
 
 // -----
 
-func.func @no_reorder_on_etype_change(%arg0 : tensor<12xi32>) -> tensor<12xi64> {
-  %0 = stablehlo.convert %arg0 : (tensor<12xi32>) -> tensor<12xi64>
-  %1 = stablehlo.abs %0 : (tensor<12xi64>) -> tensor<12xi64>
+func.func @reorder_with_type_change(%arg0 : tensor<3x4xi32>) -> tensor<12xi64> {
+  %0 = stablehlo.reshape %arg0 : (tensor<3x4xi32>) -> tensor<12xi32>
+  %1 = stablehlo.convert %0 : (tensor<12xi32>) -> tensor<12xi64>
   return %1 : tensor<12xi64>
 }
 
-// CHECK-LABEL: @no_reorder_on_etype_change
-// CHECK: %[[CONVERT:.+]] = stablehlo.convert %arg0 : (tensor<12xi32>) -> tensor<12xi64>
-// CHECK: %[[ABS:.+]] = stablehlo.abs %[[CONVERT]] : tensor<12xi64>
-// CHECK: return %[[ABS]]
+// CHECK-LABEL: @reorder_with_type_change
+// CHECK: %[[CONVERT:.+]] = stablehlo.convert %arg0 : (tensor<3x4xi32>) -> tensor<3x4xi64>
+// CHECK: %[[RESHAPE:.+]] = stablehlo.reshape %[[CONVERT]] : (tensor<3x4xi64>) -> tensor<12xi64>
+// CHECK: return %[[RESHAPE]]
 
