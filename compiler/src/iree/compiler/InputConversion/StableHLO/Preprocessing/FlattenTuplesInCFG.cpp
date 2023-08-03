@@ -39,6 +39,16 @@ void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> &newTypes) {
   }
 }
 
+template<typename T>
+bool hasTuples(T values) {
+  bool isTuple = false;
+  for (auto val : values) {
+      isTuple |= isa<TupleType>(val.getType());
+  }
+
+  return isTuple;
+}
+
 Value processTuple(Type type, Location loc, Block &block, OpBuilder &builder) {
   auto tupleType = dyn_cast<TupleType>(type);
   if (!tupleType) {
@@ -117,11 +127,7 @@ class DetupleReturnOp : public OpRewritePattern<func::ReturnOp> {
 
   LogicalResult matchAndRewrite(func::ReturnOp op,
                                 PatternRewriter &builder) const override {
-    bool isTuple = false;
-    for (auto operand : op.getOperands())
-      isTuple |= isa<TupleType>(operand.getType());
-
-    if (!isTuple)
+    if (!hasTuples(op.getOperands()))
       return builder.notifyMatchFailure(op, "No detupling required");
 
     llvm::SmallVector<Value> newOperands;
@@ -141,14 +147,7 @@ class DetupleCallOp : public OpRewritePattern<func::CallOp> {
 
   LogicalResult matchAndRewrite(func::CallOp oldOp,
                                 PatternRewriter &builder) const override {
-    bool isTuple = false;
-    for (auto operand : oldOp.getOperands())
-      isTuple |= isa<TupleType>(operand.getType());
-
-    for (auto result : oldOp.getResults())
-      isTuple |= isa<TupleType>(result.getType());
-
-    if (!isTuple)
+    if (!hasTuples(oldOp.getOperands()) && !hasTuples(oldOp.getResults()))
       return builder.notifyMatchFailure(oldOp, "No detupling required");
 
     llvm::SmallVector<Value> newArgs;
@@ -181,14 +180,7 @@ class DetupleIndirectCallOp : public OpRewritePattern<func::CallIndirectOp> {
 
   LogicalResult matchAndRewrite(func::CallIndirectOp oldOp,
                                 PatternRewriter &builder) const override {
-    bool isTuple = false;
-    for (auto operand : oldOp.getOperands())
-      isTuple |= isa<TupleType>(operand.getType());
-
-    for (auto result : oldOp.getResults())
-      isTuple |= isa<TupleType>(result.getType());
-
-    if (!isTuple)
+    if (!hasTuples(oldOp.getOperands()) && !hasTuples(oldOp.getResults()))
       return builder.notifyMatchFailure(oldOp, "No detupling required");
 
     llvm::SmallVector<Value> newArgs;
@@ -210,12 +202,7 @@ class DetupleBranchOp : public OpRewritePattern<cf::BranchOp> {
 
   LogicalResult matchAndRewrite(cf::BranchOp oldOp,
                                 PatternRewriter &builder) const override {
-
-    bool isTuple = false;
-    for (auto operand : oldOp.getOperands())
-      isTuple |= isa<TupleType>(operand.getType());
-
-    if (!isTuple)
+    if (!hasTuples(oldOp.getOperands()))
       return builder.notifyMatchFailure(oldOp, "No detupling required");
 
     llvm::SmallVector<Value> newArgs;
@@ -238,12 +225,7 @@ class DetupleConditionOp : public OpRewritePattern<cf::CondBranchOp> {
 
   LogicalResult matchAndRewrite(cf::CondBranchOp oldOp,
                                 PatternRewriter &builder) const override {
-    bool isTuple = false;
-    for (auto operand : oldOp.getOperands()) {
-      isTuple |= isa<TupleType>(operand.getType());
-    }
-
-    if (!isTuple)
+    if (!hasTuples(oldOp.getOperands()))
       return builder.notifyMatchFailure(oldOp, "No detupling required");
 
     llvm::SmallVector<Value> trueArgs;
