@@ -39,11 +39,11 @@ void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> &newTypes) {
   }
 }
 
-template<typename T>
+template <typename T>
 bool hasTuples(T values) {
   bool isTuple = false;
   for (auto val : values) {
-      isTuple |= isa<TupleType>(val.getType());
+    isTuple |= isa<TupleType>(val.getType());
   }
 
   return isTuple;
