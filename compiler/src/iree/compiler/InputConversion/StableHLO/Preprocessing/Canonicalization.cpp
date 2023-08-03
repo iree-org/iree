@@ -1073,9 +1073,8 @@ struct ReorderElementwiseAndShapeOp final
 
     Value input = definingOp->getOperand(0);
     Value result = op->getResult(0);
-    auto intermediateType =
-        cast<ShapedType>(input.getType())
-            .clone(cast<ShapedType>(result.getType()).getElementType());
+    auto intermediateType = cast<ShapedType>(input.getType())
+                                .clone(getElementTypeOrSelf(result.getType()));
 
     // Reorder the operation and rewire the inputs/outputs.
     op->moveBefore(definingOp);
