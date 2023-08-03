@@ -129,6 +129,48 @@ static inline bool iree_device_size_has_alignment(
 //  IREE_CHECK_OK(iree_allocator_malloc(allocator, total_size, (void**)&p));
 #define iree_sizeof_struct(t) iree_host_align(sizeof(t), iree_max_align_t)
 
+// Returns the ceil-divide of |lhs| by non-zero |rhs|.
+static inline iree_device_size_t iree_device_size_ceil_div(
+    iree_device_size_t lhs, iree_device_size_t rhs) {
+  return ((lhs != 0) && (lhs > 0) == (rhs > 0))
+             ? ((lhs + ((rhs > 0) ? -1 : 1)) / rhs) + 1
+             : -(-lhs / rhs);
+}
+
+// Returns the floor-divide of |lhs| by non-zero |rhs|.
+static inline iree_device_size_t iree_device_size_floor_div(
+    iree_device_size_t lhs, iree_device_size_t rhs) {
+  return ((lhs != 0) && ((lhs < 0) != (rhs < 0)))
+             ? -((-lhs + ((rhs < 0) ? 1 : -1)) / rhs) - 1
+             : lhs / rhs;
+}
+
+// Returns the greatest common divisor between two values.
+//
+// See: https://en.wikipedia.org/wiki/Greatest_common_divisor
+//
+// Examples:
+//  gcd(8, 16) = 8
+//  gcd(3, 5) = 1
+static inline iree_device_size_t iree_device_size_gcd(iree_device_size_t a,
+                                                      iree_device_size_t b) {
+  if (b == 0) return a;
+  return iree_device_size_gcd(b, a % b);
+}
+
+// Returns the least common multiple between two values, often used for
+// finding a common alignment.
+//
+// See: https://en.wikipedia.org/wiki/Least_common_multiple
+//
+// Examples:
+//  lcm(8, 16) = 16
+//  lcm(3, 5) = 15 (15 % 3 == 0, 15 % 5 == 0)
+static inline iree_device_size_t iree_device_size_lcm(iree_device_size_t a,
+                                                      iree_device_size_t b) {
+  return a * (b / iree_device_size_gcd(a, b));
+}
+
 //===----------------------------------------------------------------------===//
 // Alignment intrinsics
 //===----------------------------------------------------------------------===//

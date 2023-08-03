@@ -197,6 +197,9 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
   yaml_node_t* path_node = NULL;
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(document, module_node,
                                               IREE_SV("path"), &path_node));
+  yaml_node_t* mmap_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(document, module_node,
+                                                  IREE_SV("mmap"), &mmap_node));
 
   // Special case sourcing from stdin, which is useful for fast iteration and
   // tests where iree-compile output is piped directly into the replay tool.
@@ -222,8 +225,10 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
     IREE_RETURN_IF_ERROR(iree_file_path_join(
         replay->root_path, iree_yaml_node_as_string(path_node),
         replay->host_allocator, &full_path));
-    status = iree_file_read_contents(full_path, replay->host_allocator,
-                                     &flatbuffer_contents);
+    status = iree_file_read_contents(
+        full_path,
+        mmap_node ? IREE_FILE_READ_FLAG_MMAP : IREE_FILE_READ_FLAG_PRELOAD,
+        replay->host_allocator, &flatbuffer_contents);
     iree_allocator_free(replay->host_allocator, full_path);
   }
 

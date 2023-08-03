@@ -559,8 +559,8 @@ int main(int argc, char** argv) {
   }
 
   iree_file_contents_t* file_contents = NULL;
-  iree_status_t status =
-      iree_file_read_contents(argv[1], host_allocator, &file_contents);
+  iree_status_t status = iree_file_read_contents(
+      argv[1], IREE_FILE_READ_FLAG_DEFAULT, host_allocator, &file_contents);
 
   iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
   iree_const_byte_span_t rodata_contents = iree_const_byte_span_empty();
