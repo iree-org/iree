@@ -17,6 +17,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -36,6 +37,16 @@ void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> &newTypes) {
       newTypes.push_back(type);
     }
   }
+}
+
+template <typename T>
+bool hasTuples(T values) {
+  bool isTuple = false;
+  for (auto val : values) {
+    isTuple |= isa<TupleType>(val.getType());
+  }
+
+  return isTuple;
 }
 
 Value processTuple(Type type, Location loc, Block &block, OpBuilder &builder) {
@@ -66,7 +77,6 @@ void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
 }
 
 void recursiveUntuple(Value value, Location loc, OpBuilder &builder,
-                      IRMapping &mapping,
                       llvm::SmallVectorImpl<Value> &newValues) {
   auto tupleType = dyn_cast<TupleType>(value.getType());
   if (!tupleType) {
@@ -78,7 +88,7 @@ void recursiveUntuple(Value value, Location loc, OpBuilder &builder,
   for (auto [idx, subType] : llvm::enumerate(tupleType.getTypes())) {
     auto elementOp = builder.create<mlir::stablehlo::GetTupleElementOp>(
         loc, subType, value, builder.getI32IntegerAttr(idx));
-    recursiveUntuple(elementOp.getResult(), loc, builder, mapping, newValues);
+    recursiveUntuple(elementOp.getResult(), loc, builder, newValues);
   }
 }
 
@@ -101,126 +111,145 @@ Value recursiveRetuple(Type oldType, Operation::result_range *values,
 }
 
 template <typename T>
-LogicalResult
-untupleAndLookupValues(T values, llvm::SmallVectorImpl<Value> &newValues,
-                       OpBuilder &builder, Location loc, IRMapping &mapping) {
+LogicalResult untupleAndLookupValues(T values,
+                                     llvm::SmallVectorImpl<Value> &newValues,
+                                     OpBuilder &builder, Location loc) {
+  IRMapping mapping;
   for (auto operand : values) {
-    auto newValue = mapping.lookupOrNull(operand);
-    if (!newValue) {
-      return failure();
+    recursiveUntuple(operand, loc, builder, newValues);
+  }
+
+  return success();
+}
+
+class DetupleReturnOp : public OpRewritePattern<func::ReturnOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(func::ReturnOp op,
+                                PatternRewriter &builder) const override {
+    if (!hasTuples(op.getOperands()))
+      return builder.notifyMatchFailure(op, "No detupling required");
+
+    llvm::SmallVector<Value> newOperands;
+    if (failed(untupleAndLookupValues(op.getOperands(), newOperands, builder,
+                                      op.getLoc()))) {
+      return builder.notifyMatchFailure(op, "failed to untuple");
     }
 
-    recursiveUntuple(newValue, loc, builder, mapping, newValues);
+    builder.create<mlir::func::ReturnOp>(op->getLoc(), newOperands);
+    builder.eraseOp(op);
+    return success();
   }
+};
 
-  return success();
-}
+class DetupleCallOp : public OpRewritePattern<func::CallOp> {
+  using OpRewritePattern::OpRewritePattern;
 
-LogicalResult convertOp(mlir::func::ReturnOp op, OpBuilder &builder,
-                        IRMapping &mapping) {
-  llvm::SmallVector<Value> newOperands;
-  if (failed(untupleAndLookupValues(op.getOperands(), newOperands, builder,
-                                    op.getLoc(), mapping))) {
-    return failure();
+  LogicalResult matchAndRewrite(func::CallOp oldOp,
+                                PatternRewriter &builder) const override {
+    if (!hasTuples(oldOp.getOperands()) && !hasTuples(oldOp.getResults()))
+      return builder.notifyMatchFailure(oldOp, "No detupling required");
+
+    llvm::SmallVector<Value> newArgs;
+    if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
+                                      oldOp.getLoc()))) {
+      return builder.notifyMatchFailure(oldOp, "failed to untuple values");
+    }
+
+    SmallVector<Type> resultTypes;
+    untupleTypes(oldOp.getResultTypes(), resultTypes);
+    auto newOp = builder.create<func::CallOp>(
+        oldOp->getLoc(), oldOp.getCallee(), resultTypes, newArgs);
+    copyOperationAttrs(oldOp, newOp);
+
+    auto newResults = newOp.getResults();
+    llvm::SmallVector<Value> retupledResults;
+    for (auto oldResult : oldOp.getResults()) {
+      auto newResult = recursiveRetuple(oldResult.getType(), &newResults,
+                                        builder, oldOp->getLoc());
+      retupledResults.push_back(newResult);
+    }
+
+    builder.replaceOp(oldOp, retupledResults);
+    return success();
   }
+};
 
-  builder.create<mlir::func::ReturnOp>(op->getLoc(), newOperands);
-  return success();
-}
+class DetupleIndirectCallOp : public OpRewritePattern<func::CallIndirectOp> {
+  using OpRewritePattern::OpRewritePattern;
 
-LogicalResult convertOp(func::CallOp oldOp, OpBuilder &builder,
-                        IRMapping &mapping) {
-  llvm::SmallVector<Value> newArgs;
-  if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
-                                    oldOp.getLoc(), mapping))) {
-    return failure();
+  LogicalResult matchAndRewrite(func::CallIndirectOp oldOp,
+                                PatternRewriter &builder) const override {
+    if (!hasTuples(oldOp.getOperands()) && !hasTuples(oldOp.getResults()))
+      return builder.notifyMatchFailure(oldOp, "No detupling required");
+
+    llvm::SmallVector<Value> newArgs;
+    if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
+                                      oldOp.getLoc()))) {
+      return builder.notifyMatchFailure(oldOp, "failed to untuple values");
+    }
+
+    auto newOp = builder.create<func::CallIndirectOp>(
+        oldOp.getLoc(), oldOp.getCallee(), newArgs);
+    copyOperationAttrs(oldOp, newOp);
+    builder.replaceOp(oldOp, newOp.getResults());
+    return success();
   }
+};
 
-  SmallVector<Type> resultTypes;
-  untupleTypes(oldOp.getResultTypes(), resultTypes);
-  auto newOp = builder.create<func::CallOp>(oldOp->getLoc(), oldOp.getCallee(),
-                                            resultTypes, newArgs);
-  copyOperationAttrs(oldOp, newOp);
+class DetupleBranchOp : public OpRewritePattern<cf::BranchOp> {
+  using OpRewritePattern::OpRewritePattern;
 
-  auto newResults = newOp.getResults();
-  for (auto oldResult : oldOp.getResults()) {
-    auto newResult = recursiveRetuple(oldResult.getType(), &newResults, builder,
-                                      oldOp->getLoc());
-    mapping.map(oldResult, newResult);
+  LogicalResult matchAndRewrite(cf::BranchOp oldOp,
+                                PatternRewriter &builder) const override {
+    if (!hasTuples(oldOp.getOperands()))
+      return builder.notifyMatchFailure(oldOp, "No detupling required");
+
+    llvm::SmallVector<Value> newArgs;
+    if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
+                                      oldOp.getLoc()))) {
+      return builder.notifyMatchFailure(oldOp, "failed to untuple values");
+    }
+
+    auto newOp =
+        builder.create<cf::BranchOp>(oldOp.getLoc(), oldOp.getDest(), newArgs);
+
+    copyOperationAttrs(oldOp, newOp);
+    builder.eraseOp(oldOp);
+    return success();
   }
+};
 
-  return success();
-}
+class DetupleConditionOp : public OpRewritePattern<cf::CondBranchOp> {
+  using OpRewritePattern::OpRewritePattern;
 
-LogicalResult convertOp(func::CallIndirectOp oldOp, OpBuilder &builder,
-                        IRMapping &mapping) {
-  llvm::SmallVector<Value> newArgs;
-  if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
-                                    oldOp.getLoc(), mapping))) {
-    return failure();
+  LogicalResult matchAndRewrite(cf::CondBranchOp oldOp,
+                                PatternRewriter &builder) const override {
+    if (!hasTuples(oldOp.getOperands()))
+      return builder.notifyMatchFailure(oldOp, "No detupling required");
+
+    llvm::SmallVector<Value> trueArgs;
+    if (failed(untupleAndLookupValues(oldOp.getTrueOperands(), trueArgs,
+                                      builder, oldOp.getLoc()))) {
+      return builder.notifyMatchFailure(oldOp, "Failed to detuple true args");
+    }
+
+    llvm::SmallVector<Value> falseArgs;
+    if (failed(untupleAndLookupValues(oldOp.getFalseOperands(), falseArgs,
+                                      builder, oldOp.getLoc()))) {
+      return builder.notifyMatchFailure(oldOp, "Failed to detuple false args");
+    }
+
+    auto newOp = builder.create<cf::CondBranchOp>(
+        oldOp.getLoc(), oldOp.getCondition(), oldOp.getTrueDest(), trueArgs,
+        oldOp.getFalseDest(), falseArgs);
+
+    copyOperationAttrs(oldOp, newOp);
+
+    builder.eraseOp(oldOp);
+    return success();
   }
-
-  auto newOp = builder.create<func::CallIndirectOp>(oldOp.getLoc(),
-                                                    oldOp.getCallee(), newArgs);
-  copyOperationAttrs(oldOp, newOp);
-
-  for (auto [oldResult, newResult] :
-       llvm::zip_equal(oldOp.getResults(), newOp.getResults())) {
-    mapping.map(oldResult, newResult);
-  }
-
-  return success();
-}
-
-LogicalResult convertOp(cf::BranchOp oldOp, OpBuilder &builder,
-                        IRMapping &mapping) {
-  llvm::SmallVector<Value> newArgs;
-  if (failed(untupleAndLookupValues(oldOp.getOperands(), newArgs, builder,
-                                    oldOp.getLoc(), mapping))) {
-    return failure();
-  }
-
-  auto newOp = builder.create<cf::BranchOp>(
-      oldOp.getLoc(), mapping.lookupOrNull(oldOp.getDest()), newArgs);
-
-  copyOperationAttrs(oldOp, newOp);
-  return success();
-}
-
-LogicalResult convertOp(cf::CondBranchOp oldOp, OpBuilder &builder,
-                        IRMapping &mapping) {
-  llvm::SmallVector<Value> trueArgs;
-  if (failed(untupleAndLookupValues(oldOp.getTrueOperands(), trueArgs, builder,
-                                    oldOp.getLoc(), mapping))) {
-    return failure();
-  }
-
-  llvm::SmallVector<Value> falseArgs;
-  if (failed(untupleAndLookupValues(oldOp.getFalseOperands(), falseArgs,
-                                    builder, oldOp.getLoc(), mapping))) {
-    return failure();
-  }
-
-  auto newOp = builder.create<cf::CondBranchOp>(
-      oldOp.getLoc(), mapping.lookupOrNull(oldOp.getCondition()),
-      mapping.lookupOrNull(oldOp.getTrueDest()), trueArgs,
-      mapping.lookupOrNull(oldOp.getFalseDest()), falseArgs);
-
-  copyOperationAttrs(oldOp, newOp);
-  return success();
-}
-
-LogicalResult convertOperation(Operation *operation, OpBuilder &builder,
-                               IRMapping &mapping) {
-  return llvm::TypeSwitch<Operation *, LogicalResult>(operation)
-      .Case<func::ReturnOp, func::CallOp, func::CallIndirectOp, cf::BranchOp,
-            cf::CondBranchOp>(
-          [&](auto op) { return convertOp(op, builder, mapping); })
-      .Default([&](Operation *op) {
-        builder.clone(*operation, mapping);
-        return success();
-      });
-}
+};
 
 LogicalResult convertFunction(func::FuncOp oldFunction,
                               func::FuncOp newFunction) {
@@ -277,9 +306,7 @@ LogicalResult convertFunction(func::FuncOp oldFunction,
   for (Block &oldBlock : oldFunction.getBlocks()) {
     builder.setInsertionPointToEnd(mapping.lookupOrNull(&oldBlock));
     for (Operation &oldOp : oldBlock.getOperations()) {
-      if (failed(convertOperation(&oldOp, builder, mapping))) {
-        return failure();
-      }
+      builder.clone(oldOp, mapping);
     }
   }
 
@@ -329,6 +356,8 @@ struct FlattenTuplesInCFG final
     // to run these manually here because StableHLO does not define
     // folds/canonicalization patterns for its ops.
     RewritePatternSet patterns(ctx);
+    patterns.insert<DetupleCallOp, DetupleIndirectCallOp, DetupleConditionOp,
+                    DetupleReturnOp, DetupleBranchOp>(ctx);
     populateCanonicalizationPatterns(ctx, &patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
