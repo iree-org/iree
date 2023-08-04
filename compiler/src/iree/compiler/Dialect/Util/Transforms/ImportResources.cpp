@@ -20,11 +20,12 @@ namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
-// TODO: Upstream this.
-// class DenseResourceElementsAttr : public DenseResourceElementsAttr {
-// public:
-//   using DenseResourceElementsAttr::get;
-// };
+// TODO: Just use the DenseResourceElementsAttr::get()
+// builder once https://reviews.llvm.org/D157064 lands.
+class DenseBlobResourceElementsAttr : public DenseResourceElementsAttr {
+public:
+  using DenseResourceElementsAttr::get;
+};
 
 template <typename ElementType, unsigned numBits = sizeof(ElementType) * 8>
 static void copyIntAttrIntoBlob(AsmResourceBlob &blob,
@@ -132,32 +133,32 @@ public:
         blob = HeapAsmResourceBlob::allocate(numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyIntAttrIntoBlob<uint8_t, /*numBits=*/1>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_i1",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i1",
+                                                  std::move(blob));
       case 8:
         blob = HeapAsmResourceBlob::allocate(numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyIntAttrIntoBlob<uint8_t>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_i8",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i8",
+                                                  std::move(blob));
       case 16:
         blob = HeapAsmResourceBlob::allocate(2 * numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyIntAttrIntoBlob<uint16_t>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_i16",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i16",
+                                                  std::move(blob));
       case 32:
         blob = HeapAsmResourceBlob::allocate(4 * numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyIntAttrIntoBlob<uint32_t>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_i32",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i32",
+                                                  std::move(blob));
       case 64:
         blob = HeapAsmResourceBlob::allocate(8 * numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyIntAttrIntoBlob<uint64_t>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_i64",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i64",
+                                                  std::move(blob));
       default:
         return {};
       }
@@ -168,26 +169,26 @@ public:
         blob = HeapAsmResourceBlob::allocate(numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyFPAttrIntoBlob<uint8_t>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_f8",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_f8",
+                                                  std::move(blob));
       case 16:
         blob = HeapAsmResourceBlob::allocate(2 * numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyFPAttrIntoBlob<uint16_t>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_f16",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_f16",
+                                                  std::move(blob));
       case 32:
         blob = HeapAsmResourceBlob::allocate(4 * numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyFPAttrIntoBlob<uint32_t>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_f32",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_f32",
+                                                  std::move(blob));
       case 64:
         blob = HeapAsmResourceBlob::allocate(8 * numElements, /*align=*/64,
                                              /*dataIsMutable=*/true);
         copyFPAttrIntoBlob<uint64_t>(blob, attr);
-        return DenseResourceElementsAttr::get(st, "dense_elements_f64",
-                                              std::move(blob));
+        return DenseBlobResourceElementsAttr::get(st, "dense_elements_f64",
+                                                  std::move(blob));
       default:
         return {};
       }
