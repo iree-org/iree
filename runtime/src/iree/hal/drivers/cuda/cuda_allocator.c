@@ -25,6 +25,7 @@ typedef struct iree_hal_cuda_allocator_t {
   CUstream stream;
   iree_hal_cuda_memory_pools_t* pools;
   bool supports_concurrent_managed_access;
+  bool supports_read_only_host_register;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_cuda_allocator_t;
@@ -60,12 +61,26 @@ iree_status_t iree_hal_cuda_allocator_create(
                   &supports_concurrent_managed_access,
                   CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS, device),
               "cuDeviceGetAttribute"));
-
   IREE_TRACE_ZONE_APPEND_TEXT(
       z0, supports_concurrent_managed_access
               ? "has CONCURRENT_MANAGED_ACCESS"
               : "no CONCURRENT_MANAGED_ACCESS (expect slow accesses on "
                 "device-local + host-visible memory)");
+
+  // We can only provide the CU_MEMHOSTREGISTER_READ_ONLY flag when importing
+  // host memory if it's supported.
+  int supports_read_only_host_register = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      CU_RESULT_TO_STATUS(
+          context->syms,
+          cuDeviceGetAttribute(
+              &supports_read_only_host_register,
+              CU_DEVICE_ATTRIBUTE_READ_ONLY_HOST_REGISTER_SUPPORTED, device),
+          "cuDeviceGetAttribute"));
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, supports_read_only_host_register
+                                      ? "has READ_ONLY_HOST_REGISTER_SUPPORTED"
+                                      : "no READ_ONLY_HOST_REGISTER_SUPPORTED");
 
   iree_hal_cuda_allocator_t* allocator = NULL;
   iree_status_t status = iree_allocator_malloc(
@@ -80,6 +95,8 @@ iree_status_t iree_hal_cuda_allocator_create(
     allocator->pools = pools;
     allocator->supports_concurrent_managed_access =
         supports_concurrent_managed_access != 0;
+    allocator->supports_read_only_host_register =
+        supports_read_only_host_register != 0;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -409,7 +426,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
         &allocator->statistics, compat_params.type, allocation_size));
     *out_buffer = buffer;
   } else {
-    if (!buffer) {
+    if (!buffer && (device_ptr || host_ptr)) {
       iree_hal_cuda_buffer_free(allocator->context, buffer_type, device_ptr,
                                 host_ptr);
     } else {
@@ -518,16 +535,10 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
       }
       buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_HOST_REGISTERED;
       host_ptr = external_buffer->handle.host_allocation.ptr;
-      uint32_t register_flags = 0;
-      if (compat_params.access == IREE_HAL_MEMORY_ACCESS_READ) {
-        register_flags = CU_MEMHOSTREGISTER_READ_ONLY;
-      }
-      if (iree_any_bit_set(compat_params.usage,
-                           IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
-                               IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
-                               IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                               IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE)) {
-        register_flags = CU_MEMHOSTREGISTER_DEVICEMAP;
+      uint32_t register_flags = CU_MEMHOSTREGISTER_DEVICEMAP;
+      if (compat_params.access == IREE_HAL_MEMORY_ACCESS_READ &&
+          allocator->supports_read_only_host_register) {
+        register_flags |= CU_MEMHOSTREGISTER_READ_ONLY;
       }
       status = CU_RESULT_TO_STATUS(
           allocator->context->syms,
@@ -569,7 +580,7 @@ static iree_status_t iree_hal_cuda_allocator_import_buffer(
   if (iree_status_is_ok(status)) {
     *out_buffer = buffer;
   } else {
-    if (!buffer) {
+    if (!buffer && (device_ptr || host_ptr)) {
       iree_hal_cuda_buffer_free(allocator->context, buffer_type, device_ptr,
                                 host_ptr);
     } else {

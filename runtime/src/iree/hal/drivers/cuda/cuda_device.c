@@ -28,6 +28,8 @@
 #include "iree/hal/drivers/cuda/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
+#include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/memory_file.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda_device_t
@@ -492,6 +494,23 @@ static iree_status_t iree_hal_cuda_device_create_executable_cache(
       &device->context_wrapper, identifier, out_executable_cache);
 }
 
+static iree_status_t iree_hal_cuda_device_import_file(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_access_t access,
+    iree_hal_external_file_t* IREE_RESTRICT external_file,
+    iree_hal_file_release_callback_t release_callback,
+    iree_hal_file_t** out_file) {
+  if (external_file->type != IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "implementation does not support the external file type");
+  }
+  return iree_hal_memory_file_wrap(
+      queue_affinity, access, external_file->handle.host_allocation,
+      release_callback, iree_hal_device_allocator(base_device),
+      iree_hal_device_host_allocator(base_device), out_file);
+}
+
 static iree_status_t iree_hal_cuda_device_create_pipeline_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
@@ -542,7 +561,8 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
   // If pools are not supported we allocate a buffer as normal from whatever
   // allocator is set on the device.
   iree_status_t status = iree_ok_status();
-  if (device->supports_memory_pools) {
+  if (device->supports_memory_pools &&
+      !iree_any_bit_set(params.access, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     status = iree_hal_cuda_memory_pools_alloca(&device->memory_pools,
                                                device->stream, pool, params,
                                                allocation_size, out_buffer);
@@ -593,6 +613,48 @@ static iree_status_t iree_hal_cuda_device_queue_dealloca(
     IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
   }
   return status;
+}
+
+static iree_status_t iree_hal_cuda_device_queue_read(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_file_t* source_file, uint64_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, uint32_t flags) {
+  // TODO: expose streaming chunk count/size options.
+  iree_status_t loop_status = iree_ok_status();
+  iree_hal_file_transfer_options_t options = {
+      .loop = iree_loop_inline(&loop_status),
+      .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
+      .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_file, source_offset, target_buffer, target_offset, length, flags,
+      options));
+  return loop_status;
+}
+
+static iree_status_t iree_hal_cuda_device_queue_write(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_file_t* target_file, uint64_t target_offset,
+    iree_device_size_t length, uint32_t flags) {
+  // TODO: expose streaming chunk count/size options.
+  iree_status_t loop_status = iree_ok_status();
+  iree_hal_file_transfer_options_t options = {
+      .loop = iree_loop_inline(&loop_status),
+      .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
+      .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_buffer, source_offset, target_file, target_offset, length, flags,
+      options));
+  return loop_status;
 }
 
 static iree_status_t iree_hal_cuda_device_queue_execute(
@@ -679,6 +741,7 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
         iree_hal_cuda_device_create_descriptor_set_layout,
     .create_event = iree_hal_cuda_device_create_event,
     .create_executable_cache = iree_hal_cuda_device_create_executable_cache,
+    .import_file = iree_hal_cuda_device_import_file,
     .create_pipeline_layout = iree_hal_cuda_device_create_pipeline_layout,
     .create_semaphore = iree_hal_cuda_device_create_semaphore,
     .query_semaphore_compatibility =
@@ -686,6 +749,8 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_alloca = iree_hal_cuda_device_queue_alloca,
     .queue_dealloca = iree_hal_cuda_device_queue_dealloca,
+    .queue_read = iree_hal_cuda_device_queue_read,
+    .queue_write = iree_hal_cuda_device_queue_write,
     .queue_execute = iree_hal_cuda_device_queue_execute,
     .queue_flush = iree_hal_cuda_device_queue_flush,
     .wait_semaphores = iree_hal_cuda_device_wait_semaphores,

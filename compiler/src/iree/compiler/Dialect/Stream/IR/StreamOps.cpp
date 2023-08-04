@@ -634,18 +634,6 @@ LogicalResult ResourceAllocOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// stream.resource.map
-//===----------------------------------------------------------------------===//
-
-LogicalResult ResourceMapOp::verify() {
-  ResourceMapOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // stream.resource.try_map
 //===----------------------------------------------------------------------===//
 
@@ -789,6 +777,58 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
     }
   }
   return {};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.file.constant
+//===----------------------------------------------------------------------===//
+
+void FileConstantOp::getAsmResultNames(mlir::OpAsmSetValueNameFn setNameFn) {
+  setNameFn(getResult(), "file");
+}
+
+IREE::Util::SubrangeOperand
+FileConstantOp::getSubrangeOperand(unsigned operandIndex) {
+  if (operandIndex == 0) {
+    return IREE::Util::SubrangeOperand{getSource(), getSourceSize(),
+                                       getSourceOffset(), getSourceLength()};
+  } else {
+    assert(false && "only source is a subrange");
+    return {};
+  }
+}
+
+void FileConstantOp::setSubrangeOperand(unsigned operandIndex,
+                                        IREE::Util::SubrangeOperand operand) {
+  assert(operandIndex == 0 && "only source is a subrange");
+  getSourceMutable().assign(operand.resource);
+  getSourceSizeMutable().assign(operand.resourceSize);
+  getSourceOffsetMutable().assign(operand.offset);
+  getSourceLengthMutable().assign(operand.length);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.file.read
+//===----------------------------------------------------------------------===//
+
+LogicalResult FileReadOp::verify() {
+  FileReadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.file.write
+//===----------------------------------------------------------------------===//
+
+LogicalResult FileWriteOp::verify() {
+  FileWriteOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
