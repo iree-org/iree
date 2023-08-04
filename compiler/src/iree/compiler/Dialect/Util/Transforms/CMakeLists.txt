@@ -39,7 +39,6 @@ iree_cc_library(
     "StripDebugOps.cpp"
     "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
-    "TopLevelSCFToCFG.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
@@ -55,7 +54,6 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRSCFDialect
-    MLIRSCFToControlFlow
     MLIRSupport
     MLIRTransforms
     MLIRVectorDialect

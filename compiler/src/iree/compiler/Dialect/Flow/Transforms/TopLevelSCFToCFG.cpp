@@ -4,11 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -16,7 +17,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Util {
+namespace Flow {
 
 namespace {
 
@@ -53,7 +54,7 @@ createTopLevelSCFToCFGPass() {
   return std::make_unique<TopLevelSCFToCFGPass>();
 }
 
-} // namespace Util
+} // namespace Flow
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir

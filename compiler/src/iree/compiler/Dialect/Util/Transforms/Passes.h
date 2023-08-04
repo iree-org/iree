@@ -8,7 +8,6 @@
 #define IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -32,8 +31,6 @@ std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantsPass();
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTopLevelSCFToCFGPass();
 
 // Resource Management.
 std::unique_ptr<OperationPass<void>> createImportResourcesPass();

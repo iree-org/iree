@@ -317,6 +317,12 @@ def StripSignedness :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }
 
+def StripAndSplatConstantVariables :
+    Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
+  let summary = "Strips constant util.globals and replaces them with splats.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
+}
+
 def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
   let summary = "Checks the legality of the IR at the start of IREE flow transformation pipeline.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
