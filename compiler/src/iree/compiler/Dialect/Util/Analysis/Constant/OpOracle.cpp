@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -102,6 +103,11 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
 
   // Forbid if part of a parent that should be treated atomically.
   if (op->getParentOfType<linalg::LinalgOp>()) {
+    return {};
+  }
+
+  // Optimization barriers cannot be folded.
+  if (isa<IREE::Util::OptimizationBarrierOp>(op)) {
     return {};
   }
 

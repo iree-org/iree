@@ -160,33 +160,15 @@ FunctionCall::FunctionCall(CompiledBinary &binary, iree_host_size_t argCapacity,
                                     &outputs));
 }
 
-LogicalResult FunctionCall::addArgumentElementsAttr(Location loc,
-                                                    ElementsAttr elementsAttr) {
-  auto ser =
-      llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(elementsAttr);
-  if (!ser) {
-    return emitError(loc) << "internal error: ElementsAttr does not implement "
-                             "SerializableAttrInterface";
-  }
-  // Meta-data.
-  ShapedType st = llvm::cast<ShapedType>(elementsAttr.getType());
-  auto stShape = st.getShape();
-  auto rank = static_cast<size_t>(st.getRank());
-  iree_hal_dim_t *shape =
-      static_cast<iree_hal_dim_t *>(alloca(rank * sizeof(iree_hal_dim_t)));
-  for (size_t i = 0; i < rank; ++i) {
-    shape[i] = stShape[i];
-  }
-  Type mlirElementType = st.getElementType();
-  iree_hal_element_type_t elementType = IREE_HAL_ELEMENT_TYPE_NONE;
-  if (failed(convertToElementType(loc, mlirElementType, &elementType)))
-    return failure();
+FailureOr<iree::vm::ref<iree_hal_buffer_t>>
+FunctionCall::importSerializableAttr(
+    Location loc, IREE::Util::SerializableAttrInterface serializableAttr) {
 
   // Allocate buffer.
-  int64_t storageSize = ser.getStorageSize();
+  int64_t storageSize = serializableAttr.getStorageSize();
   if (storageSize < 0) {
     return emitError(loc) << "unsupported serializable attribute: "
-                          << elementsAttr;
+                          << serializableAttr;
   }
 
   iree::vm::ref<iree_hal_buffer_t> buffer;
@@ -209,7 +191,7 @@ LogicalResult FunctionCall::addArgumentElementsAttr(Location loc,
     return failure();
 
   // Copy.
-  LogicalResult copyResult = ser.serializeToBuffer(
+  LogicalResult copyResult = serializableAttr.serializeToBuffer(
       loc, llvm::support::endian::system_endianness(),
       ArrayRef<char>(reinterpret_cast<char *>(mapping.contents.data),
                      storageSize));
@@ -219,21 +201,72 @@ LogicalResult FunctionCall::addArgumentElementsAttr(Location loc,
     return failure();
   }
 
+  return buffer;
+}
+
+LogicalResult FunctionCall::addBufferArgumentAttr(
+    Location loc, IREE::Util::SerializableAttrInterface serializableAttr) {
+  auto buffer = importSerializableAttr(loc, serializableAttr);
+  if (failed(buffer))
+    return failure();
+  return handleRuntimeError(
+      loc, iree_vm_list_push_ref_move(inputs.get(), std::move(*buffer)));
+}
+
+LogicalResult FunctionCall::addBufferViewArgumentAttr(
+    Location loc, ShapedType shapedType,
+    IREE::Util::SerializableAttrInterface serializableAttr) {
+  // Metadata taken from the elements attr type.
+  auto rank = static_cast<size_t>(shapedType.getRank());
+  iree_hal_dim_t *shape =
+      static_cast<iree_hal_dim_t *>(alloca(rank * sizeof(iree_hal_dim_t)));
+  for (size_t i = 0; i < rank; ++i) {
+    shape[i] = shapedType.getDimSize(i);
+  }
+  iree_hal_element_type_t elementType = IREE_HAL_ELEMENT_TYPE_NONE;
+  if (failed(
+          convertToElementType(loc, shapedType.getElementType(), &elementType)))
+    return failure();
+
+  // Import buffer contents.
+  auto buffer = importSerializableAttr(loc, serializableAttr);
+  if (failed(buffer))
+    return failure();
+
   // Construct buffer view.
-  iree::vm::ref<iree_hal_buffer_view_t> bv;
-  if (failed(handleRuntimeError(loc, iree_hal_buffer_view_create(
-                                         buffer.get(), rank, shape, elementType,
-                                         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-                                         iree_allocator_system(), &bv))))
+  iree::vm::ref<iree_hal_buffer_view_t> bufferView;
+  if (failed(handleRuntimeError(
+          loc,
+          iree_hal_buffer_view_create(buffer->get(), rank, shape, elementType,
+                                      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+                                      iree_allocator_system(), &bufferView))))
     return failure();
 
   return handleRuntimeError(
-      loc, iree_vm_list_push_ref_move(inputs.get(), std::move(bv)));
+      loc, iree_vm_list_push_ref_move(inputs.get(), std::move(bufferView)));
+}
+
+static ShapedType getAttrShapedType(Attribute attr) {
+  if (auto typedAttr = llvm::dyn_cast<TypedAttr>(attr)) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(typedAttr.getType())) {
+      return shapedType;
+    }
+  }
+  return {};
 }
 
 LogicalResult FunctionCall::addArgument(Location loc, Attribute attr) {
   if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(attr)) {
-    return addArgumentElementsAttr(loc, elementsAttr);
+    return addBufferViewArgumentAttr(
+        loc, elementsAttr.getShapedType(),
+        cast<IREE::Util::SerializableAttrInterface>(attr));
+  } else if (auto serializableAttr =
+                 llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(attr)) {
+    if (auto shapedType = getAttrShapedType(attr)) {
+      return addBufferViewArgumentAttr(loc, shapedType, serializableAttr);
+    } else {
+      return addBufferArgumentAttr(loc, serializableAttr);
+    }
   } else if (auto integerAttr = llvm::dyn_cast<IntegerAttr>(attr)) {
     iree_vm_value_t value;
     APInt apValue = integerAttr.getValue();

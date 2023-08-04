@@ -62,8 +62,14 @@ public:
                                 TypedAttr &outAttr);
 
 private:
-  LogicalResult addArgumentElementsAttr(Location loc,
-                                        ElementsAttr elementsAttr);
+  FailureOr<iree::vm::ref<iree_hal_buffer_t>> importSerializableAttr(
+      Location loc, IREE::Util::SerializableAttrInterface serializableAttr);
+  LogicalResult
+  addBufferArgumentAttr(Location loc,
+                        IREE::Util::SerializableAttrInterface serializableAttr);
+  LogicalResult addBufferViewArgumentAttr(
+      Location loc, ShapedType shapedType,
+      IREE::Util::SerializableAttrInterface serializableAttr);
 
   CompiledBinary binary;
   iree::vm::ref<iree_vm_list_t> inputs;
