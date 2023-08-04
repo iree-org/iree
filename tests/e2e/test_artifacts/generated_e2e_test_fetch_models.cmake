@@ -363,69 +363,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH1/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH1.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH16/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH16.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH24"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH24/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH24.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH32/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH32.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH48/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH48.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH64/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH64.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH512"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH512/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH512.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH1024"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH1024/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH1024.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH1280"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH1280/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH1280.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH1"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH1.mlirbc"
