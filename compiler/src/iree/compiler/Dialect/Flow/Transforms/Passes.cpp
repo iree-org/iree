@@ -276,6 +276,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
 
+      .addPass(IREE::Util::createTopLevelSCFToCFGPass)
       .addPass(createFormScalarDispatchesPass)
       // Only want use the transform dialect for some dispatch regions and let
       // the FormDispatchRegions handle the rest. This only moves the root

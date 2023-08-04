@@ -46,9 +46,9 @@ void buildStableHLOInputConversionPassPipelineImpl(
       stablehlo::createLegalizeControlFlow());
 
   passManager.addPass(createFlattenTuplesInSCF());
-  if (detuple) {
+  // if (detuple) {
     passManager.addPass(createFlattenTuplesInCFG());
-  }
+  // }
 
   passManager.addPass(createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());

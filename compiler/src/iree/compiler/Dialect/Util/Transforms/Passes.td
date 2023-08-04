@@ -82,6 +82,12 @@ def StripDebugOps : Pass<"iree-util-strip-debug-ops", ""> {
   }];
 }
 
+def TopLevelSCFToCFG :
+    InterfacePass<"iree-top-level-scf-to-cfg", "mlir::FunctionOpInterface"> {
+  let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";
+  let constructor = "mlir::iree_compiler::IREE::Util::createTopLevelSCFToCFGPass()";
+}
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
