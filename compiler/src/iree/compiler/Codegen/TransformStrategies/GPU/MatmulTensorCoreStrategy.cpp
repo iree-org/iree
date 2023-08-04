@@ -97,6 +97,11 @@ LogicalResult MatmulStrategy::validate(const GPUModel &gpuModel) const {
   }
 
   if (useMmaSync) {
+    if (!gpuModel.hasTF32TensorCore) {
+      LDBG("--Matmul strategy target has not TF32 tensor core\n");
+      return failure();
+    }
+
     if (!gpuModel.hasMmaSync) {
       LDBG("--Matmul strategy target does not support MMA.SYNC operations\n");
       return failure();
