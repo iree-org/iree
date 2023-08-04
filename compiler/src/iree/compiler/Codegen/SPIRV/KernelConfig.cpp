@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -50,6 +51,11 @@ llvm::cl::opt<std::string> clSPIRVTransformDialectFileName(
     llvm::cl::desc(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
+
+llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
+    "iree-spirv-enable-transform-dialect-jit",
+    llvm::cl::desc("Enable the usage of the transform dialect JIT"),
+    llvm::cl::init(false));
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -1514,6 +1520,59 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 }
 
 //===----------------------------------------------------------------------===//
+// Transform Dialect Specialized Configurations
+//===----------------------------------------------------------------------===//
+
+static LogicalResult
+setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
+                          const spirv::TargetEnv &targetEnv) {
+  if (!clSPIRVEnableTransformDialectJit &&
+      clSPIRVTransformDialectFileName.empty()) {
+    return failure();
+  }
+
+  MLIRContext *context = entryPoint.getContext();
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      context, CodeGenPipeline::TransformDialectCodegen);
+
+  // Prefer a transform script file if provided.
+  if (!clSPIRVTransformDialectFileName.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "using user specified transform dialect...\n");
+    return setTranslationInfo(entryPoint, translationInfo);
+  }
+
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
+
+  // TODO: unify the target information into one structure.
+  iree_compiler::gpu::GPUModel gpuModel;
+  gpuModel.hasWarpShuffle =
+      targetEnv.allows(spirv::Capability::GroupNonUniformShuffle);
+  gpuModel.hasTF32TensorCore = false;
+  gpuModel.hasMmaSync = false;
+  gpuModel.hasTF32TensorCore = false;
+  gpuModel.minSubgroupSize = limits.getMinSubgroupSize();
+  gpuModel.maxSubgroupSize = limits.getMaxSubgroupSize();
+  gpuModel.maxWorkGroupInvocations = limits.getMaxComputeWorkgroupInvocations();
+
+  // Populates the supported WMMA fragment combinations from the target
+  // environment. Infer tf32 support from the list of supported fragment types.
+  auto properties = limits.getCooperativeMatrixPropertiesNv()
+                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  for (auto property : properties) {
+    if (property.getScope().getValue() != spirv::Scope::Subgroup)
+      continue;
+    gpuModel.supportedWMMAConfigs.emplace_back(iree_compiler::gpu::MMAConfig{
+        property.getMSize(), property.getNSize(), property.getKSize(),
+        property.getAType(), property.getBType(), property.getCType()});
+  }
+
+  if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
+                                                              gpuModel)))
+    return failure();
+  return setTranslationInfo(entryPoint, translationInfo);
+}
+
+//===----------------------------------------------------------------------===//
 // Configuration Dispatcher
 //===----------------------------------------------------------------------===//
 
@@ -1529,13 +1588,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
     return setUserConfig(entryPointFn, rootOp, compilationInfo);
   }
 
-  if (!clSPIRVTransformDialectFileName.empty()) {
-    MLIRContext *context = entryPointFn.getContext();
-    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        context, CodeGenPipeline::TransformDialectCodegen);
-    LLVM_DEBUG(llvm::dbgs() << "using user specified transform dialect...\n");
-
-    return setTranslationInfo(entryPointFn, translationInfo);
+  // First try to see if there is a matching transform dialect configuration.
+  if (succeeded(setTransformDialectConfig(entryPointFn, rootOp, targetEnv))) {
+    return success();
   }
 
   // First try to find a proper CodeGen configuration to tile and vectorize for

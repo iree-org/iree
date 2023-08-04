@@ -38,6 +38,14 @@ struct AbstractGemmLikeStrategy : GPUStrategy {
   /// override the user's choices.
   bool cliOptionsSpecified = false;
 
+  /// Non-default subgroup size to use configured based on hardware supported
+  /// values.
+  std::optional<int64_t> targetSubgroupSize = std::nullopt;
+
+  int64_t getSubgroupSize() const {
+    return targetSubgroupSize ? *targetSubgroupSize : subgroupSize;
+  }
+
   //===--------------------------------------------------------------------===//
   // Parameters that control the tiling and mapping.
   //===--------------------------------------------------------------------===//

@@ -91,41 +91,6 @@ void AbstractGemmLikeStrategy::initDefaultValues(const GPUModel &gpuModel) {
     cliOptionsSpecified = true;
   }
 
-  /// Default configuration based on hardware properties and problem bit widths.
-  if (clBlockTileSizes.getNumOccurrences()) {
-    blockTileSizes =
-        SmallVector<int64_t>(clBlockTileSizes.begin(), clBlockTileSizes.end());
-  } else {
-    blockTileSizes = SmallVector<int64_t>{128, 128, 1};
-  }
-
-  if (clNumThreads.getNumOccurrences()) {
-    numThreads = SmallVector<int64_t>(clNumThreads.begin(), clNumThreads.end());
-  } else {
-    // Infer from warp counts if present.
-    if (clNumWarps.getNumOccurrences()) {
-      numThreads = SmallVector<int64_t>(clNumWarps.begin(), clNumWarps.end());
-      numThreads[0] *= gpuModel.subgroupSize;
-    } else {
-      numThreads = SmallVector<int64_t>{64, 2, 1};
-    }
-  }
-  if (clNumWarps.getNumOccurrences()) {
-    numWarps = SmallVector<int64_t>(clNumWarps.begin(), clNumWarps.end());
-  } else {
-    numWarps = numThreads;
-    numWarps[0] = mlir::ceilDiv(numWarps[0], gpuModel.subgroupSize);
-  }
-  if (clUseAsyncCopies.getNumOccurrences())
-    useAsyncCopies = clUseAsyncCopies;
-  else
-    useAsyncCopies = gpuModel.hasMmaSync;
-  if (clUseMmaSync.getNumOccurrences())
-    useMmaSync = clUseMmaSync;
-  if (clUseWmma.getNumOccurrences())
-    useWmma = clUseWmma;
-  if (clUseFma.getNumOccurrences())
-    useFma = clUseFma;
   /// If not specified, select instructions to target for compute.
   if (!useMmaSync && !useWmma && !useFma) {
     /// First, try to use tensor core.
@@ -141,6 +106,46 @@ void AbstractGemmLikeStrategy::initDefaultValues(const GPUModel &gpuModel) {
       useFma = true;
     }
   }
+
+  /// Prefer smaller subgroup sizes for tensor core strategies.
+  if (!useFma)
+    targetSubgroupSize = gpuModel.minSubgroupSize;
+
+  /// Default configuration based on hardware properties and problem bit widths.
+  if (clBlockTileSizes.getNumOccurrences()) {
+    blockTileSizes =
+        SmallVector<int64_t>(clBlockTileSizes.begin(), clBlockTileSizes.end());
+  } else {
+    blockTileSizes = SmallVector<int64_t>{128, 128, 1};
+  }
+
+  if (clNumThreads.getNumOccurrences()) {
+    numThreads = SmallVector<int64_t>(clNumThreads.begin(), clNumThreads.end());
+  } else {
+    // Infer from warp counts if present.
+    if (clNumWarps.getNumOccurrences()) {
+      numThreads = SmallVector<int64_t>(clNumWarps.begin(), clNumWarps.end());
+      numThreads[0] *= getSubgroupSize();
+    } else {
+      numThreads = SmallVector<int64_t>{64, 2, 1};
+    }
+  }
+  if (clNumWarps.getNumOccurrences()) {
+    numWarps = SmallVector<int64_t>(clNumWarps.begin(), clNumWarps.end());
+  } else {
+    numWarps = numThreads;
+    numWarps[0] = mlir::ceilDiv(numWarps[0], getSubgroupSize());
+  }
+  if (clUseAsyncCopies.getNumOccurrences())
+    useAsyncCopies = clUseAsyncCopies;
+  else
+    useAsyncCopies = gpuModel.hasMmaSync;
+  if (clUseMmaSync.getNumOccurrences())
+    useMmaSync = clUseMmaSync;
+  if (clUseWmma.getNumOccurrences())
+    useWmma = clUseWmma;
+  if (clUseFma.getNumOccurrences())
+    useFma = clUseFma;
   if (clReductionTileSize.getNumOccurrences()) {
     reductionTileSize = clReductionTileSize;
   } else {
@@ -175,7 +180,7 @@ AbstractGemmLikeStrategy::getZeroPadAttrFromElementalTypes(OpBuilder &b) const {
 
 LogicalResult
 AbstractGemmLikeStrategy::validate(const GPUModel &gpuModel) const {
-  if (totalNumThreads() != totalNumWarps() * gpuModel.subgroupSize) {
+  if (totalNumThreads() != totalNumWarps() * getSubgroupSize()) {
     llvm::errs() << "Number of threads specified by warps must match total "
                     "number of threads\n";
     return failure();
