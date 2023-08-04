@@ -534,6 +534,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
   VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
 
+  IREE_VULKAN_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
+                               command_buffer->handle);
+
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_buffer));
 
@@ -579,6 +582,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
                                           length, dword_pattern);
   }
 
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
+
   return iree_ok_status();
 }
 
@@ -589,6 +595,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
   VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
+
+  IREE_VULKAN_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
+                               command_buffer->handle);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_buffer));
@@ -612,6 +621,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
     length -= chunk_length;
   }
 
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
+
   return iree_ok_status();
 }
 
@@ -625,6 +637,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
   VkBuffer source_device_buffer = iree_hal_vulkan_buffer_handle(source_buffer);
   VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
 
+  IREE_VULKAN_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
+                               command_buffer->handle);
+
   const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
   IREE_RETURN_IF_ERROR(
       iree_hal_resource_set_insert(command_buffer->resource_set, 2, buffers));
@@ -636,6 +651,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
   command_buffer->syms->vkCmdCopyBuffer(command_buffer->handle,
                                         source_device_buffer,
                                         target_device_buffer, 1, &region);
+
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
 
   return iree_ok_status();
 }

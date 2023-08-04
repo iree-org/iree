@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -69,6 +70,26 @@ static Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   auto allocatorOp =
       builder.create<IREE::HAL::DeviceAllocatorOp>(op->getLoc(), device);
   return allocatorOp.getResult();
+}
+
+static std::tuple<Value, Value>
+lookupAllocatorAndQueueAffinityFor(Operation *op, OpBuilder &builder) {
+  // NOTE: we have this combined method so that we can reuse any expensive
+  // lookups we need to do. Today we aren't duplicating the lookups and don't
+  // bother.
+
+  // Get a device handle used to create resources and schedule work.
+  // It may be shared across many mutually-exclusive devices at runtime.
+  Value device = lookupDeviceFor(op, builder);
+
+  // Each device has a single allocator that may itself present multiple.
+  Value allocator =
+      builder.create<IREE::HAL::DeviceAllocatorOp>(op->getLoc(), device);
+
+  // Derive the queue affinity mask from the op and device combination.
+  Value queueAffinity = buildQueueAffinityMaskFor(op, device, builder);
+
+  return std::make_tuple(allocator, queueAffinity);
 }
 
 // Returns the |timepointFence| or a util.null.
@@ -307,7 +328,8 @@ struct ResourceAllocOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceAllocOp allocOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto allocator = lookupAllocatorFor(allocOp, rewriter);
+    auto [allocator, queueAffinity] =
+        lookupAllocatorAndQueueAffinityFor(allocOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     SmallVector<Value> results;
@@ -324,8 +346,8 @@ struct ResourceAllocOpPattern
       }
 
       auto allocateOp = rewriter.create<IREE::HAL::AllocatorAllocateOp>(
-          allocOp.getLoc(), bufferType, allocator, memoryTypes, bufferUsage,
-          storageSize);
+          allocOp.getLoc(), bufferType, allocator, queueAffinity, memoryTypes,
+          bufferUsage, storageSize);
       results.push_back(allocateOp.getResult());
     }
 
@@ -412,37 +434,14 @@ struct ResourceSizeOpPattern
   }
 };
 
-struct ResourceMapOpPattern
-    : public StreamConversionPattern<IREE::Stream::ResourceMapOp> {
-  using StreamConversionPattern::StreamConversionPattern;
-  LogicalResult
-  matchAndRewrite(IREE::Stream::ResourceMapOp mapOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto allocator = lookupAllocatorFor(mapOp, rewriter);
-    auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
-
-    // We know this is a staging buffer. We could refine usage here by seeing
-    // whether this was upload or download.
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::HostLocal |
-                       IREE::HAL::MemoryTypeBitfield::DeviceVisible;
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::Mapping |
-                       IREE::HAL::BufferUsageBitfield::Transfer;
-
-    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateInitializedOp>(
-        mapOp, bufferType, allocator, memoryTypes, bufferUsage,
-        adaptor.getSource(), adaptor.getSourceOffset(),
-        adaptor.getResultSize());
-    return success();
-  }
-};
-
 struct ResourceTryMapOpPattern
     : public StreamConversionPattern<IREE::Stream::ResourceTryMapOp> {
   using StreamConversionPattern::StreamConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Stream::ResourceTryMapOp tryMapOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto allocator = lookupAllocatorFor(tryMapOp, rewriter);
+    auto [allocator, queueAffinity] =
+        lookupAllocatorAndQueueAffinityFor(tryMapOp, rewriter);
     auto resourceType =
         llvm::cast<IREE::Stream::ResourceType>(tryMapOp.getResult().getType());
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
@@ -459,27 +458,33 @@ struct ResourceTryMapOpPattern
       memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
       bufferUsage =
           bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
+      // TODO(benvanik): refine usage based on analysis.
+      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
+                    IREE::HAL::BufferUsageBitfield::DispatchStorage;
+      break;
+    case IREE::Stream::Lifetime::Variable:
+      // Device local; copies required to get into external resources.
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+      // TODO(benvanik): refine usage based on analysis.
+      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
+                    IREE::HAL::BufferUsageBitfield::DispatchStorage;
       break;
     case IREE::Stream::Lifetime::Staging:
       // Host local; copies required to get into device resources.
       // We could vary this based on staging usage (upload/download) by
       // making it device-local|host-visible, but host-local means we have
       // a better chance of mapping it during uploads.
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostLocal |
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostVisible |
                     IREE::HAL::MemoryTypeBitfield::DeviceVisible;
-      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                    IREE::HAL::BufferUsageBitfield::Mapping;
+      bufferUsage =
+          bufferUsage | IREE::HAL::BufferUsageBitfield::TransferSource;
       break;
     }
 
-    // TODO(benvanik): refine usage based on analysis.
-    bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                  IREE::HAL::BufferUsageBitfield::DispatchStorage;
-
-    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorTryMapOp>(
-        tryMapOp, rewriter.getI1Type(), bufferType, allocator, memoryTypes,
-        bufferUsage, adaptor.getSource(), adaptor.getSourceOffset(),
-        adaptor.getResultSize());
+    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorImportOp>(
+        tryMapOp, rewriter.getI1Type(), bufferType, allocator, queueAffinity,
+        memoryTypes, bufferUsage, adaptor.getSource(),
+        adaptor.getSourceOffset(), adaptor.getResultSize());
     return success();
   }
 };
@@ -523,6 +528,80 @@ struct ResourceSubviewOpPattern
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferSubspanOp>(
         subviewOp, bufferType, adaptor.getSource(), adaptor.getSourceOffset(),
         adaptor.getResultSize());
+    return success();
+  }
+};
+
+struct FileConstantOpPattern
+    : public StreamConversionPattern<IREE::Stream::FileConstantOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileConstantOp constantOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(constantOp, rewriter);
+    rewriter.replaceOpWithNewOp<IREE::HAL::ExFileFromMemoryOp>(
+        constantOp, rewriter.getType<IREE::HAL::FileType>(), device,
+        queueAffinity, IREE::HAL::MemoryAccessBitfield::Read,
+        constantOp.getSource(), constantOp.getSourceOffset(),
+        constantOp.getSourceLength(),
+        rewriter.create<arith::ConstantIntOp>(constantOp.getLoc(), 0, 32));
+    return success();
+  }
+};
+
+struct FileReadOpPattern
+    : public StreamConversionPattern<IREE::Stream::FileReadOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileReadOp readOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = readOp.getLoc();
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(readOp, rewriter);
+
+    // Gather wait/signal fence, which are optional.
+    Value waitFence =
+        getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
+    Value signalFence = getOrCreateSignalFence(
+        loc, device, readOp.getResultTimepoint(), rewriter);
+
+    // Queue read.
+    rewriter.create<IREE::HAL::DeviceQueueReadOp>(
+        loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
+        adaptor.getSourceOffset(), adaptor.getTarget(),
+        adaptor.getTargetOffset(), adaptor.getLength(),
+        /*flags=*/0);
+
+    rewriter.replaceOp(readOp, {signalFence});
+    return success();
+  }
+};
+
+struct FileWriteOpPattern
+    : public StreamConversionPattern<IREE::Stream::FileWriteOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileWriteOp writeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto loc = writeOp.getLoc();
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(writeOp, rewriter);
+
+    // Gather wait/signal fence, which are optional.
+    Value waitFence =
+        getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
+    Value signalFence = getOrCreateSignalFence(
+        loc, device, writeOp.getResultTimepoint(), rewriter);
+
+    // Queue write.
+    rewriter.create<IREE::HAL::DeviceQueueWriteOp>(
+        loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
+        adaptor.getSourceOffset(), adaptor.getTarget(),
+        adaptor.getTargetOffset(), adaptor.getLength(),
+        /*flags=*/0);
+
+    rewriter.replaceOp(writeOp, {signalFence});
     return success();
   }
 };
@@ -1417,6 +1496,12 @@ void populateStreamToHALPatterns(MLIRContext *context,
       });
 
   typeConverter.addConversion(
+      [=](IREE::Stream::FileType type, SmallVectorImpl<Type> &results) {
+        results.push_back(IREE::HAL::FileType::get(context));
+        return success();
+      });
+
+  typeConverter.addConversion(
       [=](IREE::Stream::ResourceType type, SmallVectorImpl<Type> &results) {
         // Resources are just buffers (no shape/encoding/etc).
         results.push_back(IREE::HAL::BufferType::get(context));
@@ -1435,9 +1520,11 @@ void populateStreamToHALPatterns(MLIRContext *context,
   auto mapping = std::make_shared<StreamConversionMapping>();
   patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
                   ResourceDeallocaOpPattern, ResourceSizeOpPattern,
-                  ResourceMapOpPattern, ResourceTryMapOpPattern,
-                  ResourceLoadOpPattern, ResourceStoreOpPattern,
-                  ResourceSubviewOpPattern>(mapping, typeConverter, context);
+                  ResourceTryMapOpPattern, ResourceLoadOpPattern,
+                  ResourceStoreOpPattern, ResourceSubviewOpPattern>(
+      mapping, typeConverter, context);
+  patterns.insert<FileConstantOpPattern, FileReadOpPattern, FileWriteOpPattern>(
+      mapping, typeConverter, context);
   patterns.insert<TensorImportBufferOpPattern, TensorImportBufferViewOpPattern,
                   TensorExportBufferOpPattern, TensorExportBufferViewOpPattern,
                   TensorTraceOpPattern>(mapping, typeConverter, context);

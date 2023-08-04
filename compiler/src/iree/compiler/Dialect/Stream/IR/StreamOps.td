@@ -227,48 +227,6 @@ def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
   let hasFolder = 1;
 }
 
-def Stream_ResourceMapOp : Stream_Op<"resource.map", [
-  Stream_AffinityOp,
-  Util_SizeAwareOp,
-  MemoryEffects<[MemAlloc]>,
-]> {
-  let summary = [{maps read-only memory into a staging resource}];
-  let description = [{
-    Synchronously maps a host heap buffer into a stream-accessible staging
-    resource. Will never fail but may induce a copy if required and as such the
-    mapped resource is not coherent with the original source buffer: changing
-    the source buffer after mapping has undefined behavior.
-  }];
-
-  let arguments = (ins
-    Util_BufferType:$source,
-    Stream_Offset:$source_offset,
-    Stream_Size:$result_size,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_StagingResource:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    $source `[` $source_offset `]` `:`
-    type($source)
-    `->`
-    type($result) `` `{` $result_size `}`
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getResultSize(); }
-  }];
-
-  let hasVerifier = 1;
-
-  let hasCanonicalizer = 1;
-}
-
 def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
   Stream_AffinityOp,
   Util_SizeAwareOp,
@@ -277,10 +235,10 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
   let summary = [{maps read-only memory into a resource}];
   let description = [{
     Synchronously maps a host heap buffer into a stream-accessible resource
-    with constant lifetime. If the given source cannot be mapped into a constant
-    a failure is returned and the resulting resource value is null. As with
-    `stream.resource.map` the resulting resource is not coherent with the source
-    and changes will not be reflected.
+    with the requested lifetime. If the given source cannot be mapped the
+    `did_map` result will be 0 and users must find another route into memory
+    (such as file I/O). The resulting resource is not coherent with the source
+    and behavior is undefined if the underlying contents change.
   }];
 
   let arguments = (ins
@@ -291,7 +249,7 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
   );
   let results = (outs
     I1:$did_map,
-    Stream_ConstantResource:$result
+    Stream_AnyStreamResource:$result
   );
 
   let assemblyFormat = [{
@@ -610,6 +568,176 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
 }
 
 } // OpGroupResourceOps
+
+//===----------------------------------------------------------------------===//
+// File ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupFileOps : OpDocGroup {
+  let summary = "File ops";
+  let description = "File ops.";
+}
+
+let opDocGroup = OpGroupFileOps in {
+
+def Stream_FileConstantOp : Stream_PureOp<"file.constant", [
+  Stream_AffinityOp,
+  Util_SizeAwareOp,
+  MemoryEffects<[MemAlloc]>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
+]> {
+  let summary = [{creates a file backed by the provided constant host memory}];
+  let description = [{
+    Synchronously wraps a host heap buffer into a stream-accessible file handle.
+    Changing the source buffer after definition has undefined behavior.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$source,
+    Util_Size:$source_size,
+    Stream_Offset:$source_offset,
+    Stream_Size:$source_length,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_File:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `[` $source_offset `for` $source_length `]` `:`
+    type($source) `` `{` $source_size `}`
+    `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
+def Stream_FileReadOp : Stream_Op<"file.read", [
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{reads a segment of a file into a resource}];
+  let description = [{
+    Asynchronously reads a segment of a file into a resource.
+
+    Some implementations this can stream directly from the file into
+    device-local memory and should be preferred to manually staging memory
+    through host buffers.
+  }];
+
+  let arguments = (ins
+    Stream_File:$source,
+    I64:$source_offset,
+    Stream_AnyStreamResource:$target,
+    Stream_Size:$target_size,
+    Stream_Offset:$target_offset,
+    Stream_Size:$length,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`):(`:`)?
+    $source `[` $source_offset `]` `,`
+    $target `[` $target_offset `]` `,`
+    $length `:`
+    type($source) `->`
+    type($target) `` `{` $target_size `}`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_FileWriteOp : Stream_Op<"file.write", [
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{writes a segment of a file from a resource}];
+  let description = [{
+    Asynchronously writes a segment of a resource into a file.
+    The file range must be valid within the file as this operation cannot
+    grow the underlying file storage.
+
+    Some implementations this can stream directly from device-local memory into
+    the file and should be preferred to manually staging memory
+    through host buffers.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$source,
+    Stream_Size:$source_size,
+    Stream_Offset:$source_offset,
+    Stream_File:$target,
+    I64:$target_offset,
+    Stream_Size:$length,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`):(`:`)?
+    $source `[` $source_offset `]` `,`
+    $target `[` $target_offset `]` `,`
+    $length `:`
+    type($source) `` `{` $source_size `}` `->`
+    type($target)
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+} // OpGroupFileOps
 
 //===----------------------------------------------------------------------===//
 // Pseudo ops for conversion support

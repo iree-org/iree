@@ -1066,7 +1066,7 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
       /*desc=*/[{
         Returns the subrange operand values for the given flat operand index.
       }],
-      /*retTy=*/"SubrangeOperand",
+      /*retTy=*/"IREE::Util::SubrangeOperand",
       /*methodName=*/"getSubrangeOperand",
       /*args=*/(ins "unsigned":$operandIndex)
     >,
@@ -1076,7 +1076,10 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
       }],
       /*retTy=*/"void",
       /*methodName=*/"setSubrangeOperand",
-      /*args=*/(ins "unsigned":$operandIndex, "SubrangeOperand":$operand)
+      /*args=*/(ins
+        "unsigned":$operandIndex,
+        "IREE::Util::SubrangeOperand":$operand
+      )
     >,
   ];
 }

@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "cmd_folding.mlir"
     "cmd_ops.mlir"
     "executable_ops.mlir"
+    "file_ops.mlir"
     "resource_folding.mlir"
     "resource_ops.mlir"
     "tensor_folding.mlir"

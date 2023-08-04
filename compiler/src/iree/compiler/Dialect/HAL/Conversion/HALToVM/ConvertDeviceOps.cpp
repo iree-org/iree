@@ -129,6 +129,10 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.device.queue.alloca");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueDeallocaOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.dealloca");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueReadOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.read");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueWriteOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.write");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueExecuteOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.execute");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueFlushOp>>(

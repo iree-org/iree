@@ -208,6 +208,103 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_copy(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
+
+  // If we are starting execution immediately then we can reduce latency by
+  // allowing inline command buffer execution.
+  iree_hal_command_buffer_mode_t command_buffer_mode =
+      IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT;
+  if (wait_semaphore_list.count == 0) {
+    command_buffer_mode |= IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION;
+  }
+
+  iree_hal_transfer_command_t command = {
+      .type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY,
+      .copy =
+          {
+              .source_buffer = source_buffer,
+              .source_offset = source_offset,
+              .target_buffer = target_buffer,
+              .target_offset = target_offset,
+              .length = length,
+          },
+  };
+
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_create_transfer_command_buffer(device, command_buffer_mode,
+                                                  queue_affinity, 1, &command,
+                                                  &command_buffer));
+
+  iree_status_t status =
+      iree_hal_device_queue_execute(device, queue_affinity, wait_semaphore_list,
+                                    signal_semaphore_list, 1, &command_buffer);
+
+  iree_hal_command_buffer_release(command_buffer);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_read(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_file_t* source_file, uint64_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, uint32_t flags) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(
+      !wait_semaphore_list.count ||
+      (wait_semaphore_list.semaphores && wait_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(!signal_semaphore_list.count ||
+                       (signal_semaphore_list.semaphores &&
+                        signal_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(source_file);
+  IREE_ASSERT_ARGUMENT(target_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(device, queue_read)(
+      device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_file, source_offset, target_buffer, target_offset, length, flags);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_write(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_file_t* target_file, uint64_t target_offset,
+    iree_device_size_t length, uint32_t flags) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(
+      !wait_semaphore_list.count ||
+      (wait_semaphore_list.semaphores && wait_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(!signal_semaphore_list.count ||
+                       (signal_semaphore_list.semaphores &&
+                        signal_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(target_file);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(device, queue_write)(
+      device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_buffer, source_offset, target_file, target_offset, length, flags);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,

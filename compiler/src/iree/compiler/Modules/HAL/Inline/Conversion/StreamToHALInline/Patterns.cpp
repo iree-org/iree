@@ -137,23 +137,6 @@ struct ResourceSizeOpPattern
   }
 };
 
-// The staging buffer returned from this is always a !util.buffer.
-// We can thus directly pass along the input buffer that's being mapped
-// (after taking a subspan for the defined range).
-struct ResourceMapOpPattern
-    : public OpConversionPattern<IREE::Stream::ResourceMapOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(IREE::Stream::ResourceMapOp mapOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::Util::BufferSubspanOp>(
-        mapOp, adaptor.getSource(),
-        getResourceSize(mapOp.getLoc(), adaptor.getSource(), rewriter),
-        adaptor.getSourceOffset(), adaptor.getResultSize());
-    return success();
-  }
-};
-
 // The constant buffer returned from this is always a !util.buffer.
 // We can thus directly pass along the input buffer that's being mapped
 // (after taking a subspan for the defined range).
@@ -703,9 +686,9 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
 
   patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
                   ResourceDeallocaOpPattern, ResourceSizeOpPattern,
-                  ResourceMapOpPattern, ResourceTryMapOpPattern,
-                  ResourceLoadOpPattern, ResourceStoreOpPattern,
-                  ResourceSubviewOpPattern>(typeConverter, context);
+                  ResourceTryMapOpPattern, ResourceLoadOpPattern,
+                  ResourceStoreOpPattern, ResourceSubviewOpPattern>(
+      typeConverter, context);
 
   patterns.insert<TensorImportBufferOpPattern, TensorImportBufferViewOpPattern,
                   TensorExportBufferOpPattern, TensorExportBufferViewOpPattern,

@@ -322,7 +322,7 @@ static void iree_hal_vulkan_native_allocator_deallocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_t* IREE_RESTRICT base_buffer) {
   iree_hal_vulkan_native_allocator_t* allocator =
-      iree_hal_vulkan_native_allocator_cast(base_buffer->device_allocator);
+      iree_hal_vulkan_native_allocator_cast(base_allocator);
   (void)allocator;
   iree_hal_allocator_statistics_record_free(&allocator->statistics,
                                             base_buffer->memory_type,
