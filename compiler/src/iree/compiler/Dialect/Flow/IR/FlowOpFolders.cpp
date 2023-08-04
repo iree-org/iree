@@ -661,9 +661,9 @@ struct FoldCastOpIntoDispatchStoreOp
 
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
         storeOp, parentOp.getSource(), storeOp.getTarget(),
-        storeOp.getTargetDims(), storeOp.offsets(), storeOp.sizes(),
-        storeOp.strides(), storeOp.static_offsets(), storeOp.static_sizes(),
-        storeOp.static_strides());
+        storeOp.getTargetDims(), storeOp.getOffsets(), storeOp.getSizes(),
+        storeOp.getStrides(), storeOp.getStaticOffsets(),
+        storeOp.getStaticSizes(), storeOp.getStaticStrides());
     return success();
   }
 };
