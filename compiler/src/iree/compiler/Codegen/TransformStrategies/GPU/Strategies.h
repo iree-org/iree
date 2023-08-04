@@ -26,9 +26,8 @@ class StagedReductionStrategy;
 static constexpr int64_t kCudaWarpSize = 32;
 static constexpr int64_t kCudaMaxNumThreads = 1024;
 
-/// Placeholder for representing supported WMMA/Cooperative Matrix
-/// configurations. This is a reflection of
-/// SPIRV_CooperativeMatrixPropertiesNVArrayAttr.
+/// Struct for representing supported WMMA/Cooperative Matrix configurations.
+/// This is a reflection of SPIRV_CooperativeMatrixPropertiesNVAttr.
 struct MMAConfig {
   int64_t m;
   int64_t n;

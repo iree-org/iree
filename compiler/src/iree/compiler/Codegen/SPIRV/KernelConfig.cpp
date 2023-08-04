@@ -54,7 +54,7 @@ llvm::cl::opt<std::string> clSPIRVTransformDialectFileName(
 
 llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
     "iree-spirv-enable-transform-dialect-jit",
-    llvm::cl::desc("enable the usage of the transform dialect JIT"),
+    llvm::cl::desc("Enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
@@ -1532,47 +1532,38 @@ setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
   }
 
   MLIRContext *context = entryPoint.getContext();
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      context, CodeGenPipeline::TransformDialectCodegen);
 
   // Prefer a transform script file if provided.
   if (!clSPIRVTransformDialectFileName.empty()) {
-    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        context, CodeGenPipeline::TransformDialectCodegen);
     LLVM_DEBUG(llvm::dbgs() << "using user specified transform dialect...\n");
-    return setTranslationInfo(entryPoint, translationInfo);
-  }
-
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint.getContext(),
-      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-  if (!clSPIRVTransformDialectFileName.empty()) {
     return setTranslationInfo(entryPoint, translationInfo);
   }
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
-  // TODO: unify the target informations into one structure.
+  // TODO: unify the target information into one structure.
   iree_compiler::gpu::GPUModel gpuModel;
   gpuModel.hasWarpShuffle =
       targetEnv.allows(spirv::Capability::GroupNonUniformShuffle);
   gpuModel.hasTF32TensorCore = false;
   gpuModel.hasMmaSync = false;
+  gpuModel.hasTF32TensorCore = false;
   gpuModel.minSubgroupSize = limits.getMinSubgroupSize();
   gpuModel.maxSubgroupSize = limits.getMaxSubgroupSize();
   gpuModel.maxWorkGroupInvocations = limits.getMaxComputeWorkgroupInvocations();
 
   // Populates the supported WMMA fragment combinations from the target
   // environment. Infer tf32 support from the list of supported fragment types.
-  Type f32Type = Float32Type::get(context);
   auto properties = limits.getCooperativeMatrixPropertiesNv()
                         .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
   for (auto property : properties) {
     if (property.getScope().getValue() != spirv::Scope::Subgroup)
       continue;
-    gpuModel.supportedWMMAConfigs.push_back(iree_compiler::gpu::MMAConfig{
+    gpuModel.supportedWMMAConfigs.emplace_back(iree_compiler::gpu::MMAConfig{
         property.getMSize(), property.getNSize(), property.getKSize(),
         property.getAType(), property.getBType(), property.getCType()});
-    if (property.getAType() == f32Type && property.getBType() == f32Type)
-      gpuModel.hasTF32TensorCore = true;
   }
 
   if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
