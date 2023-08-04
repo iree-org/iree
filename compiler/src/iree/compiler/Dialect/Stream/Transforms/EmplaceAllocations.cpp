@@ -54,18 +54,27 @@ static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
   oldValue.replaceAllUsesWith(transferValue);
 }
 
+// TODO(#14566): multiple results with sparse ties don't work due to
+// implicit operand/result ordering on the dispatch ops. Flow and stream
+// dispatch ops and the executable entry points need to be reworked to
+// remove the implicit ordering. For now we only emplace results until the
+// first we can't then bail and leave them out-of-place.
 static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
   bool didChange = false;
   for (auto [resultIndex, result] : llvm::enumerate(dispatchOp.getResults())) {
     // Ignore results with multiple users. We could potentially place these but
     // that makes tracking much more complicated.
-    if (!result.hasOneUse())
-      continue;
+    if (!result.hasOneUse()) {
+      // TODO(#14566): continue if sparse emplacement on multiple results.
+      break;
+    }
     // Ignore already-tied operands.
     // TODO(benvanik): update tied range if we want to place into a superset?
     auto operandIndex = dispatchOp.getTiedResultOperandIndex(resultIndex);
-    if (operandIndex.has_value())
-      continue;
+    if (operandIndex.has_value()) {
+      // TODO(#14566): continue if sparse emplacement on multiple results.
+      break;
+    }
 
     // Find potential.
     Value targetResource;
@@ -77,12 +86,15 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
     Value targetResultSize;
     Operation *userOp = *result.user_begin();
     if (auto updateOp = dyn_cast<IREE::Stream::AsyncUpdateOp>(userOp)) {
-      if (updateOp.getUpdate() != result)
-        continue;
+      if (updateOp.getUpdate() != result) {
+        // TODO(#14566): continue if sparse emplacement on multiple results.
+        break;
+      }
       if (!IREE::Util::tryMoveProducerBefore(updateOp.getTarget(),
                                              dispatchOp)) {
         // Failed to move while keeping valid SSA dominance.
-        continue;
+        // TODO(#14566): continue if sparse emplacement on multiple results.
+        break;
       }
       targetResource = updateOp.getTarget();
       if (targetResource.getDefiningOp() == dispatchOp) {
@@ -98,8 +110,10 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
       targetResult = updateOp.getResult();
       targetResultSize = updateOp.getTargetSize();
     }
-    if (!targetResource)
-      continue;
+    if (!targetResource) {
+      // TODO(#14566): continue if sparse emplacement on multiple results.
+      break;
+    }
 
     // Add operand and tie the result.
     operandIndex = dispatchOp.getResourceOperands().size();
