@@ -48,7 +48,8 @@ void TopLevelSCFToCFGPass::runOnOperation() {
     signalPassFailure();
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createTopLevelSCFToCFGPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTopLevelSCFToCFGPass() {
   return std::make_unique<TopLevelSCFToCFGPass>();
 }
 

@@ -47,7 +47,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
 
   passManager.addPass(createFlattenTuplesInSCF());
   // if (detuple) {
-    passManager.addPass(createFlattenTuplesInCFG());
+  passManager.addPass(createFlattenTuplesInCFG());
   // }
 
   passManager.addPass(createStableHLOToStableHLOPreprocessing());

@@ -32,7 +32,8 @@ std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantsPass();
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createTopLevelSCFToCFGPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTopLevelSCFToCFGPass();
 
 // Resource Management.
 std::unique_ptr<OperationPass<void>> createImportResourcesPass();
