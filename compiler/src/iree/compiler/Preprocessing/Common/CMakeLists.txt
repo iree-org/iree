@@ -27,6 +27,7 @@ iree_cc_library(
     "Passes.h.inc"
   SRCS
     "ConvertConv2DToImg2Col.cpp"
+    "MakeSingleDispatchForFunction.cpp"
     "PadLinalgOps.cpp"
     "PassDetail.h"
     "Passes.cpp"
