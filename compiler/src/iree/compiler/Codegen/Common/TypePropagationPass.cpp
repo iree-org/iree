@@ -28,8 +28,9 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Utils/ElementPackingUtils.h"
+#include "iree/compiler/Utils/ManagedElementsUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -105,8 +106,13 @@ struct ConstantOpTypeConversion
   LogicalResult
   matchAndRewrite(arith::ConstantOp constantOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
-    auto attrType = llvm::dyn_cast<ShapedType>(attr.getType());
+    auto attr =
+        llvm::dyn_cast_if_present<IREE::Util::ManagedElementsAttrInterface>(
+            constantOp.getValue());
+    if (!attr)
+      return rewriter.notifyMatchFailure(
+          constantOp, "expected ManagedElementsAttrInterface");
+    auto attrType = llvm::dyn_cast<ShapedType>(attr.getElements().getType());
     if (!attrType) {
       return rewriter.notifyMatchFailure(
           constantOp, "expected attribute type to be shaped type");
@@ -121,18 +127,13 @@ struct ConstantOpTypeConversion
       return rewriter.notifyMatchFailure(
           constantOp, "expected legalized type to be integer or float type");
     }
-    SmallVector<APInt> legalizedValues;
-    unsigned numElements = attr.isSplat() ? 1 : attr.getNumElements();
-    legalizedValues.reserve(numElements);
     unsigned bitWidth = legalizedElementType->getIntOrFloatBitWidth();
-    for (auto value : attr.getValues<APInt>()) {
-      legalizedValues.emplace_back(bitWidth, value.getZExtValue());
-    }
-    auto newAttrType = RankedTensorType::get(attrType.getShape(),
-                                             legalizedElementType.value());
-    auto newAttr = DenseElementsAttr::get(newAttrType, legalizedValues);
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constantOp, newAttrType,
-                                                   newAttr);
+    ManagedElementsMapper mapper(attr);
+    TypedAttr newAttr = mapper.mapViaBitcastAPInt(
+        legalizedElementType.value(),
+        [&](APInt &value) { value = APInt(bitWidth, value.getZExtValue()); });
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constantOp,
+                                                   newAttr.getType(), newAttr);
     return success();
   }
 };
@@ -547,7 +548,7 @@ struct LegalizeResultElementType : public ConversionPattern {
 struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
   TypePropagationPass() = default;
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect>();
+    registry.insert<arith::ArithDialect, IREE::Util::UtilDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();

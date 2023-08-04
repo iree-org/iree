@@ -59,6 +59,7 @@ static Value createChunkHeader(Location loc, iree_idbts_chunk_type_t type,
   header.version = 0;
   header.content_length = contentLength;
 
+  // Using DenseElementsAttr here is ok given the limited size.
   auto dataAttr = DenseElementsAttr::getFromRawBuffer(
       VectorType::get({sizeof(header)}, builder.getI8Type()),
       ArrayRef<char>(reinterpret_cast<const char *>(&header), sizeof(header)));
@@ -76,7 +77,7 @@ static Value createPadding(Location loc, uint64_t unalignedLength,
     return nullptr;
   auto i8Type = builder.getI8Type();
   auto zeroAttr = IntegerAttr::get(i8Type, 0);
-  auto dataAttr = DenseElementsAttr::get(
+  auto dataAttr = SplatElementsAttr::get(
       VectorType::get({(int64_t)padding}, i8Type), zeroAttr);
   return builder.create<IREE::Util::BufferConstantOp>(
       loc, /*name=*/nullptr, dataAttr, builder.getIndexAttr(16),

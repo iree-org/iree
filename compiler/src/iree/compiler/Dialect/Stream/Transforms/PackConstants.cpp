@@ -52,6 +52,8 @@ struct ConstantSlice {
             llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(value)) {
       return serializableAttr.getStorageSize();
     } else if (auto denseAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
+      // TODO: This case can likely be removed since SerializableAttrInterface
+      // should be comprehensive.
       return denseAttr.getRawData().size();
     } else {
       assert(false && "invalid constant attr type");
@@ -157,7 +159,7 @@ static void packStorageResourceData(StorageResource &storageBuffer,
     int64_t spanPadding = start - offset;
     if (spanPadding > 0) {
       // 0-pad until the start of this span.
-      values.push_back(DenseElementsAttr::get(
+      values.push_back(SplatElementsAttr::get(
           VectorType::get({spanPadding}, i8Type), zeroAttr));
       offset += spanPadding;
     }
@@ -173,7 +175,7 @@ static void packStorageResourceData(StorageResource &storageBuffer,
   int64_t tailPadding = storageBuffer.totalSize - offset;
   if (tailPadding > 0) {
     // 0-pad until the start of this span.
-    values.push_back(DenseElementsAttr::get(
+    values.push_back(SplatElementsAttr::get(
         VectorType::get({tailPadding}, i8Type), zeroAttr));
     offset += tailPadding;
   }

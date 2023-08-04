@@ -994,7 +994,7 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
     // Store into the constant target tensor.
     auto targetType = cast<ShapedType>(target.getType());
     if (targetType.getRank() == 0) {
-      return DenseElementsAttr::get(targetType, {value});
+      return SplatElementsAttr::get(targetType, value);
     }
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
       uint64_t offset = getFlattenedIndex(
@@ -1004,6 +1004,7 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
           }));
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
       newContents[offset] = value;
+      // TODO: Add a ManagedElementsMapper method for shuffling and use that.
       return DenseElementsAttr::get(targetType, newContents);
     }
   }
@@ -1099,6 +1100,8 @@ static ElementsAttr tensorSlice(ElementsAttr tensor, uint64_t dim,
        offset < numElements; offset += step) {
     newContents.append(valuesBegin + offset, valuesBegin + offset + num);
   }
+  // TODO: Add a ManagedElementsMapper helper for doing a shuffle
+  // and use it here.
   return DenseElementsAttr::get(outputType, newContents);
 }
 
@@ -1179,6 +1182,8 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
       }
     }
   }
+  // TODO: Add a ManagedElementsMapper method for shuffline indices
+  // and use that here.
   return DenseElementsAttr::get(targetType, targetValues);
 }
 

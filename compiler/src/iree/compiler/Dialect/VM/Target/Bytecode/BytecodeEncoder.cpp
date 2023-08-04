@@ -148,7 +148,7 @@ public:
     }
   }
 
-  LogicalResult encodePrimitiveArrayAttr(DenseElementsAttr value) override {
+  LogicalResult encodePrimitiveArrayAttr(ElementsAttr value) override {
     if (value.getNumElements() > UINT16_MAX || failed(ensureAlignment(2)) ||
         failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";

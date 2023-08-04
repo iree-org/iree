@@ -154,7 +154,7 @@ struct DetachSplatConstantOutsOperands
       if (!resultType || !resultType.getElementType().isIntOrFloat())
         continue;
 
-      auto attr = llvm::dyn_cast<DenseElementsAttr>(constOp.getValue());
+      auto attr = llvm::dyn_cast<ElementsAttr>(constOp.getValue());
       if (!attr || !attr.isSplat())
         continue;
 

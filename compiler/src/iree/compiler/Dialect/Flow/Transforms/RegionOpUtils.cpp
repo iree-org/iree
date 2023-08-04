@@ -530,7 +530,7 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
     if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
       return true;
     } else if (auto denseAttr =
-                   llvm::dyn_cast<DenseElementsAttr>(constantValueAttr)) {
+                   llvm::dyn_cast<ElementsAttr>(constantValueAttr)) {
       auto shapedType = llvm::cast<ShapedType>(constantType);
       uint64_t estimatedByteLength =
           (shapedType.getNumElements() *

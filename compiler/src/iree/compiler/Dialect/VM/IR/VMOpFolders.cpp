@@ -49,7 +49,7 @@ Attribute oneOfType(Type type) {
     auto element = oneOfType(vtType.getElementType());
     if (!element)
       return {};
-    return DenseElementsAttr::get(vtType, element);
+    return SplatElementsAttr::get(vtType, element);
   }
   return {};
 }
@@ -493,9 +493,10 @@ static Attribute constFoldUnaryOp(Attribute rawOperand,
         {operand.getSplatValue<Attribute>()}, calculate);
     if (!elementResult)
       return {};
-    return DenseElementsAttr::get(operand.getType(), elementResult);
+    return SplatElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand =
                  llvm::dyn_cast_if_present<ElementsAttr>(rawOperand)) {
+    // TODO: Come up with another way to do this mapping.
     return llvm::cast<DenseIntOrFPElementsAttr>(operand).mapValues(
         cast<ShapedType>(operand.getType()).getElementType(),
         llvm::function_ref<ElementValueT(const ElementValueT &)>(
@@ -517,9 +518,10 @@ constFoldFloatUnaryOp(Attribute rawOperand,
         constFoldFloatUnaryOp({operand.getSplatValue<Attribute>()}, calculate);
     if (!elementResult)
       return {};
-    return DenseElementsAttr::get(operand.getType(), elementResult);
+    return SplatElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand =
                  llvm::dyn_cast_if_present<ElementsAttr>(rawOperand)) {
+    // TODO: Come up with another way to do this mapping.
     return llvm::cast<DenseIntOrFPElementsAttr>(operand).mapValues(
         cast<ShapedType>(operand.getType()).getElementType(),
         llvm::function_ref<APInt(const APFloat &)>([&](const APFloat &value) {
@@ -554,7 +556,7 @@ static TypedAttr constFoldBinaryOp(Attribute rawLhs, Attribute rawRhs,
         calculate);
     if (!elementResult)
       return {};
-    return DenseElementsAttr::get(lhs.getType(), elementResult);
+    return SplatElementsAttr::get(lhs.getType(), elementResult);
   } else if (auto lhs = llvm::dyn_cast_if_present<ElementsAttr>(rawLhs)) {
     auto rhs = llvm::dyn_cast_if_present<ElementsAttr>(rawRhs);
     if (!rhs || lhs.getType() != rhs.getType())
@@ -604,7 +606,7 @@ static Attribute constFoldTernaryOp(Attribute rawA, Attribute rawB,
         c.getSplatValue<Attribute>(), calculate);
     if (!elementResult)
       return {};
-    return DenseElementsAttr::get(a.getType(), elementResult);
+    return SplatElementsAttr::get(a.getType(), elementResult);
   } else if (auto a = llvm::dyn_cast_if_present<ElementsAttr>(rawA)) {
     auto b = llvm::dyn_cast_if_present<ElementsAttr>(rawB);
     auto c = llvm::dyn_cast_if_present<ElementsAttr>(rawC);
@@ -1786,6 +1788,7 @@ static Attribute constFoldUnaryCmpOp(Attribute rawOperand,
   } else if (auto operand =
                  llvm::dyn_cast_if_present<ElementsAttr>(rawOperand)) {
     auto boolType = IntegerType::get(operand.getContext(), 32);
+    // TODO: Come up with another way to do this mapping.
     return llvm::cast<DenseIntOrFPElementsAttr>(operand).mapValues(
         boolType,
         llvm::function_ref<APInt(const ElementValueT &)>(
@@ -2246,7 +2249,7 @@ static TypedAttr constFoldBinaryCmpFOp(Attribute rawLhs, Attribute rawRhs,
       return {};
     auto resultType = lhs.getType().clone(
         std::nullopt, IntegerType::get(lhs.getContext(), 32));
-    return DenseElementsAttr::get(resultType, elementResult);
+    return SplatElementsAttr::get(resultType, elementResult);
   } else if (auto lhs = llvm::dyn_cast_if_present<ElementsAttr>(rawLhs)) {
     auto rhs = llvm::dyn_cast_if_present<ElementsAttr>(rawRhs);
     if (!rhs || lhs.getType() != rhs.getType())

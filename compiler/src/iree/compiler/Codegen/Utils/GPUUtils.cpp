@@ -481,7 +481,7 @@ static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
     // with identity elements until it's total bit size is 32.
     TypedAttr identityAttr =
         getCombiningKindIdentity(builder, kind, elementType);
-    identityAttr = DenseElementsAttr::get(unrolledLaneValType, identityAttr);
+    identityAttr = SplatElementsAttr::get(unrolledLaneValType, identityAttr);
     Value identity = builder.create<arith::ConstantOp>(loc, unrolledLaneValType,
                                                        identityAttr);
     perLaneReduction = builder.create<vector::InsertStridedSliceOp>(
@@ -502,7 +502,7 @@ static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
   }
   TypedAttr identityAttr = getCombiningKindIdentity(builder, kind, elementType);
   if (vectorType) {
-    identityAttr = DenseElementsAttr::get(vectorType, identityAttr);
+    identityAttr = SplatElementsAttr::get(vectorType, identityAttr);
   }
   assert(identityAttr && "Unknown identity value for the reduction");
   Value identity =

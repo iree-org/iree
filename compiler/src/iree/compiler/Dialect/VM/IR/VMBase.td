@@ -119,7 +119,7 @@ class VM_EncPrimitiveAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
   int bitwidth = thisBitwidth;
 }
 class VM_EncPrimitiveArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodePrimitiveArrayAttr(getOperation()->getAttrOfType<DenseElementsAttr>(\"" # name # "\"))"> {
+    "e.encodePrimitiveArrayAttr(getOperation()->getAttrOfType<ElementsAttr>(\"" # name # "\"))"> {
   int bitwidth = thisBitwidth;
 }
 class VM_EncStrAttr<string name> : VM_EncEncodeExpr<

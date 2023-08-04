@@ -51,7 +51,7 @@ public:
   virtual LogicalResult encodePrimitiveAttr(TypedAttr value) = 0;
 
   // Encodes a variable-length integer or floating-point array attribute.
-  virtual LogicalResult encodePrimitiveArrayAttr(DenseElementsAttr value) = 0;
+  virtual LogicalResult encodePrimitiveArrayAttr(ElementsAttr value) = 0;
 
   // Encodes a string attribute as a B-string.
   virtual LogicalResult encodeStrAttr(StringAttr value) = 0;

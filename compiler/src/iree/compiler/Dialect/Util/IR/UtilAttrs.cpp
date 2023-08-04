@@ -799,6 +799,21 @@ struct SerializableStringAttrModel
 };
 
 //===----------------------------------------------------------------------===//
+// ManagedElementsAttrInterface implementations
+//===----------------------------------------------------------------------===//
+
+struct ManagedDenseElementsAttrModel
+    : public ManagedElementsAttrInterface::ExternalModel<
+          ManagedDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
+  ElementsAttr getElements(Attribute baseAttr) const {
+    return llvm::cast<ElementsAttr>(baseAttr);
+  }
+  TypedAttr reshape(Attribute baseAttr, ShapedType newType) const {
+    return llvm::cast<DenseElementsAttr>(baseAttr).reshape(newType);
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
 //===----------------------------------------------------------------------===//
 
@@ -819,6 +834,12 @@ void UtilDialect::registerAttributes() {
   // up in the stack - things that end up here are generally already in a target
   // encoding.
   auto &context = *getContext();
+
+  // ManagedElements implementations.
+  DenseIntElementsAttr::attachInterface<ManagedDenseElementsAttrModel>(context);
+  DenseFPElementsAttr::attachInterface<ManagedDenseElementsAttrModel>(context);
+
+  // Serializable implementations.
   DenseIntElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
       context);
   DenseFPElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(

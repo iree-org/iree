@@ -48,11 +48,11 @@ public:
       auto elementType = tensorType.getElementType();
       TypedAttr newAttr;
       if (llvm::isa<FloatType>(elementType)) {
-        newAttr = DenseElementsAttr::get(
+        newAttr = SplatElementsAttr::get(
             tensorType, FloatAttr::get(elementType, 1.0 / replaceIndex));
       } else {
         assert(elementType.isa<IntegerType>());
-        newAttr = DenseElementsAttr::get(
+        newAttr = SplatElementsAttr::get(
             tensorType, IntegerAttr::get(elementType, replaceIndex));
       }
 

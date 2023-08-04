@@ -213,15 +213,18 @@ public:
       return rewriter.notifyMatchFailure(op, "Not casting from vector-scalar");
     }
 
-    mlir::DenseElementsAttr vectorCst;
+    mlir::ElementsAttr vectorCst;
     if (!matchPattern(operand, m_Constant(&vectorCst))) {
       return failure();
     }
 
+    // Always a splat because of rank0 check above.
     mlir::FloatAttr val = vectorCst.getSplatValue<mlir::FloatAttr>();
     auto newVal = FloatAttr::get(resultTy.getElementType(),
                                  val.getValue().convertToDouble());
-    auto vectorVal = DenseElementsAttr::get(resultTy, newVal);
+    auto vectorVal =
+        /* APPROVED USE: splat construction */ SplatElementsAttr::get(resultTy,
+                                                                      newVal);
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(op, resultTy, vectorVal);
     return success();
   }

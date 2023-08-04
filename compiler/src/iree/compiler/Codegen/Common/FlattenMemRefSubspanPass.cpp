@@ -37,6 +37,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -174,11 +175,12 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
   static Attribute flattenAttribute(Attribute value, ShapedType newType) {
     if (!value)
       return value;
-    if (auto splatAttr = llvm::dyn_cast<SplatElementsAttr>(value)) {
-      return splatAttr.reshape(newType);
-    } else if (auto denseAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
-      return denseAttr.reshape(newType);
+
+    if (auto managed =
+            llvm::dyn_cast<IREE::Util::ManagedElementsAttrInterface>(value)) {
+      return managed.reshape(newType);
     }
+
     return {};
   }
 
@@ -759,7 +761,8 @@ struct FlattenMemRefSubspanPass
   FlattenMemRefSubspanPass(const FlattenMemRefSubspanPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, memref::MemRefDialect>();
+    registry.insert<affine::AffineDialect, memref::MemRefDialect,
+                    IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
