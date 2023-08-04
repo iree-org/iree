@@ -26,8 +26,8 @@
 
 #define IREE_SET_BINARY_MODE(handle) ((void)0)
 
-#define iree_fseek64 fseek
-#define iree_ftell64 ftell
+#define iree_fseek64 fseeko
+#define iree_ftell64 ftello
 
 #endif  // IREE_PLATFORM_WINDOWS
 
