@@ -703,3 +703,36 @@ func.func public @while_zero_extent(%arg0: tensor<i32>, %arg1: tensor<3xf32>, %a
   }
   return %3#0, %3#1 : tensor<i32>, tensor<75x0xf32>
 }
+
+// -----
+
+func.func @push_shape_ops_to_end(%arg0 : tensor<12xf32>) -> tensor<3x4x2x1xf32> {
+  %0 = stablehlo.reshape %arg0 : (tensor<12xf32>) -> tensor<3x4xf32>
+  %1 = stablehlo.broadcast %0, sizes = [1, 2] : (tensor<3x4xf32>) -> tensor<1x2x3x4xf32>
+  %2 = stablehlo.cosine %1 : (tensor<1x2x3x4xf32>) -> tensor<1x2x3x4xf32>
+  %3 = stablehlo.transpose %2, dims = [2, 3, 1, 0]  : (tensor<1x2x3x4xf32>) -> tensor<3x4x2x1xf32>
+  %4 = stablehlo.abs %3 : (tensor<3x4x2x1xf32>) -> tensor<3x4x2x1xf32>
+  return %4 : tensor<3x4x2x1xf32>
+}
+
+// CHECK-LABEL: @push_shape_ops_to_end
+// CHECK: %[[COS:.+]] = stablehlo.cosine %arg0 : tensor<12xf32>
+// CHECK: %[[ABS:.+]] = stablehlo.abs %[[COS]] : tensor<12xf32>
+// CHECK: %[[RESHAPE:.+]] = stablehlo.reshape %[[ABS]] : (tensor<12xf32>) -> tensor<3x4xf32>
+// CHECK: %[[BROADCAST:.+]] = stablehlo.broadcast %[[RESHAPE]], sizes = [1, 2] : (tensor<3x4xf32>) -> tensor<1x2x3x4xf32>
+// CHECK: %[[TRANSPOSE:.+]] = stablehlo.transpose %[[BROADCAST]], dims = [2, 3, 1, 0] : (tensor<1x2x3x4xf32>) -> tensor<3x4x2x1xf32>
+// CHECK: return %[[TRANSPOSE]]
+
+// -----
+
+func.func @reorder_with_type_change(%arg0 : tensor<3x4xi32>) -> tensor<12xi64> {
+  %0 = stablehlo.reshape %arg0 : (tensor<3x4xi32>) -> tensor<12xi32>
+  %1 = stablehlo.convert %0 : (tensor<12xi32>) -> tensor<12xi64>
+  return %1 : tensor<12xi64>
+}
+
+// CHECK-LABEL: @reorder_with_type_change
+// CHECK: %[[CONVERT:.+]] = stablehlo.convert %arg0 : (tensor<3x4xi32>) -> tensor<3x4xi64>
+// CHECK: %[[RESHAPE:.+]] = stablehlo.reshape %[[CONVERT]] : (tensor<3x4xi64>) -> tensor<12xi64>
+// CHECK: return %[[RESHAPE]]
+

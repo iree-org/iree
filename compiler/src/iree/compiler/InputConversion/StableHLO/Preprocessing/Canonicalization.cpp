@@ -1048,6 +1048,45 @@ struct ZeroExtentTensorCanon final : RewritePattern {
   }
 };
 
+struct ReorderElementwiseAndShapeOp final
+    : OpTraitRewritePattern<OpTrait::Elementwise> {
+  using OpTraitRewritePattern::OpTraitRewritePattern;
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getOperands().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "expected to be unary.");
+    }
+
+    auto definingOp = op->getOperand(0).getDefiningOp();
+    if (!definingOp) {
+      return rewriter.notifyMatchFailure(
+          op, "expected to have an op before elementise op.");
+    }
+
+    if (!isa<mlir::stablehlo::ReshapeOp>(definingOp) &&
+        !isa<mlir::stablehlo::TransposeOp>(definingOp) &&
+        !isa<mlir::stablehlo::BroadcastOp>(definingOp)) {
+      return rewriter.notifyMatchFailure(
+          op, "defining operation of unexpected type.");
+    }
+
+    Value input = definingOp->getOperand(0);
+    Value result = op->getResult(0);
+    auto intermediateType = cast<ShapedType>(input.getType())
+                                .clone(getElementTypeOrSelf(result.getType()));
+
+    // Reorder the operation and rewire the inputs/outputs.
+    op->moveBefore(definingOp);
+    definingOp->getResult(0).setType(result.getType());
+    rewriter.replaceAllUsesWith(result, definingOp->getResult(0));
+    result.setType(intermediateType);
+    op->setOperands(input);
+    definingOp->setOperands(result);
+    return success();
+  }
+};
+
 struct StableHLOCanonicalize final
     : impl::StableHLOCanonicalizeBase<StableHLOCanonicalize> {
   void runOnOperation() override {
@@ -1087,5 +1126,6 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       ReshapeOpCanon, TransposeOpCanon,
       // Types.
       ZeroExtentTensorCanon>(context, benefit);
+  patterns->add<ReorderElementwiseAndShapeOp>(context);
 }
 } // namespace mlir::iree_compiler::stablehlo
