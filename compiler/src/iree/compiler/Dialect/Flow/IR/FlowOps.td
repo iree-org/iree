@@ -1011,6 +1011,12 @@ def FLOW_CallOp : FLOW_Op<"call", [
     ValueRange getResultDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
     }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getArgumentsMutable();
+    }
   }];
 
   let hasVerifier = 1;
