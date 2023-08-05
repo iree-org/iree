@@ -44,7 +44,11 @@ void iree_task_topology_initialize_from_physical_cores(
 #include <cpuinfo.h>
 
 static bool iree_task_topology_is_cpuinfo_available() {
+#if defined(IREE_PLATFORM_WINDOWS)
+  return 0;
+#else
   return cpuinfo_initialize() && cpuinfo_get_cores_count() > 0;
+#endif
 }
 
 // TODO(benvanik): change to a system API and move to iree/base/allocator.h so
@@ -58,18 +62,13 @@ iree_host_size_t iree_task_topology_query_node_count(void) {
 // Returns the core of the calling thread or NULL if not supported.
 // We wrap this here because cpuinfo only returns non-NULL on linux.
 static const struct cpuinfo_core* iree_task_topology_get_current_core() {
-  const struct cpuinfo_core* current_core = cpuinfo_get_current_core();
+  const struct cpuinfo_core* current_core = NULL;
 #if defined(IREE_PLATFORM_WINDOWS)
-  // TODO(benvanik): drop cpuinfo.
-  if (current_core == NULL) {
-    PROCESSOR_NUMBER processor_number;
-    GetCurrentProcessorNumberEx(&processor_number);
-    uint32_t processor_id =
-        cpuinfo_get_package(processor_number.Group)->processor_start +
-        processor_number.Number;
-    current_core = cpuinfo_get_processor(processor_id)->core;
-  }
-#endif  // IREE_PLATFORM_WINDOWS
+  current_core = GetCurrentProcessorNumber();
+#else
+  // Non Windows platforms usually have cpuinfo
+  current_core = cpuinfo_get_current_core();
+#endif
   return current_core;
 }
 
