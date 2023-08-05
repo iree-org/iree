@@ -201,7 +201,7 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
   Operation *bestOp = NULL;
   const int64_t kMinEstimatedCost = -1;
   int64_t bestEstimatedCost = kMinEstimatedCost;
-  regionOp.getBodyRegion().walk([&](Operation *op) {
+  regionOp.getWorkgroupBody().walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
         .Case<linalg::LinalgOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgOpCost(op);

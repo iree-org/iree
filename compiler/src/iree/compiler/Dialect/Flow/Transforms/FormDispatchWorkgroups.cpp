@@ -236,7 +236,11 @@ createDefaultWorkgroupCountRegion(RewriterBase &rewriter,
 
     // Annotate the values captures as workload with their position in the
     // workload list.
-    rewriter.setInsertionPointToStart(workgroupsOp.getBody());
+    Region &body = workgroupsOp.getWorkgroupBody();
+    if (body.empty()) {
+      return;
+    }
+    rewriter.setInsertionPointToStart(&body.front());
     int ordinalNumber = 0;
     for (auto [index, operand] : llvm::enumerate(workgroupsOp.getArguments())) {
       if (!llvm::isa<IndexType>(operand.getType()))

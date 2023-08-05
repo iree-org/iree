@@ -60,7 +60,7 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   // Move the body of the function into the region.
   Region &region = dispatchRegionOp.getBody();
   region.getBlocks().splice(region.begin(), funcBody.getBlocks(),
-                            Region::iterator(funcBodyStart));
+                            Region::iterator(funcBodyStart), funcBody.end());
 
   // Replace all `func.return` with `flow.return`.
   SmallVector<func::ReturnOp> returnOps =
