@@ -134,6 +134,14 @@ iree_c_module(
     iree-compile
 )
 
+# TODO(#14540): Fix the maybe-uninitialized warning from GCC
+if(NOT MSVC AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  target_compile_options(iree_vm_test_emitc_buffer_ops
+    PRIVATE
+    "-Wno-uninitialized"
+  )
+endif()
+
 iree_c_module(
   NAME
     call_ops
