@@ -724,7 +724,7 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_push_descriptor_set(
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
         "exceeded available binding slots for push "
-        "descriptor set #%" PRIu32 "; requested %lu vs. maximal %d",
+        "descriptor set #%" PRIu32 "; requested %" PRIhsz " vs. maximal %d",
         set, binding_count, IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT);
   }
 
