@@ -53,7 +53,7 @@ Support for hardware accelerators and APIs is also included:
 
 - [x] Vulkan
 - [x] CUDA
-- [ ] Metal (planned)
+- [x] Metal (for Apple silicon devices)
 - [ ] WebGPU (planned)
 
 ## Project architecture
