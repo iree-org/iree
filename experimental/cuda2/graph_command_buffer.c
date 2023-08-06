@@ -86,12 +86,19 @@ typedef struct iree_hal_cuda2_dispatch_segment_t {
   // constants appended at the end.
   //
   // Also, per the CUDA API requirements, we need two levels of indirection
-  // for passing kernel arguments in--"If the kernel has N parameters, then
-  // kernelParams needs to be an array of N pointers. Each pointer, from
-  // kernelParams[0] to kernelParams[N-1], points to the region of memory from
-  // which the actual parameter will be copied." It means each kernel_params[i]
-  // is itself a pointer to the corresponding element at the *second* inline
-  // allocation at the end of the current segment.
+  // for passing kernel arguments in:
+  //
+  //   "If the kernel has N parameters, then kernelParams needs to be an array
+  //   of N pointers. Each pointer, from kernelParams[0] to kernelParams[N-1],
+  //   points to the region of memory from which the actual parameter will be
+  //   copied."
+  //
+  // (From the cuGraphAddKernelNode API doc in
+  // https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__GRAPH.html#group__CUDA__GRAPH_1g50d871e3bd06c1b835e52f2966ef366b)
+  //
+  // It means each kernel_params[i] is itself a pointer to the corresponding
+  // element at the *second* inline allocation at the end of the current
+  // segment.
   void** kernel_params;
 } iree_hal_cuda2_dispatch_segment_t;
 // + Additional inline allocation for holding kernel arguments.
@@ -714,11 +721,11 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_push_descriptor_set(
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   if (binding_count > IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "exceeded available binding slots for push "
-                            "descriptor set #%u; requested %lu vs. maximal %d",
-                            set, binding_count,
-                            IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT);
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "exceeded available binding slots for push "
+        "descriptor set #%" PRIu32 "; requested %lu vs. maximal %d",
+        set, binding_count, IREE_HAL_CUDA_MAX_DESCRIPTOR_SET_BINDING_COUNT);
   }
 
   iree_hal_cuda2_graph_command_buffer_t* command_buffer =
