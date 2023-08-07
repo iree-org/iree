@@ -132,6 +132,10 @@ public:
       // Build the dispatch function by calling the target function in a loop.
       auto bodyFuncOp =
           innerSymbolTable.lookup<func::FuncOp>(exportOp.getName());
+      if (!bodyFuncOp) {
+        return exportOp.emitOpError("in variant missing body function. Does "
+                                    "this variant support inline executables?");
+      }
       if (bodyFuncOp.isPublic()) {
         if (failed(rewriteWorkgroupSignature(layoutAttr, totalBindingCount,
                                              bodyFuncOp))) {
