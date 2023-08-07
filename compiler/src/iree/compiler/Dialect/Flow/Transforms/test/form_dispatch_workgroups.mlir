@@ -33,7 +33,7 @@ func.func @simple_test_with_cfg(%arg0: i1) -> (tensor<10x20xf32>) {
 // CHECK-LABEL: func @simple_test_with_cfg
 //  CHECK-SAME:     %[[ARG0:.+]]: i1
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups(%[[ARG0]])
-//  CHECK-SAME:       %[[ARG1:.+]]: i1, %[[ARG2:.+]]: !flow.dispatch.tensor
+//  CHECK-NEXT:       %[[ARG1:.+]]: i1, %[[ARG2:.+]]: !flow.dispatch.tensor
 //       CHECK:     %[[CST:.+]] = arith.constant
 //       CHECK:     ^[[BB1:.+]]:
 //       CHECK:       %[[EMPTY:.+]] = tensor.empty()

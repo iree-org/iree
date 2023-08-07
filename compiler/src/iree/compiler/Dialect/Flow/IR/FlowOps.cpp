@@ -344,6 +344,11 @@ LogicalResult DispatchRegionOp::verify() {
     }
   }
 
+  Region &workgroupCount = getWorkgroupCount();
+  if (workgroupCount.empty()) {
+    return success();
+  }
+
   // If workgroup count region exists, check it has a single block.
   return verifyWorkgroupCountRegion(getOperation(), getWorkload(),
                                     getWorkgroupCount());
