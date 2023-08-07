@@ -752,6 +752,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
+  passManager.addNestedPass<LLVM::LLVMFuncOp>(createAddFastMathFlagsPass());
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
