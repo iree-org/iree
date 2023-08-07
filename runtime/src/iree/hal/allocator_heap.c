@@ -234,7 +234,7 @@ static iree_status_t iree_hal_heap_allocator_import_buffer(
       ptr = external_buffer->handle.host_allocation.ptr;
       break;
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION:
-      ptr = (void*)external_buffer->handle.device_allocation.ptr;
+      ptr = (void*)((intptr_t)external_buffer->handle.device_allocation.ptr);
       break;
     default:
       return iree_make_status(IREE_STATUS_UNAVAILABLE,

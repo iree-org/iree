@@ -525,7 +525,7 @@ static iree_status_t iree_vm_bytecode_module_source_location_format(
   iree_vm_DebugDatabaseDef_table_t debug_database_def =
       (iree_vm_DebugDatabaseDef_table_t)self;
   iree_vm_FunctionSourceMapDef_table_t source_map_def =
-      (iree_vm_FunctionSourceMapDef_table_t)data[0];
+      (iree_vm_FunctionSourceMapDef_table_t)((intptr_t)data[0]);
   iree_vm_BytecodeLocationDef_vec_t locations =
       iree_vm_FunctionSourceMapDef_locations(source_map_def);
   iree_vm_source_offset_t source_offset = (iree_vm_source_offset_t)data[1];
@@ -587,7 +587,7 @@ static iree_status_t iree_vm_bytecode_module_resolve_source_location(
   // The source location stores the source map and PC and will perform the
   // actual lookup within the source map on demand.
   out_source_location->self = (void*)debug_database_def;
-  out_source_location->data[0] = (uint64_t)source_map_def;
+  out_source_location->data[0] = (uint64_t)((intptr_t)source_map_def);
   out_source_location->data[1] = (uint64_t)pc;
   out_source_location->format = iree_vm_bytecode_module_source_location_format;
   return iree_ok_status();
