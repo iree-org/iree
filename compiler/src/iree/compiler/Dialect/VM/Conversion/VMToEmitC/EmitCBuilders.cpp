@@ -112,14 +112,21 @@ Value binaryOperator(OpBuilder builder, Location location, BinaryOperator op,
 }
 
 Value allocateVariable(OpBuilder builder, Location location, Type type,
-                       std::optional<StringRef> initializer) {
-  auto ctx = builder.getContext();
+                       Attribute initializer) {
   return builder
       .create<emitc::VariableOp>(
           /*location=*/location,
           /*resultType=*/type,
-          /*value=*/emitc::OpaqueAttr::get(ctx, initializer.value_or("")))
+          /*value=*/initializer)
       .getResult();
+}
+
+Value allocateVariable(OpBuilder builder, Location location, Type type,
+                       std::optional<StringRef> initializer) {
+  auto ctx = builder.getContext();
+  return allocateVariable(
+      builder, location, type,
+      emitc::OpaqueAttr::get(ctx, initializer.value_or("")));
 }
 
 Value addressOf(OpBuilder builder, Location location, Value operand) {

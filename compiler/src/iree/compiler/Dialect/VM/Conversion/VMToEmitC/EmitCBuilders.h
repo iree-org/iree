@@ -66,6 +66,9 @@ Value binaryOperator(OpBuilder builder, Location location, BinaryOperator op,
                      Value lhs, Value rhs, Type resultType);
 
 Value allocateVariable(OpBuilder builder, Location location, Type type,
+                       Attribute initializer);
+
+Value allocateVariable(OpBuilder builder, Location location, Type type,
                        std::optional<StringRef> initializer = std::nullopt);
 
 Value addressOf(OpBuilder builder, Location location, Value operand);
