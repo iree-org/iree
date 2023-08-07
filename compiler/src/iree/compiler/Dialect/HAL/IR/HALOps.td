@@ -623,8 +623,6 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
     `:` type($result)
     attr-dict-with-keyword
   }];
-
-  let hasCanonicalizer = 1;
 }
 
 def HAL_BufferViewElementTypeOp : HAL_PureOp<"buffer_view.element_type"> {
