@@ -21,7 +21,7 @@ namespace IREE {
 /// using im2col tranformation.
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 
-// Moves the body of the entire function into a single dispatch.
+/// Moves the body of the entire function into a single dispatch.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createMakeSingleDispatchForFunctionPass();
 

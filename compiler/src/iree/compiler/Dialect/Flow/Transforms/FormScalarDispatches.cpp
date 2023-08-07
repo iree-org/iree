@@ -61,7 +61,8 @@ static bool isComputeOperation(Operation *op) {
     return true;
   }
   if (op->getDialect() == context->getLoadedDialect<tensor::TensorDialect>()) {
-    return !isa<tensor::CastOp, tensor::EmptyOp>(op);
+    return !isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::EmptyOp,
+                tensor::ExpandShapeOp>(op);
   }
   return false;
 }
@@ -161,7 +162,7 @@ void FormScalarDispatchesPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
 
-  int scalarWorkloadLimit = 2;
+  int scalarWorkloadLimit = 1;
   // Convenient struct to hold all operations that need to be moved into a
   // descriptor.
   struct DispatchRegionDescriptor {
