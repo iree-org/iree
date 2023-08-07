@@ -30,6 +30,16 @@ struct MakeSingleDispatchForFunctionPass
 void MakeSingleDispatchForFunctionPass::runOnOperation() {
   auto funcOp = getOperation();
 
+  // Abort if there are any operations that prevent moving all operations
+  // into a single dispatch.
+  auto walkResult = funcOp.walk([](Operation *op) -> WalkResult {
+    return success(!isa<func::CallOp>(op));
+  });
+  if (walkResult.wasInterrupted()) {
+    funcOp->emitOpError("unhandled operation in function body prevents moving "
+                        "body into a single dispatch");
+  }
+
   // Currently this can only be done for static shapes cause
   // there is no way of getting the tied dynamic shapes for
   // a function.

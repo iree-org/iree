@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "fill_i64.mlir"
+    "force_single_dispatch.mlir"
     "globals.mlir"
     "libm_linking.mlir"
     "scalar.mlir"
