@@ -35,6 +35,14 @@ IREE_FLAG_LIST(
     "for a module needing to have been registered prior to the dependent\n"
     "module. HAL modules are added automatically when required.");
 
+IREE_FLAG(
+    string, module_mode, "preload",
+    "A module I/O mode of ['preload', 'mmap'].\n"
+    "  preload: read entire module into wired memory on startup.\n"
+    "  mmap: maps the module file into discardable memory - can increase\n"
+    "        warm-up time and variance as mapped pages are swapped\n"
+    "        by the OS.");
+
 static iree_status_t iree_tooling_load_bytecode_module(
     iree_vm_instance_t* instance, iree_string_view_t path,
     iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
@@ -51,8 +59,20 @@ static iree_status_t iree_tooling_load_bytecode_module(
   } else {
     char path_str[2048] = {0};
     iree_string_view_to_cstring(path, path_str, sizeof(path_str));
+    iree_file_read_flags_t read_flags = 0;
+    if (strcmp(FLAG_module_mode, "mmap") == 0) {
+      read_flags |= IREE_FILE_READ_FLAG_MMAP;
+    } else if (strcmp(FLAG_module_mode, "preload") == 0) {
+      read_flags |= IREE_FILE_READ_FLAG_PRELOAD;
+    } else {
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                               "unrecognized --module_mode= value '%s'",
+                               FLAG_module_mode));
+    }
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_file_read_contents(path_str, host_allocator, &file_contents));
+        z0, iree_file_read_contents(path_str, read_flags, host_allocator,
+                                    &file_contents));
   }
 
   // Try to load the module as bytecode (all we have today that we can use).

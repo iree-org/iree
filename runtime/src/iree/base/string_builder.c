@@ -79,23 +79,24 @@ IREE_API_EXPORT char* iree_string_builder_take_storage(
 
 IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
     iree_string_builder_t* builder, iree_host_size_t minimum_capacity) {
-  iree_host_size_t new_capacity = builder->capacity;
-  if (builder->capacity < minimum_capacity) {
-    new_capacity =
-        iree_host_align(minimum_capacity, IREE_STRING_BUILDER_ALIGNMENT);
-  }
-  if (builder->capacity >= new_capacity) {
+  if (IREE_LIKELY(builder->capacity >= minimum_capacity)) {
     // Already at/above the requested minimum capacity.
     return iree_ok_status();
-  } else if (iree_allocator_is_null(builder->allocator)) {
-    // No allocator provided and the builder cannot grow.
+  }
+
+  // If no allocator was provided the builder cannot grow.
+  if (iree_allocator_is_null(builder->allocator)) {
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
         "non-growable builder capacity exceeded (capacity=%" PRIhsz
-        "; requested=%" PRIhsz ", adjusted=%" PRIhsz ")",
-        builder->capacity, minimum_capacity, new_capacity);
+        "; requested>=%" PRIhsz ")",
+        builder->capacity, minimum_capacity);
   }
 
+  // Grow by 2x. Note that the current capacity may be zero.
+  iree_host_size_t new_capacity = iree_max(
+      builder->capacity * 2,
+      iree_host_align(minimum_capacity, IREE_STRING_BUILDER_ALIGNMENT));
   IREE_RETURN_IF_ERROR(iree_allocator_realloc(builder->allocator, new_capacity,
                                               (void**)&builder->buffer));
   builder->buffer[builder->size] = 0;

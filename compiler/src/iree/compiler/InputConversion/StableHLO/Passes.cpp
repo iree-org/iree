@@ -45,12 +45,10 @@ void buildStableHLOInputConversionPassPipelineImpl(
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createLegalizeControlFlow());
 
-  // Currently we don't handle SCF ops well and have to convert them all to CFG.
-  // In the future it would be nice if we could have all of flow be both scf
-  // and cfg compatible.
-  passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
-  if (detuple)
+  passManager.addPass(createFlattenTuplesInSCF());
+  if (detuple) {
     passManager.addPass(createFlattenTuplesInCFG());
+  }
 
   passManager.addPass(createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());

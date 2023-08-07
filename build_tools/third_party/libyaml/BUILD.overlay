@@ -30,8 +30,6 @@ cc_library(
         "-DYAML_VERSION_MINOR=2",
         "-DYAML_VERSION_PATCH=5",
         "-Iexternal/com_github_yaml_libyaml/include/",
-        # GCC warning
-        "-Wno-unused-value",
     ],
     includes = [
       "include/",

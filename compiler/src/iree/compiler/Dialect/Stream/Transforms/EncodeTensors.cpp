@@ -318,7 +318,7 @@ struct EncodeTensorConstantOp
     // expanded to a power of 2 byte-aligned width. This is unfortunate: it's
     // wasted bits in the final binary that we could otherwise use productively.
     RankedTensorType alignedType = alignTensorType(resultType);
-    ElementsAttr encodedAttr = op.getValue();
+    Attribute encodedAttr = op.getValue();
     if (alignedType != resultType) {
       if (auto sourceAttr = llvm::dyn_cast<DenseIntElementsAttr>(encodedAttr)) {
         auto alignedBitWidth = alignedType.getElementTypeBitWidth();

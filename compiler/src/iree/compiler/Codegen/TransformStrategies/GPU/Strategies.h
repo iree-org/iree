@@ -26,6 +26,17 @@ class StagedReductionStrategy;
 static constexpr int64_t kCudaWarpSize = 32;
 static constexpr int64_t kCudaMaxNumThreads = 1024;
 
+/// Struct for representing supported WMMA/Cooperative Matrix configurations.
+/// This is a reflection of SPIRV_CooperativeMatrixPropertiesNVAttr.
+struct MMAConfig {
+  int64_t m;
+  int64_t n;
+  int64_t k;
+  Type aType;
+  Type bType;
+  Type cType;
+};
+
 /// Placeholder for some hardware model proxy that contains relevant information
 /// to configure the strategies. In the future, this will need to be
 /// driven by some contract with the runtime.
@@ -34,11 +45,14 @@ struct GPUModel {
   llvm::StringRef model = kDefaultGPU;
   /// TODO: Support a range of subgroup sizes.
   int64_t subgroupSize = kCudaWarpSize;
+  std::optional<int> minSubgroupSize = std::nullopt;
+  std::optional<int> maxSubgroupSize = std::nullopt;
   int64_t maxWorkGroupInvocations = kCudaMaxNumThreads;
   int64_t maxWorkGroupSize[3] = {1024, 1024, 64};
   bool hasWarpShuffle = false;
   bool hasTF32TensorCore = false;
   bool hasMmaSync = false;
+  SmallVector<MMAConfig> supportedWMMAConfigs = {};
 };
 
 //===--------------------------------------------------------------------===//

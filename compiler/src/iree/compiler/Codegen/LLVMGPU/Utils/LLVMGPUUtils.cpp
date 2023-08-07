@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -346,6 +347,72 @@ void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp) {
                         transposedOperands, resultTypes, op->getAttrs());
     rewriter.replaceAllUsesWith(transposeOp.getResult(), newOp->getResult(0));
   }
+}
+
+/// Insert barriers and wait operations if there are allocs of a different alias
+/// group before the given alloc.
+static void addBarrier(func::FuncOp funcOp, Operation *alloc,
+                       ArrayRef<Operation *> aliasGroup) {
+  Block *entryBlock = &(*funcOp.getBlocks().begin());
+  bool needBarrier = false;
+  if (alloc->getBlock() != entryBlock) {
+    needBarrier = true;
+  } else {
+    for (Operation &op : entryBlock->getOperations()) {
+      if (&op == alloc)
+        break;
+      if (op.getNumRegions() != 0) {
+        needBarrier = true;
+        break;
+      }
+      if (isa<memref::AllocOp>(&op) && !llvm::is_contained(aliasGroup, &op)) {
+        needBarrier = true;
+        break;
+      }
+    }
+  }
+  if (!needBarrier)
+    return;
+  OpBuilder builder(alloc);
+  // TODO: make it a option if needed.
+  bool hasAsyncCopies = true;
+  if (hasAsyncCopies) {
+    Value groupToken = builder.create<nvgpu::DeviceAsyncCreateGroupOp>(
+        funcOp.getLoc(), nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
+        SmallVector<Value>());
+    builder.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
+                                             builder.getI32IntegerAttr(0));
+  }
+  builder.create<gpu::BarrierOp>(alloc->getLoc());
+}
+
+void packSharedMemoryAlloc(func::FuncOp funcOp) {
+  DominanceInfo dominators(funcOp);
+  SmallVector<Operation *> allocs;
+  funcOp.walk([&](memref::AllocOp alloc) {
+    if (hasSharedMemoryAddressSpace(alloc.getType())) {
+      allocs.push_back(alloc);
+    }
+  });
+  // First sink the alloc as low as possible in the CFG.
+  sinkOpsInCFG(allocs, dominators);
+  SmallVector<AliasGroup> aliasGroups;
+  analyseAllocsForPacking(funcOp, allocs, aliasGroups);
+  // If there is 1 or less alias group there is nothing to do.
+  if (aliasGroups.size() <= 1)
+    return;
+
+  // Pack all the allocations into one i8 alloc.
+  // We may need to add extra barriers to make sure we are done writting or
+  // reading from the previous alias group before starting a new one.
+  for (size_t i = 0; i < aliasGroups.size(); i++) {
+    for (Operation *alloc : aliasGroups[i]) {
+      addBarrier(funcOp, alloc, aliasGroups[i]);
+    }
+  }
+
+  OpBuilder builder(funcOp.getContext());
+  packAllocs(builder, funcOp, aliasGroups);
 }
 
 } // namespace iree_compiler

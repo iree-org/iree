@@ -160,6 +160,10 @@ static void iree_hal_metal_command_segment_list_push_back(
 typedef struct iree_hal_metal_command_buffer_t {
   iree_hal_command_buffer_t base;
 
+  // The HAL device owning this command buffer. We need to retain it to make sure it outlive this
+  // command buffer to allow access to shared resources.
+  iree_hal_device_t* device;
+
   // The Metal command queue owning this command buffer.
   id<MTLCommandQueue> queue;
 
@@ -355,6 +359,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
   iree_hal_command_buffer_initialize(device, mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
                                      binding_capacity, &iree_hal_metal_command_buffer_vtable,
                                      &command_buffer->base);
+  command_buffer->device = device;
   command_buffer->queue = [queue retain];  // +1
   command_buffer->builtin_executable = builtin_executable;
   iree_arena_initialize(block_pool, &command_buffer->arena);
@@ -391,6 +396,9 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     // Increase command buffer refcount in the shared staging buffer. We tie this to the command
     // buffer's lifetime to avoid resource leak.
     iree_hal_metal_staging_buffer_increase_refcount(staging_buffer);
+    // Retain the device given that we refer to builtin executables and staging buffers whose
+    // lifetime is associated with the device.
+    iree_hal_resource_retain(device);
   } else {
     iree_hal_metal_command_buffer_destroy_internal(&command_buffer->base);
   }
@@ -418,6 +426,7 @@ static void iree_hal_metal_command_buffer_destroy_internal(
 static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
+  iree_hal_device_t* device = command_buffer->device;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Decrease command buffer refcount in the shared staging buffer, and potentially reclaim
@@ -427,6 +436,8 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
   }
 
   iree_hal_metal_command_buffer_destroy_internal(base_command_buffer);
+
+  iree_hal_resource_release(device);
 
   IREE_TRACE_ZONE_END(z0);
 }

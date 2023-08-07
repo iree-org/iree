@@ -62,18 +62,15 @@ public:
                                 TypedAttr &outAttr);
 
 private:
-  // Imports or snapshots a raw host buffer, depending on whether import is
-  // possible. This should only be used when the MLIR and IREE layout
-  // agree.
-  LogicalResult importBufferForRead(Location loc, const uint8_t *rawData,
-                                    iree_host_size_t length,
-                                    iree_hal_buffer_t **buffer);
-  // Imports a bit vector of rawData into a byte buffer, expanding 1->8bit
-  // during import.
+  FailureOr<iree::vm::ref<iree_hal_buffer_t>> importSerializableAttr(
+      Location loc, IREE::Util::SerializableAttrInterface serializableAttr);
   LogicalResult
-  importBitwiseBoolI8BufferForRead(Location loc, const uint8_t *rawDataBits,
-                                   iree_host_size_t rawDataLengthBytes,
-                                   iree_hal_buffer_t **buffer);
+  addBufferArgumentAttr(Location loc,
+                        IREE::Util::SerializableAttrInterface serializableAttr);
+  LogicalResult addBufferViewArgumentAttr(
+      Location loc, ShapedType shapedType,
+      IREE::Util::SerializableAttrInterface serializableAttr);
+
   CompiledBinary binary;
   iree::vm::ref<iree_vm_list_t> inputs;
   iree::vm::ref<iree_vm_list_t> outputs;

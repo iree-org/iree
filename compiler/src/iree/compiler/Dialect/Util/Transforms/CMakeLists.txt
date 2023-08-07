@@ -28,6 +28,7 @@ iree_cc_library(
     "FuseGlobals.cpp"
     "HoistIntoGlobals.cpp"
     "IPO.cpp"
+    "ImportResources.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "Patterns.cpp"

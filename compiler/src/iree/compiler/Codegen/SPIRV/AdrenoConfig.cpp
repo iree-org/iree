@@ -45,10 +45,12 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   int subgroupSize = limits.getSubgroupSize();
 
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
-    if (isMatmulOrBatchMatmul(linalgOp))
-      return setAdrenoMatmulConfig(linalgOp, limits);
-  }
+  if (!isa<linalg::LinalgOp>(rootOp))
+    return failure();
+
+  auto linalgOp = cast<linalg::LinalgOp>(rootOp);
+  if (isMatmulOrBatchMatmul(linalgOp))
+    return setAdrenoMatmulConfig(linalgOp, limits);
 
   if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
     // Use the result type in case of larger bitwidth for accumulators.
@@ -57,9 +59,12 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
     if (bitwidth > 32)
       return failure();
     const int multipler = 32 / bitwidth;
-    linalg::detail::ConvolutionDimensions convDims;
-    linalg::detail::isConvolutionInterfaceImpl(rootOp, &convDims);
-    const int bestTilingFactor = (convDims.depth.empty() ? 32 : 16) * multipler;
+
+    auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
+    if (failed(convDimsOrFailure))
+      return failure();
+    const int bestTilingFactor =
+        (convDimsOrFailure->depth.empty() ? 32 : 16) * multipler;
     return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
                            bestTilingFactor);
   }

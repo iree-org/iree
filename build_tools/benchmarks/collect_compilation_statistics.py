@@ -129,8 +129,14 @@ def get_module_component_info(
                 identified_names.add(filename)
                 break
 
-    if identified_names != set(size_map.keys()):
-        raise RuntimeError(f"Unrecognized components in the module: {size_map.keys()}.")
+    actual_key_set = set(size_map.keys())
+    if identified_names != actual_key_set:
+        # With consteval, we invoke the compiler within the compiler, which
+        # can yield additional temporaries.
+        print(
+            f"Ignoring extra components in the module: {actual_key_set-identified_names}",
+            file=sys.stderr,
+        )
 
     return ModuleComponentSizes(
         file_bytes=module_file_bytes,

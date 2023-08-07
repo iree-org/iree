@@ -237,7 +237,7 @@ iree_runtime_session_append_bytecode_module_from_file(
   // contents.
   iree_file_contents_t* flatbuffer_contents = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_file_read_contents(file_path,
+      z0, iree_file_read_contents(file_path, IREE_FILE_READ_FLAG_DEFAULT,
                                   iree_runtime_session_host_allocator(session),
                                   &flatbuffer_contents));
 

@@ -59,11 +59,14 @@ std::string GetUniquePath(const char* unique_name) {
   return unique_path;
 }
 
-std::string GetUniqueContents(const char* unique_name) {
-  return std::string("Test with name ") + unique_name + "\n";
+std::string GetUniqueContents(const char* unique_name,
+                              iree_host_size_t padded_size) {
+  std::string str = std::string("Test with name ") + unique_name + "\n";
+  if (str.size() < padded_size) str.resize(padded_size, 0);
+  return str;
 }
 
-TEST(FileIO, ReadWriteContents) {
+TEST(FileIO, ReadWriteContentsPreload) {
   constexpr const char* kUniqueName = "ReadWriteContents";
   auto path = GetUniquePath(kUniqueName);
 
@@ -73,7 +76,7 @@ TEST(FileIO, ReadWriteContents) {
   iree_status_free(status);
 
   // Generate file contents.
-  auto write_contents = GetUniqueContents(kUniqueName);
+  auto write_contents = GetUniqueContents(kUniqueName, 32);
 
   // Write the contents to disk.
   IREE_ASSERT_OK(iree_file_write_contents(
@@ -82,7 +85,40 @@ TEST(FileIO, ReadWriteContents) {
 
   // Read the contents from disk.
   iree_file_contents_t* read_contents = NULL;
-  IREE_ASSERT_OK(iree_file_read_contents(path.c_str(), iree_allocator_system(),
+  IREE_ASSERT_OK(
+      iree_file_read_contents(path.c_str(), IREE_FILE_READ_FLAG_PRELOAD,
+                              iree_allocator_system(), &read_contents));
+
+  // Expect the contents are equal.
+  EXPECT_EQ(write_contents.size(), read_contents->const_buffer.data_length);
+  EXPECT_EQ(memcmp(write_contents.data(), read_contents->const_buffer.data,
+                   read_contents->const_buffer.data_length),
+            0);
+
+  iree_file_contents_free(read_contents);
+}
+
+TEST(FileIO, ReadWriteContentsMmap) {
+  constexpr const char* kUniqueName = "ReadWriteContents";
+  auto path = GetUniquePath(kUniqueName);
+
+  // File must not exist.
+  iree_status_t status = iree_file_exists(path.c_str());
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, status);
+  iree_status_free(status);
+
+  // Generate file contents.
+  auto write_contents = GetUniqueContents(kUniqueName, 4096);
+
+  // Write the contents to disk.
+  IREE_ASSERT_OK(iree_file_write_contents(
+      path.c_str(),
+      iree_make_const_byte_span(write_contents.data(), write_contents.size())));
+
+  // Read the contents from disk.
+  iree_file_contents_t* read_contents = NULL;
+  IREE_ASSERT_OK(iree_file_read_contents(path.c_str(), IREE_FILE_READ_FLAG_MMAP,
+                                         iree_allocator_system(),
                                          &read_contents));
 
   // Expect the contents are equal.

@@ -73,11 +73,11 @@ int64_t adjustNumberOfWarpsForBlockShuffle(int64_t numWarpsToUse,
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-/// Takes an optional `warpDims` argument to specify the number of warp
-/// dimensions to consider along various dimensions and avoid second-guessing
-/// how the mapping to warps should occur.
-Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
-                                ArrayRef<int64_t> blockSize);
+/// Takes an optional `subgroupSize` argument to specify the number of threads
+/// per subgroup.
+Value buildMapToBlockAndThreads(
+    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize,
+    std::optional<int64_t> subgroupSize = std::nullopt);
 
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a

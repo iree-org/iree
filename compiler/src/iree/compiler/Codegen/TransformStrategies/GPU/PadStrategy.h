@@ -20,7 +20,7 @@ namespace gpu {
 struct PadConfig {};
 
 /// Simple padding strategy.
-class PadStrategy : GPUStrategy {
+class PadStrategy : public GPUStrategy {
 public:
   PadStrategy(MLIRContext *context,
               const transform_ext::MatchedPadCaptures &captures,

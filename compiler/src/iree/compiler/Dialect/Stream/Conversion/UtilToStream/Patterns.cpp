@@ -120,8 +120,7 @@ struct GlobalOpExpansion
       auto *entryBlock = rewriter.createBlock(&initializerOp.getBody());
       rewriter.setInsertionPointToStart(entryBlock);
       auto constantOp = rewriter.create<IREE::Stream::TensorConstantOp>(
-          globalOp.getLoc(), resourceOp.getType(),
-          llvm::cast<ElementsAttr>(initialValue),
+          globalOp.getLoc(), resourceOp.getType(), initialValue,
           TypeAttr::get(globalOp.getType()),
           /*result_encoding_dims=*/ValueRange{}, /*affinity=*/nullptr);
       auto constantSizeOp = rewriter.create<IREE::Stream::ResourceSizeOp>(

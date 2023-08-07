@@ -73,6 +73,7 @@ iree_compiler_cc_library(
         "Runtime.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_task/registration",

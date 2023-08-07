@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-preprocessing-flatten-tuples %s | FileCheck %s
+// RUN: iree-opt --iree-stablehlo-preprocessing-flatten-cfg-tuples %s | FileCheck %s
 
 // CHECK-LABEL: @flatten_func
 module @flatten_func {

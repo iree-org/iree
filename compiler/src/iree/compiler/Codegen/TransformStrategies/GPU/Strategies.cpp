@@ -442,11 +442,6 @@ static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
     return failure();
   }
 
-  if (!gpuModel.hasTF32TensorCore) {
-    LDBG("--Matmul strategy no TF32 tensor core\n");
-    return failure();
-  }
-
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *fill;
   StructuredOpMatcher *matmul;

@@ -96,6 +96,34 @@ LogicalResult MatmulStrategy::validate(const GPUModel &gpuModel) const {
     return failure();
   }
 
+  if (useMmaSync) {
+    if (!gpuModel.hasTF32TensorCore) {
+      LDBG("--Matmul strategy target has not TF32 tensor core\n");
+      return failure();
+    }
+
+    if (!gpuModel.hasMmaSync) {
+      LDBG("--Matmul strategy target does not support MMA.SYNC operations\n");
+      return failure();
+    }
+  } else {
+    // Verify WMMA.
+    // Hard coded to reflect current WMMA unrolling support.
+    int reqM = 16;
+    int reqN = 16;
+    int reqK = lhsElementType.isF32() ? 8 : 16;
+    if (llvm::all_of(gpuModel.supportedWMMAConfigs,
+                     [&](iree_compiler::gpu::MMAConfig config) {
+                       return config.m != reqM || config.n != reqN ||
+                              config.k != reqK ||
+                              config.aType != lhsElementType ||
+                              config.bType != rhsElementType ||
+                              config.cType != resElementType;
+                     })) {
+      LDBG("--Matmul strategy failed wmma type check\n");
+      return failure();
+    }
+  }
   return success();
 }
 
@@ -238,7 +266,10 @@ buildCommonMatmulLikeThreadSchedule(ImplicitLocOpBuilder &b, Value variantH,
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, needs hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = buildMapToBlockAndThreads(b, funcH, strategy.numThreads);
+  funcH =
+      buildMapToBlockAndThreads(b, funcH,
+                                /*blockSize=*/strategy.numThreads,
+                                /*subgroupSize=*/strategy.targetSubgroupSize);
   funcH = b.create<EliminateGpuBarriersOp>(funcH);
 
   // Step 9. Convert to tensor core ops.

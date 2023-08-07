@@ -326,6 +326,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     options->executableOptions.targets.push_back(requestedTargetBackend);
     options->targetOptions.f32Extension = true;
     options->targetOptions.f64Extension = true;
+    options->targetOptions.truncateUnsupportedFloats = false;
     if (requestedTargetBackend == "vmvx" || !hasRequestedTargetBackend) {
       targetBackend = targetRegistry.getTargetBackend("vmvx");
     } else {

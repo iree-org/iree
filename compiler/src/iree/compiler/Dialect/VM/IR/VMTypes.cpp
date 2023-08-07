@@ -10,13 +10,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-
-// TODO(llvm-project#64312): Fix this upstream
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include "mlir/IR/DialectImplementation.h"
-#pragma GCC diagnostic pop
-
 #include "mlir/IR/TypeSupport.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.

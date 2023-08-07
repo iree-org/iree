@@ -84,6 +84,12 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     OpBuilder builder(context);
     for (auto &operand : linalgOp->getOpOperands()) {
       auto elemType = getElementTypeOrSelf(operand.get().getType());
+      if (auto complexTy = elemType.dyn_cast<ComplexType>()) {
+        auto zeroAttr = builder.getZeroAttr(complexTy.getElementType());
+        paddingValueAttributes.push_back(
+            ArrayAttr::get(context, {zeroAttr, zeroAttr}));
+        continue;
+      }
       paddingValueAttributes.push_back(builder.getZeroAttr(elemType));
     }
 

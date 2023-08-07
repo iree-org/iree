@@ -692,6 +692,30 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
   gpuModel.hasTF32TensorCore = targetInfo.hasTF32TensorCore;
   gpuModel.hasMmaSync = targetInfo.hasMmaSync;
 
+  // Populates a subset of the fragment combinations supported in MLIR lowerings
+  // to NVVM (which is itself a subset of what LLVM supports) based on what the
+  // pipeline currently supports.
+  // TODO: avoid hard coding this and populate based on hardware capabilities.
+  // TODO: add missing supported configs once the pipeline supports it.
+  MLIRContext *context = entryPoint.getContext();
+  Type f32Type = Float32Type::get(context);
+  Type f16Type = Float16Type::get(context);
+
+  iree_compiler::gpu::MMAConfig f16f32AccConfig = {
+      /*m=*/16,          /*n=*/16,          /*k=*/16,
+      /*aType=*/f16Type, /*bType=*/f16Type, /*cType=*/f32Type};
+  iree_compiler::gpu::MMAConfig f16f16AccConfig = {
+      /*m=*/16,          /*n=*/16,          /*k=*/16,
+      /*aType=*/f16Type, /*bType=*/f16Type, /*cType=*/f16Type};
+  gpuModel.supportedWMMAConfigs = {f16f32AccConfig, f16f16AccConfig};
+
+  if (targetInfo.hasTF32TensorCore) {
+    iree_compiler::gpu::MMAConfig tf32WmmaConfig = {
+        /*m=*/16,          /*n=*/16,          /*k=*/8,
+        /*aType=*/f32Type, /*bType=*/f32Type, /*cType=*/f32Type};
+    gpuModel.supportedWMMAConfigs.push_back(tf32WmmaConfig);
+  }
+
   if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
                                                               gpuModel)))
     return failure();

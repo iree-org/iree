@@ -161,6 +161,7 @@ static iree_status_t iree_hal_executable_library_run(
   // Load the executable data.
   iree_file_contents_t* file_contents = NULL;
   IREE_RETURN_IF_ERROR(iree_file_read_contents(FLAG_executable_file,
+                                               IREE_FILE_READ_FLAG_DEFAULT,
                                                host_allocator, &file_contents));
   executable_params.executable_data = file_contents->const_buffer;
 
