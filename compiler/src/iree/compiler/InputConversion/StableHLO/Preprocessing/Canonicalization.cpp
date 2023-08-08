@@ -1071,11 +1071,12 @@ struct ReorderElementwiseAndShapeOp final
           op, "defining operation of unexpected type.");
     }
 
-    // Only reorder if the defining op has no other uses
+    // Only reorder if the defining op has no other uses.
     auto intermediateResult = definingOp->getResult(0);
     if (std::distance(intermediateResult.getUses().begin(),
                       intermediateResult.getUses().end()) != 1) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          op, "operation has more than one use.");
     }
 
     Value input = definingOp->getOperand(0);
