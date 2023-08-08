@@ -162,32 +162,6 @@ void BufferViewCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<FoldBufferViewCreateSubspan>(context);
 }
 
-namespace {
-
-/// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
-/// the same scope at zero offset and we know the origin buffer.
-struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
-  using OpRewritePattern<BufferViewBufferOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewBufferOp op,
-                                PatternRewriter &rewriter) const override {
-    auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
-        op.getBufferView().getDefiningOp());
-    if (!createOp || !matchPattern(createOp.getSourceOffset(), m_Zero()))
-      return failure();
-
-    rewriter.replaceOp(op, createOp.getSourceBuffer());
-    return success();
-  }
-};
-
-} // namespace
-
-void BufferViewBufferOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                     MLIRContext *context) {
-  results.insert<SkipBufferViewBufferOp>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // hal.channel.create
 //===----------------------------------------------------------------------===//
