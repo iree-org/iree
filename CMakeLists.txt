@@ -61,7 +61,11 @@ set(IREE_TRACING_MODE_DEFAULT "2" CACHE STRING "Default tracing feature/verbosit
 set(IREE_TRACING_MODE ${IREE_TRACING_MODE_DEFAULT} CACHE STRING "Tracing feature/verbosity mode. See iree/base/tracing.h for more.")
 
 # TODO(#8469): remove the dependency on cpuinfo entirely.
-option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ON)
+set(IREE_ENABLE_CPUINFO_DEFAULT ON)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
+endif()
+option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)

@@ -155,9 +155,10 @@ iree_status_t iree_task_topology_initialize_from_flags(
     // Unpinned topology. Let the system try to figure it out.
     iree_task_topology_initialize_from_group_count(
         FLAG_task_topology_group_count, out_topology);
+    return iree_ok_status();
   } else if (strcmp(FLAG_task_topology_mode, "physical_cores") == 0) {
     // Physical cores sourced from a specific NUMA node.
-    iree_task_topology_initialize_from_physical_cores(
+    return iree_task_topology_initialize_from_physical_cores(
         node_id, FLAG_task_topology_max_group_count, out_topology);
   } else {
     return iree_make_status(
@@ -166,8 +167,6 @@ iree_status_t iree_task_topology_initialize_from_flags(
         "specified and be a valid value; have --task_topology_mode=%s.",
         FLAG_task_topology_mode);
   }
-
-  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
