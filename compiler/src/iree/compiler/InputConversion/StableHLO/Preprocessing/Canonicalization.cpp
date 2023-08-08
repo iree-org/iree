@@ -1071,6 +1071,13 @@ struct ReorderElementwiseAndShapeOp final
           op, "defining operation of unexpected type.");
     }
 
+    // Only reorder if the defining op has no other uses
+    auto intermediateResult = definingOp->getResult(0);
+    if (std::distance(intermediateResult.getUses().begin(),
+                      intermediateResult.getUses().end()) != 1) {
+      return failure();
+    }
+
     Value input = definingOp->getOperand(0);
     Value result = op->getResult(0);
     auto intermediateType = cast<ShapedType>(input.getType())
