@@ -13,4 +13,4 @@ func.func @matmul_f32f32f32(%arg0 : tensor<128x256xf32>, %arg1 : tensor<256x512x
 // CHECK-NOT:    iree_linalg_ext.upper_bound_tile_size
 // CHECK-DAG:    iree_linalg_ext.set_encoding %[[ARG0]] : tensor<128x256xf32> -> tensor<128x256xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
 // CHECK-DAG:    iree_linalg_ext.set_encoding %[[ARG1]] : tensor<256x512xf32> -> tensor<256x512xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>
-// CHECK-DAG:    iree_linalg_ext.set_encoding %[[ARG2]] : tensor<128x256xf32> -> tensor<128x512xf32> -> tensor<128x512xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
+// CHECK-DAG:    iree_linalg_ext.set_encoding %[[ARG2]] : tensor<128x512xf32> -> tensor<128x512xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
