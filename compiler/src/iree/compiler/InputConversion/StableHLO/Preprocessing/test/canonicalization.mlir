@@ -619,3 +619,87 @@ func.func @reduce_zero_ext(%arg0: tensor<0xi1>) -> tensor<i32> {
   // CHECK: return [[CST]] : tensor<i32>
   return %5 : tensor<i32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @add_zero_ext
+func.func @add_zero_ext(%arg0 : tensor<5x0xi32>, %arg1 : tensor<5x0xi32>) -> tensor<5x0xi32> {
+  %0 = stablehlo.add %arg0, %arg1 : tensor<5x0xi32>
+  func.return %0 : tensor<5x0xi32>
+}
+// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<5x0xi32>
+// CHECK:   return %[[EMPTY]] 
+
+// -----
+
+// CHECK-LABEL: func.func @add_zero_ext_dynamic
+func.func @add_zero_ext_dynamic(%arg0 : tensor<?x0xi32>, %arg1 : tensor<?x0xi32>) -> tensor<?x0xi32> {
+  %0 = stablehlo.add %arg0, %arg1 : tensor<?x0xi32>
+  func.return %0 : tensor<?x0xi32>
+}
+// CHECK-NOT:   tensor.empty()
+
+// -----
+
+// CHECK-LABEL: func.func @scatter_zero_ext
+func.func @scatter_zero_ext(%arg0 : tensor<f32>, %arg1 : tensor<1x0xi32>, %arg2 : tensor<1xf32>) -> tensor<f32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+    ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+      %1 = "stablehlo.add"(%arg3, %arg4) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+      "stablehlo.return"(%1) : (tensor<f32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [],
+      inserted_window_dims = [],
+      scatter_dims_to_operand_dims = [],
+      index_vector_dim = 1
+    >,
+    indices_are_sorted = true,
+    unique_indices = true
+  } : (tensor<f32>, tensor<1x0xi32>, tensor<1xf32>) -> tensor<f32>
+  func.return %0 : tensor<f32>
+}
+
+// CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x0xi32>
+// CHECK:   %[[SCATTER:.+]] = "stablehlo.scatter"(%arg0, %0, %arg2)
+// CHECK:   return %[[SCATTER]] 
+
+// -----
+
+  func.func public @sort_zero_extent(%arg0: tensor<0xi16> {jax.arg_info = "a", mhlo.sharding = "{replicated}"}) -> (tensor<0xi32> {jax.result_info = ""}) {
+    %0 = stablehlo.iota dim = 0 : tensor<0xi32>
+    %1:2 = "stablehlo.sort"(%arg0, %0) ({
+    ^bb0(%arg1: tensor<i16>, %arg2: tensor<i16>, %arg3: tensor<i32>, %arg4: tensor<i32>):
+      %2 = stablehlo.compare  LT, %arg1, %arg2,  SIGNED : (tensor<i16>, tensor<i16>) -> tensor<i1>
+      stablehlo.return %2 : tensor<i1>
+    }) {dimension = 0 : i64, is_stable = true} : (tensor<0xi16>, tensor<0xi32>) -> (tensor<0xi16>, tensor<0xi32>)
+    return %1#1 : tensor<0xi32>
+  }
+
+// CHECK-LABEL: @sort_zero_extent
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<0xi32>
+// CHECK: return %[[EMPTY]]
+
+// -----
+
+// CHECK-LABEL: @while_zero_extent
+// CHECK: %[[R0:.+]] = tensor.empty() : tensor<75x0xf32>
+// CHECK: %[[R1:.+]] = tensor.empty() : tensor<75x0xf32>
+// CHECK: %[[R2:.+]]:2 = stablehlo.while
+// CHECK: return %[[R2]]#0, %[[R0]]
+
+
+func.func public @while_zero_extent(%arg0: tensor<i32>, %arg1: tensor<3xf32>, %arg2: tensor<75x0xf32>) -> (tensor<i32>, tensor<75x0xf32>) {
+  %0 = stablehlo.constant dense<1> : tensor<i32>
+  %1 = stablehlo.constant dense<75> : tensor<i32>
+  %2 = stablehlo.constant dense<0> : tensor<i32>
+  %3:2 = stablehlo.while(%iterArg = %2, %iterArg_2 = %arg2) : tensor<i32>, tensor<75x0xf32>
+   cond {
+    %4 = stablehlo.compare  LT, %iterArg, %1,  SIGNED : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    stablehlo.return %4 : tensor<i1>
+  } do {
+    %44 = stablehlo.add %iterArg, %0 : tensor<i32>
+    stablehlo.return %44, %iterArg_2 : tensor<i32>, tensor<75x0xf32>
+  }
+  return %3#0, %3#1 : tensor<i32>, tensor<75x0xf32>
+}

@@ -92,6 +92,7 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     LLVMTargetParser
+    MLIRIR
   PUBLIC
 )
 

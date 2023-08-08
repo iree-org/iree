@@ -46,6 +46,7 @@ iree_cc_library(
     ::PassesIncGen
     ::Runtime
     LLVMSupport
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRPass
@@ -62,7 +63,9 @@ iree_cc_library(
   SRCS
     "Runtime.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::hal
     iree::hal::drivers::local_task::registration

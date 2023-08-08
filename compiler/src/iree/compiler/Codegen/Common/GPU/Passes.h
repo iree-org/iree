@@ -52,6 +52,9 @@ pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
 LogicalResult tileReductionToSerialLoops(func::FuncOp funcOp,
                                          bool fuseInputProducer = false);
 
+LogicalResult swizzleWorkgroupsInFunc(func::FuncOp funcOp,
+                                      unsigned swizzleLogTile);
+
 //===----------------------------------------------------------------------===//
 // Passes
 //===----------------------------------------------------------------------===//

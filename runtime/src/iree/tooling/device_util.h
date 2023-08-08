@@ -34,6 +34,15 @@ iree_status_t iree_hal_create_device_from_flags(
     iree_string_view_t default_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device);
 
+// Configures the |device| channel provider based on the current environment.
+// Today this simply checks to see if the process is running under MPI and
+// initializes that unconditionally.
+//
+// WARNING: not thread-safe and must only be called immediately after device
+// creation.
+iree_status_t iree_hal_device_set_default_channel_provider(
+    iree_hal_device_t* device);
+
 // Equivalent to iree_hal_device_profiling_begin with options sourced from
 // command line flags. No-op if profiling is not enabled.
 // Must be matched with a call to iree_hal_end_profiling_from_flags.

@@ -4,17 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Preprocessing/Common/PassDetail.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-codegen-rematerialize-parallel-ops"
+#define DEBUG_TYPE "iree-preprocessing-rematerialize-parallel-ops"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
 
 namespace {
 
@@ -25,15 +27,20 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
   return t.isIntOrIndexOrFloat();
 }
 
-/// Merge elementwise operations into their consumers.
-struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
+/// Rematerialize all parallel elementwise operations into its users within a
+/// `flow.dispatch.region`.
+struct RematerializeParallelOpsPattern
+    : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    // Avoid doing this for scalar operations. This is a temporary solution
-    // to address #14258. Ideally we should apply this pass more prescriptively
-    // instead of default always.
+    // Restrict to operations within pre-formed dispatches to avoid blanket
+    // rematerialization over the whole model.
+    if (Flow::isNonNullAndOutsideDispatch(genericOp))
+      return failure();
+
+    // Avoid doing this for scalar operations.
     auto isScalarValue = [](Value v) {
       return isScalarOrTensorOfSizeOne(v.getType());
     };
@@ -50,10 +57,6 @@ struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
       if (succeeded(fusionResult)) {
-        // Forward lowering config.
-        if (auto loweringAttr = getLoweringConfig(genericOp)) {
-          setLoweringConfig(fusionResult->fusedOp, loweringAttr);
-        }
         auto replacements = fusionResult->fusedOp->getResults().take_back(
             genericOp.getNumResults());
         rewriter.replaceOp(genericOp, replacements);
@@ -69,7 +72,7 @@ struct RematerializeParallelOpsPass
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
-    fusionPatterns.insert<MergeElementwiseOps>(funcOp.getContext());
+    fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
@@ -85,5 +88,6 @@ createRematerializeParallelOpsPass() {
   return std::make_unique<RematerializeParallelOpsPass>();
 }
 
+} // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir

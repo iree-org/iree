@@ -356,43 +356,6 @@ def IREEEliminateEmptyTensorsOp : Op<
   }];
 }
 
-def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
-    "iree.erase_hal_descriptor_type_from_memref",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Erase #hal.descriptor_type from MemRef memory space to ignore all IREE
-    memory space planning. This is meant to ease transitioning given that
-    various LLVM conversion upstream patterns assumes numeric memory space,
-    especially the default 0.
-
-    Return modes:
-    =============
-    The pass is ran on all FuncOp nested under the top-level op on which
-    the transform dialect interpreter pass is applied.
-
-    If any of the pass on any of the FuncOp fails, the transformation
-    definitely fails. Otherwise the transformation succeeds.
-
-    This transform does not consume the target handle.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs);
-
-  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -553,6 +516,49 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
       ::mlir::Operation *target,
       ::mlir::transform::ApplyToEachResultList &results,
       ::mlir::transform::TransformState &state);
+  }];
+}
+
+def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Swizzle workgroup ids";
+  let description = [{
+    Swizzle workgroup ids for better cache reuse.
+
+    This transform implements the following swizzling logic (x, y here are the
+    workgroup ids and tiledx, tiledy are the swizzled workgroup ids) :
+
+    t_tiledx = (x + (y % tile) * grid_size_x) / tile;
+    t_tiledy = (y / tile) * tile + (x + (y % tile) * grid_size_x) % tile;
+    c = grid_size_y % tile != 0 && ((y / tile) * tile + tile) > grid_size_y;
+    tiledx = c ? x : t_tiledx;
+    tiledy = c ? y : t_tiledy;
+
+    #### Return modes
+    This transform replaces the old workgroup ids inside the given operation's
+    region with swizzled workgroup ids.
+
+    It does not consume the target handle and always return success.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          I64Attr:$log_tile
+  );
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::func::FuncOp funcOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 

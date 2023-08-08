@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
@@ -457,9 +458,9 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   MLIRContext *ctx = forallOp->getContext();
   Location loc = forallOp->getLoc();
   // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
-  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimX);
-  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimY);
-  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
+  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimX);
+  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimY);
+  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimZ);
   if (forallOp.getNumResults() > 0)
     return forallOp->emitError(
         "only bufferized scf.forall lowers to workgroup");
@@ -939,31 +940,19 @@ void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
-//===---------------------------------------------------------------------===//
-// EraseHALDescriptorTypeFromMemRef
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+// WorkgroupSwizzleOp
+//===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::applyToOne(
-    transform::TransformRewriter &rewriter, ::mlir::Operation *target,
-    ::mlir::transform::ApplyToEachResultList &results,
-    ::mlir::transform::TransformState &state) {
-  if (!isa<func::FuncOp>(target)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "expects a func::FuncOp as the target op");
-  }
-  auto funcOp = cast<func::FuncOp>(target);
-
-  if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
-    return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "failed to erase #hal.descriptor_type as MemRef memory space");
-  }
-
+DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  (void)swizzleWorkgroupsInFunc(target, getLogTile());
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
+void transform_dialect::WorkgroupSwizzleOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);

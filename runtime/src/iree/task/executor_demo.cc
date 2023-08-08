@@ -37,7 +37,7 @@ static void simulate_work(const iree_task_tile_context_t* tile_context) {
   }
 }
 
-extern "C" int main(int argc, char* argv) {
+extern "C" int main(int argc, char* argv[]) {
   IREE_TRACE_SCOPE_NAMED("ExecutorTest::Any");
 
   iree_allocator_t allocator = iree_allocator_system();

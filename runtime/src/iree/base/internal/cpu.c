@@ -61,7 +61,7 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_LSE, hwcap,
                  IREE_HWCAP_ATOMICS);
   // LSE2/lse128 does not seem to be exposed in hwcaps.
-  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FULLFP16, hwcap,
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FP16, hwcap,
                  IREE_HWCAP_ASIMDHP);
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FP16FML, hwcap,
                  IREE_HWCAP_ASIMDFHM);
@@ -128,7 +128,7 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
       {
           .sysctl_key = "hw.optional.arm.FEAT_FP16",
           .out_field_index = 0,
-          .out_field_bits = IREE_CPU_DATA0_ARM_64_FULLFP16,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_FP16,
       },
       {
           .sysctl_key = "hw.optional.arm.FEAT_FHM",
@@ -196,7 +196,7 @@ static inline iree_cpuid_regs_t iree_cpuid_raw(uint32_t eax, uint32_t ecx) {
   regs.ecx = regs_array[2];
   regs.edx = regs_array[3];
 #else
-#error What's the __cpuidex built-in for this compiler?
+#error What is the __cpuidex built-in for this compiler?
 #endif
   return regs;
 }

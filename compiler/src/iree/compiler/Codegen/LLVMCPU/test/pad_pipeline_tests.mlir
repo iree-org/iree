@@ -199,9 +199,9 @@ hal.executable private @pad_consumer_fusion {
   }
 }
 //   CHECK-LABEL: func @pad_consumer_fusion_dispatch()
-//         CHECK:   %[[INPUT:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x14x14x256xf32>
-//         CHECK:   %[[FILTER:.+]] = hal.interface.binding.subspan {{.+}} : memref<3x3x256x256xf32>
-//         CHECK:   %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x14x14x256xf32>
+//         CHECK:   %[[INPUT:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x14x14x256xf32, #hal.descriptor_type<storage_buffer>>
+//         CHECK:   %[[FILTER:.+]] = hal.interface.binding.subspan {{.+}} : memref<3x3x256x256xf32, #hal.descriptor_type<storage_buffer>>
+//         CHECK:   %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x14x14x256xf32, #hal.descriptor_type<storage_buffer>>
 //     CHECK-DAG:   %[[FILTER_SUBVIEW:.+]] = memref.subview %[[FILTER]]
 //     CHECK-DAG:   %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
 //         CHECK:   scf.for

@@ -20,9 +20,11 @@ hal.executable private @pad_matmul_static_dispatch_0 {
         %cst = arith.constant 0.000000e+00 : f32
         %5 = linalg.fill ins(%cst : f32) outs(%50 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
-        //      CHECK: memref.assume_alignment %{{.*}}, 64 : memref<250x1020xf32>
-        // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32>)
-        // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32>)
+        //      CHECK: memref.assume_alignment %{{.*}}, 64 : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>
+        // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
+        // CHECK-NEXT: linalg.matmul
+        // CHECK-SAME:   ins(%{{.*}} : memref<250x500xf32, #hal.descriptor_type<storage_buffer>>, memref<500x1020xf32, #hal.descriptor_type<storage_buffer>>)
+        // CHECK-SAME:   outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
         // CHECK-NEXT: return
 
         %6 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
@@ -38,5 +40,4 @@ transform.sequence failures(propagate) {
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> (!transform.any_op)
   %func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-  transform.iree.erase_hal_descriptor_type_from_memref %func : (!transform.any_op) -> ()
 }

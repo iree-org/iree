@@ -13,6 +13,10 @@
 extern "C" {
 #endif  // __cplusplus
 
+// `query_tile_sizes` microkernel. Only used in the VMVX backend, because that
+// is the only place where target information is not known at compile time,
+// forcing deferral of tile-size selection to runtime.
+
 // Parameters for a query_tile_sizes operation.
 typedef struct iree_uk_query_tile_sizes_2d_params_t {
   iree_uk_uint32_t flags;

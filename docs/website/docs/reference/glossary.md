@@ -5,6 +5,7 @@ tags:
   - JAX
   - PyTorch
   - TensorFlow
+icon: octicons/book-16
 ---
 
 # Glossary

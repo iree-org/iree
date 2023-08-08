@@ -48,6 +48,7 @@ using llvm::dbgs;
 #define DBGS_VECTOR_TO_MMA() (dbgs() << '[' << DEBUG_VECTOR_TO_MMA << "] ")
 
 using namespace mlir;
+using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
 iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
@@ -102,13 +103,15 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
-          rewriter, transformOp, target, getWorkgroupDims(), getWarpDims(),
+          rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
           true);
   if (!diag.succeeded())
     return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
+  auto subgroupSizeAttr = rewriter.getIndexAttr(getSubgroupSize());
   rewriter.startRootUpdate(exportOp);
   exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
+  exportOp->setAttr(exportOp.getSubgroupSizeAttrName(), subgroupSizeAttr);
   rewriter.finalizeRootUpdate(exportOp);
   return DiagnosedSilenceableFailure::success();
 }
@@ -1474,6 +1477,21 @@ transform_dialect::EliminateGpuBarriersOp::applyToOne(
 
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::PackSharedMemoryAllocOp::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  packSharedMemoryAlloc(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::PackSharedMemoryAllocOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

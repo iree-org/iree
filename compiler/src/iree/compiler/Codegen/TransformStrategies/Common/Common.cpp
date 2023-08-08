@@ -32,8 +32,6 @@ using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
-    IREEEraseHALDescriptorTypeFromMemRefOp;
-using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::FuseIntoContainingOp;
 using transform::HoistRedundantTensorSubsetsOp;
@@ -353,9 +351,6 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
       });
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
-  Value memrefFunc =
-      b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
   return variantH;
 }
 

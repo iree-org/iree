@@ -581,9 +581,11 @@ Invocation::Invocation(Session &session)
   // Since the jitter invokes much of the top-level compiler recursively,
   // it must be injected at the top-level here vs in the pass pipeline
   // (or else the circular dependency cannot be resolved).
-  pipelineHooks.buildConstEvalPassPipelineCallback = [](OpPassManager &pm) {
-    pm.addPass(ConstEval::createJitGlobalsPass());
-  };
+  auto &targetRegistry = session.targetRegistry;
+  pipelineHooks.buildConstEvalPassPipelineCallback =
+      [&targetRegistry](OpPassManager &pm) {
+        pm.addPass(ConstEval::createJitGlobalsPass(targetRegistry));
+      };
   // The PluginSession implements PipelineExtensions and delegates it to
   // activated plugins.
   pipelineHooks.pipelineExtensions = &session.pluginSession;
@@ -1271,15 +1273,36 @@ ireeCompilerInvocationOutputHALExecutable(iree_compiler_invocation_t *inv,
 
 void ireeCompilerRegisterDialects(MlirDialectRegistry registry) {
   mlir::DialectRegistry *cppRegistry = unwrap(registry);
-  mlir::iree_compiler::registerAllDialects(*cppRegistry);
-  mlir::iree_compiler::registerLLVMIRTranslations(*cppRegistry);
+
+  if (!globalInit) {
+    llvm::errs() << "FATAL ERROR: Not initialized\n";
+    abort();
+  }
+  globalInit->registry.appendTo(*cppRegistry);
+
+  // The local binder is meant for overriding session-level options, but for
+  // tools like this it is unused.
+  mlir::iree_compiler::PluginManagerOptions pluginManagerOptions;
+  auto localBinder = mlir::iree_compiler::OptionsBinder::local();
+  mlir::iree_compiler::PluginManagerSession pluginSession(
+      globalInit->pluginManager, localBinder, pluginManagerOptions);
+  if (failed(pluginSession.initializePlugins())) {
+    llvm::errs() << "error: Failed to initialize IREE compiler plugins\n";
+  }
+  pluginSession.registerDialects(*cppRegistry);
 }
 
 MlirContext ireeCompilerSessionBorrowContext(iree_compiler_session_t *session) {
+  if (failed(unwrap(session)->activatePluginsOnce())) {
+    return MlirContext{nullptr};
+  }
   return wrap(&unwrap(session)->context);
 }
 
 MlirContext ireeCompilerSessionStealContext(iree_compiler_session_t *session) {
+  if (failed(unwrap(session)->activatePluginsOnce())) {
+    return MlirContext{nullptr};
+  }
   return wrap(unwrap(session)->ownedContext.release());
 }
 

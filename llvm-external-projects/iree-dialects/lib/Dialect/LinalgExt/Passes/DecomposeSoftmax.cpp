@@ -62,22 +62,22 @@ static Value reduce(Value input, Value output, int64_t dim, Location loc,
   return genericOp.getResult(0);
 }
 
-static Value subtractAndExp(Value input, Value max, Value output, int64_t dim,
-                            Location loc, OpBuilder &builder) {
+static linalg::GenericOp subtractAndExp(Value input, Value max, Value output,
+                                        int64_t dim, Location loc,
+                                        OpBuilder &builder) {
   auto inputType = input.getType().cast<ShapedType>();
   ArrayRef<int64_t> inputShape = inputType.getShape();
   int64_t inputRank = inputShape.size();
   auto [iteratorTypes, indexingMaps] =
       computeIteratorTypesAndIndexingMaps(inputRank, dim, builder, true);
   indexingMaps.push_back(indexingMaps[0]);
-  auto genericOp = builder.create<linalg::GenericOp>(
+  return builder.create<linalg::GenericOp>(
       loc, input.getType(), ValueRange{input, max}, output, indexingMaps,
       iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
         Value diff = b.create<arith::SubFOp>(loc, args[0], args[1]);
         Value result = b.create<math::ExpOp>(loc, diff);
         b.create<linalg::YieldOp>(loc, result);
       });
-  return genericOp.getResult(0);
 }
 
 static Value computeSoftmax(Value numerator, Value denominator, Value output,
@@ -141,8 +141,9 @@ LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     Value max =
         reduce<arith::MaxFOp>(input, negativeInit, reductionDim, loc, rewriter);
     // Subtract max from input and exponentiate
-    Value numerator =
+    linalg::GenericOp numeratorOp =
         subtractAndExp(input, max, outputNd, reductionDim, loc, rewriter);
+    Value numerator = numeratorOp->getResult(0);
     // Compute sum along dim
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
@@ -156,11 +157,32 @@ LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     softmaxOp.getResult()[0].replaceAllUsesWith(result);
     // Delete the op after the walk.
     toDelete.push_back(softmaxOp.getOperation());
+
+    // Rematerialize operands that are marked for this.
+    SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
+        numerator.getUses(), [](OpOperand &use) { return &use; }));
+    for (OpOperand *use : uses) {
+      Operation *consumer = use->getOwner();
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(consumer);
+      FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
+          linalg::fuseElementwiseOps(rewriter, use);
+      if (succeeded(fusionResult)) {
+        SmallVector<Value> replacements = llvm::to_vector(
+            llvm::map_range(consumer->getResults(), [&](Value oldValue) {
+              return fusionResult->replacements.lookup(oldValue);
+            }));
+        rewriter.replaceOp(consumer, replacements);
+      }
+    }
+    toDelete.push_back(numeratorOp);
+
     return WalkResult::advance();
   });
   for (Operation *op : toDelete) {
     rewriter.eraseOp(op);
   }
+
   return success();
 }
 

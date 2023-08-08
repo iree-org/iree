@@ -95,6 +95,11 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse = false,
                             unsigned multiUseFusionIteration = 2);
 
+// Create a pass that generalizes some named Linalg ops into `linalg.generic`
+// operations since the IREE compiler can handle that better.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGeneralizeLinalgNamedOpsPass();
+
 // Infers and inserts util.numeric.optional_narrow ops at points that may be
 // beneficial.
 std::unique_ptr<Pass> createInferNumericNarrowingPass();

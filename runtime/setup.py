@@ -229,13 +229,15 @@ def prepare_installation():
     version_py_content = generate_version_py()
     print(f"Generating version.py:\n{version_py_content}", file=sys.stderr)
 
+    cfg = os.getenv("IREE_CMAKE_BUILD_TYPE", "Release")
+    strip_install = cfg == "Release"
+
     if not IS_CONFIGURED:
         # Build from source tree.
         os.makedirs(IREE_BINARY_DIR, exist_ok=True)
         maybe_nuke_cmake_cache()
         print(f"CMake build dir: {IREE_BINARY_DIR}", file=sys.stderr)
         print(f"CMake install dir: {CMAKE_INSTALL_DIR_ABS}", file=sys.stderr)
-        cfg = "Release"
         cmake_args = [
             "-GNinja",
             "--log-level=VERBOSE",
@@ -282,12 +284,13 @@ def prepare_installation():
 
     # Install the component we care about.
     install_args = [
-        "-DCMAKE_INSTALL_DO_STRIP=ON",
         f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}/",
         f"-DCMAKE_INSTALL_COMPONENT=IreePythonPackage-runtime",
         "-P",
         os.path.join(IREE_BINARY_DIR, "cmake_install.cmake"),
     ]
+    if strip_install:
+        install_args.append("-DCMAKE_INSTALL_DO_STRIP=ON")
     print(f"Installing with: {install_args}", file=sys.stderr)
     subprocess.check_call(["cmake"] + install_args, cwd=IREE_BINARY_DIR)
 
@@ -376,12 +379,11 @@ with open(
 ) as f:
     README = f.read()
 
-custom_package_suffix = os.getenv("IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX")
-if not custom_package_suffix:
-    custom_package_suffix = ""
+custom_package_suffix = os.getenv("IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX", "")
+custom_package_prefix = os.getenv("IREE_RUNTIME_CUSTOM_PACKAGE_PREFIX", "")
 
 setup(
-    name=f"iree-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",
+    name=f"{custom_package_prefix}iree-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-discuss@googlegroups.com",

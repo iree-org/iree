@@ -144,7 +144,6 @@ LogicalResult convertOp(func::CallOp oldOp, OpBuilder &builder,
 
   auto newResults = newOp.getResults();
   for (auto oldResult : oldOp.getResults()) {
-    llvm::SmallVector<Value, 10> subValues;
     auto newResult = recursiveRetuple(oldResult.getType(), &newResults, builder,
                                       oldOp->getLoc());
     mapping.map(oldResult, newResult);

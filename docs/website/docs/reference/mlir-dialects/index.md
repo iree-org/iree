@@ -1,3 +1,7 @@
+---
+icon: simple/llvm
+---
+
 # MLIR dialects
 
 These pages contain automatically generated documentation for the MLIR dialects

@@ -46,14 +46,12 @@ transform.sequence failures(propagate) {
       transform.apply_patterns.linalg.erase_unnecessary_inputs
     } : !transform.any_op
     %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> (!transform.any_op)
-    %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-    transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!transform.any_op) -> ()
 
     // Step 6. Post-bufferization vector distribution
     // ===========================================================================
     %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
-    %func_8 = transform.structured.hoist_redundant_vector_transfers %memref_func
+    %func_8 = transform.structured.hoist_redundant_vector_transfers %func_7
     : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func_8 {
       transform.apply_patterns.canonicalization

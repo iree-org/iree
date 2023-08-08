@@ -170,6 +170,7 @@ EXPORTS
   mlirBlockGetParentOperation
   mlirBlockGetParentRegion
   mlirBlockGetTerminator
+  mlirBlockInsertArgument
   mlirBlockInsertOwnedOperation
   mlirBlockInsertOwnedOperationAfter
   mlirBlockInsertOwnedOperationBefore
@@ -185,6 +186,8 @@ EXPORTS
   mlirContextAppendDialectRegistry
   mlirContextAttachDiagnosticHandler
   mlirContextCreate
+  mlirContextCreateWithRegistry
+  mlirContextCreateWithThreading
   mlirContextDestroy
   mlirContextDetachDiagnosticHandler
   mlirContextEnableMultithreading
@@ -196,6 +199,7 @@ EXPORTS
   mlirContextIsRegisteredOperation
   mlirContextLoadAllAvailableDialects
   mlirContextSetAllowUnregisteredDialects
+  mlirContextSetThreadPool
   mlirCreateExternalPass
   mlirDenseArrayAttrGetTypeID
   mlirDenseArrayGetNumElements
@@ -379,6 +383,8 @@ EXPORTS
   mlirIntegerTypeUnsignedGet
   mlirIsGlobalDebugEnabled
   mlirLinalgFillBuiltinNamedOpRegion
+  mlirLlvmThreadPoolCreate
+  mlirLlvmThreadPoolDestroy
   mlirLocationCallSiteGet
   mlirLocationEqual
   mlirLocationFileLineColGet
@@ -466,6 +472,7 @@ EXPORTS
   mlirOperationRemoveFromParent
   mlirOperationSetAttributeByName
   mlirOperationSetOperand
+  mlirOperationSetOperands
   mlirOperationStateAddAttributes
   mlirOperationStateAddOperands
   mlirOperationStateAddOwnedRegions
@@ -506,6 +513,7 @@ EXPORTS
   mlirRegionInsertOwnedBlock
   mlirRegionInsertOwnedBlockAfter
   mlirRegionInsertOwnedBlockBefore
+  mlirRegionTakeBody
   mlirRegisterLinalgPasses
   mlirShapedTypeGetDimSize
   mlirShapedTypeGetDynamicSize

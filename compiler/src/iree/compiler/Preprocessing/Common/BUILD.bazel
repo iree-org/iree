@@ -34,6 +34,7 @@ iree_compiler_cc_library(
         "PadLinalgOps.cpp",
         "PassDetail.h",
         "Passes.cpp",
+        "RematerializeParallelOps.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -41,11 +42,14 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorUtils",

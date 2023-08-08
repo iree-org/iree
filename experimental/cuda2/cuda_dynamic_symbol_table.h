@@ -84,3 +84,4 @@ IREE_CU_PFN_DECL(cuFuncSetAttribute, CUfunction, CUfunction_attribute, int)
 IREE_CU_PFN_DECL(cuLaunchKernel, CUfunction, unsigned int, unsigned int,
                  unsigned int, unsigned int, unsigned int, unsigned int,
                  unsigned int, CUstream, void**, void**)
+IREE_CU_PFN_DECL(cuLaunchHostFunc, CUstream, CUhostFn, void*);

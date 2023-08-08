@@ -183,6 +183,25 @@ TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
   iree_hal_semaphore_release(signal_semaphore_2);
 }
 
+// TODO: test device -> device synchronization: submit two batches with a
+// semaphore singal -> wait dependency.
+//
+// TODO: test device -> device synchronization: submit multiple batches with
+// multiple later batches waiting on the same signaling from a former batch.
+//
+// TODO: test device -> device synchronization: submit multiple batches with
+// a former batch signaling a value greater than all other batches' (different)
+// wait values.
+
+// TODO: test host + device -> device synchronization: submit two batches
+// with a later batch waiting on both a host and device singal to proceed.
+
+// TODO: test device -> host + device synchronization: submit two batches
+// with a former batch signaling to enable both host and device to proceed.
+
+// TODO: test signaling a larger value before/after enqueuing waiting a smaller
+// value to the device.
+
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree

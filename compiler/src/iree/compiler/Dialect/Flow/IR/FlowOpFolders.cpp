@@ -561,10 +561,9 @@ canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
   mixedOffsets.assign(op.getMixedOffsets());
   mixedSizes.assign(op.getMixedSizes());
   mixedStrides.assign(op.getMixedStrides());
-  Builder builder(op.getContext());
-  if (failed(foldDynamicIndexList(builder, mixedOffsets)) &&
-      failed(foldDynamicIndexList(builder, mixedSizes)) &&
-      failed(foldDynamicIndexList(builder, mixedStrides))) {
+  if (failed(foldDynamicIndexList(mixedOffsets)) &&
+      failed(foldDynamicIndexList(mixedSizes)) &&
+      failed(foldDynamicIndexList(mixedStrides))) {
     return failure();
   }
 

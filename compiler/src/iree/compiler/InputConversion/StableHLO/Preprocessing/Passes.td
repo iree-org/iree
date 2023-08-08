@@ -34,8 +34,13 @@ def EinsumToDotGeneral :
 }
 
 def FlattenTuplesInCFG :
-    Pass<"iree-stablehlo-preprocessing-flatten-tuples", "ModuleOp"> {
+    Pass<"iree-stablehlo-preprocessing-flatten-cfg-tuples", "ModuleOp"> {
   let summary = "Flattens tuples in the CFG form of StableHLO";
+}
+
+def FlattenTuplesInSCF :
+    Pass<"iree-stablehlo-preprocessing-flatten-scf-tuples", "ModuleOp"> {
+  let summary = "Flattens tuples in the SCF form of StableHLO";
 }
 
 def GatherToTorchIndexSelect :

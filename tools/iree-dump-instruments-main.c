@@ -180,16 +180,16 @@ static iree_status_t iree_tooling_dump_dispatch_ringbuffer(
         const iree_instrument_dispatch_print_t* print =
             (const iree_instrument_dispatch_print_t*)header;
         fprintf(stream, "%016" PRIX64 " | PRINT %.*s\n",
-                print->workgroup_offset, (int)print->length, print->data);
+                (uint64_t)print->workgroup_offset, (int)print->length,
+                print->data);
         i += iree_host_align(sizeof(*print) + print->length, 16);
         break;
       }
       case IREE_INSTRUMENT_DISPATCH_TYPE_VALUE: {
         const iree_instrument_dispatch_value_t* value =
             (const iree_instrument_dispatch_value_t*)header;
-        fprintf(stream,
-                "%016" PRIX64 " | VALUE %04u = ", value->workgroup_offset,
-                (uint32_t)value->ordinal);
+        fprintf(stream, "%016" PRIX64 " | VALUE %04u = ",
+                (uint64_t)value->workgroup_offset, (uint32_t)value->ordinal);
         iree_tooling_dump_print_value(value->type, value->bits, stream);
         fputc('\n', stream);
         i += sizeof(*value);
@@ -199,7 +199,7 @@ static iree_status_t iree_tooling_dump_dispatch_ringbuffer(
         const iree_instrument_dispatch_memory_op_t* op =
             (const iree_instrument_dispatch_memory_op_t*)header;
         fprintf(stream, "%016" PRIX64 " | LOAD  %016" PRIX64 " %u\n",
-                op->workgroup_offset, op->address, (int)op->length);
+                (uint64_t)op->workgroup_offset, op->address, (int)op->length);
         i += sizeof(*op);
         break;
       }
@@ -207,7 +207,7 @@ static iree_status_t iree_tooling_dump_dispatch_ringbuffer(
         const iree_instrument_dispatch_memory_op_t* op =
             (const iree_instrument_dispatch_memory_op_t*)header;
         fprintf(stream, "%016" PRIX64 " | STORE %016" PRIX64 " %u\n",
-                op->workgroup_offset, op->address, (int)op->length);
+                (uint64_t)op->workgroup_offset, op->address, (int)op->length);
         i += sizeof(*op);
         break;
       }

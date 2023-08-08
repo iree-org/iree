@@ -86,6 +86,7 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::hal::drivers
   iree::hal::utils::allocators
   iree::modules::hal
+  iree::tooling::device_util
   iree::tooling::modules
   iree::vm
   iree::vm::bytecode::module

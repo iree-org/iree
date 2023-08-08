@@ -95,7 +95,10 @@ static void iree_uk_benchmark_register_mmt4d_impl(
   snprintf(name, sizeof name, "mmt4d_%s_tile_%dx%dx%d%s", type_str, M0, N0, K0,
            code_path_suffix);
   iree_uk_mmt4d_params_t params = {
-      .flags = flags, .M0 = M0, .N0 = N0, .K0 = K0};
+      .flags = flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS,
+      .M0 = M0,
+      .N0 = N0,
+      .K0 = K0};
   iree_uk_benchmark_register(name, iree_uk_benchmark_mmt4d, &params,
                              sizeof params, cpu_features);
 }
@@ -128,6 +131,16 @@ int main(int argc, char** argv) {
   // both.
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
                                    "");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1,
+                                   "");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1,
+                                   "fp16fml");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1,
+                                   "");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1,
+                                   "fp16");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4,
+                                   "bf16");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1,
                                    "");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4,
@@ -138,6 +151,14 @@ int main(int argc, char** argv) {
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
                                    "avx2_fma");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 16, 16, 1,
+                                   "avx512_base");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1,
+                                   "avx2_fma");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 16, 16, 1,
+                                   "avx512_base");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1,
+                                   "avx2_fma");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 16, 16, 1,
                                    "avx512_base");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 2,
                                    "avx2_fma");

@@ -34,6 +34,7 @@ iree_lit_test_suite(
     "form_dispatch_workgroups.mlir"
     "form_scalar_dispatches.mlir"
     "fusion_of_tensor_ops.mlir"
+    "generalize_named_ops.mlir"
     "infer_numeric_narrowing.mlir"
     "initialize_empty_tensors.mlir"
     "inject_dispatch_tracing.mlir"

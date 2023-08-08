@@ -174,6 +174,12 @@ def FusionOfTensorOps :
   ];
 }
 
+def GeneralizeLinalgNamedOps :
+    InterfacePass<"iree-flow-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Convert some Linalg named ops into linalg.generics";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createGeneralizeLinalgNamedOpsPass()";
+}
+
 def InferNumericNarrowing :
     Pass<"iree-flow-infer-numeric-narrowing", ""> {
   let summary = "Infers and inserts util.numeric.optional_narrow ops at points that may be beneficial";

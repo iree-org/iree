@@ -57,7 +57,7 @@ static bool getUsesIfAllTransferOp(Value value,
     }
 
     if (auto transferOp = dyn_cast<VectorTransferOpInterface>(userOp)) {
-      if (!transferOp.permutation_map().isMinorIdentity()) {
+      if (!transferOp.getPermutationMap().isMinorIdentity()) {
         uses.clear();
         LLVM_DEBUG(llvm::dbgs() << "failed: non-minor-identity transfer user: "
                                 << *userOp << "\n");

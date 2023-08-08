@@ -40,8 +40,9 @@ import json
 import shutil
 import subprocess
 import tarfile
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence, Tuple
 
+from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (
@@ -62,7 +63,6 @@ from common.android_device_utils import (
 )
 import common.common_arguments
 from e2e_test_artifacts import iree_artifacts
-from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_parameters
 
@@ -388,13 +388,10 @@ def main(args):
     commit = get_git_commit_hash("HEAD")
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    benchmark_group = benchmark_groups.get(args.target_device_name)
-    if benchmark_group is None:
-        raise ValueError("Target device not found in the benchmark config.")
-    run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group["run_configs"],
-        root_type=List[iree_definitions.E2EModelRunConfig],
+    run_configs = benchmark_suite_module.get_run_configs_by_target_and_shard(
+        benchmark_groups, args.target_device_name, args.shard_index
     )
+
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs, root_benchmark_dir=benchmark_config.root_benchmark_dir
     )

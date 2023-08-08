@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -48,6 +49,22 @@ ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
   return info;
 }
 
+// Enforce a limited allow-list of types that are legal to consider
+// constexpr operand or result types. Given MLIR's open type system,
+// it is best to be conservative here, and we limit to known value
+// types.
+bool isLegalConstExprType(Type t) {
+  if (llvm::isa<IntegerType, FloatType, IndexType>(t)) {
+    return true;
+  }
+
+  if (auto tensorType = llvm::dyn_cast<TensorType>(t)) {
+    return isLegalConstExprType(tensorType.getElementType());
+  }
+
+  return false;
+}
+
 } // namespace
 
 void registerConstExprDependentDialects(DialectRegistry &registry) {
@@ -56,21 +73,6 @@ void registerConstExprDependentDialects(DialectRegistry &registry) {
 }
 
 ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
-  // Special carve-out for unregistered testing ops.
-  if (!op->isRegistered()) {
-    // Reject.
-    if (op->getName().getStringRef() == "iree_unregistered.var_expr") {
-      return {};
-    }
-    // Accept.
-    if (op->getName().getStringRef() ==
-            "iree_unregistered.non_leaf_const_expr" ||
-        op->getName().getStringRef() == "iree_unregistered.const_expr") {
-      return getInfoForDefaultConstExprOp(op);
-    }
-    return {};
-  }
-
   // We have a specific allow-list for Linalg ops because we want to consider
   // new additions carefully.
   if (op->getDialect() ==
@@ -86,18 +88,43 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
     return {};
   }
 
-  // By default any effects make it non const-expr.
-  if (!isMemoryEffectFree(op)) {
-    return {};
-  }
-
   // By default, ops without results are not const-expr.
   if (op->getNumResults() == 0) {
     return {};
   }
 
+  // Forbid if illegal result types. It is sufficient to verify result
+  // types since all constexpr values must come from a result somewhere
+  // in the analyzed tree.
+  if (!llvm::all_of(op->getResultTypes(), isLegalConstExprType)) {
+    return {};
+  }
+
   // Forbid if part of a parent that should be treated atomically.
   if (op->getParentOfType<linalg::LinalgOp>()) {
+    return {};
+  }
+
+  // Special carve-out for unregistered testing ops.
+  // Since these are unregistered, we have to make this carve-out
+  // after any verification on structure but before any verification
+  // of traits (like effects). These specific unregistered ops
+  // override default traits.
+  if (!op->isRegistered()) {
+    // Reject.
+    if (op->getName().getStringRef() == "iree_unregistered.var_expr") {
+      return {};
+    }
+    // Accept.
+    if (op->getName().getStringRef() ==
+            "iree_unregistered.non_leaf_const_expr" ||
+        op->getName().getStringRef() == "iree_unregistered.const_expr") {
+      return getInfoForDefaultConstExprOp(op);
+    }
+  }
+
+  // By default any effects make it non const-expr.
+  if (!isMemoryEffectFree(op)) {
     return {};
   }
 

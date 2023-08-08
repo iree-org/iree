@@ -236,6 +236,9 @@ def prepare_installation():
     version_py_content = generate_version_py()
     print(f"Generating version.py:\n{version_py_content}", file=sys.stderr)
 
+    cfg = os.getenv("IREE_CMAKE_BUILD_TYPE", "Release")
+    strip_install = cfg == "Release"
+
     if not IS_CONFIGURED:
         # Build from source tree.
         subprocess.check_call(["cmake", "--version"])
@@ -243,7 +246,6 @@ def prepare_installation():
         maybe_nuke_cmake_cache()
         print(f"CMake build dir: {IREE_BINARY_DIR}", file=sys.stderr)
         print(f"CMake install dir: {CMAKE_INSTALL_DIR_ABS}", file=sys.stderr)
-        cfg = "Release"
         cmake_args = [
             "-GNinja",
             "--log-level=VERBOSE",
@@ -278,20 +280,19 @@ def prepare_installation():
             print(f"Not re-configuring (already configured)", file=sys.stderr)
 
         # Build.
-        subprocess.check_call(
-            ["cmake", "--build", ".", "--target", "compiler/all"], cwd=IREE_BINARY_DIR
-        )
+        subprocess.check_call(["cmake", "--build", "."], cwd=IREE_BINARY_DIR)
         print("Build complete.", file=sys.stderr)
 
     # Perform installation on the entire compiler/ tree as this is guaranteed
     # to have all of our installation targets.
-    install_subdirectory = os.path.join(IREE_BINARY_DIR, "compiler")
+    install_subdirectory = os.path.join(IREE_BINARY_DIR)
     install_args = [
-        "-DCMAKE_INSTALL_DO_STRIP=ON",
         f"-DCMAKE_INSTALL_PREFIX={CMAKE_INSTALL_DIR_ABS}",
         "-P",
         os.path.join(install_subdirectory, "cmake_install.cmake"),
     ]
+    if strip_install:
+        install_args.append("-DCMAKE_INSTALL_DO_STRIP=ON")
     print(f"Installing with: {install_args}", file=sys.stderr)
     subprocess.check_call(["cmake"] + install_args, cwd=install_subdirectory)
 
@@ -405,8 +406,11 @@ packages = find_namespace_packages(
 )
 print(f"Found compiler packages: {packages}")
 
+custom_package_suffix = os.getenv("IREE_COMPILER_CUSTOM_PACKAGE_SUFFIX", "")
+custom_package_prefix = os.getenv("IREE_COMPILER_CUSTOM_PACKAGE_PREFIX", "")
+
 setup(
-    name=f"iree-compiler{PACKAGE_SUFFIX}",
+    name=f"{custom_package_prefix}iree-compiler{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-discuss@googlegroups.com",

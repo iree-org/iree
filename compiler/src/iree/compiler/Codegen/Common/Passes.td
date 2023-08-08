@@ -150,6 +150,12 @@ def EliminateEmptyTensors :
   let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
 }
 
+def EmulateNarrowType :
+    Pass<"iree-codegen-emulate-narrow-type", "ModuleOp"> {
+  let summary = "Emulate narrow integer operations using wide integer operations";
+  let constructor = "mlir::iree_compiler::createEmulateNarrowTypePass()";
+}
+
 def EraseDeadAllocAndStores :
     Pass<"iree-codegen-erase-dead-alloc-and-stores", "func::FuncOp"> {
   let summary = "Erase alloc ops if all the uses are just stores";
@@ -316,12 +322,6 @@ def PolynomialApproximationPass :
   let summary = "Convert math operations to their polynomial approximation";
   let constructor =
       "mlir::iree_compiler::createPolynomialApproximationPass()";
-}
-
-def RematerializeParallelOps :
-    Pass<"iree-codegen-rematerialize-parallel-ops", "func::FuncOp"> {
-  let summary = "Pass to rematerialize and merge parallel ops to avoid creating temporary allocs.";
-  let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
 }
 
 def RemoveSingleIterationLoop :

@@ -24,6 +24,10 @@ iree_cc_library(
     "cuda_device.c"
     "cuda_device.h"
     "cuda_driver.c"
+    "event_pool.c"
+    "event_pool.h"
+    "event_semaphore.c"
+    "event_semaphore.h"
     "graph_command_buffer.c"
     "graph_command_buffer.h"
     "memory_pools.c"
@@ -32,12 +36,14 @@ iree_cc_library(
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
-    "nop_semaphore.c"
-    "nop_semaphore.h"
     "nccl_channel.c"
     "nccl_channel.h"
+    "pending_queue_actions.c"
+    "pending_queue_actions.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
+    "timepoint_pool.c"
+    "timepoint_pool.h"
     "tracing.c"
     "tracing.h"
   DEPS
@@ -45,6 +51,7 @@ iree_cc_library(
     iree::base
     iree::base::internal
     iree::base::internal::arena
+    iree::base::internal::event_pool
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::buffer_transfer

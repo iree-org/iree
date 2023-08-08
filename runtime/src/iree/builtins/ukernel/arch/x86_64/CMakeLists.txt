@@ -38,6 +38,7 @@ iree_bitcode_library(
     "-mavx"
     "-mavx2"
     "-mfma"
+    "-mf16c"
 )
 
 iree_bitcode_library(
@@ -53,6 +54,7 @@ iree_bitcode_library(
     "-mavx"
     "-mavx2"
     "-mfma"
+    "-mf16c"
     "-mavx512f"
     "-mavx512vl"
     "-mavx512cd"
@@ -71,6 +73,7 @@ iree_bitcode_library(
     "-mavx"
     "-mavx2"
     "-mfma"
+    "-mf16c"
     "-mavx512f"
     "-mavx512vl"
     "-mavx512cd"
@@ -107,6 +110,7 @@ iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX2_FMA
   CLANG_OR_GCC
     "-mavx2"
     "-mfma"
+    "-mf16c"
   MSVC
     "/arch:AVX2"
 )

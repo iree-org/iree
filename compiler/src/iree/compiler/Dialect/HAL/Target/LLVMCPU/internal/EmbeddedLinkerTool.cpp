@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LinkerTool.h"
 #include "iree/compiler/Utils/ToolUtils.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FileSystem.h"
@@ -89,7 +90,7 @@ public:
     // the downside of making some tooling (disassemblers/decompilers/binary
     // size analysis tools/etc) a bit harder to work with, though, so when
     // compiling in debug mode we export all the functions.
-    if (targetOptions.debugSymbols) {
+    if (targetOptions.target.debugSymbols) {
       for (auto llvmFunc : exportedFuncs) {
         llvmFunc->setVisibility(
             llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
@@ -185,7 +186,7 @@ public:
     flags.push_back("--hash-style=sysv");
 
     // Strip debug information (only, no relocations) when not requested.
-    if (!targetOptions.debugSymbols) {
+    if (!targetOptions.target.debugSymbols) {
       flags.push_back("--strip-debug");
     }
 

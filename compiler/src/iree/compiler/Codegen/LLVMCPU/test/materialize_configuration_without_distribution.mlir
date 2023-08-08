@@ -44,4 +44,3 @@ hal.executable private @matmul_static  {
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
-

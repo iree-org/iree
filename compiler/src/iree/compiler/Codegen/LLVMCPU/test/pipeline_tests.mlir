@@ -57,10 +57,11 @@ hal.executable private @check_no_cse {
 }
 // CHECK-LABEL: func.func @check_no_cse()
 //   CHECK-NOT:    memref.alloc
-//       CHECK:    %[[FOR:.+]] = scf.for
-//       CHECK:    %[[DIVF:.+]] = arith.divf %[[FOR]]
-//       CHECK:    %[[RES:.+]] = vector.extract %[[DIVF]]
-//       CHECK:    memref.store %[[RES]]
+//       CHECK:    scf.for
+//       CHECK:      arith.addf
+//       CHECK:    vector.reduction <add>
+//       CHECK:    arith.divf
+//       CHECK:    memref.store
 
 // -----
 
@@ -603,11 +604,11 @@ hal.executable private @ukernel_pass_through {
 //       CHECK:     hal.return %[[ARG1]], %[[ARG2]], %[[ARG2]]
 //       CHECK:   func @dispatch
 //       CHECK:     %[[INPUT0:.+]] = hal.interface.binding.subspan set(0) binding(0)
-//  CHECK-SAME:         memref<?xf32>
+//  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:     %[[INPUT1:.+]] = hal.interface.binding.subspan set(0) binding(1)
-//  CHECK-SAME:         memref<?xf32>
+//  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:     %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
-//  CHECK-SAME:         memref<?xf32>
+//  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
 //   CHECK-DAG:     %[[OFFSET:.+]] = affine.apply
 //   CHECK-DAG:     %[[SIZE:.+]] = affine.min
 //   CHECK-DAG:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[OUTPUT]][%[[OFFSET]]] [%[[SIZE]]]

@@ -92,6 +92,10 @@ createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 /// during bufferization.
 std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 
+/// A pass to emulate memref load operations that use narrow integer types
+/// with equivalent operations on supported wide integer types.
+std::unique_ptr<OperationPass<ModuleOp>> createEmulateNarrowTypePass();
+
 /// Creates a pass to erase dead alloc ops where all uses are just store ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createEraseDeadAllocAndStoresPass();
@@ -183,10 +187,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
 
 /// Pass to convert math operations to their polynomial approximation.
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
-
-/// Pass to merge parallel linalg operations.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createRematerializeParallelOpsPass();
 
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>>

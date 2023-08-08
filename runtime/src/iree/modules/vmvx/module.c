@@ -13,12 +13,15 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/vm/api.h"
 
 // Include the ukernel support library so that we can use its implementations
 // as fixed-function components of the runtime.
-#include "iree/base/internal/cpu.h"
 #include "iree/builtins/ukernel/api.h"
+
+// Additional ukernel code specific to VMVX.
+#include "iree/modules/vmvx/elementwise.h"
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0

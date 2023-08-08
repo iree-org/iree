@@ -43,9 +43,7 @@ td_library(
         "include/iree-dialects/Dialect/LinalgExt/Passes/*.td",
         "include/iree-dialects/Dialect/LinalgTransform/*.td",
         "python/iree/compiler/dialects/*.td",
-    ]) + [
-        "@llvm-project//mlir:include/mlir/Bindings/Python/Attributes.td",
-    ],
+    ]),
     includes = ["include"],
     deps = [
         "@llvm-project//mlir:BuiltinDialectTdFiles",
@@ -600,7 +598,6 @@ cc_library(
         "@llvm-project//mlir:AsyncToLLVM",
         "@llvm-project//mlir:FuncToLLVM",
         "@llvm-project//mlir:IndexToLLVM",
-        "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgToStandard",
         "@llvm-project//mlir:MathToLLVM",
         "@llvm-project//mlir:MemRefToLLVM",

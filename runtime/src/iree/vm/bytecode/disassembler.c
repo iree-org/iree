@@ -2177,8 +2177,10 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 iree_status_t iree_vm_bytecode_trace_disassembly(
     iree_vm_stack_frame_t* frame, iree_vm_source_offset_t pc,
     const iree_vm_registers_t* regs, FILE* file) {
+  IREE_ALLOCATOR_INLINE_STORAGE(inline_storage, 2048);
   iree_string_builder_t b;
-  iree_string_builder_initialize(iree_allocator_system(), &b);
+  iree_string_builder_initialize(
+      iree_allocator_inline_arena(&inline_storage.header), &b);
 
   // TODO(benvanik): ensure frame is in-sync before call or restore original.
   // It's shady to manipulate the frame here but I know we expect the pc to be

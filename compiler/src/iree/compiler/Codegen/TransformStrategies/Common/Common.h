@@ -21,13 +21,13 @@ namespace iree_compiler {
 // Base quantities generally useful for all CPU and GPU strategies.
 //===----------------------------------------------------------------------===//
 inline Attribute blockX(MLIRContext *ctx) {
-  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimX);
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::MappingId::DimX);
 }
 inline Attribute blockY(MLIRContext *ctx) {
-  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimY);
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::MappingId::DimY);
 }
 inline Attribute blockZ(MLIRContext *ctx) {
-  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::Blocks::DimZ);
+  return mlir::gpu::GPUBlockMappingAttr::get(ctx, mlir::gpu::MappingId::DimZ);
 }
 
 struct AbstractReductionStrategy;

@@ -58,6 +58,21 @@ def IREEInput_VariantType : IREEInput_Type<"Variant"> {
   }];
 }
 
+def IREEInput_ByteBufferType : IREEInput_Type<"ByteBuffer"> {
+  let mnemonic = "byte_buffer";
+
+  let summary = [{a reference counted byte buffer}];
+  let description = [{
+    A reference counted byte buffer that models a pointer, offset, and length.
+  }];
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return $_get($_ctxt);
+    }]>
+  ];
+}
+
 def IREEInput_ListType : IREEInput_Type<"List"> {
   let mnemonic = "list";
 

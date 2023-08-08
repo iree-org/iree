@@ -13,6 +13,11 @@
 extern "C" {
 #endif  // __cplusplus
 
+// `unpack` microkernel. Currently only used in the VMVX backend, not used in
+// the LLVMCPU backend, because codegen is thought to be good enough and because
+// pack ops tend to get fused with many other ops, with substantial performance
+// benefit outweighing the microkernel advantage.
+
 typedef struct iree_uk_unpack_params_t {
   const void* in_buffer;
   iree_uk_index_t in_offset;
