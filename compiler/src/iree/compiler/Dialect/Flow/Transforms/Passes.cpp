@@ -272,11 +272,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
       // Enable data tiling after all linalg level transformations.
-      .addPredicatedPass(clEnableDataTiling, []() {
-        return createSetEncodingPass(clDataTilingAssumeTileSizesDivisorsOf);
-      });
-
-  FunctionLikeNest(passManager)
+      .addPredicatedPass(clEnableDataTiling,
+                         []() {
+                           return createSetEncodingPass(
+                               clDataTilingAssumeTileSizesDivisorsOf);
+                         })
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),
