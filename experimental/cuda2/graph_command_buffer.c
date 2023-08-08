@@ -434,7 +434,7 @@ static iree_status_t iree_hal_cuda2_command_segment_record_barrier(
   // barrier segment.
   for (iree_hal_cuda2_command_segment_t* segment = base_segment->prev; segment;
        segment = segment->prev) {
-    if (segment->action == IREE_HAL_cuda2_COMMAND_SEGMENT_ACTION_BARRIER) break;
+    if (segment->action == IREE_HAL_CUDA_COMMAND_SEGMENT_ACTION_BARRIER) break;
     nodes[--command_buffer->current_batch_count] = segment->cu_graph_node;
   }
   IREE_ASSERT(command_buffer->current_batch_count == 0);
