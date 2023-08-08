@@ -29,7 +29,7 @@ vm.module @my_module {
     // CHECK: %[[BUFFER_REF:.+]] = emitc.apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %[[BUFFER_PTR:.+]] = emitc.call "iree_vm_buffer_deref"(%[[BUFFER_REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
-    // CHECK: %[[RESULT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i64
+    // CHECK: %[[RESULT:.+]] = "emitc.variable"() <{value = 0 : i64}> : () -> i64
     // CHECK-NEXT: %[[RESULT_PTR:.+]] = emitc.apply "&"(%6) : (i64) -> !emitc.ptr<i64>
     // CHECK-NEXT: %[[STATUS:.+]] = emitc.call "vm_buffer_load_i64"(%[[BUFFER_PTR]], %[[C0]], %[[RESULT_PTR]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, !emitc.ptr<i64>) -> !emitc.opaque<"iree_status_t">
 
