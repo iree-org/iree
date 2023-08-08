@@ -50,6 +50,7 @@ iree_lit_test_suite(
             "raise_special_ops.mlir",
             "remove_zero_extent_tensors.mlir",
             "set_encoding.mlir",
+            "set_encoding_with_assumption.mlir",
             "strip_and_splat_constant_variables.mlir",
             "strip_signedness.mlir",
             "tensor_pad_to_tensor_insert_slice.mlir",
