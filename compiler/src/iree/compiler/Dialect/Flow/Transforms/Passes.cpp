@@ -276,10 +276,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
         return createSetEncodingPass(clDataTilingAssumeTileSizesDivisorsOf);
       });
 
-  if (transformOptions.constExprHoisting) {
-    passManager.addPass(IREE::Util::createHoistIntoGlobalsPass());
-  }
-
   FunctionLikeNest(passManager)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
