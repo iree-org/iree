@@ -1055,20 +1055,25 @@ struct ReorderElementwiseAndShapeOp final
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     if (op->getOperands().size() != 1) {
-      return rewriter.notifyMatchFailure(op, "expected to be unary.");
+      return rewriter.notifyMatchFailure(op, "expected to be unary");
     }
 
     auto definingOp = op->getOperand(0).getDefiningOp();
     if (!definingOp) {
       return rewriter.notifyMatchFailure(
-          op, "expected to have an op before elementise op.");
+          op, "expected to have an op before elementise op");
     }
 
     if (!isa<mlir::stablehlo::ReshapeOp>(definingOp) &&
         !isa<mlir::stablehlo::TransposeOp>(definingOp) &&
         !isa<mlir::stablehlo::BroadcastOp>(definingOp)) {
       return rewriter.notifyMatchFailure(
-          op, "defining operation of unexpected type.");
+          op, "defining operation of unexpected type");
+    }
+
+    // Only reorder if the defining op has no other uses.
+    if (!llvm::hasSingleElement(definingOp->getResult(0).getUses())) {
+      return rewriter.notifyMatchFailure(op, "operation has more than one use");
     }
 
     Value input = definingOp->getOperand(0);

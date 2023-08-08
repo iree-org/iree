@@ -736,3 +736,20 @@ func.func @reorder_with_type_change(%arg0 : tensor<3x4xi32>) -> tensor<12xi64> {
 // CHECK: %[[RESHAPE:.+]] = stablehlo.reshape %[[CONVERT]] : (tensor<3x4xi64>) -> tensor<12xi64>
 // CHECK: return %[[RESHAPE]]
 
+// -----
+
+func.func @do_not_reorder_with_other_uses(%arg0: tensor<2x2xf64>, %arg1: tensor<4xf32>, %arg2: tensor<f64>) -> (tensor<f64>, tensor<4xf32>) {
+  %0 = stablehlo.reshape %arg0 : (tensor<2x2xf64>) -> tensor<4xf64>
+  %1 = stablehlo.convert %0 : (tensor<4xf64>) -> tensor<4xf32>
+  %2 = stablehlo.subtract %arg1, %1 : tensor<4xf32>
+  %3 = stablehlo.reduce(%0 init: %arg2) across dimensions = [0] : (tensor<4xf64>, tensor<f64>) -> tensor<f64>
+    reducer(%arg3: tensor<f64>, %arg4: tensor<f64>)  {
+    %4 = stablehlo.add %arg3, %arg4 : tensor<f64>
+    stablehlo.return %4 : tensor<f64>
+  }
+  return %3, %2 : tensor<f64>, tensor<4xf32>
+}
+
+// CHECK-LABEL: do_not_reorder_with_other_uses
+// CHECK: %[[RESHAPE:.+]] = stablehlo.reshape %arg0 : (tensor<2x2xf64>) -> tensor<4xf64>
+// CHECK: %[[CONVERT:.+]] = stablehlo.convert %[[RESHAPE]] : (tensor<4xf64>) -> tensor<4xf32>
