@@ -66,6 +66,7 @@ iree_cc_library(
     "task_impl.h"
     "topology.c"
     "topology_cpuinfo.c"
+    "topology_win32.c"
     "worker.c"
     "worker.h"
   DEPS
