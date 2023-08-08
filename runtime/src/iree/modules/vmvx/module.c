@@ -251,21 +251,21 @@ static iree_status_t iree_vm_shim_ukernel_x32b_2d_v(
                             "argument/result signature mismatch");
   }
 
-  MAP_BUFFER_2D_RO(lhs, uint32_t,
+  MAP_BUFFER_2D_RO(lhs, iree_uk_uint32_t,
                    /*buffer_ref=*/args->lhs_ref,
                    /*offset=*/args->lhs_offset,
                    /*stride0=*/args->lhs_stride0,
                    /*stride1=*/args->lhs_stride1,
                    /*size0=*/args->size0,
                    /*size1=*/args->size1);
-  MAP_BUFFER_2D_RO(rhs, uint32_t,
+  MAP_BUFFER_2D_RO(rhs, iree_uk_uint32_t,
                    /*buffer_ref=*/args->rhs_ref,
                    /*offset=*/args->rhs_offset,
                    /*stride0=*/args->rhs_stride0,
                    /*stride1=*/args->rhs_stride1,
                    /*size0=*/args->size0,
                    /*size1=*/args->size1);
-  MAP_BUFFER_2D_RW(out, uint32_t,
+  MAP_BUFFER_2D_RW(out, iree_uk_uint32_t,
                    /*buffer_ref=*/args->out_ref,
                    /*offset=*/args->out_offset,
                    /*stride0=*/args->out_stride0,
@@ -320,14 +320,14 @@ static iree_status_t iree_vm_shim_ukernel_x32u_2d_v(
                             "argument/result signature mismatch");
   }
 
-  MAP_BUFFER_2D_RO(in, uint32_t,
+  MAP_BUFFER_2D_RO(in, iree_uk_uint32_t,
                    /*buffer_ref=*/args->in_ref,
                    /*offset=*/args->in_offset,
                    /*stride0=*/args->in_stride0,
                    /*stride1=*/args->in_stride1,
                    /*size0=*/args->size0,
                    /*size1=*/args->size1);
-  MAP_BUFFER_2D_RW(out, uint32_t,
+  MAP_BUFFER_2D_RW(out, iree_uk_uint32_t,
                    /*buffer_ref=*/args->out_ref,
                    /*offset=*/args->out_offset,
                    /*stride0=*/args->out_stride0,
