@@ -1075,8 +1075,8 @@ struct ReorderElementwiseAndShapeOp final
     auto intermediateResult = definingOp->getResult(0);
     if (std::distance(intermediateResult.getUses().begin(),
                       intermediateResult.getUses().end()) != 1) {
-      return rewriter.notifyMatchFailure(
-          op, "operation has more than one use.");
+      return rewriter.notifyMatchFailure(op,
+                                         "operation has more than one use.");
     }
 
     Value input = definingOp->getOperand(0);
