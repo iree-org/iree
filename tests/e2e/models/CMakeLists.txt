@@ -26,8 +26,8 @@ iree_lit_test_suite(
     iree-run-mlir
   LABELS
     "driver=local-task"
-    "driver=vulkan"
     "driver=metal"
+    "driver=vulkan"
     "hostonly"
     "optonly"
 )
