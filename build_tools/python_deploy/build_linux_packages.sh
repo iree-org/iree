@@ -151,19 +151,16 @@ function build_wheel() {
 }
 
 function build_iree_runtime() {
-  IREE_HAL_DRIVER_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
   build_wheel runtime/
 }
 
 function build_iree_runtime_instrumented() {
-  IREE_HAL_DRIVER_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
   IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   build_wheel runtime/
 }
 
 function build_iree_compiler() {
-  IREE_TARGET_BACKEND_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
   build_wheel compiler/
 }
 

@@ -20,7 +20,6 @@
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
 #
 # Select CMake options are available from environment variables:
-#   IREE_TARGET_BACKEND_CUDA
 #   IREE_ENABLE_CPUINFO
 
 from gettext import install
@@ -257,7 +256,6 @@ def prepare_installation():
             "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON",
             "-DPython3_EXECUTABLE={}".format(sys.executable),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
-            get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
             # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU here (and in env)
             get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
         ]

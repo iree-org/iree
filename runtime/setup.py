@@ -21,7 +21,6 @@
 #   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX
 #
 # Select CMake options are available from environment variables:
-#   IREE_HAL_DRIVER_CUDA
 #   IREE_HAL_DRIVER_VULKAN
 #   IREE_ENABLE_RUNTIME_TRACING
 #   IREE_BUILD_TRACY
@@ -249,7 +248,6 @@ def prepare_installation():
             "-DIREE_BUILD_TESTS=OFF",
             "-DPython3_EXECUTABLE={}".format(sys.executable),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
-            get_env_cmake_option("IREE_HAL_DRIVER_CUDA"),
             get_env_cmake_option(
                 "IREE_HAL_DRIVER_VULKAN",
                 "OFF" if platform.system() == "Darwin" else "ON",
