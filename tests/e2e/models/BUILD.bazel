@@ -34,6 +34,7 @@ iree_lit_test_suite(
     tags = [
         "driver=local-task",
         "driver=vulkan",
+        "driver=metal",
         "hostonly",
         "optonly",  # swiftshader is too slow in dbg
     ],

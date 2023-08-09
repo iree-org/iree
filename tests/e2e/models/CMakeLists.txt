@@ -27,6 +27,7 @@ iree_lit_test_suite(
   LABELS
     "driver=local-task"
     "driver=vulkan"
+    "driver=metal"
     "hostonly"
     "optonly"
 )
