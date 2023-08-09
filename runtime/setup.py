@@ -216,13 +216,15 @@ def get_env_cmake_option(name: str, default_value: bool = False) -> str:
         svalue = "ON" if default_value else "OFF"
     return f"-D{name}={svalue}"
 
+
 def get_env_cmake_list(name: str, default_value: str = "") -> str:
     svalue = os.getenv(name)
     if not svalue:
-      if not default_value:
-        return f"-U{name}"
-      svalue = default_value
+        if not default_value:
+            return f"-U{name}"
+        svalue = default_value
     return f"-D{name}={svalue}"
+
 
 def add_env_cmake_setting(args, env_name: str, cmake_name=None) -> str:
     svalue = os.getenv(env_name)
