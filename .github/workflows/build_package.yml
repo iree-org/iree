@@ -78,8 +78,7 @@ jobs:
             build-family: windows
             build-package: py-compiler-pkg
             experimental: true
-          - runs-on:
-              - ${{ github.repository == 'openxla/iree' && 'windows-2022-64core' || 'windows-2022'}}
+          - runs-on: windows-2022
             build-family: windows
             build-package: py-runtime-pkg
             experimental: true
