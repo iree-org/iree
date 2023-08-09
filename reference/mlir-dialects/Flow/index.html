@@ -3864,7 +3864,7 @@ deciding which ops should form a dispatch region.</p>
 region represent the workload for the dispatch, and returns the number of
 workgroups for the dispatch. The region is lowered directly to
 <code>workload_count</code> region of <code>dispatch.workgroups</code>.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, SingleBlockImplicitTerminator<IREE::Flow::ReturnOp></p>
+<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
 <h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
@@ -4330,7 +4330,7 @@ argument by writing the argument operand's SSA value instead of its type:
 E.g., in the above example, <code>-&gt; %0</code> would tie the first argument to the
 result. In that case, there would be no separate block argument for the
 result.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, IsolatedFromAbove, SingleBlockImplicitTerminator<IREE::Flow::ReturnOp></p>
+<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, IsolatedFromAbove</p>
 <p>Interfaces: ClosureOpInterface, ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
 <h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
