@@ -216,6 +216,13 @@ def get_env_cmake_option(name: str, default_value: bool = False) -> str:
         svalue = "ON" if default_value else "OFF"
     return f"-D{name}={svalue}"
 
+def get_env_cmake_list(name: str, default_value: str = "") -> str:
+    svalue = os.getenv(name)
+    if not svalue:
+      if not default_value:
+        return f"-U{name}"
+      svalue = default_value
+    return f"-D{name}={svalue}"
 
 def add_env_cmake_setting(args, env_name: str, cmake_name=None) -> str:
     svalue = os.getenv(env_name)
@@ -252,6 +259,7 @@ def prepare_installation():
                 "IREE_HAL_DRIVER_VULKAN",
                 "OFF" if platform.system() == "Darwin" else "ON",
             ),
+            get_env_cmake_list("IREE_EXTERNAL_HAL_DRIVERS", ""),
             get_env_cmake_option("IREE_ENABLE_RUNTIME_TRACING"),
             get_env_cmake_option("IREE_BUILD_TRACY"),
             get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
