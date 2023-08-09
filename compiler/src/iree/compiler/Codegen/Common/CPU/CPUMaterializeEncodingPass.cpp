@@ -131,20 +131,32 @@ static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
 
 struct CPUMaterializeEncodingPass
     : public CPUMaterializeEncodingBase<CPUMaterializeEncodingPass> {
+  CPUMaterializeEncodingPass() : targetAttr(nullptr) {}
+  explicit CPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr attr)
+      : targetAttr(attr) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Codegen::IREECodegenDialect>();
   }
   void runOnOperation() override;
+ private:
+  IREE::HAL::ExecutableTargetAttr targetAttr;
 };
 
 struct CPUMaterializeUpperBoundTileSizePass
     : public CPUMaterializeUpperBoundTileSizeBase<
           CPUMaterializeUpperBoundTileSizePass> {
+  CPUMaterializeUpperBoundTileSizePass() = default;
+  CPUMaterializeUpperBoundTileSizePass(
+      ArrayRef<IREE::HAL::ExecutableTargetAttr> attr)
+      : targetAttrs(attr) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect>();
   }
   void runOnOperation() override;
+
+private:
+  SmallVector<IREE::HAL::ExecutableTargetAttr, 4> targetAttrs;
 };
 
 FailureOr<MaterializeEncodingInfo>
@@ -235,7 +247,8 @@ void CPUMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
   RewritePatternSet materializeEncodingPattern(context);
-  auto targetAttr = ExecutableTargetAttr::lookup(operation);
+  if (!targetAttr)
+    targetAttr = ExecutableTargetAttr::lookup(operation);
   auto materializeEncodingFn = getMaterializeEncodingFn(targetAttr);
   if (!materializeEncodingFn) {
     return signalPassFailure();
@@ -269,8 +282,9 @@ void CPUMaterializeEncodingPass::runOnOperation() {
 void CPUMaterializeUpperBoundTileSizePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
-  auto targetAttrs =
-      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(operation);
+  if (targetAttrs.empty())
+    targetAttrs =
+        IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(operation);
   RewritePatternSet patterns(context);
   MaterializeEncodingFn materializeEncodingFn =
       getUpperBoundMaterializeEncodingFn(targetAttrs);
@@ -290,10 +304,19 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createCPUMaterializeEncodingPass() {
   return std::make_unique<CPUMaterializeEncodingPass>();
 }
+std::unique_ptr<OperationPass<func::FuncOp>>
+createCPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return std::make_unique<CPUMaterializeEncodingPass>(targetAttr);
+}
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeUpperBoundTileSizePass() {
   return std::make_unique<CPUMaterializeUpperBoundTileSizePass>();
+}
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCPUMaterializeUpperBoundTileSizePass(
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs) {
+  return std::make_unique<CPUMaterializeUpperBoundTileSizePass>(targetAttrs);
 }
 
 } // namespace iree_compiler

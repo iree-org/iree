@@ -26,6 +26,7 @@ iree_cc_library(
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
     "MaterializeDispatchInstrumentation.cpp"
+    "MaterializeHomogeneousEncodings.cpp"
     "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"

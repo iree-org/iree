@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -165,6 +166,7 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(IREE::Util::createIPOPass());
 
   if (transformOptions.constExprHoisting) {
+    pipeline.addPass(IREE::HAL::createMaterializeHomogeneousEncodingsPass());
     pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());
   }
 
@@ -218,7 +220,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Flow::createRemoveZeroExtentTensorsPass)
       .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
-      .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
+      .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass)
+      // Enable data tiling after all linalg level transformations.
+      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass);
+
   passManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
 
   // Start of Flow pipeline, verify input legality.
@@ -266,8 +271,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transpose.
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
-      // Enable data tiling after all linalg level transformations.
-      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),

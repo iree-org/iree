@@ -1957,9 +1957,12 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     // Multiple pack ops case is not supported.
     if (hasChanged)
       return WalkResult::interrupt();
+    if (packOp->isBeforeInBlock(rootOp))
+      return WalkResult::advance();
 
     hasChanged = true;
     LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n");
+
 
     // Only adjust tile sizes for distribution and TileAndFuse, which are the
     // first two tile lists.

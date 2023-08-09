@@ -106,6 +106,9 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createMemoizeDeviceQueriesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createMaterializeInterfacesPass();
 
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createMaterializeHomogeneousEncodingsPass();
+
 // Dumps individual hal.executable source listings to |path|.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDumpExecutableSourcesPass(StringRef path);
@@ -213,6 +216,7 @@ inline void registerHALPasses() {
   createLinkExecutablesPass(TargetBackendRegistry::getGlobal());
   createLinkTargetExecutablesPass(TargetBackendRegistry::getGlobal(), "");
   createMaterializeDispatchInstrumentationPass(0);
+  createMaterializeHomogeneousEncodingsPass();
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
   createMemoizeDeviceQueriesPass();
