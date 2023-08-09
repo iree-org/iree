@@ -69,12 +69,14 @@ function run() {
 
 function build_iree_runtime() {
   local python_version="$1"
+  IREE_HAL_DRIVER_CUDA=ON \
   IREE_HAL_DRIVER_VULKAN=ON \
   py -${python_version} -m pip wheel -v -w $output_dir $repo_root/runtime/
 }
 
 function build_iree_runtime_instrumented() {
   local python_version="$1"
+  IREE_HAL_DRIVER_CUDA=ON \
   IREE_HAL_DRIVER_VULKAN=ON IREE_ENABLE_RUNTIME_TRACING=ON \
   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   py -${python_version} -m pip wheel -v -w $output_dir $repo_root/runtime/
@@ -82,6 +84,7 @@ function build_iree_runtime_instrumented() {
 
 function build_iree_compiler() {
   local python_version="$1"
+  IREE_TARGET_BACKEND_CUDA=ON \
   py -${python_version} -m pip wheel -v -w $output_dir $repo_root/compiler/
 }
 
