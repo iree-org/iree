@@ -6,7 +6,8 @@
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
 /// Constant JIT'ing must be disabled because the transform-dialect debug
