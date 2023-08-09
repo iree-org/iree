@@ -20,6 +20,7 @@ iree_check_single_backend_test_suite(
     "softmax.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "attention.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER

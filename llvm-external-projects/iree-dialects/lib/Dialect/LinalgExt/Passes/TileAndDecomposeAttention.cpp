@@ -246,8 +246,13 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
   SmallVector<OpFoldResult> resultShape{sequenceTileLength, sequenceTileLength};
   Value emptySquare =
       builder.create<tensor::EmptyOp>(loc, resultShape, f32Type);
+  Value emptyVec = builder.create<tensor::EmptyOp>(
+      loc, ArrayRef<OpFoldResult>{sequenceTileLength}, f32Type);
   Value qkTranspose = computeQKTranspose(querySlice, keySlice, emptySquare,
                                          zero, loc, builder, ops);
+
+  Value copyMaxSlice =
+      builder.create<linalg::CopyOp>(loc, maxSlice, emptyVec).getResult(0);
 
   // Compute current statistics
   Value newMax = computeRowwiseReduction<arith::MaxFOp>(qkTranspose, maxSlice,
@@ -255,7 +260,9 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
   Value partialSoftmax =
       computePartialSoftmax(qkTranspose, newMax, loc, builder, ops);
   Value scaledOldSum =
-      updateAndScale(maxSlice, newMax, sumSlice, loc, builder, ops);
+      updateAndScale(copyMaxSlice, newMax, sumSlice, loc, builder, ops);
+  Value copyOldSum =
+      builder.create<linalg::CopyOp>(loc, scaledOldSum, emptyVec).getResult(0);
   Value newSum = computeRowwiseReduction<arith::AddFOp>(
       partialSoftmax, scaledOldSum, loc, builder, ops);
   Value inverseNewSum = computeReciprocal(newSum, loc, builder, ops);
@@ -268,7 +275,7 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
   }
 
   // Update accumulator
-  Value scaledAcc = scaleAccumulator(outputSlice, scaledOldSum, inverseNewSum,
+  Value scaledAcc = scaleAccumulator(outputSlice, copyOldSum, inverseNewSum,
                                      loc, builder, ops);
 
   // Compute matmul(softmax, v)

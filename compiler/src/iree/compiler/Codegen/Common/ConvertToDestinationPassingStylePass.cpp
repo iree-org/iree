@@ -641,6 +641,7 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
+    IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
