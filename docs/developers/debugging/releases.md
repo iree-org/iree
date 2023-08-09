@@ -5,9 +5,9 @@
 * `.github/workflows/build_package.yml`: Release packaging jobs
 * `build_tools/github_actions/build_dist.py`: Main script to build various
   release packages (for all platforms). We usually use this when reproing to
-  approximate exactly what the CI does. Assumes a subdirectory of `main_checkout`
+  approximate exactly what the CI does. Assumes a subdirectory of `c`
   and writes builds to `iree-build` and `iree-install` as a peer of it. To use
-  locally, just symlink your source dir as `main_checkout` in an empty
+  locally, just symlink your source dir as `c` in an empty
   directory (versus checking out).
 
 ## Manylinux releases
@@ -21,11 +21,11 @@ you arrange otherwise. `yum` can be used to get some packages.
 Get a docker shell (see exact docker image in build_package.yml workflow):
 
 ```shell
-docker run --rm -it -v $(pwd):/work/main_checkout stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest /bin/bash
+docker run --rm -it -v $(pwd):/work/c stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest /bin/bash
 ```
 
 Remember that docker runs as root unless if you take steps otherwise. Don't
-touch write files in the `/work/main_checkout` directory to avoid scattering
+touch write files in the `/work/c` directory to avoid scattering
 root owned files on your workstation.
 
 The default system Python is 2.x, so you must select one of the more modern
@@ -41,7 +41,7 @@ Build core installation:
 ```shell
 # (from within docker)
 cd /work
-python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
+python ./c/build_tools/github_actions/build_dist.py main-dist
 
 # Also supports:
 #   main-dist
