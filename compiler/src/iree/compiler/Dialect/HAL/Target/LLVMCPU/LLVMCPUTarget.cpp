@@ -11,6 +11,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
+#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -216,6 +217,15 @@ public:
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
     buildLLVMCPUCodegenPassPipeline(passManager);
+  }
+
+  void buildMaterializeEncodingsPassPipeline(
+      IREE::HAL::ExecutableTargetAttr executableTarget,
+      OpPassManager &passManager) override {
+    passManager.addNestedPass<func::FuncOp>(
+        createCPUMaterializeUpperBoundTileSizePass(executableTarget));
+    passManager.addNestedPass<func::FuncOp>(
+        createCPUMaterializeEncodingPass(executableTarget));
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {

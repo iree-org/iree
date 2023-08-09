@@ -131,20 +131,33 @@ static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
 
 struct CPUMaterializeEncodingPass
     : public CPUMaterializeEncodingBase<CPUMaterializeEncodingPass> {
+  CPUMaterializeEncodingPass() : targetAttr(nullptr) {}
+  explicit CPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr attr)
+      : targetAttr(attr) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Codegen::IREECodegenDialect>();
   }
   void runOnOperation() override;
+
+private:
+  IREE::HAL::ExecutableTargetAttr targetAttr;
 };
 
 struct CPUMaterializeUpperBoundTileSizePass
     : public CPUMaterializeUpperBoundTileSizeBase<
           CPUMaterializeUpperBoundTileSizePass> {
+  CPUMaterializeUpperBoundTileSizePass() : targetAttr(nullptr){};
+  explicit CPUMaterializeUpperBoundTileSizePass(
+      IREE::HAL::ExecutableTargetAttr attr)
+      : targetAttr(attr) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect>();
   }
   void runOnOperation() override;
+
+private:
+  IREE::HAL::ExecutableTargetAttr targetAttr;
 };
 
 FailureOr<MaterializeEncodingInfo>
@@ -190,42 +203,27 @@ getMaterializeEncodingFn(ExecutableTargetAttr targetAttr) {
 // allocated buffers, so it's OK to over-estimate (only wasting some memory)
 // but not under-estimate (would cause buffer overruns) padding amounts.
 MaterializeEncodingFn
-getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
+getUpperBoundMaterializeEncodingFn(ExecutableTargetAttr targetAttr) {
   return
-      [targetAttrs](
+      [targetAttr](
           RankedTensorType tensorType) -> FailureOr<MaterializeEncodingInfo> {
         FailureOr<MaterializeEncodingInfo> result; // Defaults to failure.
-        for (auto targetAttr : targetAttrs) {
-          FailureOr<MaterializeEncodingInfo> info =
-              materializeEncodingForTarget(tensorType, targetAttr);
-          if (failed(info)) {
-            // No info at this iteration. Ignore and continue.
-            continue;
-          }
-          if (failed(result)) {
-            // No preexisting result. Use this iteration's info and continue.
-            result = info;
-            continue;
-          }
-          // Merge this iteration's info into preexisting result info.
-          // Check that permutations match, then record the max of tile sizes.
-          if (info->innerDimsPos != result->innerDimsPos ||
-              info->outerDimsPerm != result->outerDimsPerm) {
-            return failure();
-          }
-          if (info->innerTileSizes.size() != result->innerTileSizes.size()) {
-            return failure();
-          }
-          for (unsigned i = 0; i < info->innerTileSizes.size(); ++i) {
-            if (info->innerTileSizes[i] == ShapedType::kDynamic) {
-              result->innerTileSizes[i] = ShapedType::kDynamic;
-            } else {
-              result->innerTileSizes[i] =
-                  std::max(result->innerTileSizes[i], info->innerTileSizes[i]);
-            }
-          }
+        FailureOr<MaterializeEncodingInfo> info =
+            materializeEncodingForTarget(tensorType, targetAttr);
+        if (failed(info)) {
+          // No info at this iteration. Ignore and continue.
+          return failure();
         }
-        return result;
+        // Merge this iteration's info into preexisting result info.
+        // Check that permutations match, then record the max of tile sizes.
+        if (info->innerDimsPos != result->innerDimsPos ||
+            info->outerDimsPerm != result->outerDimsPerm) {
+          return failure();
+        }
+        if (info->innerTileSizes.size() != result->innerTileSizes.size()) {
+          return failure();
+        }
+        return info;
       };
 }
 
@@ -235,7 +233,8 @@ void CPUMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
   RewritePatternSet materializeEncodingPattern(context);
-  auto targetAttr = ExecutableTargetAttr::lookup(operation);
+  if (!targetAttr)
+    targetAttr = ExecutableTargetAttr::lookup(operation);
   auto materializeEncodingFn = getMaterializeEncodingFn(targetAttr);
   if (!materializeEncodingFn) {
     return signalPassFailure();
@@ -269,11 +268,11 @@ void CPUMaterializeEncodingPass::runOnOperation() {
 void CPUMaterializeUpperBoundTileSizePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
-  auto targetAttrs =
-      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(operation);
+  if (!targetAttr)
+    targetAttr = ExecutableTargetAttr::lookup(operation);
   RewritePatternSet patterns(context);
   MaterializeEncodingFn materializeEncodingFn =
-      getUpperBoundMaterializeEncodingFn(targetAttrs);
+      getUpperBoundMaterializeEncodingFn(targetAttr);
   if (!materializeEncodingFn) {
     return signalPassFailure();
   }
@@ -290,10 +289,19 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createCPUMaterializeEncodingPass() {
   return std::make_unique<CPUMaterializeEncodingPass>();
 }
+std::unique_ptr<OperationPass<func::FuncOp>>
+createCPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return std::make_unique<CPUMaterializeEncodingPass>(targetAttr);
+}
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeUpperBoundTileSizePass() {
   return std::make_unique<CPUMaterializeUpperBoundTileSizePass>();
+}
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCPUMaterializeUpperBoundTileSizePass(
+    IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return std::make_unique<CPUMaterializeUpperBoundTileSizePass>(targetAttr);
 }
 
 } // namespace iree_compiler

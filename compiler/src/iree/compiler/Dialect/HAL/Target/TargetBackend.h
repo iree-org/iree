@@ -185,6 +185,10 @@ public:
   buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                OpPassManager &passManager) = 0;
 
+  virtual void buildMaterializeEncodingsPassPipeline(
+      IREE::HAL::ExecutableTargetAttr executableTarget,
+      OpPassManager &passManager) {}
+
   // Inserts passes used to link `hal.executable.variant` ops together.
   // The pass manager will be nested on the parent module of `hal.executable`
   // ops and the pipeline will need to find relevant variant ops itself.
