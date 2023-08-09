@@ -17,11 +17,15 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 
-// Creates a pass to convert linalg convolution ops into linalg.matmul ops
-// using im2col tranformation.
+/// Creates a pass to convert linalg convolution ops into linalg.matmul ops
+/// using im2col tranformation.
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 
-// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
+/// Moves the body of the entire function into a single dispatch.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createMakeSingleDispatchForFunctionPass();
+
+/// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 
 /// Pass to merge parallel linalg operations.

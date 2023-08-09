@@ -280,31 +280,78 @@ static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
 // flow.dispatch.region
 //===----------------------------------------------------------------------===//
 
-LogicalResult DispatchRegionOp::verify() {
-  // No block arguments.
-  if (!getBody().getArguments().empty())
-    return emitOpError() << "expected no block arguments";
+// Verifies the workgroup count
 
-  // Only one block.
-  if (!getBody().hasOneBlock())
-    return emitOpError() << "expected exactly 1 block";
+static LogicalResult
+verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
+  // Verify the workload operands match the expected capture args.
+  if (workload.size() != region.getNumArguments()) {
+    return op->emitOpError()
+           << "workload operands and workgroup count args mismatch ("
+           << workload.size() << " vs " << region.getNumArguments() << ")";
+  }
+  for (auto [index, values] :
+       llvm::enumerate(llvm::zip_equal(workload, region.getArguments()))) {
+    auto [workloadValue, capturedArg] = values;
+    if (workloadValue.getType() != capturedArg.getType()) {
+      return op->emitOpError()
+             << "workload value " << index << " type mismatch; operand is "
+             << workloadValue.getType() << " but region captures "
+             << capturedArg.getType();
+    }
+  }
 
-  // Verify terminator.
-  auto returnOp = dyn_cast<Flow::ReturnOp>(getBody().front().getTerminator());
-  if (!returnOp)
-    return emitOpError() << "expected 'flow.return' terminator";
-  for (const auto [resultType, returnType] :
-       llvm::zip_equal(getResultTypes(), returnOp->getOperandTypes()))
-    if (resultType != returnType)
-      return returnOp->emitOpError()
-             << "operand types do not match with parent results";
-
-  // Make sure that all returned values are ranked tensors.
-  for (Type t : getResultTypes())
-    if (!llvm::isa<RankedTensorType>(t))
-      return emitOpError() << "only ranked tensor results are allowed";
+  // Verify the return ops all provide XYZ values.
+  for (auto returnOp : region.getOps<IREE::Flow::ReturnOp>()) {
+    if (returnOp.getNumOperands() != 3 ||
+        !llvm::all_of(returnOp.getOperandTypes(),
+                      [](Type type) { return type.isIndex(); })) {
+      return returnOp.emitOpError() << "workgroup count region must return "
+                                       "the XYZ dimension counts";
+    }
+  }
 
   return success();
+}
+
+LogicalResult DispatchRegionOp::verify() {
+  // No block arguments.
+  if (!getBody().getArguments().empty()) {
+    return emitOpError() << "expected no block arguments";
+  }
+
+  // Verify terminator.
+  SmallVector<Flow::ReturnOp> returnOps;
+  for (Block &block : getBody()) {
+    if (auto returnOp =
+            dyn_cast_or_null<Flow::ReturnOp>(block.getTerminator())) {
+      returnOps.push_back(returnOp);
+    }
+  }
+  for (auto returnOp : returnOps) {
+    for (const auto [resultType, returnType] :
+         llvm::zip_equal(getResultTypes(), returnOp->getOperandTypes()))
+      if (resultType != returnType) {
+        return returnOp->emitOpError()
+               << "operand types do not match with parent results";
+      }
+  }
+
+  // Make sure that all returned values are ranked tensors.
+  for (Type t : getResultTypes()) {
+    if (!llvm::isa<RankedTensorType>(t)) {
+      return emitOpError() << "only ranked tensor results are allowed";
+    }
+  }
+
+  Region &workgroupCount = getWorkgroupCount();
+  if (workgroupCount.empty()) {
+    return success();
+  }
+
+  // If workgroup count region exists, check it has a single block.
+  return verifyWorkgroupCountRegion(getOperation(), getWorkload(),
+                                    getWorkgroupCount());
 }
 
 ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
@@ -348,7 +395,6 @@ ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
     return failure();
   if (parser.parseRegion(*bodyRegion))
     return failure();
-  ensureTerminator(*bodyRegion, parser.getBuilder(), result.location);
 
   if (parseDispatchWorkgroupsCountRegion(parser, *workloadCountRegion)) {
     return failure();
@@ -868,38 +914,6 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
                 /*printBlockTerminators=*/true);
 }
 
-LogicalResult verifyWorkgroupCountRegion(Operation *op, ValueRange workload,
-                                         Region &region) {
-  // Verify the workload operands match the expected capture args.
-  if (workload.size() != region.getNumArguments()) {
-    return op->emitOpError()
-           << "workload operands and workgroup count args mismatch ("
-           << workload.size() << " vs " << region.getNumArguments() << ")";
-  }
-  for (auto [index, values] :
-       llvm::enumerate(llvm::zip_equal(workload, region.getArguments()))) {
-    auto [workloadValue, capturedArg] = values;
-    if (workloadValue.getType() != capturedArg.getType()) {
-      return op->emitOpError()
-             << "workload value " << index << " type mismatch; operand is "
-             << workloadValue.getType() << " but region captures "
-             << capturedArg.getType();
-    }
-  }
-
-  // Verify the return ops all provide XYZ values.
-  for (auto returnOp : region.getOps<IREE::Flow::ReturnOp>()) {
-    if (returnOp.getNumOperands() != 3 ||
-        !llvm::all_of(returnOp.getOperandTypes(),
-                      [](Type type) { return type.isIndex(); })) {
-      return returnOp.emitOpError() << "workgroup count region must return "
-                                       "the XYZ dimension counts";
-    }
-  }
-
-  return success();
-}
-
 LogicalResult DispatchWorkgroupsOp::verify() {
   Operation *op = getOperation();
 
@@ -1043,7 +1057,7 @@ DispatchWorkgroupsOp::getOperandAccess(unsigned operandIndex) {
 
 IREE::Util::ValueAccess
 DispatchWorkgroupsOp::getResultAccess(unsigned resultIndex) {
-  unsigned startIndex = getBody()->getNumArguments() - getNumResults();
+  unsigned startIndex = getWorkgroupBody().getNumArguments() - getNumResults();
   BlockArgument arg =
       getWorkgroupBody().front().getArgument(startIndex + resultIndex);
   if (auto tensorType = llvm::dyn_cast<DispatchTensorType>(arg.getType())) {
