@@ -30,6 +30,7 @@ class PolynomialApproximationPass
     RewritePatternSet mathPatterns(&getContext());
     populateExpandTanPattern(mathPatterns);
     populateExpandExp2FPattern(mathPatterns);
+    populateExpandPowFPattern(mathPatterns);
 
     if (clNativeMathPrecision) {
       mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
