@@ -164,12 +164,20 @@ static iree_status_t iree_file_preload_contents_impl(
       (uintptr_t)contents + sizeof(*contents), IREE_FILE_BASE_ALIGNMENT);
   contents->buffer.data_length = file_size;
 
-  // Attempt to read the file into memory.
-  if (fread(contents->buffer.data, 1, file_size, file) != file_size) {
-    iree_allocator_free(allocator, contents);
-    return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
-                            "unable to read entire %" PRIhsz " file bytes",
-                            file_size);
+  // Attempt to read the file into memory, chunking into ~2GB segments.
+  iree_host_size_t bytes_read = 0;
+  while ( bytes_read < file_size ) {
+    iree_host_size_t chunk_size = file_size - bytes_read;
+    if (chunk_size > INT_MAX)
+      chunk_size = INT_MAX;
+
+    if (fread(contents->buffer.data + bytes_read, 1, chunk_size, file) != chunk_size) {
+      iree_allocator_free(allocator, contents);
+      return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
+                              "unable to read %" PRIhsz " chunk bytes",
+                              chunk_size);
+    }
+    bytes_read += chunk_size;
   }
 
   // Add trailing NUL to make the contents C-string compatible.
