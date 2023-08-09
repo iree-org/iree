@@ -80,6 +80,8 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
 
   # Respect the user setting, but default to turning on Vulkan.
   export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
+  # Respect the user setting, but default to turning off Metal.
+  export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
   # Respect the user setting, but default to turning off CUDA.
   export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
   # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.

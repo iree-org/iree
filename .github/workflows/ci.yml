@@ -166,7 +166,7 @@ jobs:
       - name: "Testing IREE"
         run: |
           source .venv/bin/activate
-          bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+          IREE_METAL_DISABLE=0 bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
   build_test_all_macos_x86_64:
     needs: setup
