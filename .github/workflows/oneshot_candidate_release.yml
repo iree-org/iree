@@ -45,10 +45,10 @@ jobs:
           draft: true
           prerelease: true
 
-      - name: "Invoke workflow :: Build Native Release Packages"
+      - name: "Invoke workflow :: Build Release Packages"
         uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
         with:
-          workflow: Build Native Release Packages
+          workflow: Build Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
           inputs: '{"package_suffix": "", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'

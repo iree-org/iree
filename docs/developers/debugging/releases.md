@@ -113,9 +113,9 @@ build takes ~5, while the others can take several hours.
 From your development branch, you can manually run the
 [Schedule Snapshot Release](https://github.com/openxla/iree/actions/workflows/schedule_snapshot_release.yml)
 action, which invokes the
-[Build Native Release Packages](https://github.com/openxla/iree/actions/workflows/build_package.yml)
+[Build Release Packages](https://github.com/openxla/iree/actions/workflows/build_package.yml)
 action, which finally invokes the
 [Validate and Publish Release](https://github.com/openxla/iree/actions/workflows/validate_and_publish_release.yml)
 action.  If you already have a draft release and know the release id, package
-version, and run ID from a previous Build Native Release Packages run, you can
+version, and run ID from a previous Build Release Packages run, you can
 also manually run just the Validate and Publish Release action.
