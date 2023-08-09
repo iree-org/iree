@@ -18,8 +18,11 @@ def probe_iree_compiler_dylib() -> str:
   """Probes an installed iree.compiler for the compiler dylib."""
   # TODO: Make this an API on iree.compiler itself.
   from iree.compiler import _mlir_libs
-  from iree.compiler import version
-  logger.debug(f"Found installed iree-compiler package {version.VERSION}")
+  try:
+    from iree.compiler import version
+    logger.debug(f"Found installed iree-compiler package {version.VERSION}")
+  except ImportError:
+    logger.debug("Unable to determine iree-compiler version; assuming dev env")
   dylib_basename = "libIREECompiler.so"
   system = platform.system()
   if system == "Darwin":
