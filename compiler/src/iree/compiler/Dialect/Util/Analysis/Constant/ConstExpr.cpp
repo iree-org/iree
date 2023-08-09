@@ -91,6 +91,10 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
     Operation *constOp = it.second;
     for (auto &use : constOp->getUses()) {
       Operation *useOp = use.getOwner();
+      // For now ignore operations that are not in the same scope.
+      if (constOp->getParentOp() != useOp->getParentOp()) {
+        continue;
+      }
       expandToOp(useOp);
     }
   }

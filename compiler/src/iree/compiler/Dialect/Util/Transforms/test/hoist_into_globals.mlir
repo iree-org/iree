@@ -215,3 +215,22 @@ module @do_not_hoist_non_value_type_results {
     return %2 : !iree_unregistered.unknown_type
   }
 }
+
+// -----
+
+module @do_not_hoist_uses_within_dispatches {
+  func.func @main() -> (tensor<i32>) {
+    %cst = arith.constant dense<[2, 3]>: tensor<2xi32>
+    %result = flow.dispatch.region -> (tensor<i32>) {
+      %slice = tensor.extract_slice %cst[0] [1] [1] : tensor<2xi32> to tensor<i32>
+      flow.return %slice : tensor<i32>
+    }
+    return %result : tensor<i32>
+  }
+}
+// CHECK-LABEL: @do_not_hoist_uses_within_dispatches
+//       CHECK:   %[[CST:.+]] = arith.constant
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[CST]]
+//       CHECK:     flow.return %[[SLICE]]
+//       CHECK:   return %[[RESULT]]
