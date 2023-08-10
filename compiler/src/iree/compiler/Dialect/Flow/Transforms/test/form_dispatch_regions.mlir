@@ -391,3 +391,40 @@ func.func @no_yield_dead_results(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?xf32>,
 // CHECK:     %[[GENERIC:.+]]:2 = linalg.generic
 // CHECK:     flow.return %[[GENERIC]]#1
 // CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @no_fuse_with_gather(%arg0 : tensor<10x20xf32>, %arg1 : tensor<20x40xf32>,
+    %arg2 : tensor<50xf32>) -> tensor<10x40xf32> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<10x40xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %2 = linalg.matmul ins(%arg0, %arg1 : tensor<10x20xf32>, tensor<20x40xf32>)
+      outs(%1 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%2 : tensor<10x40xf32>) outs(%0 : tensor<10x40xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %4 = linalg.index 0 : index
+      %5 = linalg.index 1 : index
+      %6 = arith.addi %4, %5 : index
+      %7 = tensor.extract %arg2[%6] : tensor<50xf32>
+      %8 = arith.addf %7, %b0 : f32
+      linalg.yield %8 : f32
+    } -> tensor<10x40xf32>
+  return %3 : tensor<10x40xf32>
+}
+// CHECK-LABEL: func @no_fuse_with_gather
+//  CHECK-SAME:      %[[ARG0:.+]]: tensor<10x20xf32>
+//  CHECK-SAME:      %[[ARG1:.+]]: tensor<20x40xf32>
+//  CHECK-SAME:      %[[ARG2:.+]]: tensor<50xf32>
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//  CHECK-SAME:         ins(%[[ARG0]], %[[ARG1]] :
+//       CHECK:     flow.return %[[MATMUL]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
+//       CHECK:     %[[GATHER:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[DISPATCH0]] :
+//       CHECK:     flow.return %[[GATHER]]
+//       CHECK:   return %[[DISPATCH1]]

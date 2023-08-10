@@ -478,6 +478,25 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   return true;
 }
 
+/// Final decision of whether a consumer should be fused with producer
+/// based on "cost", i.e. structurally the producer/consumer are fusable,
+/// but is deemed not-profitable. Mostly these are to avoid
+/// paths in the codegen that arent developed enough to handle these.
+static bool isProfitableToFuseWithConsumer(Operation *producer,
+                                           Operation *consumer) {
+  auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
+  auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
+  if (producerLinalgOp && consumerLinalgOp) {
+    // Check if the consumer is a gather. If so dont fuse.
+    for (Operation &op : *consumerLinalgOp.getBlock()) {
+      if (isa<tensor::ExtractOp>(&op)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool
@@ -565,7 +584,8 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  return true;
+  // Check if it is "profitable" to fuse with the consumer.
+  return isProfitableToFuseWithConsumer(producer, consumer);
 }
 
 /// Fuses roots with its consumers. If a root is fused with its consumer, it is
