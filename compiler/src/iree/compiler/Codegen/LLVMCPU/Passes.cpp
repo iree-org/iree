@@ -733,6 +733,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   }
 
   // SCF -> CF
+  passManager.addPass(memref::createFoldMemRefAliasOpsPass());
   passManager.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
