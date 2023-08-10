@@ -8,8 +8,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -372,6 +370,10 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
                                           TilingConfig &tilingConfig,
                                           bool enableVectorMasking) {
+  // Make sure we get rid of unit dimensions at tensor level before we add
+  // `lowering_config`.
+  passManager.addNestedPass<func::FuncOp>(createLinalgFoldUnitExtentDimsPass());
+
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -448,6 +450,10 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
 void addMultiTilingExpertPassPipeline(
     OpPassManager &passManager, TilingConfig &tilingConfig, bool enablePeeling,
     bool enableVectorMasking, bool lowerToAVX2, bool enableAArch64SSVE) {
+  // Make sure we get rid of unit dimensions at tensor level before we add
+  // `lowering_config`.
+  passManager.addNestedPass<func::FuncOp>(createLinalgFoldUnitExtentDimsPass());
+
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -531,6 +537,10 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
                                                TilingConfig &tilingConfig,
                                                bool enableVectorMasking,
                                                bool enableAArch64SSVE) {
+  // Make sure we get rid of unit dimensions at tensor level before we add
+  // `lowering_config`.
+  passManager.addNestedPass<func::FuncOp>(createLinalgFoldUnitExtentDimsPass());
+
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
