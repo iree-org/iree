@@ -109,7 +109,7 @@ def CloneProducersIntoDispatchRegions :
 def CollapseDimensions :
     InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
   let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimensionsPass()";  
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimensionsPass()";
 }
 
 def DispatchWithTransformDialect :
@@ -315,12 +315,6 @@ def StripSignedness :
     InterfacePass<"iree-flow-strip-signedness", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes ui tensors constants to uis";
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
-}
-
-def StripAndSplatConstantVariables :
-    Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
-  let summary = "Strips constant util.globals and replaces them with splats.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
 }
 
 def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
