@@ -395,7 +395,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
 
     // Increase command buffer refcount in the shared staging buffer. We tie this to the command
     // buffer's lifetime to avoid resource leak.
-    iree_hal_metal_staging_buffer_increase_refcount(staging_buffer);
+    iree_hal_metal_staging_buffer_increase_command_buffer_refcount(staging_buffer);
     // Retain the device given that we refer to builtin executables and staging buffers whose
     // lifetime is associated with the device.
     iree_hal_resource_retain(device);
@@ -432,7 +432,7 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
   // Decrease command buffer refcount in the shared staging buffer, and potentially reclaim
   // resources. We tie this to the command buffer's lifetime to avoid resource leak.
   if (command_buffer->staging_buffer) {
-    iree_hal_metal_staging_buffer_decrease_refcount(command_buffer->staging_buffer);
+    iree_hal_metal_staging_buffer_decrease_command_buffer_refcount(command_buffer->staging_buffer);
   }
 
   iree_hal_metal_command_buffer_destroy_internal(base_command_buffer);

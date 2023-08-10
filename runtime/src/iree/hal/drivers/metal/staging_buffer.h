@@ -61,7 +61,7 @@ typedef struct iree_hal_metal_staging_buffer_t {
   // device. If this reaches zero, we know that there are no users of the
   // staging buffer so we can discard the contents and reset the offset to
   // zero.
-  iree_atomic_ref_count_t pending_command_buffers;
+  iree_atomic_int32_t pending_command_buffers;
 } iree_hal_metal_staging_buffer_t;
 
 // Initializes |out_staging_buffer| with the given |buffer_capacity|.
@@ -90,12 +90,12 @@ void iree_hal_metal_staging_buffer_reset(
     iree_hal_metal_staging_buffer_t* staging_buffer);
 
 // Increases the command buffer using this staging buffer by one.
-void iree_hal_metal_staging_buffer_increase_refcount(
+void iree_hal_metal_staging_buffer_increase_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer);
 
 // Decreases the command buffer using this staging buffer by one, which may
 // trigger reclaiming of resources.
-void iree_hal_metal_staging_buffer_decrease_refcount(
+void iree_hal_metal_staging_buffer_decrease_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer);
 
 #ifdef __cplusplus
