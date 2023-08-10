@@ -80,6 +80,12 @@ struct ConvertBatchMmt4DtoMmt4DPattern
 
 struct DecomposeBatchMmt4DOpsPass
     : public DecomposeBatchMmt4DOpsBase<DecomposeBatchMmt4DOpsPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
+                scf::SCFDialect, tensor::TensorDialect>();
+  }
+
   void runOnOperation() override;
 };
 
