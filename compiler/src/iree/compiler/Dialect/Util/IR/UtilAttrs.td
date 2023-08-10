@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
@@ -102,6 +103,89 @@ def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
   let genVerifyDecl = 1;
 
   let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Resources
+//===----------------------------------------------------------------------===//
+
+def Util_CasScope : AttrDef<Util_Dialect, "CasScope"> {
+  let mnemonic = "cas-scope";
+  let summary = "A unique scope delimitter for bindings CAS resources";
+  let description = [{
+    CAS resources can be globally (context bound) or locally (sub-tree)
+    bound. Locally scoped resources are eligible for various lifetime
+    policies, liveness analysis, etc, and they can be turned into tombstones
+    if it is deemed valid to do so (releasing the memory they hold while 
+    keeping them in index so an to not produce dangling pointers).
+
+    A scope is demarcated by a #util.cas-scope attribute, which internally
+    keeps a process unique number for each unique attribute created (either
+    by parsing or builder). This will typically be at the module level as:
+
+    ```
+    module attributes {util.cas-scope = #util.cas-scope} {
+
+    }
+    ```
+
+    Resource management APIs will typically walk the hierarchy when a local
+    scope is requested and will find/create these attributes as needed.
+  }];
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$uniqueIndex
+  );
+  let builders = [
+    // Builds with a unique global for the process.
+    AttrBuilder<(ins)>,
+  ];
+  let extraClassDeclaration = [{
+    // Looks for a `util.cas-scope = #util.cas-scope` attribute at each level
+    // of the hierarchy, starting with `op`, returning the first found. If none
+    // is found, then create one and attach it to the outermost operation.
+    static CasScopeAttr findOrCreateRootScope(Operation *op);
+  }];
+  let hasCustomAssemblyFormat = 1;
+  let skipDefaultBuilders = 1;
+}
+
+def Util_CasElementsAttr : AttrDef<Util_Dialect, "CasElements", [
+    ElementsAttrInterface
+]> {
+  let mnemonic = "elements";
+  let summary = "An ElementsAttr which uses scoped, interned blob resources";
+  let description = [{
+    The `#util.elements` attribute is an ElementsAttr implementation that:
+
+    * Presumes that its backing data is stored in IREE's serialization form
+      directly without translation.
+    * Is backed by blob resources managed out-of-line with the IR as dialect
+      resources.
+    * Interops with the `CasManagerDialectInterface` to provide local/global
+      scoping to managed data, which enables policies of GC'ing the backing
+      data as constraints allow during compilation.
+    * Is intended to be an efficient option within the compiler for producing
+      transformed elements (i.e. via constant evaluation, folding, etc)
+      with the ability to trim unreferenced data.
+    * Interns/uniques within scopes by managing hash and liveness metadata
+      with the blob.
+  }];
+  let parameters = (ins
+    AttributeSelfTypeParameter<"", "ShapedType">:$type,
+    ResourceHandleParameter<"UtilDialect::CasResourceHandle">:$handle
+  );
+  let builders = [
+    AttrBuilderWithInferredContext<(ins
+      "ShapedType":$type, "UtilDialect::CasResourceHandle":$handle
+    )>,
+  ];
+  let extraClassDeclaration = [{
+    // Returns whether the underlying resource exists, is valid, and is not
+    // marked as dead.
+    bool isResourceValid();
+  }];
+  let hasCustomAssemblyFormat = 1;
+  let skipDefaultBuilders = 1;
 }
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_ATTRS

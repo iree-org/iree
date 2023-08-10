@@ -37,6 +37,7 @@ iree_cc_library(
     "SimplifyGlobalAccesses.cpp"
     "StripAndSplatConstants.cpp"
     "StripDebugOps.cpp"
+    "TestCasResources.cpp"
     "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
   DEPS

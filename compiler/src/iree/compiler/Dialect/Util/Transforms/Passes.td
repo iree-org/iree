@@ -186,6 +186,17 @@ def AnnotateOpOrdinals : Pass<"iree-util-annotate-op-ordinals", "mlir::ModuleOp"
   }];
 }
 
+def TestCasResources : Pass<"iree-util-test-cas-resources", ""> {
+  let summary = "Various tests related to CAS resources.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createTestCasResourcesPass()
+  }];
+  let options = [
+    Option<"testMode", "test-mode", "std::string", 
+           /*default=*/"std::string()", "Test to run">
+  ];  
+}
+
 def TestConversion : Pass<"iree-util-test-conversion", "mlir::ModuleOp"> {
   let summary = "Tests util dialect conversion patterns.";
   let constructor = [{

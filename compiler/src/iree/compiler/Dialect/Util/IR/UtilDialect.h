@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_UTIL_IR_UTILDIALECT_H_
 
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/OpDefinition.h"
 
 namespace mlir {
@@ -17,6 +18,12 @@ namespace Util {
 
 class UtilDialect : public Dialect {
 public:
+  // The dialect manages its blob resources with a content-addressable storage
+  // scheme.
+  using CasResourceHandle = DialectResourceBlobHandle<UtilDialect>;
+  using BlobManagerInterface =
+      ResourceBlobManagerDialectInterfaceBase<CasResourceHandle>;
+
   explicit UtilDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "util"; }
 

@@ -6,16 +6,19 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 
+#include "iree/compiler/Dialect/Util/IR/CasResources.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Bytecode/BytecodeImplementation.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -28,14 +31,72 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
+//===----------------------------------------------------------------------===//
+// UtilBytecodeDialectInterface
+//===----------------------------------------------------------------------===//
+namespace {
+
+struct UtilBytecodeDialectInterface : public BytecodeDialectInterface {
+  enum class AttributeCode : uint64_t {
+    CasElements = 0,
+  };
+  UtilBytecodeDialectInterface(Dialect *dialect)
+      : BytecodeDialectInterface(dialect) {}
+
+  LogicalResult writeAttribute(Attribute baseAttr,
+                               DialectBytecodeWriter &writer) const override {
+    if (auto attr = llvm::dyn_cast<CasElementsAttr>(baseAttr)) {
+      writer.writeVarInt(static_cast<uint64_t>(AttributeCode::CasElements));
+      writer.writeType(attr.getType());
+      writer.writeResourceHandle(attr.getHandle());
+      return success();
+    }
+
+    return failure(); // Fallback to text.
+  }
+
+  Attribute readAttribute(DialectBytecodeReader &reader) const override {
+    uint64_t codeValue;
+    if (failed(reader.readVarInt(codeValue)))
+      return {};
+    switch (static_cast<AttributeCode>(codeValue)) {
+    case AttributeCode::CasElements: {
+      ShapedType t;
+      FailureOr<UtilDialect::CasResourceHandle> handle;
+      if (failed(reader.readType<ShapedType>(t)))
+        return {};
+      handle = reader.readResourceHandle<UtilDialect::CasResourceHandle>();
+      if (failed(handle))
+        return {};
+      return CasElementsAttr::get(t, std::move(*handle));
+      break;
+    }
+    }
+
+    reader.emitError() << "unrecognized util dialect attribute code: "
+                       << codeValue;
+    return {};
+  }
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
+// UtilOpAsmDialectInterface
+//===----------------------------------------------------------------------===//
+namespace {
+
 // Used for custom printing support.
 struct UtilOpAsmInterface : public OpAsmDialectInterface {
-  using OpAsmDialectInterface::OpAsmDialectInterface;
+  UtilOpAsmInterface(Dialect *dialect,
+                     UtilDialect::BlobManagerInterface &blobManager)
+      : OpAsmDialectInterface(dialect), blobManager(blobManager) {}
   /// Hooks for getting an alias identifier alias for a given symbol, that is
-  /// not necessarily a part of this dialect. The identifier is used in place of
-  /// the symbol when printing textual IR. These aliases must not contain `.` or
-  /// end with a numeric digit([0-9]+). Returns success if an alias was
+  /// not necessarily a part of this dialect. The identifier is used in place
+  /// of the symbol when printing textual IR. These aliases must not contain
+  /// `.` or end with a numeric digit([0-9]+). Returns success if an alias was
   /// provided, failure otherwise.
+
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
     if (auto compositeAttr = llvm::dyn_cast<CompositeAttr>(attr)) {
       os << "composite_of_" << compositeAttr.getTotalLength() << "b";
@@ -43,8 +104,47 @@ struct UtilOpAsmInterface : public OpAsmDialectInterface {
     }
     return AliasResult::NoAlias;
   }
-};
 
+  std::string
+  getResourceKey(const AsmDialectResourceHandle &handle) const override {
+    return cast<UtilDialect::CasResourceHandle>(handle).getKey().str();
+  }
+
+  FailureOr<AsmDialectResourceHandle>
+  declareResource(StringRef key) const final {
+    llvm::errs() << "::: declareResource " << key << "\n";
+    auto blobEntry = blobManager.insert(key);
+    llvm::errs() << "  = " << blobEntry.getKey() << "\n";
+    return blobEntry;
+  }
+
+  LogicalResult parseResource(AsmParsedResourceEntry &entry) const final {
+    FailureOr<AsmResourceBlob> blob = entry.parseAsBlob();
+    if (failed(blob))
+      return failure();
+
+    // Update the blob for this entry.
+    llvm::errs() << "::: parseResource: " << entry.getKey() << "\n";
+    blobManager.update(entry.getKey(), std::move(*blob));
+    return success();
+  }
+  void
+  buildResources(Operation *op,
+                 const SetVector<AsmDialectResourceHandle> &referencedResources,
+                 AsmResourceBuilder &provider) const final {
+    llvm::errs() << "::: buildResources\n";
+    blobManager.buildResources(provider, referencedResources.getArrayRef());
+  }
+
+private:
+  UtilDialect::BlobManagerInterface &blobManager;
+};
+} // namespace
+
+//===----------------------------------------------------------------------===//
+// UtilInlinerInterface
+//===----------------------------------------------------------------------===//
+namespace {
 // Used to control inlining behavior.
 struct UtilInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
@@ -82,10 +182,15 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     // util.initialize.return takes no args.
   }
 };
+} // namespace
 
 UtilDialect::UtilDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<UtilDialect>()) {
-  addInterfaces<UtilOpAsmInterface, UtilInlinerInterface>();
+  auto &blobInterface = addInterface<BlobManagerInterface>();
+  addInterface<UtilOpAsmInterface>(blobInterface);
+  addInterface<UtilBytecodeDialectInterface>();
+  addInterface<CasManagerDialectInterface>(blobInterface);
+  addInterfaces<UtilInlinerInterface>();
   registerAttributes();
   registerTypes();
 #define GET_OP_LIST

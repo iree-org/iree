@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_
 #define IREE_COMPILER_DIALECT_UTIL_IR_UTILTYPES_H_
 
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Endian.h"

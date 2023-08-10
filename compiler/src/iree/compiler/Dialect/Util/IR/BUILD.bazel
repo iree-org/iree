@@ -61,6 +61,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "IR",
     srcs = [
+        "CasResources.cpp",
         "ClosureOpUtils.cpp",
         "UtilAttrs.cpp",
         "UtilDialect.cpp",
@@ -69,6 +70,7 @@ iree_compiler_cc_library(
         "UtilTypes.cpp",
     ],
     hdrs = [
+        "CasResources.h",
         "ClosureOpUtils.h",
         "UtilDialect.h",
         "UtilOps.h",

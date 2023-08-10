@@ -1082,6 +1082,53 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::ImportableElementsAttr
+//===----------------------------------------------------------------------===//
+
+def Util_ImportableElementsAttrInterface : 
+    AttrInterface<"ImportableElementsAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Normalizes access to ElementsAttr based attributes that are supported
+    with IREE's compilation flow. Whereas the SerializableAttrInterface is
+    responsible for ensuring that values can be interchanged for a serialized
+    form, this interface is for parts of the compiler which need to reason
+    about a value as elements. For simple access, using the upstream
+    ElementsAttr interface is sufficient, but this provides additional
+    facilities for mutating, managing backing storage, etc.
+
+    Some of these may make sense to upstream to the ElementsAttr interface.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Accesses the associated ElementsAttr interface.
+      }],
+      /*retTy=*/"ElementsAttr",
+      /*methodName=*/"getElements",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a new attribute which (to the extent possible) shares storage
+        but with a specified, compatible shape. The new type must have the
+        same total number of alements as well as element type.
+      }],
+      /*retTy=*/"TypedAttr",
+      /*methodName=*/"reshape",
+      /*args=*/(ins
+        "ShapedType":$newType
+      )
+    >,
+  ];
+
+  let extraTraitClassDeclaration = [{
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::SerializableAttrInterface
 //===----------------------------------------------------------------------===//
 
