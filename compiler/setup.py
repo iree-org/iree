@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build/install the iree-compiler-backend python package.
+# Build/install the iree-compiler python package.
 # Note that this includes a relatively large build of LLVM (~2400 C++ files)
 # and can take a considerable amount of time, especially with defaults.
 # To install:
@@ -251,6 +251,8 @@ def prepare_installation():
             "-GNinja",
             "--log-level=VERBOSE",
             "-DIREE_BUILD_PYTHON_BINDINGS=ON",
+            "-DIREE_BUILD_SAMPLES=OFF",
+            "-DIREE_BUILD_TESTS=OFF",
             # Disable .so.0 style symlinking. Python wheels don't preserve links,
             # so this ~doubles the binary size if not disabled (yikes!).
             "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON",
