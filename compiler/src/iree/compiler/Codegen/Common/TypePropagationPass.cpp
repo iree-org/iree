@@ -504,9 +504,6 @@ struct LegalizeResultElementType : public ConversionPattern {
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> convertedOperands,
                   ConversionPatternRewriter &rewriter) const final {
-    if (op->getNumSuccessors()) {
-      return rewriter.notifyMatchFailure(op, "unhandled ops with successors");
-    }
     Location loc = op->getLoc();
     SmallVector<Type> resultTypes;
     for (Type resultType : op->getResultTypes()) {
@@ -517,6 +514,9 @@ struct LegalizeResultElementType : public ConversionPattern {
                          op->getAttrs());
     for (unsigned i = 0, e = op->getNumRegions(); i != e; ++i) {
       state.addRegion();
+    }
+    for (auto successor : op->getSuccessors()) {
+      state.addSuccessors(successor);
     }
     Operation *newOp = rewriter.create(state);
 
@@ -544,6 +544,42 @@ struct LegalizeResultElementType : public ConversionPattern {
   }
 };
 
+// Rewrite pattern for converting the signature of all basic blocks in the
+// top-level operation.
+template <typename OpTy>
+struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
+  using TypePropagationPattern<OpTy>::TypePropagationPattern;
+
+  LogicalResult
+  matchAndRewrite(OpTy funcOp, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const final {
+    bool opUpdated = false;
+    for (Block &block : llvm::make_early_inc_range(funcOp.getBody())) {
+      bool doSignatureConversion = false;
+      TypeConverter::SignatureConversion signatureConverter(
+          block.getNumArguments());
+      for (const auto &[argIndex, arg] :
+           llvm::enumerate(block.getArguments())) {
+        Type argType = arg.getType();
+        Type legalizedType = this->typeConverter->convertType(argType);
+        signatureConverter.addInputs(argIndex, legalizedType);
+        doSignatureConversion |= argType != legalizedType;
+      }
+      if (doSignatureConversion) {
+        if (rewriter.applySignatureConversion(&block, signatureConverter)) {
+          opUpdated = true;
+        }
+      }
+    }
+    if (!opUpdated) {
+      return rewriter.notifyMatchFailure(
+          funcOp, "failed to update signature of blocks");
+    }
+    rewriter.updateRootInPlace(funcOp, []() {});
+    return success();
+  }
+};
+
 struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
   TypePropagationPass() = default;
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -557,7 +593,8 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
     patterns.insert<
         ConstantOpTypeConversion, ForwardSourceType<arith::ExtUIOp>,
         ForwardSourceType<arith::TruncIOp>, GenericOpTypePropagation,
-        LinalgFillTypePropagation, LegalizeResultElementType,
+        LinalgFillTypePropagation, LegalizeBasicBlocks<func::FuncOp>,
+        LegalizeResultElementType,
         NamedOpTypePropagation<linalg::BatchMatmulOp>,
         NamedOpTypePropagation<linalg::MatmulOp>,
         NamedOpTypePropagation<linalg::MatvecOp>,
@@ -566,6 +603,19 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
         typeConverter, context);
 
     ConversionTarget target(*context);
+    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
+      Region &body = funcOp.getBody();
+      for (Block &block : body) {
+        for (auto arg : block.getArguments()) {
+          Type argType = arg.getType();
+          Type convertedArgType = typeConverter.convertType(argType);
+          if (convertedArgType != argType) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
       for (auto operand : op->getOperands()) {
         Type operandType = operand.getType();
