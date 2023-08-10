@@ -124,4 +124,5 @@ hal.executable private @unaligned_pack  {
   }
 }
 // CHECK:          func.func @unaligned_pack
+// CHECK-COUNT-16:   vector.maskedload {{.+}} vector<16xf32>
 // CHECK-COUNT-64:   vector.shuffle
