@@ -21,6 +21,7 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
 #include "xla/pjrt/c/pjrt_c_api.h"
+#include "xla/pjrt/c/pjrt_c_api_helpers.h"
 #include "xla/pjrt/pjrt_executable.h"
 #include "xla/shape_util.h"
 
@@ -90,6 +91,7 @@ class BufferInstance {
     return false;
   }
   iree_status_t GetXlaShape(xla::Shape** out_shape);
+  iree_status_t GetLayoutData(::pjrt::BufferMemoryLayoutData** out_layout_data);
 
   // Gets the required host size in bytes to copy to host.
   iree_status_t GetHostSizeInBytes(iree_host_size_t* host_size);
@@ -111,6 +113,7 @@ class BufferInstance {
   // Various things require XLA's idea of shapes, layouts, etc.
   // We keep one around for such cases.
   std::optional<xla::Shape> cached_shape_;
+  std::optional<::pjrt::BufferMemoryLayoutData> cached_layout_data_;
   // When the buffer resource gets freed, this is set to true.
   bool is_deleted_ = false;
   // Fences.

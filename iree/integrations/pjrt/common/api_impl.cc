@@ -6,7 +6,6 @@
 
 #include "iree/integrations/pjrt/common/api_impl.h"
 
-#include <iostream>
 #include <optional>
 
 #include "iree/hal/api.h"
@@ -373,6 +372,26 @@ iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
   return iree_ok_status();
 }
 
+iree_status_t BufferInstance::GetLayoutData(
+    ::pjrt::BufferMemoryLayoutData** out_layout_data) {
+  if (!cached_layout_data_) {
+    xla::Shape* shape;
+    IREE_RETURN_IF_ERROR(GetXlaShape(&shape));
+    if (!shape->has_layout()) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Buffer shape doesn't have a layout");
+    }
+    xla::StatusOr<::pjrt::BufferMemoryLayoutData> status_or =
+        ::pjrt::ConvertToBufferMemoryLayoutData(shape->layout());
+    if (!status_or.ok()) {
+      return iree_make_status(IREE_STATUS_UNKNOWN, "Couldn't convert layout");
+    }
+    cached_layout_data_.emplace(std::move(*status_or));
+  }
+  *out_layout_data = &(*cached_layout_data_);
+  return iree_ok_status();
+}
+
 BufferInstance::BufferInstance(
     DeviceInstance& device, iree::vm::ref<iree_hal_buffer_view_t> buffer_view)
     : device_(device), buffer_view_(std::move(buffer_view)) {
@@ -387,6 +406,47 @@ void BufferInstance::BindApi(PJRT_Api* api) {
     BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
     delete buffer;
     return nullptr;
+  };
+  api->PJRT_Buffer_ElementType =
+      +[](PJRT_Buffer_ElementType_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_ElementType");
+    BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+    auto impl = [&]() -> iree_status_t {
+      xla::Shape* shape;
+      // TODO: don't use XLA shape at all
+      // https://github.com/openxla/openxla-pjrt-plugin/issues/265
+      IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
+      args->type = static_cast<PJRT_Buffer_Type>(shape->element_type());
+      return nullptr;
+    };
+    return MakeError(impl());
+  };
+  api->PJRT_Buffer_Dimensions =
+      +[](PJRT_Buffer_Dimensions_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_Dimensions");
+    auto impl = [&]() -> iree_status_t {
+      BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+      xla::Shape* shape;
+      // TODO: don't use XLA shape at all
+      // https://github.com/openxla/openxla-pjrt-plugin/issues/265
+      IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
+      args->dims = shape->dimensions().data();
+      args->num_dims = shape->dimensions().size();
+      return nullptr;
+    };
+    return MakeError(impl());
+  };
+  api->PJRT_Buffer_UnpaddedDimensions =
+      +[](PJRT_Buffer_UnpaddedDimensions_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_UnpaddedDimensions");
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Buffer_UnpaddedDimensions"));
+  };
+  api->PJRT_Buffer_DynamicDimensionIndices =
+      +[](PJRT_Buffer_DynamicDimensionIndices_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_DynamicDimensionIndices");
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Buffer_DynamicDimensionIndices"));
   };
   api->PJRT_Buffer_OnDeviceTrimmedShape =
       +[](PJRT_Buffer_OnDeviceTrimmedShape_Args* args) -> PJRT_Error* {
@@ -411,6 +471,18 @@ void BufferInstance::BindApi(PJRT_Api* api) {
         args->has_layout = false;
       }
       return iree_ok_status();
+    };
+    return MakeError(impl());
+  };
+  api->PJRT_Buffer_GetMemoryLayout =
+      +[](PJRT_Buffer_GetMemoryLayout_Args* args) -> PJRT_Error* {
+    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_GetMemoryLayout");
+    auto impl = [&]() -> iree_status_t {
+      BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+      ::pjrt::BufferMemoryLayoutData* layout_data;
+      IREE_RETURN_IF_ERROR(buffer->GetLayoutData(&layout_data));
+      args->layout = layout_data->c_layout;
+      return nullptr;
     };
     return MakeError(impl());
   };
@@ -728,6 +800,17 @@ void DeviceInstance::BindApi(PJRT_Api* api) {
     args->local_hardware_id =
         DeviceInstance::Unwrap(args->device)->local_hardware_id();
     return nullptr;
+  };
+  api->PJRT_Device_AddressableMemories =
+      +[](PJRT_Device_AddressableMemories_Args* args) -> PJRT_Error* {
+    args->memories = nullptr;
+    args->num_memories = 0;
+    return nullptr;
+  };
+  api->PJRT_Device_DefaultMemory =
+      +[](PJRT_Device_DefaultMemory_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Device_DefaultMemory"));
   };
   api->PJRT_Device_GetDescription =
       +[](PJRT_Device_GetDescription_Args* args) -> PJRT_Error* {
@@ -1555,6 +1638,11 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
       +[](PJRT_Executable_GetCostAnalysis_Args* args) -> PJRT_Error* {
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Executable_GetCostAnalysis"));
+  };
+  api->PJRT_Executable_OutputMemoryKinds =
+      +[](PJRT_Executable_OutputMemoryKinds_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_OutputMemoryKinds"));
   };
 }
 
