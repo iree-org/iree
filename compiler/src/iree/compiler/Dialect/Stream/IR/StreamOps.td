@@ -2120,6 +2120,12 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
     Value getResultSize(unsigned idx) {
       return findValueSizeInList(idx, getResults(), getResultSizes());
     }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getResourceOperandsMutable();
+    }
   }];
 
   let hasVerifier = 1;
@@ -2792,6 +2798,12 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
       return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) { return {}; }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getResourceOperandsMutable();
+    }
   }];
 
   let hasVerifier = 1;

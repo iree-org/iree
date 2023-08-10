@@ -431,7 +431,7 @@ struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
         getTypeConverter()->convertType(op.getResult().getType());
     if (!neededResultType || !isRankZeroOrOneMemRef(neededResultType))
       return failure();
-    Value size = createTotalElementCountValue(op.getType(), op.sizes(),
+    Value size = createTotalElementCountValue(op.getType(), op.getSizes(),
                                               op.getLoc(), rewriter);
     SmallVector<Value> offsets = mlir::getValueOrCreateConstantIndexOp(
         rewriter, op.getLoc(), op.getMixedOffsets());

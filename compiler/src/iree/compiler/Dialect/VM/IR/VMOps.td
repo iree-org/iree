@@ -4022,6 +4022,12 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     void setCalleeFromCallable(CallInterfaceCallable callee) {
       (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
     }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getOperandsMutable();
+    }
   }];
 }
 
