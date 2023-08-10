@@ -167,10 +167,7 @@ static iree_status_t iree_file_preload_contents_impl(
   // Attempt to read the file into memory, chunking into ~2GB segments.
   iree_host_size_t bytes_read = 0;
   while (bytes_read < file_size) {
-    iree_host_size_t chunk_size = file_size - bytes_read;
-    if (chunk_size > INT_MAX)
-      chunk_size = INT_MAX;
-
+    iree_host_size_t chunk_size = iree_min(file_size - bytes_read, INT_MAX);
     if (fread(contents->buffer.data + bytes_read, 1, chunk_size, file) != chunk_size) {
       iree_allocator_free(allocator, contents);
       return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
