@@ -168,7 +168,8 @@ static iree_status_t iree_file_preload_contents_impl(
   iree_host_size_t bytes_read = 0;
   while (bytes_read < file_size) {
     iree_host_size_t chunk_size = iree_min(file_size - bytes_read, INT_MAX);
-    if (fread(contents->buffer.data + bytes_read, 1, chunk_size, file) != chunk_size) {
+    if (fread(contents->buffer.data + bytes_read, 1, chunk_size, file) !=
+        chunk_size) {
       iree_allocator_free(allocator, contents);
       return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
                               "unable to read %" PRIhsz " chunk bytes",
