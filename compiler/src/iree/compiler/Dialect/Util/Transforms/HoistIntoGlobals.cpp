@@ -28,8 +28,8 @@ namespace {
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
-// expressions into globals. It is not expected that such a greedy algorithm
-// is great, but it is simple. Naive use of this algorithm very likely
+// Hoist expressions into globals. It is not expected that such a greedy
+// algorithm is great, but it is simple. Naive use of this algorithm very likely
 // favors programs that consume more memory at runtime than is strictly
 // necessary. Either this algorithm can be made smarter or a follow-on pass
 // can sink globals into the program where it is profitable to reduce

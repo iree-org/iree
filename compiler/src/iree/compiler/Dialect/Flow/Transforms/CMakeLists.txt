@@ -66,7 +66,6 @@ iree_cc_library(
     "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
     "SplitReduction.cpp"
-    "StripAndSplatConstantVariables.cpp"
     "StripSignedness.cpp"
     "TensorPadToTensorInsertSlice.cpp"
     "VerifyInputLegality.cpp"

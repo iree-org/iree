@@ -10,18 +10,6 @@
 include "mlir/Pass/PassBase.td"
 
 //===----------------------------------------------------------------------===//
-// Optimizations
-//===----------------------------------------------------------------------===//
-
-def OutlineConstants :
-    Pass<"iree-stream-outline-constants", "mlir::ModuleOp"> {
-  let summary = "Outlines tensor constants into util.globals at the module level.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Stream::createOutlineConstantsPass()
-  }];
-}
-
-//===----------------------------------------------------------------------===//
 // Conversion
 //===----------------------------------------------------------------------===//
 
