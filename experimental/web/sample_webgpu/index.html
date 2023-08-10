@@ -355,8 +355,8 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
       } else if (sampleName === "multiple_results") {
         functionNameInput.value = "multiple_results";
         functionArgumentsInput.value = [
-          "f32=-1.23",
-          "f32=-4.56",
+          "2xf32=-1.23,-1.45",
+          "2xf32=-2.23,-2.45",
         ].join("\n");
       } else if (sampleName === "fullyconnected") {
         functionNameInput.value = "main";
