@@ -7,13 +7,15 @@
 import os
 import subprocess
 import sys
-from ... import _binding
+
+# Note that cpuinfo is only in the default runtime.
+from iree import _runtime_libs
 
 
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
-    exe = os.path.join(_binding.library_path, "iree-cpuinfo")
+    exe = os.path.join(_runtime_libs.__path__[0], "iree-cpuinfo")
     return subprocess.call(args=[exe] + args)
 
 

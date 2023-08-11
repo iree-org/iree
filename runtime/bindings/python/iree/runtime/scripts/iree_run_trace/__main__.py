@@ -7,13 +7,13 @@
 import os
 import subprocess
 import sys
-from ... import _binding
+from ... import _runtime_libs
 
 
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
-    exe = os.path.join(_binding.library_path, "iree-run-trace")
+    exe = os.path.join(_runtime_libs.library_path, "iree-run-trace")
     return subprocess.call(args=[exe] + args)
 
 

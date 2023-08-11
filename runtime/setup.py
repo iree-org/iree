@@ -419,7 +419,6 @@ REVISIONS = {json.dumps(git_versions)}
 """
 
 
-# packages = []
 packages = (
     find_namespace_packages(
         where=os.path.join(IREE_SOURCE_DIR, "runtime", "bindings", "python"),
@@ -511,7 +510,6 @@ setup(
         {
             # Note: Must be relative path, so we line this up with the absolute
             # path built above. Note that this must exist prior to the call.
-            # "iree.runtime": "bindings/python/iree/runtime",
             "iree.runtime": "bindings/python/iree/runtime",
             "iree._runtime_libs": f"{CMAKE_INSTALL_DIR_REL}/python_packages/iree_runtime/iree/_runtime_libs",
         },

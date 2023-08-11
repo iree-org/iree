@@ -9,8 +9,4 @@ The generated version.py comes from the selected _runtime_libs
 package.
 """
 
-from . import _binding
-
-PACKAGE_SUFFIX = _binding.version.PACKAGE_SUFFIX if _binding.version else ""
-VERSION = _binding.version.VERSION if _binding.version else ""
-REVISIONS = _binding.version.REVISIONS if _binding.version else {}
+from ._runtime_libs.version import *
