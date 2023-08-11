@@ -18,10 +18,12 @@ VER_0 {
     ireeCompilerInvocationImportStealModule;
     ireeCompilerInvocationOutputHALExecutable;
     ireeCompilerInvocationOutputIR;
+    ireeCompilerInvocationOutputIRBytecode;
     ireeCompilerInvocationOutputVMBytecode;
     ireeCompilerInvocationOutputVMCSource;
     ireeCompilerInvocationParseSource;
     ireeCompilerInvocationPipeline;
+    ireeCompilerInvocationRunPassPipeline;
     ireeCompilerInvocationSetCompileFromPhase;
     ireeCompilerInvocationSetCompileToPhase;
     ireeCompilerInvocationSetCrashHandler;
@@ -642,6 +644,7 @@ VER_0 {
     mlirValuePrint;
     mlirValuePrintAsOperand;
     mlirValueReplaceAllUsesOfWith;
+    mlirValueSetType;
     mlirVectorTypeGet;
     mlirVectorTypeGetChecked;
     mlirVectorTypeGetTypeID;

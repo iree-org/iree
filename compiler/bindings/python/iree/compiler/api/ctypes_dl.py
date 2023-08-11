@@ -54,7 +54,13 @@ def _init_dylib():
     _setsig(_dylib.ireeCompilerInvocationEnableConsoleDiagnostics, None, [c_void_p])
     _setsig(_dylib.ireeCompilerInvocationParseSource, c_bool, [c_void_p, c_void_p])
     _setsig(_dylib.ireeCompilerInvocationPipeline, c_bool, [c_void_p, c_int])
+    _setsig(_dylib.ireeCompilerInvocationRunPassPipeline, c_bool, [c_void_p, c_char_p])
     _setsig(_dylib.ireeCompilerInvocationOutputIR, c_void_p, [c_void_p, c_void_p])
+    _setsig(
+        _dylib.ireeCompilerInvocationOutputIRBytecode,
+        c_void_p,
+        [c_void_p, c_void_p, c_int],
+    )
     _setsig(
         _dylib.ireeCompilerInvocationOutputVMBytecode, c_void_p, [c_void_p, c_void_p]
     )
@@ -328,6 +334,10 @@ class Invocation:
         # Invocation.
         self._retained_module_op = None
 
+    @property
+    def session(self) -> Session:
+        return self._session
+
     def __del__(self):
         self.close()
 
@@ -365,9 +375,21 @@ class Invocation:
     ) -> bool:
         return _dylib.ireeCompilerInvocationPipeline(self._inv_p, pipeline)
 
+    def execute_text_pass_pipeline(self, text_pipeline_spec: str) -> bool:
+        return _dylib.ireeCompilerInvocationRunPassPipeline(
+            self._inv_p, text_pipeline_spec.encode()
+        )
+
     def output_ir(self, output: Output):
         _handle_error(
             _dylib.ireeCompilerInvocationOutputIR(self._inv_p, output._output_p)
+        )
+
+    def output_ir_bytecode(self, output: Output, bytecode_version: int = -1):
+        _handle_error(
+            _dylib.ireeCompilerInvocationOutputIRBytecode(
+                self._inv_p, output._output_p, bytecode_version
+            )
         )
 
     def output_vm_bytecode(self, output: Output):

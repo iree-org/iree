@@ -455,6 +455,7 @@ setup(
             # TODO: We have renamed to iree-compile on 2022-03-18. Remove
             # this alias once no longer needed.
             "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
+            "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",
         ],
     },
     install_requires=[

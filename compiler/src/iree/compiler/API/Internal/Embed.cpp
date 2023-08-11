@@ -63,6 +63,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Wrap.h"
 #include "mlir/IR/AsmState.h"
@@ -84,7 +85,7 @@
 #endif
 
 #define IREE_COMPILER_API_MAJOR 1
-#define IREE_COMPILER_API_MINOR 3
+#define IREE_COMPILER_API_MINOR 4
 
 namespace mlir::iree_compiler::embed {
 namespace {
@@ -529,19 +530,23 @@ void Output::keep() {
 
 // Invocation corresponds to iree_compiler_invocation_t
 struct Invocation {
+  using PassManagerInitializer = std::function<void(PassManager &pm)>;
   Invocation(Session &session);
   ~Invocation();
   bool initializeInvocation();
+  std::unique_ptr<PassManager> createPassManager();
   bool parseSource(Source &source);
   bool importModule(Operation *inputModule, bool steal);
   bool runPipeline(enum iree_compiler_pipeline_t pipeline);
+  bool runTextualPassPipeline(const char *textPassPipeline);
   Error *outputIR(Output &output);
+  Error *outputIRBytecode(Output &output, int bytecodeVersion);
   Error *outputVMBytecode(Output &output);
   Error *outputVMCSource(Output &output);
   Error *outputHALExecutable(Output &output);
 
   Session &session;
-  PassManager passManager;
+  llvm::SmallVector<PassManagerInitializer> passManagerInitializers;
   IREEVMPipelineHooks pipelineHooks;
 
   // Diagnostic handlers are instantiated upon parsing the source (when we
@@ -567,17 +572,7 @@ struct Invocation {
   int diagnosticCallbackFlags = 0;
 };
 
-Invocation::Invocation(Session &session)
-    : session(session), passManager(&session.context) {
-  if (session.globalInit.usesCommandLine) {
-    if (failed(mlir::applyPassManagerCLOptions(passManager))) {
-      emitError(UnknownLoc::get(&session.context))
-          << "Failed to apply pass manager CL options";
-    }
-    mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-  }
-  passManager.addInstrumentation(std::make_unique<PassTracing>());
-
+Invocation::Invocation(Session &session) : session(session) {
   // Since the jitter invokes much of the top-level compiler recursively,
   // it must be injected at the top-level here vs in the pass pipeline
   // (or else the circular dependency cannot be resolved).
@@ -595,6 +590,23 @@ Invocation::~Invocation() {
   if (parsedModuleIsOwned) {
     parsedModule->erase();
   }
+}
+
+std::unique_ptr<PassManager> Invocation::createPassManager() {
+  auto passManager = std::make_unique<PassManager>(&session.context);
+  if (session.globalInit.usesCommandLine) {
+    if (failed(mlir::applyPassManagerCLOptions(*passManager))) {
+      emitError(UnknownLoc::get(&session.context))
+          << "Failed to apply pass manager CL options";
+    }
+    mlir::applyDefaultTimingPassManagerCLOptions(*passManager);
+  }
+  passManager->addInstrumentation(std::make_unique<PassTracing>());
+  passManager->enableVerifier(enableVerifier);
+  for (auto &init : passManagerInitializers) {
+    init(*passManager);
+  }
+  return passManager;
 }
 
 bool Invocation::initializeInvocation() {
@@ -697,6 +709,7 @@ bool Invocation::importModule(Operation *inputModule, bool steal) {
 }
 
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
+  auto passManager = createPassManager();
   switch (pipeline) {
   case IREE_COMPILER_PIPELINE_STD: {
     // Parse the compile to phase name.
@@ -745,7 +758,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
         session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
         session.schedulingOptions, session.halTargetOptions,
-        session.vmTargetOptions, pipelineHooks, passManager, *compileFromPhase,
+        session.vmTargetOptions, pipelineHooks, *passManager, *compileFromPhase,
         *compileToPhase);
     break;
   }
@@ -764,7 +777,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
       return false;
     }
     IREE::HAL::buildHALTransformPassPipeline(
-        passManager, session.targetRegistry, session.halTargetOptions);
+        *passManager, session.targetRegistry, session.halTargetOptions);
     break;
   }
   default:
@@ -772,8 +785,18 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     return false;
   }
 
-  passManager.enableVerifier(enableVerifier);
-  if (failed(passManager.run(parsedModule))) {
+  if (failed(passManager->run(parsedModule))) {
+    return false;
+  }
+  return true;
+}
+
+bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
+  auto passManager = createPassManager();
+  if (failed(mlir::parsePassPipeline(textPassPipeline, *passManager,
+                                     llvm::errs())))
+    return false;
+  if (failed(passManager->run(parsedModule))) {
     return false;
   }
   return true;
@@ -781,6 +804,17 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
 
 Error *Invocation::outputIR(Output &output) {
   (*output.outputStream) << *parsedModule;
+  return output.getWriteError();
+}
+
+Error *Invocation::outputIRBytecode(Output &output, int bytecodeVersion) {
+  mlir::BytecodeWriterConfig config;
+  if (bytecodeVersion >= 0)
+    config.setDesiredBytecodeVersion(bytecodeVersion);
+  if (failed(mlir::writeBytecodeToFile(parsedModule, *output.outputStream,
+                                       config))) {
+    return new Error("illegal bytecode version requested");
+  }
   return output.getWriteError();
 }
 
@@ -1134,24 +1168,27 @@ void ireeCompilerInvocationSetCrashHandler(
     iree_compiler_output_t *output;
   };
 
-  unwrap(inv)->passManager.enableCrashReproducerGeneration(
-      [=](std::string &errorMessage)
-          -> std::unique_ptr<mlir::PassManager::ReproducerStream> {
-        iree_compiler_output_t *output = nullptr;
-        auto error = onCrashCallback(&output, userData);
-        if (error) {
-          errorMessage = ireeCompilerErrorGetMessage(error);
-          return nullptr;
-        }
+  unwrap(inv)->passManagerInitializers.push_back(
+      [=](mlir::PassManager &passManager) {
+        passManager.enableCrashReproducerGeneration(
+            [=](std::string &errorMessage)
+                -> std::unique_ptr<mlir::PassManager::ReproducerStream> {
+              iree_compiler_output_t *output = nullptr;
+              auto error = onCrashCallback(&output, userData);
+              if (error) {
+                errorMessage = ireeCompilerErrorGetMessage(error);
+                return nullptr;
+              }
 
-        if (!output) {
-          errorMessage = "callback did not set output";
-          return nullptr;
-        }
+              if (!output) {
+                errorMessage = "callback did not set output";
+                return nullptr;
+              }
 
-        return std::make_unique<StreamImpl>(output);
-      },
-      /*genLocalReproducer=*/genLocalReproducer);
+              return std::make_unique<StreamImpl>(output);
+            },
+            /*genLocalReproducer=*/genLocalReproducer);
+      });
 }
 
 bool ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,
@@ -1177,6 +1214,11 @@ void ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv,
 bool ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,
                                     enum iree_compiler_pipeline_t pipeline) {
   return unwrap(inv)->runPipeline(pipeline);
+}
+
+bool ireeCompilerInvocationRunPassPipeline(iree_compiler_invocation_t *inv,
+                                           const char *textPassPipeline) {
+  return unwrap(inv)->runTextualPassPipeline(textPassPipeline);
 }
 
 void ireeCompilerSourceDestroy(iree_compiler_source_t *source) {
@@ -1260,6 +1302,13 @@ iree_compiler_error_t *
 ireeCompilerInvocationOutputIR(iree_compiler_invocation_t *inv,
                                iree_compiler_output_t *output) {
   return wrap(unwrap(inv)->outputIR(*unwrap(output)));
+}
+
+iree_compiler_error_t *
+ireeCompilerInvocationOutputIRBytecode(iree_compiler_invocation_t *inv,
+                                       iree_compiler_output_t *output,
+                                       int bytecodeVersion) {
+  return wrap(unwrap(inv)->outputIRBytecode(*unwrap(output), bytecodeVersion));
 }
 
 iree_compiler_error_t *

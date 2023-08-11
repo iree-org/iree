@@ -253,10 +253,25 @@ IREE_EMBED_EXPORTED bool
 ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,
                                enum iree_compiler_pipeline_t pipeline);
 
+// Runs an arbitrary pass pipeline.
+// Returns false and emits diagnostics on failure.
+// Available since: 1.4
+IREE_EMBED_EXPORTED bool
+ireeCompilerInvocationRunPassPipeline(iree_compiler_invocation_t *inv,
+                                      const char *textPassPipeline);
+
 // Outputs the current compiler state as textual IR to the output.
 IREE_EMBED_EXPORTED iree_compiler_error_t *
 ireeCompilerInvocationOutputIR(iree_compiler_invocation_t *inv,
                                iree_compiler_output_t *output);
+
+// Outputs the current compiler state as bytecode IR to the output.
+// Emits as the given bytecode version or most recent if -1.
+// Available since: 1.4
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerInvocationOutputIRBytecode(iree_compiler_invocation_t *inv,
+                                       iree_compiler_output_t *output,
+                                       int bytecodeVersion);
 
 // Assuming that the compiler has produced VM IR, converts it to bytecode
 // and outputs it. This is a valid next step after running the
