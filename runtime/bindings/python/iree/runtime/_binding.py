@@ -20,6 +20,7 @@ import warnings
 variant = os.getenv("IREE_PY_RUNTIME", "default")
 if variant == "default":
     import iree._runtime_libs as _libs
+
     try:
         import iree._runtime_libs.version as _version
     except ModuleNotFoundError:
