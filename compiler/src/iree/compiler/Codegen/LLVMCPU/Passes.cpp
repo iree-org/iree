@@ -632,7 +632,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 }
 
 void addCPUDataTilingPipeline(OpPassManager &passManager,
-                              TilingConfig &tilingConfig) {
+                              TilingConfig &tilingConfig,
+                              bool enableVectorMasking) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -643,6 +644,7 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   {
     GenericVectorizationPassOptions options;
     options.vectorizePadding = true;
+    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
