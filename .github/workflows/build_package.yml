@@ -171,14 +171,13 @@ jobs:
 
       - name: Build runtime wheels (Windows)
         if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'windows'"
-        shell: bash
+        shell: powershell
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-runtime iree-runtime-instrumented"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
-        run: |
-          ./c/build_tools/python_deploy/build_windows_packages.sh
+        run: ./c/build_tools/python_deploy/build_windows_packages.ps1
 
       ##########################################################################
       # py-compiler-pkg
@@ -208,14 +207,13 @@ jobs:
 
       - name: Build compiler wheels (Windows)
         if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'windows'"
-        shell: bash
+        shell: powershell
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
-        run: |
-          ./c/build_tools/python_deploy/build_windows_packages.sh
+        run: ./c/build_tools/python_deploy/build_windows_packages.ps1
 
       ##########################################################################
       # TF Compiler Tools
