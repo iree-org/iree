@@ -101,8 +101,9 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
 
   // First tile the batch dim of linalg.batch_mmt4d into 1.
   {
+    SmallVector<int64_t> tileSizes({1});
     auto tileAndFuseOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
-        scf::SCFTilingOptions().setTileSizes({1}));
+        scf::SCFTilingOptions().setTileSizes(tileSizes));
     IRRewriter rewriter(ctx);
     funcOp->walk([&](linalg::BatchMmt4DOp op) {
       FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
