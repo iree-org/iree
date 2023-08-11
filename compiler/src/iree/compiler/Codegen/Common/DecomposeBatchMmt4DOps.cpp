@@ -6,15 +6,10 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/Transforms/Patterns.h"
-#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
-#define DEBUG_TYPE "iree-codegen-decompose-batch-mmt4d-ops"
 
 namespace mlir {
 namespace iree_compiler {
@@ -34,9 +29,9 @@ struct ConvertBatchMmt4DtoMmt4DPattern
     auto out = op.getDpsInitOperand(0)->get();
 
     auto outType = out.getType().cast<RankedTensorType>();
-    // Skip if the batch dim isn't tiled to 1.
+    // Batch dim needs to be tiled to 1 first.
     if (outType.getShape()[0] != 1) {
-      return failure();
+      return rewriter.notifyMatchFailure(op, "batch dim needs to be 1");
     }
     RankedTensorType reducedOutType =
         RankedTensorType::Builder(outType).dropDim(0);
@@ -85,9 +80,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
 struct DecomposeBatchMmt4DOpsPass
     : public DecomposeBatchMmt4DOpsBase<DecomposeBatchMmt4DOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<linalg::LinalgDialect, func::FuncDialect,
+                    arith::ArithDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -99,64 +93,15 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
 
-  // First tile the batch dim of linalg.batch_mmt4d into 1.
-  {
-    SmallVector<int64_t> tileSizes({1});
-    auto tileAndFuseOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
-        scf::SCFTilingOptions().setTileSizes(tileSizes));
-    IRRewriter rewriter(ctx);
-    funcOp->walk([&](linalg::BatchMmt4DOp op) {
-      FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-          scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
-              rewriter, cast<TilingInterface>(op.getOperation()),
-              tileAndFuseOptions);
-      if (failed(tileAndFuseResult)) {
-        return signalPassFailure();
-      }
-
-      SmallVector<Value> replacements;
-      replacements.resize(op->getNumResults());
-      for (const auto &[index, result] : llvm::enumerate(op->getResults())) {
-        replacements[index] = tileAndFuseResult->replacements[result];
-      }
-      op->replaceAllUsesWith(replacements);
-    });
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After tiling batch dim to 1 ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  // Canonicalize tiled ops.
-  {
-    RewritePatternSet patterns(ctx);
-    linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
-    scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-    memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
-  }
-
   // Convert linalg.batch_mmt4d with batch dim = 1 into linalg.mmt4d.
-  {
-    RewritePatternSet patterns(ctx);
-    patterns.add<ConvertBatchMmt4DtoMmt4DPattern>(ctx);
-    // Canonicalize extract and insert slice ops created during the conversion.
-    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
-    tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
-    tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, ctx);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After converting batch_mmt4d into mmt4d ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+  RewritePatternSet patterns(ctx);
+  patterns.add<ConvertBatchMmt4DtoMmt4DPattern>(ctx);
+  // Canonicalize extract and insert slice ops created during the conversion.
+  tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+  tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return signalPassFailure();
   }
 }
 
