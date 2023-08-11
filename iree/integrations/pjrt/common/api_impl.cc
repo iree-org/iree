@@ -803,9 +803,8 @@ void DeviceInstance::BindApi(PJRT_Api* api) {
   };
   api->PJRT_Device_AddressableMemories =
       +[](PJRT_Device_AddressableMemories_Args* args) -> PJRT_Error* {
-    args->memories = nullptr;
-    args->num_memories = 0;
-    return nullptr;
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Device_AddressableMemories"));
   };
   api->PJRT_Device_DefaultMemory =
       +[](PJRT_Device_DefaultMemory_Args* args) -> PJRT_Error* {
@@ -1152,6 +1151,11 @@ void ClientInstance::BindApi(PJRT_Api* api) {
     }
     args->device = *devices[id_as_size];
     return nullptr;
+  };
+  api->PJRT_Client_AddressableMemories =
+      +[](PJRT_Client_AddressableMemories_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Client_AddressableMemories"));
   };
   api->PJRT_Client_Compile =
       +[](PJRT_Client_Compile_Args* args) -> PJRT_Error* {
