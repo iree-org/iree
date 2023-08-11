@@ -103,15 +103,38 @@ hal.executable @matmul_i4_quant_weight {
 //           CHECK:     %[[ZP:.+]] = vector.transfer_read %[[ZP_BINDING]]
 //           CHECK:     %[[ZP_EXT:.+]] = arith.extsi %[[ZP]] : vector<4xi4> to vector<4xi32>
 //           CHECK:     scf.for %arg5 = %c0 to %c96 step %c32 iter_args({{.+}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-//   CHECK-COUNT-4:       vector.transfer_read %[[WEIGHT_BINDING]]
-//   CHECK-COUNT-4:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
-//   CHECK-COUNT-4:       arith.subi %{{.+}}, %[[ZP_EXT]] : vector<4xi32>
-//   CHECK-COUNT-4:       arith.sitofp %{{.+}} : vector<4xi32> to vector<4xf32>
-//   CHECK-COUNT-4:       arith.mulf %{{.+}}, %[[SCALE]] : vector<4xf32>
-//   CHECK-COUNT-4:       vector.transfer_write %{{.+}}, %[[B_ALLOC]]
-//           CHECK:       gpu.barrier
+
+//           CHECK:       vector.transfer_read %[[WEIGHT_BINDING]]
+//           CHECK:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
+//           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT]] : vector<4xi32>
+//           CHECK:       arith.sitofp %{{.+}} : vector<4xi32> to vector<4xf32>
+//           CHECK:       arith.mulf %{{.+}}, %[[SCALE]] : vector<4xf32>
+//           CHECK:       vector.transfer_write %{{.+}}, %[[B_ALLOC]]
+
+//           CHECK:       vector.transfer_read %[[WEIGHT_BINDING]]
+//           CHECK:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
+//           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT]] : vector<4xi32>
+//           CHECK:       arith.sitofp %{{.+}} : vector<4xi32> to vector<4xf32>
+//           CHECK:       arith.mulf %{{.+}}, %[[SCALE]] : vector<4xf32>
+//           CHECK:       vector.transfer_write %{{.+}}, %[[B_ALLOC]]
+
+//           CHECK:       vector.transfer_read %[[WEIGHT_BINDING]]
+//           CHECK:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
+//           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT]] : vector<4xi32>
+//           CHECK:       arith.sitofp %{{.+}} : vector<4xi32> to vector<4xf32>
+//           CHECK:       arith.mulf %{{.+}}, %[[SCALE]] : vector<4xf32>
+//           CHECK:       vector.transfer_write %{{.+}}, %[[B_ALLOC]]
+
+//           CHECK:       vector.transfer_read %[[WEIGHT_BINDING]]
+//           CHECK:       arith.extsi %{{.+}} : vector<4xi4> to vector<4xi32>
+//           CHECK:       arith.subi %{{.+}}, %[[ZP_EXT]] : vector<4xi32>
+//           CHECK:       arith.sitofp %{{.+}} : vector<4xi32> to vector<4xf32>
+//           CHECK:       arith.mulf %{{.+}}, %[[SCALE]] : vector<4xf32>
+//           CHECK:       vector.transfer_write %{{.+}}, %[[B_ALLOC]]
+
 //           CHECK:       vector.transfer_write %{{.+}}, %[[A_ALLOC]]
 //           CHECK:       gpu.barrier
+
 //  CHECK-COUNT-32:       vector.transfer_read %[[A_ALLOC]]
 //  CHECK-COUNT-32:       vector.transfer_read %[[B_ALLOC]]
 // CHECK-COUNT-128:       vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
