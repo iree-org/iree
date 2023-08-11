@@ -9,14 +9,14 @@
 
 # Configure settings with script parameters.
 param(
-    [array]$python_versions=@('3.11'),
-    [array]$packages=@('iree-runtime', 'iree-runtime-instrumented', 'iree-compiler'),
+    [array]$python_versions=@("3.11"),
+    [array]$packages=@("iree-runtime", "iree-runtime-instrumented", "iree-compiler"),
     [System.String]$output_dir
 )
 
 # Also allow setting parameters via environment variables.
-if ($env:override_python_versions) { $python_versions = $env:override_python_versions };
-if ($env:packages) { $packages = $env:packages };
+if ($env:override_python_versions) { $python_versions = $env:override_python_versions -split ' '};
+if ($env:packages) { $packages = $env:packages -split ' '};
 if ($env:output_dir) { $output_dir = $env:output_dir };
 # Default output directory requires evaluating an expression.
 if (!$output_dir) { $output_dir = "${PSScriptRoot}\wheelhouse" };
