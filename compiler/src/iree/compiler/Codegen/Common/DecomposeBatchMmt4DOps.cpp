@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -129,9 +130,8 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
   {
     RewritePatternSet patterns(ctx);
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+    scf::populateSCFForLoopCanonicalizationPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-    ctx->getOrLoadDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
-        patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
