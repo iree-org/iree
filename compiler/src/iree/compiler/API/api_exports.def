@@ -17,10 +17,12 @@ EXPORTS
   ireeCompilerInvocationImportStealModule
   ireeCompilerInvocationOutputHALExecutable
   ireeCompilerInvocationOutputIR
+  ireeCompilerInvocationOutputIRBytecode
   ireeCompilerInvocationOutputVMBytecode
   ireeCompilerInvocationOutputVMCSource
   ireeCompilerInvocationParseSource
   ireeCompilerInvocationPipeline
+  ireeCompilerInvocationRunPassPipeline
   ireeCompilerInvocationSetCompileFromPhase
   ireeCompilerInvocationSetCompileToPhase
   ireeCompilerInvocationSetCrashHandler
@@ -641,6 +643,7 @@ EXPORTS
   mlirValuePrint
   mlirValuePrintAsOperand
   mlirValueReplaceAllUsesOfWith
+  mlirValueSetType
   mlirVectorTypeGet
   mlirVectorTypeGetChecked
   mlirVectorTypeGetTypeID
