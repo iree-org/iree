@@ -79,6 +79,9 @@ createConvertToDestinationPassingStylePass(
 // hoisted in different loops.
 std::unique_ptr<Pass> createDecomposeAffineOpsPass();
 
+// Decomposes batch mmt4d op into mmt4d by tiling the batch dim to 1.
+std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeBatchMmt4DOpsPass();
+
 // Decomposes high-D convolution ops into low-D ones.
 std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass();
 
