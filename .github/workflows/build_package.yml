@@ -3,7 +3,7 @@
 #   * py-compiler-pkg (`iree-compiler` Python package)
 #     * Linux, macOS, Windows
 #     * All supported Python versions (e.g. 3.8, 3.9, 3.10, 3.11)
-#   * py-runtime-pkg (`iree-runtime[-instrumented]` Python package)
+#   * py-runtime-pkg (`iree-runtime` Python package)
 #     * Linux, macOS, Windows
 #     * All supported Python versions (e.g. 3.8, 3.9, 3.10, 3.11)
 #   * py-tf-compiler-tools-pkg (`iree-tools-[tf, tflite]`, pure Python packages)
@@ -144,7 +144,7 @@ jobs:
 
       ##########################################################################
       # py-runtime-pkg
-      # Builds the iree-runtime and iree-runtime-instrumented wheels.
+      # Builds the iree-runtime wheels.
       # One step per OS.
       ##########################################################################
 
@@ -153,8 +153,9 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime iree-runtime-instrumented"
+          packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
+          IREE_RUNTIME_BUILD_TRACY: ON
         run: |
           ./c/build_tools/python_deploy/build_linux_packages.sh
 
@@ -163,9 +164,10 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime iree-runtime-instrumented"
+          packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
+          IREE_RUNTIME_BUILD_TRACY: ON
         run: |
           ./c/build_tools/python_deploy/build_macos_packages.sh
 
@@ -174,9 +176,10 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime iree-runtime-instrumented"
+          packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
+          IREE_RUNTIME_BUILD_TRACY: ON
         run: |
           ./c/build_tools/python_deploy/build_windows_packages.sh
 

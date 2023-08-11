@@ -15,7 +15,6 @@
 # MacOS convention is to refer to this as major.minor (i.e. "3.9", "3.10").
 # Valid packages:
 #   iree-runtime
-#   iree-runtime-instrumented
 #   iree-compiler
 
 set -eu -o errtrace
@@ -24,7 +23,7 @@ this_dir="$(cd $(dirname $0) && pwd)"
 repo_root="$(cd $this_dir/../../ && pwd)"
 python_versions="${override_python_versions:-3.11}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
-packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
+packages="${packages:-iree-runtime iree-compiler}"
 
 # Note that this typically is selected to match the version that the official
 # Python distributed is built at.
@@ -58,10 +57,6 @@ function run() {
           clean_wheels iree_runtime $python_version
           build_iree_runtime
           ;;
-        iree-runtime-instrumented)
-          clean_wheels iree_runtime_instrumented $python_version
-          build_iree_runtime_instrumented
-          ;;
         iree-compiler)
           clean_wheels iree_compiler $python_version
           build_iree_compiler
@@ -82,14 +77,6 @@ function run() {
 function build_iree_runtime() {
   # TODO(antiagainst): remove Vulkan once IREE_HAL_DRIVER_METAL is stable
   IREE_HAL_DRIVER_VULKAN=ON \
-  python3 -m pip wheel -v -w $output_dir $repo_root/runtime/
-}
-
-function build_iree_runtime_instrumented() {
-  # TODO: Bundled tracy client on MacOS not yet supported.
-  # Add IREE_BUILD_TRACY=ON once it is.
-  IREE_HAL_DRIVER_VULKAN=ON IREE_ENABLE_RUNTIME_TRACING=ON \
-  IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   python3 -m pip wheel -v -w $output_dir $repo_root/runtime/
 }
 

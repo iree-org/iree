@@ -7,13 +7,12 @@
 
 All code in the runtime should use runtime imports via this module, which
 locates the actual _runtime module based on environment configuration.
-Currently, we only bundle a single runtime library, but in the future, this
-will let us dynamically switch between instrumented, debug, etc by changing
-the way this trampoline functions.
+
+TODO: We could rename this to _runtime since it a trampoline for
+the _runtime module we load from elsehwhere.
 """
 
 import sys
-
-from iree import _runtime
+from ._runtime_libs import _runtime
 
 sys.modules[__name__] = _runtime
