@@ -17,7 +17,7 @@
 #
 # Build specific Python versions and packages to custom directory:
 #   override_python_versions="cp38-cp38 cp39-cp39" \
-#   packages="iree-runtime iree-runtime-instrumented" \
+#   packages="iree-runtime" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
@@ -27,7 +27,6 @@
 #
 # Valid packages:
 #   iree-runtime
-#   iree-runtime-instrumented
 #   iree-compiler
 #
 # Note that this script is meant to be run on CI and it will pollute both the
@@ -68,7 +67,7 @@ repo_root=$(cd "${this_dir}" && find_git_dir_parent)
 manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:e83893d35be4ce3558c989e9d5ccc4ff88d058bc3e74a83181059cc76e2cf1f8" }')}"
 python_versions="${override_python_versions:-cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
-packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
+packages="${packages:-iree-runtime iree-compiler}"
 package_suffix="${package_suffix:-}"
 
 function run_on_host() {
@@ -125,12 +124,6 @@ function run_in_docker() {
           build_iree_runtime
           run_audit_wheel "iree_runtime${package_suffix}" "${python_version}"
           ;;
-        iree-runtime-instrumented)
-          clean_wheels "iree_runtime_instrumented${package_suffix}" "${python_version}"
-          install_deps "iree_runtime${package_suffix}" "${python_version}"
-          build_iree_runtime_instrumented
-          run_audit_wheel "iree_runtime_instrumented${package_suffix}" "${python_version}"
-          ;;
         iree-compiler)
           clean_wheels "iree_compiler${package_suffix}" "${python_version}"
           install_deps "iree_runtime${package_suffix}" "${python_version}"
@@ -151,12 +144,6 @@ function build_wheel() {
 }
 
 function build_iree_runtime() {
-  build_wheel runtime/
-}
-
-function build_iree_runtime_instrumented() {
-  IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
-  IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   build_wheel runtime/
 }
 

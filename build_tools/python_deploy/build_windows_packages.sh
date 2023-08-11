@@ -11,7 +11,6 @@
 #
 # Valid packages:
 #   iree-runtime
-#   iree-runtime-instrumented
 #   iree-compiler
 
 set -eu -o errtrace
@@ -20,7 +19,7 @@ this_dir="$(cd $(dirname $0) && pwd)"
 repo_root="$(cd $this_dir/../../ && pwd)"
 python_versions="${override_python_versions:-3.11}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
-packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
+packages="${packages:-iree-runtime iree-compiler}"
 
 # Canonicalize paths.
 mkdir -p "$output_dir"
@@ -46,10 +45,6 @@ function run() {
           clean_wheels iree_runtime $python_version
           build_iree_runtime $python_version
           ;;
-        iree-runtime-instrumented)
-          clean_wheels iree_runtime_instrumented $python_version
-          build_iree_runtime_instrumented $python_version
-          ;;
         iree-compiler)
           clean_wheels iree_compiler $python_version
           build_iree_compiler $python_version
@@ -70,13 +65,6 @@ function run() {
 function build_iree_runtime() {
   local python_version="$1"
   IREE_HAL_DRIVER_VULKAN=ON \
-  py -${python_version} -m pip wheel -v -w $output_dir $repo_root/runtime/
-}
-
-function build_iree_runtime_instrumented() {
-  local python_version="$1"
-  IREE_HAL_DRIVER_VULKAN=ON IREE_ENABLE_RUNTIME_TRACING=ON \
-  IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   py -${python_version} -m pip wheel -v -w $output_dir $repo_root/runtime/
 }
 
