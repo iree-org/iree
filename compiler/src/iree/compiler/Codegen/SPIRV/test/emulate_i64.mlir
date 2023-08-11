@@ -51,7 +51,7 @@ hal.executable private @emulate_1d_vector {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<>>}> {
     hal.executable.export public @emulate_1d_vector ordinal(0)
       layout(#hal.pipeline.layout<push_constants = 0,
-                                  sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+                                  sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -65,8 +65,8 @@ hal.executable private @emulate_1d_vector {
         %c1523712 = arith.constant 1523712 : index
         %c96 = arith.constant 96 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c96}
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c1523712) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<?xvector<4xi32>, #spirv.storage_class<StorageBuffer>>{%c36864}
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %3 = gpu.thread_id  x

@@ -326,15 +326,13 @@ hal.executable private @conv_dispatch  {
       func.func @conv_dispatch() {
         %c56 = arith.constant 56 : index
         %c64 = arith.constant 64 : index
-        %c802816 = arith.constant 802816 : index
-        %c41664 = arith.constant 41664 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<1x64x56x56xf32>
         memref.assume_alignment %0, 64 : memref<1x64x56x56xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c41664) : memref<64x64x1x1xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<64x64x1x1xf32>
         memref.assume_alignment %1, 64 : memref<64x64x1x1xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c802816) : memref<1x64x56x56xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<1x64x56x56xf32>
         memref.assume_alignment %2, 64 : memref<1x64x56x56xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index

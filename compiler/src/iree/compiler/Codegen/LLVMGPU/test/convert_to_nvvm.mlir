@@ -158,8 +158,8 @@ hal.executable @mixed_type {
     builtin.module {
       func.func @mixed_type() {
         %c0 = arith.constant 0 : index
-        %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c128) : memref<16xf32, strided<[1], offset: 4>>
+        %c16 = arith.constant 16 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c16) : memref<16xf32, strided<[1], offset: 4>>
         %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) : memref<16xi32>
         %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16xf32>
         %3 = gpu.block_id x
@@ -346,8 +346,7 @@ hal.executable @complex {
     builtin.module {
       func.func @complex() {
         %c0 = arith.constant 0 : index
-        %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xcomplex<f32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) flags(ReadOnly) : memref<16xcomplex<f32>>
         %2 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x

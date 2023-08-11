@@ -872,15 +872,13 @@ hal.executable @matmul_f16_128x262144x2304 {
       func.func @matmul_f16_128x262144x2304() {
         %c128 = arith.constant 128 : index
         %c262144 = arith.constant 262144 : index
-        %c96565312 = arith.constant 96565312 : index
-        %c806357120 = arith.constant 806357120 : index
-        %c134217728 = arith.constant 134217728 : index
+        %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f16
         %cst_0 = arith.constant dense<"0x69222B2E40A3002A45AC1AAB2E2E202DA21C212680264C2A102314A041A7D029CB28352E5BAAD3B02F299D9A142B8AA1D1285C28412B25AF9A24EE2BA22C242D53AD9E2948A9289FCF301D28012F08AD68A6DD20ECAC912465290B2E9420C5AA50A222A912AB9526B62ADA2039AD4D912C9FDD287B20B224D329BA2A4D2C41A76DAB7E30B027F62ED1A0F1273A2BAE9D0FA48029812992A65AA92A2C9C2EE9A744A4632C5FA8A9A4CF2D70A482A0F5A2DBA7B6304B9D22A52B1B9DA8E424722AB5ACD0248A2B8B29C82D782E402D1A99F0A60CA4DE2DD32815266F2A6B247FA6FE214E2853AA402390AB6925F1A339307F2664A23CACBE28BA2B3D286DB0BA2E"> : tensor<128xf16>
         %0 = bufferization.to_memref %cst_0 : memref<128xf16>
-        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c96565312)  : memref<128x2304xf16>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c806357120) : memref<2304x262144xf16>
-        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c134217728) : memref<128x262144xf16>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)  : memref<128x2304xf16>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2304x262144xf16>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<128x262144xf16>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index

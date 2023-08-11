@@ -1143,6 +1143,43 @@ LogicalResult InterfaceBindingSubspanOp::verify() {
     }
   }
 
+  if (auto memrefType = dyn_cast<MemRefType>(op.getType())) {
+    if (memrefType.getElementType().isIndex()) {
+      // Index type can have different bitwidths depending on the target
+      // environment.
+      return success();
+    }
+
+    SmallVector<int64_t> strides;
+    int64_t typeOffset;
+    if (failed(getStridesAndOffset(memrefType, strides, typeOffset))) {
+      // Stop verification if we cannot get static offset from the type.
+      return success();
+    }
+
+    if (ShapedType::isDynamic(typeOffset)) {
+      return success();
+    }
+
+    Value offset = getByteOffset();
+    APInt subspanOffset;
+    if (!offset) {
+      subspanOffset = APInt::getZero(64);
+    } else if (!matchPattern(offset, m_ConstantInt(&subspanOffset))) {
+      // Stop verification if we cannot get static offset from the op.
+      return success();
+    }
+
+    int32_t numBytes =
+        IREE::Util::getRoundedElementByteWidth(memrefType.getElementType());
+    if (typeOffset * numBytes != subspanOffset) {
+      return op.emitOpError("byte offset (")
+             << subspanOffset.getZExtValue()
+             << ") does not match with type element offset (" << typeOffset
+             << ")";
+    }
+  }
+
   return success();
 }
 

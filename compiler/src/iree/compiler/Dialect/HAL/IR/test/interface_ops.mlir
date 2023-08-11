@@ -17,10 +17,10 @@ func.func @interface_workgroup_info() {
 // CHECK-LABEL: @interface_io_subspan
 //  CHECK-SAME: (%[[DIM0:.+]]: index, %[[DIM2:.+]]: index)
 func.func @interface_io_subspan(%dim0: index, %dim2: index) {
-  %c8 = arith.constant 8 : index
+  %c0 = arith.constant 0 : index
 
-  // CHECK: = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c8) : memref<?x4x?x16xi8>{%[[DIM0]], %[[DIM2]]}
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c8) : memref<?x4x?x16xi8>{%dim0, %dim2}
+  // CHECK: = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) : memref<?x4x?x16xi8>{%[[DIM0]], %[[DIM2]]}
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) : memref<?x4x?x16xi8>{%dim0, %dim2}
 
   // CHECK: = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) alignment(16) : memref<16xi8>
   %1 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) alignment(16) : memref<16xi8>
@@ -53,5 +53,47 @@ func.func @interface_io_subspan_wrong_dynamic_dim(%dim: index) {
   // expected-error @+1{{result type 'memref<?x4x?x16xi8>' has 2 dynamic dimensions but 1 associated dimension SSA values}}
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c8) : memref<?x4x?x16xi8>{%dim}
 
+  return
+}
+
+// -----
+
+func.func @interface_io_subspan_offset_mismatch() {
+  %c9437184 = arith.constant 9437184 : index
+  // expected-error @+1 {{byte offset (9437184) does not match with type element offset (1179648)}}
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c9437184) flags(ReadOnly)
+         : memref<131072x16xvector<1xi32>, strided<[16, 1], offset: 1179648>, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @interface_io_subspan_offset_index()
+func.func @interface_io_subspan_offset_index() {
+  %c9437184 = arith.constant 9437184 : index
+  // CHECK: hal.interface.binding.subspan
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c9437184) flags(ReadOnly)
+         : memref<131072x16xindex, strided<[16, 1], offset: 1179648>, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @interface_io_subspan_offset_match
+func.func @interface_io_subspan_offset_match() {
+  %c9437184 = arith.constant 9437184 : index
+  // CHECK: hal.interface.binding.subspan
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c9437184) flags(ReadOnly)
+         : memref<131072x16xvector<1xi32>, strided<[16, 1], offset: 2359296>, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @interface_io_subspan_dynamic_offset
+func.func @interface_io_subspan_dynamic_offset(%offset: index) {
+  // CHECK: hal.interface.binding.subspan
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%offset) flags(ReadOnly)
+         : memref<131072x16xvector<1xi32>, strided<[16, 1], offset: 1179648>, #hal.descriptor_type<storage_buffer>>
   return
 }
