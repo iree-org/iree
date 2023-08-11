@@ -7,12 +7,13 @@
 import os
 import subprocess
 import sys
+from ... import _binding
 
 
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
-    exe = os.path.join(os.path.dirname(__file__), "..", "..", "iree-cpuinfo")
+    exe = os.path.join(_binding.library_path, "iree-cpuinfo")
     return subprocess.call(args=[exe] + args)
 
 
