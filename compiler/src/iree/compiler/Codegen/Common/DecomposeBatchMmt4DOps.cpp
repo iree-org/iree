@@ -37,7 +37,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
     if (outType.getShape()[0] != 1) {
       return failure();
     }
-    auto reducedOutType = RankedTensorType::Builder(outType).dropDim(0);
+    RankedTensorType reducedOutType =
+        RankedTensorType::Builder(outType).dropDim(0);
     Value reducedOut;
     Value initTensor;
     // If the init operand is a linalg.fill op, create a new linalg.fill op with
