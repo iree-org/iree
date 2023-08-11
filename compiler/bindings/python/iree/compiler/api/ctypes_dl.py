@@ -414,12 +414,20 @@ def _probe_iree_compiler_dylib() -> str:
         dev_mode = True
 
     if dev_mode and len(_mlir_libs.__path__) == 1:
-        # Track up the to the build dir and into the lib. Burn this with more fire.
-        paths = [
-            Path(_mlir_libs.__path__[0]).parent.parent.parent.parent.parent.parent
-            / "lib"
-        ]
-    else:
+        # Traverse up and find CMakeCache.txt
+        build_dir = Path(_mlir_libs.__path__[0]).parent
+        while True:
+            anchor_file = build_dir / "CMakeCache.txt"
+            if anchor_file.exists():
+                # Most OS's keep their libs in lib. Windows keeps them
+                # in bin (tools in the dev tree). Just check them all.
+                paths = [build_dir / "lib", build_dir / "tools", build_dir / "bin"]
+                break
+            new_dir = build_dir.parent
+            if new_dir == build_dir:
+                break
+            build_dir = new_dir
+    if not paths:
         paths = _mlir_libs.__path__
 
     logging.debug("Found installed iree-compiler package %r", version_dict)
@@ -433,21 +441,23 @@ def _probe_iree_compiler_dylib() -> str:
     for p in paths:
         dylib_path = Path(p) / dylib_basename
         if dylib_path.exists():
-            logging.debug("Found --iree-compiler-dylib=%s", dylib_path)
-            return dylib_path
+            logging.debug("Found IREE compiler dylib=%s", dylib_path)
+            return str(dylib_path)
     raise ValueError(f"Could not find {dylib_basename} in {paths}")
 
 
 class _GlobalInit:
     def __init__(self):
+        self.local_dylib = None
         _init_dylib()
+        _dylib.ireeCompilerGlobalInitialize()
         # Cache locally so as to not have it go out of scope first
         # during shutdown.
         self.local_dylib = _dylib
-        self.local_dylib.ireeCompilerGlobalInitialize()
 
     def __del__(self):
-        self.local_dylib.ireeCompilerGlobalShutdown()
+        if self.local_dylib:
+            self.local_dylib.ireeCompilerGlobalShutdown()
 
 
 # Keep one reference for the life of the module.
