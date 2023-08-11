@@ -60,12 +60,14 @@ struct ConvertBatchMmt4DtoMmt4DPattern
     }
 
     auto lhsType = lhs.getType().cast<RankedTensorType>();
-    auto reducedLhsType = RankedTensorType::Builder(lhsType).dropDim(0);
+    RankedTensorType reducedLhsType =
+        RankedTensorType::Builder(lhsType).dropDim(0);
     auto reducedLhs = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, lhs, reducedLhsType);
 
     auto rhsType = rhs.getType().cast<RankedTensorType>();
-    auto reducedRhsType = RankedTensorType::Builder(rhsType).dropDim(0);
+    RankedTensorType reducedRhsType =
+        RankedTensorType::Builder(rhsType).dropDim(0);
     auto reducedRhs = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, rhs, reducedRhsType);
 
