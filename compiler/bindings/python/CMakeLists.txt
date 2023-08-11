@@ -60,6 +60,7 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
   SOURCES_GLOB
     api/*.py
     tools/*.py
+    tools/ir_tool/*.py
 )
 
 ################################################################################

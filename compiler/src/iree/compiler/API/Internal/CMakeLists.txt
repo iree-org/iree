@@ -21,6 +21,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRBuiltinToLLVMIRTranslation
+    MLIRBytecodeWriter
     MLIRCAPIIR
     MLIRIR
     MLIRParser
