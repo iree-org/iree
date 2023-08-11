@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build/install the iree-compiler-backend python package.
+# Build/install the iree-compiler python package.
 # Note that this includes a relatively large build of LLVM (~2400 C++ files)
 # and can take a considerable amount of time, especially with defaults.
 # To install:
@@ -20,7 +20,6 @@
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
 #
 # Select CMake options are available from environment variables:
-#   IREE_TARGET_BACKEND_CUDA
 #   IREE_ENABLE_CPUINFO
 
 from gettext import install
@@ -252,12 +251,13 @@ def prepare_installation():
             "-GNinja",
             "--log-level=VERBOSE",
             "-DIREE_BUILD_PYTHON_BINDINGS=ON",
+            "-DIREE_BUILD_SAMPLES=OFF",
+            "-DIREE_BUILD_TESTS=OFF",
             # Disable .so.0 style symlinking. Python wheels don't preserve links,
             # so this ~doubles the binary size if not disabled (yikes!).
             "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON",
             "-DPython3_EXECUTABLE={}".format(sys.executable),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
-            get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
             # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU here (and in env)
             get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
         ]
