@@ -114,7 +114,7 @@ iree_py_library(
   SRCS
     "iree/runtime/__init__.py"
     "iree/runtime/_binding.py"
-    "iree/runtime/_runtime.py"
+    "iree/runtime/_runtime_libs.py"
     "iree/runtime/array_interop.py"
     "iree/runtime/benchmark.py"
     "iree/runtime/flags.py"
