@@ -64,6 +64,7 @@ function run() {
 
 function build_iree_runtime() {
   local python_version="$1"
+  export IREE_RUNTIME_BUILD_TRACY=ON
   IREE_HAL_DRIVER_VULKAN=ON \
   py -${python_version} -m pip wheel -v -w $output_dir $repo_root/runtime/
 }

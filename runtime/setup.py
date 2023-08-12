@@ -55,10 +55,18 @@ def combine_dicts(*ds):
 
 ENABLE_TRACY = getenv_bool("IREE_RUNTIME_BUILD_TRACY")
 if ENABLE_TRACY:
-    print("*** Enabling Tracy build (may error if missing deps)", file=sys.stderr)
+    print("*** Enabling Tracy instrumented runtime", file=sys.stderr)
 else:
     print(
-        "*** Tracy not enabled (enable with IREE_RUNTIME_BUILD_TRACY=ON)",
+        "*** Tracy instrumented runtime not enabled (enable with IREE_RUNTIME_BUILD_TRACY=ON)",
+        file=sys.stderr,
+    )
+ENABLE_TRACY_TOOLS = getenv_bool("IREE_RUNTIME_BUILD_TRACY_TOOLS")
+if ENABLE_TRACY_TOOLS:
+    print("*** Enabling Tracy tools (may error if missing deps)", file=sys.stderr)
+else:
+    print(
+        "*** Tracy tools not enabled (enable with IREE_RUNTIME_BUILD_TRACY_TOOLS=ON)",
         file=sys.stderr,
     )
 
@@ -359,13 +367,15 @@ class CMakeBuildPy(_build_py):
         print("*****************************", file=sys.stderr)
         print("* Building tracy runtime    *", file=sys.stderr)
         print("*****************************", file=sys.stderr)
+        cmake_args = [
+            "-DIREE_ENABLE_RUNTIME_TRACING=ON",
+        ]
+        if ENABLE_TRACY_TOOLS:
+            cmake_args.append("-DIREE_BUILD_TRACY=ON")
         build_configuration(
             IREE_TRACY_BINARY_DIR,
             CMAKE_TRACY_INSTALL_DIR_ABS,
-            extra_cmake_args=(
-                "-DIREE_ENABLE_RUNTIME_TRACING=ON",
-                "-DIREE_BUILD_TRACY=ON",
-            ),
+            extra_cmake_args=cmake_args,
         )
         # We only take the iree._runtime_libs from the default build.
         target_dir = os.path.join(
@@ -545,8 +555,8 @@ setup(
                 "iree-run-trace*",
                 "iree-benchmark-module*",
                 "iree-benchmark-trace*",
-                "iree-tracy-capture*",
             ]
+            + (["iree-tracy-capture"] if ENABLE_TRACY_TOOLS else [])
         }
         if ENABLE_TRACY
         else {},
@@ -559,8 +569,14 @@ setup(
             "iree-benchmark-trace = iree.runtime.scripts.iree_benchmark_trace.__main__:main",
             "iree-dump-module = iree.runtime.scripts.iree_dump_module.__main__:main",
             "iree-cpuinfo = iree.runtime.scripts.iree_cpuinfo.__main__:main",
-            "iree-tracy-capture = iree.runtime.scripts.iree_tracy_capture.__main__:main",
-        ],
+        ]
+        + (
+            [
+                "iree-tracy-capture = iree.runtime.scripts.iree_tracy_capture.__main__:main"
+            ]
+            if ENABLE_TRACY_TOOLS
+            else []
+        ),
     },
     install_requires=[
         "numpy",
