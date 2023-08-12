@@ -115,6 +115,7 @@ function run_in_docker() {
       fi
       export PATH="${python_dir}/bin:${orig_path}"
       echo ":::: Python version $(python --version)"
+      prepare_python
       # replace dashes with underscores
       package_suffix="${package_suffix//-/_}"
       case "${package}" in
@@ -170,6 +171,16 @@ function clean_wheels() {
   local python_version="$2"
   echo ":::: Clean wheels ${wheel_basename} ${python_version}"
   rm -f -v "${output_dir}/${wheel_basename}-"*"-${python_version}-"*".whl"
+}
+
+function prepare_python() {
+  # The 0.17 series of patchelf can randomly corrupt executables. Fixes
+  # have landed but not yet been released. Consider removing this pin
+  # once 0.19 is released. We just override the system version with
+  # a pip side load.
+  pip install patchelf==0.16.1.0
+  hash -r
+  echo "patchelf version: $(patchelf --version) (0.17 is bad: https://github.com/NixOS/patchelf/issues/446)"
 }
 
 function install_deps() {
