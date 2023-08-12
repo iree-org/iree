@@ -165,7 +165,7 @@ struct InsertDebugTargetAtOrdinalPass
       auto dispatchOps = llvm::to_vector<8>(bodyRegion.getOps<DispatchOp>());
 
       // Trace on a valid ordinal.
-      if (localTraceOrdinal > 0 && localTraceOrdinal < dispatchOps.size()) {
+      if (localTraceOrdinal >= 0 && localTraceOrdinal < dispatchOps.size()) {
         auto traceTarget = dispatchOps[localTraceOrdinal];
         std::string entryPointName =
             traceTarget.getEntryPoint().getRootReference().getValue().str();
@@ -181,7 +181,7 @@ struct InsertDebugTargetAtOrdinalPass
       // Break on a valid ordinal, updating the function signature in the
       // process. Currently only a single ordinal is supported so no need to
       // check for overlapping breaks.
-      if (localBreakOrdinal > 0 && localBreakOrdinal < dispatchOps.size()) {
+      if (localBreakOrdinal >= 0 && localBreakOrdinal < dispatchOps.size()) {
         auto breakTarget = dispatchOps[localBreakOrdinal];
         if (failed(replaceReturnWithOpResults(getOperation(), funcOp,
                                               breakTarget)))
