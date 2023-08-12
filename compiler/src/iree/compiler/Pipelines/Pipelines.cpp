@@ -176,6 +176,7 @@ void buildIREEVMTransformPassPipeline(
   streamOptions.dumpStatisticsFormat =
       (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
   streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
+  streamOptions.optimizeBindings = schedulingOptions.optimizeBindings;
 
   switch (schedulingOptions.executionModel) {
   case SchedulingOptions::ExecutionModel::HostOnly:
