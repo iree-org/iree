@@ -6,7 +6,7 @@
 
 iree_hal_cts_test_suite(
   DRIVER_NAME
-    experimental_rocm
+    rocm
   DRIVER_REGISTRATION_HDR
     "experimental/rocm/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
