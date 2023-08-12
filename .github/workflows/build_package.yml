@@ -155,7 +155,6 @@ jobs:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
-          IREE_RUNTIME_BUILD_TRACY: ON
         run: |
           ./c/build_tools/python_deploy/build_linux_packages.sh
 
@@ -167,7 +166,6 @@ jobs:
           packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
-          IREE_RUNTIME_BUILD_TRACY: ON
         run: |
           ./c/build_tools/python_deploy/build_macos_packages.sh
 
@@ -179,7 +177,6 @@ jobs:
           packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
-          IREE_RUNTIME_BUILD_TRACY: ON
         run: |
           ./c/build_tools/python_deploy/build_windows_packages.sh
 

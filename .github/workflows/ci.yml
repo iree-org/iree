@@ -518,7 +518,6 @@ jobs:
           # Note when upgrading: Build just one Python version synced to our
           # minimum.
           override_python_versions: cp38-cp38
-          IREE_RUNTIME_BUILD_TRACY: ON
         run: |
           ./build_tools/python_deploy/build_linux_packages.sh
       # Note that it is just a trade-off decision to have this serialized

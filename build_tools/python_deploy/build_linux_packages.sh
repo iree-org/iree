@@ -144,6 +144,9 @@ function build_wheel() {
 }
 
 function build_iree_runtime() {
+  export IREE_RUNTIME_BUILD_TRACY=ON
+  # We install the needed build deps below for the tools.
+  export IREE_RUNTIME_BUILD_TRACY_TOOLS=ON
   build_wheel runtime/
 }
 
