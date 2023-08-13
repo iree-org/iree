@@ -196,6 +196,10 @@ static inline unsigned getTypeBitWidth(Type type) {
   if (auto complexType = type.dyn_cast<ComplexType>()) {
     return 2 * complexType.getElementType().getIntOrFloatBitWidth();
   }
+  if (auto vectorType = type.dyn_cast<VectorType>()) {
+    return vectorType.getNumElements() *
+           getTypeBitWidth(vectorType.getElementType());
+  }
   return type.getIntOrFloatBitWidth();
 }
 

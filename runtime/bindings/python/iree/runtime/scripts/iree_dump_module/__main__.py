@@ -8,11 +8,14 @@ import os
 import subprocess
 import sys
 
+# Note that dump-module is only in the default libs.
+from iree import _runtime_libs
+
 
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
-    exe = os.path.join(os.path.dirname(__file__), "..", "..", "iree-dump-module")
+    exe = os.path.join(_runtime_libs.library_path, "iree-dump-module")
     return subprocess.call(args=[exe] + args)
 
 

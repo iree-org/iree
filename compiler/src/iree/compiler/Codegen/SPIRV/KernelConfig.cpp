@@ -6,9 +6,6 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
-#include <functional>
-#include <numeric>
-
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
@@ -32,6 +29,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/TypeUtilities.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
 
@@ -1293,6 +1291,21 @@ static int getReductionTilingFactor(int64_t dimSize) {
   return 1; // Otherwise just tile with size 1.
 }
 
+/// Returns the minimal element bitwidth used in the operands and results of the
+/// given Linalg op.
+static int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
+  unsigned bitwidth = std::numeric_limits<unsigned>::max();
+  for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+    unsigned b = getElementTypeOrSelf(operand->get()).getIntOrFloatBitWidth();
+    bitwidth = std::min(bitwidth, b);
+  }
+  for (OpOperand *result : linalgOp.getDpsInitOperands()) {
+    unsigned b = getElementTypeOrSelf(result->get()).getIntOrFloatBitWidth();
+    bitwidth = std::min(bitwidth, b);
+  }
+  return bitwidth;
+};
+
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op,
                                         bool allowVectorization = true) {
@@ -1356,12 +1369,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // 1) distributing to as many threads as possible, and 2) avoid assigning too
   // many threads to handle out-of-bound elements (thus idle).
 
-  // Returns true if the given `operand` has 32-bit element type.
-  auto has32BitElementType = [](Value operand) {
-    auto shapedType = llvm::dyn_cast<ShapedType>(operand.getType());
-    Type elementType =
-        (shapedType ? shapedType.getElementType() : operand.getType());
-    return llvm::isa<FloatType>(elementType) || elementType.isInteger(32);
+  auto elementHasPowerOfTwoBitwidth = [](Value operand) {
+    Type elementType = getElementTypeOrSelf(operand.getType());
+    return isa<IntegerType, FloatType>(elementType) &&
+           llvm::isPowerOf2_64(elementType.getIntOrFloatBitWidth());
   };
 
   // Whether we can try to use the vectorization pipeline.
@@ -1375,9 +1386,12 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       llvm::all_of(
           linalgOp.getIndexingMapsArray(),
           [](AffineMap map) { return map.isProjectedPermutation(); }) &&
-      // TODO: Fix non-32-bit element type vectorization and remove this.
-      llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
+      llvm::all_of(linalgOp->getOperands(), elementHasPowerOfTwoBitwidth) &&
       llvm::none_of(loopBounds, ShapedType::isDynamic);
+
+  const unsigned minBitwidth = getMinElementBitwidth(linalgOp);
+  // Make sure we use a tile size that results in some integral number of bytes.
+  const unsigned scaleToByte = minBitwidth < 8 ? 8 / minBitwidth : 1;
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
@@ -1419,31 +1433,33 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         candidates.push_back(i);
       }
       LLVM_DEBUG({
-        llvm::dbgs() << "Candidate tile sizes: [";
+        llvm::dbgs() << "Base candidate tile sizes: [";
         llvm::interleaveComma(candidates, llvm::dbgs());
         llvm::dbgs() << "]\n";
       });
 
       for (int64_t candidate : candidates) {
-        if (loopBound % candidate != 0) {
+        int64_t scaledTileSize = candidate * scaleToByte;
+        if (loopBound % scaledTileSize != 0) {
           if (!lossFactor)
             continue;
           // Skip this candidate if it causes many threads to be idle.
-          int64_t idleThreads = candidate - (loopBound % candidate);
+          int64_t idleThreads = candidate - (loopBound % scaledTileSize);
           if (idleThreads > candidate / *lossFactor)
             continue;
         }
         // If the workload is too small and we cannot distribute to more than 2
         // workgroups, try a smaller tile size to increase parallelism.
         if (partitionedLoops.size() == 1 && candidate > subgroupSize &&
-            divideCeil(loopBound, candidate) <= 2) {
+            divideCeil(loopBound, scaledTileSize) <= 2) {
           continue;
         }
 
         // Found a suitable candidate. Try to let each thread handle 4
         // elements if this is the workgroup x dimension.
-        workgroupTileSizes[shapeDim] = candidate;
-        LLVM_DEBUG(llvm::dbgs() << "Chosen tile size: " << candidate << "\n");
+        workgroupTileSizes[shapeDim] = scaledTileSize;
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Chosen workgroup tile size: " << scaledTileSize << "\n");
         if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
           // Use size-1 vectors to increase parallelism if larger ones causes
           // idle threads in the subgroup.
@@ -1451,14 +1467,14 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
               partitionedLoops.size() == 1 && candidate <= subgroupSize;
           int vectorSize = hasIdleThreads ? 1 : 4;
           LLVM_DEBUG(llvm::dbgs() << "Use vector size: " << vectorSize << "\n");
-          threadTileSizes[shapeDim] = vectorSize;
+          threadTileSizes[shapeDim] = vectorSize * scaleToByte;
           workgroupSize[wgDim] = candidate / vectorSize;
           assert(numThreads % (candidate / vectorSize) == 0);
           numThreads /= candidate / vectorSize;
         } else {
           if (wgDim == 0)
             vectorizable = false;
-          threadTileSizes[shapeDim] = 1;
+          threadTileSizes[shapeDim] = scaleToByte;
           workgroupSize[wgDim] = candidate;
           assert(numThreads % candidate == 0);
           numThreads /= candidate;

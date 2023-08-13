@@ -513,7 +513,7 @@ jobs:
       - name: Build runtime wheels (Linux)
         shell: bash
         env:
-          packages: "iree-runtime iree-runtime-instrumented"
+          packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           # Note when upgrading: Build just one Python version synced to our
           # minimum.
