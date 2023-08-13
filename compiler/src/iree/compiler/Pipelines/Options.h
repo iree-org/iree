@@ -137,6 +137,8 @@ struct SchedulingOptions {
   DumpOutputFormat dumpStatisticsFormat = DumpOutputFormat::None;
   // File path to write statistics to; or `` for stderr or `-` for stdout.
   std::string dumpStatisticsFile = "";
+  // Enables fusing bindings with the same underlying storage.
+  bool optimizeBindings = true;
 
   // TODO(benvanik): favor size/speed/etc for partitioning.
   // TODO(benvanik): execution model to optimize for (unified/discrete memory,
