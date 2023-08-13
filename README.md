@@ -26,6 +26,28 @@ export IREE_CUDA_DEPS_DIR=${HOME?}/.iree_cuda_deps
 ../iree/build_tools/docker/context/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR?}
 ```
 
+### Option 0: Pip install (non-dev)
+
+```shell
+pip install jax openxla_pjrt_plugin_cpu \
+  -f https://openxla.github.io/openxla-pjrt-plugin/pip-release-links.html \
+  -f https://openxla.github.io/iree/pip-release-links.html
+```
+
+Then one can verify & use simply with
+
+```shell
+$ python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print(a + a);"
+```
+```
+Platform 'iree_cpu' is experimental and not all JAX functionality may be correctly supported!
+[IREE-PJRT] DEBUG: Using IREE compiler binary: /tmp/.venv/lib/python3.11/site-packages/iree/compiler/_mlir_libs/libIREECompiler.so
+[IREE-PJRT] DEBUG: Compiler Version: 20230813.612 @ b56ac23bd85f0b9f4a9939c9e87fe83e629f8566 (API version 1.4)
+[IREE-PJRT] DEBUG: Partitioner was not enabled. The partitioner can be enabled by setting the 'PARTITIONER_LIB_PATH' config var ('IREE_PJRT_PARTITIONER_LIB_PATH' env var)
+[IREE-PJRT] DEBUG: CPU driver created
+[ 2  4  6  8 10 12 14 16 18]
+```
+
 ### Option 1: Synchronize to a nightly IREE release
 
 ```shell
