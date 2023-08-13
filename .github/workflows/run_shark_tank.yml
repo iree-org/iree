@@ -7,7 +7,14 @@ on:
   # Uncomment `pull_request` below to test your PR on SHARK.
   # Results will be uploaded to gs://shark-benchmark-artifacts.
   # See the workflow's `SHARK -> generate_report` log output for exact results URL.
-  # pull_request:
+  pull_request:
+  
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit).
+  group: ${{ github.event.number || github.sha }}
+  cancel-in-progress: true
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
@@ -89,7 +96,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/shark@sha256:2b2e41dbf909194b598e226144a2fb1e74d31851d41fe519d0fcb6d071b77461 \
-          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cpu" --driver "cpu" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "true" --iree-source-dir "${IREE_SOURCE_DIR}"
+          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cpu and torch and static" --driver "cpu" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "true" --iree-source-dir "${IREE_SOURCE_DIR}"
       - name: "Uploading artifacts"
         run: |
           gcloud storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"
@@ -118,7 +125,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
             gcr.io/iree-oss/shark@sha256:2b2e41dbf909194b598e226144a2fb1e74d31851d41fe519d0fcb6d071b77461 \
-          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cuda" --driver "cuda" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "false" --iree-source-dir "${IREE_SOURCE_DIR}"
+          ./build_tools/benchmarks/shark/run_shark.sh --sha "${SHARK_SHA}" --pytest-regex "cuda and torch and static" --driver "cuda" --output-dir "${SHARK_OUTPUT_DIR}" --save-version-info "false" --iree-source-dir "${IREE_SOURCE_DIR}"
       - name: "Uploading artifacts"
         run: |
           gcloud storage cp "${SHARK_OUTPUT_DIR}/**" "${GCS_UPLOAD_DIR}/"
