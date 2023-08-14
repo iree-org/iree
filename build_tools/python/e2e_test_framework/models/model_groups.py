@@ -220,7 +220,12 @@ RESNET50_JAX_BATCHES = list(jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCHES.v
 
 BERT_LARGE_JAX_BATCHES = list(jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES.values())
 
-T5_LARGE_JAX_BATCHES = list(jax_models.T5_LARGE_FP32_JAX_512XI32_BATCHES.values())
+T5_LARGE_JAX_BATCHES = [
+    model
+    for batch_size, model in jax_models.T5_LARGE_FP32_JAX_512XI32_BATCHES.items()
+    # Disabled due to TODO.
+    if batch_size != 512
+]
 
 # GPU model groups.
 

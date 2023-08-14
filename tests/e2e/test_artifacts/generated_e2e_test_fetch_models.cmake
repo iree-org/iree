@@ -403,10 +403,3 @@ iree_fetch_artifact(
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH64.mlirbc"
   UNPACK
 )
-
-iree_fetch_artifact(
-  NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH512"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/T5_LARGE_FP32_JAX_512XI32_BATCH512/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH512.mlirbc"
-  UNPACK
-)
