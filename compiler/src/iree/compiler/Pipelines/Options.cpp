@@ -167,6 +167,12 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                           llvm::cl::desc("File path to write statistics to; or "
                                          "`` for stderr or `-` for stdout."),
                           llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-scheduling-optimize-bindings", optimizeBindings,
+      llvm::cl::desc(
+          "Enables binding fusion and dispatch site specialization."),
+      llvm::cl::cat(category));
 }
 
 void PreprocessingOptions::bindOptions(OptionsBinder &binder) {

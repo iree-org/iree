@@ -119,6 +119,13 @@ def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   ];
 }
 
+def DecomposeBatchMmt4DOps
+    : Pass<"iree-codegen-decompose-batch-mmt4d-ops", "func::FuncOp"> {
+  let summary = "Decompose batch_mmt4d ops into mmt4d ops";
+  let constructor =
+      "mlir::iree_compiler::createDecomposeBatchMmt4DOpsPass()";
+}
+
 def DecomposeConvolutionToLowerDimOps :
     Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
   let summary = "Decomposes linalg convolution ops to lower dim ops";

@@ -711,29 +711,32 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               Location loc,
                                               OpFoldResult byteOffset,
                                               Type elementType) {
-  OpFoldResult elementWidth =
-      TypeSwitch<Type, OpFoldResult>(elementType)
-          .Case<ComplexType, FloatType, IntegerType, VectorType>(
-              [&](auto type) -> OpFoldResult {
-                return rewriter.getIndexAttr(
-                    IREE::Util::getRoundedElementByteWidth(elementType));
-              })
-          .Default([&](Type t) -> OpFoldResult {
-            return rewriter.create<IREE::Util::SizeOfOp>(loc, elementType)
-                .getResult();
-          });
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
-                                               {byteOffset, elementWidth});
+  if (isa<ComplexType, FloatType, IntegerType, VectorType>(elementType)) {
+    unsigned typeBitWidth = IREE::Util::getTypeBitWidth(elementType);
+    assert(llvm::isPowerOf2_32(typeBitWidth) &&
+           "unhandled non powers of 2 bit width while converting byte offset "
+           "to element offset");
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    return affine::makeComposedFoldedAffineApply(
+        rewriter, loc, (s0 * 8).floorDiv(typeBitWidth),
+        {byteOffset, rewriter.getIndexAttr(typeBitWidth)});
+  } else {
+    OpFoldResult elementByteSize =
+        rewriter.create<IREE::Util::SizeOfOp>(loc, elementType).getResult();
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
+                                                 {byteOffset, elementByteSize});
+  }
 }
 
 //===---------------------------------------------------------------------===//
 // Replace Memref users (transitively)
 //===---------------------------------------------------------------------===//
 
-/// Replaces a `use` with the `replacement` for cases where a simple substition
-/// might lead to verification errors.
+/// Replaces a `use` with the `replacement` for cases where a simple
+/// substition might lead to verification errors.
 static std::optional<SmallVector<Value>>
 replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
                      Value replacement) {

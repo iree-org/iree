@@ -10,7 +10,7 @@
 # Configure settings with script parameters.
 param(
     [array]$python_versions=@("3.11"),
-    [array]$packages=@("iree-runtime", "iree-runtime-instrumented", "iree-compiler"),
+    [array]$packages=@("iree-runtime", "iree-compiler"),
     [System.String]$output_dir
 )
 
@@ -51,10 +51,6 @@ function run() {
             clean_wheels iree_runtime $python_version
             build_iree_runtime $python_version
           }
-          "iree-runtime-instrumented" {
-            clean_wheels iree_runtime_instrumented $python_version
-            build_iree_runtime_instrumented $python_version
-          }
           "iree-compiler" {
             clean_wheels iree_compiler $python_version
             build_iree_compiler $python_version
@@ -72,14 +68,6 @@ function build_iree_runtime() {
   param($python_version)
   $env:IREE_HAL_DRIVER_VULKAN = "ON"
   & py -${python_version} -m pip wheel -v -w $output_dir $repo_root/runtime/
-}
-
-function build_iree_runtime_instrumented() {
-  param($python_version)
-  $env:IREE_HAL_DRIVER_VULKAN = "ON"
-  $env:IREE_ENABLE_RUNTIME_TRACING = "ON"
-  $env:IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX = "-instrumented"
-  py -${python_version} -m pip wheel -v -w $output_dir $repo_root/runtime/
 }
 
 function build_iree_compiler() {

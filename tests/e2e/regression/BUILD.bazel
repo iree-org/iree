@@ -78,6 +78,7 @@ iree_check_single_backend_test_suite(
         "layernorm.mlir",
         "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir",
+        "ui4_to_f32.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "local-task",
@@ -110,7 +111,9 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
     # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
-    srcs = BACKEND_TESTS,
+    srcs = [
+        "ui4_to_f32.mlir",
+    ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",

@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "convert_to_destination_passing_style.mlir"
     "convolutions.mlir"
     "decompose_affine_ops.mlir"
+    "decompose_batch_mmt4d_ops.mlir"
     "decompose_linalg_generic.mlir"
     "decompose_pack_unpack_ops.mlir"
     "eliminate_empty_tensors.mlir"
