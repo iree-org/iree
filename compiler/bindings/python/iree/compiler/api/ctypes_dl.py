@@ -413,6 +413,9 @@ def _probe_iree_compiler_dylib() -> str:
         version_dict = {}
         dev_mode = True
 
+    # Try to find development mode library, falling back to normal
+    # locations.
+    paths = None
     if dev_mode and len(_mlir_libs.__path__) == 1:
         # Traverse up and find CMakeCache.txt
         build_dir = Path(_mlir_libs.__path__[0]).parent
