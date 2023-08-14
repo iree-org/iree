@@ -94,7 +94,7 @@ hal.executable @abs_dynamic {
 //   CHECK: %[[GEP:.+]] = llvm.getelementptr %[[GEP1]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //   CHECK: %[[LOAD:.+]] = llvm.load %[[GEP]] : !llvm.ptr -> f32
 //   CHECK: %[[GEP2:.+]] = llvm.getelementptr %[[ARG0]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, i32
-//   CHECK: %27 = llvm.load %[[GEP2]] : !llvm.ptr -> i32
+//   CHECK: llvm.load %[[GEP2]] : !llvm.ptr -> i32
 //   CHECK: %[[FADD:.+]] = llvm.fadd %[[LOAD]], %{{.*}}  : f32
 //   CHECK: %[[ADD:.+]] = llvm.add
 //   CHECK: %[[ADD2:.+]] = llvm.add
