@@ -164,6 +164,11 @@ static unsigned isMemRefVectorizable(Value value,
   }
 
   unsigned elementNumBits = memrefType.getElementTypeBitWidth();
+  if (elementNumBits < 8) {
+    LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "failed: sub-byte element\n");
+    return 0;
+  }
   if (kMaxVectorNumBits % elementNumBits != 0) {
     LLVM_DEBUG(llvm::dbgs() << "failed: element not fitting in vector4\n");
     return 0;
@@ -175,7 +180,6 @@ static unsigned isMemRefVectorizable(Value value,
       return 0;
     unsigned vectorSize = vectorBits / elementNumBits;
     LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
-    LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
     // Again make sure we don't have vectors of odd numbers.
     if (vectorSize % 2 != 0) {
       LLVM_DEBUG(llvm::dbgs() << "failed: odd element count after grouping\n");
