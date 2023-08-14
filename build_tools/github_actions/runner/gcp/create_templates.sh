@@ -172,6 +172,7 @@ function create_template() {
 }
 
 for group in presubmit postsubmit; do
+  # TODO(#14661): Remove c2s601t if we decide not to migrate benchmarks to it.
   for type in gpu a100 cpu c2s16 c2s601t; do
     create_template "${group}" "${type}"
   done
