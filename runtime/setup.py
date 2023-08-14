@@ -435,6 +435,8 @@ packages = (
         include=[
             "iree.runtime",
             "iree.runtime.*",
+            "iree._runtime",
+            "iree._runtime.*",
         ],
     )
     + [
@@ -521,6 +523,7 @@ setup(
             # Note: Must be relative path, so we line this up with the absolute
             # path built above. Note that this must exist prior to the call.
             "iree.runtime": "bindings/python/iree/runtime",
+            "iree._runtime": "bindings/python/iree/_runtime",
             "iree._runtime_libs": f"{CMAKE_INSTALL_DIR_REL}/python_packages/iree_runtime/iree/_runtime_libs",
         },
         {
@@ -563,16 +566,16 @@ setup(
     ),
     entry_points={
         "console_scripts": [
-            "iree-run-module = iree.runtime.scripts.iree_run_module.__main__:main",
-            "iree-run-trace = iree.runtime.scripts.iree_run_trace.__main__:main",
-            "iree-benchmark-module = iree.runtime.scripts.iree_benchmark_module.__main__:main",
-            "iree-benchmark-trace = iree.runtime.scripts.iree_benchmark_trace.__main__:main",
-            "iree-dump-module = iree.runtime.scripts.iree_dump_module.__main__:main",
-            "iree-cpuinfo = iree.runtime.scripts.iree_cpuinfo.__main__:main",
+            "iree-run-module = iree._runtime.scripts.iree_run_module.__main__:main",
+            "iree-run-trace = iree._runtime.scripts.iree_run_trace.__main__:main",
+            "iree-benchmark-module = iree._runtime.scripts.iree_benchmark_module.__main__:main",
+            "iree-benchmark-trace = iree._runtime.scripts.iree_benchmark_trace.__main__:main",
+            "iree-dump-module = iree._runtime.scripts.iree_dump_module.__main__:main",
+            "iree-cpuinfo = iree._runtime.scripts.iree_cpuinfo.__main__:main",
         ]
         + (
             [
-                "iree-tracy-capture = iree.runtime.scripts.iree_tracy_capture.__main__:main"
+                "iree-tracy-capture = iree._runtime.scripts.iree_tracy_capture.__main__:main"
             ]
             if ENABLE_TRACY_TOOLS
             else []

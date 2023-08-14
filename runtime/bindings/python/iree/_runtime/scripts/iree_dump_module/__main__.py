@@ -15,7 +15,7 @@ from iree import _runtime_libs
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
-    exe = os.path.join(_runtime_libs.library_path, "iree-dump-module")
+    exe = os.path.join(_runtime_libs.__path__[0], "iree-dump-module")
     return subprocess.call(args=[exe] + args)
 
 
