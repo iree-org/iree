@@ -67,7 +67,7 @@ static llvm::cl::opt<bool> clResourceAliasMutableBindings(
     "iree-stream-resource-alias-mutable-bindings",
     llvm::cl::desc(
         "Fuses bindings that are mutable instead of leaving them split."),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
@@ -83,7 +83,7 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
   int64_t maxBufferRange = 0;
   int64_t minBufferRangeAlignment = 0;
   int64_t indexBits = 32;
-  bool aliasMutableBindings = false;
+  bool aliasMutableBindings = true;
   while (failed(p.parseOptionalRBrace())) {
     StringRef key;
     int64_t value = 0;
