@@ -505,7 +505,7 @@ TraversalResult Explorer::walkIncomingBranchOperands(
       regionOp.getSuccessorRegions(/*index=*/std::nullopt, entrySuccessors);
       for (auto &entrySuccessor : entrySuccessors) {
         if (fn(regionOp->getBlock(),
-               regionOp.getSuccessorEntryOperands(
+               regionOp.getEntrySuccessorOperands(
                    entrySuccessor.getSuccessor()->getRegionNumber()))
                 .wasInterrupted()) {
           break;
