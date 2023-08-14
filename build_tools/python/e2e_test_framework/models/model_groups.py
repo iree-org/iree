@@ -216,15 +216,25 @@ T5_LARGE_TF_BATCHES = [
 
 # Batched JAX models.
 
-RESNET50_JAX_BATCHES = list(jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCHES.values())
+RESNET50_JAX_BATCHES = [
+    model
+    for batch_size, model in jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCHES.items()
+    # TODO(#14668): Disabled larger batches due to compilation OOM.
+    if batch_size <= 256
+]
 
-BERT_LARGE_JAX_BATCHES = list(jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES.values())
+BERT_LARGE_JAX_BATCHES = [
+    model
+    for batch_size, model in jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES.items()
+    # TODO(#14668): Disabled larger batches due to compilation OOM.
+    if batch_size <= 64
+]
 
 T5_LARGE_JAX_BATCHES = [
     model
     for batch_size, model in jax_models.T5_LARGE_FP32_JAX_512XI32_BATCHES.items()
-    # Disabled due to TODO.
-    if batch_size != 512
+    # TODO(#14666): Disabled larger batches due to runtime CUDA OOM.
+    if batch_size <= 64
 ]
 
 # GPU model groups.
@@ -251,9 +261,8 @@ CUDA_MODELS_LONG = (
     # + RESNET50_TORCH_BATCHES
     # + RESNET50_FP16_TORCH_BATCHES
     # + BERT_LARGE_FP16_TORCH_BATCHES
-    # TODO(TODO): OOM
-    # + BERT_LARGE_JAX_BATCHES
-    # + RESNET50_JAX_BATCHES
+    + BERT_LARGE_JAX_BATCHES
+    + RESNET50_JAX_BATCHES
     + T5_LARGE_JAX_BATCHES
 )
 
