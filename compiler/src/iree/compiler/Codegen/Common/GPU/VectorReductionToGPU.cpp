@@ -139,6 +139,36 @@ public:
   }
 };
 
+LogicalResult moveShapeCastAheadOfElementwise(vector::ShapeCastOp castOp,
+                                              PatternRewriter &rewriter) {
+  Operation *oldElemOp = castOp.getSource().getDefiningOp();
+  if (!OpTrait::hasElementwiseMappableTraits(oldElemOp) ||
+      oldElemOp->getNumResults() != 1 || oldElemOp->getNumRegions() != 0)
+    return failure();
+
+  VectorType dstType = castOp.getResultVectorType();
+  SmallVector<Value> inputs;
+  for (Value operand : oldElemOp->getOperands()) {
+    auto oldType = cast<VectorType>(operand.getType());
+    auto newType = VectorType::get(dstType.getShape(), oldType.getElementType(),
+                                   dstType.getScalableDims());
+    inputs.push_back(rewriter.create<vector::ShapeCastOp>(castOp.getLoc(),
+                                                          newType, operand));
+  }
+
+  Operation *newElemOp =
+      rewriter.create(oldElemOp->getLoc(), oldElemOp->getName().getIdentifier(),
+                      inputs, dstType, oldElemOp->getAttrs());
+  rewriter.replaceOp(castOp, newElemOp->getResults());
+  return success();
+}
+
+LogicalResult moveShapeCastAheadOfTransferRead(vector::ShapeCastOp castOp,
+                                               PatternRewriter &rewriter) {
+
+  return success();
+}
+
 static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
                                        Value val, Value srcIdx,
                                        int64_t warpSz) {
@@ -178,6 +208,7 @@ public:
           patterns, vector::VectorMultiReductionLowering::InnerReduction);
       // Add clean up patterns after lowering of multidimreduce lowering.
       patterns.add<InsertElementToBroadcast>(ctx);
+      // patterns.add(moveShapeCastAheadOfElementwise);
       vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);
       vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
       vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);

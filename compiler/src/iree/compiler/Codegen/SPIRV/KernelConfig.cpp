@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
@@ -62,8 +63,20 @@ using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 //===----------------------------------------------------------------------===//
 
 bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
-  return linalg::isaContractionOpInterface(linalgOp) &&
-         llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops());
+  // (Batch) matmul should be a reduction op with 2/3 parallel dimensions.
+  if (!linalg::isaContractionOpInterface(linalgOp) ||
+      !llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops()))
+    return false;
+
+  // Also exclude the case of matvec, which has only one non-unit parallel dim.
+  int nonUnitParallelDimCount = 0;
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<utils::IteratorType, 4> kinds = linalgOp.getIteratorTypesArray();
+  for (auto [kind, bound] : llvm::zip(kinds, bounds)) {
+    if (kind == utils::IteratorType::parallel)
+      nonUnitParallelDimCount += bound != 1;
+  }
+  return nonUnitParallelDimCount > 1;
 }
 
 // Check if the given linalg op is fused with another op that may result
@@ -1154,6 +1167,8 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
+  LLVM_DEBUG(llvm::dbgs() << "generic op: " << op << "\n");
+
   auto funcOp = op->getParentOfType<FunctionOpInterface>();
   auto walkResult = funcOp.walk([](linalg::LinalgOp op) {
     if (op.hasDynamicShape())
@@ -1170,16 +1185,36 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
+  LLVM_DEBUG({
+    llvm::dbgs() << "# loops: " << op.getNumLoops() << "\n";
+    llvm::dbgs() << "reduction dims: [";
+    llvm::interleaveComma(reductionDims, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
+  if (reductionDims.empty())
     return failure();
-  if (op.getRegionOutputArgs().size() != 1)
+
+  for (int i = 0; i < reductionDims.size(); ++i) {
+    if (reductionDims[reductionDims.size() - 1 - i] !=
+        op.getNumLoops() - 1 - i) {
+      LLVM_DEBUG(llvm::dbgs() << "reduction dim #" << i << "("
+                              << reductionDims[reductionDims.size() - 1 - i]
+                              << " vs " << op.getNumLoops() - 1 - i << ")\n");
+      return failure();
+    }
+  }
+  if (op.getRegionOutputArgs().size() != 1) {
+    llvm::dbgs() << "region output args: " << op.getRegionOutputArgs().size()
+                 << "\n";
     return failure();
+  }
 
   // Only support projected permutation for now. This could be extended to
   // projected permutated with broadcast.
   if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
         return !op.getMatchingIndexingMap(input).isProjectedPermutation();
       })) {
+    llvm::dbgs() << "input is not projected permuation\n";
     return failure();
   }
 
@@ -1194,15 +1229,22 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
       foundSingleReductionOutput = true;
       continue;
     }
-    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity())
+    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity()) {
+      LLVM_DEBUG(llvm::dbgs() << "init #" << i << " not identity map\n");
       return failure();
+    }
   }
-  if (!foundSingleReductionOutput)
+  if (!foundSingleReductionOutput) {
+    LLVM_DEBUG(llvm::dbgs() << "cannot find single reduction output\n");
     return failure();
+  }
 
   const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
-  std::optional<int64_t> dimSize = op.getStaticLoopRanges()[reductionDims[0]];
-  if (!dimSize || *dimSize % subgroupSize != 0)
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t dimSize = 1;
+  for (int64_t dim : reductionDims)
+    dimSize *= bounds[dim];
+  if (dimSize % subgroupSize != 0)
     return failure();
 
   const Type elementType =
@@ -1216,13 +1258,13 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   // Let each thread handle `vectorSize` elements.
   unsigned vectorSize = kMaxVectorNumBits / bitWidth;
-  while ((*dimSize / vectorSize) % subgroupSize != 0)
+  while ((dimSize / vectorSize) % subgroupSize != 0)
     vectorSize /= 2;
 
   // TODO: Add reduction tiling to handle larger reductions.
   const int64_t maxWorkgroupSize =
       targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
-  int64_t groupSize = *dimSize / vectorSize;
+  int64_t groupSize = dimSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
@@ -1728,14 +1770,25 @@ static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
     return success();
   }
 
-  // Try to find a configuration according to a matmul/convolution op and use
-  // it as the root op.
-  for (Operation *computeOp : computeOps) {
+  // Try to find a configuration according to a matmul/convolution op, which as
+  // at least one reduction dimension, and use it as the root op. So, skip all
+  // fused parallel producer ops.
+  ArrayRef roots(computeOps);
+  while (roots.size() > 1) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(roots.front());
+    if (!linalgOp)
+      break;
+    if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
+      break;
+    roots = roots.drop_front();
+  }
+
+  for (Operation *computeOp : roots) {
     if (succeeded(setSPIRVOpConfig(targetEnv, funcOp, computeOp)))
       return success();
   }
 
-  Operation *computeOp = computeOps.back();
+  Operation *computeOp = roots.back();
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   // If there are still no root op, check for any linalg.generic op.
   if (succeeded(setDefaultOpConfig(limits, computeOp)))
