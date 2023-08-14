@@ -61,7 +61,7 @@ BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
     input_types=["1x384xi32", "1x384xi32", "1x384xi32"],
 )
 
-TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.13.0rc2_1688540251"
+TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975"
 
 ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
 NAME_FORMAT = string.Template("${name}Batch${batch_size}")
