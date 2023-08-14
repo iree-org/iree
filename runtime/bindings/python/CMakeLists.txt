@@ -114,7 +114,6 @@ iree_py_library(
   SRCS
     "iree/runtime/__init__.py"
     "iree/runtime/_binding.py"
-    "iree/runtime/_runtime_libs.py"
     "iree/runtime/array_interop.py"
     "iree/runtime/benchmark.py"
     "iree/runtime/flags.py"
@@ -123,12 +122,13 @@ iree_py_library(
     "iree/runtime/system_setup.py"
     "iree/runtime/tracing.py"
     "iree/runtime/version.py"
-    "iree/runtime/scripts/iree_benchmark_trace/__main__.py"
-    "iree/runtime/scripts/iree_benchmark_module/__main__.py"
-    "iree/runtime/scripts/iree_cpuinfo/__main__.py"
-    "iree/runtime/scripts/iree_run_trace/__main__.py"
-    "iree/runtime/scripts/iree_run_module/__main__.py"
-    "iree/runtime/scripts/iree_tracy_capture/__main__.py"
+    "iree/_runtime/libs.py"
+    "iree/_runtime/scripts/iree_benchmark_trace/__main__.py"
+    "iree/_runtime/scripts/iree_benchmark_module/__main__.py"
+    "iree/_runtime/scripts/iree_cpuinfo/__main__.py"
+    "iree/_runtime/scripts/iree_run_trace/__main__.py"
+    "iree/_runtime/scripts/iree_run_module/__main__.py"
+    "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
     iree_runtime_bindings_python_PyExtRt
 )
