@@ -254,6 +254,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(
           []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse); })
       .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
+      .addPass(createTopLevelSCFToCFGPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Split reduction operations into parallel and reduction.
@@ -276,7 +277,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
 
-      .addPass(createTopLevelSCFToCFGPass)
       .addPass(createFormScalarDispatchesPass)
       // Only want use the transform dialect for some dispatch regions and let
       // the FormDispatchRegions handle the rest. This only moves the root

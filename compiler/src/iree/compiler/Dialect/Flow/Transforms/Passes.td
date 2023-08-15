@@ -317,10 +317,10 @@ def StripSignedness :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }
 
-def StripAndSplatConstantVariables :
-    Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
-  let summary = "Strips constant util.globals and replaces them with splats.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
+def TopLevelSCFToCFG :
+    InterfacePass<"iree-top-level-scf-to-cfg", "mlir::FunctionOpInterface"> {
+  let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createTopLevelSCFToCFGPass()";
 }
 
 def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
