@@ -68,8 +68,7 @@ void linalg::transform::LinalgTransformDialect::initialize() {
 //===---------------------------------------------------------------------===//
 
 void linalg::transform::ScopeOp::getSuccessorRegions(
-    std::optional<unsigned> index, ArrayRef<Attribute> operands,
-    SmallVectorImpl<RegionSuccessor> &regions) {
+    std::optional<unsigned> index, SmallVectorImpl<RegionSuccessor> &regions) {
   if (index)
     regions.emplace_back(getResults());
   else

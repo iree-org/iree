@@ -6,12 +6,10 @@
 
 #include <utility>
 
-#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
-#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
@@ -23,7 +21,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Stream {
+namespace Util {
 
 // Returns true if |value| is worth outlining (large, etc).
 static bool isOutlinableValue(Attribute value) {
@@ -129,7 +127,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass() {
   return std::make_unique<OutlineConstantsPass>();
 }
 
-} // namespace Stream
+} // namespace Util
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir

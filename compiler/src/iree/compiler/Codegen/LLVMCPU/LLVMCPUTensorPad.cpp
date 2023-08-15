@@ -99,10 +99,12 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     SmallVector<bool> noFold(linalgOp.getNumDpsInputs(), nofold);
     noFold.append(linalgOp.getNumDpsInits(), false);
 
-    auto options = linalg::LinalgPaddingOptions()
-                       .setPaddingDimensions(paddingDims)
-                       .setPaddingValues(paddingValueAttributes)
-                       .setPackPaddings(noFold);
+    auto options =
+        linalg::LinalgPaddingOptions()
+            .setPaddingDimensions(paddingDims)
+            .setPaddingValues(paddingValueAttributes)
+            .setPackPaddings(noFold)
+            .setCopyBackOp(linalg::LinalgPaddingOptions::CopyBackOp::None);
     FailureOr<linalg::LinalgOp> maybePaddedLinalgOp =
         linalg::padAndHoistLinalgOp(rewriter, linalgOp, options);
     if (failed(maybePaddedLinalgOp)) {

@@ -17,6 +17,13 @@ endif()  # IREE_BUILD_BUNDLED_LLVM
 
 iree_py_test(
   NAME
+    ir_tool_test
+  SRCS
+    "ir_tool_test.py"
+)
+
+iree_py_test(
+  NAME
     compiler_tf_test
   SRCS
     "compiler_tf_test.py"

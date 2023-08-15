@@ -2,23 +2,19 @@
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
-/// This must be used with the custom dispatch region formation
-/// because IREE's does not fuse the 6 ops softmax version even with
-/// --iree-flow-fuse-multi-use.
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
-// RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.
-/// This must be used with the custom dispatch region formation
-/// because IREE's does not fuse the 6 ops softmax version even with
-/// --iree-flow-fuse-multi-use.
+// RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
+// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
 // RUN: iree-run-module --module=- --function=softmax --device=cuda | \

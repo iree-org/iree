@@ -254,14 +254,6 @@ std::unique_ptr<Pass> createCollapseDimsPass();
 // Simplification and Development Tools
 //===----------------------------------------------------------------------===//
 
-// Strips constant util.globals and replaces them with splats.
-// This destructively removes data (often model weights and other parameters)
-// and is intended for use as a development tool.
-// TODO(scotttodd): pass pipeline with this and other development passes to
-//                  generate test cases / models suitable for check-in
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createStripAndSplatConstantVariablesPass();
-
 /// Creates a pass to dump a graph for dispatches
 std::unique_ptr<Pass>
 createDumpDispatchGraphPass(raw_ostream &os = llvm::errs());

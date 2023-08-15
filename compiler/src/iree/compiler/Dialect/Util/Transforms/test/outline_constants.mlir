@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stream-outline-constants %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-outline-constants %s | FileCheck %s
 
 // CHECK-LABEL: @scalarConstant
 func.func @scalarConstant() {
@@ -9,8 +9,8 @@ func.func @scalarConstant() {
 
 // -----
 
-// CHECK-LABEL: @sparseConstant
-func.func @sparseConstant() {
+// CHECK-LABEL: @splatConstant
+func.func @splatConstant() {
   // CHECK: = arith.constant dense<1.200000e+00> : tensor<512x128xf32>
   %cst = arith.constant dense<1.2> : tensor<512x128xf32>
   return

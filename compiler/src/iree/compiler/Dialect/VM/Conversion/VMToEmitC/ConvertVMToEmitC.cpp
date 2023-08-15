@@ -3625,8 +3625,9 @@ private:
         results.push_back(ref.value());
         operands.push_back(ref.value());
       } else {
-        Value resultValue =
-            emitc_builders::allocateVariable(rewriter, loc, result.getType());
+        Type type = result.getType();
+        Value resultValue = emitc_builders::allocateVariable(
+            rewriter, loc, type, rewriter.getZeroAttr(type));
         Value resultPtr = emitc_builders::addressOf(rewriter, loc, resultValue);
 
         results.push_back(resultValue);

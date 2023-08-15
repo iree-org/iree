@@ -471,7 +471,7 @@ hal.executable @mma_fused {
 //           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> !llvm.void
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
@@ -554,7 +554,7 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
 //   CHECK-COUNT-1:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> !llvm.void
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
@@ -634,7 +634,7 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> !llvm.void
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
@@ -704,7 +704,7 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> !llvm.void
+//           CHECK:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma

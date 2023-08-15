@@ -3,7 +3,7 @@
 #   * py-compiler-pkg (`iree-compiler` Python package)
 #     * Linux, macOS, Windows
 #     * All supported Python versions (e.g. 3.8, 3.9, 3.10, 3.11)
-#   * py-runtime-pkg (`iree-runtime[-instrumented]` Python package)
+#   * py-runtime-pkg (`iree-runtime` Python package)
 #     * Linux, macOS, Windows
 #     * All supported Python versions (e.g. 3.8, 3.9, 3.10, 3.11)
 #   * py-tf-compiler-tools-pkg (`iree-tools-[tf, tflite]`, pure Python packages)
@@ -110,6 +110,7 @@ jobs:
       # Various tools will read this in order to embed release information.
       ##########################################################################
       - name: Write version info (release)
+        if: "matrix.build-family != 'windows'"
         shell: bash
         run: |
           cat << EOF > ./c/version_info.json
@@ -120,6 +121,21 @@ jobs:
           }
           EOF
           cat ./c/version_info.json
+
+      - name: Write version info Windows (release)
+        if: "matrix.build-family == 'windows'"
+        shell: powershell
+        run: |
+          cd c
+          $verinfoprop = @{
+            'package-suffix'= "${{ github.event.inputs.package_suffix }}"
+            'package-version'= "${{ github.event.inputs.package_version }}"
+            'iree-revision'= $(git rev-parse HEAD)
+          }
+
+          $info = New-Object -TypeName PSObject -Prop $verinfoprop
+          $info = $info | ConvertTo-JSON
+          $info | Out-File "version_info.json" -Encoding "ASCII"
 
       ##########################################################################
       # Build the main distribution tarball.
@@ -144,7 +160,7 @@ jobs:
 
       ##########################################################################
       # py-runtime-pkg
-      # Builds the iree-runtime and iree-runtime-instrumented wheels.
+      # Builds the iree-runtime wheels.
       # One step per OS.
       ##########################################################################
 
@@ -153,7 +169,7 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime iree-runtime-instrumented"
+          packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
         run: |
           ./c/build_tools/python_deploy/build_linux_packages.sh
@@ -163,7 +179,7 @@ jobs:
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime iree-runtime-instrumented"
+          packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
         run: |
@@ -171,14 +187,13 @@ jobs:
 
       - name: Build runtime wheels (Windows)
         if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'windows'"
-        shell: bash
+        shell: powershell
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime iree-runtime-instrumented"
+          packages: "iree-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
-        run: |
-          ./c/build_tools/python_deploy/build_windows_packages.sh
+        run: ./c/build_tools/python_deploy/build_windows_packages.ps1
 
       ##########################################################################
       # py-compiler-pkg
@@ -208,14 +223,13 @@ jobs:
 
       - name: Build compiler wheels (Windows)
         if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'windows'"
-        shell: bash
+        shell: powershell
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
-        run: |
-          ./c/build_tools/python_deploy/build_windows_packages.sh
+        run: ./c/build_tools/python_deploy/build_windows_packages.ps1
 
       ##########################################################################
       # TF Compiler Tools
