@@ -1623,7 +1623,7 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
     PJRT_Program* program = args->program;
     program->format = kMlirFormat.data();
     program->format_size = kMlirFormat.size();
-    size_t code_size = executable->binary->GetDataSize();
+    size_t code_size = executable->code.size();
     if (program->code == nullptr) {
       program->code_size = code_size;
     } else {
