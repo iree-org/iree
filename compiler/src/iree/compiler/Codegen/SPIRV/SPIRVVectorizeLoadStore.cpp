@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -164,6 +165,12 @@ static unsigned isMemRefVectorizable(Value value,
   }
 
   unsigned elementNumBits = memrefType.getElementTypeBitWidth();
+  LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
+  if (elementNumBits < 8 && !llvm::isPowerOf2_32(elementNumBits)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "failed: not power-of-two sub-byte element type\n");
+    return 0;
+  }
   if (kMaxVectorNumBits % elementNumBits != 0) {
     LLVM_DEBUG(llvm::dbgs() << "failed: element not fitting in vector4\n");
     return 0;
@@ -171,11 +178,10 @@ static unsigned isMemRefVectorizable(Value value,
 
   if (getUsesIfAllTransferOp(value, uses)) {
     unsigned vectorBits = calculateMemRefVectorNumBits(uses);
+    LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
     if (!vectorBits)
       return 0;
     unsigned vectorSize = vectorBits / elementNumBits;
-    LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
-    LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
     // Again make sure we don't have vectors of odd numbers.
     if (vectorSize % 2 != 0) {
       LLVM_DEBUG(llvm::dbgs() << "failed: odd element count after grouping\n");
@@ -415,6 +421,14 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
     scalarType = llvm::isa<IntegerType>(scalarType)
                      ? llvm::cast<Type>(rewriter.getI32Type())
                      : llvm::cast<Type>(rewriter.getF32Type());
+    scalarNumBits = scalarType.getIntOrFloatBitWidth();
+    vectorNumElements = vectorNumBits / scalarNumBits;
+  }
+  // If we have sub-byte elements, try to make them as whole bytes.
+  if (scalarNumBits < 8) {
+    assert(isa<IntegerType>(scalarType));
+    assert(8 % scalarNumBits == 0);
+    scalarType = llvm::cast<Type>(rewriter.getI8Type());
     scalarNumBits = scalarType.getIntOrFloatBitWidth();
     vectorNumElements = vectorNumBits / scalarNumBits;
   }
