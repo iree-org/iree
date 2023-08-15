@@ -1,0 +1,64 @@
+name: Schedule release
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  tag_release:
+    name: "Tag release"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          fetch-depth: 0
+
+      - name: Checkout latest main
+        id: latest_main
+        run: |
+          git checkout main
+          echo "release_commit_hash="$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: Compute version
+        run: |
+          package_version="$(printf '%(%Y%m%d)T.${{ github.run_number }}')"
+          tag_name="release-${package_version}"
+          echo "package_version=${package_version}" >> $GITHUB_ENV
+          echo "tag_name=${tag_name}" >> $GITHUB_ENV
+
+      - name: Updating release tag
+        run: |
+          git tag "${tag_name}"
+
+      - name: Pushing changes
+        run: git push origin "${tag_name}"
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@0cb9c9b65d5d1901c1f53e5e66eaf4afd303e70e # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        with:
+          tag_name: ${{ env.tag_name }}
+          release_name: openxla-pjrt-plugin ${{ env.tag_name }}
+          commitish: ${{ env.release_commit_hash }}
+          body: |
+            Automatic release of openxla-pjrt-plugin.
+          draft: true
+          prerelease: true
+
+      - name: "Invoke workflow :: Build Packages"
+        uses: benc-uk/workflow-dispatch@798e70c97009500150087d30d9f11c5444830385 # v1.2.2
+        with:
+          workflow: Build Packages
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          ref: "${{ env.tag_name }}"
+          inputs: |
+            {
+              "package_version": "${{ env.package_version }}",
+              "release_id": "${{ steps.create_release.outputs.id }}",
+            }
