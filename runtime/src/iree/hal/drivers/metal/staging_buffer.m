@@ -98,12 +98,14 @@ void iree_hal_metal_staging_buffer_reset(iree_hal_metal_staging_buffer_t* stagin
 
 void iree_hal_metal_staging_buffer_increase_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer) {
-  iree_atomic_ref_count_inc(&staging_buffer->pending_command_buffers);
+  iree_atomic_fetch_add_int32(&staging_buffer->pending_command_buffers, 1,
+                              iree_memory_order_relaxed);
 }
 
 void iree_hal_metal_staging_buffer_decrease_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer) {
-  if (iree_atomic_ref_count_dec(&staging_buffer->pending_command_buffers) == 1) {
+  if (iree_atomic_fetch_sub_int32(&staging_buffer->pending_command_buffers, 1,
+                                  iree_memory_order_acq_rel) == 1) {
     iree_hal_metal_staging_buffer_reset(staging_buffer);
   }
 }
