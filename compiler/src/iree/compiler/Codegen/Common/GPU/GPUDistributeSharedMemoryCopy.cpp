@@ -7,16 +7,7 @@
 #include <algorithm>
 #include <numeric>
 
-// Turn off incorrect GCC warning from llvm/include/llvm/ADT/DenseMap.h
-#if !defined(_MSC_VER)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#endif
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#if !defined(_MSC_VER)
-#pragma GCC diagnostic pop
-#endif
-
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
