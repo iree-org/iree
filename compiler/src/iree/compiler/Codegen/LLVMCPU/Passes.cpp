@@ -4,7 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Turn off incorrect GCC warning from llvm/include/llvm/ADT/DenseMap.h
+#if !defined(_MSC_VER)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#if !defined(_MSC_VER)
+#pragma GCC diagnostic pop
+#endif
+
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"

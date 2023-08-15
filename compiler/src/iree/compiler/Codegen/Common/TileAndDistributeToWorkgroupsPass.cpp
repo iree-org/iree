@@ -14,7 +14,16 @@
 //
 //===---------------------------------------------------------------------===//
 
+// Turn off incorrect GCC warning from llvm/include/llvm/ADT/DenseMap.h
+#if !defined(_MSC_VER)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#if !defined(_MSC_VER)
+#pragma GCC diagnostic pop
+#endif
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"
