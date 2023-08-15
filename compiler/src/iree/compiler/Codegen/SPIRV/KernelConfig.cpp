@@ -31,6 +31,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
 
@@ -1266,8 +1267,8 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
       targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
   int64_t groupSize = dimSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
-    groupSize = llvm::APIntOps::GreatestCommonDivisor(
-                    {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
+    groupSize = GreatestCommonDivisor({64, uint64_t(groupSize)},
+                                      {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
   }
   // Current warp reduction pattern is a two step butterfly warp reduce.
@@ -1289,8 +1290,25 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
-  reductionTileSizes.push_back(groupSize * vectorSize);
+
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  int64_t remainingSubgroupSize = subgroupSize;
+  for (int i = reductionDims.size() - 1; i >= 0; --i) {
+    LLVM_DEBUG(llvm::dbgs() << "remaining subgroup size=" << remainingSubgroupSize << "\n");
+    int64_t dim = reductionDims[i];
+    LLVM_DEBUG(llvm::dbgs() << "current i=" << i << " dim=" << dim << "\n");
+    int64_t bound = bounds[dim];
+    LLVM_DEBUG(llvm::dbgs() << "current bound=" << bound << "\n");
+    if (i == reductionDims.size() - 1)
+      bound /= vectorSize;
+    APInt size = GreatestCommonDivisor({64, uint64_t(remainingSubgroupSize)},
+                                       {64, uint64_t(bound)});
+    reductionTileSizes[dim] = size.getSExtValue();
+    if (i == reductionDims.size() - 1)
+      reductionTileSizes[dim] *= vectorSize;
+    remainingSubgroupSize /= size.getSExtValue();
+    LLVM_DEBUG(llvm::dbgs() << "current tiles size=" << reductionTileSizes[dim] << "\n");
+  }
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
