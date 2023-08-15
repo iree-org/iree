@@ -555,3 +555,29 @@ func.func @asyncLoadStore(%operand: !stream.resource<staging>, %size: index) -> 
   // CHECK: return %[[RESULT]]
   return %1 : f32
 }
+
+// -----
+
+// Tests that subview result correctly passed as a subview to consumers.
+
+// CHECK-LABEL: @yieldSubview
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[LEN:.+]]: index)
+func.func @yieldSubview(%operand: !stream.resource<external>, %size: index, %offset: index, %length: index) {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: %[[SUBVIEW:.+]] = stream.resource.subview %[[OPERAND]][%[[OFFSET]]] {{.*}} -> !stream.resource<external>{%[[LEN]]}
+  // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]})
+  // CHECK: stream.cmd.execute with(%[[SUBVIEW]] as %[[SUBVIEW_CAPTURE:.+]]: !stream.resource<external>{%[[LEN]]})
+  // CHECK: stream.cmd.fill
+  %result0, %result0_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<external>{%size}) -> (%operand as !stream.resource<external>{%length}) {
+    %subview = stream.resource.subview %capture[%offset] : !stream.resource<external>{%size} -> !stream.resource<external>{%length}
+    stream.yield %subview : !stream.resource<external>{%length}
+  } => !stream.timepoint
+  %result1, %result1_timepoint = stream.async.execute with(%result0 as %capture: !stream.resource<external>{%length}) -> (%result0 as !stream.resource<external>{%length}) {
+    %fill = stream.async.fill %c123_i32, %capture[%c0 to %length for %length] : i32 -> %capture as !stream.resource<external>{%length}
+    stream.yield %fill : !stream.resource<external>{%length}
+  } => !stream.timepoint
+  util.optimization_barrier %result1 : !stream.resource<external>
+  return
+}

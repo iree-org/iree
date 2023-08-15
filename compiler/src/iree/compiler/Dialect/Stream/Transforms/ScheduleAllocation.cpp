@@ -393,12 +393,21 @@ struct AllocationScope {
     // TODO(#5410): make alias propagation map through an indexing map for
     // slices/updates. Right now we assume all aliases are 1:1 full maps.
     for (auto alias : valueAliases[resource]) {
-      resourceRangeMap.insert(std::make_pair(alias, resourceRange));
+      ResourceRange aliasResourceRange = resourceRange;
+
+      // Update aliased resource range and length if it's coming from a subview.
+      if (auto subview =
+              IREE::Stream::ResourceSubviewOp::findSubviewOp(alias)) {
+        aliasResourceRange.offset = subview.getSubrangeOffset();
+        aliasResourceRange.length = subview.getSubrangeLength();
+      }
+
+      resourceRangeMap.insert(std::make_pair(alias, aliasResourceRange));
       LLVM_DEBUG({
         llvm::dbgs() << "   = alias ";
         alias.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << " = ";
-        resourceRange.print(llvm::dbgs(), *asmState);
+        aliasResourceRange.print(llvm::dbgs(), *asmState);
         llvm::dbgs() << "\n";
       });
     }
@@ -1380,6 +1389,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     auto resourceRange = ResourceRange(arg, operandSize);
     scope.mapResourceRange(arg, resourceRange, asmState.get());
   }
+
   SmallVector<ResultReservation> resultReservations;
   for (auto [result, resultSize] :
        llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
@@ -1392,10 +1402,14 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     // Find the internal op that defined the result.
     auto yieldValue = yieldOp.getResourceOperands()[result.getResultNumber()];
 
-    // Early-exit if we are tied to an operand and have storage already.
-    auto tiedOperandIndex =
-        executeOp.getTiedResultOperandIndex(result.getResultNumber());
-    if (tiedOperandIndex.has_value()) {
+    // Early-exit if we are tied to an operand of the same size and have storage
+    // already. If sizes are different we are tied to a subrange of the operand.
+    auto resultNumber = result.getResultNumber();
+    auto tiedOperandIndex = executeOp.getTiedResultOperandIndex(resultNumber);
+
+    if (tiedOperandIndex.has_value() &&
+        (executeOp.getResultSize(resultNumber) ==
+         executeOp.getResourceOperandSizes()[*tiedOperandIndex])) {
       // Already tied; no need to modify just map.
       auto tiedOperand = executeOp.getOperand(tiedOperandIndex.value());
       auto arg = entryBlock.getArgument(tiedOperandIndex.value());
@@ -1433,7 +1447,24 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
         result.printAsOperand(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
       });
-      resultReplacements.push_back(std::make_pair(result, operand));
+
+      // If we yield a subrange of the operand, we have to build the subview
+      // operation to replace a result with a subrange of the operand.
+      auto subview = IREE::Stream::ResourceSubviewOp::findSubviewOp(yieldValue);
+      if (subview) {
+        OpBuilder subviewBuilder(executeOp);
+
+        auto operandSubview =
+            subviewBuilder.create<IREE::Stream::ResourceSubviewOp>(
+                subview->getLoc(), subview.getResult().getType(), operand,
+                subview.getSourceSize(), subview.getSubrangeOffset(),
+                subview.getSubrangeLength());
+
+        resultReplacements.push_back(std::make_pair(result, operandSubview));
+      } else {
+        resultReplacements.push_back(std::make_pair(result, operand));
+      }
+
       continue;
     }
 
@@ -1449,6 +1480,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     });
     resultReservations.push_back(resultReservation);
   }
+
   auto resultAllocation = reserveResultAllocation(resultReservations);
   for (auto &reservationSet : resultAllocation.reservationSets) {
     // Allocate and tie an operand to the result.
