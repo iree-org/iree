@@ -110,6 +110,7 @@ jobs:
       # Various tools will read this in order to embed release information.
       ##########################################################################
       - name: Write version info (release)
+        if: "matrix.build-family != 'windows'"
         shell: bash
         run: |
           cat << EOF > ./c/version_info.json
@@ -120,6 +121,21 @@ jobs:
           }
           EOF
           cat ./c/version_info.json
+
+      - name: Write version info Windows (release)
+        if: "matrix.build-family == 'windows'"
+        shell: powershell
+        run: |
+          cd c
+          $verinfoprop = @{
+            'package-suffix'= "${{ github.event.inputs.package_suffix }}"
+            'package-version'= "${{ github.event.inputs.package_version }}"
+            'iree-revision'= $(git rev-parse HEAD)
+          }
+
+          $info = New-Object -TypeName PSObject -Prop $verinfoprop
+          $info = $info | ConvertTo-JSON
+          $info | Out-File "version_info.json" -Encoding "ASCII"
 
       ##########################################################################
       # Build the main distribution tarball.
