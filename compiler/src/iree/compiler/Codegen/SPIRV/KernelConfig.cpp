@@ -1292,21 +1292,21 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
 
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
-  int64_t remainingSubgroupSize = subgroupSize;
+  int64_t remaingGroupSize = groupSize;
   for (int i = reductionDims.size() - 1; i >= 0; --i) {
-    LLVM_DEBUG(llvm::dbgs() << "remaining subgroup size=" << remainingSubgroupSize << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "remaining group size=" << remaingGroupSize << "\n");
     int64_t dim = reductionDims[i];
     LLVM_DEBUG(llvm::dbgs() << "current i=" << i << " dim=" << dim << "\n");
     int64_t bound = bounds[dim];
     LLVM_DEBUG(llvm::dbgs() << "current bound=" << bound << "\n");
     if (i == reductionDims.size() - 1)
       bound /= vectorSize;
-    APInt size = GreatestCommonDivisor({64, uint64_t(remainingSubgroupSize)},
+    APInt size = GreatestCommonDivisor({64, uint64_t(remaingGroupSize)},
                                        {64, uint64_t(bound)});
     reductionTileSizes[dim] = size.getSExtValue();
     if (i == reductionDims.size() - 1)
       reductionTileSizes[dim] *= vectorSize;
-    remainingSubgroupSize /= size.getSExtValue();
+    remaingGroupSize /= size.getSExtValue();
     LLVM_DEBUG(llvm::dbgs() << "current tiles size=" << reductionTileSizes[dim] << "\n");
   }
 

@@ -29,8 +29,8 @@ createMakeSingleDispatchForFunctionPass();
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 
 /// Pass to merge parallel linalg operations.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createRematerializeParallelOpsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createRematerializeParallelOpsPass(
+    std::function<bool(func::FuncOp)> controlFn = nullptr);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

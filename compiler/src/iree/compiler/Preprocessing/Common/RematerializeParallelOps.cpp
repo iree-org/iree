@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <iree/compiler/Codegen/Dialect/IREECodegenAttrs.h>
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Preprocessing/Common/PassDetail.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
@@ -35,11 +36,6 @@ struct RematerializeParallelOpsPattern
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    // Restrict to operations within pre-formed dispatches to avoid blanket
-    // rematerialization over the whole model.
-    if (Flow::isNonNullAndOutsideDispatch(genericOp))
-      return failure();
-
     // Avoid doing this for scalar operations.
     auto isScalarValue = [](Value v) {
       return isScalarOrTensorOfSizeOne(v.getType());
@@ -57,6 +53,9 @@ struct RematerializeParallelOpsPattern
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
       if (succeeded(fusionResult)) {
+        if (Attribute attr = genericOp->getAttr("lowering_config")) {
+          fusionResult->fusedOp->setAttr("lowering_config", attr);
+        }
         auto replacements = fusionResult->fusedOp->getResults().take_back(
             genericOp.getNumResults());
         rewriter.replaceOp(genericOp, replacements);
@@ -67,10 +66,16 @@ struct RematerializeParallelOpsPattern
   }
 };
 
-struct RematerializeParallelOpsPass
+class RematerializeParallelOpsPass
     : public RematerializeParallelOpsBase<RematerializeParallelOpsPass> {
+public:
+  RematerializeParallelOpsPass(std::function<bool(func::FuncOp)> controlFn)
+      : controlFn(controlFn) {}
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
+    if (controlFn && !controlFn(funcOp))
+      return;
+
     RewritePatternSet fusionPatterns(funcOp.getContext());
     fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
@@ -79,13 +84,16 @@ struct RematerializeParallelOpsPass
       return signalPassFailure();
     }
   }
+
+private:
+  std::function<bool(func::FuncOp)> controlFn;
 };
 
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createRematerializeParallelOpsPass() {
-  return std::make_unique<RematerializeParallelOpsPass>();
+createRematerializeParallelOpsPass(std::function<bool(func::FuncOp)> controlFn) {
+  return std::make_unique<RematerializeParallelOpsPass>(controlFn);
 }
 
 } // namespace IREE

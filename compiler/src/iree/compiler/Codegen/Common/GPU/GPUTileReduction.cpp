@@ -29,9 +29,15 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   SmallVector<unsigned> dims;
   op.getReductionDims(dims);
   SmallVector<int64_t> tileSize = getTileSizes(op, 1);
-  if (tileSize.empty() || dims.size() != 1 ||
-      tileSize.back() == op.getStaticLoopRanges()[dims.back()])
-    return success();
+  if (tileSize.empty()) return success();
+  for (int i = 0; i < dims.size(); ++i) {
+    if (dims[dims.size() - 1 - i] != op.getNumLoops() - 1 - i) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "reduction dim #" << i << "(" << dims[dims.size() - 1 - i]
+                 << " vs " << op.getNumLoops() - 1 - i << ")\n");
+      return success();
+    }
+  }
   IRRewriter rewriter(op.getContext());
   SmallVector<OpFoldResult> sizes;
   for (int64_t size : tileSize) {

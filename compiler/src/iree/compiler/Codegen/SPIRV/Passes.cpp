@@ -12,6 +12,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include <iree/compiler/Codegen/Dialect/IREECodegenAttrs.h>
+#include <iree/compiler/Dialect/Flow/Transforms/Passes.h>
+#include <iree/compiler/Preprocessing/Common/Passes.h>
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
@@ -28,6 +31,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
@@ -501,6 +505,30 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
       pm, /*useFuseTensorPadWithConsumerPass=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  /*
+  auto controlFn = [](func::FuncOp funcOp) {
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+    for (Operation *op : computeOps) {
+      auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+      if (!linalgOp)
+        continue;
+      SmallVector<unsigned> reductionDims;
+      linalgOp.getReductionDims(reductionDims);
+      if (reductionDims.size() <= 1)
+        continue;
+      SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+      int64_t dimSize = 1;
+      for (int64_t dim : reductionDims)
+        dimSize *= bounds[dim];
+      SmallVector<int64_t> tileSize = getTileSizes(linalgOp, 1);
+
+
+    }
+    return false;
+  };
+  */
+  nestedModulePM.addNestedPass<func::FuncOp>(IREE::createRematerializeParallelOpsPass());
+  //nestedModulePM.addNestedPass<func::FuncOp>(IREE::Flow::createCollapseDimsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -600,6 +628,27 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
+
+  /*
+  auto controlFn = [](func::FuncOp funcOp) {
+    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+    for (Operation *op : computeOps) {
+      auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+      if (!linalgOp)
+        continue;
+      SmallVector<unsigned> reductionDims;
+      linalgOp.getReductionDims(reductionDims);
+      if (reductionDims.size() <= 1)
+        continue;
+      SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+      int64_t dimSize = 1;
+      for (int64_t dim : reductionDims)
+        dimSize *= bounds[dim];
+    }
+    return false;
+  };
+  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(IREE::createRematerializeParallelOpsPass());
+  */
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
