@@ -1000,9 +1000,7 @@ struct TransposeIsReshape final
               "tensor type");
     }
 
-    SmallVector<int64_t> permValues = llvm::to_vector<6>(
-        llvm::map_range(permutation.getValues<APInt>(),
-                        [](const APInt &val) { return val.getSExtValue(); }));
+    SmallVector<int64_t> permValues(permutation.getValues<int64_t>());
 
     SmallVector<int64_t> nonZeroPerms;
     nonZeroPerms.reserve(permValues.size());
