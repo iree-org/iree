@@ -137,8 +137,8 @@ def get_git_commit_hash(commit: str) -> str:
 
 
 def get_iree_benchmark_module_arguments(
-    results_filename: str,
     driver_info: DriverInfo,
+    results_filename: Optional[str] = None,
     benchmark_min_time: Optional[float] = None,
 ):
     """Returns the common arguments to run iree-benchmark-module."""
@@ -150,13 +150,16 @@ def get_iree_benchmark_module_arguments(
     else:
         repetitions = 10
 
-    cmd = [
-        "--time_unit=ns",
-        "--benchmark_format=json",
-        "--benchmark_out_format=json",
-        f"--benchmark_out={results_filename}",
-        "--print_statistics=true",
-    ]
+    cmd = []
+    if results_filename is not None:
+        cmd += [
+            "--time_unit=ns",
+            "--benchmark_format=json",
+            "--benchmark_out_format=json",
+            "--print_statistics=true",
+            f"--benchmark_out={results_filename}",
+        ]
+
     if benchmark_min_time:
         cmd.extend(
             [
