@@ -34,8 +34,8 @@ iree_status_t iree_hal_heap_buffer_create(
     iree_hal_allocator_t* allocator,
     iree_hal_heap_allocator_statistics_t* statistics,
     const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
-    iree_const_byte_span_t initial_data, iree_allocator_t data_allocator,
-    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+    iree_allocator_t data_allocator, iree_allocator_t host_allocator,
+    iree_hal_buffer_t** out_buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

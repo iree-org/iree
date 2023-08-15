@@ -68,6 +68,7 @@ class VmTypesTest(unittest.TestCase):
             bv1 = device.allocator.allocate_buffer_copy(
                 memory_type=rt.MemoryType.DEVICE_LOCAL,
                 allowed_usage=(rt.BufferUsage.DEFAULT | rt.BufferUsage.MAPPING),
+                device=device,
                 buffer=ary1,
                 element_type=et,
             )
@@ -88,6 +89,7 @@ class VmTypesTest(unittest.TestCase):
         buffer_view = device.allocator.allocate_buffer_copy(
             memory_type=rt.MemoryType.DEVICE_LOCAL,
             allowed_usage=(rt.BufferUsage.DEFAULT | rt.BufferUsage.MAPPING),
+            device=device,
             buffer=array,
             element_type=rt.HalElementType.SINT_32,
         )

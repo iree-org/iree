@@ -194,7 +194,6 @@ const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable = {
 
 typedef struct iree_hal_vulkan_vma_allocator_t {
   iree_hal_resource_t resource;
-  iree_hal_device_t* device;  // unretained to avoid cycles
   iree_allocator_t host_allocator;
   VmaAllocator vma;
 
@@ -265,11 +264,10 @@ static void iree_hal_vulkan_vma_allocator_destroy(
 iree_status_t iree_hal_vulkan_vma_allocator_create(
     const iree_hal_vulkan_device_options_t* options, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
-    iree_hal_device_t* device, iree_hal_allocator_t** out_allocator) {
+    iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(physical_device);
   IREE_ASSERT_ARGUMENT(logical_device);
-  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -281,7 +279,6 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   iree_hal_resource_initialize(&iree_hal_vulkan_vma_allocator_vtable,
                                &allocator->resource);
   allocator->host_allocator = host_allocator;
-  allocator->device = device;
 
   const auto& syms = logical_device->syms();
   VmaVulkanFunctions vulkan_fns;
@@ -449,8 +446,7 @@ iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
 static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     iree_hal_vulkan_vma_allocator_t* IREE_RESTRICT allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
-    VmaAllocationCreateFlags flags,
+    iree_device_size_t allocation_size, VmaAllocationCreateFlags flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   VkBufferCreateInfo buffer_create_info;
   buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -535,18 +531,6 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     return status;
   }
 
-  // Copy the initial contents into the buffer. This may require staging.
-  if (iree_status_is_ok(status) &&
-      !iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_device_transfer_range(
-        allocator->device,
-        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
-                                                initial_data.data_length),
-        0, iree_hal_make_device_transfer_buffer(buffer), 0,
-        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
-        iree_infinite_timeout());
-  }
-
   if (iree_status_is_ok(status)) {
     *out_buffer = buffer;
   } else {
@@ -558,7 +542,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
 static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_vulkan_vma_allocator_t* allocator =
       iree_hal_vulkan_vma_allocator_cast(base_allocator);
@@ -575,7 +559,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
   }
 
   return iree_hal_vulkan_vma_allocator_allocate_internal(
-      allocator, &compat_params, allocation_size, initial_data,
+      allocator, &compat_params, allocation_size,
       /*flags=*/0, out_buffer);
 }
 

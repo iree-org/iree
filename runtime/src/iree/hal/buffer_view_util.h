@@ -14,6 +14,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer_view.h"
+#include "iree/hal/device.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,15 +53,17 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
 // Buffer view allocation and generation
 //===----------------------------------------------------------------------===//
 
-// Allocates a buffer from |allocator| and wraps it in a buffer view.
+// Allocates a copy of a buffer from |allocator| and wraps it in a buffer view.
 //
 // This is equivalent to:
 //   1. iree_hal_buffer_compute_view_size
 //   2. iree_hal_allocator_allocate_buffer
-//   3. iree_hal_buffer_view_create
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
-    iree_hal_allocator_t* allocator, iree_host_size_t shape_rank,
-    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
+//   3. iree_hal_device_transfer_h2d
+//   4. iree_hal_buffer_view_create
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer_copy(
+    iree_hal_device_t* device, iree_hal_allocator_t* allocator,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_params_t buffer_params, iree_const_byte_span_t initial_data,
     iree_hal_buffer_view_t** out_buffer_view);
@@ -91,8 +94,9 @@ typedef iree_status_t(IREE_API_PTR* iree_hal_buffer_view_generator_callback_t)(
 //   3. iree_hal_buffer_map_range + callback + iree_hal_buffer_unmap_range
 //   4. iree_hal_buffer_view_create
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
-    iree_hal_allocator_t* allocator, iree_host_size_t shape_rank,
-    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
+    iree_hal_device_t* device, iree_hal_allocator_t* allocator,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_params_t buffer_params,
     iree_hal_buffer_view_generator_callback_t callback, void* user_data,
@@ -104,11 +108,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
 
 // Parses a serialized set of buffer elements in the canonical tensor format
 // (the same as produced by iree_hal_buffer_view_format). The underlying buffer
-// will be allocated with |buffer_allocator| as a host-local/device-visible
+// will be allocated with |device_allocator| as a host-local/device-visible
 // buffer.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_parse(
-    iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
-    iree_hal_buffer_view_t** out_buffer_view);
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_view_parse(iree_string_view_t value, iree_hal_device_t* device,
+                           iree_hal_allocator_t* device_allocator,
+                           iree_hal_buffer_view_t** out_buffer_view);
 
 // TODO(#5413): enum for printing mode (include shape, precision).
 

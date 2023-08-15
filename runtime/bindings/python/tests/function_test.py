@@ -493,6 +493,7 @@ class FunctionTest(unittest.TestCase):
         arg_buffer_view = self.device.allocator.allocate_buffer_copy(
             memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
             allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+            device=self.device,
             buffer=np.asarray([1, 0], dtype=np.int32),
             element_type=rt.HalElementType.SINT_32,
         )
@@ -565,6 +566,7 @@ class FunctionTest(unittest.TestCase):
         arg_buffer_view = self.device.allocator.allocate_buffer_copy(
             memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
             allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+            device=self.device,
             buffer=np.asarray([1, 0], dtype=np.int32),
             element_type=rt.HalElementType.SINT_32,
         )
@@ -590,6 +592,7 @@ class FunctionTest(unittest.TestCase):
             buffer_view = self.device.allocator.allocate_buffer_copy(
                 memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
                 allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+                device=self.device,
                 buffer=result_array,
                 element_type=rt.HalElementType.SINT_32,
             )
@@ -617,6 +620,7 @@ class FunctionTest(unittest.TestCase):
             buffer_view = self.device.allocator.allocate_buffer_copy(
                 memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
                 allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+                device=self.device,
                 buffer=result_array,
                 element_type=rt.HalElementType.SINT_32,
             )
@@ -636,6 +640,7 @@ class FunctionTest(unittest.TestCase):
             buffer_view = self.device.allocator.allocate_buffer_copy(
                 memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
                 allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+                device=self.device,
                 buffer=result_array,
                 element_type=rt.HalElementType.UINT_8,
             )

@@ -292,11 +292,11 @@ static iree_status_t iree_numpy_parse_shape_dims(iree_string_view_t shape,
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t
-iree_numpy_npy_load_ndarray(FILE* stream, iree_numpy_npy_load_options_t options,
-                            iree_hal_buffer_params_t buffer_params,
-                            iree_hal_allocator_t* device_allocator,
-                            iree_hal_buffer_view_t** out_buffer_view) {
+IREE_API_EXPORT iree_status_t iree_numpy_npy_load_ndarray(
+    FILE* stream, iree_numpy_npy_load_options_t options,
+    iree_hal_buffer_params_t buffer_params, iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(stream);
   IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
@@ -376,9 +376,9 @@ iree_numpy_npy_load_ndarray(FILE* stream, iree_numpy_npy_load_options_t options,
     };
     buffer_params.access |= IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE;
     status = iree_hal_buffer_view_generate_buffer(
-        device_allocator, shape_rank, shape, element_type, encoding_type,
-        buffer_params, iree_numpy_npy_read_into_mapping, &read_params,
-        out_buffer_view);
+        device, device_allocator, shape_rank, shape, element_type,
+        encoding_type, buffer_params, iree_numpy_npy_read_into_mapping,
+        &read_params, out_buffer_view);
   }
 
   iree_allocator_free(host_allocator, header_buffer);

@@ -23,7 +23,6 @@ typedef struct iree_hal_cuda2_allocator_t {
   iree_hal_resource_t resource;
 
   // The device that this allocator allocates memory from.
-  iree_hal_device_t* base_device;
   CUdevice device;
 
   // The CUDA stream that allocations should be used in.
@@ -56,11 +55,9 @@ static iree_hal_cuda2_allocator_t* iree_hal_cuda2_allocator_cast(
 }
 
 iree_status_t iree_hal_cuda2_allocator_create(
-    iree_hal_device_t* base_device,
     const iree_hal_cuda2_dynamic_symbols_t* cuda_symbols, CUdevice device,
     CUstream stream, iree_hal_cuda2_memory_pools_t* pools,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
-  IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(cuda_symbols);
   IREE_ASSERT_ARGUMENT(pools);
   IREE_ASSERT_ARGUMENT(out_allocator);
@@ -107,7 +104,6 @@ iree_status_t iree_hal_cuda2_allocator_create(
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_cuda2_allocator_vtable,
                                  &allocator->resource);
-    allocator->base_device = base_device;
     allocator->device = device;
     allocator->stream = stream;
     allocator->pools = pools;
@@ -338,7 +334,7 @@ static void iree_hal_cuda2_buffer_free(
 static iree_status_t iree_hal_cuda2_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(base_allocator);
   IREE_ASSERT_ARGUMENT(params);
@@ -431,18 +427,6 @@ static iree_status_t iree_hal_cuda2_allocator_allocate_buffer(
         /*byte_length=*/allocation_size, buffer_type, device_ptr, host_ptr,
         iree_hal_buffer_release_callback_null(),
         iree_hal_allocator_host_allocator(base_allocator), &buffer);
-  }
-
-  // Copy the initial contents into the buffer. This may require staging.
-  if (iree_status_is_ok(status) &&
-      !iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_device_transfer_range(
-        allocator->base_device,
-        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
-                                                initial_data.data_length),
-        0, iree_hal_make_device_transfer_buffer(buffer), 0,
-        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
-        iree_infinite_timeout());
   }
 
   if (iree_status_is_ok(status)) {

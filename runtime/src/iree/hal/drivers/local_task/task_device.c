@@ -388,9 +388,9 @@ static iree_status_t iree_hal_task_device_queue_alloca(
   // TODO(benvanik): queue-ordered allocations.
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
                                                     iree_infinite_timeout()));
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(base_device), params, allocation_size,
-      iree_const_byte_span_empty(), out_buffer));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
+                                         params, allocation_size, out_buffer));
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
   return iree_ok_status();
 }
