@@ -993,20 +993,11 @@ struct TransposeIsReshape final
     }
 
     auto inputTy = dyn_cast<RankedTensorType>(input.getType());
-    if (!inputTy) {
+    if (!inputTy || !inputTy.hasStaticShape() ||
+        !op.getType().hasStaticShape()) {
       return rewriter.notifyMatchFailure(
-          op, "requires input to be of a ranked tensor type");
-    }
-
-    int64_t numDynDims = 0;
-    for (int i = 0; i < inputTy.getRank(); ++i) {
-      if (inputTy.isDynamicDim(i)) {
-        numDynDims++;
-      }
-    }
-
-    if (numDynDims > 1) {
-      return rewriter.notifyMatchFailure(op, "has more than one dynamic dim.");
+          op, "requires input/output to be of a statically-shaped ranked "
+              "tensor type");
     }
 
     SmallVector<int64_t> permValues = llvm::to_vector<6>(
