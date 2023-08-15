@@ -151,6 +151,7 @@ def get_iree_benchmark_module_arguments(
         repetitions = 10
 
     cmd = [
+        "--benchmark_min_warmup_time=3.0",
         "--time_unit=ns",
         "--benchmark_format=json",
         "--benchmark_out_format=json",
