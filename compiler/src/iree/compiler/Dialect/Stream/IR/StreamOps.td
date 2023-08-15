@@ -2137,7 +2137,7 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   AttrSizedOperandSegments,
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
-    "getSuccessorEntryOperands",
+    "getEntrySuccessorOperands",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -2232,7 +2232,7 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   AttrSizedOperandSegments,
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
-    "getSuccessorEntryOperands",
+    "getEntrySuccessorOperands",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -2815,7 +2815,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   AttrSizedOperandSegments,
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
-    "getSuccessorEntryOperands",
+    "getEntrySuccessorOperands",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -3588,9 +3588,6 @@ def Stream_ReturnOp : Stream_Op<"return", [
     "IREE::Stream::ExecutableExportOp",
   ]>,
   Pure,
-  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
-    "getMutableSuccessorOperands",
-  ]>,
   ReturnLike,
   Terminator,
 ]> {
@@ -3618,10 +3615,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
     "IREE::Stream::CmdConcurrentOp",
   ]>,
   Pure,
-  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
-    "getMutableSuccessorOperands",
-  ]>,
-  ReturnLike,
+  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface>,
   Terminator,
   SameVariadicOperandSize,
   Util_SizeAwareOp,
