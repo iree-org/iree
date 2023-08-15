@@ -3969,7 +3969,7 @@ stripped during translation.</p>
   ...
 </code></pre></div>
 <p>Traits: ReturnLike, Terminator</p>
-<p>Interfaces: NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Interfaces: NoMemoryEffect (MemoryEffectOpInterface), RegionBranchTerminatorOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
@@ -4707,7 +4707,7 @@ module.</p>
 </code></pre></div>
 <p>Returns control from an initializer function.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, HasParent<IREE::Util::InitializerOp>, ReturnLike, Terminator</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), RegionBranchTerminatorOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
 <h3 id="type-manipulation-ops">Type manipulation ops<a class="headerlink" href="#type-manipulation-ops" title="Permanent link">link</a></h3>
 <h4 id="utilcast-utilcastop"><code>util.cast</code> (Util::CastOp)<a class="headerlink" href="#utilcast-utilcastop" title="Permanent link">link</a></h4>
