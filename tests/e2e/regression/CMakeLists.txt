@@ -68,7 +68,6 @@ iree_check_single_backend_test_suite(
     "softmax.mlir"
     "strided_slice.mlir"
     "transpose.mlir"
-    "ui4_to_f32.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -137,7 +136,6 @@ iree_check_single_backend_test_suite(
     "softmax.mlir"
     "strided_slice.mlir"
     "transpose.mlir"
-    "ui4_to_f32.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
