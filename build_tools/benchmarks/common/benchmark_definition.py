@@ -151,7 +151,7 @@ def get_iree_benchmark_module_arguments(
     elif capture_mode:
         # Capture mode is slower and we just need enough repetition to collect
         # trace after the warmup phase.
-        repetitions = 3
+        repetitions = 4
     else:
         repetitions = 10
 
