@@ -1165,42 +1165,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-BERT_LARGE_JAX_384XI32_BATCH32_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH32.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH32_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "BERT_LARGE_JAX_384XI32_BATCH32(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-BERT_LARGE_JAX_384XI32_BATCH48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH48.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "BERT_LARGE_JAX_384XI32_BATCH48(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-BERT_LARGE_JAX_384XI32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH64.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "BERT_LARGE_JAX_384XI32_BATCH64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
@@ -1233,30 +1197,6 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   FRIENDLY_NAME "RESNET50_FP32_JAX_3X224X224XF32_BATCH64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH128.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "RESNET50_FP32_JAX_3X224X224XF32_BATCH128(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH256_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH256.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH256_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-  FRIENDLY_NAME "RESNET50_FP32_JAX_3X224X224XF32_BATCH256(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags]"
   PUBLIC
 )
 
@@ -3830,54 +3770,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-BERT_LARGE_JAX_384XI32_BATCH32_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH32.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH32_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH32_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "BERT_LARGE_JAX_384XI32_BATCH32(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-BERT_LARGE_JAX_384XI32_BATCH48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH48.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "BERT_LARGE_JAX_384XI32_BATCH48(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-BERT_LARGE_JAX_384XI32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH64.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_BERT_LARGE_JAX_384XI32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "BERT_LARGE_JAX_384XI32_BATCH64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
@@ -3922,38 +3814,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "RESNET50_FP32_JAX_3X224X224XF32_BATCH64(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH128.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "RESNET50_FP32_JAX_3X224X224XF32_BATCH128(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH256_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH256.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH256_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=stablehlo"
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_RESNET50_FP32_JAX_3X224X224XF32_BATCH256_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "RESNET50_FP32_JAX_3X224X224XF32_BATCH256(stablehlo) [cuda-sm_80-linux_gnu-cuda][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -5466,9 +5326,6 @@ add_dependencies(iree-benchmark-import-models-large
   ${PACKAGE_NAME}_model-BERT_LARGE_JAX_384XI32_BATCH1
   ${PACKAGE_NAME}_model-BERT_LARGE_JAX_384XI32_BATCH16
   ${PACKAGE_NAME}_model-BERT_LARGE_JAX_384XI32_BATCH24
-  ${PACKAGE_NAME}_model-BERT_LARGE_JAX_384XI32_BATCH32
-  ${PACKAGE_NAME}_model-BERT_LARGE_JAX_384XI32_BATCH48
-  ${PACKAGE_NAME}_model-BERT_LARGE_JAX_384XI32_BATCH64
   ${PACKAGE_NAME}_model-BertLargeTFBatch1
   ${PACKAGE_NAME}_model-BertLargeTFBatch1024
   ${PACKAGE_NAME}_model-BertLargeTFBatch1280
@@ -5479,8 +5336,6 @@ add_dependencies(iree-benchmark-import-models-large
   ${PACKAGE_NAME}_model-BertLargeTFBatch512
   ${PACKAGE_NAME}_model-BertLargeTFBatch64
   ${PACKAGE_NAME}_model-RESNET50_FP32_JAX_3X224X224XF32_BATCH1
-  ${PACKAGE_NAME}_model-RESNET50_FP32_JAX_3X224X224XF32_BATCH128
-  ${PACKAGE_NAME}_model-RESNET50_FP32_JAX_3X224X224XF32_BATCH256
   ${PACKAGE_NAME}_model-RESNET50_FP32_JAX_3X224X224XF32_BATCH64
   ${PACKAGE_NAME}_model-RESNET50_FP32_JAX_3X224X224XF32_BATCH8
   ${PACKAGE_NAME}_model-Resnet50TFBatch1
@@ -5706,9 +5561,6 @@ add_dependencies(iree-benchmark-suites-comp-stats-large
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH16_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH24_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH32_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1024_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1280_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch16_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
@@ -5721,9 +5573,7 @@ add_dependencies(iree-benchmark-suites-comp-stats-large
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch512_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch64_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH256_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH8_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
@@ -5777,9 +5627,6 @@ add_dependencies(iree-benchmark-suites-cuda-large
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH16_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH24_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH32_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1024_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1280_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch16_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
@@ -5789,9 +5636,7 @@ add_dependencies(iree-benchmark-suites-cuda-large
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch512_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH256_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH8_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
@@ -5949,9 +5794,6 @@ add_dependencies(iree-benchmark-suites-large
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH16_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH24_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH32_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH48_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-BERT_LARGE_JAX_384XI32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1024_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1280_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch16_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
@@ -5964,9 +5806,7 @@ add_dependencies(iree-benchmark-suites-large
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch512_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch64_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH1_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
-  ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH256_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH64_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-RESNET50_FP32_JAX_3X224X224XF32_BATCH8_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch128_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_

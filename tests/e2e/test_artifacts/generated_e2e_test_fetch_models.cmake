@@ -384,27 +384,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH32/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH32.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH48/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH48.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BERT_LARGE_JAX_384XI32_BATCH64"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/BERT_LARGE_FP32_JAX_384XI32_BATCH64/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH64.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH1"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH1.mlirbc"
@@ -422,20 +401,6 @@ iree_fetch_artifact(
   NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH64"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH64/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH64.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH128"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH128/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH128.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-RESNET50_FP32_JAX_3X224X224XF32_BATCH256"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.13_1688607404/RESNET50_FP32_JAX_3X224X224XF32_BATCH256/stablehlo.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_RESNET50_FP32_JAX_3X224X224XF32_BATCH256.mlirbc"
   UNPACK
 )
 
