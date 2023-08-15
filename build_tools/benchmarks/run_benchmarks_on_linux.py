@@ -112,11 +112,21 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         if capture_config is None:
             raise ValueError("capture_config can't be None.")
 
+        tool_name = benchmark_case.benchmark_tool_name
         tool_path = (
             capture_config.traced_benchmark_tool_dir
             / benchmark_case.benchmark_tool_name
         )
         cmd = self.__build_tool_cmds(benchmark_case=benchmark_case, tool_path=tool_path)
+
+        if tool_name == "iree-benchmark-module":
+            cmd.extend(
+                get_iree_benchmark_module_arguments(
+                    driver_info=benchmark_case.driver_info,
+                    benchmark_min_time=self.config.benchmark_min_time,
+                    capture_mode=True,
+                )
+            )
 
         process = subprocess.Popen(
             cmd, env={"TRACY_NO_EXIT": "1"}, stdout=subprocess.PIPE, text=True
