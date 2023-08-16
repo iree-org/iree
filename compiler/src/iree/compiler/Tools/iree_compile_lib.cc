@@ -43,6 +43,20 @@ enum class CompileMode {
   hal_executable,
 };
 
+struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
+  BytecodeVersionParser(llvm::cl::Option &O)
+      : llvm::cl::parser<std::optional<int64_t>>(O) {}
+  bool parse(llvm::cl::Option &O, StringRef /*argName*/, StringRef arg,
+             std::optional<int64_t> &v) {
+    long long w;
+    if (llvm::getAsSignedInteger(arg, 10, w))
+      return O.error("Invalid argument '" + arg +
+                     "', only integer is supported.");
+    v = w;
+    return false;
+  }
+};
+
 } // namespace
 
 } // namespace iree_compiler
@@ -114,6 +128,19 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         compileTo.getParser().addLiteralOption(name, phase, desc);
         compileToPhases.push_back(name.str());
       });
+
+  llvm::cl::opt<bool> emitMLIRBytecode(
+      "emit-mlir-bytecode",
+      llvm::cl::desc(
+          "Emit bytecode when generating compile-to or VM MLIR output."),
+      llvm::cl::init(false));
+  llvm::cl::opt<std::optional<int64_t>, /*ExternalStorage=*/false,
+                mlir::iree_compiler::BytecodeVersionParser>
+      emitMLIRBytecodeVersion(
+          "emit-mlir-bytecode-version",
+          llvm::cl::desc("Use specified bytecode version when "
+                         "generating compile-to or VM MLIR output."),
+          llvm::cl::init(std::nullopt));
 
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
@@ -230,9 +257,19 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       return false;
     }
 
+    auto outputMLIR = [&](iree_compiler_invocation_t *inv,
+                          iree_compiler_output_t *output) {
+      if (emitMLIRBytecode) {
+        return ireeCompilerInvocationOutputIRBytecode(
+            inv, output, emitMLIRBytecodeVersion.value_or(-1));
+      } else {
+        return ireeCompilerInvocationOutputIR(inv, output);
+      }
+    };
+
     // Ending early and just emitting IR.
     if (compileTo != IREEVMPipelinePhase::End) {
-      if (auto error = ireeCompilerInvocationOutputIR(r.inv, s.output)) {
+      if (auto error = outputMLIR(r.inv, s.output)) {
         s.handleError(error);
         return false;
       }
@@ -243,7 +280,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     iree_compiler_error_t *outputError = nullptr;
     switch (outputFormat) {
     case OutputFormat::vm_asm:
-      outputError = ireeCompilerInvocationOutputIR(r.inv, s.output);
+      outputError = outputMLIR(r.inv, s.output);
       break;
     case OutputFormat::vm_bytecode:
       outputError = ireeCompilerInvocationOutputVMBytecode(r.inv, s.output);
