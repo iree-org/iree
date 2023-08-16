@@ -16,8 +16,9 @@
 #include "iree/modules/hal/utils/buffer_diagnostics.h"
 #include "iree/vm/api.h"
 
-#define IREE_HAL_MODULE_VERSION_0_0 0x00000000u
-#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_0
+//===----------------------------------------------------------------------===//
+// Limits imposed by the module (and not the HAL)
+//===----------------------------------------------------------------------===//
 
 // Limit the number of bindings we pass down through the HAL. This can be tuned
 // in the future but right now guards the stack from blowing up during calls.
@@ -34,6 +35,9 @@
 //===----------------------------------------------------------------------===//
 // Module type definitions
 //===----------------------------------------------------------------------===//
+
+#define IREE_HAL_MODULE_VERSION_0_1 0x00000001u
+#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_1
 
 typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
@@ -128,19 +132,6 @@ static iree_status_t IREE_API_PTR iree_hal_module_notify(
 }
 
 //===----------------------------------------------------------------------===//
-// Experimental APIs
-//===----------------------------------------------------------------------===//
-// NOTE: Ex* APIs are experimental and likely to be removed soon. Modules
-// using these APIs are not forward compatible.
-
-IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device,  //
-                   iree_hal_module_state_t,           //
-                   v, r) {
-  rets->r0 = iree_hal_device_retain_ref(state->shared_device);
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
 
@@ -159,88 +150,129 @@ static iree_device_size_t iree_hal_cast_device_size(int64_t value) {
 }
 
 //===----------------------------------------------------------------------===//
+// Experimental APIs
+//===----------------------------------------------------------------------===//
+// NOTE: Ex* APIs are experimental and likely to be removed soon. Modules
+// using these APIs are not forward compatible.
+
+IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device,  //
+                   iree_hal_module_state_t,           //
+                   v, r) {
+  rets->r0 = iree_hal_device_retain_ref(state->shared_device);
+  return iree_ok_status();
+}
+
+static void iree_hal_module_file_buffer_release(void* user_data) {
+  iree_vm_buffer_t* backing_buffer = (iree_vm_buffer_t*)user_data;
+  iree_vm_buffer_release(backing_buffer);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_ex_file_from_memory,  //
+                   iree_hal_module_state_t,              //
+                   rIirIIi, r) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_memory_access_t access = (iree_hal_memory_access_t)args->i2;
+  iree_vm_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &buffer));
+  iree_host_size_t offset = iree_hal_cast_host_size(args->i4);
+  iree_host_size_t length = iree_hal_cast_host_size(args->i5);
+  uint32_t flags = (uint32_t)args->i6;
+
+  // Only allow read-only access right now while experimental.
+  // The contents here are almost always from mapped file memory today.
+  if (iree_any_bit_set(access, ~IREE_HAL_MEMORY_ACCESS_READ)) {
+    return iree_make_status(
+        IREE_STATUS_PERMISSION_DENIED,
+        "only read-only memory can be accessed via a file handle (today)");
+  }
+
+  // Verify the provided range and get the host pointer.
+  iree_const_byte_span_t span = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(buffer, offset, length, 1, &span));
+
+  // Retain the buffer until the file is destroyed.
+  iree_hal_file_release_callback_t release_callback = {
+      .fn = iree_hal_module_file_buffer_release,
+      .user_data = buffer,
+  };
+  iree_vm_buffer_retain(buffer);
+
+  // Attempt to import the memory as a file.
+  // Memory files are always supported (even if via emulation) so this should
+  // always succeed.
+  iree_hal_external_file_t external_file = {
+      .type = IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION,
+      .flags = flags,
+      .handle =
+          {
+              .host_allocation =
+                  iree_make_byte_span((void*)span.data, span.data_length),
+          },
+  };
+  iree_hal_file_t* file = NULL;
+  iree_status_t status = iree_hal_file_import(
+      device, queue_affinity, access, &external_file, release_callback, &file);
+  if (!iree_status_is_ok(status)) {
+    iree_vm_buffer_release(buffer);
+  }
+
+  rets->r0 = iree_hal_file_move_ref(file);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
 
 IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
                    iree_hal_module_state_t,             //
-                   riiI, r) {
+                   rIiiI, r) {
   iree_hal_allocator_t* allocator = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
-  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
-  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i2;
-  iree_device_size_t allocation_size = iree_hal_cast_device_size(args->i3);
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i2;
+  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i3;
+  iree_device_size_t allocation_size = iree_hal_cast_device_size(args->i4);
 
   const iree_hal_buffer_params_t params = {
       .type = memory_types,
       .usage = buffer_usage,
-  };
-  iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      allocator, params, allocation_size, iree_const_byte_span_empty(),
-      &buffer));
-  rets->r0 = iree_hal_buffer_move_ref(buffer);
-  return iree_ok_status();
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate_initialized,  //
-                   iree_hal_module_state_t,                         //
-                   riirII, r) {
-  iree_hal_allocator_t* allocator = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
-  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i1;
-  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i2;
-  iree_vm_buffer_t* source = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r3, &source));
-  iree_device_size_t offset = iree_hal_cast_device_size(args->i4);
-  iree_device_size_t length = iree_hal_cast_device_size(args->i5);
-
-  iree_host_size_t buffer_length = source->data.data_length;
-  if (length == -1) {
-    length = buffer_length;
-  }
-  if (length < 0 || offset < 0 || offset > buffer_length ||
-      offset + length > buffer_length) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "byte range out of bounds (requested %" PRIdsz
-                            "-%" PRIdsz " of available %" PRIhsz ")",
-                            offset, (offset + length - 1), buffer_length);
-  }
-
-  const iree_hal_buffer_params_t params = {
-      .type = memory_types,
-      .usage = buffer_usage,
+      .queue_affinity = queue_affinity,
   };
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(
-          allocator, params, length,
-          iree_make_const_byte_span(source->data.data + offset, length),
-          &buffer),
-      "failed to allocate buffer of length %" PRIdsz, length);
+      iree_hal_allocator_allocate_buffer(allocator, params, allocation_size,
+                                         iree_const_byte_span_empty(), &buffer),
+      "failed to allocate buffer of length %" PRIdsz, allocation_size);
 
   rets->r0 = iree_hal_buffer_move_ref(buffer);
   return iree_ok_status();
 }
 
-static void iree_hal_module_mapped_buffer_release(void* user_data,
-                                                  iree_hal_buffer_t* buffer) {
+static void iree_hal_module_imported_buffer_release(void* user_data,
+                                                    iree_hal_buffer_t* buffer) {
   iree_vm_buffer_t* backing_buffer = (iree_vm_buffer_t*)user_data;
   iree_vm_buffer_release(backing_buffer);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
-                   iree_hal_module_state_t,                    //
-                   riiirII, r) {
+IREE_VM_ABI_EXPORT(iree_hal_module_allocator_import,  //
+                   iree_hal_module_state_t,           //
+                   riIiirII, r) {
   iree_hal_allocator_t* allocator = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_check_deref(args->r0, &allocator));
   bool is_try = args->i1 != 0;
-  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i2;
-  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i3;
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i2;
+  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i3;
+  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i4;
   iree_vm_buffer_t* source = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r4, &source));
-  iree_device_size_t offset = iree_hal_cast_device_size(args->i5);
-  iree_device_size_t length = iree_hal_cast_device_size(args->i6);
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r5, &source));
+  iree_device_size_t offset = iree_hal_cast_device_size(args->i6);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i7);
 
   iree_host_size_t buffer_length = source->data.data_length;
   if (length == -1) {
@@ -261,7 +293,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
                            IREE_HAL_BUFFER_USAGE_SHARING_IMMUTABLE)) {
       return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
                               "source buffer is immutable and can only be "
-                              "mapped for constant usage");
+                              "imported for constant usage");
     }
 
     // NOTE: if we wanted to lock things down for when there's no MMU to ensure
@@ -283,6 +315,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
       .type = memory_types,
       .usage = buffer_usage,
       .access = allowed_access,
+      .queue_affinity = queue_affinity,
   };
   iree_hal_external_buffer_t external_buffer = {
       .type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
@@ -291,21 +324,21 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
       .handle.host_allocation.ptr = source->data.data + offset,
   };
   iree_hal_buffer_release_callback_t release_callback = {
-      .fn = iree_hal_module_mapped_buffer_release,
+      .fn = iree_hal_module_imported_buffer_release,
       .user_data = source,
   };
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_allocator_import_buffer(
       allocator, params, &external_buffer, release_callback, &buffer);
   if (iree_status_is_ok(status)) {
-    // Mapping succeeded - retain the source buffer that'll be released by
+    // Import succeeded - retain the source buffer that'll be released by
     // iree_hal_module_map_data_ctl when the mapping is no longer used.
     iree_vm_buffer_retain(source);
     rets->r0 = iree_hal_buffer_move_ref(buffer);
     return iree_ok_status();
   }
 
-  // Failed to map - if this was a try then don't fail and just rely on the
+  // Failed to import - if this was a try then don't fail and just rely on the
   // result being nullptr to indicate to the caller that things failed.
   memset(&rets->r0, 0, sizeof(rets->r0));
   if (is_try) {
@@ -996,6 +1029,52 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_dealloca,  //
   return iree_hal_device_queue_dealloca(
       device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
       iree_hal_fence_semaphore_list(signal_fence), buffer);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_read,  //
+                   iree_hal_module_state_t,            //
+                   rIrrrIrIIi, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  iree_hal_file_t* source_file = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_file_check_deref(args->r4, &source_file));
+  uint64_t source_offset = (uint64_t)args->i5;
+  iree_hal_buffer_t* target_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r6, &target_buffer));
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i7);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i8);
+  uint32_t flags = (uint32_t)args->i9;
+  return iree_hal_device_queue_read(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), source_file, source_offset,
+      target_buffer, target_offset, length, flags);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_write,  //
+                   iree_hal_module_state_t,             //
+                   rIrrrIrIIi, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  iree_hal_buffer_t* source_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r4, &source_buffer));
+  iree_device_size_t source_offset = iree_hal_cast_device_size(args->i5);
+  iree_hal_file_t* target_file = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_file_check_deref(args->r6, &target_file));
+  uint64_t target_offset = (uint64_t)args->i7;
+  iree_device_size_t length = iree_hal_cast_device_size(args->i8);
+  uint32_t flags = (uint32_t)args->i9;
+  return iree_hal_device_queue_write(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), source_buffer, source_offset,
+      target_file, target_offset, length, flags);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute,  //

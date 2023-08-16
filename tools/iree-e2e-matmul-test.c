@@ -196,8 +196,8 @@ static iree_status_t map_host_local_row_major_data(
                             "buffer_view is not dense row major");
   }
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(buffer_view),
-      IREE_HAL_MAPPING_MODE_PERSISTENT, access, 0, IREE_WHOLE_BUFFER, mapping));
+      iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
+      access, 0, IREE_WHOLE_BUFFER, mapping));
   return iree_ok_status();
 }
 

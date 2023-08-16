@@ -10,7 +10,6 @@
 
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
-#include "iree/hal/resource.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t

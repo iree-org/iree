@@ -17,6 +17,8 @@ iree_hal_cts_test_suite(
     "\"SPVE\""
   DEPS
     iree::hal::drivers::vulkan::registration
+  EXCLUDED_TESTS
+    "semaphore_submission"  # SubmitWithWait hangs (requires async)
   LABELS
     driver=vulkan
 )

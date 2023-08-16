@@ -143,6 +143,41 @@ func.func @device_queue_dealloca(
 
 // -----
 
+// CHECK-LABEL: @device_queue_read
+func.func @device_queue_read(
+    // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64,
+    %device: !hal.device, %affinity: i64,
+    // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL_FENCE:.+]]: !vm.ref<!hal.fence>,
+    %wait_fence: !hal.fence, %signal_fence: !hal.fence,
+    // CHECK-SAME:  %[[SOURCE_FILE:.+]]: !vm.ref<!hal.file>,
+    %source_file: !hal.file,
+    // CHECK-SAME:  %[[TARGET_BUFFER:.+]]: !vm.ref<!hal.buffer>)
+    %target_buffer: !hal.buffer) {
+  // CHECK-DAG: %[[SOURCE_OFFSET:.+]] = vm.const.i64 100
+  %source_offset = arith.constant 100 : i64
+  // CHECK-DAG: %[[TARGET_OFFSET:.+]] = vm.const.i64 200
+  %target_offset = arith.constant 200 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = vm.const.i64 300
+  %length = arith.constant 300 : index
+  // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i32.zero
+  // CHECK: vm.call @hal.device.queue.read(
+  // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
+  // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
+  // CHECK-SAME: %[[SOURCE_FILE]], %[[SOURCE_OFFSET]],
+  // CHECK-SAME: %[[TARGET_BUFFER]], %[[TARGET_OFFSET]],
+  // CHECK-SAME: %[[LENGTH]], %[[FLAGS]])
+  hal.device.queue.read<%device : !hal.device>
+      affinity(%affinity)
+      wait(%wait_fence) signal(%signal_fence)
+      source(%source_file : !hal.file)[%source_offset]
+      target(%target_buffer : !hal.buffer)[%target_offset]
+      length(%length)
+      flags(0)
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @device_queue_execute
 func.func @device_queue_execute(
     // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64,

@@ -50,6 +50,8 @@ iree_cc_library(
     "executable_cache.h"
     "fence.c"
     "fence.h"
+    "file.c"
+    "file.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
     "resource.h"

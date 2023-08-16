@@ -15,26 +15,6 @@
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 #include "iree/hal/utils/semaphore_base.h"
 
-// The maximum valid payload value of an iree_hal_semaphore_t.
-// Payload values larger than this indicate that the semaphore has failed.
-//
-// This originates from Vulkan having a lower-bound of INT_MAX for
-// maxTimelineSemaphoreValueDifference and many Android devices only supporting
-// that lower-bound. At ~100 signals per second it'll take 1.5+ years to
-// saturate. We may increase this value at some point but so long as there are
-// some devices in the wild that may have this limitation we can ensure better
-// consistency across the backends by observing this.
-//
-// The major mitigation here is that in proper usage of IREE there are no
-// semaphores that are implicitly referenced by multiple VMs (each creates their
-// own internally) and in a multitenant system each session should have its own
-// semaphores - so even if the process lives for years it's highly unlikely any
-// particular session does. Whatever, 640K is enough for anyone.
-//
-// See:
-//   https://vulkan.gpuinfo.org/displayextensionproperty.php?name=maxTimelineSemaphoreValueDifference
-#define IREE_HAL_VULKAN_SEMAPHORE_MAX_VALUE (2147483647ull - 1)
-
 using namespace iree::hal::vulkan;
 
 typedef struct iree_hal_vulkan_native_semaphore_t {
@@ -146,7 +126,7 @@ static iree_status_t iree_hal_vulkan_native_semaphore_query(
       "vkGetSemaphoreCounterValue"));
 
   // If the semaphore failed then clone the status so we can report it.
-  if (value > IREE_HAL_VULKAN_SEMAPHORE_MAX_VALUE) {
+  if (value >= IREE_HAL_SEMAPHORE_FAILURE_VALUE) {
     iree_status_t failure_status = (iree_status_t)iree_atomic_load_intptr(
         &semaphore->failure_status, iree_memory_order_acquire);
     if (iree_status_is_ok(failure_status)) {
@@ -211,7 +191,7 @@ static void iree_hal_vulkan_native_semaphore_fail(
   signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
   signal_info.pNext = NULL;
   signal_info.semaphore = semaphore->handle;
-  signal_info.value = IREE_HAL_VULKAN_SEMAPHORE_MAX_VALUE + 1;
+  signal_info.value = IREE_HAL_SEMAPHORE_FAILURE_VALUE;
   // NOTE: we don't care about the result in case of failures as we are
   // failing and the caller will likely be tearing everything down anyway.
   semaphore->logical_device->syms()->vkSignalSemaphore(

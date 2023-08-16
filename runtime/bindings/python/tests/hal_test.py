@@ -137,9 +137,10 @@ class DeviceHalTest(unittest.TestCase):
         bv = iree.runtime.HalBufferView(
             buffer, (1, 2), iree.runtime.HalElementType.INT_16
         )
+        # NOTE: the exact bits set on type/usage/etc is implementation defined.
         self.assertEqual(
             repr(bv),
-            "<HalBufferView (1, 2), element_type=0x10000010, 13 bytes (at offset 0 into 13), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING>",
+            "<HalBufferView (1, 2), element_type=0x10000010, 13 bytes (at offset 0 into 13), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING|MAPPING_PERSISTENT>",
         )
 
     def testBufferMap(self):
@@ -158,9 +159,10 @@ class DeviceHalTest(unittest.TestCase):
             allowed_usage=iree.runtime.BufferUsage.DEFAULT,
             buffer=ary,
         )
+        # NOTE: the exact bits set on type/usage/etc is implementation defined.
         self.assertEqual(
             repr(buffer),
-            "<HalBuffer 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING>",
+            "<HalBuffer 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING|MAPPING_PERSISTENT>",
         )
 
     def testAllocateBufferViewCopy(self):
@@ -171,16 +173,18 @@ class DeviceHalTest(unittest.TestCase):
             buffer=ary,
             element_type=iree.runtime.HalElementType.SINT_32,
         )
+        # NOTE: the exact bits set on type/usage/etc is implementation defined.
         self.assertEqual(
             repr(buffer),
-            "<HalBufferView (3, 4), element_type=0x20000011, 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING>",
+            "<HalBufferView (3, 4), element_type=0x20000011, 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING|MAPPING_PERSISTENT>",
         )
 
     def testAllocateHostStagingBufferCopy(self):
         buffer = self.allocator.allocate_host_staging_buffer_copy(np.int32(0))
+        # NOTE: the exact bits set on type/usage/etc is implementation defined.
         self.assertEqual(
             repr(buffer),
-            "<HalBuffer 4 bytes (at offset 0 into 4), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|MAPPING>",
+            "<HalBuffer 4 bytes (at offset 0 into 4), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|MAPPING|MAPPING_PERSISTENT>",
         )
 
     def testSemaphore(self):
