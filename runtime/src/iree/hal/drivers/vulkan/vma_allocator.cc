@@ -504,7 +504,9 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     allocation_create_info.requiredFlags |=
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   }
-  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
+  if (iree_any_bit_set(params->usage,
+                       IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+                           IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT)) {
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   }
 
