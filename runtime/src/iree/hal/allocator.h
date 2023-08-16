@@ -323,12 +323,22 @@ typedef struct iree_hal_external_buffer_t {
     // IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION
     struct {
       // Host memory pointer.
+      //
+      // On Metal this must be a base pointer to a virtual memory region
+      // allocated with vm_allocate or mmap. Pointers returned from malloc (or
+      // iree_allocator_malloc/etc) are not supported.
       void* ptr;
     } host_allocation;
     // IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION
     struct {
       // Device memory pointer. Pointer width may vary across devices so it is
       // always treated as a 64-bit integer here.
+      //
+      // Common implementations:
+      //    CPU: host memory pointer
+      //   CUDA: CUdeviceptr
+      //  Metal: MTLBuffer
+      // Vulkan: VkDeviceMemory
       uint64_t ptr;
     } device_allocation;
     // IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD
