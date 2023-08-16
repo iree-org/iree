@@ -95,6 +95,11 @@ createSPIRVEraseStorageBufferStaticShapePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVFoldProcessorIDUsesPass();
 
+// This pass generalizes linalg.matmul_transpose_b ops that are equivalent
+// to a transposed matvec op (have a unit dimension in the output)
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVGeneralizeNamedOpsPass();
+
 /// Main pass to lower executables to scalar + vector code on SPIR-V path.
 /// Invokes one of the pass pipelines that translate the executable to
 /// scalar + vector code.
