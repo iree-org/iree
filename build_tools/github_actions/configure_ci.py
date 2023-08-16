@@ -537,6 +537,7 @@ def main():
     repo = os.environ["GITHUB_REPOSITORY"]
     workflow_ref = os.environ["GITHUB_WORKFLOW_REF"]
     workflow_file = parse_path_from_workflow_ref(repo=repo, workflow_ref=workflow_ref)
+    base_ref = os.environ["BASE_REF"]
 
     try:
         benchmark_presets = get_benchmark_presets(
@@ -546,7 +547,7 @@ def main():
         enabled_jobs = get_enabled_jobs(
             trailers,
             all_jobs,
-            modified_paths=get_modified_paths(),
+            modified_paths=get_modified_paths(base_ref),
             is_pr=is_pr,
         )
     except ValueError as e:
