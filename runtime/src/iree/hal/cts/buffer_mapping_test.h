@@ -54,7 +54,7 @@ class buffer_mapping_test : public CtsTestBase {
     iree_hal_buffer_t* device_buffer = NULL;
     IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device_), params, buffer_size,
-        iree_const_byte_span_empty(), &device_buffer));
+        &device_buffer));
     *out_buffer = device_buffer;
   }
 };

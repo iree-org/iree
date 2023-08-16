@@ -96,8 +96,8 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
       IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE | IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_view_t* input_buffer_view = NULL;
   float input_data[1] = {-2.5f};
-  IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-      device_allocator_,
+  IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer_copy(
+      device_, device_allocator_,
       /*shape_rank=*/0, /*shape=*/NULL, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_params,
       iree_make_const_byte_span((void*)input_data, sizeof(input_data)),
@@ -110,8 +110,7 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
                         IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* output_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, output_params, sizeof(float),
-      iree_const_byte_span_empty(), &output_buffer));
+      device_allocator_, output_params, sizeof(float), &output_buffer));
 
   iree_hal_descriptor_set_binding_t descriptor_set_bindings[] = {
       {

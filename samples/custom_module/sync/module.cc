@@ -118,8 +118,7 @@ class CustomModuleState final {
     vm::ref<iree_hal_buffer_t> result_buffer;
     IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
         device_allocator, buffer_params,
-        iree_hal_buffer_view_byte_length(arg_view.get()),
-        iree_const_byte_span_empty(), &result_buffer));
+        iree_hal_buffer_view_byte_length(arg_view.get()), &result_buffer));
 
     // Hacky example accessing the source contents and producing the result
     // contents. This emulates what an external library the user is calling that

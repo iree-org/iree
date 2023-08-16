@@ -978,16 +978,44 @@ struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
   }
 };
 
-struct TransposeOpCanon final : OpRewritePattern<mlir::stablehlo::TransposeOp> {
+struct TransposeIsReshape final
+    : OpRewritePattern<mlir::stablehlo::TransposeOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::TransposeOp op,
                                 PatternRewriter &rewriter) const override {
-    // Check if this transpose is a noop and use the operand instead.
-    if (!isIotaRange(op.getPermutation()))
-      return failure();
+    auto input = op.getOperand();
+    auto permutation = op.getPermutation();
 
-    rewriter.replaceOp(op, op.getOperand());
+    if (isIotaRange(permutation)) {
+      rewriter.replaceOp(op, op.getOperand());
+      return success();
+    }
+
+    auto inputTy = dyn_cast<RankedTensorType>(input.getType());
+    if (!inputTy || !inputTy.hasStaticShape() ||
+        !op.getType().hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          op, "requires input/output to be of a statically-shaped ranked "
+              "tensor type");
+    }
+
+    SmallVector<int64_t> permValues(permutation.getValues<int64_t>());
+
+    SmallVector<int64_t> nonZeroPerms;
+    nonZeroPerms.reserve(permValues.size());
+    for (auto idx : permValues) {
+      auto sz = inputTy.getDimSize(idx);
+      if (sz != 1)
+        nonZeroPerms.push_back(idx);
+    }
+
+    for (int i = 1, s = nonZeroPerms.size(); i < s; ++i)
+      if (nonZeroPerms[i - 1] > nonZeroPerms[i])
+        return rewriter.notifyMatchFailure(op, "memory layout change");
+
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, op.getType(),
+                                                            input);
     return success();
   }
 };
@@ -1128,7 +1156,7 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
       ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon, GatherOpCanon,
-      ReshapeOpCanon, TransposeOpCanon,
+      ReshapeOpCanon, TransposeIsReshape,
       // Types.
       ZeroExtentTensorCanon>(context, benefit);
   patterns->add<ReorderElementwiseAndShapeOp>(context);

@@ -26,8 +26,8 @@ static iree_status_t iree_allocate_and_copy_cstring_from_view(
 }
 
 static iree_status_t iree_tooling_load_ndarrays_from_file(
-    iree_string_view_t file_path, iree_hal_allocator_t* device_allocator,
-    iree_vm_list_t* list) {
+    iree_string_view_t file_path, iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator, iree_vm_list_t* list) {
   char* file_path_cstring = NULL;
   IREE_RETURN_IF_ERROR(iree_allocate_and_copy_cstring_from_view(
       iree_allocator_system(), file_path, &file_path_cstring));
@@ -50,7 +50,7 @@ static iree_status_t iree_tooling_load_ndarrays_from_file(
   while (iree_status_is_ok(status) && !iree_file_is_at(file, file_length)) {
     iree_hal_buffer_view_t* buffer_view = NULL;
     status = iree_numpy_npy_load_ndarray(
-        file, IREE_NUMPY_NPY_LOAD_OPTION_DEFAULT, buffer_params,
+        file, IREE_NUMPY_NPY_LOAD_OPTION_DEFAULT, buffer_params, device,
         device_allocator, &buffer_view);
     if (iree_status_is_ok(status)) {
       iree_vm_ref_t buffer_view_ref =
@@ -90,7 +90,7 @@ static iree_status_t iree_create_buffer_from_file_generator_callback(
 // The file contents are directly read in to memory with no processing.
 static iree_status_t iree_create_buffer_view_from_file(
     iree_string_view_t metadata, iree_string_view_t file_path,
-    iree_hal_allocator_t* device_allocator,
+    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
     iree_hal_buffer_view_t** out_buffer_view) {
   *out_buffer_view = NULL;
 
@@ -137,7 +137,7 @@ static iree_status_t iree_create_buffer_view_from_file(
       file,
   };
   iree_status_t status = iree_hal_buffer_view_generate_buffer(
-      device_allocator, shape_rank, shape, element_type, encoding_type,
+      device, device_allocator, shape_rank, shape, element_type, encoding_type,
       buffer_params, iree_create_buffer_from_file_generator_callback,
       &read_params, out_buffer_view);
 
@@ -147,7 +147,7 @@ static iree_status_t iree_create_buffer_view_from_file(
 }
 
 iree_status_t iree_tooling_parse_to_variant_list(
-    iree_hal_allocator_t* device_allocator,
+    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
     const iree_string_view_t* input_strings,
     iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
     iree_vm_list_t** out_list) {
@@ -161,8 +161,8 @@ iree_status_t iree_tooling_parse_to_variant_list(
                               input_strings_count, host_allocator, &list));
 
   iree_status_t status = iree_tooling_parse_into_variant_list(
-      device_allocator, input_strings, input_strings_count, host_allocator,
-      list);
+      device, device_allocator, input_strings, input_strings_count,
+      host_allocator, list);
   if (iree_status_is_ok(status)) {
     *out_list = list;
   } else {
@@ -173,7 +173,7 @@ iree_status_t iree_tooling_parse_to_variant_list(
 }
 
 iree_status_t iree_tooling_parse_into_variant_list(
-    iree_hal_allocator_t* device_allocator,
+    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
     const iree_string_view_t* input_strings,
     iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
     iree_vm_list_t* list) {
@@ -193,7 +193,7 @@ iree_status_t iree_tooling_parse_into_variant_list(
                                 "no value specified for input");
       break;
     } else if (iree_string_view_consume_prefix(&input_view, IREE_SV("@"))) {
-      status = iree_tooling_load_ndarrays_from_file(input_view,
+      status = iree_tooling_load_ndarrays_from_file(input_view, device,
                                                     device_allocator, list);
       continue;
     } else if (iree_string_view_equal(input_view, IREE_SV("(null)")) ||
@@ -220,11 +220,11 @@ iree_status_t iree_tooling_parse_into_variant_list(
         iree_string_view_split(input_view, '@', &metadata, &file_path);
         iree_string_view_consume_suffix(&metadata, iree_make_cstring_view("="));
         status = iree_create_buffer_view_from_file(
-            metadata, file_path, device_allocator, &buffer_view);
+            metadata, file_path, device, device_allocator, &buffer_view);
         if (!iree_status_is_ok(status)) break;
       } else {
-        status = iree_hal_buffer_view_parse(input_view, device_allocator,
-                                            &buffer_view);
+        status = iree_hal_buffer_view_parse(input_view, device,
+                                            device_allocator, &buffer_view);
         if (!iree_status_is_ok(status)) {
           status =
               iree_status_annotate_f(status, "parsing value '%.*s'",

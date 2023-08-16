@@ -5,19 +5,19 @@
 // CHECK-PRETTY:   Constants: 1, estimated storage of 192 B
 // CHECK-PRETTY:   Variables: 0, (TBD)
 // CHECK-PRETTY:  D->H Syncs: 2
-// CHECK-PRETTY: Submissions: 3, using cumulative 0 B
+// CHECK-PRETTY: Submissions: 2, using cumulative 0 B
 // CHECK-PRETTY:   DMA Fills: 0
-// CHECK-PRETTY:  DMA Copies: 2
+// CHECK-PRETTY:  DMA Copies: 1
 // CHECK-PRETTY: Collectives: 0
 // CHECK-PRETTY:  Dispatches: 3
 // CHECK-PRETTY: Executables: 2, 33% reuse
 
 // CHECK-CSV: ; Aggregate Statistics
 // CHECK-CSV: "Constants","Constant Size","Variables","Variable Size","Awaits","Submissions","Transient Size","Fills","Copies","Dispatches","Async Calls","Executables"
-// CHECK-CSV: 1,192,0,0,2,3,0,0,2,3,0,2
+// CHECK-CSV: 1,192,0,0,2,2,0,0,1,3,0,2
 // CHECK-CSV: ; Execution
 // CHECK-CSV: "Depth","Command","Symbol","Length","Invocations","Workload","Operands","Resources"
-// CHECK-CSV: 0,"copy",,192,,,,
+// CHECK-CSV: 0,"copy",,16,,,,
 // CHECK-CSV: 0,"dispatch","@func_a_ex_0::@dispatch_0",,4,"4;1;1",0,3
 
 util.global private mutable @_constant__timepoint = #stream.timepoint<immediate>
@@ -41,18 +41,8 @@ util.initializer {
       dense<0> : vector<20xi8>,
   ]>
   %did_map, %result = stream.resource.try_map %1[%c0] : !util.buffer -> i1, !stream.resource<constant>{%c192}
-  %2:2 = scf.if %did_map -> (!stream.resource<constant>, !stream.timepoint) {
-    scf.yield %result, %0 : !stream.resource<constant>, !stream.timepoint
-  } else {
-    %3 = stream.resource.map %1[%c0] : !util.buffer -> !stream.resource<staging>{%c192}
-    %4 = stream.resource.alloc uninitialized : !stream.resource<constant>{%c192}
-    %5 = stream.cmd.execute with(%3 as %arg0: !stream.resource<staging>{%c192}, %4 as %arg1: !stream.resource<constant>{%c192}) {
-      stream.cmd.copy %arg0[%c0], %arg1[%c0], %c192 : !stream.resource<staging>{%c192} -> !stream.resource<constant>{%c192}
-    } => !stream.timepoint
-    scf.yield %4, %5 : !stream.resource<constant>, !stream.timepoint
-  }
-  util.global.store %2#0, @_constant : !stream.resource<constant>
-  util.global.store %2#1, @_constant__timepoint : !stream.timepoint
+  util.global.store %result, @_constant : !stream.resource<constant>
+  util.global.store %0, @_constant__timepoint : !stream.timepoint
   util.initializer.return
 }
 

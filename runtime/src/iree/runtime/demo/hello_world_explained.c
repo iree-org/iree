@@ -181,6 +181,7 @@ static iree_status_t iree_runtime_demo_perform_mul(
   // Append the function inputs with the HAL device allocator in use by the
   // session. The buffers will be usable within the session and _may_ be usable
   // in other sessions depending on whether they share a compatible device.
+  iree_hal_device_t* device = iree_runtime_session_device(session);
   iree_hal_allocator_t* device_allocator =
       iree_runtime_session_device_allocator(session);
   iree_allocator_t host_allocator =
@@ -192,8 +193,8 @@ static iree_status_t iree_runtime_demo_perform_mul(
     if (iree_status_is_ok(status)) {
       static const iree_hal_dim_t arg0_shape[1] = {4};
       static const float arg0_data[4] = {1.0f, 1.1f, 1.2f, 1.3f};
-      status = iree_hal_buffer_view_allocate_buffer(
-          device_allocator,
+      status = iree_hal_buffer_view_allocate_buffer_copy(
+          device, device_allocator,
           // Shape rank and dimensions:
           IREE_ARRAYSIZE(arg0_shape), arg0_shape,
           // Element type:
@@ -203,8 +204,8 @@ static iree_status_t iree_runtime_demo_perform_mul(
           (iree_hal_buffer_params_t){
               // Where to allocate (host or device):
               .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-              // Access to allow to this memory (this is .rodata so READ only):
-              .access = IREE_HAL_MEMORY_ACCESS_READ,
+              // Access to allow to this memory:
+              .access = IREE_HAL_MEMORY_ACCESS_ALL,
               // Intended usage of the buffer (transfers, dispatches, etc):
               .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           },
@@ -229,13 +230,13 @@ static iree_status_t iree_runtime_demo_perform_mul(
     if (iree_status_is_ok(status)) {
       static const iree_hal_dim_t arg1_shape[1] = {4};
       static const float arg1_data[4] = {10.0f, 100.0f, 1000.0f, 10000.0f};
-      status = iree_hal_buffer_view_allocate_buffer(
-          device_allocator, IREE_ARRAYSIZE(arg1_shape), arg1_shape,
+      status = iree_hal_buffer_view_allocate_buffer_copy(
+          device, device_allocator, IREE_ARRAYSIZE(arg1_shape), arg1_shape,
           IREE_HAL_ELEMENT_TYPE_FLOAT_32,
           IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
           (iree_hal_buffer_params_t){
               .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-              .access = IREE_HAL_MEMORY_ACCESS_READ,
+              .access = IREE_HAL_MEMORY_ACCESS_ALL,
               .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
           },
           iree_make_const_byte_span(arg1_data, sizeof(arg1_data)), &arg1);

@@ -83,11 +83,11 @@ typedef uint32_t iree_numpy_npy_save_options_t;
 //
 // See `numpy.load`:
 // https://numpy.org/doc/stable/reference/generated/numpy.load.html
-IREE_API_EXPORT iree_status_t
-iree_numpy_npy_load_ndarray(FILE* stream, iree_numpy_npy_load_options_t options,
-                            iree_hal_buffer_params_t buffer_params,
-                            iree_hal_allocator_t* device_allocator,
-                            iree_hal_buffer_view_t** out_buffer_view);
+IREE_API_EXPORT iree_status_t iree_numpy_npy_load_ndarray(
+    FILE* stream, iree_numpy_npy_load_options_t options,
+    iree_hal_buffer_params_t buffer_params, iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_view_t** out_buffer_view);
 
 // Saves |buffer_view| to a .npy |stream|.
 // The ndarray will be appended to the stream to produce a concatenated file.

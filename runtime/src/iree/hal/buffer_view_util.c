@@ -10,7 +10,6 @@
 #include <stdbool.h>
 
 #include "iree/base/api.h"
-#include "iree/hal/allocator.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/string_util.h"
 
@@ -169,12 +168,17 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
 // Buffer view allocation and generation
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
-    iree_hal_allocator_t* allocator, iree_host_size_t shape_rank,
-    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer_copy(
+    iree_hal_device_t* device, iree_hal_allocator_t* allocator,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_params_t buffer_params, iree_const_byte_span_t initial_data,
     iree_hal_buffer_view_t** out_buffer_view) {
+  if (!iree_const_byte_span_is_empty(initial_data) && !device) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "a device is required for initial_data upload");
+  }
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -186,8 +190,15 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_allocate_buffer(
-        allocator, buffer_params, allocation_size, initial_data, &buffer);
+    status = iree_hal_allocator_allocate_buffer(allocator, buffer_params,
+                                                allocation_size, &buffer);
+  }
+  if (iree_status_is_ok(status) &&
+      !iree_const_byte_span_is_empty(initial_data)) {
+    status = iree_hal_device_transfer_h2d(
+        device, initial_data.data, buffer, 0,
+        iree_min(initial_data.data_length, allocation_size),
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
   }
 
   if (iree_status_is_ok(status)) {
@@ -202,8 +213,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
 }
 
 static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
-    iree_hal_allocator_t* allocator, iree_host_size_t shape_rank,
-    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
+    iree_hal_device_t* device, iree_hal_allocator_t* allocator,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_params_t buffer_params,
     iree_hal_buffer_view_generator_callback_t callback, void* user_data,
@@ -211,8 +223,8 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
   // Allocate the buffer view and entire buffer contents with the target memory
   // type and the mapping bits.
   iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-      allocator, shape_rank, shape, element_type, encoding_type,
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer_copy(
+      device, allocator, shape_rank, shape, element_type, encoding_type,
       iree_hal_buffer_params_with_usage(buffer_params,
                                         IREE_HAL_BUFFER_USAGE_MAPPING),
       iree_const_byte_span_empty(), &buffer_view));
@@ -240,8 +252,9 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
 }
 
 static iree_status_t iree_hal_buffer_view_generate_buffer_on_host(
-    iree_hal_allocator_t* allocator, iree_host_size_t shape_rank,
-    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
+    iree_hal_device_t* device, iree_hal_allocator_t* allocator,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_params_t buffer_params, iree_device_size_t allocation_size,
     iree_hal_buffer_view_generator_callback_t callback, void* user_data,
@@ -264,17 +277,19 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_on_host(
   // Allocate the buffer with the data we just generated.
   // We could try importing but that may create buffers that are slower to
   // access and we want users to opt in to that instead.
-  status = iree_hal_buffer_view_allocate_buffer(
-      allocator, shape_rank, shape, element_type, encoding_type, buffer_params,
-      iree_make_const_byte_span(host_ptr, allocation_size), out_buffer_view);
+  status = iree_hal_buffer_view_allocate_buffer_copy(
+      device, allocator, shape_rank, shape, element_type, encoding_type,
+      buffer_params, iree_make_const_byte_span(host_ptr, allocation_size),
+      out_buffer_view);
 
   iree_allocator_free(host_allocator, host_ptr);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
-    iree_hal_allocator_t* allocator, iree_host_size_t shape_rank,
-    const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
+    iree_hal_device_t* device, iree_hal_allocator_t* allocator,
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type,
     iree_hal_buffer_params_t buffer_params,
     iree_hal_buffer_view_generator_callback_t callback, void* user_data,
@@ -312,12 +327,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
   if (is_mappable) {
     // Compatible with allocate -> map -> generate.
     status = iree_hal_buffer_view_generate_buffer_in_situ(
-        allocator, shape_rank, shape, element_type, encoding_type,
+        device, allocator, shape_rank, shape, element_type, encoding_type,
         mappable_params, callback, user_data, out_buffer_view);
   } else {
     // Allocate host-local memory first and generate into that.
     status = iree_hal_buffer_view_generate_buffer_on_host(
-        allocator, shape_rank, shape, element_type, encoding_type,
+        device, allocator, shape_rank, shape, element_type, encoding_type,
         buffer_params, allocation_size, callback, user_data, out_buffer_view);
   }
 
@@ -342,7 +357,8 @@ static iree_status_t iree_hal_buffer_view_parse_into(
 }
 
 static iree_status_t iree_hal_buffer_view_parse_impl(
-    iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
+    iree_string_view_t value, iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     iree_hal_buffer_view_t** out_buffer_view) {
   // Strip whitespace that may come along (linefeeds/etc).
   value = iree_string_view_trim(value);
@@ -412,20 +428,21 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
       .element_type = element_type,
   };
   return iree_hal_buffer_view_generate_buffer(
-      buffer_allocator, shape_rank, shape, element_type, encoding_type,
+      device, device_allocator, shape_rank, shape, element_type, encoding_type,
       buffer_params, iree_hal_buffer_view_parse_into, &parse_params,
       out_buffer_view);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_parse(
-    iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
-    iree_hal_buffer_view_t** out_buffer_view) {
-  IREE_ASSERT_ARGUMENT(buffer_allocator);
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_view_parse(iree_string_view_t value, iree_hal_device_t* device,
+                           iree_hal_allocator_t* device_allocator,
+                           iree_hal_buffer_view_t** out_buffer_view) {
+  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
   *out_buffer_view = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status =
-      iree_hal_buffer_view_parse_impl(value, buffer_allocator, out_buffer_view);
+  iree_status_t status = iree_hal_buffer_view_parse_impl(
+      value, device, device_allocator, out_buffer_view);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

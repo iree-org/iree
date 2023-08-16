@@ -519,7 +519,7 @@ struct BufferView final
     BufferView buffer_view;
     iree_status_t status = iree_hal_buffer_view_parse(
         iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
-        allocator, &buffer_view);
+        /*device=*/NULL, allocator, &buffer_view);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }
