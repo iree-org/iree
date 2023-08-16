@@ -359,6 +359,7 @@ static iree_status_t iree_hal_metal_device_queue_read(
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list, source_file,
       source_offset, target_buffer, target_offset, length, flags, options));
+  return loop_status;
 }
 
 static iree_status_t iree_hal_metal_device_queue_write(
