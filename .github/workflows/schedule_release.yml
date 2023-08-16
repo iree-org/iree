@@ -21,7 +21,7 @@ jobs:
         id: latest_main
         run: |
           git checkout main
-          echo "release_commit_hash="$(git rev-parse HEAD)" >> $GITHUB_ENV
+          echo "release_commit_hash=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
       - name: Compute version
         run: |
