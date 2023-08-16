@@ -118,12 +118,16 @@ CONTROL_JOBS = frozenset(["setup", "summary"])
 POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         "build_test_all_windows",
-        "build_test_all_macos_arm64",
         "build_test_all_macos_x86_64",
         # Due to the outstock of A100, only run this test in postsubmit.
         "test_a100",
     ]
 )
+
+# Jobs to run in presumbit if files under the corresponding path see changes.
+PRESUBMIT_TOUCH_ONLY_JOBS = [
+    ("build_test_all_macos_arm64", "runtime/src/iree/hal/drivers/metal/*"),
+]
 
 DEFAULT_BENCHMARK_PRESET_GROUP = [
     "cuda",
@@ -440,6 +444,13 @@ def get_enabled_jobs(
             " are marked as excluded."
         )
         default_jobs = frozenset()
+    else:
+        # Add jobs if the monitored files are changed.
+        base_ref = os.environ["BASE_REF"]
+        for modified_path in get_modified_paths(base_ref):
+            for job, match_path in PRESUBMIT_TOUCH_ONLY_JOBS:
+                if fnmatch.fnmatch(modified_path, match_path):
+                    default_jobs |= frozenset(job)
 
     return (default_jobs | extra_jobs) - skip_jobs
 
