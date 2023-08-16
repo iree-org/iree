@@ -115,9 +115,12 @@ RUNNER_ENV_OPTIONS = [RUNNER_ENV_DEFAULT, "testing"]
 
 CONTROL_JOBS = frozenset(["setup", "summary"])
 
-POSTSUBMIT_ONLY_JOBS = frozenset(
+# Jobs to run only on postsubmit by default.
+# They may also run on presubmit only under certain conditions.
+DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         "build_test_all_windows",
+        "build_test_all_macos_arm64",
         "build_test_all_macos_x86_64",
         # Due to the outstock of A100, only run this test in postsubmit.
         "test_a100",
@@ -305,10 +308,9 @@ def get_modified_paths(base_ref: str) -> Iterable[str]:
     ).stdout.splitlines()
 
 
-def modifies_included_path() -> bool:
-    base_ref = os.environ["BASE_REF"]
+def modifies_included_path(paths: Iterable[str]) -> bool:
     try:
-        return any(not skip_path(p) for p in get_modified_paths(base_ref))
+        return any(not skip_path(p) for p in paths)
     except TimeoutError as e:
         print(
             "Computing modified files timed out. Not using PR diff to determine"
@@ -385,7 +387,7 @@ def get_enabled_jobs(
     all_jobs: Set[str],
     *,
     is_pr: bool,
-    modifies: bool,
+    modified_paths: Iterable[str],
 ) -> Set[str]:
     if not is_pr:
         print(
@@ -436,9 +438,9 @@ def get_enabled_jobs(
             f" '{Trailer.EXTRA_JOBS}', but found {ambiguous_jobs}"
         )
 
-    default_jobs = all_jobs - POSTSUBMIT_ONLY_JOBS
+    default_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS
 
-    if not modifies:
+    if not modifies_included_path(modified_paths):
         print(
             "Not including any jobs by default because all modified files"
             " are marked as excluded."
@@ -446,11 +448,10 @@ def get_enabled_jobs(
         default_jobs = frozenset()
     else:
         # Add jobs if the monitored files are changed.
-        base_ref = os.environ["BASE_REF"]
-        for modified_path in get_modified_paths(base_ref):
+        for modified_path in modified_paths:
             for job, match_path in PRESUBMIT_TOUCH_ONLY_JOBS:
                 if fnmatch.fnmatch(modified_path, match_path):
-                    default_jobs |= frozenset(job)
+                    default_jobs |= {job}
 
     return (default_jobs | extra_jobs) - skip_jobs
 
@@ -537,7 +538,6 @@ def main():
     workflow_ref = os.environ["GITHUB_WORKFLOW_REF"]
     workflow_file = parse_path_from_workflow_ref(repo=repo, workflow_ref=workflow_ref)
 
-    modifies = modifies_included_path()
     try:
         benchmark_presets = get_benchmark_presets(
             trailers, labels, is_pr, is_llvm_integrate_pr
@@ -546,7 +546,7 @@ def main():
         enabled_jobs = get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=get_modified_paths(),
             is_pr=is_pr,
         )
     except ValueError as e:
