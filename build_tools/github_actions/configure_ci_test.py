@@ -147,7 +147,7 @@ class ConfigureCITest(unittest.TestCase):
         trailers = {}
         all_jobs = {"job1", "job2", "job3"}
         is_pr = True
-        modified_paths = ['runtime/file']
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
@@ -162,7 +162,7 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = False
-        modified_paths = ['runtime/file']
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
@@ -177,7 +177,7 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modified_paths = ['runtime/file']
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
@@ -192,7 +192,7 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modified_paths = ['experimental/file']
+        modified_paths = ["experimental/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
@@ -207,7 +207,7 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modified_paths = ['runtime/file']
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
@@ -222,7 +222,7 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modified_paths = ['runtime/file']
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
@@ -237,7 +237,7 @@ class ConfigureCITest(unittest.TestCase):
         default_jobs = {"job1", "job2", "job3"}
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modified_paths = ['runtime/file']
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
@@ -252,7 +252,7 @@ class ConfigureCITest(unittest.TestCase):
         default_jobs = {"job1", "job2", "job3"}
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modified_paths = ['runtime/file']
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
@@ -265,14 +265,14 @@ class ConfigureCITest(unittest.TestCase):
         trailers = {}
         all_jobs = {"job1"}
         is_pr = True
-        modified_paths = ['runtime/src/iree/hal/drivers/metal/file']
+        modified_paths = ["runtime/src/iree/hal/drivers/metal/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
         )
-        expected_jobs = {'job1', 'build_test_all_macos_arm64'}
+        expected_jobs = {"job1", "build_test_all_macos_arm64"}
         self.assertCountEqual(jobs, expected_jobs)
 
     def test_parse_path_from_workflow_ref(self):
