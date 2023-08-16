@@ -224,6 +224,7 @@ def asdevicearray(
     buffer_view = device.allocator.allocate_buffer_copy(
         memory_type=memory_type,
         allowed_usage=allowed_usage,
+        device=device,
         buffer=a,
         element_type=element_type,
     )

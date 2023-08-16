@@ -103,8 +103,7 @@ static iree_status_t iree_hal_rocm_device_create_internal(
   device->context_wrapper.host_allocator = host_allocator;
   device->context_wrapper.syms = syms;
   iree_status_t status = iree_hal_rocm_allocator_create(
-      (iree_hal_device_t*)device, &device->context_wrapper,
-      &device->device_allocator);
+      &device->context_wrapper, &device->device_allocator);
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -301,9 +300,9 @@ static iree_status_t iree_hal_rocm_device_queue_alloca(
   // TODO: queue-ordered allocations.
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
                                                     iree_infinite_timeout()));
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(base_device), params, allocation_size,
-      iree_const_byte_span_empty(), out_buffer));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
+                                         params, allocation_size, out_buffer));
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
   return iree_ok_status();
 }

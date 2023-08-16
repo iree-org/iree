@@ -178,7 +178,7 @@ iree_hal_heap_allocator_query_buffer_compatibility(
 static iree_status_t iree_hal_heap_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_heap_allocator_t* allocator =
       iree_hal_heap_allocator_cast(base_allocator);
@@ -198,7 +198,7 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
   IREE_STATISTICS(statistics = &allocator->statistics);
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_heap_buffer_create(
-      base_allocator, statistics, &compat_params, allocation_size, initial_data,
+      base_allocator, statistics, &compat_params, allocation_size,
       allocator->data_allocator, allocator->host_allocator, &buffer));
 
   *out_buffer = buffer;

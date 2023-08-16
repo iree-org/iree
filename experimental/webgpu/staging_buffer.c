@@ -46,9 +46,9 @@ iree_status_t iree_hal_webgpu_staging_buffer_initialize(
   };
   iree_hal_buffer_t* device_buffer = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_allocator_allocate_buffer(
-              device_allocator, buffer_params, out_staging_buffer->capacity,
-              iree_const_byte_span_empty(), &device_buffer));
+      z0, iree_hal_allocator_allocate_buffer(device_allocator, buffer_params,
+                                             out_staging_buffer->capacity,
+                                             &device_buffer));
   out_staging_buffer->device_buffer = device_buffer;
   iree_hal_buffer_retain(device_buffer);
   out_staging_buffer->device_buffer_handle =

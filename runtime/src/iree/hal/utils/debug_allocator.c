@@ -187,7 +187,7 @@ static iree_status_t iree_hal_debug_allocator_fill_on_device(
 static iree_status_t iree_hal_debug_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_debug_allocator_t* allocator =
       iree_hal_debug_allocator_cast(base_allocator);
@@ -196,17 +196,9 @@ static iree_status_t iree_hal_debug_allocator_allocate_buffer(
   // undefined contents (including those from prior allocations which may appear
   // correct).
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      allocator->device_allocator, *params, allocation_size, initial_data,
-      out_buffer));
+      allocator->device_allocator, *params, allocation_size, out_buffer));
 
-  // If the buffer is read-only we can't fill it even if we wanted to. This
-  // usually happens with initial data.
   iree_hal_buffer_t* base_buffer = *out_buffer;
-  if (initial_data.data_length > 0 ||
-      !iree_all_bits_set(iree_hal_buffer_allowed_access(base_buffer),
-                         IREE_HAL_MEMORY_ACCESS_WRITE)) {
-    return iree_ok_status();
-  }
 
   // We could rotate this here if we wanted to have it vary over time (per
   // allocation, per trim, etc).

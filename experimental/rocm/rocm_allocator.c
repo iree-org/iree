@@ -30,9 +30,8 @@ static iree_hal_rocm_allocator_t* iree_hal_rocm_allocator_cast(
 }
 
 iree_status_t iree_hal_rocm_allocator_create(
-    iree_hal_device_t* base_device, iree_hal_rocm_context_wrapper_t* context,
+    iree_hal_rocm_context_wrapper_t* context,
     iree_hal_allocator_t** out_allocator) {
-  IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_rocm_allocator_t* allocator = NULL;
@@ -42,7 +41,6 @@ iree_status_t iree_hal_rocm_allocator_create(
     iree_hal_resource_initialize(&iree_hal_rocm_allocator_vtable,
                                  &allocator->resource);
     allocator->context = context;
-    allocator->base_device = base_device;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -186,7 +184,7 @@ static void iree_hal_rocm_buffer_free(iree_hal_rocm_context_wrapper_t* context,
 static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_rocm_allocator_t* allocator =
       iree_hal_rocm_allocator_cast(base_allocator);
@@ -240,18 +238,6 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
         compat_params.access, compat_params.usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, device_ptr, host_ptr, &buffer);
-  }
-
-  // Copy the initial contents into the buffer. This may require staging.
-  if (iree_status_is_ok(status) &&
-      !iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_device_transfer_range(
-        allocator->base_device,
-        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
-                                                initial_data.data_length),
-        0, iree_hal_make_device_transfer_buffer(buffer), 0,
-        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
-        iree_infinite_timeout());
   }
 
   if (iree_status_is_ok(status)) {

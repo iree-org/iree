@@ -195,7 +195,7 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda2_allocator_create(
-        (iree_hal_device_t*)device, cuda_symbols, cu_device, dispatch_stream,
+        cuda_symbols, cu_device, dispatch_stream,
         device->supports_memory_pools ? &device->memory_pools : NULL,
         host_allocator, &device->device_allocator);
   }
@@ -624,7 +624,7 @@ static iree_status_t iree_hal_cuda2_device_queue_alloca(
   } else {
     status = iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(base_device), params, allocation_size,
-        iree_const_byte_span_empty(), out_buffer);
+        out_buffer);
   }
 
   // Only signal if not returning a synchronous error - synchronous failure

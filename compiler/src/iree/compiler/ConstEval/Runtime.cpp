@@ -177,9 +177,8 @@ FunctionCall::importSerializableAttr(
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   if (failed(handleRuntimeError(
-          loc, iree_hal_allocator_allocate_buffer(
-                   binary.getAllocator(), params, storageSize,
-                   iree_const_byte_span_t{nullptr, 0}, &buffer))))
+          loc, iree_hal_allocator_allocate_buffer(binary.getAllocator(), params,
+                                                  storageSize, &buffer))))
     return failure();
 
   iree_hal_buffer_mapping_t mapping;

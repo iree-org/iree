@@ -244,10 +244,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
       .queue_affinity = queue_affinity,
   };
   iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(allocator, params, allocation_size,
-                                         iree_const_byte_span_empty(), &buffer),
-      "failed to allocate buffer of length %" PRIdsz, allocation_size);
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+                           allocator, params, allocation_size, &buffer),
+                       "failed to allocate buffer of length %" PRIdsz,
+                       allocation_size);
 
   rets->r0 = iree_hal_buffer_move_ref(buffer);
   return iree_ok_status();

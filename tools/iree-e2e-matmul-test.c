@@ -204,10 +204,10 @@ static iree_status_t map_host_local_row_major_data(
 // Allocates host-local |dst| to have the same shape as |src|.
 // Implicitly zero-filled.
 static iree_status_t allocate_host_buffer_view_like(
-    iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
-    iree_hal_buffer_view_t** dst) {
-  return iree_hal_buffer_view_allocate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
+    iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
+  return iree_hal_buffer_view_allocate_buffer_copy(
+      device, hal_allocator, iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
@@ -222,10 +222,11 @@ static iree_status_t allocate_host_buffer_view_like(
 // Allocates device-local |dst| to have the same shape as |src|.
 // Implicitly zero-filled.
 static iree_status_t allocate_device_buffer_view_like(
-    iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
-    iree_const_byte_span_t initial_data, iree_hal_buffer_view_t** dst) {
-  return iree_hal_buffer_view_allocate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
+    iree_hal_buffer_view_t* src, iree_const_byte_span_t initial_data,
+    iree_hal_buffer_view_t** dst) {
+  return iree_hal_buffer_view_allocate_buffer_copy(
+      device, hal_allocator, iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
@@ -243,7 +244,8 @@ static iree_status_t copy_device_buffer_view_to_host(
     iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
   IREE_RETURN_IF_ERROR(
       validate_memory_type(src, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL));
-  IREE_RETURN_IF_ERROR(allocate_host_buffer_view_like(hal_allocator, src, dst));
+  IREE_RETURN_IF_ERROR(
+      allocate_host_buffer_view_like(device, hal_allocator, src, dst));
   iree_hal_buffer_mapping_t dst_mapping;
   iree_status_t status = map_host_local_row_major_data(
       *dst, IREE_HAL_MEMORY_ACCESS_WRITE, &dst_mapping);
@@ -267,8 +269,8 @@ static iree_status_t copy_host_buffer_view_to_device(
       src, IREE_HAL_MEMORY_ACCESS_READ, &src_mapping));
   iree_const_byte_span_t const_src_bytes = iree_make_const_byte_span(
       src_mapping.contents.data, src_mapping.contents.data_length);
-  IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(hal_allocator, src,
-                                                        const_src_bytes, dst));
+  IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
+      device, hal_allocator, src, const_src_bytes, dst));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&src_mapping));
   return iree_ok_status();
 }
@@ -281,7 +283,7 @@ static iree_status_t copy_device_buffer_view_to_device(
   IREE_RETURN_IF_ERROR(
       validate_memory_type(src, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL));
   IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
-      hal_allocator, src, iree_const_byte_span_empty(), dst));
+      device, hal_allocator, src, iree_const_byte_span_empty(), dst));
   iree_status_t status = iree_hal_device_transfer_d2d(
       device, iree_hal_buffer_view_buffer(src), 0,
       iree_hal_buffer_view_buffer(*dst), 0,
@@ -1021,8 +1023,9 @@ static iree_status_t do_matmul_and_check_results(
 
   // Allocate host_expected_result with same shape as host_actual_result.
   iree_hal_buffer_view_t* host_expected_result = NULL;
-  IREE_CHECK_OK(allocate_host_buffer_view_like(
-      device_allocator, host_actual_result, &host_expected_result));
+  IREE_CHECK_OK(allocate_host_buffer_view_like(replay->device, device_allocator,
+                                               host_actual_result,
+                                               &host_expected_result));
 
   // Use the reference matmul implementation to fill host_expected_result
   IREE_CHECK_OK(reference_matmul(host_inputs, host_expected_result));

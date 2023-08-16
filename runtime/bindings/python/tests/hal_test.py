@@ -157,6 +157,7 @@ class DeviceHalTest(unittest.TestCase):
         buffer = self.allocator.allocate_buffer_copy(
             memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
             allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            device=self.device,
             buffer=ary,
         )
         # NOTE: the exact bits set on type/usage/etc is implementation defined.
@@ -170,6 +171,7 @@ class DeviceHalTest(unittest.TestCase):
         buffer = self.allocator.allocate_buffer_copy(
             memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
             allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            device=self.device,
             buffer=ary,
             element_type=iree.runtime.HalElementType.SINT_32,
         )
@@ -180,7 +182,9 @@ class DeviceHalTest(unittest.TestCase):
         )
 
     def testAllocateHostStagingBufferCopy(self):
-        buffer = self.allocator.allocate_host_staging_buffer_copy(np.int32(0))
+        buffer = self.allocator.allocate_host_staging_buffer_copy(
+            self.device, np.int32(0)
+        )
         # NOTE: the exact bits set on type/usage/etc is implementation defined.
         self.assertEqual(
             repr(buffer),

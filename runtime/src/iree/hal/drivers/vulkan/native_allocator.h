@@ -21,7 +21,7 @@ iree_status_t iree_hal_vulkan_native_allocator_create(
     const iree_hal_vulkan_device_options_t* options, VkInstance instance,
     VkPhysicalDevice physical_device,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    iree_hal_device_t* device, iree_hal_allocator_t** out_allocator);
+    iree_hal_allocator_t** out_allocator);
 
 #ifdef __cplusplus
 }  // extern "C"
