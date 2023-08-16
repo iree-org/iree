@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/IR/CasResources.h"
+#include "iree/compiler/Dialect/Util/IR/CASResources.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
@@ -802,58 +802,58 @@ struct SerializableStringAttrModel
 };
 
 //===----------------------------------------------------------------------===//
-// CasScope
+// CASScope
 //===----------------------------------------------------------------------===//
 
 namespace {
-int64_t getUniqueCasScopeIndex() {
+int64_t getUniqueCASScopeIndex() {
   static std::atomic<int64_t> index;
   return index.fetch_add(1);
 }
 } // namespace
 
-CasScopeAttr CasScopeAttr::get(MLIRContext *context) {
-  return Base::get(context, getUniqueCasScopeIndex());
+CASScopeAttr CASScopeAttr::get(MLIRContext *context) {
+  return Base::get(context, getUniqueCASScopeIndex());
 }
 
-Attribute CasScopeAttr::parse(AsmParser &parser, Type type) {
-  return CasScopeAttr::get(parser.getContext());
+Attribute CASScopeAttr::parse(AsmParser &parser, Type type) {
+  return CASScopeAttr::get(parser.getContext());
 }
 
-void CasScopeAttr::print(AsmPrinter &p) const {}
+void CASScopeAttr::print(AsmPrinter &p) const {}
 
-CasScopeAttr CasScopeAttr::findOrCreateRootScope(Operation *op) {
+CASScopeAttr CASScopeAttr::findOrCreateRootScope(Operation *op) {
   Operation *lastOp = op;
   while (op) {
     lastOp = op;
-    auto scope = op->getAttrOfType<CasScopeAttr>("util.cas-scope");
+    auto scope = op->getAttrOfType<CASScopeAttr>("util.cas-scope");
     if (scope)
       return scope;
     op = op->getParentOp();
   }
 
   // Not found.
-  auto newScope = CasScopeAttr::get(lastOp->getContext());
+  auto newScope = CASScopeAttr::get(lastOp->getContext());
   lastOp->setAttr("util.cas-scope", newScope);
   return newScope;
 }
 
 //===----------------------------------------------------------------------===//
-// CasElementsAttr
+// CASElementsAttr
 //===----------------------------------------------------------------------===//
 
-CasElementsAttr CasElementsAttr::get(ShapedType type,
-                                     UtilDialect::CasResourceHandle handle) {
+CASElementsAttr CASElementsAttr::get(ShapedType type,
+                                     UtilDialect::CASResourceHandle handle) {
   return Base::get(type.getContext(), type, handle);
 }
 
-Attribute CasElementsAttr::parse(AsmParser &parser, Type type) {
+Attribute CASElementsAttr::parse(AsmParser &parser, Type type) {
   if (parser.parseLess())
     return nullptr;
 
   // Parse the resource handle.
-  FailureOr<UtilDialect::CasResourceHandle> maybeHandle =
-      parser.parseResourceHandle<UtilDialect::CasResourceHandle>();
+  FailureOr<UtilDialect::CASResourceHandle> maybeHandle =
+      parser.parseResourceHandle<UtilDialect::CASResourceHandle>();
   if (failed(maybeHandle) || parser.parseGreater())
     return nullptr;
 
@@ -870,24 +870,24 @@ Attribute CasElementsAttr::parse(AsmParser &parser, Type type) {
            nullptr;
   }
 
-  return CasElementsAttr::get(shapedType, *maybeHandle);
+  return CASElementsAttr::get(shapedType, *maybeHandle);
 }
 
-void CasElementsAttr::print(AsmPrinter &p) const {
+void CASElementsAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
   p.printResourceHandle(getHandle());
   os << ">";
 }
 
-bool CasElementsAttr::isResourceValid() {
+bool CASElementsAttr::isResourceValid() {
   auto *resource = getHandle().getResource();
   if (!resource)
     return false;
   auto *blob = resource->getBlob();
   if (!blob)
     return false;
-  CasResourceReader reader(blob->getData());
+  CASResourceReader reader(blob->getData());
   return reader.isValid() && !reader.isDead();
 }
 

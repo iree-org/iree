@@ -109,15 +109,15 @@ def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
 // Resources
 //===----------------------------------------------------------------------===//
 
-def Util_CasScope : AttrDef<Util_Dialect, "CasScope"> {
-  let mnemonic = "cas-scope";
+def Util_CASScope : AttrDef<Util_Dialect, "CASScope"> {
+  let mnemonic = "cas_scope";
   let summary = "A unique scope delimitter for bindings CAS resources";
   let description = [{
     CAS resources can be globally (context bound) or locally (sub-tree)
     bound. Locally scoped resources are eligible for various lifetime
     policies, liveness analysis, etc, and they can be turned into tombstones
     if it is deemed valid to do so (releasing the memory they hold while 
-    keeping them in index so an to not produce dangling pointers).
+    keeping them in index so as to not produce dangling pointers).
 
     A scope is demarcated by a #util.cas-scope attribute, which internally
     keeps a process unique number for each unique attribute created (either
@@ -143,13 +143,13 @@ def Util_CasScope : AttrDef<Util_Dialect, "CasScope"> {
     // Looks for a `util.cas-scope = #util.cas-scope` attribute at each level
     // of the hierarchy, starting with `op`, returning the first found. If none
     // is found, then create one and attach it to the outermost operation.
-    static CasScopeAttr findOrCreateRootScope(Operation *op);
+    static CASScopeAttr findOrCreateRootScope(Operation *op);
   }];
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1;
 }
 
-def Util_CasElementsAttr : AttrDef<Util_Dialect, "CasElements", [
+def Util_CASElementsAttr : AttrDef<Util_Dialect, "CASElements", [
     ElementsAttrInterface
 ]> {
   let mnemonic = "elements";
@@ -161,7 +161,7 @@ def Util_CasElementsAttr : AttrDef<Util_Dialect, "CasElements", [
       directly without translation.
     * Is backed by blob resources managed out-of-line with the IR as dialect
       resources.
-    * Interops with the `CasManagerDialectInterface` to provide local/global
+    * Interops with the `CASManagerDialectInterface` to provide local/global
       scoping to managed data, which enables policies of GC'ing the backing
       data as constraints allow during compilation.
     * Is intended to be an efficient option within the compiler for producing
@@ -172,11 +172,11 @@ def Util_CasElementsAttr : AttrDef<Util_Dialect, "CasElements", [
   }];
   let parameters = (ins
     AttributeSelfTypeParameter<"", "ShapedType">:$type,
-    ResourceHandleParameter<"UtilDialect::CasResourceHandle">:$handle
+    ResourceHandleParameter<"UtilDialect::CASResourceHandle">:$handle
   );
   let builders = [
     AttrBuilderWithInferredContext<(ins
-      "ShapedType":$type, "UtilDialect::CasResourceHandle":$handle
+      "ShapedType":$type, "UtilDialect::CASResourceHandle":$handle
     )>,
   ];
   let extraClassDeclaration = [{

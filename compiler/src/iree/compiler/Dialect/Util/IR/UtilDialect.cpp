@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 
-#include "iree/compiler/Dialect/Util/IR/CasResources.h"
+#include "iree/compiler/Dialect/Util/IR/CASResources.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SmallVector.h"
@@ -38,15 +38,15 @@ namespace {
 
 struct UtilBytecodeDialectInterface : public BytecodeDialectInterface {
   enum class AttributeCode : uint64_t {
-    CasElements = 0,
+    CASElements = 0,
   };
   UtilBytecodeDialectInterface(Dialect *dialect)
       : BytecodeDialectInterface(dialect) {}
 
   LogicalResult writeAttribute(Attribute baseAttr,
                                DialectBytecodeWriter &writer) const override {
-    if (auto attr = llvm::dyn_cast<CasElementsAttr>(baseAttr)) {
-      writer.writeVarInt(static_cast<uint64_t>(AttributeCode::CasElements));
+    if (auto attr = llvm::dyn_cast<CASElementsAttr>(baseAttr)) {
+      writer.writeVarInt(static_cast<uint64_t>(AttributeCode::CASElements));
       writer.writeType(attr.getType());
       writer.writeResourceHandle(attr.getHandle());
       return success();
@@ -60,15 +60,15 @@ struct UtilBytecodeDialectInterface : public BytecodeDialectInterface {
     if (failed(reader.readVarInt(codeValue)))
       return {};
     switch (static_cast<AttributeCode>(codeValue)) {
-    case AttributeCode::CasElements: {
+    case AttributeCode::CASElements: {
       ShapedType t;
-      FailureOr<UtilDialect::CasResourceHandle> handle;
+      FailureOr<UtilDialect::CASResourceHandle> handle;
       if (failed(reader.readType<ShapedType>(t)))
         return {};
-      handle = reader.readResourceHandle<UtilDialect::CasResourceHandle>();
+      handle = reader.readResourceHandle<UtilDialect::CASResourceHandle>();
       if (failed(handle))
         return {};
-      return CasElementsAttr::get(t, std::move(*handle));
+      return CASElementsAttr::get(t, std::move(*handle));
       break;
     }
     }
@@ -107,7 +107,7 @@ struct UtilOpAsmInterface : public OpAsmDialectInterface {
 
   std::string
   getResourceKey(const AsmDialectResourceHandle &handle) const override {
-    return cast<UtilDialect::CasResourceHandle>(handle).getKey().str();
+    return cast<UtilDialect::CASResourceHandle>(handle).getKey().str();
   }
 
   FailureOr<AsmDialectResourceHandle>
@@ -189,7 +189,7 @@ UtilDialect::UtilDialect(MLIRContext *context)
   auto &blobInterface = addInterface<BlobManagerInterface>();
   addInterface<UtilOpAsmInterface>(blobInterface);
   addInterface<UtilBytecodeDialectInterface>();
-  addInterface<CasManagerDialectInterface>(blobInterface);
+  addInterface<CASManagerDialectInterface>(blobInterface);
   addInterfaces<UtilInlinerInterface>();
   registerAttributes();
   registerTypes();

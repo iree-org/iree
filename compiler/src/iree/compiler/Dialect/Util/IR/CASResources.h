@@ -21,39 +21,39 @@
 
 namespace mlir::iree_compiler::IREE::Util {
 
-// A PopulatedCasResource holds a live reference to a backing CasResourceHandle
+// A PopulatedCASResource holds a live reference to a backing CASResourceHandle
 // that has been globally registered in the dialect's blob manager.
 // While the lifetime of the registration is context-scoped, the
-// lifetime of the contents are bounded by PopulatedCasResource instances,
+// lifetime of the contents are bounded by PopulatedCASResource instances,
 // which have shared_ptr semantics.
-// When the CasResource is destructed, a tombstone blob will replace
+// When the CASResource is destructed, a tombstone blob will replace
 // the existing data, freeing up storage.
-class PopulatedCasResource
-    : public std::enable_shared_from_this<PopulatedCasResource> {
+class PopulatedCASResource
+    : public std::enable_shared_from_this<PopulatedCASResource> {
 public:
-  using Reference = std::shared_ptr<PopulatedCasResource>;
+  using Reference = std::shared_ptr<PopulatedCASResource>;
 
-  PopulatedCasResource(UtilDialect::CasResourceHandle globalResource)
+  PopulatedCASResource(UtilDialect::CASResourceHandle globalResource)
       : globalResource(globalResource) {}
-  ~PopulatedCasResource();
+  ~PopulatedCASResource();
   void detach() { globalResource.reset(); }
 
   Reference ref() { return shared_from_this(); }
 
-  UtilDialect::CasResourceHandle getGlobalResource() { return *globalResource; }
+  UtilDialect::CASResourceHandle getGlobalResource() { return *globalResource; }
   AsmResourceBlob *getBlob() { return globalResource->getBlob(); }
 
 private:
   // The backing resource, owned by the dialect and with context
   // scoped lifetime.
-  std::optional<UtilDialect::CasResourceHandle> globalResource;
+  std::optional<UtilDialect::CASResourceHandle> globalResource;
 };
 
 // CAS resource blobs have a trailer which follows the blob data
 // and is always of a fixed size. By making this a trailer, we don't
 // disrupt the native alignment of the main data and merely have to
 // memcpy this record to access it in an aligned way.
-struct CasResourceTrailer {
+struct CASResourceTrailer {
   // Stable hash code computed relative to the version. This hash
   // code is stable run-to-run and safe for serialization. It is
   // not guaranteed unique and is used as a bucket identifier, not
@@ -71,14 +71,14 @@ struct CasResourceTrailer {
   // Always 0.
   uint64_t bomZero : 1;
 };
-static_assert(sizeof(CasResourceTrailer) == 2 * sizeof(uint64_t));
+static_assert(sizeof(CASResourceTrailer) == 2 * sizeof(uint64_t));
 
 // Given raw cas data, manages read access to it.
-class CasResourceReader {
+class CASResourceReader {
 public:
-  CasResourceReader(ArrayRef<char> data);
+  CASResourceReader(ArrayRef<char> data);
   bool isValid() { return valid; }
-  const CasResourceTrailer &getTrailer() { return trailerCopy; }
+  const CASResourceTrailer &getTrailer() { return trailerCopy; }
   ArrayRef<char> getData() { return userData; }
   bool isDead() { return trailerCopy.dead; }
   uint64_t getHashCode() { return trailerCopy.hashCode; }
@@ -86,24 +86,24 @@ public:
 
 private:
   ArrayRef<char> fullData;
-  CasResourceTrailer trailerCopy;
+  CASResourceTrailer trailerCopy;
   ArrayRef<char> userData;
   bool valid = false;
 };
 
 // Builds a cas resource of a size known in advance.
-class CasResourceBuilder {
+class CASResourceBuilder {
 public:
-  ~CasResourceBuilder();
-  CasResourceBuilder(CasResourceBuilder &&other)
+  ~CASResourceBuilder();
+  CASResourceBuilder(CASResourceBuilder &&other)
       : fullData(other.fullData), alignment(other.alignment),
         deleter(std::move(other.deleter)), finalized(other.finalized) {}
-  static CasResourceBuilder allocateHeap(size_t dataSize);
+  static CASResourceBuilder allocateHeap(size_t dataSize);
   static AsmResourceBlob getTombstoneBlob();
 
   MutableArrayRef<char> getData() {
     return MutableArrayRef<char>(fullData.data(),
-                                 fullData.size() - sizeof(CasResourceTrailer));
+                                 fullData.size() - sizeof(CASResourceTrailer));
   }
 
   // Access the data as a type. If the type does not evenly divide the
@@ -115,12 +115,12 @@ public:
   }
 
 private:
-  CasResourceBuilder(MutableArrayRef<char> fullData, size_t alignment,
+  CASResourceBuilder(MutableArrayRef<char> fullData, size_t alignment,
                      AsmResourceBlob::DeleterFn deleter)
       : fullData(fullData), alignment(alignment), deleter(std::move(deleter)) {}
 
   // Finalizes after all mutations have been performed.
-  CasResourceReader finalize();
+  CASResourceReader finalize();
 
   // When done building, finalize and return the AsmResourceBlob.
   // This ends the life-cycle of the builder and it cannot be
@@ -131,50 +131,50 @@ private:
   size_t alignment;
   AsmResourceBlob::DeleterFn deleter;
   bool finalized = false;
-  friend class CasManagerDialectInterface;
+  friend class CASManagerDialectInterface;
 };
 
 // Dialect interface implemented by the UtilDialect which mediates
 // access to blob resources managed in a content-addressable database.
-class CasManagerDialectInterface
-    : public DialectInterface::Base<CasManagerDialectInterface> {
+class CASManagerDialectInterface
+    : public DialectInterface::Base<CASManagerDialectInterface> {
 public:
-  CasManagerDialectInterface(Dialect *dialect,
+  CASManagerDialectInterface(Dialect *dialect,
                              UtilDialect::BlobManagerInterface &blobManager);
-  ~CasManagerDialectInterface();
+  ~CASManagerDialectInterface();
 
   // Gets the interface from the context.
-  static CasManagerDialectInterface &get(MLIRContext *context);
+  static CASManagerDialectInterface &get(MLIRContext *context);
 
   // Interns a resource from a builder that has been populated.
   // The resource is added to the global scope.
-  PopulatedCasResource::Reference
-  internGlobalResource(CasResourceBuilder builder);
+  PopulatedCASResource::Reference
+  internGlobalResource(CASResourceBuilder builder);
 
   // Interns a local resource, accounted to the given scope.
-  PopulatedCasResource::Reference
-  internLocalResource(CasResourceBuilder builder, CasScopeAttr scopeAttr);
+  PopulatedCASResource::Reference
+  internLocalResource(CASResourceBuilder builder, CASScopeAttr scopeAttr);
 
   // Interns a local resource, accounted to a scope that is defined by
-  // CasScopeAttr::findOrCreateRootScope against the given operation.
-  PopulatedCasResource::Reference
-  internLocalResource(CasResourceBuilder builder,
+  // CASScopeAttr::findOrCreateRootScope against the given operation.
+  PopulatedCASResource::Reference
+  internLocalResource(CASResourceBuilder builder,
                       Operation *findOrCreateScopeFor);
 
   // Invalidates all resources associated to a scope.
   // TODO: Have an exclusion set to enable partial GC.
-  void invalidateScope(CasScopeAttr scopeAttr);
+  void invalidateScope(CASScopeAttr scopeAttr);
 
 private:
   // A bucket contains all populated resources with a given hash key.
-  using Bucket = llvm::SmallVector<PopulatedCasResource::Reference>;
+  using Bucket = llvm::SmallVector<PopulatedCASResource::Reference>;
   struct Scope {
     llvm::DenseMap<uint64_t, Bucket> populatedResources;
 
     void detach();
   };
 
-  PopulatedCasResource::Reference internResource(CasResourceBuilder builder,
+  PopulatedCASResource::Reference internResource(CASResourceBuilder builder,
                                                  Scope &scope);
 
   UtilDialect::BlobManagerInterface &blobManager;
@@ -182,8 +182,8 @@ private:
   // A scope that is bounded by the context (effectively forever).
   // TODO: Protect these with RW locks.
   Scope globalScope;
-  // Local scopes are defined against CasScopeAttr instances.
-  llvm::DenseMap<CasScopeAttr, Scope> localScopes;
+  // Local scopes are defined against CASScopeAttr instances.
+  llvm::DenseMap<CASScopeAttr, Scope> localScopes;
 };
 
 } // namespace mlir::iree_compiler::IREE::Util

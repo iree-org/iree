@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/IR/CasResources.h"
+#include "iree/compiler/Dialect/Util/IR/CASResources.h"
 
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringExtras.h"
@@ -21,31 +21,31 @@ namespace mlir::iree_compiler::IREE::Util {
 static const uint64_t CURRENT_VERSION = 1;
 
 //===----------------------------------------------------------------------===//
-// PopulatedCasResource
+// PopulatedCASResource
 //===----------------------------------------------------------------------===//
 
-PopulatedCasResource::~PopulatedCasResource() {
+PopulatedCASResource::~PopulatedCASResource() {
   if (globalResource) {
     StringRef key = globalResource->getKey();
     LLVM_DEBUG(dbgs() << "[iree-cas-resource] Converting out of scope cas "
                          "resource to tombstone: "
                       << key << "\n");
     globalResource->getResource()->setBlob(
-        CasResourceBuilder::getTombstoneBlob());
+        CASResourceBuilder::getTombstoneBlob());
   }
 }
 
 //===----------------------------------------------------------------------===//
-// CasResourceReader
+// CASResourceReader
 //===----------------------------------------------------------------------===//
 
-CasResourceReader::CasResourceReader(ArrayRef<char> data) : fullData(data) {
-  if (fullData.size() < sizeof(CasResourceTrailer)) {
+CASResourceReader::CASResourceReader(ArrayRef<char> data) : fullData(data) {
+  if (fullData.size() < sizeof(CASResourceTrailer)) {
     valid = false;
   } else {
-    size_t userDataSize = fullData.size() - sizeof(CasResourceTrailer);
+    size_t userDataSize = fullData.size() - sizeof(CASResourceTrailer);
     std::memcpy(&trailerCopy, &fullData[userDataSize],
-                sizeof(CasResourceTrailer));
+                sizeof(CASResourceTrailer));
     userData = ArrayRef<char>(&fullData[0], userDataSize);
     if (trailerCopy.version != CURRENT_VERSION || trailerCopy.bomOne != 1 ||
         trailerCopy.bomZero != 0) {
@@ -56,19 +56,19 @@ CasResourceReader::CasResourceReader(ArrayRef<char> data) : fullData(data) {
   }
 }
 
-std::string CasResourceReader::getEncodedHashCode() {
+std::string CASResourceReader::getEncodedHashCode() {
   auto hashCode = getHashCode();
   return llvm::toHex(
       StringRef(reinterpret_cast<const char *>(&hashCode), sizeof(hashCode)));
 }
 
 //===----------------------------------------------------------------------===//
-// CasResourceBuilder
+// CASResourceBuilder
 //===----------------------------------------------------------------------===//
 
-CasResourceBuilder CasResourceBuilder::allocateHeap(size_t dataSize) {
-  size_t fullSize = dataSize + sizeof(CasResourceTrailer);
-  return CasResourceBuilder(
+CASResourceBuilder CASResourceBuilder::allocateHeap(size_t dataSize) {
+  size_t fullSize = dataSize + sizeof(CASResourceTrailer);
+  return CASResourceBuilder(
       MutableArrayRef<char>(static_cast<char *>(malloc(fullSize)), fullSize),
       /*alignment=*/sizeof(double),
       /*deleter=*/[](void *data, size_t size, size_t align) {
@@ -79,9 +79,9 @@ CasResourceBuilder CasResourceBuilder::allocateHeap(size_t dataSize) {
       });
 }
 
-AsmResourceBlob CasResourceBuilder::getTombstoneBlob() {
-  static CasResourceTrailer tombstoneTrailer = ([]() {
-    CasResourceTrailer t;
+AsmResourceBlob CASResourceBuilder::getTombstoneBlob() {
+  static CASResourceTrailer tombstoneTrailer = ([]() {
+    CASResourceTrailer t;
     std::memset(&t, 0, sizeof(t));
     t.bomOne = 1;
     t.bomZero = 0;
@@ -95,15 +95,15 @@ AsmResourceBlob CasResourceBuilder::getTombstoneBlob() {
       /*align=*/sizeof(uint64_t));
 }
 
-CasResourceBuilder::~CasResourceBuilder() {
+CASResourceBuilder::~CASResourceBuilder() {
   if (deleter) {
     deleter((void *)fullData.data(), fullData.size(), alignment);
   }
 }
 
-CasResourceReader CasResourceBuilder::finalize() {
+CASResourceReader CASResourceBuilder::finalize() {
   if (!finalized) {
-    CasResourceTrailer trailer;
+    CASResourceTrailer trailer;
     trailer.bomOne = 1;
     trailer.dead = 0;
     trailer.version = CURRENT_VERSION;
@@ -117,10 +117,10 @@ CasResourceReader CasResourceBuilder::finalize() {
                 (const void *)&trailer, sizeof(trailer));
     finalized = true;
   }
-  return CasResourceReader(fullData);
+  return CASResourceReader(fullData);
 }
 
-AsmResourceBlob CasResourceBuilder::createBlob() {
+AsmResourceBlob CASResourceBuilder::createBlob() {
   finalize();
   // Transfer ownership.
   return AsmResourceBlob(fullData, alignment, std::move(deleter),
@@ -128,13 +128,13 @@ AsmResourceBlob CasResourceBuilder::createBlob() {
 }
 
 //===----------------------------------------------------------------------===//
-// CasManagerDialectInterface
+// CASManagerDialectInterface
 //===----------------------------------------------------------------------===//
 
-CasManagerDialectInterface::CasManagerDialectInterface(
+CASManagerDialectInterface::CASManagerDialectInterface(
     Dialect *dialect, UtilDialect::BlobManagerInterface &blobManager)
     : Base(dialect), blobManager(blobManager) {}
-CasManagerDialectInterface::~CasManagerDialectInterface() {
+CASManagerDialectInterface::~CASManagerDialectInterface() {
   // Because this interface may be destroyed after the the blob manager
   // is torn down, we need to go through and detach anything we were
   // tracking so that it doesn't go through the normal tombstone swap
@@ -145,35 +145,35 @@ CasManagerDialectInterface::~CasManagerDialectInterface() {
   }
 }
 
-void CasManagerDialectInterface::Scope::detach() {
+void CASManagerDialectInterface::Scope::detach() {
   LLVM_DEBUG(dbgs() << "[iree-cas-resource] Detaching resources at context "
                        "destroy from scope "
                     << static_cast<void *>(this) << "\n");
   for (auto it : populatedResources) {
     Bucket &bucket = it.second;
-    for (PopulatedCasResource::Reference &ref : bucket) {
+    for (PopulatedCASResource::Reference &ref : bucket) {
       ref->detach();
     }
   }
 }
 
-CasManagerDialectInterface &
-CasManagerDialectInterface::get(MLIRContext *context) {
+CASManagerDialectInterface &
+CASManagerDialectInterface::get(MLIRContext *context) {
   auto *iface =
       context->getOrLoadDialect<UtilDialect>()
-          ->template getRegisteredInterface<CasManagerDialectInterface>();
-  assert(iface && "util dialect does not register CasManagerDialectInterface");
+          ->template getRegisteredInterface<CASManagerDialectInterface>();
+  assert(iface && "util dialect does not register CASManagerDialectInterface");
   return *iface;
 }
 
-PopulatedCasResource::Reference
-CasManagerDialectInterface::internGlobalResource(CasResourceBuilder builder) {
+PopulatedCASResource::Reference
+CASManagerDialectInterface::internGlobalResource(CASResourceBuilder builder) {
   return internResource(std::move(builder), globalScope);
 }
 
-PopulatedCasResource::Reference
-CasManagerDialectInterface::internLocalResource(CasResourceBuilder builder,
-                                                CasScopeAttr scopeAttr) {
+PopulatedCASResource::Reference
+CASManagerDialectInterface::internLocalResource(CASResourceBuilder builder,
+                                                CASScopeAttr scopeAttr) {
   Scope &scope = localScopes[scopeAttr];
   // TODO: Really should be searching the global scope too before falling
   // back to creating.
@@ -181,27 +181,27 @@ CasManagerDialectInterface::internLocalResource(CasResourceBuilder builder,
 }
 
 // Interns a local resource, accounted to a scope that is defined by
-// CasScopeAttr::findOrCreateRootScope against the given operation.
-PopulatedCasResource::Reference CasManagerDialectInterface::internLocalResource(
-    CasResourceBuilder builder, Operation *findOrCreateScopeFor) {
-  CasScopeAttr scope =
-      CasScopeAttr::findOrCreateRootScope(findOrCreateScopeFor);
+// CASScopeAttr::findOrCreateRootScope against the given operation.
+PopulatedCASResource::Reference CASManagerDialectInterface::internLocalResource(
+    CASResourceBuilder builder, Operation *findOrCreateScopeFor) {
+  CASScopeAttr scope =
+      CASScopeAttr::findOrCreateRootScope(findOrCreateScopeFor);
   return internLocalResource(std::move(builder), scope);
 }
 
-PopulatedCasResource::Reference
-CasManagerDialectInterface::internResource(CasResourceBuilder builder,
+PopulatedCASResource::Reference
+CASManagerDialectInterface::internResource(CASResourceBuilder builder,
                                            Scope &scope) {
-  CasResourceReader reader = builder.finalize();
+  CASResourceReader reader = builder.finalize();
   assert(reader.isValid() && !reader.isDead() && "encoded blob is not valid");
   uint64_t hashCode = reader.getHashCode();
   auto foundIt = scope.populatedResources.find(hashCode);
   if (foundIt != scope.populatedResources.end()) {
     // Scan the bucket for an actual match.
     Bucket &bucket = foundIt->second;
-    for (PopulatedCasResource::Reference &match : bucket) {
+    for (PopulatedCASResource::Reference &match : bucket) {
       assert(match->getBlob() && "blob is nullptr");
-      CasResourceReader matchReader(match->getBlob()->getData());
+      CASResourceReader matchReader(match->getBlob()->getData());
       assert(matchReader.isValid() && !matchReader.isDead() &&
              "cas resource bucket contains invalid or dead blob");
       // Trivially reject on size mismatch.
@@ -224,15 +224,15 @@ CasManagerDialectInterface::internResource(CasResourceBuilder builder,
                     << hashCode << "\n");
   std::string encodedHash = reader.getEncodedHashCode();
   AsmResourceBlob createdBlob = builder.createBlob();
-  UtilDialect::CasResourceHandle globalHandle =
+  UtilDialect::CASResourceHandle globalHandle =
       blobManager.insert(encodedHash, std::move(createdBlob));
-  PopulatedCasResource::Reference createdRef =
-      std::make_shared<PopulatedCasResource>(std::move(globalHandle));
+  PopulatedCASResource::Reference createdRef =
+      std::make_shared<PopulatedCASResource>(std::move(globalHandle));
   scope.populatedResources[hashCode].push_back(createdRef);
   return createdRef;
 }
 
-void CasManagerDialectInterface::invalidateScope(CasScopeAttr scopeAttr) {
+void CASManagerDialectInterface::invalidateScope(CASScopeAttr scopeAttr) {
   LLVM_DEBUG(dbgs() << "[iree-cas-resource] Invalidate local scope "
                     << scopeAttr.getUniqueIndex() << "\n");
   localScopes.erase(scopeAttr);

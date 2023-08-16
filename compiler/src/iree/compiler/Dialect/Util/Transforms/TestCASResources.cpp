@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/IR/CasResources.h"
+#include "iree/compiler/Dialect/Util/IR/CASResources.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
@@ -18,37 +18,37 @@ namespace Util {
 
 namespace {
 
-class TestCasResourcesPass : public TestCasResourcesBase<TestCasResourcesPass> {
+class TestCASResourcesPass : public TestCASResourcesBase<TestCASResourcesPass> {
 public:
-  TestCasResourcesPass() = default;
-  TestCasResourcesPass(const TestCasResourcesPass &) = default;
+  TestCASResourcesPass() = default;
+  TestCASResourcesPass(const TestCASResourcesPass &) = default;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
   }
 
-  GlobalOp addGlobalI32x4(CasScopeAttr scopeAttr, StringRef name, int32_t a,
+  GlobalOp addGlobalI32x4(CASScopeAttr scopeAttr, StringRef name, int32_t a,
                           int32_t b, int32_t c, int32_t d) {
     MLIRContext *context = &getContext();
     auto *moduleOp = getOperation();
     Location loc = moduleOp->getLoc();
     OpBuilder builder = OpBuilder::atBlockEnd(&moduleOp->getRegion(0).front());
     auto st = RankedTensorType::get({2, 2}, builder.getIntegerType(32));
-    auto casb = CasResourceBuilder::allocateHeap(16);
+    auto casb = CASResourceBuilder::allocateHeap(16);
     auto data = casb.getTypedData<int32_t>();
     data[0] = a;
     data[1] = b;
     data[2] = c;
     data[3] = d;
 
-    CasManagerDialectInterface &casManager =
-        CasManagerDialectInterface::get(context);
-    PopulatedCasResource::Reference ref;
+    CASManagerDialectInterface &casManager =
+        CASManagerDialectInterface::get(context);
+    PopulatedCASResource::Reference ref;
     if (scopeAttr) {
       ref = casManager.internLocalResource(std::move(casb), scopeAttr);
     } else {
       ref = casManager.internGlobalResource(std::move(casb));
     }
-    auto value = CasElementsAttr::get(st, ref->getGlobalResource());
+    auto value = CASElementsAttr::get(st, ref->getGlobalResource());
     GlobalOp global = builder.create<GlobalOp>(loc, name, false, st, value);
     return global;
   }
@@ -78,7 +78,7 @@ public:
   }
 
   void testInternLocalScope() {
-    auto scopeAttr = CasScopeAttr::findOrCreateRootScope(getOperation());
+    auto scopeAttr = CASScopeAttr::findOrCreateRootScope(getOperation());
     llvm::SmallVector<GlobalOp> ops = {
         addGlobalI32x4(scopeAttr, "test0", 1, 2, 3, 4),
         addGlobalI32x4(scopeAttr, "test1", 4, 3, 2, 1),
@@ -89,14 +89,14 @@ public:
   }
 
   void internLocalInvalidate() {
-    auto scopeAttr = CasScopeAttr::findOrCreateRootScope(getOperation());
+    auto scopeAttr = CASScopeAttr::findOrCreateRootScope(getOperation());
     llvm::SmallVector<GlobalOp> ops = {
         addGlobalI32x4(scopeAttr, "test0", 1, 2, 3, 4),
         addGlobalI32x4(scopeAttr, "test1", 4, 3, 2, 1),
         addGlobalI32x4(nullptr, "test2", 4, 3, 2, 1), // global
         addGlobalI32x4(scopeAttr, "test3", 1, 2, 3, 4),
     };
-    CasManagerDialectInterface::get(&getContext()).invalidateScope(scopeAttr);
+    CASManagerDialectInterface::get(&getContext()).invalidateScope(scopeAttr);
     markDeadGlobalResources(ops);
   }
 
@@ -104,7 +104,7 @@ public:
     // Now go annotate an iree.aliases attribute on each where we note
     // indices that the storage key aliases.
     auto getKey = [](GlobalOp globalOp) -> StringRef {
-      auto attr = llvm::cast<CasElementsAttr>(*globalOp.getInitialValue());
+      auto attr = llvm::cast<CASElementsAttr>(*globalOp.getInitialValue());
       return attr.getHandle().getKey();
     };
     for (auto outerOp : ops) {
@@ -124,7 +124,7 @@ public:
 
   void markDeadGlobalResources(llvm::SmallVectorImpl<GlobalOp> &ops) {
     for (auto op : ops) {
-      auto attr = llvm::cast<CasElementsAttr>(*op.getInitialValue());
+      auto attr = llvm::cast<CASElementsAttr>(*op.getInitialValue());
       if (attr.isResourceValid()) {
         op->setAttr("iree.resource-live", UnitAttr::get(&getContext()));
       } else {
@@ -136,8 +136,8 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<void>> createTestCasResourcesPass() {
-  return std::make_unique<TestCasResourcesPass>();
+std::unique_ptr<OperationPass<void>> createTestCASResourcesPass() {
+  return std::make_unique<TestCASResourcesPass>();
 }
 
 } // namespace Util

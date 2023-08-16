@@ -20,9 +20,9 @@ class UtilDialect : public Dialect {
 public:
   // The dialect manages its blob resources with a content-addressable storage
   // scheme.
-  using CasResourceHandle = DialectResourceBlobHandle<UtilDialect>;
+  using CASResourceHandle = DialectResourceBlobHandle<UtilDialect>;
   using BlobManagerInterface =
-      ResourceBlobManagerDialectInterfaceBase<CasResourceHandle>;
+      ResourceBlobManagerDialectInterfaceBase<CASResourceHandle>;
 
   explicit UtilDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "util"; }

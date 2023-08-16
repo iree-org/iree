@@ -34,8 +34,8 @@ iree_compiler_cc_library(
         "SimplifyGlobalAccesses.cpp",
         "StripAndSplatConstants.cpp",
         "StripDebugOps.cpp",
-        "TestCasResources.cpp",
         "TestConversion.cpp",
+        "TestCASResources.cpp",
         "TestFloatRangeAnalysis.cpp",
     ],
     hdrs = [
