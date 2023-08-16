@@ -340,7 +340,7 @@ def PolynomialApproximationPass :
 
 def RematerializeParallelOps :
     Pass<"iree-codegen-rematerialize-parallel-ops", "func::FuncOp"> {
-  let summary = "Pass to rematerialize and merge parallel ops on pre-formed dispatches.";
+  let summary = "Pass to rematerialize and merge parallel ops into consumers.";
   let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
 }
 
