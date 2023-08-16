@@ -222,6 +222,12 @@ static FailureOr<SmallVector<Value>> lowerUpperBoundTileSizeOpToConstants(
     results[innerDimsPos[i]] =
         rewriter.create<arith::ConstantIndexOp>(loc, tileSize);
   }
+  // For the dims that have no inner tiles, use 1 as tile size to avoid padding.
+  for (unsigned i = 0; i < results.size(); ++i) {
+    if (!results[i]) {
+      results[i] = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    }
+  }
   return results;
 }
 
