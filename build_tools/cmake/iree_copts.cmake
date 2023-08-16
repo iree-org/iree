@@ -205,9 +205,9 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # intrinsics (#14168).
     "-fno-lax-vector-conversions"
 
-  # TODO(#6959): Enable -Werror once we have a presubmit CI.
   GCC
     "-Wall"
+    "-Werror"
     "-Wno-address-of-packed-member"
     "-Wno-comment"
     "-Wno-format-zero-length"
