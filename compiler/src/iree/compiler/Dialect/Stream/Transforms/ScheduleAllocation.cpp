@@ -390,15 +390,22 @@ struct AllocationScope {
       llvm::dbgs() << "\n";
     });
 
-    // TODO(#5410): make alias propagation map through an indexing map for
-    // slices/updates. Right now we assume all aliases are 1:1 full maps.
+    // Propagate alias subranges when present.
     for (auto alias : valueAliases[resource]) {
-      resourceRangeMap.insert(std::make_pair(alias, resourceRange));
+      ResourceRange aliasRange = resourceRange;
+      if (auto subviewOp =
+              IREE::Stream::ResourceSubviewOp::findSubviewOp(alias)) {
+        aliasRange.resourceSize = subviewOp.getSubrangeResource();
+        aliasRange.resourceSize = subviewOp.getSubrangeResourceSize();
+        aliasRange.offset = subviewOp.getSubrangeOffset();
+        aliasRange.length = subviewOp.getSubrangeLength();
+      }
+      resourceRangeMap.insert(std::make_pair(alias, aliasRange));
       LLVM_DEBUG({
         llvm::dbgs() << "   = alias ";
         alias.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << " = ";
-        resourceRange.print(llvm::dbgs(), *asmState);
+        aliasRange.print(llvm::dbgs(), *asmState);
         llvm::dbgs() << "\n";
       });
     }
@@ -1238,6 +1245,63 @@ static Value findTiedYieldResult(Value seedValue) {
   return {};
 }
 
+// Returns a reversed list of subrange operations that lead from an initial
+// resource down a sequence to |derivedValue|. The first element in the list
+// will be the last subview of |derivedValue| and the last element will be the
+// first subview.
+static SmallVector<IREE::Util::SubrangeOperand>
+gatherSubranges(Value derivedValue) {
+  SmallVector<IREE::Util::SubrangeOperand> subrangeStack;
+  Value baseValue = derivedValue;
+  while (auto definingOp = dyn_cast_or_null<IREE::Util::TiedOpInterface>(
+             baseValue.getDefiningOp())) {
+    auto tiedValue = definingOp.getTiedResultOperand(baseValue);
+    if (!tiedValue)
+      break;
+    if (auto subrangeOp = dyn_cast<IREE::Util::SubrangeOpInterface>(
+            definingOp.getOperation())) {
+      if (subrangeOp.getSubrangeResource() == tiedValue) {
+        subrangeStack.push_back(IREE::Util::SubrangeOperand{
+            subrangeOp.getSubrangeResource(),
+            subrangeOp.getSubrangeResourceSize(),
+            subrangeOp.getSubrangeOffset(), subrangeOp.getSubrangeLength()});
+      }
+    }
+    baseValue = tiedValue;
+  }
+  return subrangeStack;
+}
+
+// Returns a resource range for |resultValue| mapping to the base resource.
+//
+// Example:
+//   %0 = resource
+//   %1 = subview %0[%a for %a_length]
+//   %2 = subview %0[%b for %b_length]
+//   return %3 <- result
+// -> range(%0[(%a + %b) for %b_length])
+static ResourceRange deriveResourceRangeFromResult(Value resultValue,
+                                                   Value resultSize,
+                                                   OpBuilder &builder) {
+  auto subranges = gatherSubranges(resultValue);
+  if (subranges.empty())
+    return ResourceRange(resultValue, resultSize);
+
+  // TODO(benvanik): switch to affine.apply when fully supported.
+  Value offset;
+  for (auto subrange : llvm::reverse(subranges)) {
+    if (offset) {
+      offset = builder.createOrFold<arith::AddIOp>(resultValue.getLoc(), offset,
+                                                   subrange.offset);
+    } else {
+      offset = subrange.offset;
+    }
+  }
+
+  return ResourceRange(subranges.back().resource, subranges.back().resourceSize,
+                       offset, resultSize);
+}
+
 // TODO(benvanik): find a way to split this up. We could probably do this in
 // several passes each time pulling out different resource types, however the
 // analysis we perform needs to see the original form and getting a shared
@@ -1398,8 +1462,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     if (tiedOperandIndex.has_value()) {
       // Already tied; no need to modify just map.
       auto tiedOperand = executeOp.getOperand(tiedOperandIndex.value());
-      auto arg = entryBlock.getArgument(tiedOperandIndex.value());
       LLVM_DEBUG({
+        auto arg = entryBlock.getArgument(tiedOperandIndex.value());
         AsmState asmState(executeOp->getParentOp());
         llvm::dbgs() << "  - tying operand ";
         tiedOperand.printAsOperand(llvm::dbgs(), asmState);
@@ -1408,10 +1472,35 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
         llvm::dbgs() << " = ";
         result.printAsOperand(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
+        auto subrangeStack = gatherSubranges(yieldValue);
+        if (!subrangeStack.empty()) {
+          llvm::dbgs() << "    -> subranges:\n";
+          for (auto subrange : llvm::reverse(subrangeStack)) {
+            llvm::dbgs() << "       ";
+            subrange.resource.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << "{";
+            subrange.resourceSize.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << "}[";
+            subrange.offset.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << " for ";
+            subrange.length.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << "]\n";
+          }
+        }
       });
-      scope.mapResourceRange(yieldValue, ResourceRange(arg, resultSize),
-                             asmState.get());
-      resultReplacements.push_back(std::make_pair(result, tiedOperand));
+      auto resourceRange = deriveResourceRangeFromResult(yieldValue, resultSize,
+                                                         externalBuilder);
+      scope.mapResourceRange(yieldValue, resourceRange, asmState.get());
+      if (resourceRange.offset) {
+        auto resultSubviewOp =
+            externalBuilder.create<IREE::Stream::ResourceSubviewOp>(
+                yieldValue.getLoc(), tiedOperand, resourceRange.resourceSize,
+                resourceRange.offset, resourceRange.length);
+        resultReplacements.push_back(
+            std::make_pair(result, resultSubviewOp.getResult()));
+      } else {
+        resultReplacements.push_back(std::make_pair(result, tiedOperand));
+      }
       continue;
     }
 
@@ -1552,6 +1641,14 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   for (auto replacement : resultReplacements) {
     if (!replacement.second)
       continue; // handled already
+    LLVM_DEBUG({
+      AsmState asmState(newExecuteOp->getParentOp());
+      llvm::dbgs() << "  == replacing region result ";
+      replacement.first.printAsOperand(llvm::dbgs(), asmState);
+      llvm::dbgs() << " -> ";
+      replacement.second.printAsOperand(llvm::dbgs(), asmState);
+      llvm::dbgs() << "\n";
+    });
     replacement.first.replaceAllUsesWith(replacement.second);
   }
   scope.replaceRootOp(newExecuteOp);
