@@ -358,9 +358,7 @@ static iree_status_t iree_hal_metal_device_queue_read(
   };
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list, source_file,
-      source_offset, target_buffer, target_offset, length, flags, iree_loop_inline(&loop_status),
-      chunk_count, chunk_size));
-  return loop_status;
+      source_offset, target_buffer, target_offset, length, flags, options));
 }
 
 static iree_status_t iree_hal_metal_device_queue_write(
@@ -378,8 +376,7 @@ static iree_status_t iree_hal_metal_device_queue_write(
   };
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list, source_buffer,
-      source_offset, target_file, target_offset, length, flags, iree_loop_inline(&loop_status),
-      chunk_count, chunk_size));
+      source_offset, target_file, target_offset, length, flags, options));
   return loop_status;
 }
 
