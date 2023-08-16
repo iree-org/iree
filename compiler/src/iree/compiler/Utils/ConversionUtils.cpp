@@ -53,7 +53,7 @@ LogicalResult verifyAllOperationsAreLegal(Operation *op,
 }
 
 Attribute convertAttribute(Location loc, Attribute oldAttr,
-                           TypeConverter &typeConverter) {
+                           const TypeConverter &typeConverter) {
   // Type attributes get their nested type converted.
   if (auto oldTypeAttr = llvm::dyn_cast<TypeAttr>(oldAttr)) {
     return TypeAttr::get(typeConverter.convertType(oldTypeAttr.getValue()));

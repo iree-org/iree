@@ -23,7 +23,7 @@ LogicalResult verifyAllOperationsAreLegal(Operation *op,
 
 // Returns |oldAttr| converted to its new type via |typeConverter|, if needed.
 Attribute convertAttribute(Location loc, Attribute oldAttr,
-                           TypeConverter &typeConverter);
+                           const TypeConverter &typeConverter);
 
 } // namespace iree_compiler
 } // namespace mlir
