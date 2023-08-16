@@ -839,7 +839,7 @@ CASScopeAttr CASScopeAttr::findOrCreateRootScope(Operation *op) {
 }
 
 //===----------------------------------------------------------------------===//
-// CASElementsAttr
+// #util.elements
 //===----------------------------------------------------------------------===//
 
 CASElementsAttr CASElementsAttr::get(ShapedType type,
@@ -880,31 +880,98 @@ void CASElementsAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-bool CASElementsAttr::isResourceValid() {
-  auto *resource = getHandle().getResource();
-  if (!resource)
-    return false;
-  auto *blob = resource->getBlob();
-  if (!blob)
-    return false;
+std::optional<CASResourceReader>
+CASElementsAttr::getResourceData(Location loc) const {
+  auto handle = getHandle();
+  auto *resource = handle.getResource();
+  if (!resource) {
+    emitError(loc) << "backing data for resource '" << handle.getKey()
+                   << "' is not defined";
+    return {};
+  }
+  AsmResourceBlob *blob = resource->getBlob();
+  if (!blob) {
+    emitError(loc) << "the resource '" << handle.getKey() << "' has no data";
+    return {};
+  }
   CASResourceReader reader(blob->getData());
-  return reader.isValid() && !reader.isDead();
+  if (!reader.isValid()) {
+    emitError(loc) << "the resource '" << handle.getKey() << "' is corrupt";
+    return {};
+  }
+  if (reader.isDead()) {
+    emitError(loc) << "the resource '" << handle.getKey()
+                   << "' has been deleted";
+    return {};
+  }
+  return reader;
 }
 
-//===----------------------------------------------------------------------===//
-// ImportableElementsAttr implementations
-//===----------------------------------------------------------------------===//
+std::optional<CASResourceReader>
+CASElementsAttr::getOptionalResourceData() const {
+  auto handle = getHandle();
+  auto *resource = handle.getResource();
+  if (!resource)
+    return {};
+  AsmResourceBlob *blob = resource->getBlob();
+  if (!blob)
+    return {};
+  CASResourceReader reader(blob->getData());
+  if (!reader.isValid())
+    return {};
+  if (reader.isDead())
+    return {};
+  return reader;
+}
 
-struct ImportableElementsAttrModel
-    : public ImportableElementsAttr::ExternalModel<ImportableElementsAttrModel,
-                                                   DenseIntOrFPElementsAttr> {
-  ElementsAttr getElements(Attribute baseAttr) const {
-    return llvm::cast<ElementsAttr>(baseAttr);
+int64_t CASElementsAttr::getStorageSize() const {
+  auto reader = getOptionalResourceData();
+  if (reader) {
+    return reader->getData().size();
   }
-  TypedAttr reshape(Attribute baseAttr, ShapedType newType) const {
-    return llvm::cast<DenseElementsAttr>(baseAttr).reshape(newType);
-  }
-};
+  return 0;
+}
+
+LogicalResult
+CASElementsAttr::serializeToBuffer(Location loc,
+                                   llvm::support::endianness endian,
+                                   ArrayRef<char> buffer) const {
+  auto reader = getResourceData(loc);
+  if (!reader)
+    return failure();
+  assert(buffer.size() == reader->getData().size() &&
+         "CASElementsAttr serializeToBuffer should be same size");
+  buffer = reader->getData();
+  return success();
+}
+
+LogicalResult
+CASElementsAttr::serializeToStream(Location loc,
+                                   llvm::support::endianness endian,
+                                   llvm::raw_ostream &os) const {
+  auto reader = getResourceData(loc);
+  if (!reader)
+    return failure();
+  os.write(reader->getData().data(), reader->getData().size());
+  return success();
+}
+
+// //===----------------------------------------------------------------------===//
+// // ImportableElementsAttr implementations
+// //===----------------------------------------------------------------------===//
+
+// struct ImportableElementsAttrModel
+//     : public
+//     ImportableElementsAttr::ExternalModel<ImportableElementsAttrModel,
+//                                                    DenseIntOrFPElementsAttr>
+//                                                    {
+//   ElementsAttr getElements(Attribute baseAttr) const {
+//     return llvm::cast<ElementsAttr>(baseAttr);
+//   }
+//   TypedAttr reshape(Attribute baseAttr, ShapedType newType) const {
+//     return llvm::cast<DenseElementsAttr>(baseAttr).reshape(newType);
+//   }
+// };
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
@@ -929,8 +996,8 @@ void UtilDialect::registerAttributes() {
   auto &context = *getContext();
 
   // ManagedElements implementations.
-  DenseIntElementsAttr::attachInterface<ImportableElementsAttrModel>(context);
-  DenseFPElementsAttr::attachInterface<ImportableElementsAttrModel>(context);
+  // DenseIntElementsAttr::attachInterface<ImportableElementsAttrModel>(context);
+  // DenseFPElementsAttr::attachInterface<ImportableElementsAttrModel>(context);
 
   // Serializable implementations.
   DenseIntElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(

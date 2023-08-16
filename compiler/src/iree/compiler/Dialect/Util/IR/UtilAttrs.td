@@ -21,6 +21,7 @@ include "mlir/IR/OpBase.td"
 def Util_BytePatternAttr : AttrDef<Util_Dialect, "BytePattern", [
   TypedAttrInterface,
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
+    "getStorageSize",
     "serializeToBuffer",
     "serializeToStream",
   ]>,
@@ -150,7 +151,11 @@ def Util_CASScope : AttrDef<Util_Dialect, "CASScope"> {
 }
 
 def Util_CASElementsAttr : AttrDef<Util_Dialect, "CASElements", [
-    ElementsAttrInterface
+    ElementsAttrInterface,
+    DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
+      "serializeToBuffer",
+      "serializeToStream",
+    ]>,
 ]> {
   let mnemonic = "elements";
   let summary = "An ElementsAttr which uses scoped, interned blob resources";
@@ -180,9 +185,15 @@ def Util_CASElementsAttr : AttrDef<Util_Dialect, "CASElements", [
     )>,
   ];
   let extraClassDeclaration = [{
-    // Returns whether the underlying resource exists, is valid, and is not
-    // marked as dead.
-    bool isResourceValid();
+    // Gets the backing resource data. If the data cannot be resolved, or
+    // is not valid, an error is emitted.
+    // The returned data is valid so long as the resource is alive.
+    std::optional<CASResourceReader> getResourceData(Location loc) const;
+
+    // Gets the backing resource data, emitting no error if it cannot be found
+    // or is not valid.
+    // The returned data is valid so long as the resource is alive.
+    std::optional<CASResourceReader> getOptionalResourceData() const;
   }];
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1;

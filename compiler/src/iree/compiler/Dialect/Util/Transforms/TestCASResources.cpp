@@ -125,7 +125,7 @@ public:
   void markDeadGlobalResources(llvm::SmallVectorImpl<GlobalOp> &ops) {
     for (auto op : ops) {
       auto attr = llvm::cast<CASElementsAttr>(*op.getInitialValue());
-      if (attr.isResourceValid()) {
+      if (attr.getOptionalResourceData()) {
         op->setAttr("iree.resource-live", UnitAttr::get(&getContext()));
       } else {
         op->setAttr("iree.resource-dead", UnitAttr::get(&getContext()));

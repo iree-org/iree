@@ -26,6 +26,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
+class CASResourceReader;
 class GlobalOpInterface;
 class GlobalAccessorOpInterface;
 class GlobalAddressOpInterface;

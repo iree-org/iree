@@ -76,6 +76,7 @@ static_assert(sizeof(CASResourceTrailer) == 2 * sizeof(uint64_t));
 // Given raw cas data, manages read access to it.
 class CASResourceReader {
 public:
+  CASResourceReader() = default;
   CASResourceReader(ArrayRef<char> data);
   bool isValid() { return valid; }
   const CASResourceTrailer &getTrailer() { return trailerCopy; }

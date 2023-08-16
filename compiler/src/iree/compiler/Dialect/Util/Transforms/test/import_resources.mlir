@@ -19,6 +19,14 @@ func.func @dense_i1() -> tensor<4xi1> {
 // CHECK: dense_elements_i1: "0x4000000001000001"
 
 // -----
+// CHECK-LABEL: func.func @dense_i4
+func.func @dense_i4() -> tensor<4xi4> {
+  // CHECK: dense_resource<dense_elements_i1>
+  %c123 = arith.constant dense<[1, 7, 15, 4]> : tensor<4xi4>
+  return %c123 : tensor<4xi4>
+}
+
+// -----
 // CHECK-LABEL: func.func @dense_i8
 func.func @dense_i8() -> tensor<4xi8> {
   // CHECK: dense_resource<dense_elements_i8>

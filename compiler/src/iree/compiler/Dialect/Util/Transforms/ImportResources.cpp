@@ -6,6 +6,8 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/Util/IR/CASResources.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/DenseMap.h"
@@ -20,56 +22,11 @@ namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
-// TODO: Just use the DenseResourceElementsAttr::get()
-// builder once https://reviews.llvm.org/D157064 lands.
-class DenseBlobResourceElementsAttr : public DenseResourceElementsAttr {
-public:
-  using DenseResourceElementsAttr::get;
-};
-
-template <typename ElementType, unsigned numBits = sizeof(ElementType) * 8>
-static void copyIntAttrIntoBlob(AsmResourceBlob &blob,
-                                DenseIntElementsAttr attr) {
-  ArrayRef<ElementType> data = blob.getDataAs<ElementType>();
-  MutableArrayRef<ElementType> rwData = MutableArrayRef<ElementType>(
-      const_cast<ElementType *>(data.data()), data.size());
-  ArrayRef<char> rawSrcData = attr.getRawData();
-  if (rawSrcData.size() == blob.getData().size()) {
-    // Memcpy.
-    std::memcpy(rwData.data(), rawSrcData.data(), rawSrcData.size());
-  } else {
-    // Slow.
-    size_t index = 0;
-    for (APInt value : attr.getValues<APInt>()) {
-      rwData[index++] = value.extractBitsAsZExtValue(numBits, 0);
-    }
-  }
-}
-
-template <typename ElementType, unsigned numBits = sizeof(ElementType) * 8>
-static void copyFPAttrIntoBlob(AsmResourceBlob &blob,
-                               DenseFPElementsAttr attr) {
-  ArrayRef<ElementType> data = blob.getDataAs<ElementType>();
-  MutableArrayRef<ElementType> rwData = MutableArrayRef<ElementType>(
-      const_cast<ElementType *>(data.data()), data.size());
-  ArrayRef<char> rawSrcData = attr.getRawData();
-  if (rawSrcData.size() == blob.getData().size()) {
-    // Memcpy.
-    std::memcpy(rwData.data(), rawSrcData.data(), rawSrcData.size());
-  } else {
-    // Slow.
-    size_t index = 0;
-    for (APFloat value : attr.getValues<APFloat>()) {
-      rwData[index++] =
-          value.bitcastToAPInt().extractBitsAsZExtValue(numBits, 0);
-    }
-  }
-}
-
 class ImportResourcesPass : public ImportResourcesBase<ImportResourcesPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<BuiltinDialect>();
+    registry.insert<UtilDialect>();
   }
 
   void runOnOperation() override {
@@ -92,16 +49,12 @@ public:
           }
 
           // Convert.
-          if (shouldConvertElements(elements)) {
-            LLVM_DEBUG(llvm::dbgs() << ":: Converting elements attr of "
-                                    << elements.getType() << "\n");
-            if (auto replacement = convertElementsAttr(elements)) {
-              attr.setValue(replacement);
-              replacements[elements] = replacement;
-              updated = true;
-            } else {
-              LLVM_DEBUG(llvm::dbgs() << "  Failed to convert\n");
-            }
+          ElementsAttr replacement =
+              convertElementsAttr(op->getLoc(), elements);
+          if (replacement) {
+            attr.setValue(replacement);
+            replacements[elements] = replacement;
+            updated = true;
           }
         }
       }
@@ -111,89 +64,47 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "DONE CONVERTING RESOURCES\n");
   }
 
-  static bool shouldConvertElements(ElementsAttr attr) {
-    if (llvm::isa<DenseElementsAttr>(attr)) {
+  static ElementsAttr convertElementsAttr(Location loc,
+                                          ElementsAttr elementsAttr) {
+    if (llvm::isa<DenseElementsAttr>(elementsAttr) && elementsAttr.isSplat()) {
       // DenseElementsAttr encodes arbitrary dimension
       // splats whereas DenseResourceElementsAttr does not.
-      return !attr.isSplat();
+      // TODO: Also extend this to possibly be size threshold based.
+      return {};
+    }
+    if (llvm::isa<CASElementsAttr>(elementsAttr)) {
+      // Don't self convert.
+      return {};
+    }
+    auto serializable = llvm::dyn_cast<SerializableAttrInterface>(elementsAttr);
+    if (!serializable) {
+      LLVM_DEBUG(llvm::dbgs() << "Cannot convert (not serializable) "
+                              << elementsAttr.getType() << "\n");
+      return {};
     }
 
-    return false;
-  }
-
-  static ElementsAttr convertElementsAttr(ElementsAttr elementsAttr) {
-    auto st = llvm::cast<ShapedType>(elementsAttr.getType());
-    auto elementType = st.getElementType();
-    auto numElements = elementsAttr.getNumElements();
-    auto bitWidth = elementType.getIntOrFloatBitWidth();
-    AsmResourceBlob blob;
-    if (auto attr = llvm::dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
-      switch (bitWidth) {
-      case 1:
-        blob = HeapAsmResourceBlob::allocate(numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyIntAttrIntoBlob<uint8_t, /*numBits=*/1>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i1",
-                                                  std::move(blob));
-      case 8:
-        blob = HeapAsmResourceBlob::allocate(numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyIntAttrIntoBlob<uint8_t>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i8",
-                                                  std::move(blob));
-      case 16:
-        blob = HeapAsmResourceBlob::allocate(2 * numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyIntAttrIntoBlob<uint16_t>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i16",
-                                                  std::move(blob));
-      case 32:
-        blob = HeapAsmResourceBlob::allocate(4 * numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyIntAttrIntoBlob<uint32_t>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i32",
-                                                  std::move(blob));
-      case 64:
-        blob = HeapAsmResourceBlob::allocate(8 * numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyIntAttrIntoBlob<uint64_t>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_i64",
-                                                  std::move(blob));
-      default:
-        return {};
-      }
-    } else if (auto attr = llvm::dyn_cast<DenseFPElementsAttr>(elementsAttr)) {
-      AsmResourceBlob blob;
-      switch (bitWidth) {
-      case 8:
-        blob = HeapAsmResourceBlob::allocate(numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyFPAttrIntoBlob<uint8_t>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_f8",
-                                                  std::move(blob));
-      case 16:
-        blob = HeapAsmResourceBlob::allocate(2 * numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyFPAttrIntoBlob<uint16_t>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_f16",
-                                                  std::move(blob));
-      case 32:
-        blob = HeapAsmResourceBlob::allocate(4 * numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyFPAttrIntoBlob<uint32_t>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_f32",
-                                                  std::move(blob));
-      case 64:
-        blob = HeapAsmResourceBlob::allocate(8 * numElements, /*align=*/64,
-                                             /*dataIsMutable=*/true);
-        copyFPAttrIntoBlob<uint64_t>(blob, attr);
-        return DenseBlobResourceElementsAttr::get(st, "dense_elements_f64",
-                                                  std::move(blob));
-      default:
-        return {};
-      }
+    LLVM_DEBUG(llvm::dbgs() << "Converting elements attr "
+                            << elementsAttr.getType() << "\n");
+    int64_t storageSize = serializable.getStorageSize();
+    if (storageSize <= 0) {
+      LLVM_DEBUG(llvm::dbgs() << "Cannot convert elements attr "
+                              << elementsAttr.getType() << "\n");
+      return {};
     }
-    return {};
+
+    CASResourceBuilder builder =
+        CASResourceBuilder::allocateHeap(static_cast<size_t>(storageSize));
+    if (failed(serializable.serializeToBuffer(
+            loc, llvm::support::endianness::native, builder.getData()))) {
+      return {};
+    }
+
+    CASManagerDialectInterface &casManager =
+        CASManagerDialectInterface::get(loc.getContext());
+    PopulatedCASResource::Reference ref =
+        casManager.internGlobalResource(std::move(builder));
+    return CASElementsAttr::get(elementsAttr.getShapedType(),
+                                ref->getGlobalResource());
   }
 };
 
