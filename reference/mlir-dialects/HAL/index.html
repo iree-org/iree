@@ -1522,13 +1522,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#halallocatorallocateinitialized-halallocatorallocateinitializedop" class="md-nav__link">
-    hal.allocator.allocate.initialized (HAL::AllocatorAllocateInitializedOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#halallocatorallocate-halallocatorallocateop" class="md-nav__link">
     hal.allocator.allocate (HAL::AllocatorAllocateOp)
   </a>
@@ -1536,8 +1529,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#halallocatortry_map-halallocatortrymapop" class="md-nav__link">
-    hal.allocator.try_map (HAL::AllocatorTryMapOp)
+  <a href="#halallocatorimport-halallocatorimportop" class="md-nav__link">
+    hal.allocator.import (HAL::AllocatorImportOp)
   </a>
   
 </li>
@@ -1894,6 +1887,20 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#haldevicequeueread-haldevicequeuereadop" class="md-nav__link">
+    hal.device.queue.read (HAL::DeviceQueueReadOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#haldevicequeuewrite-haldevicequeuewriteop" class="md-nav__link">
+    hal.device.queue.write (HAL::DeviceQueueWriteOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#haldeviceswitch-haldeviceswitchop" class="md-nav__link">
     hal.device.switch (HAL::DeviceSwitchOp)
   </a>
@@ -2023,6 +2030,13 @@
   
     <nav class="md-nav" aria-label="Experimental ops">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#halexfilefrom_memory-halexfilefrommemoryop" class="md-nav__link">
+    hal.ex.file.from_memory (HAL::ExFileFromMemoryOp)
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#halexshared_device-halexshareddeviceop" class="md-nav__link">
@@ -2466,6 +2480,13 @@
           <li class="md-nav__item">
   <a href="#fence" class="md-nav__link">
     fence
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer_1" class="md-nav__link">
+    buffer
   </a>
   
 </li>
@@ -3076,13 +3097,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#halallocatorallocateinitialized-halallocatorallocateinitializedop" class="md-nav__link">
-    hal.allocator.allocate.initialized (HAL::AllocatorAllocateInitializedOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#halallocatorallocate-halallocatorallocateop" class="md-nav__link">
     hal.allocator.allocate (HAL::AllocatorAllocateOp)
   </a>
@@ -3090,8 +3104,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#halallocatortry_map-halallocatortrymapop" class="md-nav__link">
-    hal.allocator.try_map (HAL::AllocatorTryMapOp)
+  <a href="#halallocatorimport-halallocatorimportop" class="md-nav__link">
+    hal.allocator.import (HAL::AllocatorImportOp)
   </a>
   
 </li>
@@ -3448,6 +3462,20 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#haldevicequeueread-haldevicequeuereadop" class="md-nav__link">
+    hal.device.queue.read (HAL::DeviceQueueReadOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#haldevicequeuewrite-haldevicequeuewriteop" class="md-nav__link">
+    hal.device.queue.write (HAL::DeviceQueueWriteOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#haldeviceswitch-haldeviceswitchop" class="md-nav__link">
     hal.device.switch (HAL::DeviceSwitchOp)
   </a>
@@ -3577,6 +3605,13 @@
   
     <nav class="md-nav" aria-label="Experimental ops">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#halexfilefrom_memory-halexfilefrommemoryop" class="md-nav__link">
+    hal.ex.file.from_memory (HAL::ExFileFromMemoryOp)
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#halexshared_device-halexshareddeviceop" class="md-nav__link">
@@ -4025,6 +4060,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#buffer_1" class="md-nav__link">
+    buffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pipeline_layout" class="md-nav__link">
     pipeline_layout
   </a>
@@ -4077,9 +4119,8 @@ input.</p>
 <li><a href="#hal-dialect">'hal' Dialect</a><ul>
 <li><a href="#operation-definition">Operation definition</a><ul>
 <li><a href="#allocator-ops">Allocator ops</a><ul>
-<li><a href="#halallocatorallocateinitialized-halallocatorallocateinitializedop">hal.allocator.allocate.initialized (HAL::AllocatorAllocateInitializedOp)</a></li>
 <li><a href="#halallocatorallocate-halallocatorallocateop">hal.allocator.allocate (HAL::AllocatorAllocateOp)</a></li>
-<li><a href="#halallocatortry_map-halallocatortrymapop">hal.allocator.try_map (HAL::AllocatorTryMapOp)</a></li>
+<li><a href="#halallocatorimport-halallocatorimportop">hal.allocator.import (HAL::AllocatorImportOp)</a></li>
 </ul>
 </li>
 <li><a href="#buffer-ops">Buffer ops</a><ul>
@@ -4137,6 +4178,8 @@ input.</p>
 <li><a href="#haldevicequeuedealloca-haldevicequeuedeallocaop">hal.device.queue.dealloca (HAL::DeviceQueueDeallocaOp)</a></li>
 <li><a href="#haldevicequeueexecute-haldevicequeueexecuteop">hal.device.queue.execute (HAL::DeviceQueueExecuteOp)</a></li>
 <li><a href="#haldevicequeueflush-haldevicequeueflushop">hal.device.queue.flush (HAL::DeviceQueueFlushOp)</a></li>
+<li><a href="#haldevicequeueread-haldevicequeuereadop">hal.device.queue.read (HAL::DeviceQueueReadOp)</a></li>
+<li><a href="#haldevicequeuewrite-haldevicequeuewriteop">hal.device.queue.write (HAL::DeviceQueueWriteOp)</a></li>
 <li><a href="#haldeviceswitch-haldeviceswitchop">hal.device.switch (HAL::DeviceSwitchOp)</a></li>
 <li><a href="#halreturn-halreturnop">hal.return (HAL::ReturnOp)</a></li>
 </ul>
@@ -4158,6 +4201,7 @@ input.</p>
 </ul>
 </li>
 <li><a href="#experimental-ops">Experimental ops</a><ul>
+<li><a href="#halexfilefrom_memory-halexfilefrommemoryop">hal.ex.file.from_memory (HAL::ExFileFromMemoryOp)</a></li>
 <li><a href="#halexshared_device-halexshareddeviceop">hal.ex.shared_device (HAL::ExSharedDeviceOp)</a></li>
 </ul>
 </li>
@@ -4231,6 +4275,7 @@ input.</p>
 <li><a href="#event">event</a></li>
 <li><a href="#executable">executable</a></li>
 <li><a href="#fence">fence</a></li>
+<li><a href="#buffer_1">buffer</a></li>
 <li><a href="#pipeline_layout">pipeline_layout</a></li>
 </ul>
 </li>
@@ -4241,19 +4286,19 @@ input.</p>
 <h2 id="operation-definition">Operation definition<a class="headerlink" href="#operation-definition" title="Permanent link">link</a></h2>
 <h3 id="allocator-ops">Allocator ops<a class="headerlink" href="#allocator-ops" title="Permanent link">link</a></h3>
 <p>Ops for <code>!hal.allocator</code> / <code>iree_hal_allocator_t</code>.</p>
-<h4 id="halallocatorallocateinitialized-halallocatorallocateinitializedop"><code>hal.allocator.allocate.initialized</code> (HAL::AllocatorAllocateInitializedOp)<a class="headerlink" href="#halallocatorallocateinitialized-halallocatorallocateinitializedop" title="Permanent link">link</a></h4>
-<p><em>Allocator-supported host buffer wrapping operation</em></p>
+<h4 id="halallocatorallocate-halallocatorallocateop"><code>hal.allocator.allocate</code> (HAL::AllocatorAllocateOp)<a class="headerlink" href="#halallocatorallocate-halallocatorallocateop" title="Permanent link">link</a></h4>
+<p><em>Empty buffer allocation operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.allocator.allocate.initialized` `&lt;` $allocator `:` type($allocator) `&gt;`
-              `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
+<div class="highlight"><pre><span></span><code>operation ::= `hal.allocator.allocate` `&lt;` $allocator `:` type($allocator) `&gt;`
+              `affinity` `(` $queue_affinity `)`
               `type` `(` $memory_types `)`
               `usage` `(` $buffer_usage `)`
-              `:` type($result)
+              `:` custom&lt;SizeAwareType&gt;(type($result), $result_size)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Wraps a !hal.buffer around host read-only memory backed by the given byte
-buffer. The returned buffer may be host-only and not directly usable on
-devices.</p>
+<p>Allocates a buffer of the given size from the allocator.
+The size of the buffer returned may be larger than the requested size if the
+allocator has specific alignment requirements or minimum allocation sizes.</p>
 <p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
@@ -4291,15 +4336,11 @@ devices.</p>
 <td>allocator</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>source</code></td>
-<td>a reference counted byte buffer</td>
+<td style="text-align: center;"><code>queue_affinity</code></td>
+<td>64-bit signless integer</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>offset</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>length</code></td>
+<td style="text-align: center;"><code>result_size</code></td>
 <td>index</td>
 </tr>
 </tbody>
@@ -4319,18 +4360,22 @@ devices.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="halallocatorallocate-halallocatorallocateop"><code>hal.allocator.allocate</code> (HAL::AllocatorAllocateOp)<a class="headerlink" href="#halallocatorallocate-halallocatorallocateop" title="Permanent link">link</a></h4>
-<p><em>Empty buffer allocation operation</em></p>
+<h4 id="halallocatorimport-halallocatorimportop"><code>hal.allocator.import</code> (HAL::AllocatorImportOp)<a class="headerlink" href="#halallocatorimport-halallocatorimportop" title="Permanent link">link</a></h4>
+<p><em>Allocator-supported host buffer import operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.allocator.allocate` `&lt;` $allocator `:` type($allocator) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal.allocator.import` `&lt;` $allocator `:` type($allocator) `&gt;`
+              `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
+              `affinity` `(` $queue_affinity `)`
               `type` `(` $memory_types `)`
               `usage` `(` $buffer_usage `)`
-              `:` custom&lt;SizeAwareType&gt;(type($result), $result_size)
+              `:` type($did_import) `,` type($result)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Allocates a buffer of the given size from the allocator.
-The size of the buffer returned may be larger than the requested size if the
-allocator has specific alignment requirements or minimum allocation sizes.</p>
+<p>Tries importing host memory backed by the given byte buffer into a
+device accessible <code>!hal.buffer</code>. The returned buffer may be host-only and
+not directly usable on devices. If the mapping cannot be completed (such as
+trying to map the host memory as device-local on devices with discrete
+memory) then <code>did_import</code> will indicate that the returned buffer is null.</p>
 <p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
@@ -4368,76 +4413,8 @@ allocator has specific alignment requirements or minimum allocation sizes.</p>
 <td>allocator</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>result_size</code></td>
-<td>index</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>buffer</td>
-</tr>
-</tbody>
-</table>
-<h4 id="halallocatortry_map-halallocatortrymapop"><code>hal.allocator.try_map</code> (HAL::AllocatorTryMapOp)<a class="headerlink" href="#halallocatortry_map-halallocatortrymapop" title="Permanent link">link</a></h4>
-<p><em>Allocator-supported host buffer wrapping operation</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.allocator.try_map` `&lt;` $allocator `:` type($allocator) `&gt;`
-              `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
-              `type` `(` $memory_types `)`
-              `usage` `(` $buffer_usage `)`
-              `:` type($did_map) `,` type($result)
-              attr-dict-with-keyword
-</code></pre></div>
-<p>Tries wrapping a !hal.buffer around host read-only memory backed by the
-given byte buffer. The returned buffer may be host-only and not directly
-usable on devices. If the mapping cannot be completed (such as trying to
-map the host memory as device-local on devices with discrete memory) then
-did_map will indicate that the returned buffer is null.</p>
-<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>memory_types</code></td>
-<td style="text-align: center;">mlir::iree_compiler::IREE::HAL::MemoryTypeBitfieldAttr</td>
-<td>valid MemoryType</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>buffer_usage</code></td>
-<td style="text-align: center;">mlir::iree_compiler::IREE::HAL::BufferUsageBitfieldAttr</td>
-<td>valid BufferUsage</td>
-</tr>
-</tbody>
-</table>
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>allocator</code></td>
-<td>allocator</td>
+<td style="text-align: center;"><code>queue_affinity</code></td>
+<td>64-bit signless integer</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
@@ -4453,7 +4430,7 @@ did_map will indicate that the returned buffer is null.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4463,7 +4440,7 @@ did_map will indicate that the returned buffer is null.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>did_map</code></td>
+<td style="text-align: center;"><code>did_import</code></td>
 <td>1-bit signless integer</td>
 </tr>
 <tr>
@@ -4493,7 +4470,7 @@ the allocators are compatible (devices can address each other's memory),
 the type and usage contain all the requested bits (having more bits is ok),
 and the length is at least the requested minimum (as padding may be
 ignored).</p>
-<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4520,7 +4497,7 @@ ignored).</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4556,7 +4533,7 @@ view into another buffer.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4571,7 +4548,7 @@ view into another buffer.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4598,7 +4575,7 @@ view into another buffer.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4617,7 +4594,7 @@ view into another buffer.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4641,7 +4618,7 @@ view into another buffer.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Stores a value into a buffer by mapping it.</p>
-<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
+<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4676,7 +4653,7 @@ view into another buffer.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SizeAwareOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
+<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4699,7 +4676,7 @@ view into another buffer.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4729,7 +4706,7 @@ view into another buffer.</p>
 <p>Asserts that the buffer view contains a data compatible tensor with the
 given encoding. Program execution will abort as if <code>std.assert</code> had been
 used.</p>
-<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4746,7 +4723,7 @@ used.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
+<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4784,7 +4761,7 @@ used.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
+<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4799,7 +4776,7 @@ used.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
+<h5 id="results_5">Results:<a class="headerlink" href="#results_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4832,7 +4809,7 @@ along with the contents.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
+<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4867,7 +4844,7 @@ along with the contents.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
+<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4894,7 +4871,7 @@ along with the contents.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
+<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4911,6 +4888,47 @@ along with the contents.</p>
 </tr>
 </tbody>
 </table>
+<h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>buffer_view</code></td>
+<td>buffer_view</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="halbuffer_viewelement_type-halbufferviewelementtypeop"><code>hal.buffer_view.element_type</code> (HAL::BufferViewElementTypeOp)<a class="headerlink" href="#halbuffer_viewelement_type-halbufferviewelementtypeop" title="Permanent link">link</a></h4>
+<p><em>Buffer view element type query</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.element_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+              `:` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Returns the element type of the buffer view.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
 <h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4937,18 +4955,18 @@ along with the contents.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>index</td>
+<td>32-bit signless integer</td>
 </tr>
 </tbody>
 </table>
-<h4 id="halbuffer_viewelement_type-halbufferviewelementtypeop"><code>hal.buffer_view.element_type</code> (HAL::BufferViewElementTypeOp)<a class="headerlink" href="#halbuffer_viewelement_type-halbufferviewelementtypeop" title="Permanent link">link</a></h4>
-<p><em>Buffer view element type query</em></p>
+<h4 id="halbuffer_viewencoding_type-halbufferviewencodingtypeop"><code>hal.buffer_view.encoding_type</code> (HAL::BufferViewEncodingTypeOp)<a class="headerlink" href="#halbuffer_viewencoding_type-halbufferviewencodingtypeop" title="Permanent link">link</a></h4>
+<p><em>Buffer view encoding type query</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.element_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.encoding_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Returns the element type of the buffer view.</p>
+<p>Returns the encoding type of the buffer view.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
@@ -4982,14 +5000,14 @@ along with the contents.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="halbuffer_viewencoding_type-halbufferviewencodingtypeop"><code>hal.buffer_view.encoding_type</code> (HAL::BufferViewEncodingTypeOp)<a class="headerlink" href="#halbuffer_viewencoding_type-halbufferviewencodingtypeop" title="Permanent link">link</a></h4>
-<p><em>Buffer view encoding type query</em></p>
+<h4 id="halbuffer_viewrank-halbufferviewrankop"><code>hal.buffer_view.rank</code> (HAL::BufferViewRankOp)<a class="headerlink" href="#halbuffer_viewrank-halbufferviewrankop" title="Permanent link">link</a></h4>
+<p><em>Buffer view rank query</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.encoding_type` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.rank` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
               `:` type($result)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Returns the encoding type of the buffer view.</p>
+<p>Returns the rank of the buffer view.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
@@ -5019,47 +5037,6 @@ along with the contents.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>32-bit signless integer</td>
-</tr>
-</tbody>
-</table>
-<h4 id="halbuffer_viewrank-halbufferviewrankop"><code>hal.buffer_view.rank</code> (HAL::BufferViewRankOp)<a class="headerlink" href="#halbuffer_viewrank-halbufferviewrankop" title="Permanent link">link</a></h4>
-<p><em>Buffer view rank query</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.buffer_view.rank` `&lt;` $buffer_view `:` type($buffer_view) `&gt;`
-              `:` type($result)
-              attr-dict-with-keyword
-</code></pre></div>
-<p>Returns the rank of the buffer view.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>buffer_view</code></td>
-<td>buffer_view</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
 <td>index</td>
 </tr>
 </tbody>
@@ -5073,7 +5050,7 @@ along with the contents.</p>
 <p>Traces out to a runtime trace sink (console, log file, etc) the given buffer
 views and titles them with the given key. The key is informational only and
 useful for titling/marking specific sets of buffers for easier searching.</p>
-<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
+<h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5090,7 +5067,7 @@ useful for titling/marking specific sets of buffers for easier searching.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
+<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5127,7 +5104,7 @@ compatible queues.</p>
 used to indicate a default inherited from the environment or device
 configuration.</p>
 <p>Interfaces: OpAsmOpInterface</p>
-<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
+<h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5144,7 +5121,7 @@ configuration.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
+<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5179,7 +5156,7 @@ configuration.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
+<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5206,7 +5183,7 @@ group in <code>[0, count)</code> and the total participant count.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
+<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5221,7 +5198,7 @@ group in <code>[0, count)</code> and the total participant count.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
+<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5258,7 +5235,7 @@ use the same key the tie will be broken using their rank in the parent
 group. A color of -1 indicates that the rank does not participate in any
 subgroup and will return a null channel.</p>
 <p>Interfaces: OpAsmOpInterface</p>
-<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
+<h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5275,7 +5252,7 @@ subgroup and will return a null channel.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
+<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5298,7 +5275,7 @@ subgroup and will return a null channel.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
+<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5326,7 +5303,7 @@ subgroup and will return a null channel.</p>
 All commands between this and a mandatory matching call to
 <code>hal.command_buffer.end_debug_group</code> will be grouped together with the
 given label.</p>
-<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
+<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5343,7 +5320,7 @@ given label.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
+<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5374,7 +5351,7 @@ given label.</p>
 </code></pre></div>
 <p>Dispatches a collective operation defined by op using the given buffers.</p>
 <p>Traits: AttrSizedOperandSegments</p>
-<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
+<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5391,7 +5368,7 @@ given label.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
+<h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5454,7 +5431,7 @@ given label.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Copies a range of one buffer to another.</p>
-<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
+<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5501,7 +5478,7 @@ given label.</p>
 </code></pre></div>
 <p>Returns a command buffer from the device pool ready to begin recording.</p>
 <p>Interfaces: OpAsmOpInterface</p>
-<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
+<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5523,7 +5500,7 @@ given label.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
+<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5542,7 +5519,7 @@ given label.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
+<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5568,7 +5545,7 @@ given label.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
+<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5583,7 +5560,7 @@ given label.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
+<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5610,7 +5587,7 @@ given label.</p>
 </code></pre></div>
 <p>Dispatches an execution request with the dispatch parameters loaded from the
 given buffer.</p>
-<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
+<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5627,7 +5604,7 @@ given buffer.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
+<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5668,7 +5645,7 @@ given buffer, using using a nested symbol reference to the entry point.</p>
 <div class="highlight"><pre><span></span><code>hal.command_buffer.dispatch.indirect.symbol %cmd, @executable::@target::@entry,
                                             workgroups = %buffer[%offset]
 </code></pre></div>
-<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
+<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5685,7 +5662,7 @@ given buffer, using using a nested symbol reference to the entry point.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
+<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5722,7 +5699,7 @@ given buffer, using using a nested symbol reference to the entry point.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Dispatches an execution request.</p>
-<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
+<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5739,7 +5716,7 @@ given buffer, using using a nested symbol reference to the entry point.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
+<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5783,7 +5760,7 @@ given buffer, using using a nested symbol reference to the entry point.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Dispatches an execution request, using a nested symbol reference to the entry point.</p>
-<h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
+<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5800,7 +5777,7 @@ given buffer, using using a nested symbol reference to the entry point.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
+<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5834,7 +5811,7 @@ given buffer, using using a nested symbol reference to the entry point.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Pops a debug group from the stack.</p>
-<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
+<h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5861,7 +5838,7 @@ given buffer, using using a nested symbol reference to the entry point.</p>
 <p>Defines an execution dependency between all commands recorded before the
 barrier and all commands recorded after the barrier. Only the stages
 provided will be affected.</p>
-<h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
+<h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5888,7 +5865,7 @@ provided will be affected.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
+<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5913,7 +5890,7 @@ provided will be affected.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Fills the target buffer with the given repeating value.</p>
-<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
+<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5952,7 +5929,7 @@ provided will be affected.</p>
 </code></pre></div>
 <p>Ends recording into the command buffer and prepares it for submission.
 No more commands may be recorded into the command buffer.</p>
-<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
+<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5981,7 +5958,7 @@ No more commands may be recorded into the command buffer.</p>
 dispatches using a compatible pipeline layout.</p>
 <p>Push constants are always 4-byte values and treated as opaque, meaning that
 they may be bit-casted floats, bit-packed booleans, etc.</p>
-<h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
+<h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5998,7 +5975,7 @@ they may be bit-casted floats, bit-packed booleans, etc.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
+<h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6040,7 +6017,7 @@ they may be bit-casted floats, bit-packed booleans, etc.</p>
 The provided buffers may either be HAL buffers or indirect references into
 the command buffer binding table.</p>
 <p>Traits: SameVariadicOperandSize</p>
-<h5 id="operands_33">Operands:<a class="headerlink" href="#operands_33" title="Permanent link">link</a></h5>
+<h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6097,6 +6074,72 @@ executables that use the same set layouts can be reduced.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Attribute</th>
+<th style="text-align: center;">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>flags</code></td>
+<td style="text-align: center;">::mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlagsAttr</td>
+<td>valid DescriptorSetLayout flags</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>bindings</code></td>
+<td style="text-align: center;">::mlir::ArrayAttr</td>
+<td>HAL descriptor set layout binding array attribute</td>
+</tr>
+</tbody>
+</table>
+<h5 id="operands_33">Operands:<a class="headerlink" href="#operands_33" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>descriptor_set_layout</td>
+</tr>
+</tbody>
+</table>
+<h4 id="haldescriptor_set_layoutlookup-haldescriptorsetlayoutlookupop"><code>hal.descriptor_set_layout.lookup</code> (HAL::DescriptorSetLayoutLookupOp)<a class="headerlink" href="#haldescriptor_set_layoutlookup-haldescriptorsetlayoutlookupop" title="Permanent link">link</a></h4>
+<p><em>Descriptor set layout cache lookup pseudo-op</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal.descriptor_set_layout.lookup` `device` `(` $device `:` type($device) `)`
+              `flags` `(` $flags `)`
+              `bindings` `(` $bindings `)`
+              `:` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Used during conversion to provide a placeholder for a globally cached and
+possibly lazy-initialized descriptor set layout.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
+<p>Effects: MemoryEffects::Effect{}</p>
 <h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6149,42 +6192,18 @@ executables that use the same set layouts can be reduced.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="haldescriptor_set_layoutlookup-haldescriptorsetlayoutlookupop"><code>hal.descriptor_set_layout.lookup</code> (HAL::DescriptorSetLayoutLookupOp)<a class="headerlink" href="#haldescriptor_set_layoutlookup-haldescriptorsetlayoutlookupop" title="Permanent link">link</a></h4>
-<p><em>Descriptor set layout cache lookup pseudo-op</em></p>
+<h3 id="device-ops">Device ops<a class="headerlink" href="#device-ops" title="Permanent link">link</a></h3>
+<p>Ops for <code>!hal.device</code> / <code>iree_hal_device_t</code>.</p>
+<h4 id="haldeviceallocator-haldeviceallocatorop"><code>hal.device.allocator</code> (HAL::DeviceAllocatorOp)<a class="headerlink" href="#haldeviceallocator-haldeviceallocatorop" title="Permanent link">link</a></h4>
+<p><em>Device allocator accessor operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.descriptor_set_layout.lookup` `device` `(` $device `:` type($device) `)`
-              `flags` `(` $flags `)`
-              `bindings` `(` $bindings `)`
-              `:` type($result)
-              attr-dict-with-keyword
+<div class="highlight"><pre><span></span><code>operation ::= `hal.device.allocator` `&lt;` $device `:` type($device) `&gt;` `:` type($result) attr-dict-with-keyword
 </code></pre></div>
-<p>Used during conversion to provide a placeholder for a globally cached and
-possibly lazy-initialized descriptor set layout.</p>
+<p>Returns the allocator that can be used to allocate buffers compatible with
+the device.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>flags</code></td>
-<td style="text-align: center;">::mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlagsAttr</td>
-<td>valid DescriptorSetLayout flags</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>bindings</code></td>
-<td style="text-align: center;">::mlir::ArrayAttr</td>
-<td>HAL descriptor set layout binding array attribute</td>
-</tr>
-</tbody>
-</table>
 <h5 id="operands_35">Operands:<a class="headerlink" href="#operands_35" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6201,48 +6220,6 @@ possibly lazy-initialized descriptor set layout.</p>
 </tbody>
 </table>
 <h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>descriptor_set_layout</td>
-</tr>
-</tbody>
-</table>
-<h3 id="device-ops">Device ops<a class="headerlink" href="#device-ops" title="Permanent link">link</a></h3>
-<p>Ops for <code>!hal.device</code> / <code>iree_hal_device_t</code>.</p>
-<h4 id="haldeviceallocator-haldeviceallocatorop"><code>hal.device.allocator</code> (HAL::DeviceAllocatorOp)<a class="headerlink" href="#haldeviceallocator-haldeviceallocatorop" title="Permanent link">link</a></h4>
-<p><em>Device allocator accessor operation</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal.device.allocator` `&lt;` $device `:` type($device) `&gt;` `:` type($result) attr-dict-with-keyword
-</code></pre></div>
-<p>Returns the allocator that can be used to allocate buffers compatible with
-the device.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_36">Operands:<a class="headerlink" href="#operands_36" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>device</code></td>
-<td>device</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_19">Results:<a class="headerlink" href="#results_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6306,7 +6283,7 @@ forever; all non-experimental keys should be vetted.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, HAL_DeviceQuery</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
+<h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6333,7 +6310,7 @@ forever; all non-experimental keys should be vetted.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_37">Operands:<a class="headerlink" href="#operands_37" title="Permanent link">link</a></h5>
+<h5 id="operands_36">Operands:<a class="headerlink" href="#operands_36" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6348,7 +6325,7 @@ forever; all non-experimental keys should be vetted.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_20">Results:<a class="headerlink" href="#results_20" title="Permanent link">link</a></h5>
+<h5 id="results_19">Results:<a class="headerlink" href="#results_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6389,7 +6366,7 @@ allocator has specific alignment requirements or minimum allocation sizes.</p>
 contents are undefined before the allocation signal fence has been signaled
 and after the deallocation wait fence has been reached.</p>
 <p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
-<h5 id="attributes_21">Attributes:<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h5>
+<h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6411,7 +6388,7 @@ and after the deallocation wait fence has been reached.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_38">Operands:<a class="headerlink" href="#operands_38" title="Permanent link">link</a></h5>
+<h5 id="operands_37">Operands:<a class="headerlink" href="#operands_37" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6446,7 +6423,7 @@ and after the deallocation wait fence has been reached.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_21">Results:<a class="headerlink" href="#results_21" title="Permanent link">link</a></h5>
+<h5 id="results_20">Results:<a class="headerlink" href="#results_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6476,7 +6453,7 @@ The deallocation will not be made until the wait fence has been reached and
 once the storage is available for reuse the signal fence will be signaled.</p>
 <p>After deallocation the contents of the buffer may still be accessible but
 will have undefined contents as other operations reuse the memory.</p>
-<h5 id="operands_39">Operands:<a class="headerlink" href="#operands_39" title="Permanent link">link</a></h5>
+<h5 id="operands_38">Operands:<a class="headerlink" href="#operands_38" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6521,7 +6498,7 @@ will have undefined contents as other operations reuse the memory.</p>
 The command buffers are executed in order as if they were recorded as one.
 No commands will execute until the wait fence has been reached and the
 signal fence will be signaled when all commands have completed.</p>
-<h5 id="operands_40">Operands:<a class="headerlink" href="#operands_40" title="Permanent link">link</a></h5>
+<h5 id="operands_39">Operands:<a class="headerlink" href="#operands_39" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6563,6 +6540,63 @@ signal fence will be signaled when all commands have completed.</p>
 When submitting many queue operations this can be used to eagerly flush
 earlier submissions while later ones are still being constructed.
 This may be a no-op.</p>
+<h5 id="operands_40">Operands:<a class="headerlink" href="#operands_40" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>queue_affinity</code></td>
+<td>64-bit signless integer</td>
+</tr>
+</tbody>
+</table>
+<h4 id="haldevicequeueread-haldevicequeuereadop"><code>hal.device.queue.read</code> (HAL::DeviceQueueReadOp)<a class="headerlink" href="#haldevicequeueread-haldevicequeuereadop" title="Permanent link">link</a></h4>
+<p><em>Reads a segment from a file into a device buffer</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.read` `&lt;` $device `:` type($device) `&gt;`
+              `affinity` `(` $queue_affinity `)`
+              `wait` `(` $wait_fence `)`
+              `signal` `(` $signal_fence `)`
+              `source` `(` $source_file `:` type($source_file) `)`
+              `` `[` $source_offset `]`
+              `target` `(` $target_buffer `:` type($target_buffer) `)`
+              `` `[` $target_offset `]`
+              `length` `(` $length `)`
+              `flags` `(` $flags `)`
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Enqueues a file read operation that streams a segment of the source file
+defined by the source offset and length into the target HAL buffer at the
+specified target offset. The queue affinity should be set to where the
+target buffer will be consumed. The source file must have read permission
+and the target buffer must have transfer-target usage. Read failure will
+result in propagated semaphore failure or device loss.</p>
+<h5 id="attributes_21">Attributes:<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Attribute</th>
+<th style="text-align: center;">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>flags</code></td>
+<td style="text-align: center;">::mlir::IntegerAttr</td>
+<td>32-bit signless integer attribute</td>
+</tr>
+</tbody>
+</table>
 <h5 id="operands_41">Operands:<a class="headerlink" href="#operands_41" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6579,6 +6613,119 @@ This may be a no-op.</p>
 <tr>
 <td style="text-align: center;"><code>queue_affinity</code></td>
 <td>64-bit signless integer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>wait_fence</code></td>
+<td>fence</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>signal_fence</code></td>
+<td>fence</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_file</code></td>
+<td>buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_offset</code></td>
+<td>64-bit signless integer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_buffer</code></td>
+<td>buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>length</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="haldevicequeuewrite-haldevicequeuewriteop"><code>hal.device.queue.write</code> (HAL::DeviceQueueWriteOp)<a class="headerlink" href="#haldevicequeuewrite-haldevicequeuewriteop" title="Permanent link">link</a></h4>
+<p><em>Writes a segment from a device buffer into a file</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal.device.queue.write` `&lt;` $device `:` type($device) `&gt;`
+              `affinity` `(` $queue_affinity `)`
+              `wait` `(` $wait_fence `)`
+              `signal` `(` $signal_fence `)`
+              `source` `(` $source_buffer `:` type($source_buffer) `)`
+              `` `[` $source_offset `]`
+              `target` `(` $target_file `:` type($target_file) `)`
+              `` `[` $target_offset `]`
+              `length` `(` $length `)`
+              `flags` `(` $flags `)`
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Enqueues a file write operation that streams a segment of the source HAL
+buffer defined by the source offset and length into the target file at the
+specified target offset. The queue affinity should be set to where the
+source buffer was produced. The source buffer must have transfer-source
+usage and the target file must have write permission. Write failure will
+result in propagated semaphore failure or device loss.</p>
+<h5 id="attributes_22">Attributes:<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Attribute</th>
+<th style="text-align: center;">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>flags</code></td>
+<td style="text-align: center;">::mlir::IntegerAttr</td>
+<td>32-bit signless integer attribute</td>
+</tr>
+</tbody>
+</table>
+<h5 id="operands_42">Operands:<a class="headerlink" href="#operands_42" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>queue_affinity</code></td>
+<td>64-bit signless integer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>wait_fence</code></td>
+<td>fence</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>signal_fence</code></td>
+<td>fence</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_buffer</code></td>
+<td>buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_file</code></td>
+<td>buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>target_offset</code></td>
+<td>64-bit signless integer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>length</code></td>
+<td>index</td>
 </tr>
 </tbody>
 </table>
@@ -6626,7 +6773,7 @@ return the same types.</p>
   }
 </code></pre></div>
 <p>Traits: NoRegionArguments, RecursiveMemoryEffects</p>
-<h5 id="attributes_22">Attributes:<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h5>
+<h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6643,7 +6790,7 @@ return the same types.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_42">Operands:<a class="headerlink" href="#operands_42" title="Permanent link">link</a></h5>
+<h5 id="operands_43">Operands:<a class="headerlink" href="#operands_43" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6658,7 +6805,7 @@ return the same types.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
+<h5 id="results_21">Results:<a class="headerlink" href="#results_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6680,7 +6827,7 @@ return the same types.</p>
 </code></pre></div>
 <p>Returns the given values from the region and back to the host code.</p>
 <p>Traits: Terminator</p>
-<h5 id="operands_43">Operands:<a class="headerlink" href="#operands_43" title="Permanent link">link</a></h5>
+<h5 id="operands_44">Operands:<a class="headerlink" href="#operands_44" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6708,7 +6855,7 @@ return the same types.</p>
 IR prior to serialization (for debugging).</p>
 <p>Traits: HasParent<IREE::HAL::ExecutableOp></p>
 <p>Interfaces: Symbol</p>
-<h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
+<h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6760,7 +6907,7 @@ the workgroup count calculation region of the target
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
+<h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6777,7 +6924,7 @@ the workgroup count calculation region of the target
 </tr>
 </tbody>
 </table>
-<h5 id="operands_44">Operands:<a class="headerlink" href="#operands_44" title="Permanent link">link</a></h5>
+<h5 id="operands_45">Operands:<a class="headerlink" href="#operands_45" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6796,7 +6943,7 @@ the workgroup count calculation region of the target
 </tr>
 </tbody>
 </table>
-<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
+<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6856,7 +7003,7 @@ a way compatible with its execution model. Examples:
 - WebGPU: pipeline-overridable constants</p>
 <p>Traits: HasParent<IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp>, IsolatedFromAbove</p>
 <p>Interfaces: CallableOpInterface, FunctionOpInterface, Symbol</p>
-<h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
+<h5 id="attributes_26">Attributes:<a class="headerlink" href="#attributes_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6902,7 +7049,7 @@ those not needing special behavior.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_26">Attributes:<a class="headerlink" href="#attributes_26" title="Permanent link">link</a></h5>
+<h5 id="attributes_27">Attributes:<a class="headerlink" href="#attributes_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6919,7 +7066,7 @@ those not needing special behavior.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
+<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6956,7 +7103,7 @@ runtime-derived parameters.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_27">Attributes:<a class="headerlink" href="#attributes_27" title="Permanent link">link</a></h5>
+<h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6973,7 +7120,7 @@ runtime-derived parameters.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_45">Operands:<a class="headerlink" href="#operands_45" title="Permanent link">link</a></h5>
+<h5 id="operands_46">Operands:<a class="headerlink" href="#operands_46" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6996,7 +7143,7 @@ runtime-derived parameters.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
+<h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7028,7 +7175,7 @@ dispatch.
 It returns the number of workgroups along x, y, and z.</p>
 <p>Traits: HasParent<IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp>, IsolatedFromAbove</p>
 <p>Interfaces: Symbol</p>
-<h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
+<h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7088,7 +7235,7 @@ possibly lazy-initialized executable.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
+<h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7105,7 +7252,7 @@ possibly lazy-initialized executable.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_46">Operands:<a class="headerlink" href="#operands_46" title="Permanent link">link</a></h5>
+<h5 id="operands_47">Operands:<a class="headerlink" href="#operands_47" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7120,7 +7267,7 @@ possibly lazy-initialized executable.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
+<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7147,7 +7294,7 @@ possibly lazy-initialized executable.</p>
 kernel/shader/etc.</p>
 <p>Traits: IsolatedFromAbove, SingleBlockImplicitTerminator<IREE::HAL::ExecutableEndOp>, SymbolTable</p>
 <p>Interfaces: Symbol</p>
-<h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
+<h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7189,7 +7336,7 @@ module without an assigned target. This is useful for hand-authoring
 executables prior to device specification.</p>
 <p>Traits: IsolatedFromAbove, SingleBlockImplicitTerminator<IREE::HAL::ExecutableSourceEndOp>, SymbolTable</p>
 <p>Interfaces: Symbol</p>
-<h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
+<h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7236,7 +7383,7 @@ executables prior to device specification.</p>
 is usually removed during transformation.</p>
 <p>Traits: HasParent<IREE::HAL::ExecutableOp>, IsolatedFromAbove, SingleBlockImplicitTerminator<IREE::HAL::ExecutableVariantEndOp>, SymbolTable</p>
 <p>Interfaces: Symbol</p>
-<h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
+<h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7270,6 +7417,98 @@ is usually removed during transformation.</p>
 </table>
 <h3 id="experimental-ops">Experimental ops<a class="headerlink" href="#experimental-ops" title="Permanent link">link</a></h3>
 <p>Temporary hack ops expected to be removed in the future.</p>
+<h4 id="halexfilefrom_memory-halexfilefrommemoryop"><code>hal.ex.file.from_memory</code> (HAL::ExFileFromMemoryOp)<a class="headerlink" href="#halexfilefrom_memory-halexfilefrommemoryop" title="Permanent link">link</a></h4>
+<p><em>Creates a file mapped into a byte range of a host buffer</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal.ex.file.from_memory` `device` `(` $device `:` type($device) `)`
+              `affinity` `(` $queue_affinity `)`
+              `access` `(` $access `)`
+              `buffer` `(` $buffer `:` type($buffer) `)`
+              `` `[` $offset `for` $length `]`
+              `flags` `(` $flags `)`
+              `:` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Returns a file handle that is backed by the given <code>buffer</code> contents.
+Behavior is undefined if the buffer contents change while the accesses are
+in-flight.</p>
+<p>Experimental as the exact interface for getting files from module contents
+still needs iteration. Most hardware APIs require a file descriptor or
+native platform handle but here we only have host pointers. When
+memory-mapped some systems allow for retrieval of the platform handle from
+a virtual address (GetMappedFileNameA/posix_mem_offset) but the APIs are
+sketchy and likely slow. Instead we should probably have a way to query for
+a file handle derived from the calling module by stack-walking and asking
+the VM module for its handle. Until we can figure this out this method will
+be marked epxerimental.</p>
+<p>Interfaces: OpAsmOpInterface</p>
+<h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Attribute</th>
+<th style="text-align: center;">MLIR Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>access</code></td>
+<td style="text-align: center;">mlir::iree_compiler::IREE::HAL::MemoryAccessBitfieldAttr</td>
+<td>valid MemoryAccess</td>
+</tr>
+</tbody>
+</table>
+<h5 id="operands_48">Operands:<a class="headerlink" href="#operands_48" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>queue_affinity</code></td>
+<td>64-bit signless integer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>length</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>flags</code></td>
+<td>32-bit signless integer</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>buffer</td>
+</tr>
+</tbody>
+</table>
 <h4 id="halexshared_device-halexshareddeviceop"><code>hal.ex.shared_device</code> (HAL::ExSharedDeviceOp)<a class="headerlink" href="#halexshared_device-halexshareddeviceop" title="Permanent link">link</a></h4>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.ex.shared_device` attr-dict `:` type($result)
@@ -7306,7 +7545,7 @@ is usually removed during transformation.</p>
 fence after the wait, with a non-zero value indicating failure.</p>
 <p>Traits: Util_YieldPoint</p>
 <p>Interfaces: OpAsmOpInterface</p>
-<h5 id="operands_47">Operands:<a class="headerlink" href="#operands_47" title="Permanent link">link</a></h5>
+<h5 id="operands_49">Operands:<a class="headerlink" href="#operands_49" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7354,7 +7593,7 @@ asynchronously signaled by the device by passing them as an operand to
 queue submission ops.</p>
 <p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</p>
-<h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
+<h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7371,7 +7610,7 @@ queue submission ops.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_48">Operands:<a class="headerlink" href="#operands_48" title="Permanent link">link</a></h5>
+<h5 id="operands_50">Operands:<a class="headerlink" href="#operands_50" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7411,7 +7650,7 @@ queue submission ops.</p>
 <p>Signals the fence with a failure. The <code>status</code> will be returned from
 each timepoint semaphores <code>hal.semaphore.query</code> and <code>hal.semaphore.signal</code>
 for the lifetime of each semaphore.</p>
-<h5 id="operands_49">Operands:<a class="headerlink" href="#operands_49" title="Permanent link">link</a></h5>
+<h5 id="operands_51">Operands:<a class="headerlink" href="#operands_51" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7439,7 +7678,7 @@ for the lifetime of each semaphore.</p>
 </code></pre></div>
 <p>Returns a fence that joins the input fences as a wait-all operation.</p>
 <p>Interfaces: OpAsmOpInterface</p>
-<h5 id="operands_50">Operands:<a class="headerlink" href="#operands_50" title="Permanent link">link</a></h5>
+<h5 id="operands_52">Operands:<a class="headerlink" href="#operands_52" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7479,7 +7718,7 @@ for the lifetime of each semaphore.</p>
 <p>Queries whether the fence has been reached and its status.
 Returns OK if the fence has been signaled successfully, DEFERRED if it is
 unsignaled, and otherwise an error indicating the failure.</p>
-<h5 id="operands_51">Operands:<a class="headerlink" href="#operands_51" title="Permanent link">link</a></h5>
+<h5 id="operands_53">Operands:<a class="headerlink" href="#operands_53" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7517,7 +7756,7 @@ unsignaled, and otherwise an error indicating the failure.</p>
 </code></pre></div>
 <p>Signals the fence to indicate that the timepoints contained have been
 reached. Waiting work may begin immediately.</p>
-<h5 id="operands_52">Operands:<a class="headerlink" href="#operands_52" title="Permanent link">link</a></h5>
+<h5 id="operands_54">Operands:<a class="headerlink" href="#operands_54" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7546,7 +7785,7 @@ bytes from the given resolved pointer have been loaded by the workgroup.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_53">Operands:<a class="headerlink" href="#operands_53" title="Permanent link">link</a></h5>
+<h5 id="operands_55">Operands:<a class="headerlink" href="#operands_55" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7604,7 +7843,7 @@ bytes have been stored to the given resolved pointer by the workgroup.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_54">Operands:<a class="headerlink" href="#operands_54" title="Permanent link">link</a></h5>
+<h5 id="operands_56">Operands:<a class="headerlink" href="#operands_56" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7662,7 +7901,7 @@ provided values and then emits an <code>iree_instrument_dispatch_print_t</code> 
 formatted string lengths may be limited to as much as 1024 characters and
 should be kept as small as possible to avoid easily exceeding the
 instrumentation storage buffers with redundant strings.</p>
-<h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
+<h5 id="attributes_36">Attributes:<a class="headerlink" href="#attributes_36" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7679,7 +7918,7 @@ instrumentation storage buffers with redundant strings.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_55">Operands:<a class="headerlink" href="#operands_55" title="Permanent link">link</a></h5>
+<h5 id="operands_57">Operands:<a class="headerlink" href="#operands_57" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7712,7 +7951,7 @@ instrumentation storage buffers with redundant strings.</p>
 ordinal.</p>
 <p>This op will be preserved even if the output is not used as it is only for
 debugging purposes.</p>
-<h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
+<h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7729,7 +7968,7 @@ debugging purposes.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_56">Operands:<a class="headerlink" href="#operands_56" title="Permanent link">link</a></h5>
+<h5 id="operands_58">Operands:<a class="headerlink" href="#operands_58" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7786,7 +8025,7 @@ only the first invocation within the workgroup should emit the workgroup
 event (by checking if the LocalInvocationIndex or threadIdx == 0, etc).</p>
 <p>The resulting workgroup key is used by subsequent workgroup-specific
 instrumentation events.</p>
-<h5 id="operands_57">Operands:<a class="headerlink" href="#operands_57" title="Permanent link">link</a></h5>
+<h5 id="operands_59">Operands:<a class="headerlink" href="#operands_59" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7842,7 +8081,7 @@ will be the minimum of the two.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_36">Attributes:<a class="headerlink" href="#attributes_36" title="Permanent link">link</a></h5>
+<h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7879,7 +8118,7 @@ will be the minimum of the two.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_58">Operands:<a class="headerlink" href="#operands_58" title="Permanent link">link</a></h5>
+<h5 id="operands_60">Operands:<a class="headerlink" href="#operands_60" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7936,7 +8175,7 @@ and must be assumed to have any value.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
+<h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -7995,7 +8234,7 @@ built-in variable.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
+<h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8043,7 +8282,7 @@ built-in variable.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
+<h5 id="attributes_41">Attributes:<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8092,7 +8331,7 @@ built-in variable.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
+<h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8145,7 +8384,7 @@ adjacent to it.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_41">Attributes:<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h5>
+<h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8162,7 +8401,7 @@ adjacent to it.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_59">Operands:<a class="headerlink" href="#operands_59" title="Permanent link">link</a></h5>
+<h5 id="operands_61">Operands:<a class="headerlink" href="#operands_61" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8209,7 +8448,7 @@ possibly lazy-initialized pipeline layout.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
+<h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8226,7 +8465,7 @@ possibly lazy-initialized pipeline layout.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_60">Operands:<a class="headerlink" href="#operands_60" title="Permanent link">link</a></h5>
+<h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8269,7 +8508,7 @@ possibly lazy-initialized pipeline layout.</p>
 <p>Defines a barrier that is used to indicate availability of an entire set of
 tensors by signaling a fence. The source tensors are returned for chaining.</p>
 <p>Interfaces: TiedOpInterface</p>
-<h5 id="operands_61">Operands:<a class="headerlink" href="#operands_61" title="Permanent link">link</a></h5>
+<h5 id="operands_63">Operands:<a class="headerlink" href="#operands_63" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8329,7 +8568,7 @@ device-visible and defined for transfer-target and dispatch usage.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
+<h5 id="attributes_45">Attributes:<a class="headerlink" href="#attributes_45" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8351,7 +8590,7 @@ device-visible and defined for transfer-target and dispatch usage.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
+<h5 id="operands_64">Operands:<a class="headerlink" href="#operands_64" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8412,7 +8651,7 @@ types, etc.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
+<h5 id="attributes_46">Attributes:<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -8434,7 +8673,7 @@ types, etc.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="operands_63">Operands:<a class="headerlink" href="#operands_63" title="Permanent link">link</a></h5>
+<h5 id="operands_65">Operands:<a class="headerlink" href="#operands_65" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9049,8 +9288,11 @@ across CommandBuffers from the same device or others.</p>
 <h3 id="fence">fence<a class="headerlink" href="#fence" title="Permanent link">link</a></h3>
 <p>A set of semaphore timepoints defining a common point in time across
 multiple timelines.</p>
+<h3 id="buffer_1">buffer<a class="headerlink" href="#buffer_1" title="Permanent link">link</a></h3>
+<p>A stateless file handle that can be read/written using queue-ordered
+transfer operations.</p>
 <h3 id="pipeline_layout">pipeline_layout<a class="headerlink" href="#pipeline_layout" title="Permanent link">link</a></h3>
-<p>An pipeline layout describing the descriptor sets and push constants used.</p>
+<p>A pipeline layout describing the descriptor sets and push constants used.</p>
 
 
 
