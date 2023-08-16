@@ -48,6 +48,11 @@ chooseMatmulTileParamsAArch64(EncodingUser user, ExecutableTargetAttr target) {
   case EncodingUser::MATMUL_F16F16F16:
   case EncodingUser::MATMUL_BF16BF16F32:
   case EncodingUser::MATMUL_BF16BF16BF16:
+  case EncodingUser::BATCH_MATMUL_F32F32F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F16:
+  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
+  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
@@ -55,6 +60,7 @@ chooseMatmulTileParamsAArch64(EncodingUser user, ExecutableTargetAttr target) {
     // accumulator itself is f16/bf16.
     return {8, 1, 8};
   case EncodingUser::MATMUL_I8I8I32:
+  case EncodingUser::BATCH_MATMUL_I8I8I32:
     if (hasFeature(target, "+i8mm")) {
       // Aim to use SMMLA.
       return {8, 8, 8};
@@ -78,6 +84,11 @@ chooseMatmulTileParamsX86_64(EncodingUser user, ExecutableTargetAttr target) {
   case EncodingUser::MATMUL_F16F16F16:
   case EncodingUser::MATMUL_BF16BF16F32:
   case EncodingUser::MATMUL_BF16BF16BF16:
+  case EncodingUser::BATCH_MATMUL_F32F32F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F16:
+  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
+  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
@@ -96,6 +107,7 @@ chooseMatmulTileParamsX86_64(EncodingUser user, ExecutableTargetAttr target) {
     // SSE fallback.
     return {8, 1, 4};
   case EncodingUser::MATMUL_I8I8I32:
+  case EncodingUser::BATCH_MATMUL_I8I8I32:
     if (hasFeature(target, "+avx512vnni")) {
       // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
       // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
@@ -159,7 +171,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
   MatmulTileParams tileParams = chooseMatmulTileParams(user, targetAttr);
-  auto encodingInfo = chooseEncodingInfoForMatmul(role, tileParams);
+  auto encodingInfo = chooseEncodingInfoForMatmul(user, role, tileParams);
   auto originalTypeAttr = encoding.getOriginalType();
   auto originalType = originalTypeAttr
                           ? originalTypeAttr.getValue().cast<RankedTensorType>()
