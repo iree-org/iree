@@ -17,7 +17,6 @@ iree_lit_test_suite(
     "conv2d_to_img2col.mlir"
     "make_single_dispatch_for_function.mlir"
     "pad_linalg_ops.mlir"
-    "rematerialize_parallel_ops.mlir"
   TOOLS
     FileCheck
     iree-opt

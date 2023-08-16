@@ -4,19 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/Preprocessing/Common/PassDetail.h"
-#include "iree/compiler/Preprocessing/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-preprocessing-rematerialize-parallel-ops"
+#define DEBUG_TYPE "iree-codegen-rematerialize-parallel-ops"
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
 
 namespace {
 
@@ -35,11 +32,6 @@ struct RematerializeParallelOpsPattern
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    // Restrict to operations within pre-formed dispatches to avoid blanket
-    // rematerialization over the whole model.
-    if (Flow::isNonNullAndOutsideDispatch(genericOp))
-      return failure();
-
     // Avoid doing this for scalar operations.
     auto isScalarValue = [](Value v) {
       return isScalarOrTensorOfSizeOne(v.getType());
@@ -88,6 +80,5 @@ createRematerializeParallelOpsPass() {
   return std::make_unique<RematerializeParallelOpsPass>();
 }
 
-} // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
