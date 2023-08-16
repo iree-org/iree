@@ -194,6 +194,27 @@ def Util_CASElementsAttr : AttrDef<Util_Dialect, "CASElements", [
     // or is not valid.
     // The returned data is valid so long as the resource is alive.
     std::optional<CASResourceReader> getOptionalResourceData() const;
+
+    // ElementsAttr implementation.
+    using ContiguousIterableTypesT = std::tuple<
+      // Integer types.
+      // uint8_t, uint16_t, uint32_t, uint64_t,
+      // int8_t, int16_t, int32_t, int64_t,
+      // short, unsigned short, int, unsigned, long, unsigned long,
+      // // Float types.
+      // float, double
+    >;
+    using NonContiguousIterableTypesT = std::tuple<
+      // Integer types.
+      APInt,
+      // Float types.
+      APFloat
+    >;
+
+    // template <typename T>
+    // auto try_value_begin_impl(OverloadToken<T>) const {
+    //   return try_value_begin<T>();
+    // }
   }];
   let hasCustomAssemblyFormat = 1;
   let skipDefaultBuilders = 1;

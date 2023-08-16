@@ -119,8 +119,8 @@ def SimplifyGlobalAccesses :
 // Resource Management
 //===----------------------------------------------------------------------===//
 
-def ImportResources : Pass<"iree-util-import-resources", ""> {
-  let summary = "Imports IR with arbitrary large-data into resources that IREE can manage efficiently";
+def ConvertElements : Pass<"iree-util-convert-elements", ""> {
+  let summary = "Converts ElementsAttr attributes to different supported forms";
   let description = [{
     MLIR has many interesting ways to store large constants, most of which
     derive from *ElementsAttr. Given the uniquing/inline behavior, this exacts
@@ -132,8 +132,12 @@ def ImportResources : Pass<"iree-util-import-resources", ""> {
     transition and testing by doing a manual conversion with iree-opt.
   }];
   let constructor = [{
-    mlir::iree_compiler::IREE::Util::createImportResourcesPass()
+    mlir::iree_compiler::IREE::Util::createConvertElementsPass()
   }];
+  let options = [
+    Option<"mode", "mode", "std::string", 
+           /*default=*/"std::string(\"CASElements\")", "What to convert to">
+  ];  
 }
 
 //===----------------------------------------------------------------------===//

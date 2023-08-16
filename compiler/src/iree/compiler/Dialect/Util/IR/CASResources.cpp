@@ -223,9 +223,14 @@ CASManagerDialectInterface::internResource(CASResourceBuilder builder,
   LLVM_DEBUG(dbgs() << "[iree-cas-resource] Interning new cas resource for "
                     << hashCode << "\n");
   std::string encodedHash = reader.getEncodedHashCode();
+  // Since we use the blob key as part of a resource handle in the IR, it must
+  // syntactically be a valid identifier. Prefixing with a letter makes it legal
+  // and also leaves us syntactic room in the future for stripped resources
+  // with another prefix.
+  std::string blobKey = std::string("R") + encodedHash;
   AsmResourceBlob createdBlob = builder.createBlob();
   UtilDialect::CASResourceHandle globalHandle =
-      blobManager.insert(encodedHash, std::move(createdBlob));
+      blobManager.insert(blobKey, std::move(createdBlob));
   PopulatedCASResource::Reference createdRef =
       std::make_shared<PopulatedCASResource>(std::move(globalHandle));
   scope.populatedResources[hashCode].push_back(createdRef);

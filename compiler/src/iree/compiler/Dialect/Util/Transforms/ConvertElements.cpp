@@ -22,8 +22,9 @@ namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
-class ImportResourcesPass : public ImportResourcesBase<ImportResourcesPass> {
+class ConvertElementsPass : public ConvertElementsBase<ConvertElementsPass> {
 public:
+  using Converter = std::function<ElementsAttr(Location, ElementsAttr)>;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<BuiltinDialect>();
     registry.insert<UtilDialect>();
@@ -31,6 +32,17 @@ public:
 
   void runOnOperation() override {
     llvm::DenseMap<Attribute, Attribute> replacements;
+    Converter converter;
+    if (mode == "CASElements") {
+      converter = &ConvertElementsPass::convertElementsAttrToCAS;
+    } else if (mode == "DenseElements") {
+      converter = &ConvertElementsPass::convertElementsAttrToDense;
+    } else {
+      emitError(UnknownLoc::get(&getContext()))
+          << "unknown pass 'mode' = '" << mode << "'";
+      signalPassFailure();
+      return;
+    }
 
     getOperation()->walk([&](Operation *op) {
       bool updated = false;
@@ -49,8 +61,7 @@ public:
           }
 
           // Convert.
-          ElementsAttr replacement =
-              convertElementsAttr(op->getLoc(), elements);
+          ElementsAttr replacement = converter(op->getLoc(), elements);
           if (replacement) {
             attr.setValue(replacement);
             replacements[elements] = replacement;
@@ -64,8 +75,8 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "DONE CONVERTING RESOURCES\n");
   }
 
-  static ElementsAttr convertElementsAttr(Location loc,
-                                          ElementsAttr elementsAttr) {
+  static ElementsAttr convertElementsAttrToCAS(Location loc,
+                                               ElementsAttr elementsAttr) {
     if (llvm::isa<DenseElementsAttr>(elementsAttr) && elementsAttr.isSplat()) {
       // DenseElementsAttr encodes arbitrary dimension
       // splats whereas DenseResourceElementsAttr does not.
@@ -106,12 +117,58 @@ public:
     return CASElementsAttr::get(elementsAttr.getShapedType(),
                                 ref->getGlobalResource());
   }
+
+  static ElementsAttr convertElementsAttrToDense(Location loc,
+                                                 ElementsAttr elementsAttr) {
+    if (llvm::isa<DenseElementsAttr>(elementsAttr)) {
+      // Do not self convert.
+      return {};
+    }
+
+    // Switch based on float vs int because builtin variants don't
+    // support bag of bits access.
+    ShapedType st = elementsAttr.getShapedType();
+    Type elementType = st.getElementType();
+    int64_t numElements = st.getNumElements();
+
+    // TODO: We could fast-path this with various access to raw data,
+    // but this is a utility pass and it is testing that elements
+    // conversions works.
+    if (llvm::isa<FloatType>(elementType)) {
+      std::vector<APFloat> newValues;
+      newValues.reserve(numElements);
+      auto range = elementsAttr.tryGetValues<APFloat>();
+      if (!range) {
+        emitWarning(loc) << "elements attr does not support APFloat iteration";
+        return {};
+      }
+      for (APFloat value : elementsAttr.getValues<APFloat>()) {
+        newValues.push_back(value);
+      }
+      return DenseElementsAttr::get(st, newValues);
+    } else if (llvm::isa<IntegerType>(elementType)) {
+      std::vector<APInt> newValues;
+      newValues.reserve(numElements);
+      auto range = elementsAttr.tryGetValues<APInt>();
+      if (!range) {
+        emitWarning(loc) << "elements attr does not support APInt iteration";
+        return {};
+      }
+      for (APInt value : *range) {
+        newValues.push_back(value);
+      }
+      return DenseElementsAttr::get(st, newValues);
+    } else {
+      // Not supported.
+      return {};
+    }
+  }
 };
 
 } // namespace
 
-std::unique_ptr<OperationPass<void>> createImportResourcesPass() {
-  return std::make_unique<ImportResourcesPass>();
+std::unique_ptr<OperationPass<void>> createConvertElementsPass() {
+  return std::make_unique<ConvertElementsPass>();
 }
 
 } // namespace mlir::iree_compiler::IREE::Util
