@@ -123,6 +123,58 @@ func.func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
 
 // -----
 
+// Tests that subviews of tied operands are propagated to consumers.
+
+// CHECK-LABEL: @tiedOperandSubviews
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[SIZE:.+]]: index, %[[OFFSET0:.+]]: index, %[[OFFSET1:.+]]: index, %[[OFFSET2:.+]]: index, %[[LENGTH0:.+]]: index, %[[LENGTH1:.+]]: index, %[[LENGTH2:.+]]: index)
+func.func @tiedOperandSubviews(%operand: !stream.resource<external>, %size: index, %offset0: index, %offset1: index, %offset2: index, %length0: index, %length1: index, %length2: index) {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[SUBVIEW_OFFSET:.+]] = arith.addi %[[OFFSET0]], %[[OFFSET1]]
+  // CHECK: %[[SUBVIEW:.+]] = stream.resource.subview %[[OPERAND]][%[[SUBVIEW_OFFSET]]] {{.*}} -> !stream.resource<external>{%[[LENGTH1]]}
+  // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]})
+  // CHECK-NEXT: } => !stream.timepoint
+  %result0, %result0_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<external>{%size}) -> (%operand as !stream.resource<external>{%length1}) {
+    %subview0 = stream.resource.subview %capture[%offset0] : !stream.resource<external>{%size} -> !stream.resource<external>{%length0}
+    %subview1 = stream.resource.subview %subview0[%offset1] : !stream.resource<external>{%length0} -> !stream.resource<external>{%length1}
+    stream.yield %subview1 : !stream.resource<external>{%length1}
+  } => !stream.timepoint
+  // CHECK: stream.cmd.execute with(%[[SUBVIEW]] as %[[SUBVIEW_CAPTURE:.+]]: !stream.resource<external>{%[[LENGTH1]]})
+  // CHECK: stream.cmd.copy %[[SUBVIEW_CAPTURE]][%[[OFFSET2]]], %[[SUBVIEW_CAPTURE]][%c0], %[[LENGTH2]] : !stream.resource<external>{%[[LENGTH1]]} -> !stream.resource<external>{%[[LENGTH1]]}
+  %result1, %result1_timepoint = stream.async.execute with(%result0 as %capture: !stream.resource<external>{%length1}) -> (%result0 as !stream.resource<external>{%length1}) {
+    %subview2 = stream.resource.subview %capture[%offset2] : !stream.resource<external>{%length1} -> !stream.resource<external>{%length2}
+    %update = stream.async.update %subview2, %capture[%c0 to %length2] : !stream.resource<external>{%length2} -> %capture as !stream.resource<external>{%length1}
+    stream.yield %update : !stream.resource<external>{%length1}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[SUBVIEW]]
+  util.optimization_barrier %result1 : !stream.resource<external>
+  return
+}
+
+// -----
+
+// Tests that value aliases with subranges are propagated.
+
+// CHECK-LABEL: @aliasPropagation
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
+func.func @aliasPropagation(%operand: !stream.resource<external>, %size: index, %offset: index, %length: index) {
+  %c0 = arith.constant 0 : index
+  // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<external>{%size}) -> (%operand as !stream.resource<external>{%size}) {
+    // CHECK-NOT: stream.resource.subview
+    %subview = stream.resource.subview %capture[%offset] : !stream.resource<external>{%size} -> !stream.resource<external>{%length}
+    // CHECK: stream.cmd.copy %[[CAPTURE]][%[[OFFSET]]], %[[CAPTURE]][%c0], %[[LENGTH]] : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+    %update = stream.async.update %subview, %capture[%c0 to %length] : !stream.resource<external>{%length} -> %capture as !stream.resource<external>{%size}
+    stream.yield %update : !stream.resource<external>{%size}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<external>
+  return
+}
+
+// -----
+
 // Tests results are allocated for external use.
 // We expect them to be allocated with synchronous alloc ops.
 

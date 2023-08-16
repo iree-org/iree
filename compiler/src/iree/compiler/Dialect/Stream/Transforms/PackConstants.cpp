@@ -237,196 +237,83 @@ computePackingMap(ArrayRef<ConstantSlice> slices,
 // Upload materialization
 //===----------------------------------------------------------------------===//
 
-struct AllocatedStorage {
-  // Resource storing all packed constants.
+struct TimepointResource {
+  Value timepoint;
   Value resource;
-  // Total size, in bytes, of the storage resource.
   Value resourceSize;
 };
 
-struct UploadResult {
-  // Timepoint when the storage is initialized with the constant values.
-  Value timepoint;
-  // Each (resource, resourceSize) allocated.
-  SmallVector<AllocatedStorage> allocations;
-};
+static TimepointResource buildFileRead(
+    Location loc, Value awaitTimepoint, IREE::Stream::AffinityAttr affinityAttr,
+    IREE::Stream::ResourceType resourceType, StorageResource storageResource,
+    Value storageResourceSize, Value storageBuffer, Value storageBufferSize,
+    IndexSet &indexSet, OpBuilder &builder) {
+  // Allocate the resulting storage resource of the final resource type.
+  auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
+      storageResource.loc, resourceType, storageResourceSize,
+      /*uninitialized=*/builder.getUnitAttr(), affinityAttr);
 
-// Maps constants as a staging buffer and then issues copy commands.
-// Per-storage resource we map the source rodata, allocate the result, and then
-// issue an async copy from source to result. To avoid a bunch of overhead when
-// there are multiple storage buffers we invert the logic so that we put all the
-// async copies into a single region.
-static UploadResult
-buildStagingUpload(Location loc, IREE::Stream::AffinityAttr affinityAttr,
-                   IREE::Stream::ResourceType resourceType,
-                   ArrayRef<StorageResource> storageResources,
-                   ArrayRef<Value> storageBuffers, IndexSet &indexSet,
-                   OpBuilder &builder) {
-  UploadResult uploadResult;
-  auto stagingType = builder.getType<IREE::Stream::ResourceType>(
-      IREE::Stream::Lifetime::Staging);
+  // Create the file backed by the constant resource buffer.
+  auto fileOp = builder.create<IREE::Stream::FileConstantOp>(
+      storageResource.loc, storageBuffer, storageBufferSize, indexSet.get(0),
+      storageResourceSize, affinityAttr);
 
-  // Map all of the storage data and allocate the result buffers.
-  // This will produce a list of copies we should perform from staging->final.
-  struct Copy {
-    Location loc;
-    Value source;
-    Value sourceSize;
-    Value sourceOffset;
-    Value target;
-    Value targetSize;
-    Value targetOffset;
-    Value length;
-  };
-  SmallVector<Copy> copies;
-  SmallVector<Value> capturedResources;
-  SmallVector<Value> capturedResourceSizes;
-  for (auto [storageResource, storageBuffer] :
-       llvm::zip_equal(storageResources, storageBuffers)) {
-    // Today we assume 1:1 lengths of storage data and uploaded data, but this
-    // need not be the case if we want to pad the buffer for runtime.
-    auto totalLength = indexSet.get(storageResource.totalSize);
+  // Issue asynchronous file read into the buffer.
+  auto zeroI64 =
+      builder.create<arith::ConstantIntOp>(storageResource.loc, 0, 64);
+  auto readOp = builder.create<IREE::Stream::FileReadOp>(
+      storageResource.loc, fileOp.getResult(), zeroI64, allocOp.getResult(0),
+      allocOp.getResultSize(0), indexSet.get(0), storageResourceSize,
+      awaitTimepoint, affinityAttr);
 
-    // Map the source staging resource rodata.
-    auto mapOp = builder.create<IREE::Stream::ResourceMapOp>(
-        storageResource.loc, stagingType, storageBuffer, indexSet.get(0),
-        totalLength, affinityAttr);
-
-    // Allocate the resulting storage resource of the final resource type.
-    auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
-        storageResource.loc, resourceType, mapOp.getResultSize(),
-        /*uninitialized=*/builder.getUnitAttr(), affinityAttr);
-
-    uploadResult.allocations.push_back({
-        allocOp.getResults().front(),
-        allocOp.getStorageSizes().front(),
-    });
-
-    // Queue copy for processing below.
-    Copy copy{
-        storageResource.loc,
-        mapOp.getResult(),
-        mapOp.getResultSize(),
-        indexSet.get(0),
-        allocOp.getResults().front(),
-        allocOp.getStorageSizes().front(),
-        indexSet.get(0),
-        totalLength,
-    };
-    capturedResources.push_back(copy.source);
-    capturedResourceSizes.push_back(copy.sourceSize);
-    capturedResources.push_back(copy.target);
-    capturedResourceSizes.push_back(copy.targetSize);
-    copies.push_back(std::move(copy));
-  }
-
-  // Create the execution op capturing the resources.
-  auto executeOp = builder.create<IREE::Stream::CmdExecuteOp>(
-      loc, /*awaitTimepoint=*/Value{}, capturedResources,
-      capturedResourceSizes);
-  if (affinityAttr)
-    executeOp.setAffinityAttr(affinityAttr);
-  uploadResult.timepoint = executeOp.getResultTimepoint();
-
-  // Map captured resources into the execution region.
-  IRMapping mapping;
-  auto *entryBlock = new Block();
-  executeOp.getBody().push_back(entryBlock);
-  for (auto outerValue : capturedResources) {
-    auto arg =
-        entryBlock->addArgument(outerValue.getType(), outerValue.getLoc());
-    mapping.map(outerValue, arg);
-  }
-
-  // Issue copies. Note that we use the captured resources.
-  auto executionBuilder = OpBuilder::atBlockBegin(entryBlock);
-  for (auto &copy : copies) {
-    executionBuilder.create<IREE::Stream::CmdCopyOp>(
-        copy.loc, mapping.lookup(copy.source), copy.sourceSize,
-        copy.sourceOffset, mapping.lookup(copy.target), copy.targetSize,
-        copy.targetOffset, copy.length);
-  }
-  executionBuilder.create<IREE::Stream::YieldOp>(executeOp.getLoc());
-
-  return uploadResult;
+  return TimepointResource{readOp.getResultTimepoint(), readOp.getTarget(),
+                           readOp.getTargetSize()};
 }
 
-// Emits IR to first try mapping the storage resources directly into usable
-// constant resources. If the mapping fails (the target can't use the memory)
+// Emits IR to first try mapping the storage resource directly into a usable
+// constant resource. If the mapping fails (the target can't use the memory)
 // then fall back to staging uploads.
-static UploadResult buildTryMapConstantResources(
-    Location loc, IREE::Stream::AffinityAttr affinityAttr,
-    IREE::Stream::ResourceType resourceType,
-    ArrayRef<StorageResource> storageResources, ArrayRef<Value> storageBuffers,
+// Returns a timepoint indicating the operation has completed.
+static TimepointResource buildTryMapConstantResource(
+    Location loc, Value awaitTimepoint, IREE::Stream::AffinityAttr affinityAttr,
+    IREE::Stream::ResourceType resourceType, StorageResource storageResource,
+    Value storageResourceSize, Value storageBuffer, Value storageBufferSize,
     IndexSet &indexSet, OpBuilder &builder) {
-  // Try mapping each resource. We do this as an all-or-nothing across the
-  // storage: if any fails we fallback to the allocation path. This is mostly
-  // just to get more predictable behavior in the face of weird platform
-  // requirements: we want something like misaligned mappings to be easily
-  // visible in tracing.
-  SmallVector<Value> mappedResources;
-  SmallVector<Type> resultTypes;
-  Value ok;
-  auto zero = indexSet.get(0);
-  for (auto [storageResource, storageBuffer] :
-       llvm::zip_equal(storageResources, storageBuffers)) {
-    auto tryMapOp = builder.create<IREE::Stream::ResourceTryMapOp>(
-        storageResource.loc, builder.getI1Type(), resourceType, storageBuffer,
-        zero, indexSet.get(storageResource.totalSize), affinityAttr);
-    if (!ok) {
-      ok = tryMapOp.getDidMap();
-    } else {
-      ok = builder.createOrFold<arith::AndIOp>(tryMapOp.getLoc(), ok,
-                                               tryMapOp.getDidMap());
-    }
-    mappedResources.push_back(tryMapOp.getResult());
-    resultTypes.push_back(tryMapOp.getResult().getType());
-  }
+  // Try mapping; this may fail if the device can't use the storage buffer as
+  // the type of resource requested.
+  auto tryMapOp = builder.create<IREE::Stream::ResourceTryMapOp>(
+      storageResource.loc, builder.getI1Type(), resourceType, storageBuffer,
+      indexSet.get(0), storageResourceSize, affinityAttr);
 
   // If we are able to directly map the resources then we don't need to wait.
-  auto timepointType = builder.getType<IREE::Stream::TimepointType>();
-  resultTypes.push_back(timepointType);
-
-  // if ok: return mapped resources
-  // else: allocate and upload
+  // Otherwise we need to stage the storage buffer into memory via the file
+  // streaming API.
   auto ifOp = builder.create<scf::IfOp>(
-      loc, ok,
+      loc, tryMapOp.getDidMap(),
       [&](OpBuilder &thenBuilder, Location loc) {
         // Just return the resources + an immediate timepoint.
-        SmallVector<Value> ifResults = mappedResources;
-        ifResults.push_back(
-            thenBuilder.create<IREE::Stream::TimepointImmediateOp>(loc));
-        thenBuilder.create<scf::YieldOp>(loc, ifResults);
+        thenBuilder.create<scf::YieldOp>(loc, ValueRange{
+                                                  awaitTimepoint,
+                                                  tryMapOp.getResult(),
+                                              });
       },
       [&](OpBuilder &elseBuilder, Location loc) {
-        // Fallback to upload and then
-        auto stagingResult = buildStagingUpload(
-            loc, affinityAttr, resourceType, storageResources, storageBuffers,
-            indexSet, builder);
-        SmallVector<Value> ifResults;
-        for (auto &allocation : stagingResult.allocations) {
-          ifResults.push_back(allocation.resource);
-        }
-        ifResults.push_back(stagingResult.timepoint);
-        elseBuilder.create<scf::YieldOp>(loc, ifResults);
+        auto readResult =
+            buildFileRead(loc, awaitTimepoint, affinityAttr, resourceType,
+                          storageResource, storageResourceSize, storageBuffer,
+                          storageBufferSize, indexSet, elseBuilder);
+        elseBuilder.create<scf::YieldOp>(loc, ValueRange{
+                                                  readResult.timepoint,
+                                                  readResult.resource,
+                                              });
       });
-  auto ifTimepoint = ifOp.getResults().back();
-  auto ifResources = ifOp.getResults().slice(0, ifOp.getResults().size() - 1);
-
-  // Use the result of either the direct mapping or the staging upload.
-  UploadResult uploadResult;
-  uploadResult.timepoint = ifTimepoint;
-  for (auto [storageResource, ifResource] :
-       llvm::zip_equal(storageResources, ifResources)) {
-    uploadResult.allocations.push_back({
-        ifResource,
-        indexSet.get(storageResource.totalSize),
-    });
-  }
-  return uploadResult;
+  auto ifTimepoint = ifOp.getResults().front();
+  auto ifResource = ifOp.getResults().back();
+  return TimepointResource{ifTimepoint, ifResource, storageResourceSize};
 }
 
-static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
+static Value generateUpload(Value awaitTimepoint,
+                            IREE::Stream::ResourceConstantsOp constantsOp,
                             IREE::Stream::Lifetime lifetime,
                             IREE::Stream::ResourceConfigAttr resourceConfig,
                             IndexSet &indexSet, OpBuilder &builder) {
@@ -454,49 +341,53 @@ static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
   if (storageResources.empty())
     return nullptr;
 
-  // Emit rodata storage for the constant values.
-  // As our upload paths may vary this ensures that we are only emitting
-  // them once regardless of how many strategies we emit IR for.
-  SmallVector<Value> storageBuffers;
-  for (auto &storageResource : storageResources) {
-    auto rodataOp = builder.create<IREE::Util::BufferConstantOp>(
-        storageResource.loc, /*name=*/nullptr, storageResource.data,
-        builder.getIndexAttr(resourceConfig.getMinBufferOffsetAlignment()),
-        /*mimeType=*/nullptr);
-    storageBuffers.push_back(rodataOp);
-  }
+  // TODO(benvanik): should be able to have a single buffer constant and
+  // subrange it so that we don't need so many files.
 
-  // If this is producing constants (vs variables) we can try to go on a
-  // fast-path where we directly map the constant memory. If producing
-  // variables then we always need to stage and clone.
   auto anyResult = slices.front().result;
   auto resourceType =
       llvm::cast<IREE::Stream::ResourceType>(anyResult.getType());
-  UploadResult uploadResult;
-  if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
-    uploadResult = buildTryMapConstantResources(
-        constantsOp.getLoc(), constantsOp.getAffinityAttr(), resourceType,
-        storageResources, storageBuffers, indexSet, builder);
-  } else {
-    uploadResult = buildStagingUpload(
-        constantsOp.getLoc(), constantsOp.getAffinityAttr(), resourceType,
-        storageResources, storageBuffers, indexSet, builder);
-  }
 
-  // Build subviews for all packed spans back into storage buffers.
-  for (auto [storageResource, allocatedStorage] :
-       llvm::zip_equal(storageResources, uploadResult.allocations)) {
+  // Emit rodata storage for the constant values.
+  // As our upload paths may vary this ensures that we are only emitting
+  // them once regardless of how many strategies we emit IR for.
+  Value currentTimepoint = awaitTimepoint;
+  for (auto &storageResource : storageResources) {
+    Value storageBuffer = builder.create<IREE::Util::BufferConstantOp>(
+        storageResource.loc, /*name=*/nullptr, storageResource.data,
+        builder.getIndexAttr(resourceConfig.getMinBufferOffsetAlignment()),
+        /*mimeType=*/nullptr);
+    auto resourceSize = indexSet.get(storageResource.totalSize);
+
+    // If this is producing constants (vs variables) we can try to go on a
+    // fast-path where we directly map the constant memory. If producing
+    // variables then we always need to stage and clone.
+    TimepointResource uploadedResource;
+    if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
+      uploadedResource = buildTryMapConstantResource(
+          constantsOp.getLoc(), currentTimepoint, constantsOp.getAffinityAttr(),
+          resourceType, storageResource, resourceSize, storageBuffer,
+          resourceSize, indexSet, builder);
+    } else {
+      uploadedResource = buildFileRead(
+          constantsOp.getLoc(), currentTimepoint, constantsOp.getAffinityAttr(),
+          resourceType, storageResource, resourceSize, storageBuffer,
+          resourceSize, indexSet, builder);
+    }
+
     for (auto &span : storageResource.spans) {
       auto loc = span.slice.result.getLoc();
       auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
-          loc, allocatedStorage.resource, allocatedStorage.resourceSize,
+          loc, uploadedResource.resource, uploadedResource.resourceSize,
           indexSet.get(span.offset), span.slice.resultSize);
       span.slice.result.replaceAllUsesWith(subviewOp.getResult());
     }
+
+    currentTimepoint = uploadedResource.timepoint;
   }
 
   // Join on storage timepoints for our transitive dependencies to await.
-  return uploadResult.timepoint;
+  return currentTimepoint;
 }
 
 //===----------------------------------------------------------------------===//
@@ -540,31 +431,20 @@ public:
       indexSet.populate(constantsOp.getResultSizes());
 
       // Perform upload/processing for immutable and mutable constants.
-      SmallVector<Value> timepoints;
-      if (auto timepoint =
-              generateUpload(constantsOp, IREE::Stream::Lifetime::Constant,
-                             resourceConfig, indexSet, builder)) {
-        timepoints.push_back(timepoint);
+      Value currentTimepoint =
+          builder.create<IREE::Stream::TimepointImmediateOp>(
+              constantsOp.getLoc());
+      if (auto uploadTimepoint = generateUpload(
+              currentTimepoint, constantsOp, IREE::Stream::Lifetime::Constant,
+              resourceConfig, indexSet, builder)) {
+        currentTimepoint = uploadTimepoint;
       }
-      if (auto timepoint =
-              generateUpload(constantsOp, IREE::Stream::Lifetime::Variable,
-                             resourceConfig, indexSet, builder)) {
-        timepoints.push_back(timepoint);
+      if (auto uploadTimepoint = generateUpload(
+              currentTimepoint, constantsOp, IREE::Stream::Lifetime::Variable,
+              resourceConfig, indexSet, builder)) {
+        currentTimepoint = uploadTimepoint;
       }
-      if (timepoints.empty())
-        return;
-
-      // Join on storage timepoints for our transitive dependencies to await.
-      // We could do this at a finer granularity if we were to split the
-      // constants op into multiple units earlier on.
-      Value joinTimepoint;
-      if (timepoints.size() > 1) {
-        joinTimepoint = builder.create<IREE::Stream::TimepointJoinOp>(
-            constantsOp.getLoc(), timepoints.front().getType(), timepoints);
-      } else {
-        joinTimepoint = timepoints.front();
-      }
-      constantsOp.getResultTimepoint().replaceAllUsesWith(joinTimepoint);
+      constantsOp.getResultTimepoint().replaceAllUsesWith(currentTimepoint);
 
       constantsOp.erase();
     });

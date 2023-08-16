@@ -157,8 +157,10 @@ static iree_status_t iree_hal_metal_buffer_map_range(iree_hal_buffer_t* base_buf
   // TODO(benvanik): add upload/download for unmapped buffers.
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(base_buffer), IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(iree_hal_buffer_allowed_usage(base_buffer),
-                                                      IREE_HAL_BUFFER_USAGE_MAPPING));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
+      iree_hal_buffer_allowed_usage(base_buffer), mapping_mode == IREE_HAL_MAPPING_MODE_PERSISTENT
+                                                      ? IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT
+                                                      : IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
 
   void* host_ptr = buffer->buffer.contents;
   IREE_ASSERT(host_ptr != NULL);  // Should be guaranteed by previous checks.

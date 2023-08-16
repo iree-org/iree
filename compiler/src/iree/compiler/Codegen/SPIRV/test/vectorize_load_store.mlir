@@ -440,3 +440,66 @@ func.func @vectorize_mma_load_store_non_identity_memref(%i0: index, %i1: index) 
 // CHECK: %[[VAL:.+]] = gpu.subgroup_mma_load_matrix %[[SPAN0]][%[[I0]], %[[APPLY]]] {leadDimension = 160 : index}
 // CHECK: gpu.subgroup_mma_store_matrix %[[VAL]], %[[SPAN1]][%[[I0]], %[[APPLY]]] {leadDimension = 160 : index}
 
+// -----
+
+func.func @transfer_read_i4_memref_vector8(%x: index) -> vector<8xi4> {
+  %c0_i4 = arith.constant 0 : i4
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2048xi4>
+  %1 = vector.transfer_read %0[%x], %c0_i4 {in_bounds = [true]} : memref<2048xi4>, vector<8xi4>
+  return %1: vector<8xi4>
+}
+
+// CHECK-LABEL: func.func @transfer_read_i4_memref_vector8
+//  CHECK-SAME: (%[[ARG:.+]]: index)
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<256xvector<1xi32>>
+//       CHECK:   %[[INDEX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[ARG]]]
+//       CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]] : memref<256xvector<1xi32>>
+//       CHECK:   %[[CAST:.+]] = vector.bitcast %[[LOAD]] : vector<1xi32> to vector<8xi4>
+//       CHECK:   return %[[CAST]] : vector<8xi4>
+
+// -----
+
+func.func @transfer_read_i4_memref_vector4(%x: index) -> vector<4xi4> {
+  %c0_i4 = arith.constant 0 : i4
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2048xi4>
+  %1 = vector.transfer_read %0[%x], %c0_i4 {in_bounds = [true]} : memref<2048xi4>, vector<4xi4>
+  return %1: vector<4xi4>
+}
+
+// CHECK-LABEL: func.func @transfer_read_i4_memref_vector4
+//  CHECK-SAME: (%[[ARG:.+]]: index)
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<512xvector<2xi8>>
+//       CHECK:   %[[INDEX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 4)>()[%[[ARG]]]
+//       CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]] : memref<512xvector<2xi8>>
+//       CHECK:   %[[CAST:.+]] = vector.bitcast %[[LOAD]] : vector<2xi8> to vector<4xi4>
+//       CHECK:   return %[[CAST]] : vector<4xi4>
+
+// -----
+
+func.func @transfer_read_i4_memref_vector2(%x: index) -> vector<2xi4> {
+  %c0_i4 = arith.constant 0 : i4
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2048xi4>
+  %1 = vector.transfer_read %0[%x], %c0_i4 {in_bounds = [true]} : memref<2048xi4>, vector<2xi4>
+  return %1: vector<2xi4>
+}
+
+// CHECK-LABEL: func.func @transfer_read_i4_memref_vector2
+//  CHECK-SAME: (%[[ARG:.+]]: index)
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024xvector<1xi8>>
+//       CHECK:   %[[INDEX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[ARG]]]
+//       CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]] : memref<1024xvector<1xi8>>
+//       CHECK:   %[[CAST:.+]] = vector.bitcast %[[LOAD]] : vector<1xi8> to vector<2xi4>
+//       CHECK:   return %[[CAST]] : vector<2xi4>
+
+// -----
+
+func.func @transfer_read_i3_memref_vector8(%x: index) -> vector<8xi3> {
+  %c0_i3 = arith.constant 0 : i3
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2048xi3>
+  %1 = vector.transfer_read %0[%x], %c0_i3 {in_bounds = [true]} : memref<2048xi3>, vector<8xi3>
+  return %1: vector<8xi3>
+}
+
+//   CHECK-LABEL: func.func @transfer_read_i3_memref_vector8
+//         CHECK:   hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2048xi3>
+// CHECK-COUNT-8:   memref.load {{.+}} : memref<2048xi3>

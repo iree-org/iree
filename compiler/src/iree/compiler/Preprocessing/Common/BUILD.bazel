@@ -35,7 +35,6 @@ iree_compiler_cc_library(
         "PadLinalgOps.cpp",
         "PassDetail.h",
         "Passes.cpp",
-        "RematerializeParallelOps.cpp",
     ],
     hdrs = [
         "Passes.h",

@@ -31,7 +31,6 @@ iree_cc_library(
     "PadLinalgOps.cpp"
     "PassDetail.h"
     "Passes.cpp"
-    "RematerializeParallelOps.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport

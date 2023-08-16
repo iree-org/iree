@@ -73,7 +73,7 @@ static unsigned getDITypeSizeInBits(LLVM::DITypeAttr typeAttr) {
   }
 }
 
-ExecutableLibraryDI::ExecutableLibraryDI(LLVMTypeConverter *typeConverter)
+ExecutableLibraryDI::ExecutableLibraryDI(const LLVMTypeConverter *typeConverter)
     : typeConverter(typeConverter), builder(&typeConverter->getContext()) {
   auto *context = builder.getContext();
   fileAttr = LLVM::DIFileAttr::get(
@@ -315,7 +315,7 @@ llvm::sys::Mutex HALDispatchABI::sMutex;
 // static
 LLVM::LLVMStructType
 HALDispatchABI::getProcessorType(MLIRContext *context,
-                                 LLVMTypeConverter *typeConverter) {
+                                 const LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType =
       LLVM::LLVMStructType::getIdentified(context, "iree_hal_processor_v0_t");
@@ -340,7 +340,7 @@ HALDispatchABI::getProcessorType(MLIRContext *context,
 // static
 LLVM::LLVMStructType
 HALDispatchABI::getEnvironmentType(MLIRContext *context,
-                                   LLVMTypeConverter *typeConverter,
+                                   const LLVMTypeConverter *typeConverter,
                                    LLVM::LLVMStructType processorType) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
@@ -378,7 +378,7 @@ HALDispatchABI::getEnvironmentType(MLIRContext *context,
 // static
 LLVM::LLVMStructType
 HALDispatchABI::getDispatchStateType(MLIRContext *context,
-                                     LLVMTypeConverter *typeConverter) {
+                                     const LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_dispatch_state_v0_t");
@@ -432,7 +432,7 @@ HALDispatchABI::getDispatchStateType(MLIRContext *context,
 // static
 LLVM::LLVMStructType
 HALDispatchABI::getWorkgroupStateType(MLIRContext *context,
-                                      LLVMTypeConverter *typeConverter) {
+                                      const LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_workgroup_state_v0_t");
@@ -473,7 +473,7 @@ HALDispatchABI::getWorkgroupStateType(MLIRContext *context,
 // static
 SmallVector<Type, 5>
 HALDispatchABI::getInputTypes(MLIRContext *context,
-                              LLVMTypeConverter *typeConverter) {
+                              const LLVMTypeConverter *typeConverter) {
   return SmallVector<Type, 5>{
       // const iree_hal_executable_environment_v0_t* IREE_RESTRICT
       //   environment
@@ -490,7 +490,7 @@ HALDispatchABI::getInputTypes(MLIRContext *context,
 // static
 LLVM::DISubprogramAttr
 HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
-                               LLVMTypeConverter *typeConverter) {
+                               const LLVMTypeConverter *typeConverter) {
   auto *context = &typeConverter->getContext();
   Builder builder(context);
 

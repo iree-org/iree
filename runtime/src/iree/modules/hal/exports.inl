@@ -24,9 +24,8 @@
 
 // clang-format off
 
-EXPORT_FN("allocator.allocate", iree_hal_module_allocator_allocate, riiI, r)
-EXPORT_FN("allocator.allocate.initialized", iree_hal_module_allocator_allocate_initialized, riirII, r)
-EXPORT_FN("allocator.map.byte_buffer", iree_hal_module_allocator_map_byte_buffer, riiirII, r)
+EXPORT_FN("allocator.allocate", iree_hal_module_allocator_allocate, rIiiI, r)
+EXPORT_FN("allocator.import", iree_hal_module_allocator_import, riIiirII, r)
 
 EXPORT_FN("buffer.assert", iree_hal_module_buffer_assert, rrrIii, v)
 EXPORT_FN("buffer.length", iree_hal_module_buffer_length, r, I)
@@ -69,7 +68,10 @@ EXPORT_FN("device.queue.alloca", iree_hal_module_device_queue_alloca, rIrriiiI, 
 EXPORT_FN("device.queue.dealloca", iree_hal_module_device_queue_dealloca, rIrrr, v)
 EXPORT_FN("device.queue.execute", iree_hal_module_device_queue_execute, rIrrCrD, v)
 EXPORT_FN("device.queue.flush", iree_hal_module_device_queue_flush, rI, v)
+EXPORT_FN("device.queue.read", iree_hal_module_device_queue_read, rIrrrIrIIi, v)
+EXPORT_FN("device.queue.write", iree_hal_module_device_queue_write, rIrrrIrIIi, v)
 
+EXPORT_FN("ex.file.from_memory", iree_hal_module_ex_file_from_memory, rIirIIi, r)
 EXPORT_FN("ex.shared_device", iree_hal_module_ex_shared_device, v, r)
 
 EXPORT_FN("executable.create", iree_hal_module_executable_create, rrrrCrD, r)

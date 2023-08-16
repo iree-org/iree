@@ -55,6 +55,51 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
   ];
 }
 
+def HAL_ExFileFromMemoryOp : HAL_Op<"ex.file.from_memory", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{creates a file mapped into a byte range of a host buffer}];
+  let description = [{
+    Returns a file handle that is backed by the given `buffer` contents.
+    Behavior is undefined if the buffer contents change while the accesses are
+    in-flight.
+
+    Experimental as the exact interface for getting files from module contents
+    still needs iteration. Most hardware APIs require a file descriptor or
+    native platform handle but here we only have host pointers. When
+    memory-mapped some systems allow for retrieval of the platform handle from
+    a virtual address (GetMappedFileNameA/posix_mem_offset) but the APIs are
+    sketchy and likely slow. Instead we should probably have a way to query for
+    a file handle derived from the calling module by stack-walking and asking
+    the VM module for its handle. Until we can figure this out this method will
+    be marked epxerimental.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_MemoryAccessBitfieldAttr:$access,
+    Util_BufferType:$buffer,
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length,
+    I32:$flags
+  );
+  let results = (outs
+    HAL_File:$result
+  );
+
+  let assemblyFormat = [{
+    `device` `(` $device `:` type($device) `)`
+    `affinity` `(` $queue_affinity `)`
+    `access` `(` $access `)`
+    `buffer` `(` $buffer `:` type($buffer) `)`
+    `` `[` $offset `for` $length `]`
+    `flags` `(` $flags `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
 } // OpGroupExperimentalOps
 
 //===----------------------------------------------------------------------===//
@@ -270,6 +315,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
 
   let arguments = (ins
     HAL_Allocator:$allocator,
+    HAL_DeviceQueueAffinity:$queue_affinity,
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
     HAL_DeviceSize:$result_size
@@ -281,6 +327,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   // TODO(benvanik): change type/usage to ref params.
   let assemblyFormat = [{
     `<` $allocator `:` type($allocator) `>`
+    `affinity` `(` $queue_affinity `)`
     `type` `(` $memory_types `)`
     `usage` `(` $buffer_usage `)`
     `:` custom<SizeAwareType>(type($result), $result_size)
@@ -288,19 +335,22 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   }];
 }
 
-def HAL_AllocatorAllocateInitializedOp : HAL_Op<"allocator.allocate.initialized", [
+def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,
   ]> {
-  let summary = [{allocator-supported host buffer wrapping operation}];
+  let summary = [{allocator-supported host buffer import operation}];
   let description = [{
-    Wraps a !hal.buffer around host read-only memory backed by the given byte
-    buffer. The returned buffer may be host-only and not directly usable on
-    devices.
+    Tries importing host memory backed by the given byte buffer into a
+    device accessible `!hal.buffer`. The returned buffer may be host-only and
+    not directly usable on devices. If the mapping cannot be completed (such as
+    trying to map the host memory as device-local on devices with discrete
+    memory) then `did_import` will indicate that the returned buffer is null.
   }];
 
   let arguments = (ins
     HAL_Allocator:$allocator,
+    HAL_DeviceQueueAffinity:$queue_affinity,
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
     // TODO(benvanik): support other types (and mutable buffers).
@@ -309,6 +359,7 @@ def HAL_AllocatorAllocateInitializedOp : HAL_Op<"allocator.allocate.initialized"
     HAL_DeviceSize:$length
   );
   let results = (outs
+    I1:$did_import,
     HAL_Buffer:$result
   );
 
@@ -316,47 +367,10 @@ def HAL_AllocatorAllocateInitializedOp : HAL_Op<"allocator.allocate.initialized"
   let assemblyFormat = [{
     `<` $allocator `:` type($allocator) `>`
     `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
+    `affinity` `(` $queue_affinity `)`
     `type` `(` $memory_types `)`
     `usage` `(` $buffer_usage `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_AllocatorTryMapOp : HAL_Op<"allocator.try_map", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
-  ]> {
-  let summary = [{allocator-supported host buffer wrapping operation}];
-  let description = [{
-    Tries wrapping a !hal.buffer around host read-only memory backed by the
-    given byte buffer. The returned buffer may be host-only and not directly
-    usable on devices. If the mapping cannot be completed (such as trying to
-    map the host memory as device-local on devices with discrete memory) then
-    did_map will indicate that the returned buffer is null.
-  }];
-
-  let arguments = (ins
-    HAL_Allocator:$allocator,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
-    // TODO(benvanik): support other types (and mutable buffers).
-    Util_BufferType:$source,
-    HAL_DeviceSize:$offset,
-    HAL_DeviceSize:$length
-  );
-  let results = (outs
-    I1:$did_map,
-    HAL_Buffer:$result
-  );
-
-  // TODO(benvanik): change type/usage to ref params.
-  let assemblyFormat = [{
-    `<` $allocator `:` type($allocator) `>`
-    `source` `(` $source `:` type($source) `)` `` `[` $offset `,` $length `]`
-    `type` `(` $memory_types `)`
-    `usage` `(` $buffer_usage `)`
-    `:` type($did_map) `,` type($result)
+    `:` type($did_import) `,` type($result)
     attr-dict-with-keyword
   }];
 }
@@ -1615,6 +1629,90 @@ def HAL_DeviceQueueDeallocaOp : HAL_Op<"device.queue.dealloca"> {
     `wait` `(` $wait_fence `)`
     `signal` `(` $signal_fence `)`
     `buffer` `(` $buffer `:` type($buffer) `)`
+    attr-dict-with-keyword
+  }];
+
+  let hasVerifier = 1;
+}
+
+def HAL_DeviceQueueReadOp : HAL_Op<"device.queue.read"> {
+  let summary = [{reads a segment from a file into a device buffer}];
+  let description = [{
+    Enqueues a file read operation that streams a segment of the source file
+    defined by the source offset and length into the target HAL buffer at the
+    specified target offset. The queue affinity should be set to where the
+    target buffer will be consumed. The source file must have read permission
+    and the target buffer must have transfer-target usage. Read failure will
+    result in propagated semaphore failure or device loss.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    HAL_File:$source_file,
+    I64:$source_offset,
+    HAL_Buffer:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length,
+    I32Attr:$flags
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `source` `(` $source_file `:` type($source_file) `)`
+    `` `[` $source_offset `]`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `]`
+    `length` `(` $length `)`
+    `flags` `(` $flags `)`
+    attr-dict-with-keyword
+  }];
+
+  let hasVerifier = 1;
+}
+
+def HAL_DeviceQueueWriteOp : HAL_Op<"device.queue.write"> {
+  let summary = [{writes a segment from a device buffer into a file}];
+  let description = [{
+    Enqueues a file write operation that streams a segment of the source HAL
+    buffer defined by the source offset and length into the target file at the
+    specified target offset. The queue affinity should be set to where the
+    source buffer was produced. The source buffer must have transfer-source
+    usage and the target file must have write permission. Write failure will
+    result in propagated semaphore failure or device loss.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DeviceQueueAffinity:$queue_affinity,
+    HAL_Fence:$wait_fence,
+    HAL_Fence:$signal_fence,
+    HAL_Buffer:$source_buffer,
+    HAL_DeviceSize:$source_offset,
+    HAL_File:$target_file,
+    I64:$target_offset,
+    HAL_DeviceSize:$length,
+    I32Attr:$flags
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $device `:` type($device) `>`
+    `affinity` `(` $queue_affinity `)`
+    `wait` `(` $wait_fence `)`
+    `signal` `(` $signal_fence `)`
+    `source` `(` $source_buffer `:` type($source_buffer) `)`
+    `` `[` $source_offset `]`
+    `target` `(` $target_file `:` type($target_file) `)`
+    `` `[` $target_offset `]`
+    `length` `(` $length `)`
+    `flags` `(` $flags `)`
     attr-dict-with-keyword
   }];
 

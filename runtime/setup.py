@@ -309,6 +309,16 @@ def build_configuration(cmake_build_dir, cmake_install_dir, extra_cmake_args=())
     ]
     if strip_install:
         install_args.append("-DCMAKE_INSTALL_DO_STRIP=ON")
+    # May have been deleted in a cleanup step.
+    populate_built_package(
+        os.path.join(
+            cmake_install_dir,
+            "python_packages",
+            "iree_runtime",
+            "iree",
+            "_runtime_libs",
+        )
+    )
     print(f"Installing with: {install_args}", file=sys.stderr)
     subprocess.check_call(["cmake"] + install_args, cwd=cmake_build_dir)
 
@@ -458,29 +468,38 @@ with open(
 custom_package_suffix = os.getenv("IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX", "")
 custom_package_prefix = os.getenv("IREE_RUNTIME_CUSTOM_PACKAGE_PREFIX", "")
 
+
 # We need some directories to exist before setup.
-os.makedirs(
+def populate_built_package(abs_dir):
+    """Makes sure that a directory and __init__.py exist.
+
+    This needs to unfortunately happen before any of the build process
+    takes place so that setuptools can plan what needs to be built.
+    We do this for any built packages (vs pure source packages).
+    """
+    os.makedirs(abs_dir, exist_ok=True)
+    with open(os.path.join(abs_dir, "__init__.py"), "wt"):
+        pass
+
+
+populate_built_package(
     os.path.join(
         CMAKE_INSTALL_DIR_ABS,
         "python_packages",
         "iree_runtime",
         "iree",
         "_runtime_libs",
-    ),
-    exist_ok=True,
-)
-if ENABLE_TRACY:
-    os.makedirs(
-        os.path.join(
-            CMAKE_TRACY_INSTALL_DIR_ABS,
-            "python_packages",
-            "iree_runtime",
-            "iree",
-            "_runtime_libs",
-        ),
-        exist_ok=True,
     )
-
+)
+populate_built_package(
+    os.path.join(
+        CMAKE_TRACY_INSTALL_DIR_ABS,
+        "python_packages",
+        "iree_runtime",
+        "iree",
+        "_runtime_libs",
+    )
+)
 
 setup(
     name=f"{custom_package_prefix}iree-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",

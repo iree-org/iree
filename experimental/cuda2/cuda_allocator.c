@@ -23,7 +23,6 @@ typedef struct iree_hal_cuda2_allocator_t {
   iree_hal_resource_t resource;
 
   // The device that this allocator allocates memory from.
-  iree_hal_device_t* base_device;
   CUdevice device;
 
   // The CUDA stream that allocations should be used in.
@@ -41,6 +40,9 @@ typedef struct iree_hal_cuda2_allocator_t {
   // between GPU and CPU if not.
   bool supports_concurrent_managed_access;
 
+  // Whether host memory can be registered with CU_MEMHOSTREGISTER_READ_ONLY.
+  bool supports_read_only_host_register;
+
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_cuda2_allocator_t;
 
@@ -53,11 +55,9 @@ static iree_hal_cuda2_allocator_t* iree_hal_cuda2_allocator_cast(
 }
 
 iree_status_t iree_hal_cuda2_allocator_create(
-    iree_hal_device_t* base_device,
     const iree_hal_cuda2_dynamic_symbols_t* cuda_symbols, CUdevice device,
     CUstream stream, iree_hal_cuda2_memory_pools_t* pools,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
-  IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(cuda_symbols);
   IREE_ASSERT_ARGUMENT(pools);
   IREE_ASSERT_ARGUMENT(out_allocator);
@@ -77,12 +77,26 @@ iree_status_t iree_hal_cuda2_allocator_create(
                   &supports_concurrent_managed_access,
                   CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS, device),
               "cuDeviceGetAttribute"));
-
   IREE_TRACE_ZONE_APPEND_TEXT(
       z0, supports_concurrent_managed_access
               ? "has CONCURRENT_MANAGED_ACCESS"
               : "no CONCURRENT_MANAGED_ACCESS (expect slow accesses on "
                 "device-local + host-visible memory)");
+
+  // We can only provide the CU_MEMHOSTREGISTER_READ_ONLY flag when importing
+  // host memory if it's supported.
+  int supports_read_only_host_register = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      CU_RESULT_TO_STATUS(
+          context->syms,
+          cuDeviceGetAttribute(
+              &supports_read_only_host_register,
+              CU_DEVICE_ATTRIBUTE_READ_ONLY_HOST_REGISTER_SUPPORTED, device),
+          "cuDeviceGetAttribute"));
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, supports_read_only_host_register
+                                      ? "has READ_ONLY_HOST_REGISTER_SUPPORTED"
+                                      : "no READ_ONLY_HOST_REGISTER_SUPPORTED");
 
   iree_hal_cuda2_allocator_t* allocator = NULL;
   iree_status_t status = iree_allocator_malloc(
@@ -90,7 +104,6 @@ iree_status_t iree_hal_cuda2_allocator_create(
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_cuda2_allocator_vtable,
                                  &allocator->resource);
-    allocator->base_device = base_device;
     allocator->device = device;
     allocator->stream = stream;
     allocator->pools = pools;
@@ -98,6 +111,8 @@ iree_status_t iree_hal_cuda2_allocator_create(
     allocator->host_allocator = host_allocator;
     allocator->supports_concurrent_managed_access =
         supports_concurrent_managed_access != 0;
+    allocator->supports_read_only_host_register =
+        supports_read_only_host_register != 0;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -319,7 +334,7 @@ static void iree_hal_cuda2_buffer_free(
 static iree_status_t iree_hal_cuda2_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(base_allocator);
   IREE_ASSERT_ARGUMENT(params);
@@ -414,18 +429,6 @@ static iree_status_t iree_hal_cuda2_allocator_allocate_buffer(
         iree_hal_allocator_host_allocator(base_allocator), &buffer);
   }
 
-  // Copy the initial contents into the buffer. This may require staging.
-  if (iree_status_is_ok(status) &&
-      !iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_device_transfer_range(
-        allocator->base_device,
-        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
-                                                initial_data.data_length),
-        0, iree_hal_make_device_transfer_buffer(buffer), 0,
-        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
-        iree_infinite_timeout());
-  }
-
   if (iree_status_is_ok(status)) {
     IREE_TRACE_ALLOC_NAMED(IREE_HAL_CUDA_ALLOCATOR_ID,
                            (void*)iree_hal_cuda2_buffer_device_pointer(buffer),
@@ -434,7 +437,7 @@ static iree_status_t iree_hal_cuda2_allocator_allocate_buffer(
         &allocator->statistics, compat_params.type, allocation_size));
     *out_buffer = buffer;
   } else {
-    if (!buffer) {
+    if (!buffer && (device_ptr || host_ptr)) {
       iree_hal_cuda2_buffer_free(allocator->symbols, buffer_type, device_ptr,
                                  host_ptr);
     } else {
@@ -549,16 +552,10 @@ static iree_status_t iree_hal_cuda2_allocator_import_buffer(
       }
       buffer_type = IREE_HAL_CUDA_BUFFER_TYPE_HOST_REGISTERED;
       host_ptr = external_buffer->handle.host_allocation.ptr;
-      uint32_t register_flags = 0;
-      if (compat_params.access == IREE_HAL_MEMORY_ACCESS_READ) {
-        register_flags = CU_MEMHOSTREGISTER_READ_ONLY;
-      }
-      if (iree_any_bit_set(compat_params.usage,
-                           IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMS |
-                               IREE_HAL_BUFFER_USAGE_DISPATCH_UNIFORM_READ |
-                               IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
-                               IREE_HAL_BUFFER_USAGE_DISPATCH_IMAGE)) {
-        register_flags = CU_MEMHOSTREGISTER_DEVICEMAP;
+      uint32_t register_flags = CU_MEMHOSTREGISTER_DEVICEMAP;
+      if (compat_params.access == IREE_HAL_MEMORY_ACCESS_READ &&
+          allocator->supports_read_only_host_register) {
+        register_flags |= CU_MEMHOSTREGISTER_READ_ONLY;
       }
       status = IREE_CURESULT_TO_STATUS(
           allocator->symbols,
@@ -599,7 +596,7 @@ static iree_status_t iree_hal_cuda2_allocator_import_buffer(
   if (iree_status_is_ok(status)) {
     *out_buffer = buffer;
   } else {
-    if (!buffer) {
+    if (!buffer && (device_ptr || host_ptr)) {
       iree_hal_cuda2_buffer_free(allocator->symbols, buffer_type, device_ptr,
                                  host_ptr);
     } else {

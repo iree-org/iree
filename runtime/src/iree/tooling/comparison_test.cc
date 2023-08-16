@@ -20,7 +20,8 @@ namespace {
 
 using ::testing::HasSubstr;
 
-static void ParseToVariantList(iree_hal_allocator_t* device_allocator,
+static void ParseToVariantList(iree_hal_device_t* device,
+                               iree_hal_allocator_t* device_allocator,
                                iree::span<const std::string> input_strings,
                                iree_allocator_t host_allocator,
                                iree_vm_list_t** out_list) {
@@ -30,8 +31,8 @@ static void ParseToVariantList(iree_hal_allocator_t* device_allocator,
     input_string_views[i].size = input_strings[i].size();
   }
   IREE_CHECK_OK(iree_tooling_parse_to_variant_list(
-      device_allocator, input_string_views.data(), input_string_views.size(),
-      host_allocator, out_list));
+      device, device_allocator, input_string_views.data(),
+      input_string_views.size(), host_allocator, out_list));
 }
 
 class ComparisonTest : public ::testing::Test {
@@ -53,12 +54,12 @@ class ComparisonTest : public ::testing::Test {
       iree::span<const std::string> expected_strings,
       iree::span<const std::string> actual_strings, std::string* out_string) {
     vm::ref<iree_vm_list_t> expected_list;
-    ParseToVariantList(device_allocator_, expected_strings, host_allocator_,
-                       &expected_list);
+    ParseToVariantList(/*device=*/NULL, device_allocator_, expected_strings,
+                       host_allocator_, &expected_list);
 
     vm::ref<iree_vm_list_t> actual_list;
-    ParseToVariantList(device_allocator_, actual_strings, host_allocator_,
-                       &actual_list);
+    ParseToVariantList(/*device=*/NULL, device_allocator_, actual_strings,
+                       host_allocator_, &actual_list);
 
     iree_string_builder_t builder;
     iree_string_builder_initialize(host_allocator_, &builder);

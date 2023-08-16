@@ -442,9 +442,6 @@ iree_hal_allocator_query_buffer_compatibility(
     iree_device_size_t* out_allocation_size);
 
 // Allocates a buffer from the allocator.
-// If |initial_data| is provided then the bytes will be copied into the device
-// buffer. To avoid the copy when device-accessible constant data is used prefer
-// iree_hal_allocator_import_buffer when available.
 //
 // The memory type of the buffer returned may differ from the requested value
 // if the device can provide more functionality; for example, if requesting
@@ -460,7 +457,7 @@ iree_hal_allocator_query_buffer_compatibility(
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
-    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
+    iree_hal_buffer_t** out_buffer);
 
 // TODO(benvanik): iree_hal_allocator_query_external_buffer_compatibility to
 // check for support without needing an external buffer already. There's a few
@@ -560,7 +557,7 @@ typedef struct iree_hal_allocator_vtable_t {
   iree_status_t(IREE_API_PTR* allocate_buffer)(
       iree_hal_allocator_t* IREE_RESTRICT allocator,
       const iree_hal_buffer_params_t* IREE_RESTRICT params,
-      iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+      iree_device_size_t allocation_size,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
   void(IREE_API_PTR* deallocate_buffer)(

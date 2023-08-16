@@ -122,6 +122,7 @@ iree_py_library(
     "iree/runtime/system_setup.py"
     "iree/runtime/tracing.py"
     "iree/runtime/version.py"
+    "iree/_runtime/__init__.py"
     "iree/_runtime/libs.py"
     "iree/_runtime/scripts/iree_benchmark_trace/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_module/__main__.py"

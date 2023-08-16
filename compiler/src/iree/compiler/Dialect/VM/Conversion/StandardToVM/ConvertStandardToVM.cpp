@@ -64,7 +64,7 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
 
 // Converts a function signature with the given |signatureConversion| util.
 static FailureOr<FunctionType>
-convertFuncSignature(func::FuncOp srcOp, TypeConverter &typeConverter,
+convertFuncSignature(func::FuncOp srcOp, const TypeConverter &typeConverter,
                      TypeConverter::SignatureConversion &signatureConversion,
                      ConversionPatternRewriter &rewriter) {
   FunctionType srcFuncType = srcOp.getFunctionType();
@@ -131,7 +131,7 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
                                 newFuncOp.end());
 
     // Tell the rewriter to convert the region signature.
-    TypeConverter &typeConverter = *getTypeConverter();
+    const TypeConverter &typeConverter = *getTypeConverter();
     if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
                                            typeConverter,
                                            &signatureConversion))) {

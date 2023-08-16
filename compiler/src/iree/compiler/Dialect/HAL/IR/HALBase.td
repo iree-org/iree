@@ -62,6 +62,26 @@ def HAL_MemoryTypeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_MemoryAccess_None                        : I32BitEnumAttrCase<"None",                         0x00000000>;
+def HAL_MemoryAccess_Read                        : I32BitEnumAttrCase<"Read",                         0x00000001>;
+def HAL_MemoryAccess_Write                       : I32BitEnumAttrCase<"Write",                        0x00000002>;
+def HAL_MemoryAccess_Discard                     : I32BitEnumAttrCase<"Discard",                      0x00000004>;
+def HAL_MemoryAccess_MayAlias                    : I32BitEnumAttrCase<"MayAlias",                     0x00000008>;
+def HAL_MemoryAccess_Unaligned                   : I32BitEnumAttrCase<"Unaligned",                    0x00000010>;
+def HAL_MemoryAccess_Any                         : I32BitEnumAttrCase<"Any",                          0x00000020>;
+def HAL_MemoryAccessBitfieldAttr :
+    I32BitEnumAttr<"MemoryAccessBitfield", "valid MemoryAccess", [
+      HAL_MemoryAccess_None,
+      HAL_MemoryAccess_Read,
+      HAL_MemoryAccess_Write,
+      HAL_MemoryAccess_Discard,
+      HAL_MemoryAccess_MayAlias,
+      HAL_MemoryAccess_Unaligned,
+      HAL_MemoryAccess_Any,
+    ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_BufferUsage_None                         : I32BitEnumAttrCase<"None",                         0x00000000>;
 def HAL_BufferUsage_TransferSource               : I32BitEnumAttrCase<"TransferSource",               0x00000001>;
 def HAL_BufferUsage_TransferTarget               : I32BitEnumAttrCase<"TransferTarget",               0x00000002>;
@@ -422,16 +442,6 @@ def HAL_Executable : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::ExecutableType>()";
 }
 
-def HAL_PipelineLayout : DialectType<
-    HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::PipelineLayoutType>()">,
-    "pipeline_layout"> {
-  let description = [{
-    An pipeline layout describing the descriptor sets and push constants used.
-  }];
-  let builderCall = "$_builder.getType<IREE::HAL::PipelineLayoutType>()";
-}
-
 def HAL_Fence : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::FenceType>()">,
@@ -441,6 +451,27 @@ def HAL_Fence : DialectType<
     multiple timelines.
   }];
   let builderCall = "$_builder.getType<IREE::HAL::FenceType>()";
+}
+
+def HAL_File : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::FileType>()">,
+    "buffer"> {
+  let description = [{
+    A stateless file handle that can be read/written using queue-ordered
+    transfer operations.
+  }];
+  let builderCall = "$_builder.getType<IREE::HAL::FileType>()";
+}
+
+def HAL_PipelineLayout : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::PipelineLayoutType>()">,
+    "pipeline_layout"> {
+  let description = [{
+    A pipeline layout describing the descriptor sets and push constants used.
+  }];
+  let builderCall = "$_builder.getType<IREE::HAL::PipelineLayoutType>()";
 }
 
 def HAL_ObjectType : AnyTypeOf<[
@@ -453,6 +484,7 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Event,
   HAL_Executable,
   HAL_Fence,
+  HAL_File,
   HAL_PipelineLayout,
 ]>;
 

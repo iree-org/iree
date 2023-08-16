@@ -1,7 +1,7 @@
 # Non user-API runtime support.
 
 This package contains elements of the runtime which are not user
-visible parts of the API. It is a pure namespace package that does
+visible parts of the API. It is a pure source package that does
 no native initialization by default (unlike the `runtime` package
 which initializes the native library as part of exporting its API).
 

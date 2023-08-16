@@ -122,17 +122,16 @@ struct ExecutableType
   using Base::Base;
 };
 
-struct PipelineLayoutType
-    : public Type::TypeBase<PipelineLayoutType, Type, TypeStorage> {
-  using Base::Base;
-};
-
 struct FenceType : public Type::TypeBase<FenceType, Type, TypeStorage> {
   using Base::Base;
 };
 
-struct RingBufferType
-    : public Type::TypeBase<RingBufferType, Type, TypeStorage> {
+struct FileType : public Type::TypeBase<FileType, Type, TypeStorage> {
+  using Base::Base;
+};
+
+struct PipelineLayoutType
+    : public Type::TypeBase<PipelineLayoutType, Type, TypeStorage> {
   using Base::Base;
 };
 

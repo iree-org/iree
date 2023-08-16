@@ -128,7 +128,7 @@ iree_hal_webgpu_simple_allocator_query_buffer_compatibility(
 static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(base_allocator);
   IREE_ASSERT_ARGUMENT(params);
@@ -180,13 +180,12 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
     usage_flags |= WGPUBufferUsage_Indirect;
   }
 
-  const bool has_initial_data = !iree_const_byte_span_is_empty(initial_data);
   WGPUBufferDescriptor descriptor = {
       .nextInChain = NULL,
       .label = NULL,
       .usage = usage_flags,
       .size = allocation_size,
-      .mappedAtCreation = has_initial_data,
+      .mappedAtCreation = false,
   };
   WGPUBuffer buffer_handle = wgpuDeviceCreateBuffer(
       iree_hal_webgpu_device_handle(allocator->device), &descriptor);
@@ -194,19 +193,6 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "unable to allocate buffer of size %" PRIdsz,
                             allocation_size);
-  }
-
-  // Upload the initial data into the mapped buffer. In WebGPU the only
-  // _somewhat_ efficient path for buffer initialization is setting
-  // mappedAtCreation and populating it before unmapping.
-  if (has_initial_data) {
-    IREE_TRACE_ZONE_BEGIN(z1);
-    IREE_TRACE_ZONE_APPEND_VALUE_I64(z1, (uint64_t)initial_data.data_length);
-    void* mapped_ptr =
-        wgpuBufferGetMappedRange(buffer_handle, 0, initial_data.data_length);
-    memcpy(mapped_ptr, initial_data.data, initial_data.data_length);
-    wgpuBufferUnmap(buffer_handle);
-    IREE_TRACE_ZONE_END(z1);
   }
 
   iree_status_t status = iree_hal_webgpu_buffer_wrap(

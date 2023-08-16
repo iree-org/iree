@@ -56,7 +56,7 @@ struct PointwiseConversionInfo {
 /// Returns the max operand rank and the result type on success.
 FailureOr<PointwiseConversionInfo>
 checkOperandsAndResults(Operation *op, ValueRange operands,
-                        TypeConverter &typeConverter,
+                        const TypeConverter &typeConverter,
                         ConversionPatternRewriter &rewriter) {
   int64_t maxRank = getMaxRank(operands);
 
