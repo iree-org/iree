@@ -21,7 +21,6 @@ namespace {
 
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
-  passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
   passManager.addPass(createIREEImportPublicPass());
   passManager.addPass(createImportMLProgramPass());
   passManager.addPass(createSanitizeModuleNamesPass());

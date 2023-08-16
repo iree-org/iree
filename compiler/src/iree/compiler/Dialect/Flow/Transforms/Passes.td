@@ -317,6 +317,12 @@ def StripSignedness :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }
 
+def TopLevelSCFToCFG :
+    InterfacePass<"iree-top-level-scf-to-cfg", "mlir::FunctionOpInterface"> {
+  let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createTopLevelSCFToCFGPass()";
+}
+
 def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
   let summary = "Checks the legality of the IR at the start of IREE flow transformation pipeline.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
