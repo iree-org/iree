@@ -97,6 +97,28 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
   return fusedWithOp;
 }
 
+// Check if there is a fused linalg op present in the backward slice of either
+// input.
+static bool hasFusedLeadingOp(linalg::LinalgOp matmul) {
+  assert(matmul.getNumDpsInputs() == 2 && "matmul expected to have two inputs");
+
+  BackwardSliceOptions options;
+  options.inclusive = true;
+
+  // Get the backward slice of the lhs.
+  SetVector<Operation *> backwardSlice;
+  getBackwardSlice(matmul->getOperand(0), &backwardSlice, options);
+
+  // Get the backward slice of the rhs and take the union.
+  SetVector<Operation *> rhsBackwardSlice;
+  getBackwardSlice(matmul->getOperand(1), &rhsBackwardSlice, options);
+  backwardSlice.set_union(rhsBackwardSlice);
+
+  return llvm::any_of(backwardSlice, [](Operation *op) {
+    return llvm::isa<linalg::LinalgOp>(op);
+  });
+}
+
 //===----------------------------------------------------------------------===//
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
@@ -727,6 +749,12 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   if ((pipelineDepth != 1 || storeStage != 1) &&
       fusedOpMayUseExtraSharedMemory(op)) {
     pipelineDepth = 1;
+    storeStage = 1;
+  }
+
+  // TODO: Enable multibuffering with leading elementwise.
+  if (hasFusedLeadingOp(op)) {
+    pipelineDepth = 0;
     storeStage = 1;
   }
 
