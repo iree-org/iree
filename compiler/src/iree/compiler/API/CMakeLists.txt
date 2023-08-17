@@ -32,7 +32,7 @@ iree_cc_library(
     MLIRCAPILinalg
     MLIRCAPIPDL
     MLIRCAPITransformDialect
-    iree::compiler::API::Internal::Embed
+    iree::compiler::API::Internal::CompilerDriver
     iree::compiler::API::Internal::IREECompileToolEntryPoint
     iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API::Internal::IREEOptToolEntryPoint
@@ -78,7 +78,7 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPILinalg
   obj.MLIRCAPIPDL
   obj.MLIRCAPITransformDialect
-  iree_compiler_API_Internal_Embed.objects
+  iree_compiler_API_Internal_CompilerDriver.objects
   iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
   iree_compiler_API_Internal_IREEMLIRLSPServerToolEntryPoint.objects
   iree_compiler_API_Internal_IREEOptToolEntryPoint.objects

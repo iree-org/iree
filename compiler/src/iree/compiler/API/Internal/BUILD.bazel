@@ -13,10 +13,10 @@ package(
 )
 
 iree_compiler_cc_library(
-    name = "Embed",
+    name = "CompilerDriver",
     srcs = [
+        "CompilerDriver.cpp",
         "Diagnostics.cpp",
-        "Embed.cpp",
     ],
     hdrs = [
         "Diagnostics.h",
