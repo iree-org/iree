@@ -40,6 +40,7 @@ iree_lit_test_suite(
     "illegal_configuration.mlir"
     "lowering_matmul_fusion.mlir"
     "lowering_matmul_promotion.mlir"
+    "lowering_matvec.mlir"
     "lowering_reduction.mlir"
     "lowering_scalar_dispatch.mlir"
     "map_memref_storage_class.mlir"
