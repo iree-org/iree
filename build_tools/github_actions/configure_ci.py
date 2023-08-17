@@ -45,7 +45,7 @@ import string
 import subprocess
 import sys
 import textwrap
-from typing import Iterable, List, Mapping, Sequence, Set, Tuple, Optional
+from typing import Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 import yaml
 
