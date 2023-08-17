@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -66,8 +67,9 @@ public:
     // clang-format off
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
                     mlir::iree_compiler::IREE::Flow::FlowDialect,
+                    mlir::iree_compiler::IREE::Codegen::IREECodegenDialect,
                     arith::ArithDialect,
-                   affine::AffineDialect,
+                    affine::AffineDialect,
                     bufferization::BufferizationDialect,
                     func::FuncDialect,
                     gpu::GPUDialect,
