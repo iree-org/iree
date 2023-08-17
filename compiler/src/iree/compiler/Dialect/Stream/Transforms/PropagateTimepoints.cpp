@@ -14,6 +14,8 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -24,6 +26,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-propagate-timepoints"
@@ -524,6 +527,28 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op,
   op.erase();
 }
 
+static ValueRange asValueRange(ArrayRef<Value> values) { return values; }
+
+static void expandSwitchOp(mlir::cf::SwitchOp op,
+                           IRMapping &resourceTimepointMap) {
+  if (!usesResources(op))
+    return;
+  OpBuilder builder(op);
+  auto caseOperands = llvm::to_vector(
+      llvm::map_range(op.getCaseOperands(), [&](ValueRange operands) {
+        return expandOperands(op.getLoc(), operands, resourceTimepointMap,
+                              builder);
+      }));
+  auto asValueRange = [](ArrayRef<Value> ref) -> ValueRange { return ref; };
+  builder.create<mlir::cf::SwitchOp>(
+      op.getLoc(), op.getFlag(), op.getDefaultDestination(),
+      expandOperands(op.getLoc(), op.getDefaultOperands(), resourceTimepointMap,
+                     builder),
+      op.getCaseValuesAttr(), op.getCaseDestinations(),
+      llvm::to_vector(llvm::map_range(caseOperands, asValueRange)));
+  op.erase();
+}
+
 // Tracks timepoints associated with resources based on awaits.
 // By nature of SSA we will encounter these and setup the mapping before any
 // user of the resulting resource performs a lookup, avoiding the need to
@@ -599,6 +624,8 @@ static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
     expandBranchOp(branchOp, resourceTimepointMap);
   } else if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(op)) {
     expandCondBranchOp(condBranchOp, resourceTimepointMap);
+  } else if (auto switchOp = dyn_cast<mlir::cf::SwitchOp>(op)) {
+    expandSwitchOp(switchOp, resourceTimepointMap);
   } else if (auto awaitOp = dyn_cast<IREE::Stream::TimepointAwaitOp>(op)) {
     expandAwaitOp(awaitOp, resourceTimepointMap);
   } else if (auto executeOp = dyn_cast<IREE::Stream::AsyncExecuteOp>(op)) {

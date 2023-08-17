@@ -151,3 +151,36 @@ func.func private @br(%resource0: !stream.resource<external>, %resource1: !strea
 
   return
 }
+
+
+// -----
+
+// Tests switch terminator expansion similar to a branch test above.
+
+// CHECK-LABEL: @switch
+// CHECK-SAME: (%[[RESOURCE0:.+]]: !stream.resource<external>, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
+func.func private @switch(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) {
+  %flag = arith.constant 1 : i32
+
+  // CHECK:      cf.switch
+  // CHECK-NEXT: default: ^bb1(%[[RESOURCE0]], %[[STORAGE_SIZE0]], %[[OFFSET0]], %[[LENGTH0]],
+  // CHECK-SAME:    %[[RESOURCE1]], %[[STORAGE_SIZE1]], %[[OFFSET1]], %[[LENGTH1]]
+  // CHECK-NEXT: 0: ^bb1(%[[RESOURCE0]], %[[STORAGE_SIZE0]], %[[OFFSET0]], %[[LENGTH0]],
+  // CHECK-SAME:    %[[RESOURCE1]], %[[STORAGE_SIZE1]], %[[OFFSET1]], %[[LENGTH1]]
+  cf.switch %flag : i32, [
+    default: ^bb1(%resource0, %resource1 : !stream.resource<external>, !stream.resource<transient>),
+    0: ^bb1(%resource0, %resource1 : !stream.resource<external>, !stream.resource<transient>)
+  ]  
+
+// CHECK: ^bb1(%[[BB1_RESOURCE0:.+]]: !stream.resource<external>, %[[BB1_STORAGE_SIZE0:.+]]: index, %[[BB1_OFFSET0:.+]]: index, %[[BB1_LENGTH0:.+]]: index, %[[BB1_RESOURCE1:.+]]: !stream.resource<transient>, %[[BB1_STORAGE_SIZE1:.+]]: index, %[[BB1_OFFSET1:.+]]: index, %[[BB1_LENGTH1:.+]]: index):
+^bb1(%bb1_resource0: !stream.resource<external>, %bb1_resource1: !stream.resource<transient>):
+  // CHECK-NEXT: %[[BB1_SUBVIEW0:.+]] = stream.resource.subview %[[BB1_RESOURCE0]][%[[BB1_OFFSET0]]] : !stream.resource<external>{%[[BB1_STORAGE_SIZE0]]} -> !stream.resource<external>{%[[BB1_LENGTH0]]}
+  // CHECK-NEXT: %[[BB1_SUBVIEW1:.+]] = stream.resource.subview %[[BB1_RESOURCE1]][%[[BB1_OFFSET1]]] : !stream.resource<transient>{%[[BB1_STORAGE_SIZE1]]} -> !stream.resource<transient>{%[[BB1_LENGTH1]]}
+
+  // CHECK-NEXT: util.optimization_barrier %[[BB1_SUBVIEW0]]
+  util.optimization_barrier %bb1_resource0 : !stream.resource<external>
+  // CHECK-NEXT: util.optimization_barrier %[[BB1_SUBVIEW1]]
+  util.optimization_barrier %bb1_resource1 : !stream.resource<transient>
+
+  return
+}
