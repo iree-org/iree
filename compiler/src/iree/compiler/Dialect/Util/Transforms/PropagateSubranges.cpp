@@ -559,6 +559,27 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
   op.erase();
 }
 
+static ValueRange asValueRange(ArrayRef<Value> values) { return values; }
+
+static void expandSwitchOp(mlir::cf::SwitchOp op, IndexSet &indexSet,
+                           SubrangeMap &subrangeMap) {
+  if (!usesResources(op))
+    return;
+  OpBuilder builder(op);
+  auto caseOperands = llvm::to_vector(
+      llvm::map_range(op.getCaseOperands(), [&](ValueRange operands) {
+        return expandOperands(op.getLoc(), operands, subrangeMap, indexSet,
+                              builder);
+      }));
+  builder.create<mlir::cf::SwitchOp>(
+      op.getLoc(), op.getFlag(), op.getDefaultDestination(),
+      expandOperands(op.getLoc(), op.getDefaultOperands(), subrangeMap,
+                     indexSet, builder),
+      op.getCaseValuesAttr(), op.getCaseDestinations(),
+      llvm::to_vector(llvm::map_range(caseOperands, asValueRange)));
+  op.erase();
+}
+
 // Recursively expands resources into (resource, size, offset, length) in |op|.
 // TODO(benvanik): make this a type switch.
 static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
@@ -583,6 +604,8 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
     return expandBranchOp(branchOp, indexSet, subrangeMap);
   } else if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(op)) {
     return expandCondBranchOp(condBranchOp, indexSet, subrangeMap);
+  } else if (auto switchOp = dyn_cast<mlir::cf::SwitchOp>(op)) {
+    return expandSwitchOp(switchOp, indexSet, subrangeMap);
   }
 
   // We could have a more generic thing here with RegionBranchOpInterface but

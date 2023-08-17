@@ -191,6 +191,8 @@ struct CondBranchOpConversion
   }
 };
 
+static ValueRange asValueRange(ArrayRef<Value> values) { return values; }
+
 struct SwitchOpConversion : public OpConversionPattern<mlir::cf::SwitchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -199,15 +201,14 @@ struct SwitchOpConversion : public OpConversionPattern<mlir::cf::SwitchOp> {
     // Expand any resource operands to resource + size.
     auto defaultOperands = expandResourceOperands(
         op.getLoc(), adaptor.getDefaultOperands(), rewriter);
-    auto caseOperandsStorage = llvm::to_vector(
+    auto caseOperands = llvm::to_vector(
         llvm::map_range(adaptor.getCaseOperands(), [&](ValueRange operands) {
           return expandResourceOperands(op.getLoc(), operands, rewriter);
         }));
-    auto caseOperands = llvm::to_vector(llvm::map_range(
-        caseOperandsStorage, [](auto &vec) { return ValueRange(vec); }));
     rewriter.replaceOpWithNewOp<mlir::cf::SwitchOp>(
         op, adaptor.getFlag(), op.getDefaultDestination(), defaultOperands,
-        op.getCaseValuesAttr(), op.getCaseDestinations(), caseOperands);
+        op.getCaseValuesAttr(), op.getCaseDestinations(),
+        llvm::to_vector(llvm::map_range(caseOperands, asValueRange)));
     return success();
   }
 };
