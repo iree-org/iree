@@ -30,7 +30,7 @@ hal.executable private @apply_scale_no_vector_feature {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -78,7 +78,7 @@ hal.executable private @apply_scale_v {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -124,7 +124,7 @@ hal.executable private @apply_scale_zve64x {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -170,7 +170,7 @@ hal.executable private @apply_scale_zve32x {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -223,7 +223,7 @@ hal.executable private @apply_scale_zve32f {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
