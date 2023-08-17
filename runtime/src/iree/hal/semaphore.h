@@ -23,6 +23,30 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 // iree_hal_semaphore_t
 //===----------------------------------------------------------------------===//
 
+// The maximum valid payload value of an iree_hal_semaphore_t.
+// Payload values larger than this indicate that the semaphore has failed.
+//
+// This originates from Vulkan having a lower-bound of INT_MAX for
+// maxTimelineSemaphoreValueDifference and many Android devices only supporting
+// that lower-bound. At ~100 signals per second it'll take 1.5+ years to
+// saturate. We may increase this value at some point but so long as there are
+// some devices in the wild that may have this limitation we can ensure better
+// consistency across the backends by observing this.
+//
+// The major mitigation here is that in proper usage of IREE there are no
+// semaphores that are implicitly referenced by multiple VMs (each creates their
+// own internally) and in a multitenant system each session should have its own
+// semaphores - so even if the process lives for years it's highly unlikely any
+// particular session does. Whatever, 640K is enough for anyone.
+//
+// In the future we may try to back this out and go back to UINT64_MAX.
+//
+// See:
+//   https://vulkan.gpuinfo.org/displayextensionproperty.php?name=maxTimelineSemaphoreValueDifference
+#define IREE_HAL_SEMAPHORE_MAX_VALUE (2147483647ull - 1)
+
+#define IREE_HAL_SEMAPHORE_FAILURE_VALUE (IREE_HAL_SEMAPHORE_MAX_VALUE + 1)
+
 // Synchronization mechanism for host->device, device->host, host->host,
 // and device->device notification. Semaphores behave like Vulkan timeline
 // semaphores (or D3D12 fences) and contain a monotonically increasing

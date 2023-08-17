@@ -141,6 +141,12 @@ class Handle {
   T* value_ = nullptr;
 };
 
+// C++ wrapper for iree_hal_buffer_t.
+struct Buffer final : public Handle<iree_hal_buffer_t, iree_hal_buffer_retain,
+                                    iree_hal_buffer_release> {
+  using handle_type::handle_type;
+};
+
 // C++ wrapper for iree_hal_buffer_view_t.
 struct BufferView final
     : public Handle<iree_hal_buffer_view_t, iree_hal_buffer_view_retain,
@@ -184,11 +190,15 @@ class BufferViewMatchersTest : public ::testing::Test {
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
     params.usage =
         IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+    Buffer buffer;
+    IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+        device_allocator_, params, num_elements * sizeof(T), &buffer));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_write(buffer, 0, contents,
+                                                   num_elements * sizeof(T)));
     BufferView buffer_view;
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-        device_allocator_, shape.size(), shape.data(), element_type,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
-        iree_make_const_byte_span(contents, num_elements * sizeof(T)),
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+        buffer, shape.size(), shape.data(), element_type,
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_system(),
         &buffer_view));
     return std::move(buffer_view);
   }

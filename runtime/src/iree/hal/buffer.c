@@ -167,7 +167,7 @@ IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_hal_subspan_buffer_destroy(iree_hal_buffer_t* base_buffer) {
@@ -833,9 +833,11 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
                                           iree_hal_buffer_memory_type(buffer),
                                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_hal_buffer_validate_usage(iree_hal_buffer_allowed_usage(buffer),
-                                       IREE_HAL_BUFFER_USAGE_MAPPING));
+        z0, iree_hal_buffer_validate_usage(
+                iree_hal_buffer_allowed_usage(buffer),
+                mapping_mode == IREE_HAL_MAPPING_MODE_PERSISTENT
+                    ? IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT
+                    : IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
   }
 
   iree_device_size_t local_byte_offset = 0;

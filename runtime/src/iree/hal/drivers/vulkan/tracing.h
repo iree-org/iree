@@ -116,12 +116,12 @@ void iree_hal_vulkan_tracing_zone_end_impl(
     iree_hal_vulkan_tracing_context_t* context, VkCommandBuffer command_buffer);
 
 // Begins a new zone with the parent function name.
-#define IREE_VULKAN_TRACE_ZONE_BEGIN(context, command_buffer)                 \
-  static const iree_tracing_location_t TracyConcat(                           \
-      __tracy_source_location, __LINE__) = {name_literal, __FUNCTION__,       \
-                                            __FILE__, (uint32_t)__LINE__, 0}; \
-  iree_hal_vulkan_tracing_zone_begin_impl(                                    \
-      context, command_buffer,                                                \
+#define IREE_VULKAN_TRACE_ZONE_BEGIN(context, command_buffer)             \
+  static const iree_tracing_location_t TracyConcat(                       \
+      __tracy_source_location, __LINE__) = {NULL, __FUNCTION__, __FILE__, \
+                                            (uint32_t)__LINE__, 0};       \
+  iree_hal_vulkan_tracing_zone_begin_impl(                                \
+      context, command_buffer,                                            \
       &TracyConcat(__tracy_source_location, __LINE__));
 
 // Begins an externally defined zone with a dynamic source location.

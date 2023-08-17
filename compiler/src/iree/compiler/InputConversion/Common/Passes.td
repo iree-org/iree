@@ -39,12 +39,6 @@ def SanitizeModuleNames :
   let constructor = "mlir::iree_compiler::createSanitizeModuleNamesPass()";
 }
 
-def TopLevelSCFToCFG :
-    Pass<"iree-top-level-scf-to-cfg", "func::FuncOp"> {
-  let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";
-  let constructor = "mlir::iree_compiler::createTopLevelSCFToCFGPass()";
-}
-
 def AutoInputConversionPipeline :
     Pass<"iree-auto-input-conversion", "ModuleOp"> {
   let summary = "Analyzes and runs appropriate input pipeline.";

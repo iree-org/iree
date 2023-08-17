@@ -69,22 +69,6 @@ func.func @resourceSize(%arg0: !stream.resource<transient>) -> index {
 
 // -----
 
-// CHECK-LABEL: @resourceMap
-// CHECK-SAME: (%[[SOURCE:.+]]: !util.buffer)
-func.func @resourceMap(%source: !util.buffer) -> !stream.resource<staging> {
-  // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 100
-  %offset = arith.constant 100 : index
-  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 128
-  %length = arith.constant 128 : index
-  // CHECK: %[[SOURCE_SIZE:.+]] = util.buffer.size %[[SOURCE]] : !util.buffer
-  // CHECK: %[[MAPPING:.+]] = util.buffer.subspan %[[SOURCE]][%[[OFFSET]]] : !util.buffer{%[[SOURCE_SIZE]]} -> !util.buffer{%[[LENGTH]]}
-  %mapping = stream.resource.map %source[%offset] : !util.buffer -> !stream.resource<staging>{%length}
-  // CHECK: return %[[MAPPING]]
-  return %mapping : !stream.resource<staging>
-}
-
-// -----
-
 // CHECK-LABEL: @resourceTryMap
 // CHECK-SAME: (%[[SOURCE:.+]]: !util.buffer)
 func.func @resourceTryMap(%source: !util.buffer) -> (i1, !stream.resource<constant>) {

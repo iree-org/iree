@@ -119,12 +119,17 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
-// hal.ex.shared_device
+// hal.ex.*
 //===----------------------------------------------------------------------===//
 
 void ExSharedDeviceOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "device");
+}
+
+void ExFileFromMemoryOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "memory_file");
 }
 
 //===----------------------------------------------------------------------===//
@@ -335,35 +340,18 @@ Value AllocatorAllocateOp::getResultSize(unsigned idx) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.allocator.allocate.initialized
+// hal.allocator.import
 //===----------------------------------------------------------------------===//
 
-void AllocatorAllocateInitializedOp::getAsmResultNames(
+void AllocatorImportOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getDidImport(), "did_import");
   setNameFn(getResult(), "mapped");
 }
 
-Value AllocatorAllocateInitializedOp::getOperandSize(unsigned idx) {
-  return {};
-}
+Value AllocatorImportOp::getOperandSize(unsigned idx) { return {}; }
 
-Value AllocatorAllocateInitializedOp::getResultSize(unsigned idx) {
-  return getLength();
-}
-
-//===----------------------------------------------------------------------===//
-// hal.allocator.try_map
-//===----------------------------------------------------------------------===//
-
-void AllocatorTryMapOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getDidMap(), "did_map");
-  setNameFn(getResult(), "mapped");
-}
-
-Value AllocatorTryMapOp::getOperandSize(unsigned idx) { return {}; }
-
-Value AllocatorTryMapOp::getResultSize(unsigned idx) { return getLength(); }
+Value AllocatorImportOp::getResultSize(unsigned idx) { return getLength(); }
 
 //===----------------------------------------------------------------------===//
 // hal.buffer.subspan
@@ -678,6 +666,14 @@ LogicalResult DeviceQueueAllocaOp::verify() {
 }
 
 LogicalResult DeviceQueueDeallocaOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueReadOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueWriteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }
 

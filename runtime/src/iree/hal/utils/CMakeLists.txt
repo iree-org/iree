@@ -97,6 +97,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    file_transfer
+  HDRS
+    "file_transfer.h"
+  SRCS
+    "file_transfer.c"
+  DEPS
+    ::memory_file
+    iree::base
+    iree::base::internal
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     libmpi
   HDRS
     "libmpi.h"
@@ -120,6 +135,19 @@ iree_cc_test(
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    memory_file
+  HDRS
+    "memory_file.h"
+  SRCS
+    "memory_file.c"
+  DEPS
+    iree::base
+    iree::hal
+  PUBLIC
 )
 
 iree_cc_library(

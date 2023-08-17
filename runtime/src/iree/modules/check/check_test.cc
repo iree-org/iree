@@ -91,9 +91,10 @@ class CheckTest : public ::testing::Test {
     params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
-    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-        allocator_, shape.size(), shape.data(), IREE_HAL_ELEMENT_TYPE_INT_32,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
+    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer_copy(
+        device_, allocator_, shape.size(), shape.data(),
+        IREE_HAL_ELEMENT_TYPE_INT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        params,
         iree_make_const_byte_span(contents.data(),
                                   contents.size() * sizeof(int32_t)),
         &*out_buffer_view));
@@ -113,9 +114,10 @@ class CheckTest : public ::testing::Test {
     params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
-    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-        allocator_, shape.size(), shape.data(), IREE_HAL_ELEMENT_TYPE_FLOAT_16,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
+    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer_copy(
+        device_, allocator_, shape.size(), shape.data(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_16, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        params,
         iree_make_const_byte_span(contents.data(),
                                   contents.size() * sizeof(uint16_t)),
         &*out_buffer_view));
@@ -135,9 +137,10 @@ class CheckTest : public ::testing::Test {
     params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
-    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-        allocator_, shape.size(), shape.data(), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
+    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer_copy(
+        device_, allocator_, shape.size(), shape.data(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        params,
         iree_make_const_byte_span(contents.data(),
                                   contents.size() * sizeof(float)),
         &*out_buffer_view));
@@ -157,9 +160,10 @@ class CheckTest : public ::testing::Test {
     params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
                    IREE_HAL_BUFFER_USAGE_TRANSFER |
                    IREE_HAL_BUFFER_USAGE_MAPPING;
-    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
-        allocator_, shape.size(), shape.data(), IREE_HAL_ELEMENT_TYPE_FLOAT_64,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
+    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer_copy(
+        device_, allocator_, shape.size(), shape.data(),
+        IREE_HAL_ELEMENT_TYPE_FLOAT_64, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        params,
         iree_make_const_byte_span(contents.data(),
                                   contents.size() * sizeof(double)),
         &*out_buffer_view));

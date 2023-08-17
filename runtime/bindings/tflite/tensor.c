@@ -144,7 +144,7 @@ iree_status_t _TfLiteTensorReallocateIfNeeded(
                            IREE_HAL_BUFFER_USAGE_TRANSFER |
                            IREE_HAL_BUFFER_USAGE_MAPPING,
               },
-              allocation_size, iree_const_byte_span_empty(), &tensor->buffer));
+              allocation_size, &tensor->buffer));
 
   // Map the buffer memory immediately. The tflite API doesn't let us know if
   // this is a buffer the user will actually touch or some state buffer that is

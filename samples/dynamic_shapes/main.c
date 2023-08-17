@@ -19,7 +19,8 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
 
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer(
+    status = iree_hal_buffer_view_allocate_buffer_copy(
+        iree_runtime_session_device(session),
         iree_runtime_session_device_allocator(session),
         IREE_ARRAYSIZE(arg0_shape), arg0_shape, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
@@ -68,7 +69,8 @@ iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
 
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer(
+    status = iree_hal_buffer_view_allocate_buffer_copy(
+        iree_runtime_session_device(session),
         iree_runtime_session_device_allocator(session),
         IREE_ARRAYSIZE(arg0_shape), arg0_shape, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
@@ -108,7 +110,8 @@ iree_status_t add_one(iree_runtime_session_t* session, const int* values,
 
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer(
+    status = iree_hal_buffer_view_allocate_buffer_copy(
+        iree_runtime_session_device(session),
         iree_runtime_session_device_allocator(session),
         IREE_ARRAYSIZE(arg0_shape), arg0_shape, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,

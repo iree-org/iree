@@ -159,8 +159,8 @@ iree_status_t Run() {
       }
     }
     if (iree_status_is_ok(status)) {
-      status = iree_hal_buffer_view_allocate_buffer(
-          iree_hal_device_allocator(device), rank[i], shape[i],
+      status = iree_hal_buffer_view_allocate_buffer_copy(
+          device, iree_hal_device_allocator(device), rank[i], shape[i],
           IREE_HAL_TYPE, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
           (iree_hal_buffer_params_t){
               .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,

@@ -986,7 +986,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
-      allocation_size, iree_const_byte_span_empty(), &buffer));
+      allocation_size, &buffer));
 
   *out_result =
       iree_vm_make_variant_ref_assign(iree_hal_buffer_move_ref(buffer));
@@ -1053,17 +1053,17 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
         .shape_rank = shape_rank,
     };
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
-        iree_hal_device_allocator(replay->device), shape_rank, shape,
-        element_type, encoding_type,
+        replay->device, iree_hal_device_allocator(replay->device), shape_rank,
+        shape, element_type, encoding_type,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
         },
         iree_trace_replay_generate_hal_buffer_callback, &params, &buffer_view));
   } else {
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
-        iree_hal_device_allocator(replay->device), shape_rank, shape,
-        element_type, encoding_type,
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer_copy(
+        replay->device, iree_hal_device_allocator(replay->device), shape_rank,
+        shape, element_type, encoding_type,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
@@ -1088,7 +1088,7 @@ static iree_status_t iree_trace_replay_parse_inline_hal_buffer(
     yaml_node_t* value_node, iree_vm_variant_t* out_result) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
-      iree_yaml_node_as_string(value_node),
+      iree_yaml_node_as_string(value_node), replay->device,
       iree_hal_device_allocator(replay->device), &buffer_view));
   *out_result = iree_vm_make_variant_ref_assign(
       iree_hal_buffer_retain_ref(iree_hal_buffer_view_buffer(buffer_view)));
@@ -1106,7 +1106,7 @@ static iree_status_t iree_trace_replay_parse_inline_hal_buffer_view(
     yaml_node_t* value_node, iree_vm_variant_t* out_result) {
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
-      iree_yaml_node_as_string(value_node),
+      iree_yaml_node_as_string(value_node), replay->device,
       iree_hal_device_allocator(replay->device), &buffer_view));
   *out_result = iree_vm_make_variant_ref_assign(
       iree_hal_buffer_view_move_ref(buffer_view));
@@ -1456,8 +1456,6 @@ static iree_status_t iree_trace_replay_event_numpy_load(
   buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
   buffer_params.access = IREE_HAL_MEMORY_ACCESS_READ;
   buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
-  iree_hal_allocator_t* device_allocator =
-      iree_hal_device_allocator(replay->device);
 
   if (iree_status_is_ok(status)) {
     for (yaml_node_item_t* item = arrays_node->data.sequence.items.start;
@@ -1471,7 +1469,8 @@ static iree_status_t iree_trace_replay_event_numpy_load(
       iree_hal_buffer_view_t* buffer_view = NULL;
       status = iree_numpy_npy_load_ndarray(
           file, IREE_NUMPY_NPY_LOAD_OPTION_DEFAULT, buffer_params,
-          device_allocator, &buffer_view);
+          replay->device, iree_hal_device_allocator(replay->device),
+          &buffer_view);
       if (!iree_status_is_ok(status)) break;
 
       // Route the loaded value to its destination.

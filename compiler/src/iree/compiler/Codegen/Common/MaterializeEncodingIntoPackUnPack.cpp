@@ -54,7 +54,7 @@ static RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
 /// `dynamicDims`.
 static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     OpBuilder &builder, Location loc,
-    MaterializeEncodingTypeConverter &typeConverter,
+    const MaterializeEncodingTypeConverter &typeConverter,
     IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   auto boundTensorType =
@@ -94,7 +94,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
 /// provided in `dynamicDims`.
 static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
     OpBuilder &builder, Location loc,
-    MaterializeEncodingTypeConverter &typeConverter,
+    const MaterializeEncodingTypeConverter &typeConverter,
     IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   FailureOr<SmallVector<OpFoldResult>> convertedTargetShape =
@@ -143,8 +143,8 @@ struct MaterializeInterfaceBindingEncoding
       return rewriter.notifyMatchFailure(subspanOp, "bound type already valid");
     }
 
-    auto *typeConverter =
-        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter());
+    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
     // Get the dynamic dims of the target.
     Location loc = subspanOp.getLoc();
     FailureOr<SmallVector<Value>> convertedDynamicDims =
@@ -186,8 +186,8 @@ struct MaterializeFlowDispatchTensorLoadOp
 
     auto sourceType = loadOp.getSourceType();
     auto boundTensorType = sourceType.getBoundType();
-    auto *typeConverter =
-        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter());
+    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
     if (typeConverter->convertType(boundTensorType) == boundTensorType) {
       return rewriter.notifyMatchFailure(loadOp, "bound type already valid");
     }
@@ -236,8 +236,8 @@ struct MaterializeFlowDispatchTensorStoreOp
 
     auto targetType = storeOp.getTargetType();
     auto boundTensorType = targetType.getBoundType();
-    auto *typeConverter =
-        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter());
+    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
 
     if (typeConverter->convertType(boundTensorType) == boundTensorType) {
       return rewriter.notifyMatchFailure(storeOp, "bound type already valid");

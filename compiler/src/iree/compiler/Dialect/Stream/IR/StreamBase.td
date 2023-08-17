@@ -619,6 +619,28 @@ def Stream_AnyStreamResource : AnyTypeOf<[
 ]>;
 
 //===----------------------------------------------------------------------===//
+// File resources
+//===----------------------------------------------------------------------===//
+
+def Stream_File : TypeDef<Stream_Dialect, "File", []> {
+  let mnemonic = "file";
+
+  let summary = [{a file handle used for I/O operations}];
+  let description = [{
+    A file handle that can be asynchronously read and written into/from
+    stream resources.
+  }];
+
+  let parameters = (ins);
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return $_get($_ctxt);
+    }]>,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // Executable bindings
 //===----------------------------------------------------------------------===//
 

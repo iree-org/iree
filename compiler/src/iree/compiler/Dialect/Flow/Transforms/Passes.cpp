@@ -227,6 +227,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the better
   // our fusions will be.
+  FunctionLikeNest(passManager).addPass(createTopLevelSCFToCFGPass);
   passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 

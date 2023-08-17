@@ -129,7 +129,7 @@ py::str HalAllocator::FormattedStatistics() {
 }
 
 py::object HalAllocator::AllocateBufferCopy(
-    int memory_type, int allowed_usage, py::object buffer,
+    int memory_type, int allowed_usage, HalDevice& device, py::object buffer,
     std::optional<iree_hal_element_types_t> element_type) {
   IREE_TRACE_SCOPE_NAMED("HalAllocator::AllocateBufferCopy");
   // Request a view of the buffer (use the raw python C API to avoid
@@ -157,9 +157,13 @@ py::object HalAllocator::AllocateBufferCopy(
   iree_status_t status = iree_ok_status();
   {
     py::gil_scoped_release release;
-    status = iree_hal_allocator_allocate_buffer(
-        raw_ptr(), params, py_view.len,
-        iree_make_const_byte_span(py_view.buf, py_view.len), &hal_buffer);
+    status = iree_hal_allocator_allocate_buffer(raw_ptr(), params, py_view.len,
+                                                &hal_buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_transfer_h2d(
+          device.raw_ptr(), py_view.buf, hal_buffer, 0, py_view.len,
+          IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+    }
   }
   CheckApiStatus(status, "Failed to allocate device visible buffer");
 
@@ -186,7 +190,8 @@ py::object HalAllocator::AllocateBufferCopy(
                   py::rv_policy::move);
 }
 
-HalBuffer HalAllocator::AllocateHostStagingBufferCopy(py::handle buffer) {
+HalBuffer HalAllocator::AllocateHostStagingBufferCopy(HalDevice& device,
+                                                      py::handle buffer) {
   IREE_TRACE_SCOPE_NAMED("HalAllocator::AllocateHostStagingBufferCopy");
   // Request a view of the buffer (use the raw python C API to avoid
   // some allocation and copying at the pybind level).
@@ -213,9 +218,13 @@ HalBuffer HalAllocator::AllocateHostStagingBufferCopy(py::handle buffer) {
   iree_status_t status = iree_ok_status();
   {
     py::gil_scoped_release release;
-    status = iree_hal_allocator_allocate_buffer(
-        raw_ptr(), params, py_view.len,
-        iree_make_const_byte_span(py_view.buf, py_view.len), &hal_buffer);
+    status = iree_hal_allocator_allocate_buffer(raw_ptr(), params, py_view.len,
+                                                &hal_buffer);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_transfer_h2d(
+          device.raw_ptr(), py_view.buf, hal_buffer, 0, py_view.len,
+          IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+    }
   }
   CheckApiStatus(status, "Failed to allocate device visible buffer");
 
@@ -917,11 +926,10 @@ void SetupHalBindings(nanobind::module_ m) {
             params.type = memory_type;
             params.usage = allowed_usage;
             iree_hal_buffer_t* buffer = nullptr;
-            iree_const_byte_span_t empty_initial_data{nullptr, 0};
-            CheckApiStatus(iree_hal_allocator_allocate_buffer(
-                               self.raw_ptr(), params, allocation_size,
-                               empty_initial_data, &buffer),
-                           "could not allocate buffer");
+            CheckApiStatus(
+                iree_hal_allocator_allocate_buffer(self.raw_ptr(), params,
+                                                   allocation_size, &buffer),
+                "could not allocate buffer");
             return HalBuffer::StealFromRawPtr(buffer);
           },
           py::arg("memory_type"), py::arg("allowed_usage"),
@@ -929,15 +937,16 @@ void SetupHalBindings(nanobind::module_ m) {
           "Allocates a new buffer with requested characteristics (does not "
           "initialize with specific data).")
       .def("allocate_buffer_copy", &HalAllocator::AllocateBufferCopy,
-           py::arg("memory_type"), py::arg("allowed_usage"), py::arg("buffer"),
-           py::arg("element_type") = py::none(), py::keep_alive<0, 1>(),
+           py::arg("memory_type"), py::arg("allowed_usage"), py::arg("device"),
+           py::arg("buffer"), py::arg("element_type") = py::none(),
+           py::keep_alive<0, 1>(),
            "Allocates a new buffer and initializes it from a Python buffer "
            "object. If an element type is specified, wraps in a BufferView "
            "matching the characteristics of the Python buffer. The format is "
            "requested as ND/C-Contiguous, which may incur copies if not "
            "already in that format.")
       .def("allocate_host_staging_buffer_copy",
-           &HalAllocator::AllocateHostStagingBufferCopy,
+           &HalAllocator::AllocateHostStagingBufferCopy, py::arg("device"),
            py::arg("initial_contents"), py::keep_alive<0, 1>(),
            "Allocates a new buffer and initializes it from a Python buffer "
            "object. The buffer is configured as optimal for use on the device "

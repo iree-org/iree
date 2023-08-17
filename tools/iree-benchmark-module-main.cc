@@ -490,7 +490,7 @@ class IREEBenchmark {
         &function));
 
     IREE_CHECK_OK(iree_tooling_parse_to_variant_list(
-        device_allocator_.get(), FLAG_input_list().values,
+        device_.get(), device_allocator_.get(), FLAG_input_list().values,
         FLAG_input_list().count, iree_vm_instance_allocator(instance_.get()),
         &inputs_));
 

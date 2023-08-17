@@ -1104,7 +1104,7 @@ void HALDialect::registerAttributes() {
 void HALDialect::registerTypes() {
   addTypes<AllocatorType, BufferType, BufferViewType, ChannelType,
            CommandBufferType, DescriptorSetLayoutType, DeviceType, EventType,
-           ExecutableType, PipelineLayoutType, FenceType, RingBufferType,
+           ExecutableType, FenceType, FileType, PipelineLayoutType,
            SemaphoreType>();
 }
 
@@ -1153,9 +1153,9 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Case("device", DeviceType::get(getContext()))
           .Case("event", EventType::get(getContext()))
           .Case("executable", ExecutableType::get(getContext()))
-          .Case("pipeline_layout", PipelineLayoutType::get(getContext()))
           .Case("fence", FenceType::get(getContext()))
-          .Case("ring_buffer", RingBufferType::get(getContext()))
+          .Case("file", FileType::get(getContext()))
+          .Case("pipeline_layout", PipelineLayoutType::get(getContext()))
           .Case("semaphore", SemaphoreType::get(getContext()))
           .Default(nullptr);
   if (!type) {
@@ -1184,12 +1184,12 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "event";
   } else if (llvm::isa<ExecutableType>(type)) {
     p << "executable";
-  } else if (llvm::isa<PipelineLayoutType>(type)) {
-    p << "pipeline_layout";
   } else if (llvm::isa<FenceType>(type)) {
     p << "fence";
-  } else if (llvm::isa<RingBufferType>(type)) {
-    p << "ring_buffer";
+  } else if (llvm::isa<FileType>(type)) {
+    p << "file";
+  } else if (llvm::isa<PipelineLayoutType>(type)) {
+    p << "pipeline_layout";
   } else if (llvm::isa<SemaphoreType>(type)) {
     p << "semaphore";
   } else {

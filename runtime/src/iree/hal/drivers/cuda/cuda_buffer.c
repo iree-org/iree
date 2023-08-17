@@ -87,9 +87,11 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(base_buffer),
       IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_validate_usage(iree_hal_buffer_allowed_usage(base_buffer),
-                                     IREE_HAL_BUFFER_USAGE_MAPPING));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
+      iree_hal_buffer_allowed_usage(base_buffer),
+      mapping_mode == IREE_HAL_MAPPING_MODE_PERSISTENT
+          ? IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT
+          : IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
 
   uint8_t* data_ptr = (uint8_t*)(buffer->host_ptr) + local_byte_offset;
   // If we mapped for discard scribble over the bytes. This is not a mandated
