@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -94,11 +95,15 @@ static iree_status_t iree_allocator_system_alloc(
     }
   });
 
+  // This variable is necessary to avoid use-after-free errors.
+  // According to the standard after realloc using existing_ptr
+  // is undefined behavior even when not dereferencing it.
+  uintptr_t existing_ptr_for_trace = (uintptr_t)existing_ptr;
   void* new_ptr = NULL;
   if (existing_ptr && command == IREE_ALLOCATOR_COMMAND_REALLOC) {
     new_ptr = realloc(existing_ptr, byte_length);
   } else {
-    existing_ptr = NULL;
+    existing_ptr_for_trace = (uintptr_t)NULL;
     if (command == IREE_ALLOCATOR_COMMAND_CALLOC) {
       new_ptr = calloc(1, byte_length);
     } else {
@@ -110,8 +115,8 @@ static iree_status_t iree_allocator_system_alloc(
                             "system allocator failed the request");
   }
 
-  if (existing_ptr) {
-    IREE_TRACE_FREE(existing_ptr);
+  if (existing_ptr_for_trace) {
+    IREE_TRACE_FREE((void*)existing_ptr_for_trace);
   }
   IREE_TRACE_ALLOC(new_ptr, byte_length);
 
