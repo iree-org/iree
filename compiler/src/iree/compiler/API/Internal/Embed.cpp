@@ -536,6 +536,7 @@ struct Invocation {
   bool initializeInvocation();
   std::unique_ptr<PassManager> createPassManager();
   bool parseSource(Source &source);
+  Operation *exportModule();
   bool importModule(Operation *inputModule, bool steal);
   bool runPipeline(enum iree_compiler_pipeline_t pipeline);
   bool runTextualPassPipeline(const char *textPassPipeline);
@@ -706,6 +707,13 @@ bool Invocation::importModule(Operation *inputModule, bool steal) {
     }
   }
   return true;
+}
+
+Operation *Invocation::exportModule() {
+  if (!parsedModuleIsOwned)
+    return nullptr;
+  parsedModuleIsOwned = false;
+  return parsedModule;
 }
 
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
@@ -1376,4 +1384,9 @@ bool ireeCompilerInvocationImportBorrowModule(iree_compiler_invocation_t *inv,
 bool ireeCompilerInvocationImportStealModule(iree_compiler_invocation_t *inv,
                                              MlirOperation moduleOp) {
   return unwrap(inv)->importModule(unwrap(moduleOp), /*steal=*/true);
+}
+
+MlirOperation
+ireeCompilerInvocationExportStealModule(iree_compiler_invocation_t *inv) {
+  return wrap(unwrap(inv)->exportModule());
 }

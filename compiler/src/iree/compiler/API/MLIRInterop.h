@@ -65,6 +65,12 @@ MLIR_CAPI_EXPORTED bool
 ireeCompilerInvocationImportStealModule(iree_compiler_invocation_t *inv,
                                         MlirOperation moduleOp);
 
+// Exports the owned module from the invocation, transferring ownership to the
+// caller.
+MLIR_CAPI_EXPORTED
+MlirOperation
+ireeCompilerInvocationExportStealModule(iree_compiler_invocation_t *inv);
+
 #ifdef __cplusplus
 }
 #endif

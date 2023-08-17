@@ -7,17 +7,18 @@
 # TODO: Upstream this to IREE.
 
 import platform
+
 if platform.system() == "Windows":
     print("WARNING: Test disabled on Windows due to suspected MSVC bug")
 else:
     from contextlib import closing
+    import os
     from pathlib import Path
     import tempfile
     import unittest
 
     from iree.compiler.api import *
     from iree.compiler import ir
-
 
     class DlFlagsTest(unittest.TestCase):
         def testDefaultFlags(self):
@@ -47,12 +48,88 @@ else:
             with self.assertRaises(ValueError):
                 session.set_flags("--does-not-exist=1")
 
-
     class DlInvocationTest(unittest.TestCase):
         def testCreate(self):
             session = Session()
             inv = session.invocation()
 
+        def testInputFile(self):
+            session = Session()
+            inv = session.invocation()
+            with tempfile.NamedTemporaryFile("w", delete=False) as tf:
+                tf.write("module {}")
+                tf.close()
+            try:
+                source = Source.open_file(session, tf.name)
+                inv.parse_source(source)
+            finally:
+                os.unlink(tf.name)
+            out = Output.open_membuffer()
+            inv.output_ir(out)
+            mem = out.map_memory()
+            self.assertIn(b"module", bytes(mem))
+            out.close()
+
+        def testInputBuffer(self):
+            session = Session()
+            inv = session.invocation()
+            source = Source.wrap_buffer(session, b"builtin.module {}")
+            inv.parse_source(source)
+            out = Output.open_membuffer()
+            inv.output_ir(out)
+            mem = out.map_memory()
+            self.assertIn(b"module", bytes(mem))
+            out.close()
+
+        def testOutputBytecode(self):
+            session = Session()
+            inv = session.invocation()
+            source = Source.wrap_buffer(session, b"builtin.module {}")
+            inv.parse_source(source)
+            out = Output.open_membuffer()
+            inv.output_ir_bytecode(out)
+            mem = out.map_memory()
+            self.assertIn(b"module", bytes(mem))
+            out.close()
+
+        def testExecutePassPipeline(self):
+            session = Session()
+            inv = session.invocation()
+            source = Source.wrap_buffer(
+                session,
+                b"""
+                builtin.module {
+                    func.func private @foobar() -> ()
+                }
+                """,
+            )
+            inv.parse_source(source)
+            inv.execute_text_pass_pipeline("symbol-dce")
+            out = Output.open_membuffer()
+            inv.output_ir(out)
+            mem = out.map_memory()
+            self.assertNotIn(b"func", bytes(mem))
+            out.close()
+
+        def testExecuteStdPipeline(self):
+            session = Session()
+            session.set_flags("--iree-hal-target-backends=vmvx")
+            inv = session.invocation()
+            source = Source.wrap_buffer(
+                session,
+                b"""
+                builtin.module {
+                    func.func @main(%arg0: i32) -> (i32) {
+                        return %arg0 : i32
+                    }
+                }
+                """,
+            )
+            inv.parse_source(source)
+            inv.execute()
+            out = Output.open_membuffer()
+            inv.output_vm_bytecode(out)
+            out.close()
 
     class DlOutputTest(unittest.TestCase):
         def testOpenMembuffer(self):
@@ -97,7 +174,6 @@ else:
             finally:
                 Path(file_path).unlink()
 
-
     class DlInteropTest(unittest.TestCase):
         def testContextFromSession(self):
             s = Session()
@@ -123,53 +199,21 @@ else:
                 print(contents)
                 self.assertIn('test.test = "working"', contents)
 
-
-    # TODO: Port these to the current API.
-    # class CompilerAPITest(unittest.TestCase):
-    #     def testCreate(self):
-    #         compiler = Compiler()
-
-    #     def testLoadFromBytes(self):
-    #         compiler = Compiler()
-    #         p = compiler.load_buffer("module {}".encode(), buffer_name="foobar")
-
-    #     def testPipelineClose(self):
-    #         compiler = Compiler()
-    #         p = compiler.load_buffer("module {}".encode(), buffer_name="foobar")
-    #         p.close()
-
-    #     def testLoadFromFile(self):
-    #         compiler = Compiler()
-    #         with tempfile.NamedTemporaryFile("w", delete=False) as tf:
-    #             tf.write("module {}")
-    #             tf.close()
-    #             p = compiler.load_file(tf.name)
-    #             p.close()
-
-    #     def testExecuteIR(self):
-    #         compiler = Compiler()
-    #         p = compiler.load_buffer("module {}".encode(), buffer_name="foobar")
-    #         p.execute()
-    #         with closing(compiler.open_output_membuffer()) as output:
-    #             p.output_ir(output)
-    #             ir_contents = bytes(output.map_memory())
-    #             print(ir_contents)
-    #             self.assertEqual(b"module {\n}", ir_contents)
-
-    #     def testExecuteVMFB(self):
-    #         compiler = Compiler()
-    #         compiler.set_flags("--iree-hal-target-backends=vmvx")
-    #         p = compiler.load_buffer(
-    #             "module {func.func @main(%arg0: i32) -> (i32) {return %arg0 : i32}}".encode(),
-    #             buffer_name="foobar",
-    #         )
-    #         p.execute()
-    #         with closing(compiler.open_output_membuffer()) as output:
-    #             p.output_vm_bytecode(output)
-    #             ir_contents = bytes(output.map_memory())
-    #             print(len(ir_contents))
-    #             self.assertGreater(len(ir_contents), 0)
-
+        def testExportModule(self):
+            s = Session()
+            with ir.Location.unknown(s.context):
+                source = Source.wrap_buffer(s, b"builtin.module {}")
+                inv = s.invocation()
+                self.assertTrue(inv.parse_source(source))
+                module_op = inv.export_module()
+                module_op.attributes["test.test"] = ir.Attribute.parse('"working"')
+                # Round-trip it back through an Output and verify that the attribute
+                # we set is still there.
+                output = Output.open_membuffer()
+                inv.output_ir(output)
+                contents = bytes(output.map_memory()).decode()
+                print(contents)
+                self.assertIn('test.test = "working"', contents)
 
     if __name__ == "__main__":
         unittest.main()

@@ -103,6 +103,11 @@ def _init_dylib():
         c_bool,
         [c_void_p, c_void_p],
     )
+    _setsig(
+        _dylib.ireeCompilerInvocationExportStealModule,
+        c_void_p,
+        [c_void_p],
+    )
     # Source
     _setsig(_dylib.ireeCompilerSourceDestroy, None, [c_void_p])
     _setsig(
@@ -297,7 +302,7 @@ class Source:
 
     @staticmethod
     def wrap_buffer(
-        session: Session, buffer, *, buffer_name: Optional[str] = None
+        session: Session, buffer, *, buffer_name: str = "source.mlir"
     ) -> "Source":
         view = memoryview(buffer)
         if not view.c_contiguous:
@@ -351,6 +356,20 @@ class Invocation:
 
     def enable_console_diagnostics(self):
         _dylib.ireeCompilerInvocationEnableConsoleDiagnostics(self._inv_p)
+
+    def export_module(self):
+        """Exports the module."""
+        from .. import ir
+
+        if self._retained_module_op:
+            return self._retained_module_op
+        module_ptr = _dylib.ireeCompilerInvocationExportStealModule(self._inv_p)
+        if not module_ptr:
+            raise RuntimeError("Module is not available to export")
+        capsule = PyCapsule_New(module_ptr, MLIR_PYTHON_CAPSULE_OPERATION, None)
+        operation = ir.Operation._CAPICreate(capsule)
+        self._retained_module_op = operation
+        return operation
 
     def import_module(self, module_op) -> bool:
         self._retained_module_op = module_op
