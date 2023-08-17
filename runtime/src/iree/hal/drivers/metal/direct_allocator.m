@@ -15,7 +15,7 @@
 #include "iree/hal/drivers/metal/metal_buffer.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
-static const char* IREE_HAL_METAL_ALLOCATOR_ID = "METAL";
+static const char* IREE_HAL_METAL_ALLOCATOR_ID = "Metal";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 typedef struct iree_hal_metal_allocator_t {
@@ -312,13 +312,80 @@ static void iree_hal_metal_allocator_deallocate_buffer(
   iree_hal_buffer_destroy(base_buffer);  // -1
 }
 
+static iree_status_t iree_hal_metal_allocator_import_host_buffer(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  iree_hal_metal_allocator_t* allocator = iree_hal_metal_allocator_cast(base_allocator);
+
+  // MTLResourceOptions options = iree_hal_metal_select_resource_options(
+  //     params->type, allocator->is_unified_memory, allocator->resource_tracking_mode);
+  MTLResourceOptions options = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModeShared |
+                               MTLResourceHazardTrackingModeUntracked;
+
+  id<MTLBuffer> metal_buffer =
+      [allocator->device newBufferWithBytesNoCopy:external_buffer->handle.host_allocation.ptr
+                                           length:(NSUInteger)external_buffer->size
+                                          options:options
+                                      deallocator:nil];  // +1
+  if (!metal_buffer) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "unable to allocate buffer");
+  }
+
+  return iree_hal_metal_buffer_wrap(
+#if defined(IREE_PLATFORM_MACOS)
+      allocator->queue,
+#endif  // IREE_PLATFORM_MACOS
+      metal_buffer, base_allocator, params->type, params->access, params->usage,
+      external_buffer->size, /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
+      iree_hal_buffer_release_callback_null(), out_buffer);  // +1
+}
+
+static iree_status_t iree_hal_metal_allocator_import_device_buffer(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  iree_hal_metal_allocator_t* allocator = iree_hal_metal_allocator_cast(base_allocator);
+
+  // Device allocation is an unowned MTLBuffer; we need to retain it to keep it live.
+  id<MTLBuffer> metal_buffer =
+      (__bridge id<MTLBuffer>)external_buffer->handle.device_allocation.ptr;
+  if (!metal_buffer) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "no handle provided");
+  }
+
+  // Wrap the externally-provided buffer in a HAL buffer handle that will retain the MTLBuffer until
+  // it has been released.
+  return iree_hal_metal_buffer_wrap(
+#if defined(IREE_PLATFORM_MACOS)
+      allocator->queue,
+#endif  // IREE_PLATFORM_MACOS
+      metal_buffer, base_allocator, params->type, params->access, params->usage,
+      external_buffer->size, /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
+      release_callback, out_buffer);  // +1
+}
+
 static iree_status_t iree_hal_metal_allocator_import_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE, "unsupported importing from external buffer");
+  switch (external_buffer->type) {
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION:
+      return iree_hal_metal_allocator_import_host_buffer(base_allocator, params, external_buffer,
+                                                         release_callback, out_buffer);
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION:
+      return iree_hal_metal_allocator_import_device_buffer(base_allocator, params, external_buffer,
+                                                           release_callback, out_buffer);
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "external buffer type import not implemented");
+  }
 }
 
 static iree_status_t iree_hal_metal_allocator_export_buffer(
