@@ -651,6 +651,8 @@ jobs:
           BUILD_DIR: build-gcc-tracing
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env CC=/usr/bin/gcc-9 \
+            --env CXX=/usr/bin/g++-9 \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:d6c426d1fe55947a4afe7669abae6c7e6aa44fa94e84804bc5d7e7304dd183c9" \
