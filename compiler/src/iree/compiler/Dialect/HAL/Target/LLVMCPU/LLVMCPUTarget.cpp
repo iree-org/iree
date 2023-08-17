@@ -225,7 +225,7 @@ public:
     passManager.addNestedPass<func::FuncOp>(
         createCPUMaterializeUpperBoundTileSizePass(executableTarget));
     passManager.addNestedPass<func::FuncOp>(
-        createCPUMaterializeEncodingPass(executableTarget));
+        createCPUMaterializeEncodingPass({executableTarget}));
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {

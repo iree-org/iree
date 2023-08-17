@@ -46,7 +46,7 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeUpperBoundTileSizePass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeUpperBoundTileSizePass(
-    IREE::HAL::ExecutableTargetAttr targetAttr);
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs);
 
 void registerCodegenCommonCPUPasses();
 
