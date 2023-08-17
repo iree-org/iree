@@ -50,6 +50,29 @@ func.func @condBrExpansion(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>) -> tensor
 
 // -----
 
+// CHECK-LABEL: @switchExpansion
+//  CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[ARG0_SIZE:.+]]: index,
+//  CHECK-SAME:  %[[ARG1:.+]]: !stream.resource<*>, %[[ARG1_SIZE:.+]]: index)
+//  CHECK-SAME: -> (!stream.resource<*>, index)
+func.func @switchExpansion(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
+  %flag = arith.constant 1 : i32
+  //      CHECK: %[[FLAG:.+]] = arith.constant 1 : i32
+  //      CHECK: cf.switch %[[FLAG]] : i32, [
+  // CHECK-NEXT:   default: ^bb1(%[[ARG0]], %[[ARG0_SIZE]] : !stream.resource<*>, index),
+  // CHECK-NEXT:   0: ^bb2(%[[ARG1]], %[[ARG1_SIZE]] : !stream.resource<*>, index)
+  // CHECK-NEXT: ]
+  cf.switch %flag : i32, [
+    default: ^bb1(%arg0 : tensor<1xf32>),
+    0: ^bb2(%arg1 : tensor<1xf32>)
+  ]
+^bb1(%0: tensor<1xf32>):
+  return %0 : tensor<1xf32>
+^bb2(%1: tensor<1xf32>):
+  return %1 : tensor<1xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @selectExpansion
 //  CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[ARG0_SIZE:.+]]: index,
 //  CHECK-SAME:  %[[COND:.+]]: i1,
