@@ -9,6 +9,8 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -189,6 +191,27 @@ struct CondBranchOpConversion
   }
 };
 
+struct SwitchOpConversion : public OpConversionPattern<mlir::cf::SwitchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::cf::SwitchOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Expand any resource operands to resource + size.
+    auto defaultOperands = expandResourceOperands(
+        op.getLoc(), adaptor.getDefaultOperands(), rewriter);
+    auto caseOperandsStorage = llvm::to_vector(
+        llvm::map_range(adaptor.getCaseOperands(), [&](ValueRange operands) {
+          return expandResourceOperands(op.getLoc(), operands, rewriter);
+        }));
+    auto caseOperands = llvm::to_vector(llvm::map_range(
+        caseOperandsStorage, [](auto &vec) { return ValueRange(vec); }));
+    rewriter.replaceOpWithNewOp<mlir::cf::SwitchOp>(
+        op, adaptor.getFlag(), op.getDefaultDestination(), defaultOperands,
+        op.getCaseValuesAttr(), op.getCaseDestinations(), caseOperands);
+    return success();
+  }
+};
+
 struct SelectOpConversion : public OpConversionPattern<mlir::arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -258,11 +281,17 @@ void populateStandardStructuralToStreamPatterns(
           return typeConverter.isLegal(type);
         });
       });
+  conversionTarget.addDynamicallyLegalOp<mlir::cf::SwitchOp>(
+      [&](mlir::cf::SwitchOp op) {
+        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
+          return typeConverter.isLegal(type);
+        });
+      });
 
   patterns
       .insert<FuncOpSignatureConversion, CallOpConversion, ReturnOpConversion,
-              BranchOpConversion, CondBranchOpConversion, SelectOpConversion>(
-          typeConverter, context);
+              BranchOpConversion, CondBranchOpConversion, SwitchOpConversion,
+              SelectOpConversion>(typeConverter, context);
 }
 
 } // namespace iree_compiler
