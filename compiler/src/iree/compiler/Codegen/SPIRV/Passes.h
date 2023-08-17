@@ -95,6 +95,10 @@ createSPIRVEraseStorageBufferStaticShapePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVFoldProcessorIDUsesPass();
 
+// This pass generalizes named Linalg ops that are better off as generics.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVGeneralizeNamedOpsPass();
+
 /// Main pass to lower executables to scalar + vector code on SPIR-V path.
 /// Invokes one of the pass pipelines that translate the executable to
 /// scalar + vector code.
