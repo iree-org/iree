@@ -352,6 +352,10 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
       // Stores - not eligible for deduplication.
       continue;
     }
+    if (!global.op.getGlobalInitialValue()) {
+      // No initial value, not constant.
+      continue;
+    }
     auto it = leaderMap.insert(
         {global.op.getGlobalInitialValue(), global.op.getGlobalName()});
     if (it.second) {
