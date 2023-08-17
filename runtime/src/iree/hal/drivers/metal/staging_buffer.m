@@ -35,14 +35,17 @@ iree_status_t iree_hal_metal_staging_buffer_initialize(
   out_staging_buffer->capacity = (uint32_t)buffer_capacity;
   out_staging_buffer->metal_buffer = metal_buffer;
   out_staging_buffer->host_buffer = metal_buffer.contents;
+  iree_slim_mutex_initialize(&out_staging_buffer->offset_mutex);
   out_staging_buffer->offset = 0;
-  out_staging_buffer->pending_command_buffers = 0;
+  iree_atomic_store_int32(&out_staging_buffer->pending_command_buffers, 0,
+                          iree_memory_order_relaxed);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 void iree_hal_metal_staging_buffer_deinitialize(iree_hal_metal_staging_buffer_t* staging_buffer) {
+  iree_slim_mutex_deinitialize(&staging_buffer->offset_mutex);
   [staging_buffer->metal_buffer release];  // -1
 }
 
@@ -58,14 +61,21 @@ iree_status_t iree_hal_metal_staging_buffer_reserve(iree_hal_metal_staging_buffe
                             "reservation (%" PRIhsz " bytes) exceeds the maximum capacity of "
                             "the staging buffer (%" PRIu32 " bytes)",
                             length, staging_buffer->capacity);
-  } else if (staging_buffer->offset + aligned_length > staging_buffer->capacity) {
+  }
+
+  iree_slim_mutex_lock(&staging_buffer->offset_mutex);
+  uint32_t offset = staging_buffer->offset;
+  if (offset + aligned_length > staging_buffer->capacity) {
+    iree_slim_mutex_unlock(&staging_buffer->offset_mutex);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "failed to reserve %" PRIhsz " bytes in staging buffer", length);
   }
-  *out_reservation =
-      iree_make_byte_span(staging_buffer->host_buffer + staging_buffer->offset, aligned_length);
-  *out_offset = staging_buffer->offset;
   staging_buffer->offset += aligned_length;
+  iree_slim_mutex_unlock(&staging_buffer->offset_mutex);
+
+  *out_reservation = iree_make_byte_span(staging_buffer->host_buffer + offset, aligned_length);
+  *out_offset = offset;
+
   return iree_ok_status();
 }
 
@@ -81,18 +91,21 @@ iree_status_t iree_hal_metal_staging_buffer_append(iree_hal_metal_staging_buffer
 }
 
 void iree_hal_metal_staging_buffer_reset(iree_hal_metal_staging_buffer_t* staging_buffer) {
+  iree_slim_mutex_lock(&staging_buffer->offset_mutex);
   staging_buffer->offset = 0;
+  iree_slim_mutex_unlock(&staging_buffer->offset_mutex);
 }
 
-void iree_hal_metal_staging_buffer_increase_refcount(
+void iree_hal_metal_staging_buffer_increase_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer) {
-  ++staging_buffer->pending_command_buffers;
+  iree_atomic_fetch_add_int32(&staging_buffer->pending_command_buffers, 1,
+                              iree_memory_order_relaxed);
 }
 
-void iree_hal_metal_staging_buffer_decrease_refcount(
+void iree_hal_metal_staging_buffer_decrease_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer) {
-  IREE_ASSERT(staging_buffer->pending_command_buffers > 0);
-  if (--staging_buffer->pending_command_buffers == 0) {
+  if (iree_atomic_fetch_sub_int32(&staging_buffer->pending_command_buffers, 1,
+                                  iree_memory_order_acq_rel) == 1) {
     iree_hal_metal_staging_buffer_reset(staging_buffer);
   }
 }

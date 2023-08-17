@@ -78,7 +78,7 @@ class command_buffer_push_constants_test : public CtsTestBase {
 };
 
 TEST_P(command_buffer_push_constants_test, DispatchWithPushConstants) {
-  PrepareExecutable();
+  ASSERT_NO_FATAL_FAILURE(PrepareExecutable());
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
