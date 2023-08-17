@@ -141,6 +141,10 @@ createStripSignednessPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveZeroExtentTensorsPass();
 
+// Decomposes top-level SCF operations to CFG.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTopLevelSCFToCFGPass();
+
 // Verifies that the input to the Flow transformation pipeline is legal.
 // This includes checking for operations from dialects that are expected
 // to be legalized before this pass.
@@ -180,6 +184,9 @@ createCollapseDimensionsPass();
 // converting to dispatch workgroups with explicit captures.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCloneProducersIntoDispatchRegionsPass();
+
+// A pass to fuse dequantization and matmul linalg.generic ops
+std::unique_ptr<Pass> createFuseDequantizationMatmulPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)

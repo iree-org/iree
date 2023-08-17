@@ -7,16 +7,11 @@
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-tile-reduction"
 
@@ -29,9 +24,13 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   SmallVector<unsigned> dims;
   op.getReductionDims(dims);
   SmallVector<int64_t> tileSize = getTileSizes(op, 1);
-  if (tileSize.empty() || dims.size() != 1 ||
-      tileSize.back() == op.getStaticLoopRanges()[dims.back()])
+  if (tileSize.empty())
     return success();
+  // Make sure reduction dimensions are the innermost ones.
+  for (int i = 0; i < dims.size(); ++i) {
+    if (dims[dims.size() - 1 - i] != op.getNumLoops() - 1 - i)
+      return success();
+  }
   IRRewriter rewriter(op.getContext());
   SmallVector<OpFoldResult> sizes;
   for (int64_t size : tileSize) {

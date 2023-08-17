@@ -25,7 +25,8 @@ void adjustTileSizesToNarrowStaticShape(
     ArrayRef<int64_t> shape);
 
 IREE::LinalgExt::MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(IREE::LinalgExt::EncodingRole role,
+chooseEncodingInfoForMatmul(IREE::LinalgExt::EncodingUser user,
+                            IREE::LinalgExt::EncodingRole role,
                             MatmulTileParams tileParams);
 
 IREE::LinalgExt::MaterializeEncodingValueFn

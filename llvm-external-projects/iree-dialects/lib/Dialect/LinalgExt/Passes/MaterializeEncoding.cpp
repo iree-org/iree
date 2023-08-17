@@ -323,7 +323,8 @@ struct SetEncodingOpToPackOpConversion
   matchAndRewrite(SetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter())
+        static_cast<const MaterializeEncodingTypeConverter *>(
+            getTypeConverter())
             ->getMaterializeEncodingFn();
     auto packOp = lowerSetEncodingOpToPackOp(
         rewriter, encodingOp, adaptor.getSource(), materializeEncodingFn,
@@ -346,7 +347,7 @@ struct UnsetEncodingOpToPackOpConversion
   matchAndRewrite(UnsetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<MaterializeEncodingTypeConverter *>(
+        static_cast<const MaterializeEncodingTypeConverter *>(
             this->getTypeConverter())
             ->getMaterializeEncodingFn();
     auto unpackOp = lowerUnsetEncodingToUnpackOp(
@@ -393,7 +394,7 @@ struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
   matchAndRewrite(OpTy dpsOp, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<MaterializeEncodingTypeConverter *>(
+        static_cast<const MaterializeEncodingTypeConverter *>(
             this->getTypeConverter())
             ->getMaterializeEncodingFn();
     FailureOr<Operation *> convertedOp = lowerOpWithEncoding(
@@ -415,7 +416,7 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<MaterializeEncodingTypeConverter *>(
+        static_cast<const MaterializeEncodingTypeConverter *>(
             this->getTypeConverter())
             ->getMaterializeEncodingFn();
     FailureOr<Operation *> convertedOp = lowerOpWithEncoding(

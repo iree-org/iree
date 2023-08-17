@@ -10,6 +10,7 @@
 #import <Metal/Metal.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
 
 #ifdef __cplusplus
@@ -40,8 +41,7 @@ extern "C" {
 // * Argument buffers for descriptor sets
 // * Source buffer for buffer update commands
 //
-// TODO(#14049): Use proper atomics/mutexes for concurrent command buffer
-// recording and execution.
+// Thread safe; multiple threads can reserve spaces concurrently.
 typedef struct iree_hal_metal_staging_buffer_t {
   // Maximum number of bytes in the buffer.
   uint32_t capacity;
@@ -51,14 +51,17 @@ typedef struct iree_hal_metal_staging_buffer_t {
   // Host pointer to the buffer.
   uint8_t* host_buffer;
 
+  // Non-recursive mutex guarding access to the offset field.
+  iree_slim_mutex_t offset_mutex;
+
   // Current write offset of the device buffer.
-  uint32_t offset;
+  uint32_t offset IREE_GUARDED_BY(offset_mutex);
 
   // The number of command buffers that are being recorded or executed on
   // device. If this reaches zero, we know that there are no users of the
   // staging buffer so we can discard the contents and reset the offset to
   // zero.
-  uint32_t pending_command_buffers;
+  iree_atomic_int32_t pending_command_buffers;
 } iree_hal_metal_staging_buffer_t;
 
 // Initializes |out_staging_buffer| with the given |buffer_capacity|.
@@ -87,12 +90,12 @@ void iree_hal_metal_staging_buffer_reset(
     iree_hal_metal_staging_buffer_t* staging_buffer);
 
 // Increases the command buffer using this staging buffer by one.
-void iree_hal_metal_staging_buffer_increase_refcount(
+void iree_hal_metal_staging_buffer_increase_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer);
 
 // Decreases the command buffer using this staging buffer by one, which may
 // trigger reclaiming of resources.
-void iree_hal_metal_staging_buffer_decrease_refcount(
+void iree_hal_metal_staging_buffer_decrease_command_buffer_refcount(
     iree_hal_metal_staging_buffer_t* staging_buffer);
 
 #ifdef __cplusplus

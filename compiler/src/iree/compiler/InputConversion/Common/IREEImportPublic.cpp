@@ -329,7 +329,7 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     }
 
     // Tell the rewriter to convert the region signature.
-    TypeConverter &typeConverter = *getTypeConverter();
+    const TypeConverter &typeConverter = *getTypeConverter();
     if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
                                            typeConverter,
                                            &signatureConversion))) {

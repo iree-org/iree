@@ -36,7 +36,6 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToSCF());
-  passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
 
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
