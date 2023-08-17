@@ -49,6 +49,7 @@ iree_cc_library(
     "FormDispatchRegions.cpp"
     "FormDispatchWorkgroups.cpp"
     "FormScalarDispatches.cpp"
+    "FuseDequantizationMatmul.cpp"
     "FusionOfTensorOps.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "InferNumericNarrowing.cpp"

@@ -328,4 +328,10 @@ def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
 }
 
+def FuseDequantizationMatmul:
+    Pass<"iree-flow-fuse-dequantization-matmul", ""> {
+  let summary = "Fuse dequantization and matmul linalg.generic ops";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFuseDequantizationMatmulPass()";
+}
+
 #endif  // IREE_DIALECT_FLOW_PASSES
