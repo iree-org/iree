@@ -270,9 +270,25 @@ struct MaterializeFlowDispatchTensorStoreOp
 } // namespace
 
 IREE::LinalgExt::MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(EncodingRole role, MatmulTileParams tileParams) {
+chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
+                            MatmulTileParams tileParams) {
+  // Start dim of the MxK (LHS), KxN (RHS), or MxN (RESULT) 2D matrix.
+  int64_t matmulDimBase = 0;
+  switch (user) {
+  case EncodingUser::BATCH_MATMUL_F32F32F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F16:
+  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
+  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
+  case EncodingUser::BATCH_MATMUL_I8I8I32:
+    matmulDimBase = 1;
+    break;
+  default:
+    break;
+  }
+
   MaterializeEncodingInfo encodingInfo;
-  encodingInfo.innerDimsPos = {0, 1};
+  encodingInfo.innerDimsPos = {matmulDimBase, matmulDimBase + 1};
   switch (role) {
   case (EncodingRole::LHS): {
     encodingInfo.innerTileSizes = {tileParams.M, tileParams.K};
@@ -280,8 +296,11 @@ chooseEncodingInfoForMatmul(EncodingRole role, MatmulTileParams tileParams) {
   }
   case (EncodingRole::RHS): {
     encodingInfo.innerTileSizes = {tileParams.N, tileParams.K};
-    encodingInfo.innerDimsPos = {1, 0};
-    encodingInfo.outerDimsPerm = {1, 0};
+    encodingInfo.innerDimsPos = {matmulDimBase + 1, matmulDimBase};
+    encodingInfo.outerDimsPerm =
+        llvm::to_vector(llvm::seq<int64_t>(0, matmulDimBase));
+    encodingInfo.outerDimsPerm.push_back(matmulDimBase + 1);
+    encodingInfo.outerDimsPerm.push_back(matmulDimBase);
     break;
   }
   case (EncodingRole::RESULT): {
@@ -298,7 +317,7 @@ chooseEncodingInfoForMatmul(EncodingRole role, MatmulTileParams tileParams) {
 
 void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
                                         ArrayRef<int64_t> shape) {
-  for (size_t i = 0; i < shape.size(); i++) {
+  for (size_t i = 0; i < encodingInfo.innerDimsPos.size(); i++) {
     int64_t size = shape[encodingInfo.innerDimsPos[i]];
     // Dynamic sizes are assumed to be large enough, not to be candidates for
     // narrow kernels.
