@@ -785,12 +785,15 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
       // The offset in the subspan is byteoffset. It is converted to element
       // offset here. It is assumed that the byte offset is a multiple of
       // the element type byte width.
-      int32_t elementWidth =
-          IREE::Util::getRoundedElementByteWidth(memRefType.getElementType());
+      int32_t elementBitWidth =
+          IREE::Util::getTypeBitWidth(memRefType.getElementType());
       Value elementWidthVal =
-          builder.create<LLVM::ConstantOp>(loc, llvmIndexType, elementWidth);
+          builder.create<LLVM::ConstantOp>(loc, llvmIndexType, elementBitWidth);
+      Value eight = builder.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
+      Value bitOffset =
+          builder.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
       Value elementOffsetVal =
-          builder.create<LLVM::UDivOp>(loc, baseOffsetValue, elementWidthVal);
+          builder.create<LLVM::UDivOp>(loc, bitOffset, elementWidthVal);
       desc.setOffset(builder, loc, elementOffsetVal);
     } else {
       desc.setConstantOffset(builder, loc, offset);

@@ -35,11 +35,12 @@ llvm.func @sink(%arg0: f32) {
 
 // CHECK-LABEL: llvm.func @binding_ptrs_dynamic(
 func.func @binding_ptrs_dynamic() {
-  // CHECK-DAG: %[[C1:.+]] = llvm.mlir.constant(1
-  // CHECK-DAG: %[[C4:.+]] = llvm.mlir.constant(4
-  // CHECK-DAG: %[[C7:.+]] = llvm.mlir.constant(7
-  // CHECK-DAG: %[[C5:.+]] = llvm.mlir.constant(5
-  // CHECK-DAG: %[[C3:.+]] = llvm.mlir.constant(3
+  // CHECK-DAG: %[[C1:.+]] = llvm.mlir.constant(1 :
+  // CHECK-DAG: %[[C8:.+]] = llvm.mlir.constant(8 :
+  // CHECK-DAG: %[[C32:.+]] = llvm.mlir.constant(32 :
+  // CHECK-DAG: %[[C7:.+]] = llvm.mlir.constant(7 :
+  // CHECK-DAG: %[[C5:.+]] = llvm.mlir.constant(5 :
+  // CHECK-DAG: %[[C3:.+]] = llvm.mlir.constant(3 :
 
   // CHECK: %[[STATE:.+]] = llvm.load %arg1
   // CHECK: %[[CONSTANT_BASEPTR:.+]] = llvm.extractvalue %[[STATE]][9]
@@ -67,7 +68,8 @@ func.func @binding_ptrs_dynamic() {
   // CHECK: %[[BASE_PTR:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr -> !llvm.ptr
   %memref = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<?x?x?xf32, strided<[?, ?, 1], offset: ?>>{%dim0, %dim1, %dim2}
 
-  // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[OFFSET_ZEXT]], %[[C4]]
+  // CHECK: %[[BASE_BIT_OFFSET:.+]] = llvm.mul %[[OFFSET_ZEXT]], %[[C8]]
+  // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[BASE_BIT_OFFSET]], %[[C32]]
   // CHECK: %[[STRIDE1:.+]] = llvm.mul %[[DIM2_ZEXT]], %[[C1]]
   // CHECK: %[[STRIDE2:.+]] = llvm.mul %[[STRIDE1]], %[[DIM1_ZEXT]]
   // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[BASE_OFFSET]]]
@@ -87,5 +89,41 @@ func.func @binding_ptrs_dynamic() {
   return
 }
 llvm.func @sink(%arg0: f32) {
+  llvm.return
+}
+
+// -----
+
+// CHECK-LABEL: llvm.func @binding_ptrs_sub_byte_dynamic(
+func.func @binding_ptrs_sub_byte_dynamic() {
+  // CHECK-DAG: %[[C8:.+]] = llvm.mlir.constant(8 :
+  // CHECK-DAG: %[[C4:.+]] = llvm.mlir.constant(4 :
+
+  // CHECK: %[[STATE:.+]] = llvm.load %arg1
+  // CHECK: %[[CONSTANT_BASEPTR:.+]] = llvm.extractvalue %[[STATE]][9]
+  // CHECK: %[[OFFSET:.+]] = llvm.load %[[CONSTANT_BASEPTR]]
+  // CHECK: %[[OFFSET_ZEXT:.+]] = llvm.zext %[[OFFSET]]
+  %offset = hal.interface.constant.load[0] : index
+  %dim0 = hal.interface.constant.load[1]: index
+  
+  // CHECK: %[[STATE3:.+]] = llvm.load %arg1
+  // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE3]][10]
+  // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][1] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr
+  // CHECK: %[[BASE_PTR:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr -> !llvm.ptr
+  %memref = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<?xi4, strided<[1], offset: ?>>{%dim0}
+
+  // CHECK: %[[BASE_BIT_OFFSET:.+]] = llvm.mul %[[OFFSET_ZEXT]], %[[C8]]
+  // CHECK: %[[BASE_OFFSET:.+]] = llvm.udiv %[[BASE_BIT_OFFSET]], %[[C4]]
+  // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][%[[BASE_OFFSET]]]
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr %[[OFFSET_PTR0]][7]
+  // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
+  %c7 = arith.constant 7 : index
+  %value = memref.load %memref[%c7] : memref<?xi4, strided<[1], offset: ?>>
+
+  // CHECK: llvm.call @sink(%[[VALUE]])
+  llvm.call @sink(%value) : (i4) -> ()
+  return
+}
+llvm.func @sink(%arg0: i4) {
   llvm.return
 }
