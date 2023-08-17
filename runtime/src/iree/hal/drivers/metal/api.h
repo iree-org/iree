@@ -88,7 +88,6 @@ void iree_hal_metal_device_params_initialize(
 // Creates a Metal HAL driver, from which devices can be created with the given
 // |device_params|.
 //
-//
 // |out_driver| must be released by the caller (see iree_hal_driver_release).
 IREE_API_EXPORT iree_status_t iree_hal_metal_driver_create(
     iree_string_view_t identifier,
