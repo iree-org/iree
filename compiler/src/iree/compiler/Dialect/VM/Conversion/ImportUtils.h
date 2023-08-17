@@ -58,7 +58,7 @@ void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp);
 template <typename T, typename Adaptor = typename T::Adaptor>
 std::optional<SmallVector<Value>>
 rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
-              TypeConverter &typeConverter,
+              const TypeConverter &typeConverter,
               ConversionPatternRewriter &rewriter) {
   auto *operation = op.getOperation();
   bool isOpVariadic = importOp.isVariadic();

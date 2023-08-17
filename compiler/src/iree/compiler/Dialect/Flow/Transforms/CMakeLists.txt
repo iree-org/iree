@@ -68,6 +68,7 @@ iree_cc_library(
     "SplitReduction.cpp"
     "StripSignedness.cpp"
     "TensorPadToTensorInsertSlice.cpp"
+    "TopLevelSCFToCFG.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
@@ -98,6 +99,7 @@ iree_cc_library(
     MLIRParser
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFToControlFlow
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms

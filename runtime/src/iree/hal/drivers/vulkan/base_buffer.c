@@ -69,7 +69,9 @@ iree_status_t iree_hal_vulkan_find_memory_type(
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     require_flags |= VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   }
-  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
+  if (iree_any_bit_set(params->usage,
+                       IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+                           IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT)) {
     require_flags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   }
 

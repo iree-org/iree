@@ -34,15 +34,15 @@ public:
 
   // This is the same as convertType, but returns `iree_vm_ref_t` rather than a
   // pointer to it for `vm.ref` types.
-  Type convertTypeAsNonPointer(Type type);
-  Type convertTypeAsPointer(Type type);
-  emitc::OpaqueType convertTypeAsCType(Type type);
+  Type convertTypeAsNonPointer(Type type) const;
+  Type convertTypeAsPointer(Type type) const;
+  emitc::OpaqueType convertTypeAsCType(Type type) const;
 
   void cacheTypeTable(IREE::VM::ModuleOp module) {
     typeTable = buildTypeTable(module);
   }
   void mapType(Type type, size_t index) { typeOrdinalMap[type] = index; }
-  std::optional<size_t> lookupType(Type type) {
+  std::optional<size_t> lookupType(Type type) const {
     auto ptr = typeOrdinalMap.find(type);
     if (ptr == typeOrdinalMap.end()) {
       return std::nullopt;

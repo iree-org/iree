@@ -58,7 +58,7 @@ EmitCTypeConverter::EmitCTypeConverter() {
   });
 }
 
-Type EmitCTypeConverter::convertTypeAsNonPointer(Type type) {
+Type EmitCTypeConverter::convertTypeAsNonPointer(Type type) const {
   Type convertedType = convertType(type);
 
   if (auto ptrType = llvm::dyn_cast<emitc::PointerType>(convertedType)) {
@@ -68,11 +68,11 @@ Type EmitCTypeConverter::convertTypeAsNonPointer(Type type) {
   return convertedType;
 }
 
-Type EmitCTypeConverter::convertTypeAsPointer(Type type) {
+Type EmitCTypeConverter::convertTypeAsPointer(Type type) const {
   return emitc::PointerType::get(convertTypeAsNonPointer(type));
 }
 
-emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) {
+emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) const {
   Type convertedType = convertTypeAsNonPointer(type);
 
   if (auto oType = llvm::dyn_cast<emitc::OpaqueType>(convertedType)) {
