@@ -41,8 +41,8 @@ from setuptools.command.build_ext import build_ext as _build_ext
 from setuptools.command.build_py import build_py as _build_py
 
 
-def getenv_bool(key):
-    value = os.getenv(key, "OFF")
+def getenv_bool(key, default_value="OFF"):
+    value = os.getenv(key, default_value)
     return value.upper() in ["ON", "1", "TRUE"]
 
 
@@ -53,9 +53,12 @@ def combine_dicts(*ds):
     return result
 
 
-ENABLE_TRACY = getenv_bool("IREE_RUNTIME_BUILD_TRACY")
+ENABLE_TRACY = getenv_bool("IREE_RUNTIME_BUILD_TRACY", "ON")
 if ENABLE_TRACY:
-    print("*** Enabling Tracy instrumented runtime", file=sys.stderr)
+    print(
+        "*** Enabling Tracy instrumented runtime (disable with IREE_RUNTIME_BUILD_TRACY=OFF)",
+        file=sys.stderr,
+    )
 else:
     print(
         "*** Tracy instrumented runtime not enabled (enable with IREE_RUNTIME_BUILD_TRACY=ON)",
