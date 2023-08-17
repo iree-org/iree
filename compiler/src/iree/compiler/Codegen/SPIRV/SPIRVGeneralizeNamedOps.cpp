@@ -4,11 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- SPIRVGeneralizeNamedOps.cpp - Pass to generalize ---------===//
-//===- linalg.matmul_transpose_b LinalgOps with unit dimensions -----------===//
+//===- SPIRVGeneralizeNamedOps.cpp - Pass to generalize named linalg ops --===//
 //
-// The pass is to generalize linalg.matmul_transpose_b ops that are equivalent
-// to a transposed matvec op
+// The pass is to generalize named linalg ops that are better as linalg.generic
+// ops in IREE
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,31 +22,17 @@ namespace iree_compiler {
 
 namespace {
 struct SPIRVGeneralizeNamedOpsPass
-    : public SPIRVGeneralizeNamedOpsBase<
-          SPIRVGeneralizeNamedOpsPass> {
+    : public SPIRVGeneralizeNamedOpsBase<SPIRVGeneralizeNamedOpsPass> {
 
   void runOnOperation() override;
 };
 } // namespace
 
-// Check if any of the input dimensions are static 1
-static bool hasUnitDims(linalg::MatmulTransposeBOp linalgOp) {
-  auto initDims =
-      llvm::cast<ShapedType>(linalgOp.getDpsInitOperand(0)->get().getType())
-          .getShape();
-  return (llvm::any_of(initDims, [](auto dim) {
-    return !ShapedType::isDynamic(dim) && dim == 1;
-  }));
-}
-
 void SPIRVGeneralizeNamedOpsPass::runOnOperation() {
   auto funcOp = getOperation();
   SmallVector<linalg::MatmulTransposeBOp> namedOpCandidates;
   funcOp.walk([&](linalg::MatmulTransposeBOp linalgOp) {
-    if (isa_and_nonnull<linalg::MatmulTransposeBOp>(linalgOp.getOperation())) {
-      if (hasUnitDims(linalgOp))
-        namedOpCandidates.push_back(linalgOp);
-    }
+    namedOpCandidates.push_back(linalgOp);
   });
 
   IRRewriter rewriter(&getContext());

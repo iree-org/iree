@@ -60,7 +60,7 @@ def SPIRVEraseStorageBufferStaticShape :
 
 def SPIRVGeneralizeNamedOps :
     Pass<"iree-spirv-generalize-named-ops", "func::FuncOp"> {
-  let summary = "Convert linalg.matmul_transpose_b ops into linalg.generics";
+  let summary = "Convert named Linalg ops to linalg.generic ops";
   let constructor = "mlir::iree_compiler::createSPIRVGeneralizeNamedOpsPass()";
 }
 

@@ -95,8 +95,7 @@ createSPIRVEraseStorageBufferStaticShapePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVFoldProcessorIDUsesPass();
 
-// This pass generalizes linalg.matmul_transpose_b ops that are equivalent
-// to a transposed matvec op (have a unit dimension in the output)
+// This pass generalizes named Linalg ops that are better off as generics.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVGeneralizeNamedOpsPass();
 
