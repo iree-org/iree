@@ -45,7 +45,7 @@ import string
 import subprocess
 import sys
 import textwrap
-from typing import Iterable, List, Mapping, Sequence, Set, Tuple
+from typing import Iterable, List, Mapping, Sequence, Set, Tuple, Optional
 
 import yaml
 
@@ -128,8 +128,10 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 )
 
 # Jobs to run in presumbit if files under the corresponding path see changes.
+# Each tuple consists of the CI job name and a list of file paths to match.
+# The file paths should be specified using Unix shell-style wildcards.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
-    ("build_test_all_macos_arm64", "runtime/src/iree/hal/drivers/metal/*"),
+    ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
 ]
 
 DEFAULT_BENCHMARK_PRESET_GROUP = [
@@ -298,26 +300,30 @@ def get_trailers_and_labels(is_pr: bool) -> Tuple[Mapping[str, str], List[str]]:
     return (trailer_map, labels)
 
 
-def get_modified_paths(base_ref: str) -> Iterable[str]:
-    return subprocess.run(
-        ["git", "diff", "--name-only", base_ref],
-        stdout=subprocess.PIPE,
-        check=True,
-        text=True,
-        timeout=60,
-    ).stdout.splitlines()
-
-
-def modifies_included_path(paths: Iterable[str]) -> bool:
+def get_modified_paths(base_ref: str) -> Optional[Iterable[str]]:
+    """Returns the paths of modified files in this code change."""
     try:
-        return any(not skip_path(p) for p in paths)
+        return subprocess.run(
+            ["git", "diff", "--name-only", base_ref],
+            stdout=subprocess.PIPE,
+            check=True,
+            text=True,
+            timeout=60,
+        ).stdout.splitlines()
     except TimeoutError as e:
         print(
             "Computing modified files timed out. Not using PR diff to determine"
             " jobs to run.",
             file=sys.stderr,
         )
+        return None
+
+
+def modifies_non_skip_paths(paths: Optional[Iterable[str]]) -> bool:
+    """Returns true if not all modified paths are in the skip set."""
+    if paths is None:
         return True
+    return any(not skip_path(p) for p in paths)
 
 
 def get_runner_env(trailers: Mapping[str, str]) -> str:
@@ -387,8 +393,20 @@ def get_enabled_jobs(
     all_jobs: Set[str],
     *,
     is_pr: bool,
-    modified_paths: Iterable[str],
+    modified_paths: Optional[Iterable[str]],
 ) -> Set[str]:
+    """Returns the CI jobs to run.
+
+    Args:
+      trailers: trailers from PR description.
+      all_jobs: all known supported jobs.
+      is_pr: whether this is for pull requests or not.
+      modified_paths: the paths of the files changed. These paths are
+        relative to the repo root directory.
+
+    Returns:
+      The list of CI jobs to run.
+    """
     if not is_pr:
         print(
             "Running all jobs because run was not triggered by a pull request"
@@ -440,7 +458,7 @@ def get_enabled_jobs(
 
     default_jobs = all_jobs - DEFAULT_POSTSUBMIT_ONLY_JOBS
 
-    if not modifies_included_path(modified_paths):
+    if not modifies_non_skip_paths(modified_paths):
         print(
             "Not including any jobs by default because all modified files"
             " are marked as excluded."
@@ -449,9 +467,10 @@ def get_enabled_jobs(
     else:
         # Add jobs if the monitored files are changed.
         for modified_path in modified_paths:
-            for job, match_path in PRESUBMIT_TOUCH_ONLY_JOBS:
-                if fnmatch.fnmatch(modified_path, match_path):
-                    default_jobs |= {job}
+            for job, match_paths in PRESUBMIT_TOUCH_ONLY_JOBS:
+                for match_path in match_paths:
+                    if fnmatch.fnmatch(modified_path, match_path):
+                        default_jobs |= {job}
 
     return (default_jobs | extra_jobs) - skip_jobs
 
