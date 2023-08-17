@@ -4,7 +4,19 @@ name: Build Packages
 
 on:
   workflow_call:
+  # Note: this workflow is typically invoked by schedule_candidate_release.yml.
   workflow_dispatch:
+    inputs:
+      package_version:
+        description: "Version of the package"
+        required: true
+        default: "0.1a1"
+      release_id:
+        description: "Release id to upload artifacts to"
+        default: ""
+      commit:
+        description: "Commit to check out"
+        default: ""
   pull_request:
   push:
     branches:
@@ -24,6 +36,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@e2f20e631ae6d7dd3b768f56a5d2af784dd54791 # v2.5.0
+        with:
+          ref: ${{ github.event.inputs.commit }}
 
       - id: "gcp-auth"
         name: "Authenticating to Google Cloud"
