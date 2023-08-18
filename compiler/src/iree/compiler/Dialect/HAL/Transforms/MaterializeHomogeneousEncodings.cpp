@@ -60,6 +60,10 @@ public:
     OpPassManager passManager(moduleOp.getOperationName());
     auto targetBackend =
         targetRegistry.getTargetBackend(executableTarget.getBackend());
+    if (!targetBackend) {
+      moduleOp.emitError() << "unregistered target backend '" << target << "'";
+      return;
+    }
     targetBackend->buildMaterializeEncodingsPassPipeline(executableTarget,
                                                          passManager);
     if (failed(runPipeline(passManager, moduleOp))) {
