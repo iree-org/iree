@@ -41,7 +41,8 @@ iree_status_t iree_hal_vulkan_native_buffer_wrap(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     VkDeviceMemory device_memory, VkBuffer handle,
-    iree_hal_vulkan_native_buffer_release_callback_t release_callback,
+    iree_hal_vulkan_native_buffer_release_callback_t internal_release_callback,
+    iree_hal_buffer_release_callback_t user_release_callback,
     iree_hal_buffer_t** out_buffer);
 
 #ifdef __cplusplus

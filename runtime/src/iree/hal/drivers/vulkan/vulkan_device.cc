@@ -200,6 +200,17 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
           VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
+  // VK_KHR_external_memory:
+  // Promoted to core in Vulkan 1.1 and not required but here just in case
+  // tooling wants to see the request.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+
+  // VK_EXT_external_memory_host:
+  // Optional to enable import/export of host pointers.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
+
   //===--------------------------------------------------------------------===//
   // Vulkan forward-compatibility shims
   //===--------------------------------------------------------------------===//
@@ -820,7 +831,7 @@ static iree_status_t iree_hal_vulkan_device_query_extensibility_set(
 
 iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
-    iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_features_t requested_features,
     const iree_hal_vulkan_device_options_t* options,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
@@ -833,12 +844,12 @@ iree_status_t iree_hal_vulkan_device_create(
   iree::Arena arena(128 * 1024);
   iree_hal_vulkan_string_list_t required_extensions;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_query_extensibility_set(
-      enabled_features,
+      requested_features,
       IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED, &arena,
       &required_extensions));
   iree_hal_vulkan_string_list_t optional_extensions;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_query_extensibility_set(
-      enabled_features,
+      requested_features,
       IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL, &arena,
       &optional_extensions));
   iree_hal_vulkan_string_list_t enabled_extensions;
@@ -920,7 +931,32 @@ iree_status_t iree_hal_vulkan_device_create(
     features2.features.shaderInt64 = VK_TRUE;
   }
 
-  if (iree_all_bits_set(enabled_features,
+  iree_hal_vulkan_features_t enabled_features = 0;
+
+  IREE_TRACE({
+    if (iree_all_bits_set(requested_features,
+                          IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
+      enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
+    }
+  });
+
+  if (iree_all_bits_set(requested_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING) &&
+      physical_device_features.sparseBinding) {
+    features2.features.sparseBinding = VK_TRUE;
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING;
+  }
+  if (iree_all_bits_set(
+          requested_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED) &&
+      physical_device_features.sparseResidencyBuffer &&
+      physical_device_features.sparseResidencyAliased) {
+    features2.features.sparseResidencyBuffer = VK_TRUE;
+    features2.features.sparseResidencyAliased = VK_TRUE;
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED;
+  }
+
+  if (iree_all_bits_set(requested_features,
                         IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS)) {
     if (physical_device_features.robustBufferAccess != VK_TRUE) {
       return iree_make_status(
@@ -928,6 +964,7 @@ iree_status_t iree_hal_vulkan_device_create(
           "Robust buffer access not supported by physical device");
     }
     features2.features.robustBufferAccess = VK_TRUE;
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS;
   }
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
@@ -959,7 +996,8 @@ iree_status_t iree_hal_vulkan_device_create(
   }
 
   auto logical_device = new VkDeviceHandle(
-      instance_syms, enabled_device_extensions,
+      instance_syms, physical_device, enabled_features,
+      enabled_device_extensions,
       /*owns_device=*/true, host_allocator, /*allocator=*/NULL);
 
   iree_status_t status = VK_RESULT_TO_STATUS(
@@ -1033,7 +1071,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
 
   // Wrap the provided VkDevice with a VkDeviceHandle for use within the HAL.
   auto logical_device_handle = new VkDeviceHandle(
-      device_syms.get(), enabled_device_extensions,
+      device_syms.get(), physical_device, enabled_features,
+      enabled_device_extensions,
       /*owns_device=*/false, host_allocator, /*allocator=*/NULL);
   *logical_device_handle->mutable_value() = logical_device;
 

@@ -244,7 +244,7 @@ namespace vulkan {
   DEV_PFN(EXCLUDED, vkGetImageViewHandleNVX)                            \
   DEV_PFN(EXCLUDED, vkGetMemoryFdKHR)                                   \
   DEV_PFN(EXCLUDED, vkGetMemoryFdPropertiesKHR)                         \
-  DEV_PFN(EXCLUDED, vkGetMemoryHostPointerPropertiesEXT)                \
+  DEV_PFN(OPTIONAL, vkGetMemoryHostPointerPropertiesEXT)                \
   DEV_PFN(EXCLUDED, vkGetPastPresentationTimingGOOGLE)                  \
   DEV_PFN(REQUIRED, vkGetPipelineCacheData)                             \
   DEV_PFN(REQUIRED, vkGetQueryPoolResults)                              \
@@ -321,8 +321,8 @@ namespace vulkan {
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceDisplayPlanePropertiesKHR)       \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceDisplayProperties2KHR)           \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceDisplayPropertiesKHR)            \
-  INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalBufferProperties)        \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalBufferPropertiesKHR)     \
+  INS_PFN(REQUIRED, vkGetPhysicalDeviceExternalBufferProperties)        \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalFenceProperties)         \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalFencePropertiesKHR)      \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalImageFormatPropertiesNV) \
@@ -362,7 +362,7 @@ namespace vulkan {
   INS_PFN(EXCLUDED, vkReleaseDisplayEXT)                                \
   DEV_PFN(EXCLUDED, vkGetQueueCheckpointDataNV)                         \
   DEV_PFN(OPTIONAL, vkQueueBeginDebugUtilsLabelEXT)                     \
-  DEV_PFN(EXCLUDED, vkQueueBindSparse)                                  \
+  DEV_PFN(OPTIONAL, vkQueueBindSparse)                                  \
   DEV_PFN(OPTIONAL, vkQueueEndDebugUtilsLabelEXT)                       \
   DEV_PFN(OPTIONAL, vkQueueInsertDebugUtilsLabelEXT)                    \
   DEV_PFN(EXCLUDED, vkQueuePresentKHR)                                  \
