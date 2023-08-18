@@ -52,15 +52,13 @@ def parse_arguments(argv=None):
     # copy (cp) command.
     cp_parser = subparsers.add_parser(
         "copy",
-        aliases=['cp'],
+        aliases=["cp"],
         help="Read a file and then output it using the given options, without "
         "modification",
     )
     add_ouptut_options(cp_parser)
     cp_parser.add_argument("input_file", help="File to process")
-    cp_parser.add_argument(
-        "-o", required=True, dest="output_file", help="Output file"
-    )
+    cp_parser.add_argument("-o", required=True, dest="output_file", help="Output file")
 
     # strip-data command.
     strip_data_parser = subparsers.add_parser(
