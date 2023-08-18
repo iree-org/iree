@@ -907,7 +907,7 @@ jobs:
           - platform: emscripten
             arch: wasm32
             abi: wasm32
-            docker_image: "gcr.io/iree-oss/emscripten@sha256:7652907cef454d08211e2bc08da6d27d6e9d6e9df06508224dadc2d5ba6c1873"
+            docker_image: "gcr.io/iree-oss/emscripten@sha256:3569560116a0de257f43961361640c636e6d92f5249a799dabebd7cf7ecedad1"
             build_script: "./build_tools/cmake/build_runtime_emscripten.sh"
             # No test script
 

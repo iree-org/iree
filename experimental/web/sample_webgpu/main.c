@@ -439,15 +439,12 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
   switch (map_status) {
     case WGPUBufferMapAsyncStatus_Success:
       break;
-    case WGPUBufferMapAsyncStatus_Error:
-      fprintf(stderr, "  buffer_map_async_callback status: Error\n");
-      break;
     case WGPUBufferMapAsyncStatus_DeviceLost:
       fprintf(stderr, "  buffer_map_async_callback status: DeviceLost\n");
       break;
-    case WGPUBufferMapAsyncStatus_Unknown:
     default:
-      fprintf(stderr, "  buffer_map_async_callback status: Unknown\n");
+      fprintf(stderr, "  buffer_map_async_callback status: Error %d\n",
+              map_status);
       break;
   }
 
