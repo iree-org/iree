@@ -55,14 +55,14 @@ hal.executable @i4_dequant_matvec {
   }
 }
 
-//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 2, 128]{{\]}}>
-//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
-//      CHECK: hal.executable.export public @i4_dequant_matvec
-// CHECK-SAME:   translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
-//      CHECK: func.func @i4_dequant_matvec()
-//      CHECK:   linalg.generic
-// CHECK-SAME:     lowering_config = #[[$CONFIG]]
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
+// CHECK-LABEL: hal.executable.export public @i4_dequant_matvec
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
+//       CHECK: func.func @i4_dequant_matvec()
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
 
 // -----
 
@@ -80,8 +80,8 @@ hal.executable @i4_dequant_matvec {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
-        max_compute_workgroup_invocations = 512,
-        max_compute_workgroup_size = [512, 512, 512],
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>>
     }> {
     hal.executable.export @i4_dequant_matvec layout(#pipeline_layout)
@@ -136,11 +136,11 @@ hal.executable @i4_dequant_matvec {
   }
 }
 
-//  CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 16, 128]{{\]}}>
-//  CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
-//      CHECK: hal.executable.export public @i4_dequant_matvec
-// CHECK-SAME:   translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [512 : index, 1 : index, 1 : index]
-//      CHECK: func.func @i4_dequant_matvec()
-//      CHECK:   linalg.generic
-// CHECK-SAME:     lowering_config = #[[$CONFIG]]
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 32, 128]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
+// CHECK-LABEL: hal.executable.export public @i4_dequant_matvec
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [1024 : index, 1 : index, 1 : index]
+//       CHECK: func.func @i4_dequant_matvec()
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
