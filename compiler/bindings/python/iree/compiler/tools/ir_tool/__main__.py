@@ -49,6 +49,17 @@ def parse_arguments(argv=None):
             help="Bytecode version to emit or -1 for latest",
         )
 
+    # copy (cp) command.
+    cp_parser = subparsers.add_parser(
+        "copy",
+        aliases=["cp"],
+        help="Read a file and then output it using the given options, without "
+        "modification",
+    )
+    add_ouptut_options(cp_parser)
+    cp_parser.add_argument("input_file", help="File to process")
+    cp_parser.add_argument("-o", required=True, dest="output_file", help="Output file")
+
     # strip-data command.
     strip_data_parser = subparsers.add_parser(
         "strip-data",
@@ -66,16 +77,29 @@ def parse_arguments(argv=None):
     strip_data_parser.add_argument(
         "-o", required=True, dest="output_file", help="Output file"
     )
+
     args = parser.parse_args(argv)
     return args
 
 
 def main(args) -> int:
+    if args.sub_command == "copy":
+        return do_copy(args)
     if args.sub_command == "strip-data":
         return do_strip_data(args)
     else:
         print("error: Unrecognized sub-command {args.sub_command}", file=sys.stderr)
         return 1
+    return 0
+
+
+def do_copy(args) -> int:
+    session = Session()
+    output = Output.open_file(args.output_file)
+    inv = session.invocation()
+    inv.enable_console_diagnostics()
+    load_source(inv, args.input_file)
+    write_output(inv, output, args)
     return 0
 
 

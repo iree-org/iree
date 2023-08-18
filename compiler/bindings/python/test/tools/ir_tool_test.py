@@ -41,6 +41,53 @@ class IrToolTest(unittest.TestCase):
         with open(self.outputPath, "rt" if text else "rb") as f:
             return f.read()
 
+    def testCpDefaultArgs(self):
+        self.saveInput(
+            r"""
+            builtin.module {
+            }
+            """
+        )
+        run_tool("copy", self.inputPath, "-o", self.outputPath)
+        output = self.loadOutput()
+        print("Output:", output)
+        self.assertIn("module", output)
+
+    def testCpEmitBytecode(self):
+        self.saveInput(
+            r"""
+            builtin.module {
+            }
+            """
+        )
+        run_tool(
+            "copy",
+            "--emit-bytecode",
+            self.inputPath,
+            "-o",
+            self.outputPath,
+        )
+        output = self.loadOutput(text=False)
+        self.assertIn(b"MLIR", output)
+
+    def testCpEmitBytecodeVersion(self):
+        self.saveInput(
+            r"""
+            builtin.module {
+            }
+            """
+        )
+        run_tool(
+            "copy",
+            "--emit-bytecode",
+            "--bytecode-version=0",
+            self.inputPath,
+            "-o",
+            self.outputPath,
+        )
+        output = self.loadOutput(text=False)
+        self.assertIn(b"MLIR", output)
+
     def testStripDataWithImport(self):
         self.saveInput(
             r"""
