@@ -17,7 +17,6 @@ void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager) {
   passManager.addPass(createBufferizeCopyOnlyDispatchesPass());
   passManager.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createDecomposeSoftmaxPass());
-  passManager.addNestedPass<func::FuncOp>(createRematerializeParallelOpsPass());
 }
 
 //===---------------------------------------------------------------------===//
