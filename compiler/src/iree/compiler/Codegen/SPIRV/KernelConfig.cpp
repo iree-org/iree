@@ -1198,12 +1198,19 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   auto funcOp = op->getParentOfType<FunctionOpInterface>();
   auto walkResult = funcOp.walk([](linalg::LinalgOp op) {
-    if (op.hasDynamicShape())
-      return WalkResult::interrupt();
+    using utils::IteratorType;
+    SmallVector<IteratorType, 4> kinds = op.getIteratorTypesArray();
+    SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+    for (auto [kind, bound] : llvm::zip_equal(kinds, bounds)) {
+      if (kind == IteratorType::reduction && ShapedType::isDynamic(bound))
+        return WalkResult::interrupt();
+    }
     return WalkResult::advance();
   });
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: dynamic shapes in reduction dims\n");
     return failure();
+  }
 
   // This pipeline eventually generates non-uniform group shuffle ops, which
   // requires special capability.
@@ -1278,8 +1285,8 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
       targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
   int64_t groupSize = dimSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
-    groupSize = GreatestCommonDivisor({64, uint64_t(groupSize)},
-                                      {64, uint64_t(maxWorkgroupSize)})
+    groupSize = GreatestCommonDivisor(APInt(64, uint64_t(groupSize)),
+                                      APInt(64, uint64_t(maxWorkgroupSize)))
                     .getZExtValue();
   }
   // Current warp reduction pattern is a two step butterfly warp reduce.
@@ -1309,8 +1316,8 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     int64_t bound = bounds[dim];
     if (i == reductionDims.size() - 1)
       bound /= vectorSize;
-    APInt size = GreatestCommonDivisor({64, uint64_t(remaingGroupSize)},
-                                       {64, uint64_t(bound)});
+    APInt size = GreatestCommonDivisor(APInt(64, uint64_t(remaingGroupSize)),
+                                       APInt(64, uint64_t(bound)));
     reductionTileSizes[dim] = size.getSExtValue();
     if (i == reductionDims.size() - 1)
       reductionTileSizes[dim] *= vectorSize;
@@ -1469,11 +1476,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // If there are more than 3 parallel dim try to tile the extra higher level
     // dimensions to 1 for extra dimensions.
     if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
-      SmallVector<int64_t> ranges = linalgOp.getStaticLoopRanges();
       for (int64_t i = 0, e = workgroupTileSizes.size(); i < e; i++) {
         if (workgroupTileSizes[i] != 0)
           break;
-        if (ranges[i] != 1)
+        if (loopBounds[i] != 1)
           workgroupTileSizes[i] = 1;
       }
     }
