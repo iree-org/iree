@@ -61,7 +61,8 @@ public:
     auto targetBackend =
         targetRegistry.getTargetBackend(executableTarget.getBackend());
     if (!targetBackend) {
-      moduleOp.emitError() << "unregistered target backend '" << target << "'";
+      moduleOp.emitError() << "unregistered target backend '"
+                           << executableTarget.getBackend() << "'";
       return;
     }
     targetBackend->buildMaterializeEncodingsPassPipeline(executableTarget,
