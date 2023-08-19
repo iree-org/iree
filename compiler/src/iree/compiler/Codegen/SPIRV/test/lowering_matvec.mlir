@@ -9,7 +9,7 @@
     #hal.descriptor_set.binding<4, storage_buffer>
   ]>
 ]>
-hal.executable @i4_dequant_matvec {
+hal.executable @i4_dequant_matvec_f32 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
@@ -17,13 +17,13 @@ hal.executable @i4_dequant_matvec {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 64>>
     }> {
-    hal.executable.export @i4_dequant_matvec layout(#pipeline_layout) {
+    hal.executable.export @i4_dequant_matvec_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @i4_dequant_matvec() {
+      func.func @i4_dequant_matvec_f32() {
         %cst = arith.constant 0.000000e+00 : f32
         %10 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86x128xi4>>
         %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>>
@@ -58,7 +58,7 @@ hal.executable @i4_dequant_matvec {
   }
 }
 
-//   CHECK-LABEL: func.func @i4_dequant_matvec()
+//   CHECK-LABEL: func.func @i4_dequant_matvec_f32()
 
 //         CHECK:   %[[FOR:.+]] = scf.for %arg0 = %c0 to %c86 step %c2 iter_args({{.+}}) -> (vector<1x4xf32>)
 //         CHECK:     %[[READ0:.+]] = vector.transfer_read {{.+}} : memref<4096x86x128xi4, #hal.descriptor_type<storage_buffer>>, vector<4xi4>
