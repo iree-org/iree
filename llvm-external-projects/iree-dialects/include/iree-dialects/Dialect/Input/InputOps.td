@@ -218,6 +218,31 @@ def OpGroupBufferAndBufferViewOps : OpDocGroup {
 
 let opDocGroup = OpGroupBufferAndBufferViewOps in {
 
+def IREEInput_BufferSubspanOp : IREEInput_PureOp<"buffer.subspan", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+  ]> {
+  let summary = [{buffer subspan operation}];
+  let description = [{
+    Returns a reference to a subspan of the buffer.
+  }];
+
+  let arguments = (ins
+    IREEInput_BufferType:$source_buffer,
+    IREEInput_DeviceSize:$source_offset,
+    IREEInput_DeviceSize:$length
+  );
+  let results = (outs
+    IREEInput_BufferType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $source_buffer `:` type($source_buffer) `>`
+    `` `[` $source_offset `,` $length `]`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
 def IREEInput_BufferViewCreateOp : IREEInput_PureOp<"buffer_view.create"> {
   let summary = [{buffer view reference initializer}];
   let description = [{
