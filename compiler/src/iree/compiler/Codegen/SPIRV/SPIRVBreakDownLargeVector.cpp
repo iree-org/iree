@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -40,20 +41,24 @@ namespace {
 // ``mlir
 // %zero = arith.constant dense<0> : vector<4xi32>
 // %base = vector.extract %input[0] : vector<1xi32>
-// %shr0 = arith.shrui %base, %c12
+// %shr0 = arith.shrui %base, %c0
 // %and0 = arith.andi %shr0, %c15
 // %ins0 = vector.insert %and0, %zero [0]
-// %shr1 = arith.shrui %base, %c8
+// %shr1 = arith.shrui %base, %4
 // %and1 = arith.andi %shr1, %c15
 // %ins1 = vector.insert %and1, %ins1 [1]
-// %shr2 = arith.shrui %base, %c4
+// %shr2 = arith.shrui %base, %c8
 // %and2 = arith.andi %shr2, %c15
 // %ins2 = vector.insert %and2, %ins2 [2]
-// %shr3 = arith.shrui %base, %c0
+// %shr3 = arith.shrui %base, %c12
 // %and3 = arith.andi %shr3, %c15
 // %extend = vector.insert %and2, %ins3 [3]
 // ```
-
+//
+// Note that the above pattern assumes littlen-endian style encoding of the
+// sub-byte elements. That is, for 8xi4 [A, B, C, D, E, F, G, H], they are
+// stored in memory as [BA, DC, FE, HG], and read as an i32 HGFEDCBA. Therefore
+// the first i4 element is the lest significant 4 bits.
 struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(arith::ExtUIOp extOp,
@@ -71,8 +76,11 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
     VectorType extractDstType = extractOp.getType();
     // We expect high-D vectors are broken down into 1-D ones so here we only
     // handle 1-D vectors.
-    if (extractSrcType.getShape().size() != 1 ||
-        extractDstType.getShape().size() != 1)
+    if (extractSrcType.getRank() != 1 || extractDstType.getRank() != 1)
+      return failure();
+    // We only have power-of-two bitwidth cases for now.
+    if (!llvm::isPowerOf2_64(extractSrcType.getNumElements()) ||
+        !llvm::isPowerOf2_64(extractDstType.getNumElements()))
       return failure();
     // We only handle not directly supported vector sizes.
     if (extractSrcType.getNumElements() <= 4)
@@ -99,11 +107,13 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
         extractOp.getLoc(), extOp.getType(),
         rewriter.getZeroAttr(extOp.getType()));
 
+    // Extract each elements assuming little-endian style encoding--lower bits
+    // corresponds to earlier elements.
     auto dstElemType = cast<VectorType>(extOp.getType()).getElementType();
     auto mask = rewriter.create<arith::ConstantOp>(
         extOp.getLoc(), dstElemType,
         rewriter.getIntegerAttr(dstElemType, (1u << midElemBitwidth) - 1));
-    int64_t shrSize = srcElemBitwidth - srcElemOffset - midElemBitwidth;
+    int64_t shrSize = srcElemOffset;
     for (int i = 0; i < extractDstType.getNumElements(); ++i) {
       // Each time we extract midElemBitwidth bits from srcElement. We do that
       // by shift right first and then and a mask.
@@ -116,7 +126,7 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
           rewriter.create<arith::AndIOp>(extractOp.getLoc(), shr, mask);
       result = rewriter.create<vector::InsertOp>(
           extractOp.getLoc(), extOp.getType(), elem, result, i);
-      shrSize -= midElemBitwidth;
+      shrSize += midElemBitwidth;
     }
 
     rewriter.replaceOp(extOp, result);
