@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -75,8 +76,11 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
     VectorType extractDstType = extractOp.getType();
     // We expect high-D vectors are broken down into 1-D ones so here we only
     // handle 1-D vectors.
-    if (extractSrcType.getShape().size() != 1 ||
-        extractDstType.getShape().size() != 1)
+    if (extractSrcType.getRank() != 1 || extractDstType.getRank() != 1)
+      return failure();
+    // We only have power-of-two bitwidth cases for now.
+    if (!llvm::isPowerOf2_64(extractSrcType.getNumElements()) ||
+        !llvm::isPowerOf2_64(extractDstType.getNumElements()))
       return failure();
     // We only handle not directly supported vector sizes.
     if (extractSrcType.getNumElements() <= 4)
@@ -103,7 +107,8 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
         extractOp.getLoc(), extOp.getType(),
         rewriter.getZeroAttr(extOp.getType()));
 
-    // Extract each elements assuming little-endian style encoding.
+    // Extract each elements assuming little-endian style encoding--lower bits
+    // corresponds to earlier elements.
     auto dstElemType = cast<VectorType>(extOp.getType()).getElementType();
     auto mask = rewriter.create<arith::ConstantOp>(
         extOp.getLoc(), dstElemType,
