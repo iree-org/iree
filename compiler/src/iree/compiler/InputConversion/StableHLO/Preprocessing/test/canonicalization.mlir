@@ -401,6 +401,17 @@ func.func @reshape(%arg0: tensor<1xf32>)
 
 // -----
 
+// CHECK-LABEL: @merge_consecutive_reshapes
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
+func.func @merge_consecutive_reshapes(%arg0: tensor<4x4xi32>) -> tensor<16xi32> {
+  %0 = stablehlo.reshape %arg0 : (tensor<4x4xi32>) -> tensor<2x8xi32>
+  %1 = stablehlo.reshape %0 : (tensor<2x8xi32>) -> tensor<16xi32>
+  // CHECK: [[R0:%.+]] = stablehlo.reshape %[[ARG0]] : (tensor<4x4xi32>) -> tensor<16xi32>
+  return %1 : tensor<16xi32>
+}
+
+// -----
+
 // CHECK-LABEL: func.func @transpose
 // CHECK-SAME:   ([[ARG0:%.+]]: tensor<2xf32>, [[ARG1:%.+]]: tensor<3x2xf32>, [[ARG2:%.+]]: tensor<f32>)
 func.func @transpose(%arg0: tensor<2xf32>, %arg1: tensor<3x2xf32>, %arg2: tensor<f32>)
