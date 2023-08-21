@@ -55,7 +55,16 @@ ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
 // it is best to be conservative here, and we limit to known value
 // types.
 bool isLegalConstExprType(Type t) {
-  if (llvm::isa<IntegerType, FloatType, IndexType>(t)) {
+  if (llvm::isa<IntegerType, FloatType>(t)) {
+    // TODO: We shouldn't need to be this conservative about the bit widths we
+    // support, but for now the consteval JIT has interop limitations. Lift
+    // this restriction when the JIT interops for all types.
+    auto bitWidth = t.getIntOrFloatBitWidth();
+    return bitWidth == 1 || bitWidth == 8 || bitWidth == 16 || bitWidth == 32 ||
+           bitWidth == 64;
+  }
+
+  if (llvm::isa<IndexType>(t)) {
     return true;
   }
 
@@ -72,6 +81,8 @@ void registerConstExprDependentDialects(DialectRegistry &registry) {
   registry.insert<IREE::Util::UtilDialect>();
   registry.insert<linalg::LinalgDialect>();
 }
+
+bool isLegalConstExprRootType(Type t) { return isLegalConstExprType(t); }
 
 ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   // We have a specific allow-list for Linalg ops because we want to consider

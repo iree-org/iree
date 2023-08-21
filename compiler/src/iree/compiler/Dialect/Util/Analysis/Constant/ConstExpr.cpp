@@ -12,7 +12,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
-#define DEBUG_TYPE "iree-const-expr-analysis"
+#define DEBUG_TYPE "iree-constexpr"
 
 using llvm::dbgs;
 
@@ -58,6 +58,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
       return;
     if (info->isIndirect)
       return;
+    if (!isLegalConstExprRootType(info->op.getGlobalType()))
+      return;
     for (auto *use : info->uses) {
       auto loadOp = llvm::dyn_cast<GlobalLoadOp>(use);
       if (!loadOp)
@@ -68,7 +70,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
 
   // Populate the constant roots for all inline constants in the program.
   rootOp->walk([&](arith::ConstantOp constOp) {
-    constantRoots[constOp.getResult()] = constOp;
+    if (isLegalConstExprRootType(constOp.getResult().getType()))
+      constantRoots[constOp.getResult()] = constOp;
   });
 
   // Prime the const value map with known roots. This must be done first
