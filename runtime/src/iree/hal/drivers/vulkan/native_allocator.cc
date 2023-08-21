@@ -449,7 +449,8 @@ static iree_status_t iree_hal_vulkan_native_allocator_allocate_internal(
   const bool use_sparse_allocation =
       iree_hal_vulkan_buffer_needs_sparse_binding(allocator, params,
                                                   allocation_size);
-  if (!iree_all_bits_set(allocator->logical_device->enabled_features(),
+  if (use_sparse_allocation &&
+      !iree_all_bits_set(allocator->logical_device->enabled_features(),
                          IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING)) {
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,
