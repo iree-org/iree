@@ -553,27 +553,11 @@ struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
   LogicalResult
   matchAndRewrite(OpTy funcOp, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    bool opUpdated = false;
-    for (Block &block : llvm::make_early_inc_range(funcOp.getBody())) {
-      bool doSignatureConversion = false;
-      TypeConverter::SignatureConversion signatureConverter(
-          block.getNumArguments());
-      for (const auto &[argIndex, arg] :
-           llvm::enumerate(block.getArguments())) {
-        Type argType = arg.getType();
-        Type legalizedType = this->typeConverter->convertType(argType);
-        signatureConverter.addInputs(argIndex, legalizedType);
-        doSignatureConversion |= argType != legalizedType;
-      }
-      if (doSignatureConversion) {
-        if (rewriter.applySignatureConversion(&block, signatureConverter)) {
-          opUpdated = true;
-        }
-      }
-    }
-    if (!opUpdated) {
-      return rewriter.notifyMatchFailure(
-          funcOp, "failed to update signature of blocks");
+    FailureOr<Block *> newEntry =
+        rewriter.convertRegionTypes(&funcOp.getBody(), *this->typeConverter);
+    if (failed(newEntry)) {
+      return rewriter.notifyMatchFailure(funcOp,
+                                         "failed to convert region types");
     }
     rewriter.updateRootInPlace(funcOp, []() {});
     return success();
