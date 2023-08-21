@@ -42,6 +42,11 @@ struct ConstExprOpInfo {
   static ConstExprOpInfo getForOp(Operation *op);
 };
 
+// Whether the type is considered legal for a constexpr root. For example,
+// this would be called with the i32 type below:
+//   %cst = arith.constant 4 : i32
+bool isLegalConstExprRootType(Type t);
+
 // Whether a const-expr op is eligible to be hoistable. This enforces
 // policies for excluding certain, otherwise eligible, const-expr ops from
 // being hoisted to a global.
