@@ -18,6 +18,12 @@
 // to be omitted and not have VMA poking around where it shouldn't.
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
 
+#define VMA_DEBUG_LOG_FORMAT(format, ...)   \
+  do {                                      \
+    fprintf(stderr, (format), __VA_ARGS__); \
+    fprintf(stderr, "\n");                  \
+  } while (false)
+
 #include <vk_mem_alloc.h>  // IWYU pragma: export
 
 #endif  // IREE_HAL_DRIVERS_VULKAN_VMA_IMPL_H_

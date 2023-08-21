@@ -261,6 +261,19 @@ static void VKAPI_PTR iree_hal_vulkan_vma_free_callback(
 static void iree_hal_vulkan_vma_allocator_destroy(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator);
 
+static PFN_vkAllocateMemory allocate_memory_ptr = NULL;
+static VkResult HOOKED_vkAllocateMemory(
+    VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
+    const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory) {
+  fprintf(stderr,
+          "vkAllocateMemory(%p, allocationSize=%" PRIu64
+          ", memoryTypeIndex=%u, pNext=%p, %p, %p)\n",
+          (void*)device, (uint64_t)pAllocateInfo->allocationSize,
+          pAllocateInfo->memoryTypeIndex, pAllocateInfo->pNext, pAllocator,
+          pMemory);
+  return allocate_memory_ptr(device, pAllocateInfo, pAllocator, pMemory);
+}
+
 iree_status_t iree_hal_vulkan_vma_allocator_create(
     const iree_hal_vulkan_device_options_t* options, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
@@ -287,7 +300,8 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
       syms->vkGetPhysicalDeviceProperties;
   vulkan_fns.vkGetPhysicalDeviceMemoryProperties =
       syms->vkGetPhysicalDeviceMemoryProperties;
-  vulkan_fns.vkAllocateMemory = syms->vkAllocateMemory;
+  allocate_memory_ptr = syms->vkAllocateMemory;
+  vulkan_fns.vkAllocateMemory = HOOKED_vkAllocateMemory;
   vulkan_fns.vkFreeMemory = syms->vkFreeMemory;
   vulkan_fns.vkMapMemory = syms->vkMapMemory;
   vulkan_fns.vkUnmapMemory = syms->vkUnmapMemory;

@@ -268,6 +268,8 @@ static iree_status_t iree_hal_vulkan_native_allocator_commit_and_wrap(
   VkMemoryRequirements requirements = {0};
   logical_device->syms()->vkGetBufferMemoryRequirements(*logical_device, handle,
                                                         &requirements);
+  fprintf(stderr, "vkGetBufferMemoryRequirements alignment %u bits %08X\n",
+          (uint32_t)requirements.alignment, requirements.memoryTypeBits);
   uint32_t memory_type_index = 0;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_find_memory_type(
       &allocator->device_props, &allocator->memory_props, params,
@@ -287,6 +289,10 @@ static iree_status_t iree_hal_vulkan_native_allocator_commit_and_wrap(
         allocator->device_props_11.maxMemoryAllocationSize, out_buffer);
   }
 
+  fprintf(stderr, "vkAllocateMemory\nreq size %u\nmemory type index %u\n",
+          (uint32_t)requirements.size, memory_type_index);
+
+
   // Allocate the device memory we'll attach the buffer to.
   VkMemoryAllocateInfo allocate_info = {};
   allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -294,6 +300,12 @@ static iree_status_t iree_hal_vulkan_native_allocator_commit_and_wrap(
   allocate_info.allocationSize = requirements.size;
   allocate_info.memoryTypeIndex = memory_type_index;
   VkDeviceMemory device_memory = VK_NULL_HANDLE;
+  fprintf(stderr,
+          "vkAllocateMemory(%p, allocationSize=%" PRIu64
+          ", memoryTypeIndex=%u, pNext=%p, %p, %p)\n",
+          (void*)logical_device->value(),
+          (uint64_t)allocate_info.allocationSize, allocate_info.memoryTypeIndex,
+          allocate_info.pNext, logical_device->allocator(), &device_memory);
   VK_RETURN_IF_ERROR(logical_device->syms()->vkAllocateMemory(
                          *logical_device, &allocate_info,
                          logical_device->allocator(), &device_memory),

@@ -17,6 +17,7 @@ from urllib.request import urlretrieve
 import numpy as np
 
 from iree.compiler.tools import InputType, compile_file
+from iree import runtime as rt
 from iree.runtime import load_vm_flatbuffer_file
 
 MODEL_ARTIFACTS_URL = "https://storage.googleapis.com/iree-model-artifacts/mnist_train.a49ba1535a45ac0f3e6be22a7ed5dddf4a53cd1f41126af938f0667b998f8e11.tar"
@@ -76,6 +77,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--target_backend", type=str, default="llvm-cpu")
     parser.add_argument("--driver", type=str, default="local-task")
+    parser.add_argument("--vma", default=False, action="store_true")
     return parser.parse_known_args()
 
 
@@ -115,6 +117,13 @@ def extract_test_data(archive_path: str, out_dir: str):
 
 class MnistTrainTest(unittest.TestCase):
     def test_mnist_training(self):
+        if args.vma:
+          rt.flags.parse_flags("--vulkan_vma_allocator=true")
+        else:
+          rt.flags.parse_flags("--vulkan_vma_allocator=false")
+        rt.flags.parse_flags("--vulkan_validation_layers=true")
+        rt.flags.parse_flags("--vulkan_debug_utils=true")
+        rt.flags.parse_flags("--vulkan_debug_verbosity=4")
         with tempfile.TemporaryDirectory() as tmp_dir:
             archive_path = os.path.join(tmp_dir, "mnist_train.tar")
             download_test_data(archive_path)

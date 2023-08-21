@@ -24,3 +24,6 @@ fi
 
 echo "${VULKAN_INSTANCE?}"
 echo "${VK_PHYSICAL_DEVICE_PROPERTIES?}"
+
+cat /tmp/vulkaninfo.stdout
+cat /tmp/vulkaninfo.stderr
