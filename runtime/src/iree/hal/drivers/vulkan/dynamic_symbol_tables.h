@@ -293,6 +293,9 @@ namespace vulkan {
   DEV_PFN(OPTIONAL, vkSignalSemaphore)                                  \
   DEV_PFN(OPTIONAL, vkSignalSemaphoreKHR)                               \
                                                                         \
+  DEV_PFN(OPTIONAL, vkGetBufferDeviceAddress)                           \
+  DEV_PFN(OPTIONAL, vkGetBufferDeviceAddressKHR)                        \
+                                                                        \
   INS_PFN(EXCLUDED, vkCreateDebugReportCallbackEXT)                     \
   INS_PFN(OPTIONAL, vkCreateDebugUtilsMessengerEXT)                     \
   INS_PFN(EXCLUDED, vkCreateDisplayPlaneSurfaceKHR)                     \
@@ -329,7 +332,7 @@ namespace vulkan {
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalSemaphoreProperties)     \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceExternalSemaphorePropertiesKHR)  \
   INS_PFN(REQUIRED, vkGetPhysicalDeviceFeatures)                        \
-  INS_PFN(EXCLUDED, vkGetPhysicalDeviceFeatures2)                       \
+  INS_PFN(REQUIRED, vkGetPhysicalDeviceFeatures2)                       \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceFeatures2KHR)                    \
   INS_PFN(REQUIRED, vkGetPhysicalDeviceFormatProperties)                \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceFormatProperties2)               \
