@@ -78,13 +78,13 @@ function(iree_bitcode_library)
       OUTPUT
         "${_BITCODE_FILE}"
       COMMAND
-        "${IREE_CLANG_BINARY}"
+        "clang"
         ${_COPTS}
         "${_BITCODE_SRC_PATH}"
         "-o"
         "${_BITCODE_FILE}"
       DEPENDS
-        "${IREE_CLANG_BINARY}"
+        "clang"
         "${_SRC}"
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
@@ -96,12 +96,12 @@ function(iree_bitcode_library)
     OUTPUT
       ${_OUT}
     COMMAND
-      ${IREE_LLVM_LINK_BINARY}
+      "llvm-link"
       ${_BITCODE_FILES}
       "-o"
       "${_OUT}"
     DEPENDS
-      ${IREE_LLVM_LINK_BINARY}
+      "llvm-link"
       ${_BITCODE_FILES}
     COMMENT
       "Linking bitcode to ${_OUT}"
@@ -167,13 +167,13 @@ function(iree_cuda_bitcode_library)
       OUTPUT
         "${_BITCODE_FILE}"
       COMMAND
-        "${IREE_CLANG_BINARY}"
+        "clang"
         ${_COPTS}
         "${_BITCODE_SRC_PATH}"
         "-o"
         "${_BITCODE_FILE}"
       DEPENDS
-        "${IREE_CLANG_BINARY}"
+        "clang"
         "${_SRC}"
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
@@ -185,12 +185,12 @@ function(iree_cuda_bitcode_library)
     OUTPUT
       ${_OUT}
     COMMAND
-      ${IREE_LLVM_LINK_BINARY}
+      "llvm-link"
       ${_BITCODE_FILES}
       "-o"
       "${_OUT}"
     DEPENDS
-      ${IREE_LLVM_LINK_BINARY}
+      "llvm-link"
       ${_BITCODE_FILES}
     COMMENT
       "Linking bitcode to ${_OUT}"
@@ -235,12 +235,12 @@ function(iree_link_bitcode)
     OUTPUT
       ${_OUT}
     COMMAND
-      ${IREE_LLVM_LINK_BINARY}
+      "llvm-link"
       ${_BITCODE_FILES}
       "-o"
       "${_OUT}"
     DEPENDS
-      ${IREE_LLVM_LINK_BINARY}
+      "llvm-link"
       ${_BITCODE_FILES}
     COMMENT
       "Linking bitcode to ${_OUT}"
