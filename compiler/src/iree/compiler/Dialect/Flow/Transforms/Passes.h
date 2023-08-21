@@ -25,20 +25,7 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  // Enables the iree-util-hoist-into-globals pass. This should eventually
-  // become the default.
-  bool constExprHoisting = false;
-
-  // Enables passes to perform numeric precision reduction.
-  bool numericPrecisionReduction = false;
-
-  // Hook to populate a constant evaluation pass pipeline. If nullptr, then
-  // no passes are added for constant evaluation. This must be injected in
-  // because constant-evaluators can depend on the whole compiler, of which
-  // this is a part, and we maintain strict optionality for this component.
-  std::function<void(OpPassManager &passManager)> buildConstEvalPassPipeline;
-};
+void buildFlowPreprocessingTransformPassPipeline(OpPassManager &passManager);
 
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
@@ -51,8 +38,7 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 //     - Directly passing supported flow plus core ops
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager,
-                                    const TransformOptions &transformOptions);
+void buildFlowTransformPassPipeline(OpPassManager &passManager);
 
 void registerFlowTransformPassPipeline();
 

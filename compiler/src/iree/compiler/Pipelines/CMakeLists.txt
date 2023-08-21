@@ -59,6 +59,7 @@ iree_cc_library(
     iree::compiler::InputConversion::Common
     iree::compiler::InputConversion::Common::AutoInputConversionPipeline
     iree::compiler::Preprocessing::Passes
+    iree::compiler::GlobalOptimization
     iree::compiler::Utils
   PUBLIC
 )
