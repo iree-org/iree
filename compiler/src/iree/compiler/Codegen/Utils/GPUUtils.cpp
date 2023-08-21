@@ -359,6 +359,16 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
   return unpackedVector;
 }
 
+LogicalResult
+DropSharedMemoryDeallocOp::matchAndRewrite(memref::DeallocOp op,
+                                           PatternRewriter &rewriter) const {
+  if (!hasSharedMemoryAddressSpace(
+          llvm::cast<MemRefType>(op.getMemref().getType())))
+    return failure();
+  rewriter.eraseOp(op);
+  return success();
+}
+
 /// Emit warp reduction code sequence for a given input.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
