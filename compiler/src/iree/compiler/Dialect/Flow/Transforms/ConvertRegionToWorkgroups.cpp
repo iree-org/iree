@@ -124,22 +124,25 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   region.walk(
       [&](Flow::ReturnOp returnOp) { origTerminators.push_back(returnOp); });
   assert(!origTerminators.empty() && "expected at least one terminator");
-  // Use one of the terminators to get the the `tiedArguments` set.
-  // TODO: Check that using all terminators gives you the same result.
-  for (const auto &it :
-       llvm::enumerate(origTerminators.front()->getOperands())) {
-    auto tiedArgument =
-        findFirstTiedValueOutsideOfRegionOp(regionOp, it.value());
-    if (!tiedArgument.has_value())
-      continue;
-    assert(argumentsSet.contains(*tiedArgument) &&
-           "expected that tiedArgument is already an argument");
-    // Do not tie an argument to multiple results.
-    if (tiedArgumentsSet.contains(*tiedArgument))
-      continue;
-    tiedArgumentsSet.insert(*tiedArgument);
-    tiedArguments[it.index()] = std::distance(
-        argumentsSet.begin(), llvm::find(argumentsSet, *tiedArgument));
+
+  // The logic to find the tied arguments only works for single block regions.
+  // For ops with multiple blocks, just ignore tied arguments for now.
+  if (llvm::hasSingleElement(region)) {
+    for (const auto &it :
+         llvm::enumerate(origTerminators.front()->getOperands())) {
+      auto tiedArgument =
+          findFirstTiedValueOutsideOfRegionOp(regionOp, it.value());
+      if (!tiedArgument.has_value())
+        continue;
+      assert(argumentsSet.contains(*tiedArgument) &&
+             "expected that tiedArgument is already an argument");
+      // Do not tie an argument to multiple results.
+      if (tiedArgumentsSet.contains(*tiedArgument))
+        continue;
+      tiedArgumentsSet.insert(*tiedArgument);
+      tiedArguments[it.index()] = std::distance(
+          argumentsSet.begin(), llvm::find(argumentsSet, *tiedArgument));
+    }
   }
 
   // Create empty dispatch region.
