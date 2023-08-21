@@ -52,7 +52,7 @@ if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
 GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.307.1}"
-GITHUB_RUNNER_X86_64_ARCHIVE_DIGEST="${GITHUB_RUNNER_X86_64_ARCHIVE_DIGEST:-038c9e98b3912c5fd6d0b277f2e4266b2a10accc1ff8ff981b9971a8e76b5441}"
+GITHUB_RUNNER_X64_ARCHIVE_DIGEST="${GITHUB_RUNNER_X64_ARCHIVE_DIGEST:-038c9e98b3912c5fd6d0b277f2e4266b2a10accc1ff8ff981b9971a8e76b5441}"
 GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST:-01edc84342ef4128a8f19bc2f33709b40f2f1c40e250e2a4c5e0adf620044ab3}"
 GITHUB_TOKEN_PROXY_URL="${GITHUB_TOKEN_PROXY_URL:-https://ght-proxy-openxla-zbhz5clunq-ue.a.run.app}"
 
@@ -116,7 +116,7 @@ function create_template() {
     local runner_archive_digest="${GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST}"
   else
     local runner_arch="x64"
-    local runner_archive_digest="${GITHUB_RUNNER_X86_64_ARCHIVE_DIGEST}"
+    local runner_archive_digest="${GITHUB_RUNNER_X64_ARCHIVE_DIGEST}"
   fi
   metadata+=(
     "github-runner-archive-url=https://github.com/actions/runner/releases/download/v${GITHUB_RUNNER_VERSION}/actions-runner-linux-${runner_arch}-${GITHUB_RUNNER_VERSION}.tar.gz"
