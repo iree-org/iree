@@ -233,6 +233,8 @@ void iree_tracing_message_string_view(const char* value, size_t value_length,
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
+static inline void* iree_tracing_obscure_ptr(void* ptr) { return ptr; }
+
 // TODO(benvanik): console tracing allocation support. We could just print out
 // pointers or keep track of statistics and dump them in IREE_TRACE_APP_EXIT.
 #define IREE_TRACE_ALLOC(ptr, size)
