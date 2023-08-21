@@ -210,6 +210,7 @@ EOF
 
   ########################### Install the ops agent ############################
 
+  # TODO(#14766): google cloud ops agent hasn't support ARM64 ubuntu 22.04 yet.
   if [[ "${RUNNER_TYPE^^}" != ARM64 ]]; then
     nice_curl https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh \
       | bash -s -- --also-install --remove-repo --version=2.24.0
