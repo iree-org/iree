@@ -119,6 +119,13 @@ def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   ];
 }
 
+def DecomposeBatchMmt4DOps
+    : Pass<"iree-codegen-decompose-batch-mmt4d-ops", "func::FuncOp"> {
+  let summary = "Decompose batch_mmt4d ops into mmt4d ops";
+  let constructor =
+      "mlir::iree_compiler::createDecomposeBatchMmt4DOpsPass()";
+}
+
 def DecomposeConvolutionToLowerDimOps :
     Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
   let summary = "Decomposes linalg convolution ops to lower dim ops";
@@ -329,6 +336,12 @@ def PolynomialApproximationPass :
   let summary = "Convert math operations to their polynomial approximation";
   let constructor =
       "mlir::iree_compiler::createPolynomialApproximationPass()";
+}
+
+def RematerializeParallelOps :
+    Pass<"iree-codegen-rematerialize-parallel-ops", "func::FuncOp"> {
+  let summary = "Pass to rematerialize and merge parallel ops into consumers.";
+  let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
 }
 
 def RemoveSingleIterationLoop :

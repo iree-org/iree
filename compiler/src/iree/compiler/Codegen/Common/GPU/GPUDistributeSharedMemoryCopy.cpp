@@ -112,16 +112,36 @@ populateTilingCopyToWorkgroupMemPatterns(RewritePatternSet &patterns,
           StringAttr::get(patterns.getContext(), getVectorizeMarker())));
 }
 
+// Returns the vector size to use for the given genericOp considering its
+// operand/result element types.
+static int getBaseVectorSize(linalg::GenericOp genericOp) {
+  assert(genericOp.getNumDpsInits() == 1);
+  unsigned resultBW =
+      llvm::cast<MemRefType>(genericOp.getDpsInitOperand(0)->get().getType())
+          .getElementTypeBitWidth();
+  // Check the operand element types. If we have some sub-byte types there, make
+  // sure we at least read a full byte for the sub-byte-element operands.
+  unsigned operandBW = std::numeric_limits<unsigned>::max();
+  for (OpOperand *operand : genericOp.getDpsInputOperands()) {
+    unsigned b = getElementTypeOrSelf(operand->get()).getIntOrFloatBitWidth();
+    operandBW = std::min(operandBW, b);
+  }
+  int vectorSize = copyVectorNumBits / resultBW;
+  if (operandBW < resultBW && operandBW < 8) {
+    // Scale up to make sure we read at least a full byte for the
+    // sub-byte-element operand.
+    vectorSize *= 8 / operandBW;
+  }
+  return vectorSize;
+}
+
 /// Compute a tile size so that the numer of iteraton is equal to the flat
 /// workgroup size.
 static std::optional<SmallVector<int64_t>>
 getTileToDistributableSize(linalg::GenericOp copyOp,
                            int64_t flatWorkgroupSize) {
   SmallVector<int64_t> shape = copyOp.getStaticLoopRanges();
-  unsigned bitWidth =
-      llvm::cast<MemRefType>(copyOp.getDpsInitOperand(0)->get().getType())
-          .getElementTypeBitWidth();
-  int targetVectorSize = copyVectorNumBits / bitWidth;
+  int targetVectorSize = getBaseVectorSize(copyOp);
   SmallVector<int64_t> unroll;
   assert(shape.back() % targetVectorSize == 0);
   int64_t threadsAvailable = flatWorkgroupSize;
@@ -207,10 +227,7 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
 /// Return the shape of copy op that can be vectorized to a
 /// transfer_read/transfer_write of size `targetVectorSize`.
 SmallVector<int64_t> getNativeDstShape(linalg::GenericOp copyOp) {
-  unsigned bitWidth =
-      llvm::cast<MemRefType>(copyOp.getDpsInitOperand(0)->get().getType())
-          .getElementTypeBitWidth();
-  int targetVectorSize = copyVectorNumBits / bitWidth;
+  int targetVectorSize = getBaseVectorSize(copyOp);
   SmallVector<int64_t> dstShape;
   for (int64_t dim : copyOp.getStaticLoopRanges()) {
     // Skip tiling of dimension of size 1 to simplify distribution.

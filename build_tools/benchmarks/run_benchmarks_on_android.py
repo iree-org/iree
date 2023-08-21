@@ -214,10 +214,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             benchmark_case_dir.relative_to(self.config.root_benchmark_dir)
         )
 
-        run_config = benchmark_case.run_config
         self.__check_and_push_file(
             benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir
         )
+        run_config = benchmark_case.run_config
         taskset = self.__deduce_taskset_from_run_config(run_config)
         run_args = run_config.materialize_run_flags()
         run_args.append(f"--module={iree_artifacts.MODULE_FILENAME}")
@@ -225,8 +225,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if benchmark_results_filename is not None:
             self.__run_benchmark(
                 android_case_dir=android_case_dir,
-                tool_name=benchmark_case.benchmark_tool_name,
-                driver_info=benchmark_case.driver_info,
+                benchmark_case=benchmark_case,
                 run_args=run_args,
                 results_filename=benchmark_results_filename,
                 taskset=taskset,
@@ -235,7 +234,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if capture_filename is not None:
             self.__run_capture(
                 android_case_dir=android_case_dir,
-                tool_name=benchmark_case.benchmark_tool_name,
+                benchmark_case=benchmark_case,
                 run_args=run_args,
                 capture_filename=capture_filename,
                 taskset=taskset,
@@ -244,8 +243,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     def __run_benchmark(
         self,
         android_case_dir: pathlib.PurePosixPath,
-        tool_name: str,
-        driver_info: DriverInfo,
+        benchmark_case: BenchmarkCase,
         run_args: Sequence[str],
         results_filename: pathlib.Path,
         taskset: str,
@@ -253,6 +251,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if self.config.normal_benchmark_tool_dir is None:
             raise ValueError("normal_benchmark_tool_dir can't be None.")
 
+        tool_name = benchmark_case.benchmark_tool_name
         host_tool_path = self.config.normal_benchmark_tool_dir / tool_name
         android_tool = self.__check_and_push_file(host_tool_path, NORMAL_TOOL_REL_DIR)
         cmd = ["taskset", taskset, android_tool]
@@ -260,7 +259,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if tool_name == "iree-benchmark-module":
             cmd += get_iree_benchmark_module_arguments(
                 results_filename=f"'{results_filename.name}'",
-                driver_info=driver_info,
+                driver_info=benchmark_case.driver_info,
                 benchmark_min_time=self.config.benchmark_min_time,
             )
 
@@ -277,15 +276,16 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     def __run_capture(
         self,
         android_case_dir: pathlib.PurePosixPath,
-        tool_name: str,
-        capture_filename: pathlib.Path,
+        benchmark_case: BenchmarkCase,
         run_args: Sequence[str],
+        capture_filename: pathlib.Path,
         taskset: str,
     ):
         capture_config = self.config.trace_capture_config
         if capture_config is None:
             raise ValueError("capture_config can't be None.")
 
+        tool_name = benchmark_case.benchmark_tool_name
         host_tool_path = capture_config.traced_benchmark_tool_dir / tool_name
         android_tool = self.__check_and_push_file(host_tool_path, TRACED_TOOL_REL_DIR)
         run_cmd = [
@@ -296,6 +296,12 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             android_tool,
         ]
         run_cmd += run_args
+        if tool_name == "iree-benchmark-module":
+            run_cmd += get_iree_benchmark_module_arguments(
+                driver_info=benchmark_case.driver_info,
+                benchmark_min_time=self.config.benchmark_min_time,
+                capture_mode=True,
+            )
 
         # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
         # waiting for the adb command to complete as that won't happen.

@@ -151,6 +151,13 @@ function create_template() {
       --maintenance-policy=MIGRATE
       --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
     )
+  elif [[ "${type}" == c2s601t ]]; then
+    cmd+=(
+      --machine-type=c2-standard-60
+      --threads-per-core=1
+      --maintenance-policy=MIGRATE
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+    )
   else
     echo "Got unrecognized type '${type}'" >2
     exit 1
@@ -165,7 +172,8 @@ function create_template() {
 }
 
 for group in presubmit postsubmit; do
-  for type in gpu a100 cpu c2s16; do
+  # TODO(#14661): Remove c2s601t if we decide not to migrate benchmarks to it.
+  for type in gpu a100 cpu c2s16 c2s601t; do
     create_template "${group}" "${type}"
   done
 done

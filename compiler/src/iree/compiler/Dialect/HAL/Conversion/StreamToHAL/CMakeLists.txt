@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRIR
     MLIRPass
+    MLIRSCFDialect
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR

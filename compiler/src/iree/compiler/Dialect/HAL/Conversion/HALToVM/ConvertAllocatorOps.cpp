@@ -13,21 +13,20 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-class AllocatorAllocateInitializedOpConversion
-    : public OpConversionPattern<IREE::HAL::AllocatorAllocateInitializedOp> {
+class AllocatorAllocateOpConversion
+    : public OpConversionPattern<IREE::HAL::AllocatorAllocateOp> {
 public:
-  AllocatorAllocateInitializedOpConversion(TypeConverter &typeConverter,
-                                           MLIRContext *context,
-                                           SymbolTable &importSymbols)
+  AllocatorAllocateOpConversion(TypeConverter &typeConverter,
+                                MLIRContext *context,
+                                SymbolTable &importSymbols)
       : OpConversionPattern(typeConverter, context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(
-        "hal.allocator.allocate.initialized");
+    importOp =
+        importSymbols.lookup<IREE::VM::ImportOp>("hal.allocator.allocate");
     assert(importOp);
   }
 
   LogicalResult
-  matchAndRewrite(IREE::HAL::AllocatorAllocateInitializedOp op,
-                  OpAdaptor adaptor,
+  matchAndRewrite(IREE::HAL::AllocatorAllocateOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, importOp.getName(),
@@ -36,14 +35,13 @@ public:
         },
         ArrayRef<Value>{
             adaptor.getAllocator(),
+            castToImportType(adaptor.getQueueAffinity(), rewriter.getI64Type(),
+                             rewriter),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(
                 op.getLoc(), op.getMemoryTypesAttr().getInt()),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(
                 op.getLoc(), op.getBufferUsageAttr().getInt()),
-            adaptor.getSource(),
-            castToImportType(adaptor.getOffset(), rewriter.getI64Type(),
-                             rewriter),
-            castToImportType(adaptor.getLength(), rewriter.getI64Type(),
+            castToImportType(adaptor.getResultSize(), rewriter.getI64Type(),
                              rewriter),
         });
     copyImportAttrs(importOp, callOp);
@@ -54,19 +52,18 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-class AllocatorTryMapOpConversion
-    : public OpConversionPattern<IREE::HAL::AllocatorTryMapOp> {
+class AllocatorImportOpConversion
+    : public OpConversionPattern<IREE::HAL::AllocatorImportOp> {
 public:
-  AllocatorTryMapOpConversion(TypeConverter &typeConverter,
+  AllocatorImportOpConversion(TypeConverter &typeConverter,
                               MLIRContext *context, SymbolTable &importSymbols)
       : OpConversionPattern(typeConverter, context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(
-        "hal.allocator.map.byte_buffer");
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>("hal.allocator.import");
     assert(importOp);
   }
 
   LogicalResult
-  matchAndRewrite(IREE::HAL::AllocatorTryMapOp op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::HAL::AllocatorImportOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto callOp = rewriter.create<IREE::VM::CallOp>(
         op.getLoc(), importOp.getName(),
@@ -76,6 +73,8 @@ public:
         ArrayRef<Value>{
             adaptor.getAllocator(),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(), /*try=*/1),
+            castToImportType(adaptor.getQueueAffinity(), rewriter.getI64Type(),
+                             rewriter),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(
                 op.getLoc(), op.getMemoryTypesAttr().getInt()),
             rewriter.createOrFold<IREE::VM::ConstI32Op>(
@@ -88,9 +87,9 @@ public:
         });
     copyImportAttrs(importOp, callOp);
     auto result = callOp.getResults().front();
-    auto didMap = rewriter.create<IREE::VM::CmpNZRefOp>(
+    auto didImport = rewriter.create<IREE::VM::CmpNZRefOp>(
         op.getLoc(), rewriter.getI32Type(), result);
-    rewriter.replaceOp(op, {didMap, result});
+    rewriter.replaceOp(op, {didImport, result});
     return success();
   }
 
@@ -104,11 +103,9 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                       SymbolTable &importSymbols,
                                       TypeConverter &typeConverter,
                                       RewritePatternSet &patterns) {
-  patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorAllocateOp>>(
-      context, importSymbols, typeConverter, "hal.allocator.allocate");
-  patterns.insert<AllocatorAllocateInitializedOpConversion>(
-      typeConverter, context, importSymbols);
-  patterns.insert<AllocatorTryMapOpConversion>(typeConverter, context,
+  patterns.insert<AllocatorAllocateOpConversion>(typeConverter, context,
+                                                 importSymbols);
+  patterns.insert<AllocatorImportOpConversion>(typeConverter, context,
                                                importSymbols);
 }
 

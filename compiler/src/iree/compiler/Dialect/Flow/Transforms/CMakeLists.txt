@@ -49,6 +49,7 @@ iree_cc_library(
     "FormDispatchRegions.cpp"
     "FormDispatchWorkgroups.cpp"
     "FormScalarDispatches.cpp"
+    "FuseDequantizationMatmul.cpp"
     "FusionOfTensorOps.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "InferNumericNarrowing.cpp"
@@ -66,9 +67,9 @@ iree_cc_library(
     "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
     "SplitReduction.cpp"
-    "StripAndSplatConstantVariables.cpp"
     "StripSignedness.cpp"
     "TensorPadToTensorInsertSlice.cpp"
+    "TopLevelSCFToCFG.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
@@ -99,6 +100,7 @@ iree_cc_library(
     MLIRParser
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFToControlFlow
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms

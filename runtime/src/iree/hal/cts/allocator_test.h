@@ -85,9 +85,8 @@ TEST_P(allocator_test, AllocateBuffer) {
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_t* buffer = NULL;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, params, kAllocationSize, iree_const_byte_span_empty(),
-      &buffer));
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
+                                                    kAllocationSize, &buffer));
 
   // At a mimimum, the requested memory type should be respected.
   // Additional bits may be optionally set depending on the allocator.
@@ -109,8 +108,7 @@ TEST_P(allocator_test, AllocateEmptyBuffer) {
   params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, params, /*allocation_size=*/0,
-      iree_const_byte_span_empty(), &buffer));
+      device_allocator_, params, /*allocation_size=*/0, &buffer));
 
   iree_hal_buffer_release(buffer);
 }

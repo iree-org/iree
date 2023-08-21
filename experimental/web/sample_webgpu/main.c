@@ -331,8 +331,8 @@ void unload_program(iree_program_state_t* program_state) {
 //===----------------------------------------------------------------------===//
 
 static iree_status_t parse_input_into_call(
-    iree_runtime_call_t* call, iree_hal_allocator_t* device_allocator,
-    iree_string_view_t input) {
+    iree_runtime_call_t* call, iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator, iree_string_view_t input) {
   bool has_equal =
       iree_string_view_find_char(input, '=', 0) != IREE_STRING_VIEW_NPOS;
   bool has_x =
@@ -342,9 +342,9 @@ static iree_status_t parse_input_into_call(
     bool is_storage_reference =
         iree_string_view_consume_prefix(&input, iree_make_cstring_view("&"));
     iree_hal_buffer_view_t* buffer_view = NULL;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_view_parse(input, device_allocator, &buffer_view),
-        "parsing value '%.*s'", (int)input.size, input.data);
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
+                             input, device, device_allocator, &buffer_view),
+                         "parsing value '%.*s'", (int)input.size, input.data);
     if (is_storage_reference) {
       // Storage buffer reference; just take the storage for the buffer view -
       // it'll still have whatever contents were specified (or 0) but we'll
@@ -388,8 +388,8 @@ static iree_status_t parse_input_into_call(
 }
 
 static iree_status_t parse_inputs_into_call(
-    iree_runtime_call_t* call, iree_hal_allocator_t* device_allocator,
-    iree_string_view_t inputs) {
+    iree_runtime_call_t* call, iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator, iree_string_view_t inputs) {
   if (inputs.size == 0) return iree_ok_status();
 
   // Inputs are provided in a semicolon-delimited list.
@@ -401,7 +401,7 @@ static iree_status_t parse_inputs_into_call(
     split_index = iree_string_view_split(remaining_inputs, ';', &next_input,
                                          &remaining_inputs);
     IREE_RETURN_IF_ERROR(
-        parse_input_into_call(call, device_allocator, next_input));
+        parse_input_into_call(call, device, device_allocator, next_input));
   } while (split_index != -1);
 
   return iree_ok_status();
@@ -439,15 +439,12 @@ static void buffer_map_async_callback(WGPUBufferMapAsyncStatus map_status,
   switch (map_status) {
     case WGPUBufferMapAsyncStatus_Success:
       break;
-    case WGPUBufferMapAsyncStatus_Error:
-      fprintf(stderr, "  buffer_map_async_callback status: Error\n");
-      break;
     case WGPUBufferMapAsyncStatus_DeviceLost:
       fprintf(stderr, "  buffer_map_async_callback status: DeviceLost\n");
       break;
-    case WGPUBufferMapAsyncStatus_Unknown:
     default:
-      fprintf(stderr, "  buffer_map_async_callback status: Unknown\n");
+      fprintf(stderr, "  buffer_map_async_callback status: Error %d\n",
+              map_status);
       break;
   }
 
@@ -911,7 +908,7 @@ const bool call_function(
 
   if (iree_status_is_ok(status)) {
     status = parse_inputs_into_call(
-        &call_state->call,
+        &call_state->call, iree_runtime_session_device(program_state->session),
         iree_runtime_session_device_allocator(program_state->session),
         iree_make_cstring_view(inputs));
   }

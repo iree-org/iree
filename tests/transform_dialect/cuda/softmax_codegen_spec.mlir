@@ -35,6 +35,10 @@ transform.sequence failures(propagate) {
   %forall_with_type = transform.cast %forall : !transform.any_op to !transform.op<"scf.forall">
   transform.iree.share_forall_operands %forall_with_type
     : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.canonicalization
+  } : !transform.any_op
+  transform.iree.apply_cse %variant_op : !transform.any_op
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // ================================================================

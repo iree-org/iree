@@ -68,8 +68,8 @@ void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
   for (NamedAttribute oldAttr : oldOp->getAttrs()) {
     // Don't copy segment attributes as these correspond to the number operands,
     // which may be different.
-    if (oldAttr.getName() == "operand_segment_sizes" ||
-        oldAttr.getName() == "result_segment_sizes")
+    if (oldAttr.getName() == "operandSegmentSizes" ||
+        oldAttr.getName() == "resultSegmentSizes")
       continue;
 
     newOp->setAttr(oldAttr.getName(), oldAttr.getValue());

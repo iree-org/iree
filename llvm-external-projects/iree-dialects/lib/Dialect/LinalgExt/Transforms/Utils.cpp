@@ -82,9 +82,9 @@ Value mlir::iree_compiler::IREE::LinalgExt::createMatchingSubsetInsertOp(
     Value source, Value dest) {
   return b.create<tensor::InsertSliceOp>(
       loc, subsetExtractOp.getSource().getType(), source, dest,
-      subsetExtractOp.offsets(), subsetExtractOp.sizes(),
-      subsetExtractOp.strides(), subsetExtractOp.static_offsets(),
-      subsetExtractOp.static_sizes(), subsetExtractOp.static_strides());
+      subsetExtractOp.getOffsets(), subsetExtractOp.getSizes(),
+      subsetExtractOp.getStrides(), subsetExtractOp.getStaticOffsets(),
+      subsetExtractOp.getStaticSizes(), subsetExtractOp.getStaticStrides());
 }
 
 void mlir::iree_compiler::IREE::LinalgExt::createMatchingParallelSubsetInsertOp(

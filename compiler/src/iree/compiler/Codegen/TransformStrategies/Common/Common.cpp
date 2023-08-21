@@ -279,7 +279,7 @@ Value mlir::iree_compiler::buildPad(
                                 b.getI64ArrayAttr(padToMultipleOf),
                                 b.getI64ArrayAttr(packingDimensions),
                                 b.getArrayAttr(transposeAttrs),
-                                /*copyBack=*/b.getBoolAttr(false))
+                                /*copyBack=*/b.getStringAttr("none"))
       ->getResult(0);
 }
 

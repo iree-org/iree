@@ -55,6 +55,21 @@ func.func @null_op() -> !iree_input.variant {
 }
 
 //----
+// CHECK-LABEL: func.func @buffer_subspan
+// CHECK-SAME: (%arg0: !hal.buffer) -> !hal.buffer
+// CHECK: %[[OFFSET:.+]] = arith.constant 100
+// CHECK: %[[LENGTH:.+]] = arith.constant 200
+// CHECK: %buffer = hal.buffer.subspan
+// CHECK-SAME: <%arg0 : !hal.buffer>[%[[OFFSET]], %[[LENGTH]]] : !hal.buffer
+
+func.func @buffer_subspan(%arg0: !iree_input.buffer) -> !iree_input.buffer {  
+  %offset = arith.constant 100 : index
+  %length = arith.constant 200 : index
+  %buffer = iree_input.buffer.subspan<%arg0 : !iree_input.buffer>[%offset, %length] : !iree_input.buffer
+  return %buffer : !iree_input.buffer
+}
+
+//----
 // CHECK-LABEL: func.func @buffer_view_create
 // CHECK-SAME: (%arg0: !hal.buffer) -> !hal.buffer_view
 // CHECK: %[[C0:.*]] = arith.constant 0 : index

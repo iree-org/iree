@@ -12,15 +12,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Embed
+    CompilerDriver
   HDRS
     "Diagnostics.h"
   SRCS
+    "CompilerDriver.cpp"
     "Diagnostics.cpp"
-    "Embed.cpp"
   DEPS
     LLVMSupport
     MLIRBuiltinToLLVMIRTranslation
+    MLIRBytecodeWriter
     MLIRCAPIIR
     MLIRIR
     MLIRParser

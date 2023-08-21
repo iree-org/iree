@@ -210,6 +210,9 @@ iree_hal_vulkan_populate_enabled_device_extensions(
     } else if (strcmp(extension_name,
                       VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME) == 0) {
       extensions.subgroup_size_control = true;
+    } else if (strcmp(extension_name,
+                      VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME) == 0) {
+      extensions.external_memory_host = true;
     }
   }
   return extensions;

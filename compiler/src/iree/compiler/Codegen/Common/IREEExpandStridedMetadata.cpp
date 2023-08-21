@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -198,14 +199,18 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
     SmallVector<Value> results;
     results.reserve(memRefType.getRank() + 2);
     auto baseBufferType = llvm::cast<MemRefType>(op.getBaseBuffer().getType());
-    if (newBufferType == baseBufferType) {
-      results.push_back(linearInterfaceBinding);
+    if (!op.getBaseBuffer().use_empty()) {
+      if (newBufferType == baseBufferType) {
+        results.push_back(linearInterfaceBinding);
+      } else {
+        Value reinterpretCast = rewriter.create<memref::ReinterpretCastOp>(
+            loc, baseBufferType, linearInterfaceBinding, /*offset=*/0,
+            /*sizes=*/ArrayRef<int64_t>(),
+            /*strides=*/ArrayRef<int64_t>());
+        results.push_back(reinterpretCast);
+      }
     } else {
-      Value reinterpretCast = rewriter.create<memref::ReinterpretCastOp>(
-          loc, baseBufferType, linearInterfaceBinding, /*offset=*/0,
-          /*sizes=*/ArrayRef<int64_t>(),
-          /*strides=*/ArrayRef<int64_t>());
-      results.push_back(reinterpretCast);
+      results.push_back(nullptr);
     }
 
     results.push_back(getValueOrCreateConstantIndexOp(
@@ -231,12 +236,18 @@ struct IREEExpandStridedMetadataPass
 };
 } // namespace
 
-void IREEExpandStridedMetadataPass::runOnOperation() {
-  MLIRContext *context = &getContext();
-  RewritePatternSet patterns(context);
+void populateIREEResolveExtractStridedMetadataPatterns(
+    MLIRContext *context, RewritePatternSet &patterns) {
   memref::populateResolveExtractStridedMetadataPatterns(patterns);
   patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
       context);
+}
+
+void IREEExpandStridedMetadataPass::runOnOperation() {
+  MLIRContext *context = &getContext();
+  RewritePatternSet patterns(context);
+  populateIREEResolveExtractStridedMetadataPatterns(context, patterns);
+  populateRemoveDeadMemAllocPatterns(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

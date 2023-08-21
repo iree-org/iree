@@ -90,6 +90,94 @@ func.func @set_encoding_dynamic() {
 
 // -----
 
+func.func @set_encoding_128x80x32_batch_matmul_LHS() attributes {
+   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma"}>
+} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = hal.interface.constant.load[1] : i32
+  %2 = hal.interface.constant.load[2] : i32
+  %3 = hal.interface.constant.load[3] : i32
+  %4 = arith.index_castui %0 : i32 to index
+  %5 = arith.index_castui %1 : i32 to index
+  %6 = arith.index_castui %2 : i32 to index
+  %7 = arith.index_castui %3 : i32 to index
+  %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x80x32xf32>>
+  %9 = flow.dispatch.workload.ordinal %6, 2 : index
+  %10 = flow.dispatch.workload.ordinal %7, 3 : index
+  %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = LHS, original_type = tensor<128x80x32xf32>>>>{%9, %10}
+  %12 = flow.dispatch.workload.ordinal %4, 0 : index
+  %13 = flow.dispatch.workload.ordinal %5, 1 : index
+  %14 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0], sizes = [128, 80, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x80x32xf32>> -> tensor<128x80x32xf32>
+  %15 = affine.apply affine_map<()[s0] -> ((32 ceildiv s0) * s0 - 32)>()[%12]
+  %16 = affine.apply affine_map<()[s0] -> ((80 ceildiv s0) * s0 - 80)>()[%13]
+  %padded = tensor.pad %14 low[0, 0, 0] high[0, %16, %15] {
+  ^bb0(%arg0: index, %arg1: index, %arg2: index):
+    tensor.yield %cst : f32
+  } : tensor<128x80x32xf32> to tensor<128x?x?xf32>
+  %17 = iree_linalg_ext.set_encoding %padded : tensor<128x?x?xf32> -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = LHS, original_type = tensor<128x80x32xf32>>>
+  flow.dispatch.tensor.store %17, %11, offsets = [0, 0, 0], sizes = [128, %9, %10], strides = [1, 1, 1]
+    : tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = LHS, original_type = tensor<128x80x32xf32>>>
+    -> !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = LHS, original_type = tensor<128x80x32xf32>>>>{%9, %10}
+  return
+}
+// CHECK:    func @set_encoding_128x80x32_batch_matmul_LHS(
+// CHECK-DAG:  %[[CST:.+]] = arith.constant 0.0
+// CHECK:      %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) {{.*}} !flow.dispatch.tensor<readonly:tensor<128x80x32xf32>>
+// CHECK:      %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.*}} !flow.dispatch.tensor<writeonly:tensor<128x10x32x8x1xf32>>
+// CHECK:      %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]], offsets = [0, 0, 0], sizes = [128, 80, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x80x32xf32>> -> tensor<128x80x32xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<128x10x32x8x1xf32>
+// CHECK:      %[[PACK:.+]] = tensor.pack %[[INPUT]] padding_value(%[[CST]] : f32) inner_dims_pos = [1, 2] inner_tiles = [8, 1] into %[[EMPTY]] : tensor<128x80x32xf32> -> tensor<128x10x32x8x1xf32>
+// CHECK:      flow.dispatch.tensor.store %[[PACK]], %[[OUTPUT_BINDING]], offsets = [0, 0, 0, 0, 0], sizes = [128, 10, 32, 8, 1], strides = [1, 1, 1, 1, 1] : tensor<128x10x32x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x10x32x8x1xf32>>
+
+// -----
+
+func.func @set_encoding_128x32x320_batch_matmul_RHS() attributes {
+   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma"}>
+} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = hal.interface.constant.load[1] : i32
+  %2 = hal.interface.constant.load[2] : i32
+  %3 = hal.interface.constant.load[3] : i32
+  %4 = hal.interface.constant.load[4] : i32
+  %5 = arith.index_castui %0 {stream.alignment = 64 : index} : i32 to index
+  %6 = arith.index_castui %1 : i32 to index
+  %7 = arith.index_castui %2 : i32 to index
+  %8 = arith.index_castui %3 : i32 to index
+  %9 = arith.index_castui %4 : i32 to index
+  %10 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x32x320xf32>>
+  %11 = flow.dispatch.workload.ordinal %8, 2 : index
+  %12 = flow.dispatch.workload.ordinal %9, 3 : index
+  %13 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = RHS, original_type = tensor<128x32x320xf32>>>>{%11, %12}
+  %14 = flow.dispatch.workload.ordinal %6, 0 : index
+  %15 = flow.dispatch.workload.ordinal %7, 1 : index
+  %16 = flow.dispatch.tensor.load %10, offsets = [0, 0, 0], sizes = [128, 32, 320], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x32x320xf32>> -> tensor<128x32x320xf32>
+  %17 = affine.apply affine_map<()[s0] -> ((320 ceildiv s0) * s0 - 320)>()[%14]
+  %18 = affine.apply affine_map<()[s0] -> ((32 ceildiv s0) * s0 - 32)>()[%15]
+  %padded = tensor.pad %16 low[0, 0, 0] high[0, %18, %17] {
+  ^bb0(%arg0: index, %arg1: index, %arg2: index):
+    tensor.yield %cst : f32
+  } : tensor<128x32x320xf32> to tensor<128x?x?xf32>
+  %19 = iree_linalg_ext.set_encoding %padded : tensor<128x?x?xf32> -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = RHS, original_type = tensor<128x32x320xf32>>>
+  flow.dispatch.tensor.store %19, %13, offsets = [0, 0, 0], sizes = [128, %11, %12], strides = [1, 1, 1]
+    : tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = RHS, original_type = tensor<128x32x320xf32>>>
+    -> !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = RHS, original_type = tensor<128x32x320xf32>>>>{%11, %12}
+  return
+}
+// CHECK:    func @set_encoding_128x32x320_batch_matmul_RHS(
+// CHECK-DAG:  %[[CST:.+]] = arith.constant 0.0
+// CHECK:      %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) {{.*}} !flow.dispatch.tensor<readonly:tensor<128x32x320xf32>>
+// CHECK:      %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.*}} !flow.dispatch.tensor<writeonly:tensor<128x40x32x8x1xf32>>
+// CHECK:      %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]], offsets = [0, 0, 0], sizes = [128, 32, 320], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x32x320xf32>> -> tensor<128x32x320xf32>
+// CHECK:      %[[EMPTY:.+]] = tensor.empty() : tensor<128x40x32x8x1xf32>
+// CHECK:      %[[PACK:.+]] = tensor.pack %[[INPUT]] padding_value(%[[CST]] : f32) outer_dims_perm = [0, 2, 1] inner_dims_pos = [2, 1] inner_tiles = [8, 1] into %[[EMPTY]] : tensor<128x32x320xf32> -> tensor<128x40x32x8x1xf32>
+// CHECK:      flow.dispatch.tensor.store %[[PACK]], %[[OUTPUT_BINDING]], offsets = [0, 0, 0, 0, 0], sizes = [128, 40, 32, 8, 1], strides = [1, 1, 1, 1, 1] : tensor<128x40x32x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x40x32x8x1xf32>>
+
+// -----
+
 func.func @unset_encoding_dynamic() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -129,6 +217,45 @@ func.func @unset_encoding_dynamic() {
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty(%[[OUTD0]], %[[OUTD1]])
 //       CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[INPUT]]
 //  CHECK-SAME:       inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %[[EMPTY]]
+//   CHECK-DAG:   flow.dispatch.tensor.store %[[UNPACK]], %[[OUTPUT_BINDING]]
+
+// -----
+
+func.func @unset_encoding_128x80x320_batch_matmul_RESULT() attributes {
+   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma"}>
+} {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = hal.interface.constant.load[1] : i32
+  %2 = hal.interface.constant.load[2] : i32
+  %3 = arith.index_castui %0 : i32 to index
+  %4 = arith.index_castui %1 : i32 to index
+  %5 = arith.index_castui %2 : i32 to index
+  %6 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
+  %7 = flow.dispatch.workload.ordinal %4, 0 : index
+  %8 = flow.dispatch.workload.ordinal %5, 1 : index
+  %9 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = RESULT, original_type = tensor<128x80x320xf32>>>>{%7, %8}
+  %10 = flow.dispatch.tensor.load %9, offsets = [0, 0, 0], sizes = [128, %7, %8], strides = [1, 1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = RESULT, original_type = tensor<128x80x320xf32>>>>{%7, %8}
+      -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = RESULT, original_type = tensor<128x80x320xf32>>>
+  %11 = iree_linalg_ext.unset_encoding %10 : tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = RESULT, original_type = tensor<128x80x320xf32>>> -> tensor<128x?x?xf32>
+  %extracted_slice = tensor.extract_slice %11[0, 0, 0] [128, 80, 320] [1, 1, 1] : tensor<128x?x?xf32> to tensor<128x80x320xf32>
+  flow.dispatch.tensor.store %extracted_slice, %6, offsets = [0, 0, 0], sizes = [128, 80, 320], strides = [1, 1, 1] : tensor<128x80x320xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
+  return
+}
+//       CHECK: func @unset_encoding_128x80x320_batch_matmul_RESULT()
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0]
+//       CHECK:   %[[CAST:.+]] = arith.index_castui %[[D0]] : i32 to index
+//       CHECK:   %[[OUTPUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[C0]]) 
+//  CHECK-SAME:       : !flow.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
+//       CHECK:   %[[INPUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[CAST]]) 
+//  CHECK-SAME:       : !flow.dispatch.tensor<readonly:tensor<128x10x40x8x8xf32>>
+//       CHECK:   %[[INPUT:.+]] = flow.dispatch.tensor.load %[[INPUT_BINDING]]
+//  CHECK-SAME:       offsets = [0, 0, 0, 0, 0], sizes = [128, 10, 40, 8, 8], strides = [1, 1, 1, 1, 1]
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty()
+//       CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[INPUT]]
+//  CHECK-SAME:       inner_dims_pos = [1, 2] inner_tiles = [8, 8] into %[[EMPTY]]
 //   CHECK-DAG:   flow.dispatch.tensor.store %[[UNPACK]], %[[OUTPUT_BINDING]]
 
 // -----

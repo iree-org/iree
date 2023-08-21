@@ -32,6 +32,12 @@ IREE_FLAG(bool, vulkan_tracing, true,
 
 IREE_FLAG(bool, vulkan_robust_buffer_access, false,
           "Enables the Vulkan 'robustBufferAccess' feature.");
+IREE_FLAG(
+    bool, vulkan_sparse_binding, true,
+    "Enables the Vulkan 'sparseBinding' feature (and others) when available.");
+IREE_FLAG(bool, vulkan_sparse_residency, true,
+          "Enables the Vulkan 'sparseResidencyBuffer' feature (and others) "
+          "when available.");
 
 IREE_FLAG(
     bool, vulkan_dedicated_compute_queue, false,
@@ -79,6 +85,14 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   if (FLAG_vulkan_robust_buffer_access) {
     driver_options.requested_features |=
         IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS;
+  }
+  if (FLAG_vulkan_sparse_binding) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING;
+  }
+  if (FLAG_vulkan_sparse_residency) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED;
   }
 
   if (FLAG_vulkan_dedicated_compute_queue) {

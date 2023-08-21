@@ -92,7 +92,7 @@ public:
 
 private:
   FailureOr<scf::SCFTilingResult>
-  tileConsumerAndFuseInputProducer(RewriterBase &rewriter,
+  tileConsumerAndFuseInputProducer(PatternRewriter &rewriter,
                                    TilingInterface consumer,
                                    ArrayRef<int64_t> tileSizes) const {
     // First tile the current op as the consumer op.
@@ -141,7 +141,18 @@ private:
     while (!candidates.empty()) {
       tensor::ExtractSliceOp sliceOp = candidates.back();
       candidates.pop_back();
-      tileAndFuseProducerOfSlice(rewriter, sliceOp, tilingResult->loops);
+      std::optional<scf::SCFFuseProducerOfSliceResult> result =
+          tileAndFuseProducerOfSlice(rewriter, sliceOp, tilingResult->loops);
+      if (result) {
+        // Mark the fused input producer for distribution when writing to shared
+        // memory. We cannot use the current matmul op's tiling scheme here
+        // given dimensions are different.
+        IREE::LinalgExt::LinalgTransformationFilter f(
+            ArrayRef<StringAttr>(),
+            rewriter.getStringAttr(getCopyToWorkgroupMemoryMarker()));
+        f.replaceLinalgTransformationFilter(
+            rewriter, result->tiledAndFusedProducer.getDefiningOp());
+      }
     }
     return tilingResult;
   }
@@ -207,7 +218,15 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
   SmallVector<TilingInterface> computeOps;
   funcOp.walk([&](TilingInterface op) { computeOps.push_back(op); });
 
+  auto marker =
+      StringAttr::get(funcOp.getContext(), getCopyToWorkgroupMemoryMarker());
+
   for (TilingInterface tilingOp : computeOps) {
+    auto attr = tilingOp->getAttr(
+        IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
+    if (attr == marker)
+      continue;
+
     size_t numLoops = 0;
     for (auto type : tilingOp.getLoopIteratorTypes()) {
       if (type == utils::IteratorType::parallel)
@@ -317,10 +336,6 @@ public:
     if (!isEntryPoint(funcOp))
       return;
 
-    funcOp->walk([&](linalg::LinalgOp op) {
-      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-    });
-
     auto workgroupSize = llvm::map_to_vector(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
@@ -329,7 +344,7 @@ public:
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After second level of tiling";
+      llvm::dbgs() << "// --- After second level of tiling:\n";
       funcOp.dump();
     });
 
@@ -339,7 +354,7 @@ public:
       return signalPassFailure();
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After tile reductions:";
+      llvm::dbgs() << "// --- After tile reductions:\n";
       funcOp.dump();
     });
 
@@ -348,7 +363,7 @@ public:
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After conv unrolling:";
+      llvm::dbgs() << "// --- After conv unrolling:\n";
       funcOp.dump();
     });
   }

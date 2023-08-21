@@ -67,16 +67,15 @@ transform.sequence failures(propagate) {
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
-  %variant_op_2 = transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> !transform.any_op
-  %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op_2 : (!transform.any_op) -> !transform.any_op
+  transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
+  %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> !transform.any_op
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // =========================================================
   %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-  %func_3 = transform.iree.forall_to_workgroup %func_2 : (!transform.any_op) -> !transform.any_op
-  transform.iree.map_nested_forall_to_gpu_threads %func_3
-    { workgroup_dims = [32, 4, 1] }
+  transform.iree.forall_to_workgroup %func_2 : (!transform.any_op) -> ()
+  transform.iree.map_nested_forall_to_gpu_threads %func_2 workgroup_dims = [32, 4, 1] : (!transform.any_op) -> ()
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   // ===================================================================
@@ -90,5 +89,5 @@ transform.sequence failures(propagate) {
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
     : (!transform.any_op) -> !transform.any_op
-  transform.iree.vector.warp_distribute %end_func
+  transform.iree.vector.warp_distribute %end_func : (!transform.any_op) -> ()
 }

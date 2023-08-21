@@ -325,7 +325,7 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
     setFuncEncodings(srcOp, oldFuncType, newFuncType);
 
     // Tell the rewriter to convert the region signature.
-    TypeConverter &typeConverter = *getTypeConverter();
+    const TypeConverter &typeConverter = *getTypeConverter();
     if (failed(rewriter.convertRegionTypes(&srcOp.getBody(), typeConverter,
                                            &signatureConversion))) {
       return failure();

@@ -6,9 +6,6 @@
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
-#include <functional>
-#include <numeric>
-
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
@@ -32,6 +29,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/TypeUtilities.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
 
@@ -64,8 +62,21 @@ using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 //===----------------------------------------------------------------------===//
 
 bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
-  return linalg::isaContractionOpInterface(linalgOp) &&
-         llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops());
+  // (Batch) matmul should be a reduction op with 2/3 parallel dimensions.
+  if (!linalg::isaContractionOpInterface(linalgOp) ||
+      !llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops()))
+    return false;
+
+  // Also exclude the case of matvec, which has only one non-unit parallel dim.
+  // They should go down different pipelines.
+  int nonUnitParallelDimCount = 0;
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<utils::IteratorType, 4> kinds = linalgOp.getIteratorTypesArray();
+  for (auto [kind, bound] : llvm::zip(kinds, bounds)) {
+    if (kind == utils::IteratorType::parallel)
+      nonUnitParallelDimCount += bound != 1;
+  }
+  return nonUnitParallelDimCount > 1;
 }
 
 // Check if the given linalg op is fused with another op that may result
@@ -97,6 +108,28 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
     return WalkResult::advance();
   });
   return fusedWithOp;
+}
+
+// Check if there is a fused linalg op present in the backward slice of either
+// input.
+static bool hasFusedLeadingOp(linalg::LinalgOp matmul) {
+  assert(matmul.getNumDpsInputs() == 2 && "matmul expected to have two inputs");
+
+  BackwardSliceOptions options;
+  options.inclusive = true;
+
+  // Get the backward slice of the lhs.
+  SetVector<Operation *> backwardSlice;
+  getBackwardSlice(matmul->getOperand(0), &backwardSlice, options);
+
+  // Get the backward slice of the rhs and take the union.
+  SetVector<Operation *> rhsBackwardSlice;
+  getBackwardSlice(matmul->getOperand(1), &rhsBackwardSlice, options);
+  backwardSlice.set_union(rhsBackwardSlice);
+
+  return llvm::any_of(backwardSlice, [](Operation *op) {
+    return llvm::isa<linalg::LinalgOp>(op);
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -732,6 +765,12 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
     storeStage = 1;
   }
 
+  // TODO: Enable multibuffering with leading elementwise.
+  if (hasFusedLeadingOp(op)) {
+    pipelineDepth = 0;
+    storeStage = 1;
+  }
+
   // Try to adjust tiling sizes to fit in shared memory.
   auto usePromotionPipeline =
       enablePromotion &&
@@ -1156,14 +1195,22 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
+
   auto funcOp = op->getParentOfType<FunctionOpInterface>();
   auto walkResult = funcOp.walk([](linalg::LinalgOp op) {
-    if (op.hasDynamicShape())
-      return WalkResult::interrupt();
+    using utils::IteratorType;
+    SmallVector<IteratorType, 4> kinds = op.getIteratorTypesArray();
+    SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+    for (auto [kind, bound] : llvm::zip_equal(kinds, bounds)) {
+      if (kind == IteratorType::reduction && ShapedType::isDynamic(bound))
+        return WalkResult::interrupt();
+    }
     return WalkResult::advance();
   });
-  if (walkResult.wasInterrupted())
+  if (walkResult.wasInterrupted()) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: dynamic shapes in reduction dims\n");
     return failure();
+  }
 
   // This pipeline eventually generates non-uniform group shuffle ops, which
   // requires special capability.
@@ -1172,8 +1219,16 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
+  if (reductionDims.empty())
     return failure();
+
+  // Make sure reduction dimensions are the innermost ones.
+  for (int i = 0; i < reductionDims.size(); ++i) {
+    if (reductionDims[reductionDims.size() - 1 - i] !=
+        op.getNumLoops() - 1 - i) {
+      return failure();
+    }
+  }
   if (op.getRegionOutputArgs().size() != 1)
     return failure();
 
@@ -1196,15 +1251,19 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
       foundSingleReductionOutput = true;
       continue;
     }
-    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity())
+    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity()) {
       return failure();
+    }
   }
   if (!foundSingleReductionOutput)
     return failure();
 
   const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
-  std::optional<int64_t> dimSize = op.getStaticLoopRanges()[reductionDims[0]];
-  if (!dimSize || *dimSize % subgroupSize != 0)
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t dimSize = 1;
+  for (int64_t dim : reductionDims)
+    dimSize *= bounds[dim];
+  if (dimSize % subgroupSize != 0)
     return failure();
 
   const Type elementType =
@@ -1218,16 +1277,16 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   // Let each thread handle `vectorSize` elements.
   unsigned vectorSize = kMaxVectorNumBits / bitWidth;
-  while ((*dimSize / vectorSize) % subgroupSize != 0)
+  while ((dimSize / vectorSize) % subgroupSize != 0)
     vectorSize /= 2;
 
   // TODO: Add reduction tiling to handle larger reductions.
   const int64_t maxWorkgroupSize =
       targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
-  int64_t groupSize = *dimSize / vectorSize;
+  int64_t groupSize = dimSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
-    groupSize = llvm::APIntOps::GreatestCommonDivisor(
-                    {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
+    groupSize = GreatestCommonDivisor(APInt(64, uint64_t(groupSize)),
+                                      APInt(64, uint64_t(maxWorkgroupSize)))
                     .getZExtValue();
   }
   // Current warp reduction pattern is a two step butterfly warp reduce.
@@ -1249,8 +1308,21 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
-  reductionTileSizes.push_back(groupSize * vectorSize);
+
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  int64_t remaingGroupSize = groupSize;
+  for (int i = reductionDims.size() - 1; i >= 0; --i) {
+    int64_t dim = reductionDims[i];
+    int64_t bound = bounds[dim];
+    if (i == reductionDims.size() - 1)
+      bound /= vectorSize;
+    APInt size = GreatestCommonDivisor(APInt(64, uint64_t(remaingGroupSize)),
+                                       APInt(64, uint64_t(bound)));
+    reductionTileSizes[dim] = size.getSExtValue();
+    if (i == reductionDims.size() - 1)
+      reductionTileSizes[dim] *= vectorSize;
+    remaingGroupSize /= size.getSExtValue();
+  }
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
@@ -1292,6 +1364,21 @@ static int getReductionTilingFactor(int64_t dimSize) {
 
   return 1; // Otherwise just tile with size 1.
 }
+
+/// Returns the minimal element bitwidth used in the operands and results of the
+/// given Linalg op.
+static int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
+  unsigned bitwidth = std::numeric_limits<unsigned>::max();
+  for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
+    unsigned b = getElementTypeOrSelf(operand->get()).getIntOrFloatBitWidth();
+    bitwidth = std::min(bitwidth, b);
+  }
+  for (OpOperand *result : linalgOp.getDpsInitOperands()) {
+    unsigned b = getElementTypeOrSelf(result->get()).getIntOrFloatBitWidth();
+    bitwidth = std::min(bitwidth, b);
+  }
+  return bitwidth;
+};
 
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op,
@@ -1356,12 +1443,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // 1) distributing to as many threads as possible, and 2) avoid assigning too
   // many threads to handle out-of-bound elements (thus idle).
 
-  // Returns true if the given `operand` has 32-bit element type.
-  auto has32BitElementType = [](Value operand) {
-    auto shapedType = llvm::dyn_cast<ShapedType>(operand.getType());
-    Type elementType =
-        (shapedType ? shapedType.getElementType() : operand.getType());
-    return llvm::isa<FloatType>(elementType) || elementType.isInteger(32);
+  auto elementHasPowerOfTwoBitwidth = [](Value operand) {
+    Type elementType = getElementTypeOrSelf(operand.getType());
+    return isa<IntegerType, FloatType>(elementType) &&
+           llvm::isPowerOf2_64(elementType.getIntOrFloatBitWidth());
   };
 
   // Whether we can try to use the vectorization pipeline.
@@ -1375,9 +1460,12 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       llvm::all_of(
           linalgOp.getIndexingMapsArray(),
           [](AffineMap map) { return map.isProjectedPermutation(); }) &&
-      // TODO: Fix non-32-bit element type vectorization and remove this.
-      llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
+      llvm::all_of(linalgOp->getOperands(), elementHasPowerOfTwoBitwidth) &&
       llvm::none_of(loopBounds, ShapedType::isDynamic);
+
+  const unsigned minBitwidth = getMinElementBitwidth(linalgOp);
+  // Make sure we use a tile size that results in some integral number of bytes.
+  const unsigned scaleToByte = minBitwidth < 8 ? 8 / minBitwidth : 1;
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
@@ -1388,11 +1476,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // If there are more than 3 parallel dim try to tile the extra higher level
     // dimensions to 1 for extra dimensions.
     if (isa<linalg::GenericOp>(linalgOp.getOperation())) {
-      SmallVector<int64_t> ranges = linalgOp.getStaticLoopRanges();
       for (int64_t i = 0, e = workgroupTileSizes.size(); i < e; i++) {
         if (workgroupTileSizes[i] != 0)
           break;
-        if (ranges[i] != 1)
+        if (loopBounds[i] != 1)
           workgroupTileSizes[i] = 1;
       }
     }
@@ -1419,31 +1506,33 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         candidates.push_back(i);
       }
       LLVM_DEBUG({
-        llvm::dbgs() << "Candidate tile sizes: [";
+        llvm::dbgs() << "Base candidate tile sizes: [";
         llvm::interleaveComma(candidates, llvm::dbgs());
         llvm::dbgs() << "]\n";
       });
 
       for (int64_t candidate : candidates) {
-        if (loopBound % candidate != 0) {
+        int64_t scaledTileSize = candidate * scaleToByte;
+        if (loopBound % scaledTileSize != 0) {
           if (!lossFactor)
             continue;
           // Skip this candidate if it causes many threads to be idle.
-          int64_t idleThreads = candidate - (loopBound % candidate);
+          int64_t idleThreads = candidate - (loopBound % scaledTileSize);
           if (idleThreads > candidate / *lossFactor)
             continue;
         }
         // If the workload is too small and we cannot distribute to more than 2
         // workgroups, try a smaller tile size to increase parallelism.
         if (partitionedLoops.size() == 1 && candidate > subgroupSize &&
-            divideCeil(loopBound, candidate) <= 2) {
+            divideCeil(loopBound, scaledTileSize) <= 2) {
           continue;
         }
 
         // Found a suitable candidate. Try to let each thread handle 4
         // elements if this is the workgroup x dimension.
-        workgroupTileSizes[shapeDim] = candidate;
-        LLVM_DEBUG(llvm::dbgs() << "Chosen tile size: " << candidate << "\n");
+        workgroupTileSizes[shapeDim] = scaledTileSize;
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Chosen workgroup tile size: " << scaledTileSize << "\n");
         if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
           // Use size-1 vectors to increase parallelism if larger ones causes
           // idle threads in the subgroup.
@@ -1451,14 +1540,14 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
               partitionedLoops.size() == 1 && candidate <= subgroupSize;
           int vectorSize = hasIdleThreads ? 1 : 4;
           LLVM_DEBUG(llvm::dbgs() << "Use vector size: " << vectorSize << "\n");
-          threadTileSizes[shapeDim] = vectorSize;
+          threadTileSizes[shapeDim] = vectorSize * scaleToByte;
           workgroupSize[wgDim] = candidate / vectorSize;
           assert(numThreads % (candidate / vectorSize) == 0);
           numThreads /= candidate / vectorSize;
         } else {
           if (wgDim == 0)
             vectorizable = false;
-          threadTileSizes[shapeDim] = 1;
+          threadTileSizes[shapeDim] = scaleToByte;
           workgroupSize[wgDim] = candidate;
           assert(numThreads % candidate == 0);
           numThreads /= candidate;
@@ -1712,14 +1801,25 @@ static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
     return success();
   }
 
-  // Try to find a configuration according to a matmul/convolution op and use
-  // it as the root op.
-  for (Operation *computeOp : computeOps) {
+  // Try to find a configuration according to a matmul/convolution op, which as
+  // at least one reduction dimension, and use it as the root op. So, skip all
+  // fused parallel producer ops.
+  ArrayRef roots(computeOps);
+  while (roots.size() > 1) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(roots.front());
+    if (!linalgOp)
+      break;
+    if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
+      break;
+    roots = roots.drop_front();
+  }
+
+  for (Operation *computeOp : roots) {
     if (succeeded(setSPIRVOpConfig(targetEnv, funcOp, computeOp)))
       return success();
   }
 
-  Operation *computeOp = computeOps.back();
+  Operation *computeOp = roots.back();
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   // If there are still no root op, check for any linalg.generic op.
   if (succeeded(setDefaultOpConfig(limits, computeOp)))

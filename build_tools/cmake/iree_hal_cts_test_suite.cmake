@@ -23,6 +23,8 @@ include(CMakeParseArguments)
 #       `-iree-hal-target-backends` option of `iree-compile` to use for
 #       executable generation. If this is omitted, or the associated compiler
 #       target is not enabled, tests which use executables will be disabled.
+#   COMPILER_FLAGS: Additional compiler flags.
+#       Example: "--iree-llvmcpu-target-float-abi=hard --iree-llvmcpu-loop-unrolling"
 #   EXECUTABLE_FORMAT: Executable format identifier. Will be interpreted
 #       literally in C++ and may include macros like IREE_ARCH as needed.
 #       Examples:
@@ -46,7 +48,7 @@ function(iree_hal_cts_test_suite)
     _RULE
     ""
     "DRIVER_NAME;VARIANT_SUFFIX;DRIVER_REGISTRATION_HDR;DRIVER_REGISTRATION_FN;COMPILER_TARGET_BACKEND;EXECUTABLE_FORMAT"
-    "DEPS;ARGS;INCLUDED_TESTS;EXCLUDED_TESTS;LABELS"
+    "DEPS;ARGS;COMPILER_FLAGS;INCLUDED_TESTS;EXCLUDED_TESTS;LABELS;"
     ${ARGN}
   )
 
@@ -83,6 +85,7 @@ function(iree_hal_cts_test_suite)
     set(_TRANSLATE_FLAGS
       "--compile-mode=hal-executable"
       "--iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}"
+      ${_RULE_COMPILER_FLAGS}
     )
 
     # Skip if already created (multiple suites using the same compiler setting).

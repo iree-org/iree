@@ -640,6 +640,15 @@ LogicalResult ByteBufferConstantOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// iree_input.buffer.subspan
+//===----------------------------------------------------------------------===//
+
+void BufferSubspanOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "buffer");
+}
+
+//===----------------------------------------------------------------------===//
 // iree_input.buffer_view.create
 //===----------------------------------------------------------------------===//
 

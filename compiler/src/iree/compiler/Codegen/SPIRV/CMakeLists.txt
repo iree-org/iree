@@ -61,6 +61,7 @@ iree_cc_library(
     "SPIRVDistribute.cpp"
     "SPIRVEmulateI64.cpp"
     "SPIRVEraseStorageBufferStaticShape.cpp"
+    "SPIRVGeneralizeNamedOps.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVMapMemRefStorageClass.cpp"
     "SPIRVTile.cpp"

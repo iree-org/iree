@@ -632,7 +632,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 }
 
 void addCPUDataTilingPipeline(OpPassManager &passManager,
-                              TilingConfig &tilingConfig) {
+                              TilingConfig &tilingConfig,
+                              bool enableVectorMasking) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -643,6 +644,7 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   {
     GenericVectorizationPassOptions options;
     options.vectorizePadding = true;
+    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -738,7 +740,10 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // (HAL, IREE, Linalg, CF) -> LLVM
   passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  passManager.addPass(memref::createFoldMemRefAliasOpsPass());
   passManager.addPass(createEmulateNarrowTypePass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
   if (clInstrumentMemoryAccesses) {
     passManager.addNestedPass<func::FuncOp>(
         createInstrumentMemoryAccessesPass());
@@ -756,17 +761,22 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
-  addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
-  // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added way to
-  // late and should insted be be done during lowering to LLVM.
-  passManager.addPass(createExpandF16OpToF32Pass());
+  {
+    OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    addCommonTargetExecutablePreprocessingPasses(modulePassManager);
+    modulePassManager.addNestedPass<func::FuncOp>(
+        createRematerializeParallelOpsPass());
+    // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added way
+    // to late and should insted be be done during lowering to LLVM.
+    modulePassManager.addPass(createExpandF16OpToF32Pass());
 
-  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createCPUMaterializeEncodingPass());
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
+    modulePassManager.addNestedPass<func::FuncOp>(
+        createCPUMaterializeEncodingPass());
+    // TODO: Remove the following pass the plumb support for
+    // #hal.descriptor_type memory space through the stack.
+    modulePassManager.addNestedPass<func::FuncOp>(
+        createEraseHALDescriptorTypeFromMemRefPass());
+  }
 
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

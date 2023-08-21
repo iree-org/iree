@@ -35,8 +35,7 @@ let opDocGroup = OpGroupPartitionedRegionOps in {
 
 def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     Util_ShapeAwareOp,
-    AttrSizedOperandSegments,
-    SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">]> {
+    AttrSizedOperandSegments]> {
   let summary = [{a group of ops}];
   let description = [{
     This op is a container/grouping of ops. It represents a fusion group before
@@ -76,7 +75,6 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
 def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
-  SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
@@ -1012,6 +1010,12 @@ def FLOW_CallOp : FLOW_Op<"call", [
     }
     ValueRange getResultDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+    }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getArgumentsMutable();
     }
   }];
 

@@ -169,6 +169,8 @@ void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
 
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
+void* iree_tracing_obscure_ptr(void* ptr);
+
 #endif  // IREE_TRACING_FEATURES
 
 #ifdef __cplusplus

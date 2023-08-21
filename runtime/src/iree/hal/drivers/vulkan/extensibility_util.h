@@ -82,6 +82,8 @@ typedef struct iree_hal_vulkan_device_extensions_t {
   bool calibrated_timestamps : 1;
   // VK_EXT_subgroup_size_control is enabled.
   bool subgroup_size_control : 1;
+  // VK_EXT_external_memory_host is enabled.
+  bool external_memory_host : 1;
 } iree_hal_vulkan_device_extensions_t;
 
 // Returns a bitfield with all of the provided extension names.

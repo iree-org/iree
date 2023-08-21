@@ -2566,3 +2566,28 @@ func.func @micro_kernel_op() {
 //  CHECK-SAME:       outs(%[[ARG1]], %[[ARG2]] :
 //  CHECK-SAME:       (%[[S0]], %[[ARG3]], %[[S1]] :
 //       CHECK:   return
+
+// -----
+
+func.func @sub_byte_bufferize_with_offset() {
+  %c64 = arith.constant 64 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c64) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64xi4>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64xf32>>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %2 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+  %3 = flow.dispatch.tensor.load %1, offsets = [%2], sizes = [64], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<64xf32>> -> tensor<64xf32>
+  %4 = flow.dispatch.tensor.load %0, offsets = [%2], sizes = [64], strides = [1] : !flow.dispatch.tensor<readonly:tensor<64xi4>> -> tensor<64xi4>
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4 : tensor<64xi4>) outs(%3 : tensor<64xf32>) {
+  ^bb0(%in: i4, %out: f32):
+    %6 = arith.extui %in : i4 to i32
+    %7 = arith.uitofp %6 : i32 to f32
+    linalg.yield %7 : f32
+  } -> tensor<64xf32>
+  flow.dispatch.tensor.store %5, %1, offsets = [%2], sizes = [64], strides = [1] : tensor<64xf32> -> !flow.dispatch.tensor<writeonly:tensor<64xf32>>
+  return
+}
+// CHECK-LABEL: func.func @sub_byte_bufferize_with_offset()
+//       CHECK:   %[[C64:.+]] = arith.constant 64 : index
+//       CHECK:   hal.interface.binding.subspan set(0) binding(0)
+//  CHECK-SAME:       memref<64xi4, strided<[1], offset: 128>

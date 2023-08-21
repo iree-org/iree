@@ -275,10 +275,22 @@ bool ireeCompilerInvocationPipeline(iree_compiler_invocation_t *run,
   return __ireeCompilerInvocationPipeline(run, pipeline);
 }
 
+bool ireeCompilerInvocationRunPassPipeline(iree_compiler_invocation_t *inv,
+                                           const char *textPassPipeline) {
+  return __ireeCompilerInvocationRunPassPipeline(inv, textPassPipeline);
+}
+
 iree_compiler_error_t *
 ireeCompilerInvocationOutputIR(iree_compiler_invocation_t *run,
                                iree_compiler_output_t *output) {
   return __ireeCompilerInvocationOutputIR(run, output);
+}
+
+iree_compiler_error_t *
+ireeCompilerInvocationOutputIRBytecode(iree_compiler_invocation_t *inv,
+                                       iree_compiler_output_t *output,
+                                       int bytecodeVersion) {
+  return __ireeCompilerInvocationOutputIRBytecode(inv, output, bytecodeVersion);
 }
 
 iree_compiler_error_t *

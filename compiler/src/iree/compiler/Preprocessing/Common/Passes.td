@@ -15,6 +15,12 @@ def ConvertConv2DToImg2Col :
   let constructor = "mlir::iree_compiler::IREE::createConvertConv2DToImg2ColPass()";
 }
 
+def MakeSingleDispatchForFunction :
+    Pass<"iree-preprocessing-make-single-dispatch-for-function", "func::FuncOp"> {
+  let summary = "Convert entire function into a single dispatch";
+  let constructor = "mlir::iree_compiler::IREE::createMakeSingleDispatchForFunctionPass()";
+}
+
 def PadLinalgOps :
     Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
@@ -24,12 +30,6 @@ def PadLinalgOps :
            /*default=*/"4",
            "Specify the padding size">,
   ];
-}
-
-def RematerializeParallelOps :
-    Pass<"iree-preprocessing-rematerialize-parallel-ops", "func::FuncOp"> {
-  let summary = "Pass to rematerialize and merge parallel ops on pre-formed dispatches.";
-  let constructor = "mlir::iree_compiler::IREE::createRematerializeParallelOpsPass()";
 }
 
 #endif  // IREE_PREPROCESSING_COMMON_PASSES

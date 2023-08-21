@@ -33,6 +33,8 @@
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 #include "iree/hal/drivers/vulkan/vma_allocator.h"
 #include "iree/hal/utils/buffer_transfer.h"
+#include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/memory_file.h"
 
 using namespace iree::hal::vulkan;
 
@@ -197,6 +199,17 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   // was promoted to core in Vulkan 1.2.
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
           VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+
+  // VK_KHR_external_memory:
+  // Promoted to core in Vulkan 1.1 and not required but here just in case
+  // tooling wants to see the request.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+
+  // VK_EXT_external_memory_host:
+  // Optional to enable import/export of host pointers.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
 
   //===--------------------------------------------------------------------===//
   // Vulkan forward-compatibility shims
@@ -717,11 +730,11 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
                         IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR)) {
     status = iree_hal_vulkan_vma_allocator_create(
         options, instance, physical_device, logical_device,
-        (iree_hal_device_t*)device, &device->device_allocator);
+        &device->device_allocator);
   } else {
     status = iree_hal_vulkan_native_allocator_create(
         options, instance, physical_device, logical_device,
-        (iree_hal_device_t*)device, &device->device_allocator);
+        &device->device_allocator);
   }
 
   // Create command pools for each queue family. If we don't have a transfer
@@ -818,7 +831,7 @@ static iree_status_t iree_hal_vulkan_device_query_extensibility_set(
 
 iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
-    iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_features_t requested_features,
     const iree_hal_vulkan_device_options_t* options,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
@@ -831,12 +844,12 @@ iree_status_t iree_hal_vulkan_device_create(
   iree::Arena arena(128 * 1024);
   iree_hal_vulkan_string_list_t required_extensions;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_query_extensibility_set(
-      enabled_features,
+      requested_features,
       IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED, &arena,
       &required_extensions));
   iree_hal_vulkan_string_list_t optional_extensions;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_query_extensibility_set(
-      enabled_features,
+      requested_features,
       IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL, &arena,
       &optional_extensions));
   iree_hal_vulkan_string_list_t enabled_extensions;
@@ -918,7 +931,32 @@ iree_status_t iree_hal_vulkan_device_create(
     features2.features.shaderInt64 = VK_TRUE;
   }
 
-  if (iree_all_bits_set(enabled_features,
+  iree_hal_vulkan_features_t enabled_features = 0;
+
+  IREE_TRACE({
+    if (iree_all_bits_set(requested_features,
+                          IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
+      enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
+    }
+  });
+
+  if (iree_all_bits_set(requested_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING) &&
+      physical_device_features.sparseBinding) {
+    features2.features.sparseBinding = VK_TRUE;
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING;
+  }
+  if (iree_all_bits_set(
+          requested_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED) &&
+      physical_device_features.sparseResidencyBuffer &&
+      physical_device_features.sparseResidencyAliased) {
+    features2.features.sparseResidencyBuffer = VK_TRUE;
+    features2.features.sparseResidencyAliased = VK_TRUE;
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED;
+  }
+
+  if (iree_all_bits_set(requested_features,
                         IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS)) {
     if (physical_device_features.robustBufferAccess != VK_TRUE) {
       return iree_make_status(
@@ -926,6 +964,7 @@ iree_status_t iree_hal_vulkan_device_create(
           "Robust buffer access not supported by physical device");
     }
     features2.features.robustBufferAccess = VK_TRUE;
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS;
   }
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
@@ -957,7 +996,8 @@ iree_status_t iree_hal_vulkan_device_create(
   }
 
   auto logical_device = new VkDeviceHandle(
-      instance_syms, enabled_device_extensions,
+      instance_syms, physical_device, enabled_features,
+      enabled_device_extensions,
       /*owns_device=*/true, host_allocator, /*allocator=*/NULL);
 
   iree_status_t status = VK_RESULT_TO_STATUS(
@@ -1031,7 +1071,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
 
   // Wrap the provided VkDevice with a VkDeviceHandle for use within the HAL.
   auto logical_device_handle = new VkDeviceHandle(
-      device_syms.get(), enabled_device_extensions,
+      device_syms.get(), physical_device, enabled_features,
+      enabled_device_extensions,
       /*owns_device=*/false, host_allocator, /*allocator=*/NULL);
   *logical_device_handle->mutable_value() = logical_device;
 
@@ -1206,6 +1247,23 @@ static iree_status_t iree_hal_vulkan_device_create_executable_cache(
       device->logical_device, identifier, out_executable_cache);
 }
 
+static iree_status_t iree_hal_vulkan_device_import_file(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_access_t access,
+    iree_hal_external_file_t* IREE_RESTRICT external_file,
+    iree_hal_file_release_callback_t release_callback,
+    iree_hal_file_t** out_file) {
+  if (external_file->type != IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "implementation does not support the external file type");
+  }
+  return iree_hal_memory_file_wrap(
+      queue_affinity, access, external_file->handle.host_allocation,
+      release_callback, iree_hal_device_allocator(base_device),
+      iree_hal_device_host_allocator(base_device), out_file);
+}
+
 static iree_status_t iree_hal_vulkan_device_create_pipeline_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
@@ -1249,9 +1307,9 @@ static iree_status_t iree_hal_vulkan_device_queue_alloca(
   // TODO(benvanik): queue-ordered allocations.
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
                                                     iree_infinite_timeout()));
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(base_device), params, allocation_size,
-      iree_const_byte_span_empty(), out_buffer));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
+                                         params, allocation_size, out_buffer));
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
   return iree_ok_status();
 }
@@ -1265,6 +1323,48 @@ static iree_status_t iree_hal_vulkan_device_queue_dealloca(
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
       base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list));
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_device_queue_read(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_file_t* source_file, uint64_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, uint32_t flags) {
+  // TODO: expose streaming chunk count/size options.
+  iree_status_t loop_status = iree_ok_status();
+  iree_hal_file_transfer_options_t options = {
+      /*.loop=*/iree_loop_inline(&loop_status),
+      /*.chunk_count=*/IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
+      /*.chunk_size=*/IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_file, source_offset, target_buffer, target_offset, length, flags,
+      options));
+  return loop_status;
+}
+
+static iree_status_t iree_hal_vulkan_device_queue_write(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_file_t* target_file, uint64_t target_offset,
+    iree_device_size_t length, uint32_t flags) {
+  // TODO: expose streaming chunk count/size options.
+  iree_status_t loop_status = iree_ok_status();
+  iree_hal_file_transfer_options_t options = {
+      /*.loop=*/iree_loop_inline(&loop_status),
+      /*.chunk_count=*/IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
+      /*.chunk_size=*/IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_buffer, source_offset, target_file, target_offset, length, flags,
+      options));
+  return loop_status;
 }
 
 static iree_status_t iree_hal_vulkan_device_queue_execute(
@@ -1283,7 +1383,10 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
       /*.command_buffers=*/command_buffers,
       /*.signal_semaphores=*/signal_semaphore_list,
   };
-  return queue->Submit(1, &batch);
+  IREE_RETURN_IF_ERROR(queue->Submit(1, &batch));
+  // HACK: we don't track async resource lifetimes so we have to block.
+  return iree_hal_semaphore_list_wait(signal_semaphore_list,
+                                      iree_infinite_timeout());
 }
 
 static iree_status_t iree_hal_vulkan_device_queue_flush(
@@ -1383,6 +1486,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.create_event=*/iree_hal_vulkan_device_create_event,
     /*.create_executable_cache=*/
     iree_hal_vulkan_device_create_executable_cache,
+    /*.import_file=*/iree_hal_vulkan_device_import_file,
     /*.create_pipeline_layout=*/
     iree_hal_vulkan_device_create_pipeline_layout,
     /*.create_semaphore=*/iree_hal_vulkan_device_create_semaphore,
@@ -1391,6 +1495,8 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.transfer_range=*/iree_hal_device_submit_transfer_range_and_wait,
     /*.queue_alloca=*/iree_hal_vulkan_device_queue_alloca,
     /*.queue_dealloca=*/iree_hal_vulkan_device_queue_dealloca,
+    /*.queue_read=*/iree_hal_vulkan_device_queue_read,
+    /*.queue_write=*/iree_hal_vulkan_device_queue_write,
     /*.queue_execute=*/iree_hal_vulkan_device_queue_execute,
     /*.queue_flush=*/iree_hal_vulkan_device_queue_flush,
     /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,

@@ -165,12 +165,13 @@ appendGlobalBuffer(Location loc, StringRef baseName,
   auto allocator =
       initBuilder.create<IREE::HAL::DeviceAllocatorOp>(loc, device).getResult();
 
+  auto queueAffinity = initBuilder.create<arith::ConstantIntOp>(loc, -1, 64);
   auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
   auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
                      IREE::HAL::BufferUsageBitfield::DispatchStorage;
   auto allocateOp = initBuilder.create<IREE::HAL::AllocatorAllocateOp>(
-      loc, globalOp.getType(), allocator, memoryTypes, bufferUsage,
-      indexSet.get(totalLength));
+      loc, globalOp.getType(), allocator, queueAffinity, memoryTypes,
+      bufferUsage, indexSet.get(totalLength));
 
   initBuilder.create<IREE::Util::GlobalStoreOp>(loc, allocateOp.getResult(),
                                                 globalOp.getNameAttr());

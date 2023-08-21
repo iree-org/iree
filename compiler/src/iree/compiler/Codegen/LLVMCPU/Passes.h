@@ -122,7 +122,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
 
 /// Populates the passes to lower ops through data tiling transformations.
 void addCPUDataTilingPipeline(OpPassManager &passManager,
-                              TilingConfig &tilingConfig);
+                              TilingConfig &tilingConfig,
+                              bool enableVectorMasking);
 
 /// Populates the passes to lower to scalars operations for linalg based
 /// code-generation. This pipeline does not vectorize, but instead just

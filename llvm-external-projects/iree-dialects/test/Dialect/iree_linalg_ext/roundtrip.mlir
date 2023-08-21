@@ -913,6 +913,25 @@ func.func @set_encoding_ops_mixed_dynamic_static(%arg0: tensor<?x10xf32>) -> ten
 
 // -----
 
+// CHECK: @set_encoding_with_batch_matmul_user(%[[ARG0:.+]]: tensor<?x?x?xf32>)
+func.func @set_encoding_with_batch_matmul_user(%arg0: tensor<?x?x?xf32>) {
+  // CHECK: iree_linalg_ext.set_encoding %[[ARG0]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = LHS>>
+  iree_linalg_ext.set_encoding %arg0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F32F32F32, role = LHS>>
+  // CHECK: iree_linalg_ext.set_encoding %[[ARG0]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_I8I8I32, role = LHS>>
+  iree_linalg_ext.set_encoding %arg0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_I8I8I32, role = LHS>>
+  // CHECK: iree_linalg_ext.set_encoding %[[ARG0]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F16F16F32, role = LHS>>
+  iree_linalg_ext.set_encoding %arg0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F16F16F32, role = LHS>>
+  // CHECK: iree_linalg_ext.set_encoding %[[ARG0]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F16F16F16, role = LHS>>
+  iree_linalg_ext.set_encoding %arg0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_F16F16F16, role = LHS>>
+  // CHECK: iree_linalg_ext.set_encoding %[[ARG0]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_BF16BF16F32, role = LHS>>
+  iree_linalg_ext.set_encoding %arg0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_BF16BF16F32, role = LHS>>
+  // CHECK: iree_linalg_ext.set_encoding %[[ARG0]] : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_BF16BF16BF16, role = LHS>>
+  iree_linalg_ext.set_encoding %arg0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL_BF16BF16BF16, role = LHS>>
+  return
+}
+
+// -----
+
 // CHECK: @unset_encoding_ops(%[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>)
 func.func @unset_encoding_ops(%arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>) -> tensor<?x?xf32> {
   // CHECK: iree_linalg_ext.unset_encoding %[[ARG0]] : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>> -> tensor<?x?xf32>

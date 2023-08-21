@@ -26,7 +26,7 @@ struct InitializerOpConversion
                                newOp.getBody().begin());
 
     // Tell the rewriter to convert the region signature.
-    TypeConverter &typeConverter = *getTypeConverter();
+    const TypeConverter &typeConverter = *getTypeConverter();
     TypeConverter::SignatureConversion signatureConversion(0);
     if (failed(rewriter.convertRegionTypes(&newOp.getBody(), typeConverter,
                                            &signatureConversion))) {

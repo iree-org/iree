@@ -91,11 +91,25 @@ module @hoist_sub_byte_aligned_scalar_transitive {
 }
 
 // -----
-// CHECK-LABEL: @hoist_sub_byte_aligned_tensor_transitive
-// CHECK: util.global private {{.*}} : i32
+// CHECK-LABEL: @do_not_hoist_sub_byte_tensor_transitive
+// CHECK-NOT: util.global
+// We do not yet support constexpr of sub-byte types that are 
 // Can hoist a const-expr tree that transitively includes sub-byte aligned
 // values.
-module @hoist_sub_byte_aligned_tensor_transitive {
+module @do_not_hoist_sub_byte_tensor_transitive {
+  func.func @main() -> (i32) {
+    %0 = arith.constant dense<3> : tensor<i4>
+    %2 = "iree_unregistered.const_expr"(%0) : (tensor<i4>) -> i32
+    return %2 : i32
+  }
+}
+
+// -----
+// CHECK-LABEL: @hoist_i1_tensor_transitive
+// CHECK: util.global private {{.*}} : i32
+// We presently expand i1 -> i8 for legacy reasons. As such, we support
+// it, even though we don't generally support sub-byte constexprs.
+module @hoist_i1_tensor_transitive {
   func.func @main() -> (i32) {
     %0 = arith.constant dense<true> : tensor<i1>
     %2 = "iree_unregistered.const_expr"(%0) : (tensor<i1>) -> i32
@@ -215,3 +229,22 @@ module @do_not_hoist_non_value_type_results {
     return %2 : !iree_unregistered.unknown_type
   }
 }
+
+// -----
+
+module @do_not_hoist_uses_within_dispatches {
+  func.func @main() -> (tensor<i32>) {
+    %cst = arith.constant dense<[2, 3]>: tensor<2xi32>
+    %result = flow.dispatch.region -> (tensor<i32>) {
+      %slice = tensor.extract_slice %cst[0] [1] [1] : tensor<2xi32> to tensor<i32>
+      flow.return %slice : tensor<i32>
+    }
+    return %result : tensor<i32>
+  }
+}
+// CHECK-LABEL: @do_not_hoist_uses_within_dispatches
+//       CHECK:   %[[CST:.+]] = arith.constant
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[CST]]
+//       CHECK:     flow.return %[[SLICE]]
+//       CHECK:   return %[[RESULT]]

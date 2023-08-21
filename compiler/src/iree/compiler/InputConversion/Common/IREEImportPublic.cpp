@@ -329,7 +329,7 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     }
 
     // Tell the rewriter to convert the region signature.
-    TypeConverter &typeConverter = *getTypeConverter();
+    const TypeConverter &typeConverter = *getTypeConverter();
     if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
                                            typeConverter,
                                            &signatureConversion))) {
@@ -488,6 +488,7 @@ void IREEImportPublicPass::runOnOperation() {
       typeConverter, SrcOpTy::getOperationName(),                              \
       TargetOpTy::getOperationName(), &getContext(), specific_benefit)
 
+  ONE_TO_ONE(IREE::Input::BufferSubspanOp, IREE::HAL::BufferSubspanOp);
   ONE_TO_ONE(IREE::Input::BufferViewCreateOp, IREE::HAL::BufferViewCreateOp);
   ONE_TO_ONE(IREE::Input::BufferViewRankOp, IREE::HAL::BufferViewRankOp);
   ONE_TO_ONE(IREE::Input::BufferViewDimOp, IREE::HAL::BufferViewDimOp);

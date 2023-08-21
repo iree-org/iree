@@ -39,7 +39,7 @@ class ExecutableLibraryDI {
 public:
   // Initializes a cached DI provider using |typeConverter| to determine
   // variable-width types such as index/size_t.
-  explicit ExecutableLibraryDI(LLVMTypeConverter *typeConverter);
+  explicit ExecutableLibraryDI(const LLVMTypeConverter *typeConverter);
 
   // Returns `void*`.
   LLVM::DIDerivedTypeAttr getVoidPtr() { return voidPtr; }
@@ -96,7 +96,7 @@ public:
   LLVM::DIDerivedTypeAttr getWorkgroupStateV0T();
 
 private:
-  LLVMTypeConverter *typeConverter;
+  const LLVMTypeConverter *typeConverter;
   Builder builder;
   LLVM::DIFileAttr fileAttr;
   unsigned ptrBitwidth;
@@ -135,7 +135,8 @@ public:
 
   // Returns a Type representing iree_hal_processor_v0_t.
   static LLVM::LLVMStructType
-  getProcessorType(MLIRContext *context, LLVMTypeConverter *typeConverter);
+  getProcessorType(MLIRContext *context,
+                   const LLVMTypeConverter *typeConverter);
 
   // Matches the field order in iree_hal_executable_environment_v0_t.
   enum class EnvironmentField {
@@ -148,7 +149,8 @@ public:
 
   // Returns a Type representing iree_hal_executable_environment_v0_t.
   static LLVM::LLVMStructType
-  getEnvironmentType(MLIRContext *context, LLVMTypeConverter *typeConverter,
+  getEnvironmentType(MLIRContext *context,
+                     const LLVMTypeConverter *typeConverter,
                      LLVM::LLVMStructType processorType);
 
   // Matches the field order in iree_hal_executable_dispatch_state_v0_t.
@@ -172,7 +174,8 @@ public:
 
   // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
   static LLVM::LLVMStructType
-  getDispatchStateType(MLIRContext *context, LLVMTypeConverter *typeConverter);
+  getDispatchStateType(MLIRContext *context,
+                       const LLVMTypeConverter *typeConverter);
 
   enum class WorkgroupStateField {
     /*uint32_t*/ workgroup_id_x = 0,
@@ -189,13 +192,14 @@ public:
 
   // Returns a Type representing iree_hal_executable_workgroup_state_v0_t.
   static LLVM::LLVMStructType
-  getWorkgroupStateType(MLIRContext *context, LLVMTypeConverter *typeConverter);
+  getWorkgroupStateType(MLIRContext *context,
+                        const LLVMTypeConverter *typeConverter);
 
   // Returns the types of the LLVM function inputs for the ABI.
   // This matches the signature of `iree_hal_executable_dispatch_v0_t` in
   // `iree/hal/local/executable_library.h`.
-  static SmallVector<Type, 5> getInputTypes(MLIRContext *context,
-                                            LLVMTypeConverter *typeConverter);
+  static SmallVector<Type, 5>
+  getInputTypes(MLIRContext *context, const LLVMTypeConverter *typeConverter);
 
   // Builds a DISubprogram for a function in |moduleOp| named |funcName|.
   // This is required in order to get any debug information (including line
@@ -204,7 +208,7 @@ public:
   // downstream tools will be.
   static LLVM::DISubprogramAttr
   buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
-                 LLVMTypeConverter *typeConverter);
+                 const LLVMTypeConverter *typeConverter);
 
   explicit HALDispatchABI(LLVMTypeConverter *typeConverter)
       : context(&typeConverter->getContext()), typeConverter(typeConverter),
@@ -402,7 +406,7 @@ private:
                                                   OpBuilder &builder);
 
   mlir::MLIRContext *context;
-  LLVMTypeConverter *typeConverter;
+  const LLVMTypeConverter *typeConverter;
   LLVM::LLVMStructType processorType;
   LLVM::LLVMStructType environmentType;
   LLVM::LLVMStructType dispatchStateType;

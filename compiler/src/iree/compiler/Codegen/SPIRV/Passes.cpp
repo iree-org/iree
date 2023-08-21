@@ -27,7 +27,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
-#include "mlir/Dialect/GPU/Transforms/Passes.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
@@ -202,6 +202,8 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Turn scalar load/store from memrefs into vectorized ones if possible. This
   // gives better memory access patterns, which is very important for perf.
   pm.addPass(createSPIRVVectorizeLoadStore());
+  // Perform optimizations that need to across the scf.for region boundary.
+  pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
   pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
@@ -501,7 +503,12 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
       pm, /*useFuseTensorPadWithConsumerPass=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  // Fuse input parallel ops into the reduction op so that we don't need to
+  // create temporary allocations during bufferization.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
@@ -600,6 +607,9 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createSPIRVGeneralizeNamedOpsPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());

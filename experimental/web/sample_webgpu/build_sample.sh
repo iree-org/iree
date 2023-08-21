@@ -15,7 +15,15 @@
 # Usage:
 #   build_sample.sh (optional install path) && serve_sample.sh
 
-set -e
+set -euo pipefail
+
+ROOT_DIR=$(git rev-parse --show-toplevel)
+
+HOST_BUILD_DIR="${IREE_HOST_BUILD_DIR:-${ROOT_DIR}/build-host}"
+BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripten}"
+INSTALL_ROOT="$(realpath ${1:-${HOST_BUILD_DIR}/install})"
+SOURCE_DIR="${ROOT_DIR}/experimental/web/sample_webgpu"
+BINARY_DIR="${BUILD_DIR}/experimental/web/sample_webgpu"
 
 ###############################################################################
 # Setup and checking for dependencies                                         #
@@ -27,17 +35,9 @@ then
   exit 1
 fi
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-ROOT_DIR=$(git rev-parse --show-toplevel)
-SOURCE_DIR=${ROOT_DIR}/experimental/web/sample_webgpu
+source "${ROOT_DIR}/build_tools/cmake/setup_build.sh"
 
-BUILD_DIR=${ROOT_DIR?}/build-emscripten
-mkdir -p ${BUILD_DIR}
-
-BINARY_DIR=${BUILD_DIR}/experimental/web/sample_webgpu
 mkdir -p ${BINARY_DIR}
-
-INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 
 ###############################################################################
 # Compile from .mlir input to portable .vmfb file using host tools            #

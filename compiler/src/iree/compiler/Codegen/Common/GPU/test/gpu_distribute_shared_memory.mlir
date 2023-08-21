@@ -196,3 +196,69 @@ hal.executable private @zero_dim_shared_memory_copy  {
     }
   }
 }
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>
+]>
+
+hal.executable private @zero_dim_shared_memory_copy  {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @zero_dim_shared_memory_copy layout(#pipeline_layout) attributes {
+      workgroup_size = [32: index, 8: index, 1:index]
+    } {
+    ^bb0(%arg0: !hal.device, %arg1 : index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @zero_dim_shared_memory_copy(%A: memref<1x32x128xi4>, %B: memref<1x128xf32>, %C: memref<1x128xi4>,
+                                             %SM: memref<1x32x128xf32, #gpu.address_space<workgroup>>) {
+        linalg.generic {
+          indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
+            affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+          ],
+          iterator_types = ["parallel", "parallel", "parallel"]
+        }
+        ins(%A, %B, %C : memref<1x32x128xi4>, memref<1x128xf32>, memref<1x128xi4>)
+        outs(%SM : memref<1x32x128xf32, #gpu.address_space<workgroup>>)
+        attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
+        ^bb0(%in: i4, %in_14: f32, %in_15: i4, %out: f32):
+          %19 = arith.extui %in : i4 to i32
+          %20 = arith.extui %in_15 : i4 to i32
+          %21 = arith.subi %19, %20 : i32
+          %22 = arith.sitofp %21 : i32 to f32
+          %23 = arith.mulf %22, %in_14 : f32
+          linalg.yield %23 : f32
+        }
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @zero_dim_shared_memory_copy
+//  CHECK-SAME: (%[[A:.+]]: memref<1x32x128xi4>, %{{.+}}: memref<1x128xf32>, %[[C:.+]]: memref<1x128xi4>, %[[SM:.+]]: memref<1x32x128xf32, {{.*}}>)
+
+// CHECK:   %[[A0:.+]] = vector.transfer_read %[[A]]
+// CHECK:   %[[C0:.+]] = vector.transfer_read %[[C]]
+// CHECK:   %[[A0E:.+]] = arith.extui %[[A0]] : vector<1x1x8xi4> to vector<1x1x8xi32>
+// CHECK:   %[[C0E:.+]] = arith.extui %[[C0]] : vector<1x1x8xi4> to vector<1x1x8xi32>
+// CHECK:   %[[SUB0:.+]] = arith.subi %[[A0E]], %[[C0E]] : vector<1x1x8xi32>
+// CHECK:   %[[EXT0:.+]] = arith.sitofp %[[SUB0]] : vector<1x1x8xi32> to vector<1x1x8xf32>
+// CHECK:   %[[MUL0:.+]] = arith.mulf %[[EXT0]], %{{.+}} : vector<1x1x8xf32>
+// CHECK:   vector.transfer_write %[[MUL0]], %[[SM]]
+
+// CHECK:   %[[A1:.+]] = vector.transfer_read %[[A]]
+// CHECK:   %[[C1:.+]] = vector.transfer_read %[[C]]
+// CHECK:   %[[A1E:.+]] = arith.extui %[[A1]] : vector<1x1x8xi4> to vector<1x1x8xi32>
+// CHECK:   %[[C1E:.+]] = arith.extui %[[C1]] : vector<1x1x8xi4> to vector<1x1x8xi32>
+// CHECK:   %[[SUB1:.+]] = arith.subi %[[A1E]], %[[C1E]] : vector<1x1x8xi32>
+// CHECK:   %[[EXT1:.+]] = arith.sitofp %[[SUB1]] : vector<1x1x8xi32> to vector<1x1x8xf32>
+// CHECK:   %[[MUL1:.+]] = arith.mulf %[[EXT1]], %{{.+}} : vector<1x1x8xf32>
+// CHECK:   vector.transfer_write %[[MUL1]], %[[SM]]
+

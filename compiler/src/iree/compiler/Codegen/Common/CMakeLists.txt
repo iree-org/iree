@@ -98,6 +98,7 @@ iree_cc_library(
     MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
@@ -128,6 +129,7 @@ iree_cc_library(
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DecomposeAffineOpsPass.cpp"
+    "DecomposeBatchMmt4DOps.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
@@ -154,6 +156,7 @@ iree_cc_library(
     "PadDynamicAlloc.cpp"
     "Passes.cpp"
     "PolynomialApproximationPass.cpp"
+    "RematerializeParallelOps.cpp"
     "RemoveTrivialLoops.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TestExecutablePreprocessing.cpp"
@@ -192,6 +195,7 @@ iree_cc_library(
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRMemRefUtils
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow

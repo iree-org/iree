@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build/install the iree-compiler-backend python package.
+# Build/install the iree-compiler python package.
 # Note that this includes a relatively large build of LLVM (~2400 C++ files)
 # and can take a considerable amount of time, especially with defaults.
 # To install:
@@ -20,7 +20,6 @@
 # This can be set with the IREE_COMPILER_API_CMAKE_BUILD_DIR env var.
 #
 # Select CMake options are available from environment variables:
-#   IREE_TARGET_BACKEND_CUDA
 #   IREE_ENABLE_CPUINFO
 
 from gettext import install
@@ -75,8 +74,10 @@ IREE_BINARY_DIR = None
 # We must do the intermediate installation to a fixed location that agrees
 # between what we pass to setup() and cmake. So hard-code it here.
 # Note that setup() needs a relative path (to the setup.py file).
+# We keep the path short ('i' instead of 'install') for platforms like Windows
+# that have file length limits.
 SETUPPY_DIR = os.path.realpath(os.path.dirname(__file__))
-CMAKE_INSTALL_DIR_REL = os.path.join("build", "cmake_install")
+CMAKE_INSTALL_DIR_REL = os.path.join("build", "i")
 CMAKE_INSTALL_DIR_ABS = os.path.join(SETUPPY_DIR, CMAKE_INSTALL_DIR_REL)
 
 IS_CONFIGURED = CONFIGURED_SOURCE_DIR[0] != "@"
@@ -96,7 +97,7 @@ else:
         # Note that setuptools always builds into a "build" directory that
         # is a sibling of setup.py, so we just colonize a sub-directory of that
         # by default.
-        IREE_BINARY_DIR = os.path.join(SETUPPY_DIR, "build", "cmake_build")
+        IREE_BINARY_DIR = os.path.join(SETUPPY_DIR, "build", "b")
     print(
         f"Running setup.py from source tree: "
         f"SOURCE_DIR = {IREE_SOURCE_DIR} "
@@ -250,12 +251,13 @@ def prepare_installation():
             "-GNinja",
             "--log-level=VERBOSE",
             "-DIREE_BUILD_PYTHON_BINDINGS=ON",
+            "-DIREE_BUILD_SAMPLES=OFF",
+            "-DIREE_BUILD_TESTS=OFF",
             # Disable .so.0 style symlinking. Python wheels don't preserve links,
             # so this ~doubles the binary size if not disabled (yikes!).
             "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON",
             "-DPython3_EXECUTABLE={}".format(sys.executable),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
-            get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
             # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU here (and in env)
             get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
         ]
@@ -453,6 +455,7 @@ setup(
             # TODO: We have renamed to iree-compile on 2022-03-18. Remove
             # this alias once no longer needed.
             "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
+            "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",
         ],
     },
     install_requires=[

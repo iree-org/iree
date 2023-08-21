@@ -15,7 +15,7 @@
 #include "iree/hal/drivers/metal/metal_buffer.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
-static const char* IREE_HAL_METAL_ALLOCATOR_ID = "METAL";
+static const char* IREE_HAL_METAL_ALLOCATOR_ID = "Metal";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 typedef struct iree_hal_metal_allocator_t {
@@ -171,7 +171,7 @@ static iree_hal_buffer_compatibility_t iree_hal_metal_allocator_query_buffer_com
 // Returns the corresponding Metal resource options controlling storage modes, CPU caching modes,
 // and hazard tracking modes for the given IREE HAL memory |type|.
 static MTLResourceOptions iree_hal_metal_select_resource_options(
-    iree_hal_memory_type_t type, bool is_unified_memory, bool has_init_data,
+    iree_hal_memory_type_t type, bool is_unified_memory,
     iree_hal_metal_resource_hazard_tracking_mode_t resource_tracking_mode) {
   MTLResourceOptions options;
 
@@ -201,9 +201,7 @@ static MTLResourceOptions iree_hal_metal_select_resource_options(
 #endif  // IREE_PLATFORM_MACOS
     } else {
       // Device local + host invisible.
-      // For unified memory, update it to Shared storage mode if we have initial data.
-      options = (is_unified_memory && has_init_data) ? MTLResourceStorageModeShared
-                                                     : MTLResourceStorageModePrivate;
+      options = MTLResourceStorageModePrivate;
     }
   } else {
     if (iree_all_bits_set(type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
@@ -235,7 +233,7 @@ static MTLResourceOptions iree_hal_metal_select_resource_options(
 static iree_status_t iree_hal_metal_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params, iree_device_size_t allocation_size,
-    iree_const_byte_span_t initial_data, iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_metal_allocator_t* allocator = iree_hal_metal_allocator_cast(base_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
@@ -265,28 +263,12 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
 #endif  // IREE_STATUS_MODE
   }
 
-  bool has_init_data = !iree_const_byte_span_is_empty(initial_data);
-  MTLResourceOptions options =
-      iree_hal_metal_select_resource_options(compat_params.type, allocator->is_unified_memory,
-                                             has_init_data, allocator->resource_tracking_mode);
-  if (has_init_data && iree_all_bits_set(options, MTLResourceStorageModePrivate)) {
-    IREE_TRACE_ZONE_END(z0);
-    // This should only happen for macOS devices with non-uniform memory; for uniform memory
-    // devices, the allocator compatibility would update it to use Shared storage mode.
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "private storage with initial data");
-  }
+  MTLResourceOptions options = iree_hal_metal_select_resource_options(
+      compat_params.type, allocator->is_unified_memory, allocator->resource_tracking_mode);
 
-  id<MTLBuffer> metal_buffer = nil;
-  // If we chose shared storage mode, we can handle initial data with newByfferWithBytes directly.
-  // Otherwise we just create the buffer here, and explicitly transfer range later.
-  if (has_init_data && iree_all_bits_set(options, MTLResourceStorageModeShared)) {
-    IREE_ASSERT_EQ(allocation_size, initial_data.data_length);
-    metal_buffer = [allocator->device newBufferWithBytes:(void*)initial_data.data
-                                                  length:initial_data.data_length
-                                                 options:options];  // +1
-  } else {
-    metal_buffer = [allocator->device newBufferWithLength:allocation_size options:options];  // +1
-  }
+  id<MTLBuffer> metal_buffer = [allocator->device newBufferWithLength:allocation_size
+                                                              options:options];  // +1
+
   if (!metal_buffer) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "unable to allocate buffer");
@@ -299,17 +281,6 @@ static iree_status_t iree_hal_metal_allocator_allocate_buffer(
       metal_buffer, base_allocator, compat_params.type, compat_params.access, compat_params.usage,
       allocation_size, /*byte_offset=*/0, /*byte_length=*/allocation_size,
       iree_hal_buffer_release_callback_null(), &buffer);  // +1
-
-#if defined(IREE_PLATFORM_MACOS)
-  if (iree_status_is_ok(status) && has_init_data &&
-      !iree_all_bits_set(options, MTLResourceStorageModePrivate)) {
-    // Explicitly handle synchronization for Managed storage mode.
-    if (iree_all_bits_set(options, MTLResourceStorageModeManaged)) {
-      memcpy(metal_buffer.contents, initial_data.data, initial_data.data_length);
-      [metal_buffer didModifyRange:NSMakeRange(0, initial_data.data_length)];
-    }
-  }
-#endif  // IREE_PLATFORM_MACOS
 
   if (iree_status_is_ok(status)) {
     IREE_TRACE_ALLOC_NAMED(IREE_HAL_METAL_ALLOCATOR_ID, (void*)iree_hal_metal_buffer_handle(buffer),
@@ -341,13 +312,80 @@ static void iree_hal_metal_allocator_deallocate_buffer(
   iree_hal_buffer_destroy(base_buffer);  // -1
 }
 
+static iree_status_t iree_hal_metal_allocator_import_host_buffer(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  iree_hal_metal_allocator_t* allocator = iree_hal_metal_allocator_cast(base_allocator);
+
+  // MTLResourceOptions options = iree_hal_metal_select_resource_options(
+  //     params->type, allocator->is_unified_memory, allocator->resource_tracking_mode);
+  MTLResourceOptions options = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModeShared |
+                               MTLResourceHazardTrackingModeUntracked;
+
+  id<MTLBuffer> metal_buffer =
+      [allocator->device newBufferWithBytesNoCopy:external_buffer->handle.host_allocation.ptr
+                                           length:(NSUInteger)external_buffer->size
+                                          options:options
+                                      deallocator:nil];  // +1
+  if (!metal_buffer) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED, "unable to allocate buffer");
+  }
+
+  return iree_hal_metal_buffer_wrap(
+#if defined(IREE_PLATFORM_MACOS)
+      allocator->queue,
+#endif  // IREE_PLATFORM_MACOS
+      metal_buffer, base_allocator, params->type, params->access, params->usage,
+      external_buffer->size, /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
+      iree_hal_buffer_release_callback_null(), out_buffer);  // +1
+}
+
+static iree_status_t iree_hal_metal_allocator_import_device_buffer(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  iree_hal_metal_allocator_t* allocator = iree_hal_metal_allocator_cast(base_allocator);
+
+  // Device allocation is an unowned MTLBuffer; we need to retain it to keep it live.
+  id<MTLBuffer> metal_buffer =
+      (__bridge id<MTLBuffer>)external_buffer->handle.device_allocation.ptr;
+  if (!metal_buffer) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "no handle provided");
+  }
+
+  // Wrap the externally-provided buffer in a HAL buffer handle that will retain the MTLBuffer until
+  // it has been released.
+  return iree_hal_metal_buffer_wrap(
+#if defined(IREE_PLATFORM_MACOS)
+      allocator->queue,
+#endif  // IREE_PLATFORM_MACOS
+      metal_buffer, base_allocator, params->type, params->access, params->usage,
+      external_buffer->size, /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
+      release_callback, out_buffer);  // +1
+}
+
 static iree_status_t iree_hal_metal_allocator_import_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE, "unsupported importing from external buffer");
+  switch (external_buffer->type) {
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION:
+      return iree_hal_metal_allocator_import_host_buffer(base_allocator, params, external_buffer,
+                                                         release_callback, out_buffer);
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION:
+      return iree_hal_metal_allocator_import_device_buffer(base_allocator, params, external_buffer,
+                                                           release_callback, out_buffer);
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "external buffer type import not implemented");
+  }
 }
 
 static iree_status_t iree_hal_metal_allocator_export_buffer(

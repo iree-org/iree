@@ -51,6 +51,8 @@ iree_cc_library(
     "native_semaphore.h"
     "nop_executable_cache.cc"
     "nop_executable_cache.h"
+    "sparse_buffer.cc"
+    "sparse_buffer.h"
     "status_util.c"
     "status_util.h"
     "tracing.cc"
@@ -76,6 +78,8 @@ iree_cc_library(
     iree::hal::drivers::vulkan::util::intrusive_list
     iree::hal::drivers::vulkan::util::ref_ptr
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::file_transfer
+    iree::hal::utils::memory_file
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::spirv_executable_def_c_fbs

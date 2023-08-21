@@ -81,8 +81,8 @@ IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
 static iree_status_t iree_tooling_process_outputs(
-    iree_vm_list_t* outputs, iree_allocator_t host_allocator,
-    int* out_exit_code);
+    iree_hal_device_t* device, iree_vm_list_t* outputs,
+    iree_allocator_t host_allocator, int* out_exit_code);
 
 static iree_status_t iree_tooling_create_run_context(
     iree_vm_instance_t* instance, iree_string_view_t default_device_uri,
@@ -183,8 +183,8 @@ static iree_status_t iree_tooling_run_function(
   iree_vm_list_t* inputs = NULL;
   iree_status_t status = iree_status_annotate_f(
       iree_tooling_parse_to_variant_list(
-          device_allocator, FLAG_input_list().values, FLAG_input_list().count,
-          host_allocator, &inputs),
+          device, device_allocator, FLAG_input_list().values,
+          FLAG_input_list().count, host_allocator, &inputs),
       "parsing function inputs");
 
   // If the function is async add fences so we can invoke it synchronously.
@@ -249,7 +249,8 @@ static iree_status_t iree_tooling_run_function(
   // expected values (basic pass/fail testing).
   if (iree_status_is_ok(status)) {
     status = iree_status_annotate_f(
-        iree_tooling_process_outputs(outputs, host_allocator, out_exit_code),
+        iree_tooling_process_outputs(device, outputs, host_allocator,
+                                     out_exit_code),
         "processing function outputs");
   }
   iree_vm_list_release(outputs);
@@ -260,8 +261,8 @@ static iree_status_t iree_tooling_run_function(
 }
 
 static iree_status_t iree_tooling_process_outputs(
-    iree_vm_list_t* outputs, iree_allocator_t host_allocator,
-    int* out_exit_code) {
+    iree_hal_device_t* device, iree_vm_list_t* outputs,
+    iree_allocator_t host_allocator, int* out_exit_code) {
   *out_exit_code = EXIT_SUCCESS;
 
   // Basic output handling to route to the console or files.
@@ -293,7 +294,7 @@ static iree_status_t iree_tooling_process_outputs(
   iree_vm_list_t* expected_list = NULL;
   iree_status_t status = iree_status_annotate_f(
       iree_tooling_parse_to_variant_list(
-          heap_allocator, FLAG_expected_output_list().values,
+          device, heap_allocator, FLAG_expected_output_list().values,
           FLAG_expected_output_list().count, host_allocator, &expected_list),
       "parsing expected function outputs");
 

@@ -147,11 +147,11 @@ class ConfigureCITest(unittest.TestCase):
         trailers = {}
         all_jobs = {"job1", "job2", "job3"}
         is_pr = True
-        modifies = True
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=modified_paths,
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, all_jobs)
@@ -159,14 +159,14 @@ class ConfigureCITest(unittest.TestCase):
     def test_get_enabled_jobs_postsubmit(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
-        postsubmit_job = next(iter(configure_ci.POSTSUBMIT_ONLY_JOBS))
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = False
-        modifies = True
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=modified_paths,
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, all_jobs)
@@ -174,14 +174,14 @@ class ConfigureCITest(unittest.TestCase):
     def test_get_enabled_jobs_no_postsubmit(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
-        postsubmit_job = next(iter(configure_ci.POSTSUBMIT_ONLY_JOBS))
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modifies = True
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=modified_paths,
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, default_jobs)
@@ -189,14 +189,14 @@ class ConfigureCITest(unittest.TestCase):
     def test_get_enabled_jobs_no_modifies(self):
         trailers = {}
         default_jobs = {"job1", "job2", "job3"}
-        postsubmit_job = next(iter(configure_ci.POSTSUBMIT_ONLY_JOBS))
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modifies = False
+        modified_paths = ["experimental/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=modified_paths,
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, {})
@@ -204,14 +204,14 @@ class ConfigureCITest(unittest.TestCase):
     def test_get_enabled_jobs_skip(self):
         trailers = {configure_ci.Trailer.SKIP_JOBS: "job1,job2"}
         default_jobs = {"job1", "job2", "job3"}
-        postsubmit_job = next(iter(configure_ci.POSTSUBMIT_ONLY_JOBS))
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modifies = True
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=modified_paths,
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, {"job3"})
@@ -219,47 +219,61 @@ class ConfigureCITest(unittest.TestCase):
     def test_get_enabled_jobs_skip_all(self):
         trailers = {configure_ci.Trailer.SKIP_JOBS: "all"}
         default_jobs = {"job1", "job2", "job3"}
-        postsubmit_job = next(iter(configure_ci.POSTSUBMIT_ONLY_JOBS))
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modifies = True
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=modified_paths,
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, {})
 
     def test_get_enabled_jobs_extra(self):
-        postsubmit_job = next(iter(configure_ci.POSTSUBMIT_ONLY_JOBS))
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         trailers = {configure_ci.Trailer.EXTRA_JOBS: postsubmit_job}
         default_jobs = {"job1", "job2", "job3"}
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modifies = True
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=modified_paths,
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, all_jobs)
 
     def test_get_enabled_jobs_exactly(self):
-        postsubmit_job = next(iter(configure_ci.POSTSUBMIT_ONLY_JOBS))
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         trailers = {configure_ci.Trailer.EXACTLY_JOBS: postsubmit_job}
         default_jobs = {"job1", "job2", "job3"}
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
-        modifies = True
+        modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
-            modifies=modifies,
+            modified_paths=modified_paths,
             is_pr=is_pr,
         )
         self.assertCountEqual(jobs, {postsubmit_job})
+
+    def test_get_enabled_jobs_metal(self):
+        trailers = {}
+        all_jobs = {"job1"}
+        is_pr = True
+        modified_paths = ["runtime/src/iree/hal/drivers/metal/file"]
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modified_paths=modified_paths,
+            is_pr=is_pr,
+        )
+        expected_jobs = {"job1", "build_test_all_macos_arm64"}
+        self.assertCountEqual(jobs, expected_jobs)
 
     def test_parse_path_from_workflow_ref(self):
         path = configure_ci.parse_path_from_workflow_ref(

@@ -32,7 +32,6 @@ iree_lit_test_suite(
     "layout_slices.mlir"
     "materialize_builtins.mlir"
     "materialize_copy_on_write.mlir"
-    "outline_constants.mlir"
     "pack_allocations.mlir"
     "pack_constants.mlir"
     "pack_dispatch_operands.mlir"
