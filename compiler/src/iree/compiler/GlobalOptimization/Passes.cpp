@@ -12,63 +12,14 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
-static llvm::cl::opt<bool> clDemoteI64ToI32(
-    "iree-global-opt-demote-i64-to-i32",
-    llvm::cl::desc("Converts all i64 ops and values into i32 counterparts "
-                   "unconditionally before global optimization."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clDemoteF32ToF16(
-    "iree-global-opt-demote-f32-to-f16",
-    llvm::cl::desc("Converts all f32 ops and values into f16 counterparts "
-                   "unconditionally before global optimization."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clPromoteBF16ToF32(
-    "iree-global-opt-promote-bf16-to-f32",
-    llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts "
-                   "unconditionally before global optimization."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clPromoteF16ToF32(
-    "iree-global-opt-promote-f16-to-f32",
-    llvm::cl::desc("Converts all f16 ops and values into f32 counterparts "
-                   "unconditionally before global optimization."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clDemoteF64ToF32(
-    "iree-global-opt-demote-f64-to-f32",
-    llvm::cl::desc("Converts all f64 ops and values into f32 counterparts "
-                   "unconditionally before global optimization."),
-    llvm::cl::init(true));
-
 namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
-
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
-  // ML frontends have very uneven support for user-controlled types _and_ users
-  // tend to use types not well suited for the work they are doing. These
-  // demotions/promotions allow users to change the types after lowering out of
-  // the frontends. It'll always be better to do this higher up in the stack
-  // as these kind of blanket conversions have corner cases and potential
-  // accuracy/precision losses beyond what the user may expect.
-  if (clDemoteF64ToF32) {
-    mainPassManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
-  }
-  if (clDemoteF32ToF16) {
-    mainPassManager.addPass(IREE::Util::createDemoteF32ToF16Pass());
-  }
-  if (clPromoteF16ToF32) {
-    mainPassManager.addPass(IREE::Util::createPromoteF16ToF32Pass());
-  }
-  if (clDemoteI64ToI32) {
-    mainPassManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
-  }
-  if (clPromoteBF16ToF32) {
-    mainPassManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
-  }
-
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(mainPassManager)
       .addPass(IREE::Flow::createRemoveZeroExtentTensorsPass)
