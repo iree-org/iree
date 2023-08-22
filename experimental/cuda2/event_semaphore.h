@@ -43,7 +43,7 @@ iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_signal(
     CUevent* out_event);
 
 // Acquires a timepoint to wait the timeline to reach at least the given
-// |min_value| on the device The underlying CUDA event is written into
+// |min_value| on the device. The underlying CUDA event is written into
 // |out_event| for interacting with CUDA APIs.
 iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t min_value,
