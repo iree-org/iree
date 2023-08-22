@@ -531,7 +531,7 @@ static iree_hal_vulkan_device_t* iree_hal_vulkan_device_cast(
 IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->flags = IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR;
+  out_options->flags = 0;
   out_options->large_heap_block_size = 64 * 1024 * 1024;
 }
 

@@ -42,7 +42,7 @@ IREE_FLAG(bool, vulkan_sparse_residency, true,
 IREE_FLAG(
     bool, vulkan_dedicated_compute_queue, false,
     "Use a dedicated queue with VK_QUEUE_COMPUTE_BIT for dispatch workloads.");
-IREE_FLAG(bool, vulkan_vma_allocator, true,
+IREE_FLAG(bool, vulkan_vma_allocator, false,
           "Whether to use the VMA allocator instead of native Vulkan API "
           "memory allocations.");
 IREE_FLAG(
