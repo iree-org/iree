@@ -47,6 +47,10 @@ using namespace iree::hal::vulkan;
 // avoid introducing a backdoor.
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
 
+#if !defined(IREE_PLATFORM_WINDOWS)
+#include <dlfcn.h>
+#endif  // IREE_PLATFORM_WINDOWS
+
 // NOTE: C API, see https://renderdoc.org/docs/in_application_api.html.
 // When compiled in the API will no-op itself if not running under a RenderDoc
 // capture context (renderdoc.dll/so already loaded).
