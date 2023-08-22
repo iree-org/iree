@@ -251,7 +251,7 @@ static LogicalResult tryRaiseToView(linalg::GenericOp linalgOp,
   if (!blockArg)
     return failure();
   // Check if the block argument is an argument of the linalgOp.
-  if (blockArg.getOwner() == linalgOp.getBody())
+  if (blockArg.getOwner() != linalgOp.getBody())
     return failure();
   // Check that the block arguement corresponds to the input.
   if (blockArg.getArgNumber() != 0)
