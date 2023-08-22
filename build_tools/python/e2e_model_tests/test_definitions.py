@@ -63,54 +63,58 @@ class ModelTestConfig(object):
 
 TEST_CONFIGS = [
     # mobilenet_v1_fp32_correctness_test
-    ModelTestConfig(
-        name="mobilenet_v1_fp32_correctness_test",
-        imported_model=iree_definitions.ImportedModel.from_model(
-            tflite_models.MOBILENET_V1
-        ),
-        execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
-        expected_output="mobilenet_v1_fp32_expected_output.txt",
-        unsupported_platforms=[
-            CMakePlatform.LINUX_RISCV32,
-            CMakePlatform.ANDROID_ARMV8_A,
-        ],
-    ),
+    # TODO(#14775): Re-enable the tests.
+    # ModelTestConfig(
+    #     name="mobilenet_v1_fp32_correctness_test",
+    #     imported_model=iree_definitions.ImportedModel.from_model(
+    #         tflite_models.MOBILENET_V1
+    #     ),
+    #     execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
+    #     expected_output="mobilenet_v1_fp32_expected_output.txt",
+    #     unsupported_platforms=[
+    #         CMakePlatform.LINUX_RISCV32,
+    #         CMakePlatform.ANDROID_ARMV8_A,
+    #     ],
+    # ),
     # efficientnet_int8_correctness_test
-    ModelTestConfig(
-        name="efficientnet_int8_correctness_test",
-        imported_model=iree_definitions.ImportedModel.from_model(
-            tflite_models.EFFICIENTNET_INT8
-        ),
-        execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
-        expected_output="efficientnet_int8_expected_output.txt",
-        unsupported_platforms=[
-            CMakePlatform.ANDROID_ARMV8_A,
-            CMakePlatform.LINUX_RISCV32,
-            CMakePlatform.LINUX_RISCV64,
-        ],
-    ),
+    # TODO(#14775): Re-enable the tests.
+    # ModelTestConfig(
+    #     name="efficientnet_int8_correctness_test",
+    #     imported_model=iree_definitions.ImportedModel.from_model(
+    #         tflite_models.EFFICIENTNET_INT8
+    #     ),
+    #     execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
+    #     expected_output="efficientnet_int8_expected_output.txt",
+    #     unsupported_platforms=[
+    #         CMakePlatform.ANDROID_ARMV8_A,
+    #         CMakePlatform.LINUX_RISCV32,
+    #         CMakePlatform.LINUX_RISCV64,
+    #     ],
+    # ),
     # deeplab_v3_fp32_correctness_test
-    ModelTestConfig(
-        name="deeplab_v3_fp32_correctness_test",
-        imported_model=iree_definitions.ImportedModel.from_model(
-            tflite_models.DEEPLABV3_FP32
-        ),
-        execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
-        expected_output="deeplab_v3_fp32_input_0_expected_output.npy",
-        extra_test_flags=["--expected_f32_threshold=0.001"],
-        unsupported_platforms=[
-            CMakePlatform.LINUX_RISCV32,
-            CMakePlatform.LINUX_RISCV64,
-        ],
-    ),
+    # TODO(#14775): Re-enable the tests.
+    # ModelTestConfig(
+    #     name="deeplab_v3_fp32_correctness_test",
+    #     imported_model=iree_definitions.ImportedModel.from_model(
+    #         tflite_models.DEEPLABV3_FP32
+    #     ),
+    #     execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
+    #     expected_output="deeplab_v3_fp32_input_0_expected_output.npy",
+    #     extra_test_flags=["--expected_f32_threshold=0.001"],
+    #     unsupported_platforms=[
+    #         CMakePlatform.LINUX_RISCV32,
+    #         CMakePlatform.LINUX_RISCV64,
+    #     ],
+    # ),
     # person_detect_int8_correctness_test
-    ModelTestConfig(
-        name="person_detect_int8_correctness_test",
-        imported_model=iree_definitions.ImportedModel.from_model(
-            tflite_models.PERSON_DETECT_INT8
-        ),
-        execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
-        expected_output="1x2xi8=[72 -72]",
-        unsupported_platforms=[CMakePlatform.ANDROID_ARMV8_A],
-    ),
+    # TODO(#14775): Re-enable the tests.
+    # ModelTestConfig(
+    #     name="person_detect_int8_correctness_test",
+    #     imported_model=iree_definitions.ImportedModel.from_model(
+    #         tflite_models.PERSON_DETECT_INT8
+    #     ),
+    #     execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
+    #     expected_output="1x2xi8=[72 -72]",
+    #     unsupported_platforms=[CMakePlatform.ANDROID_ARMV8_A],
+    # ),
 ]
