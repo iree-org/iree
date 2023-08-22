@@ -215,6 +215,11 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
           VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME);
 
+  // VK_KHR_buffer_device_address:
+  // Promoted to core in Vulkan 1.2 but still an extension in 1.1.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+
   //===--------------------------------------------------------------------===//
   // Vulkan forward-compatibility shims
   //===--------------------------------------------------------------------===//
@@ -911,9 +916,20 @@ iree_status_t iree_hal_vulkan_device_create(
   dispatch_queue_info.pQueuePriorities = dispatch_queue_priorities.data();
 
   // Collect supported physical device features.
-  VkPhysicalDeviceFeatures physical_device_features;
-  instance_syms->vkGetPhysicalDeviceFeatures(physical_device,
-                                             &physical_device_features);
+  VkPhysicalDeviceFeatures2 available_features2;
+  memset(&available_features2, 0, sizeof(available_features2));
+  available_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  VkPhysicalDeviceBufferDeviceAddressFeatures
+      available_buffer_device_address_features;
+  memset(&available_buffer_device_address_features, 0,
+         sizeof(available_buffer_device_address_features));
+  available_buffer_device_address_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+  available_features2.pNext = &available_buffer_device_address_features;
+  instance_syms->vkGetPhysicalDeviceFeatures2(physical_device,
+                                              &available_features2);
+  const VkPhysicalDeviceFeatures* available_features =
+      &available_features2.features;
 
   // Create device and its queues.
   VkDeviceCreateInfo device_create_info;
@@ -927,12 +943,12 @@ iree_status_t iree_hal_vulkan_device_create(
   device_create_info.pQueueCreateInfos = queue_create_info.data();
   device_create_info.pEnabledFeatures = NULL;
 
-  VkPhysicalDeviceFeatures2 features2;
-  memset(&features2, 0, sizeof(features2));
-  features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  device_create_info.pNext = &features2;
-  if (physical_device_features.shaderInt64) {
-    features2.features.shaderInt64 = VK_TRUE;
+  VkPhysicalDeviceFeatures2 enabled_features2;
+  memset(&enabled_features2, 0, sizeof(enabled_features2));
+  enabled_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  device_create_info.pNext = &enabled_features2;
+  if (available_features->shaderInt64) {
+    enabled_features2.features.shaderInt64 = VK_TRUE;
   }
 
   iree_hal_vulkan_features_t enabled_features = 0;
@@ -946,37 +962,52 @@ iree_status_t iree_hal_vulkan_device_create(
 
   if (iree_all_bits_set(requested_features,
                         IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING) &&
-      physical_device_features.sparseBinding) {
-    features2.features.sparseBinding = VK_TRUE;
+      available_features->sparseBinding) {
+    enabled_features2.features.sparseBinding = VK_TRUE;
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING;
   }
   if (iree_all_bits_set(
           requested_features,
           IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED) &&
-      physical_device_features.sparseResidencyBuffer &&
-      physical_device_features.sparseResidencyAliased) {
-    features2.features.sparseResidencyBuffer = VK_TRUE;
-    features2.features.sparseResidencyAliased = VK_TRUE;
+      available_features->sparseResidencyBuffer &&
+      available_features->sparseResidencyAliased) {
+    enabled_features2.features.sparseResidencyBuffer = VK_TRUE;
+    enabled_features2.features.sparseResidencyAliased = VK_TRUE;
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED;
   }
 
   if (iree_all_bits_set(requested_features,
                         IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS)) {
-    if (physical_device_features.robustBufferAccess != VK_TRUE) {
+    if (available_features->robustBufferAccess != VK_TRUE) {
       return iree_make_status(
           IREE_STATUS_UNAVAILABLE,
-          "Robust buffer access not supported by physical device");
+          "robust buffer access not supported by physical device");
     }
-    features2.features.robustBufferAccess = VK_TRUE;
+    enabled_features2.features.robustBufferAccess = VK_TRUE;
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS;
+  }
+
+  VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features;
+  if (iree_all_bits_set(
+          requested_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES) &&
+      available_buffer_device_address_features.bufferDeviceAddress) {
+    memset(&buffer_device_address_features, 0,
+           sizeof(buffer_device_address_features));
+    buffer_device_address_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    buffer_device_address_features.pNext = enabled_features2.pNext;
+    enabled_features2.pNext = &buffer_device_address_features;
+    buffer_device_address_features.bufferDeviceAddress = true;
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES;
   }
 
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
   memset(&semaphore_features, 0, sizeof(semaphore_features));
   semaphore_features.sType =
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
-  semaphore_features.pNext = features2.pNext;
-  features2.pNext = &semaphore_features;
+  semaphore_features.pNext = enabled_features2.pNext;
+  enabled_features2.pNext = &semaphore_features;
   semaphore_features.timelineSemaphore = VK_TRUE;
 
   VkPhysicalDeviceHostQueryResetFeaturesEXT host_query_reset_features;
@@ -984,8 +1015,8 @@ iree_status_t iree_hal_vulkan_device_create(
     memset(&host_query_reset_features, 0, sizeof(host_query_reset_features));
     host_query_reset_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES_EXT;
-    host_query_reset_features.pNext = features2.pNext;
-    features2.pNext = &host_query_reset_features;
+    host_query_reset_features.pNext = enabled_features2.pNext;
+    enabled_features2.pNext = &host_query_reset_features;
     host_query_reset_features.hostQueryReset = VK_TRUE;
   }
 
@@ -994,8 +1025,8 @@ iree_status_t iree_hal_vulkan_device_create(
     memset(&subgroup_control_features, 0, sizeof(subgroup_control_features));
     subgroup_control_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES;
-    subgroup_control_features.pNext = features2.pNext;
-    features2.pNext = &subgroup_control_features;
+    subgroup_control_features.pNext = enabled_features2.pNext;
+    enabled_features2.pNext = &subgroup_control_features;
     subgroup_control_features.subgroupSizeControl = VK_TRUE;
   }
 
@@ -1134,16 +1165,25 @@ static iree_status_t iree_hal_vulkan_device_trim(
 static iree_status_t iree_hal_vulkan_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value) {
-  // iree_hal_vulkan_device_t* device =
-  //     iree_hal_vulkan_device_cast(base_device);
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   *out_value = 0;
 
   if (iree_string_view_equal(category,
                              iree_make_cstring_view("hal.executable.format"))) {
-    *out_value =
-        iree_string_view_equal(key, iree_make_cstring_view("vulkan-spirv-fb"))
-            ? 1
-            : 0;
+    if (iree_string_view_equal(key,
+                               iree_make_cstring_view("vulkan-spirv-fb"))) {
+      // Base SPIR-V always supported.
+      *out_value = 1;
+    } else if (iree_string_view_equal(
+                   key, iree_make_cstring_view("vulkan-spirv-fb-ptr"))) {
+      // SPIR-V with device addresses is optionally supported based on whether
+      // we have device feature support.
+      *out_value = iree_all_bits_set(
+                       device->logical_device->enabled_features(),
+                       IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES)
+                       ? 1
+                       : 0;
+    }
     return iree_ok_status();
   }
 
