@@ -25,8 +25,6 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-void buildFlowPreprocessingTransformPassPipeline(OpPassManager &passManager);
-
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
 //

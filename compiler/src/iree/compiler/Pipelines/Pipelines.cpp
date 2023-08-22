@@ -193,12 +193,6 @@ void buildIREEVMTransformPassPipeline(
     if (compileTo == IREEVMPipelinePhase::Preprocessing)
       return; // early-exit
 
-    if (compileFrom < IREEVMPipelinePhase::FlowPreprocessing) { // late-entry
-      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "FlowPreprocessing");
-      IREE::Flow::buildFlowPreprocessingTransformPassPipeline(passManager);
-      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "FlowPreprocessing");
-    }
-
     if (compileFrom < IREEVMPipelinePhase::GlobalOptimization) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimization");
       GlobalOptimization::buildGlobalOptimizationPassPipeline(passManager,

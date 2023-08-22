@@ -21,6 +21,7 @@ iree_cc_library(
     LLVMSupport
     MLIRFuncDialect
     MLIRIR
+    MLIRLinalgTransforms
     MLIRPass
     MLIRTransforms
     iree::compiler::Dialect::Flow::Transforms
