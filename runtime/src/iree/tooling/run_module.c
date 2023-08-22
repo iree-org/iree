@@ -111,6 +111,7 @@ static iree_status_t iree_tooling_create_run_context(
     if (iree_status_is_ok(status)) {
       status = iree_tooling_module_list_push_back(&module_list, module);
     }
+    iree_vm_module_release(module);  // Now tracked in module_list.
   }
   if (!iree_status_is_ok(status)) {
     iree_tooling_module_list_reset(&module_list);
