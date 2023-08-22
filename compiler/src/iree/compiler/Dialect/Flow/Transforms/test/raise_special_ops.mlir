@@ -186,23 +186,6 @@ func.func @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
 //       CHECK:   %[[RESULT:.+]] = linalg.matmul_transpose_b
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 //       CHECK:   return %[[RESULT]]
-// -----
-
-#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-func.func @test(%arg0: tensor<1x1x?x?xf32>, %arg1: tensor<1x1x?x?xf32>) -> tensor<1x1x?x?xf32> {
-  %c0 = arith.constant 0 : index
-  // CHECK: linalg.generic
-  // CHECK:  (%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-  // CHECK:  linalg.yield %[[IN]] : f32
-  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} outs(%arg1 : tensor<1x1x?x?xf32>) {
-  ^bb0(%out: f32):
-    %1 = linalg.index 2 : index
-    %2 = linalg.index 3 : index
-    %extracted = tensor.extract %arg0[%c0, %c0, %1, %2] : tensor<1x1x?x?xf32>
-    linalg.yield %extracted : f32
-  } -> tensor<1x1x?x?xf32>
-  return %0 : tensor<1x1x?x?xf32>
-}
 
 // -----
 
@@ -217,4 +200,38 @@ func.func @test(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) -> tensor<5120
     linalg.yield %extracted : f32
   } -> tensor<5120xf32>
   return %0 : tensor<5120xf32>
+}
+
+// -----
+
+// This currently should not be raised as the operation does not remain
+// elementwise after raising the tensor.extract to input.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @test(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  // CHECK: linalg.generic
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
+  ^bb0(%out: f32):
+    %i1 = linalg.index 0 : index
+    %i2 = linalg.index 1 : index
+    %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<128x128x128xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<64x64xf32>
+  return %0 : tensor<64x64xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @test(%A : tensor<64x64x64xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
+  ^bb0(%out: f32):
+    %i1 = linalg.index 0 : index
+    %i2 = linalg.index 1 : index
+    // CHECK: tensor.extract_slice
+    %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<64x64x64xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<64x64xf32>
+  return %0 : tensor<64x64xf32>
 }

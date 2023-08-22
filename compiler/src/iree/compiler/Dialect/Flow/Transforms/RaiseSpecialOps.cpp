@@ -87,6 +87,9 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
   if (!isElementwise(linalgOp)) {
     return failure();
   }
+  if (!llvm::hasSingleElement(linalgOp.getResults())) {
+    return failure();
+  }
 
   // Find a tensor.extract op in the linalgOp body.
   auto extractOps = linalgOp.getBody()->getOps<tensor::ExtractOp>();
@@ -94,10 +97,17 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
     return failure();
   }
   tensor::ExtractOp extractOp = *extractOps.begin();
+  auto resultType = dyn_cast<TensorType>(linalgOp.getResult(0).getType());
+  if (!resultType) {
+    return failure();
+  }
+
+  ArrayRef<int64_t> sourceShape = extractOp.getTensor().getType().getShape();
+  ArrayRef<int64_t> resultShape = resultType.getShape();
 
   // Raise the tensor.extract op to an input.
   SmallVector<AffineExpr> exprs;
-  for (Value indexValue : extractOp.getIndices()) {
+  for (auto [idx, indexValue] : llvm::enumerate(extractOp.getIndices())) {
     // For raising, the indexing value must be one of the following:
     //    1. A constant value.
     //    2. A linalg.index.
@@ -111,6 +121,18 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
     }
     // 2. The indexing value is a linalg.index.
     if (auto indexOp = indexValue.getDefiningOp<linalg::IndexOp>()) {
+      // Make sure that for this index, the size of the input and output
+      // match and are not dynamic. We need this to maintain the op to be
+      // elementwise.
+      // TODO: This restriction can be relaxed by adding a extract_slice op
+      // on the `source` tensor. This is not same as raising the whole
+      // operation to an extract_slice, as there can be permutations and
+      // projections involved.
+      if (sourceShape[idx] == ShapedType::kDynamic ||
+          resultShape[indexOp.getDim()] == ShapedType::kDynamic ||
+          sourceShape[idx] != resultShape[indexOp.getDim()]) {
+        return failure();
+      }
       exprs.push_back(
           getAffineDimExpr(indexOp.getDim(), rewriter.getContext()));
       continue;
