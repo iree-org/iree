@@ -314,7 +314,7 @@ jobs:
               --env CTEST_PARALLEL_LEVEL=2 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:1717431fd46b8b1e96d95fa72508e3e3eacb5c95f1245b9b7dbeec23ae823d02 \
+              gcr.io/iree-oss/nvidia@sha256:de6e4453614aa48059fd611d7e7255f4d6ac27ac29a47aabdc04191ec1758533 \
               bash -euo pipefail -c \
                 "./build_tools/scripts/check_cuda.sh
                 ./build_tools/scripts/check_vulkan.sh
@@ -362,7 +362,7 @@ jobs:
               --env CTEST_PARALLEL_LEVEL=4 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:1717431fd46b8b1e96d95fa72508e3e3eacb5c95f1245b9b7dbeec23ae823d02 \
+              gcr.io/iree-oss/nvidia@sha256:de6e4453614aa48059fd611d7e7255f4d6ac27ac29a47aabdc04191ec1758533 \
               bash -euo pipefail -c \
                 "./build_tools/scripts/check_cuda.sh
                 ./build_tools/scripts/check_vulkan.sh
