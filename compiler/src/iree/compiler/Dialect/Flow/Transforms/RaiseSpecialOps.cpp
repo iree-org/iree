@@ -79,24 +79,21 @@ std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
 /// Matches a linalg.generic operation reading data from a tensor `source` using
 /// tensor.extract, and raises the `source` tensor to an input of the linalg
 /// operation.
-static LogicalResult raiseTensorExtractToInput(linalg::GenericOp linalgOp,
-                                               RewriterBase &rewriter) {
-  if (!linalgOp.hasTensorSemantics())
+static FailureOr<linalg::GenericOp>
+raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
+  if (!linalgOp.hasTensorSemantics()) {
     return failure();
-  if (!isElementwise(linalgOp))
+  }
+  if (!isElementwise(linalgOp)) {
     return failure();
+  }
 
   // Find a tensor.extract op in the linalgOp body.
-  tensor::ExtractOp extractOp;
-  linalgOp.walk([&](tensor::ExtractOp op) {
-    if (extractOp)
-      return WalkResult::interrupt();
-    extractOp = op;
-    return WalkResult::advance();
-  });
-
-  if (!extractOp)
+  auto extractOps = linalgOp.getBody()->getOps<tensor::ExtractOp>();
+  if (!llvm::hasSingleElement(extractOps)) {
     return failure();
+  }
+  tensor::ExtractOp extractOp = *extractOps.begin();
 
   // Raise the tensor.extract op to an input.
   SmallVector<AffineExpr> exprs;
@@ -130,23 +127,26 @@ static LogicalResult raiseTensorExtractToInput(linalg::GenericOp linalgOp,
   newInputs.insert(newInputs.begin(), extractOp.getTensor());
   SmallVector<Attribute> newIndexingMaps;
   newIndexingMaps.push_back(AffineMapAttr::get(indexingMap));
-  for (AffineMap map : linalgOp.getIndexingMapsArray())
+  for (AffineMap map : linalgOp.getIndexingMapsArray()) {
     newIndexingMaps.push_back(AffineMapAttr::get(map));
+  }
 
   auto bodyBuilder = [&](OpBuilder &builder, Location loc, ValueRange args) {
     // Create an IR mapping from old block arguements to new ones.
     IRMapping mapper;
     ArrayRef<BlockArgument> oldArgs = linalgOp.getBody()->getArguments();
     // Map i^th old argument to (i + 1)^th new argument.
-    for (unsigned i = 0; i < oldArgs.size(); ++i)
+    for (unsigned i = 0; i < oldArgs.size(); ++i) {
       mapper.map(oldArgs[i], args[i + 1]);
+    }
     // Clone the body of the linalgOp.
     for (Operation &op : linalgOp.getBody()->getOperations()) {
       // Replace the extractOp with the first block argument.
-      if (&op == extractOp)
+      if (&op == extractOp) {
         mapper.map(op.getResult(0), args[0]);
-      else
+      } else {
         builder.clone(op, mapper);
+      }
     }
   };
 
@@ -158,8 +158,7 @@ static LogicalResult raiseTensorExtractToInput(linalg::GenericOp linalgOp,
       linalgOp.getLibraryCallAttr(), bodyBuilder);
 
   rewriter.replaceOp(linalgOp, newLinalgOp.getResults());
-
-  return success();
+  return newLinalgOp;
 }
 
 /// Given a linalg.generic operation, and input/output tensors with their
@@ -171,15 +170,18 @@ static LogicalResult tryRaiseToExtractSlice(AffineMap inputIndexingMap,
                                             linalg::GenericOp linalgOp,
                                             RewriterBase &rewriter) {
   // Output shape must be smaller than input shape.
-  if (outputIndexingMap.getNumResults() >= inputIndexingMap.getNumResults())
+  if (outputIndexingMap.getNumResults() >= inputIndexingMap.getNumResults()) {
     return failure();
+  }
   // Output map should be identity.
-  if (!outputIndexingMap.isIdentity())
+  if (!outputIndexingMap.isIdentity()) {
     return failure();
+  }
 
   auto outType = dyn_cast<RankedTensorType>(output.getType());
-  if (!outType)
+  if (!outType) {
     return failure();
+  }
   ArrayRef<int64_t> outShape = outType.getShape();
 
   // Try to match each output dimension to an input dimension, in order.
@@ -207,9 +209,10 @@ static LogicalResult tryRaiseToExtractSlice(AffineMap inputIndexingMap,
       continue;
     }
     // Assume that the constant access is a rank reducing access.
-    if (expr.isa<AffineConstantExpr>() &&
-        expr.cast<AffineConstantExpr>().getValue() == 0) {
-      offsets.push_back(zero);
+    if (expr.isa<AffineConstantExpr>()) {
+      IntegerAttr constIdx = rewriter.getI64IntegerAttr(
+          expr.cast<AffineConstantExpr>().getValue());
+      offsets.push_back(constIdx);
       sizes.push_back(one);
       continue;
     }
@@ -218,8 +221,9 @@ static LogicalResult tryRaiseToExtractSlice(AffineMap inputIndexingMap,
   }
 
   // All output dimensions did not match an input dimension.
-  if (currOutDim != outputIndexingMap.getNumResults())
+  if (currOutDim != outputIndexingMap.getNumResults()) {
     return failure();
+  }
 
   // We only support dim expr or a constant expr on the input map, so strides
   // will always be 1.
@@ -234,28 +238,34 @@ static LogicalResult tryRaiseToExtractSlice(AffineMap inputIndexingMap,
 /// tensor, and tries to raise it to a view-like operation on the input tensor.
 static LogicalResult tryRaiseToView(linalg::GenericOp linalgOp,
                                     RewriterBase &rewriter) {
-  if (!linalgOp.hasTensorSemantics())
+  if (!linalgOp.hasTensorSemantics()) {
     return failure();
+  }
 
   // Assume there is only 1 input, and 1 init tensor.
-  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
+  if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1) {
     return failure();
+  }
   OpOperand *inputOperand = linalgOp.getDpsInputOperand(0);
   OpOperand *outputOperand = linalgOp.getDpsInitOperand(0);
 
   // Check if linalg.yield yields a block arguement.
   auto yieldOp = dyn_cast<linalg::YieldOp>(linalgOp.getBody()->getTerminator());
-  if (!yieldOp)
+  if (!yieldOp) {
     return failure();
+  }
   auto blockArg = dyn_cast<BlockArgument>(yieldOp.getOperand(0));
-  if (!blockArg)
+  if (!blockArg) {
     return failure();
+  }
   // Check if the block argument is an argument of the linalgOp.
-  if (blockArg.getOwner() != linalgOp.getBody())
+  if (blockArg.getOwner() != linalgOp.getBody()) {
     return failure();
+  }
   // Check that the block arguement corresponds to the input.
-  if (blockArg.getArgNumber() != 0)
+  if (blockArg.getArgNumber() != 0) {
     return failure();
+  }
 
   Value input = inputOperand->get();
   Value output = outputOperand->get();
@@ -273,6 +283,23 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
   }
 
   void runOnOperation() override {
+    IRRewriter rewriter(&getContext());
+
+    getOperation()->walk([&](linalg::GenericOp op) {
+      rewriter.setInsertionPoint(op);
+
+      // Try raising to tensor.export.
+      FailureOr<linalg::GenericOp> maybeNewOp =
+          raiseTensorExtractToInput(op, rewriter);
+      // Update op if we succeeded.
+      if (succeeded(maybeNewOp)) {
+        op = maybeNewOp.value();
+      }
+
+      // Try raising to a view-like operation.
+      (void)tryRaiseToView(op, rewriter);
+    });
+
     SmallVector<std::pair<linalg::LinalgOp, Value>> softmaxRoots;
     SmallVector<std::pair<linalg::MatmulOp, Value>> transposeMatmulRoots;
     getOperation()->walk([&](linalg::LinalgOp op) {
@@ -291,8 +318,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
         }
       }
     });
-
-    IRRewriter rewriter(&getContext());
 
     for (std::pair<linalg::LinalgOp, Value> softmax : softmaxRoots) {
       linalg::LinalgOp op = softmax.first;
@@ -313,18 +338,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
           matmulOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
     }
-
-    // Raise tensor.export.
-    getOperation()->walk([&](linalg::GenericOp op) {
-      rewriter.setInsertionPoint(op);
-      (void)raiseTensorExtractToInput(op, rewriter);
-    });
-
-    // Raise linalg.generic view-like ops.
-    getOperation()->walk([&](linalg::GenericOp op) {
-      rewriter.setInsertionPoint(op);
-      (void)tryRaiseToView(op, rewriter);
-    });
   }
 };
 
