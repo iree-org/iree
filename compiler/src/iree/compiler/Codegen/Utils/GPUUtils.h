@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/PatternMatch.h"
 namespace mlir {
 namespace iree_compiler {
 
@@ -101,16 +100,6 @@ Value packVectorToSupportedWidth(Location loc, OpBuilder &builder, Value input);
 /// (i.e i32 -> vector<4xi8> or f32 -> vector<2xf16>)
 Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
                      VectorType targetVecType);
-
-// A `dealloc` is converted into a call to `free` on the underlying data buffer.
-// The memref descriptor being an SSA value, there is no need to clean it up
-// in any way.
-struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(memref::DeallocOp op,
-                                PatternRewriter &rewriter) const override;
-};
 
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
