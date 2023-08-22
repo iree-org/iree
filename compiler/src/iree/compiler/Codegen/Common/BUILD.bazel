@@ -76,6 +76,8 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "TransformDialectInterpreterPass",
     srcs = [
+        "CommonDialectRegistration.cpp",
+        "MaterializeUserConfigs.cpp",
         "TransformDialectInterpreterPass.cpp",
     ],
     deps = [

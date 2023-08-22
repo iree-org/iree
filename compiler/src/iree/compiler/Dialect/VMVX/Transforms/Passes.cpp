@@ -34,7 +34,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
   // Tensor-level optimization, kernel dispatch and lower to buffers.
   // ---------------------------------------------------------------------------
-  addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
+  addCommonTargetExecutablePreprocessingPasses(passManager);
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createCPUMaterializeEncodingPass());
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type

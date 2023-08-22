@@ -44,12 +44,6 @@ constexpr int kMaxVectorNumBits = 128;
 namespace mlir {
 namespace iree_compiler {
 
-llvm::cl::opt<std::string> clSPIRVTransformDialectFileName(
-    "iree-spirv-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
-
 llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
     "iree-spirv-enable-transform-dialect-jit",
     llvm::cl::desc("Enable the usage of the transform dialect JIT"),
@@ -1617,20 +1611,13 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult
 setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
                           const spirv::TargetEnv &targetEnv) {
-  if (!clSPIRVEnableTransformDialectJit &&
-      clSPIRVTransformDialectFileName.empty()) {
+  if (!clSPIRVEnableTransformDialectJit) {
     return failure();
   }
 
   MLIRContext *context = entryPoint.getContext();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       context, CodeGenPipeline::TransformDialectCodegen);
-
-  // Prefer a transform script file if provided.
-  if (!clSPIRVTransformDialectFileName.empty()) {
-    LLVM_DEBUG(llvm::dbgs() << "using user specified transform dialect...\n");
-    return setTranslationInfo(entryPoint, translationInfo);
-  }
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
@@ -1848,6 +1835,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   for (auto funcOp : module.getOps<func::FuncOp>()) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp)
+      continue;
+    if (getTranslationInfo(exportOp))
       continue;
 
     if (failed(setConfigForKernel(targetEnv, exportOp, funcOp))) {

@@ -51,6 +51,8 @@ iree_cc_library(
   NAME
     TransformDialectInterpreterPass
   SRCS
+    "CommonDialectRegistration.cpp"
+    "MaterializeUserConfigs.cpp"
     "TransformDialectInterpreterPass.cpp"
   DEPS
     ::PassHeaders

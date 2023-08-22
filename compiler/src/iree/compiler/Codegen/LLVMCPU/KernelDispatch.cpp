@@ -89,26 +89,10 @@ static llvm::cl::opt<bool>
                         llvm::cl::init(true));
 
 // Non-static options are used in other places.
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
-    "iree-codegen-llvmcpu-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
 llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
     "iree-codegen-llvmcpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag(
-    "iree-codegen-llvmcpu-transform-dialect-debug-payload-tag",
-    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
-                   "payload root operation"),
-    llvm::cl::init(""));
-
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag(
-    "iree-codegen-llvmcpu-transform-dialect-debug-transform-tag",
-    llvm::cl::desc(
-        "tag attribute value for the transform dialect transform op container"),
-    llvm::cl::init(""));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -2458,18 +2442,6 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       continue;
     if (getTranslationInfo(exportOp))
       continue;
-
-    // If using the transform dialect with a script file, intercept early.
-    if (!clCPUCodegenTransformDialectFileName.empty()) {
-      assert(!clCPUEnableTransformDialectJit &&
-             "Can't use both transform dialect interpreted and jitted modes");
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(),
-          IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-      if (failed(setTranslationInfo(funcOp, translationInfo)))
-        return failure();
-      continue;
-    }
 
     // For now pick the default for functions with control flow, cause
     // the currently built pipelines dont work so well with control flow.

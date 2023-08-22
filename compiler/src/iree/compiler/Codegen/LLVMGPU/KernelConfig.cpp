@@ -33,28 +33,11 @@ static constexpr StringLiteral kCudaTarget = "cuda";
 static constexpr StringLiteral kRocmTarget = "rocm";
 namespace mlir {
 namespace iree_compiler {
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
-    "iree-codegen-llvmgpu-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(true));
-
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
-    "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
-    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
-                   "payload root operation"),
-    llvm::cl::init(""));
-
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
-    "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
-    llvm::cl::desc(
-        "tag attribute value for the transform dialect transform op container"),
-    llvm::cl::init(""));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -345,7 +328,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             std::move(workgroupTileSizes)); // Workgroup level.
         return setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes, pipeline, workgroupSize,
-            /*subgroupSize=*/std::nullopt, softwarePipelineDepth);
+            /*subgroupSize=*/std::nullopt, softwarePipelineDepth,
+            /*softwarePipelineStoreStage=*/1);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
@@ -717,29 +701,17 @@ static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   return std::nullopt;
 }
 
-/// Set configuration for reduction transform dialect based strategy.
+/// Set configuration for transform dialect based strategies.
 static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
                                                Operation *op,
                                                const TargetInfo &targetInfo) {
-  if (!clGPUCodegenTransformDialectFileName.empty() &&
-      clGPUEnableTransformDialectJit) {
-    return entryPoint.emitError()
-           << "option clash in transform dialect lowering config: the filename "
-              "cannot be provided when the jit option is set";
-  }
-
-  if (!clGPUEnableTransformDialectJit &&
-      clGPUCodegenTransformDialectFileName.empty()) {
+  if (!clGPUEnableTransformDialectJit) {
     return failure();
   }
 
-  // Transform script file provided, use it.
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPoint.getContext(),
       IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-  if (!clGPUCodegenTransformDialectFileName.empty()) {
-    return setTranslationInfo(entryPoint, translationInfo);
-  }
 
   // TODO: unify the target informations into one structure.
   iree_compiler::gpu::GPUModel gpuModel;
@@ -1193,17 +1165,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
       return success();
     }
-  }
-
-  // If using the transform dialect, call the proper pipeline.
-  assert((clGPUCodegenTransformDialectFileName.empty() ||
-          !clGPUEnableTransformDialectJit) &&
-         "Can't use both transform dialect interpreted and jitted modes");
-  if (clGPUCodegenTransformDialectFileName.size() > 0) {
-    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        entryPointFn.getContext(),
-        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-    return setTranslationInfo(entryPointFn, translationInfo);
   }
 
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {

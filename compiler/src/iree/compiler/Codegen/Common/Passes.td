@@ -331,6 +331,15 @@ def LowerUKernelOpsToCalls :
   let constructor = "mlir::iree_compiler::createLowerUKernelOpsToCallsPass()";
 }
 
+def MaterializeUserConfigs :
+    Pass<"iree-codegen-materialize-user-configs", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Sets the lowering configs and translation info from user configs";
+  let constructor = "mlir::iree_compiler::createMaterializeUserConfigsPass()";
+  let dependentDialects = [
+      "transform::TransformDialect"
+  ];
+}
+
 def MemrefCopyToLinalgPass :
     Pass<"iree-codegen-memrefcopy-to-linalg", "func::FuncOp"> {
   let summary = "Convert memref.copy to linalg op";
