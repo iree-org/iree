@@ -1,6 +1,14 @@
 // RUN: iree-opt %s
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  print %arg0 : !transform.any_op
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @print_config(%variant_op: !transform.any_op {transform.consumed}) {
+    transform.print %variant_op {name = "from_config"} : !transform.any_op
+    transform.yield
+  }
+
+  transform.sequence failures(propagate) {
+  ^bb0(%arg0: !transform.any_op):
+    print %arg0 {name = "from_flag"} : !transform.any_op
+    transform.yield
+  }
 }

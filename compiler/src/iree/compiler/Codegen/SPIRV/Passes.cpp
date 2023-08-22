@@ -257,11 +257,14 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 
 extern llvm::cl::opt<std::string> clSPIRVTransformDialectFileName;
 
-void addSPIRVTransformDialectPasses(OpPassManager &passManager) {
+void addSPIRVTransformDialectPasses(OpPassManager &passManager,
+                                    StringAttr codegenSpecFileName) {
   // Give control to the transform dialect.
+  StringRef fileName = codegenSpecFileName == StringAttr()
+                           ? clSPIRVTransformDialectFileName
+                           : codegenSpecFileName.getValue();
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clSPIRVTransformDialectFileName));
+      mlir::iree_compiler::createTransformDialectInterpreterPass(fileName));
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -622,8 +625,9 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
       /*flatten=*/false, /*dropUnitDims=*/false));
 }
 
-void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
-  addSPIRVTransformDialectPasses(pm);
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm,
+                                          StringAttr codegenSpecFileName) {
+  addSPIRVTransformDialectPasses(pm, codegenSpecFileName);
 
   // Run SPIRVVectorize pass additionally to convert vectors into forms needed
   // for SPIR-V.

@@ -10,6 +10,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
 #define GET_ATTRDEF_CLASSES
@@ -99,11 +100,12 @@ ExportConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
+    StringAttr codegenSpecFileName, SymbolRefAttr codegenSpec) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
   return get(context, pipelineAttr, softwarePipelineDepth,
-             softwarePipelineStoreStage);
+             softwarePipelineStoreStage, codegenSpecFileName, codegenSpec);
 }
 
 DispatchLoweringPassPipeline
@@ -114,7 +116,8 @@ TranslationInfoAttr::getDispatchLoweringPassPipeline() {
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
+    StringAttr codegenSpecFileName, SymbolRefAttr codegenSpec) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
@@ -122,6 +125,19 @@ LogicalResult TranslationInfoAttr::verify(
   if (passPipelineValue > IREE::Codegen::DispatchLoweringPassPipeline::None) {
     return emitError() << "invalid pass pipeline value : "
                        << stringifyEnum(passPipeline.getValue());
+  }
+  auto tdPassPipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen;
+  bool hasSpecFile = codegenSpecFileName != StringAttr();
+  bool hasSpecSymbol = codegenSpec != SymbolRefAttr();
+  if ((hasSpecFile || hasSpecSymbol) && passPipelineValue != tdPassPipeline) {
+    return emitError()
+           << "transform dialect codegen spec requires pass pipeline : "
+           << stringifyEnum(tdPassPipeline);
+  }
+  if (hasSpecFile && hasSpecSymbol) {
+    return emitError() << "transform dialect codegen spec and file name are "
+                          "mutually exclusive";
   }
   return success();
 }
@@ -245,7 +261,9 @@ LogicalResult CompilationInfoAttr::verify(
   if (failed(TranslationInfoAttr::verify(
           emitError, translationInfo.getPassPipeline(),
           translationInfo.getSoftwarePipelineDepth(),
-          translationInfo.getSoftwarePipelineStoreStage()))) {
+          translationInfo.getSoftwarePipelineStoreStage(),
+          translationInfo.getCodegenSpecFileName(),
+          translationInfo.getCodegenSpec()))) {
     return failure();
   }
   if (workgroupSize) {
@@ -320,12 +338,62 @@ LogicalResult setDispatchConfig(func::FuncOp entryPoint,
   return success();
 }
 
+static void createIncludeTransformStrategy(func::FuncOp entryPoint,
+                                           SymbolRefAttr strategySymbol) {
+  MLIRContext *ctx = entryPoint.getContext();
+  Location loc = entryPoint.getLoc();
+  OpBuilder b(ctx);
+  b.setInsertionPointAfter(entryPoint);
+  auto topLevelTransformModule = b.create<ModuleOp>(loc);
+  topLevelTransformModule->setAttr(
+      transform::TransformDialect::kWithNamedSequenceAttrName, b.getUnitAttr());
+  Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
+  b.setInsertionPointToStart(&topLevelTransformRegion.front());
+  auto anyOpType = transform::AnyOpType::get(b.getContext());
+
+  // Create the internal named sequence op to be linked against.
+  auto funcTypeAttr =
+      TypeAttr::get(FunctionType::get(ctx, anyOpType, TypeRange{}));
+  auto symVisibility = StringAttr::get(ctx, "public");
+  // Pessimistically assume the handle is consumed as we don't yet know the
+  // contents of the strategy.
+  auto consumedName =
+      StringAttr::get(ctx, transform::TransformDialect::kArgConsumedAttrName);
+  auto argAttrs =
+      ArrayAttr::get(ctx, ArrayRef<Attribute>{b.getDictionaryAttr(
+                              b.getNamedAttr(consumedName, b.getUnitAttr()))});
+  auto resAttrs = ArrayAttr::get(ctx, ArrayRef<Attribute>{});
+  auto namedSequence = b.create<transform::NamedSequenceOp>(
+      loc, TypeRange{}, strategySymbol.getRootReference(), funcTypeAttr,
+      symVisibility, argAttrs, resAttrs);
+  (void)namedSequence;
+
+  // Create the include for the named sequence with the expectation that the
+  // external definition will be linked in later.
+  auto propMode = transform::FailurePropagationMode::Propagate;
+  auto sequence = b.create<transform::SequenceOp>(
+      loc, TypeRange{}, transform::FailurePropagationMode::Propagate, anyOpType,
+      [&](OpBuilder &b, Location loc, Value variantH) {
+        b.create<transform::IncludeOp>(loc, TypeRange{}, strategySymbol,
+                                       propMode, variantH);
+        b.create<transform::YieldOp>(loc);
+      });
+  (void)sequence;
+}
+
 LogicalResult
 setTranslationInfo(func::FuncOp entryPoint,
                    IREE::Codegen::TranslationInfoAttr translationInfo) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
   if (failed(exportOp))
     return failure();
+  // If the codegen spec comes from a symbol reference, we construct the
+  // strategy here and assume the library containing the correct reference to
+  // the strategy is included with the interpreter pipeline.
+  if (translationInfo.getCodegenSpec() != SymbolRefAttr()) {
+    createIncludeTransformStrategy(entryPoint,
+                                   translationInfo.getCodegenSpec());
+  }
   exportOp.value()->setAttr(kTranslationInfoAttrName, translationInfo);
   return success();
 }

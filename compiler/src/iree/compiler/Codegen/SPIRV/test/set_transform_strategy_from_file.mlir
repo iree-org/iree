@@ -1,4 +1,9 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass)))" --iree-spirv-use-transform-dialect=%p/transform_dialect_dummy_spec.mlir | FileCheck %s
+// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass)))" --iree-spirv-use-transform-dialect=%p/transform_dialect_dummy_spec.mlir | FileCheck %s
+// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass)))" --iree-codegen-transform-library-file-name=%p/transform_dialect_dummy_spec.mlir | FileCheck %s --check-prefix=CONFIG
+
+#blank_config = #iree_codegen.lowering_config<tile_sizes = []>
+#translation = #iree_codegen.translation_info<TransformDialectCodegen codegen_spec=@print_config>
+#config = #iree_codegen.compilation_info<lowering_config = #blank_config, translation_info = #translation, workgroup_size = []>
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -21,7 +26,8 @@ hal.executable private @copy_f32 {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      // CHECK: IR printer:
+      // CHECK: IR printer: from_flag
+      // CONFIG: IR printer: from_config
       func.func @copy_f32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
@@ -31,7 +37,7 @@ hal.executable private @copy_f32 {
         %3 = tensor.empty() : tensor<2x2xf32>
         %4 = linalg.generic {
             indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
-            ins(%2 : tensor<2x2xf32>) outs(%3 : tensor<2x2xf32>) {
+            ins(%2 : tensor<2x2xf32>) outs(%3 : tensor<2x2xf32>) attrs = {compilation_info = #config} {
           ^bb0(%arg0: f32, %arg1: f32):
             %5 = math.sqrt %arg0 : f32
             linalg.yield %5 : f32

@@ -192,7 +192,8 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       addSPIRVWinogradVectorizePassPipeline(pipeline);
       break;
     case CodeGenPipeline::TransformDialectCodegen:
-      addSPIRVTransformDialectPassPipeline(pipeline);
+      addSPIRVTransformDialectPassPipeline(
+          pipeline, translationInfo.value().getCodegenSpecFileName());
       break;
     default:
       variantOp.emitOpError("Unsupported pipeline on GPU target.");

@@ -132,7 +132,9 @@ def IREECodegen_TranslationInfoAttr :
   let assemblyFormat = [{
     `<` `` $passPipeline
     (`pipeline_depth` `=` $softwarePipelineDepth^)?
-    (`store_stage` `=` $softwarePipelineStoreStage^)? `>`
+    (`store_stage` `=` $softwarePipelineStoreStage^)?
+    (`codegen_spec_file_name` `=` $codegenSpecFileName^)?
+    (`codegen_spec` `=` $codegenSpec^)? `>`
   }];
 
   let parameters = (ins
@@ -141,12 +143,18 @@ def IREECodegen_TranslationInfoAttr :
     OptionalParameter<"unsigned",
         "The software pipeline depth to be used">:$softwarePipelineDepth,
     DefaultValuedParameter<"unsigned", "1",
-        "The software pipeline stage to place stores">:$softwarePipelineStoreStage
+        "The software pipeline stage to place stores">:$softwarePipelineStoreStage,
+    OptionalParameter<"StringAttr",
+        "The path to the transform dialect codegen spec to be used">:$codegenSpecFileName,
+    OptionalParameter<"SymbolRefAttr",
+        "The symbol pointing to the transform dialect codegen spec to be used">:$codegenSpec
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
         CArg<"unsigned", "0">:$softwarePipelineDepth,
-        CArg<"unsigned", "1">:$softwarePipelineStoreStage)>
+        CArg<"unsigned", "1">:$softwarePipelineStoreStage,
+        CArg<"StringAttr", "{}">:$codegenSpecFileName,
+        CArg<"SymbolRefAttr", "{}">:$codegenSpec)>
   ];
   let extraClassDeclaration = [{
     // Returns the lowering pass pipeline set.

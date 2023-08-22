@@ -48,6 +48,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRParser
     MLIRSupport
+    MLIRTransformDialect
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Utils

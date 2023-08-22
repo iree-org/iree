@@ -153,7 +153,8 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);
 
 /// Transform dialect-based common.
-void addTransformDialectPasses(OpPassManager &passManager);
+void addTransformDialectPasses(OpPassManager &passManager,
+                               StringAttr codegenSpecFileName);
 
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.

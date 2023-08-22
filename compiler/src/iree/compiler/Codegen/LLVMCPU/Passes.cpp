@@ -664,12 +664,15 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addBufferizePasses(nestedModulePM);
 }
 
-void addTransformDialectPasses(OpPassManager &passManager) {
+void addTransformDialectPasses(OpPassManager &passManager,
+                               StringAttr codegenSpecFileName) {
   // Give control to the transform dialect.
+  StringRef fileName = codegenSpecFileName == StringAttr()
+                           ? clCPUCodegenTransformDialectFileName
+                           : codegenSpecFileName.getValue();
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clCPUCodegenTransformDialectFileName,
-          clCPUCodegenTransformDialectDebugPayloadTag,
+          fileName, clCPUCodegenTransformDialectDebugPayloadTag,
           clCPUCodegenTransformDialectDebugTransformTag));
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the

@@ -309,7 +309,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         // Transform-dialect pipelines.
         case IREE::Codegen::DispatchLoweringPassPipeline::
             TransformDialectCodegen:
-          addTransformDialectPasses(executableLoweringPipeline);
+          addTransformDialectPasses(
+              executableLoweringPipeline,
+              translationInfo.value().getCodegenSpecFileName());
           break;
         default:
           moduleOp.emitOpError("Unsupported pipeline on CPU target.");
