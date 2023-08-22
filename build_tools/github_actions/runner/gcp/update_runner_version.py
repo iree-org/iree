@@ -44,7 +44,7 @@ ASSET_URL_TEMPLATE = string.Template(
 TARGET_SCRIPT = "build_tools/github_actions/runner/gcp/create_templates.sh"
 
 # Typically we use "x86_64" but "x64" is used by Github runner.
-RUNNER_ARCHES = ["x64", "arm64"]
+RUNNER_ARCHITECTURES = ["x64", "arm64"]
 
 
 def error(*msg):
@@ -81,7 +81,7 @@ if __name__ == "__main__":
             error(f"ERROR: Multiple digests of the same architecture:", matches)
         arch_to_digest[arch] = digest
 
-    for arch in RUNNER_ARCHES:
+    for arch in RUNNER_ARCHITECTURES:
         archive = RUNNER_ARCHIVE_TEMPLATE.substitute(arch=arch, version=version)
         asset_url = ASSET_URL_TEMPLATE.substitute(version=version, archive=archive)
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
             continue
 
         found = False
-        for arch in RUNNER_ARCHES:
+        for arch in RUNNER_ARCHITECTURES:
             if line.startswith(DIGEST_VARIABLE_FORMAT_STRING % arch.upper()):
                 print(DIGEST_LINE_FORMAT_STRING % (arch.upper(), arch_to_digest[arch]))
                 found = True
