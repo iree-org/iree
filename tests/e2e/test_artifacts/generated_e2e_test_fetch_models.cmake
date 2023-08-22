@@ -1,11 +1,4 @@
 iree_fetch_artifact(
-  NAME "model-MobileNetV3Small_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallStaticBatch.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV3Small_fp32.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-MobileNetV2_int8"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_int8.0_224_quantized.tflite"
