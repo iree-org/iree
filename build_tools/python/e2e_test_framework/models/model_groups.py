@@ -24,9 +24,9 @@ X86_64_BENCHMARK_CONFIG = [
     # common_definitions.CpuBenchmarkConfig(
     # model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
     # ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILENET_V3SMALL, threads=[0, 1]
-    ),
+    # common_definitions.CpuBenchmarkConfig(
+    # model=tflite_models.MOBILENET_V3SMALL, threads=[0, 1]
+    # ),
     # Small models.
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
@@ -92,9 +92,9 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     # common_definitions.CpuBenchmarkConfig(
     # model=tflite_models.PERSON_DETECT_INT8, threads=[1]
     # ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILENET_V3SMALL, threads=[1]
-    ),
+    # common_definitions.CpuBenchmarkConfig(
+    # model=tflite_models.MOBILENET_V3SMALL, threads=[1]
+    # ),
     # Small models.
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
