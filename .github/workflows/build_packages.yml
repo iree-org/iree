@@ -79,6 +79,17 @@ jobs:
             bindist/**/*
           retention-days: 5
 
+      - name: Upload Release Assets
+        if: github.event.inputs.release_id != ''
+        id: upload-release-assets
+        uses: dwenegar/upload-release-assets@5bc3024cf83521df8ebfadf00ad0c4614fd59148 # v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        with:
+          release_id: ${{ github.event.inputs.release_id }}
+          # Only upload plugin artifacts.
+          assets_path: ./bindist/openxla_pjrt*.*
+
   publish:
     name: "Trigger publish release"
     needs: build
