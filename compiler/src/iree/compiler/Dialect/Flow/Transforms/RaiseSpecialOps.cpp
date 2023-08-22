@@ -286,17 +286,16 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
     IRRewriter rewriter(&getContext());
 
     getOperation()->walk([&](linalg::GenericOp op) {
-      rewriter.setInsertionPoint(op);
-
       // Try raising to tensor.export.
+      rewriter.setInsertionPoint(op);
       FailureOr<linalg::GenericOp> maybeNewOp =
           raiseTensorExtractToInput(op, rewriter);
-      // Update op if we succeeded.
       if (succeeded(maybeNewOp)) {
-        op = maybeNewOp.value();
+        op = *maybeNewOp;
       }
 
       // Try raising to a view-like operation.
+      rewriter.setInsertionPoint(op);
       (void)tryRaiseToView(op, rewriter);
     });
 
