@@ -20,22 +20,21 @@ import re
 import string
 import subprocess
 import sys
-import urllib
-
-import requests
+import urllib.request
 
 # This is using the old printf-style string formatting because we're creating
 # lines that have Bash substitutions using braces
 VERSION_LINE_FORMAT_STRING = 'GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-%s}"'
+DIGEST_VARIABLE_FORMAT_STRING = "GITHUB_RUNNER_%s_ARCHIVE_DIGEST"
 DIGEST_LINE_FORMAT_STRING = (
-    'GITHUB_RUNNER_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARCHIVE_DIGEST:-%s}"'
+    DIGEST_VARIABLE_FORMAT_STRING + '="${GITHUB_RUNNER_X86_64_ARCHIVE_DIGEST:-%s}"'
 )
 
-DIGEST_SEARCH_PATTERN = (
-    r"^.*\bBEGIN.SHA linux-x64\b.*\b([a-fA-F0-9]{64})\b.*END.SHA linux-x64\b.*$"
-)
+DIGEST_SEARCH_PATTERN = r"^.*\bBEGIN.SHA linux-(?P<arch>\w+)\b.*\b(?P<digest>[a-fA-F0-9]{64})\b.*END.SHA linux-\w+\b.*$"
 
-RUNNER_ARCHIVE_TEMPLATE = string.Template("actions-runner-linux-x64-${version}.tar.gz")
+RUNNER_ARCHIVE_TEMPLATE = string.Template(
+    "actions-runner-linux-${arch}-${version}.tar.gz"
+)
 ASSET_URL_TEMPLATE = string.Template(
     "https://github.com/actions/runner/releases/download/v${version}/${archive}"
 )
@@ -43,6 +42,9 @@ ASSET_URL_TEMPLATE = string.Template(
 # I think it's actually simpler to have this hardcoded than to have the script
 # introspect on its own source file location.
 TARGET_SCRIPT = "build_tools/github_actions/runner/gcp/create_templates.sh"
+
+# Typically we use "x86_64" but "x64" is used by Github runner.
+RUNNER_ARCHITECTURES = ["x64", "arm64"]
 
 
 def error(*msg):
@@ -66,7 +68,6 @@ if __name__ == "__main__":
         )
 
     version = release["tag_name"][1:]
-    digest = None
 
     sha_pattern = re.compile(DIGEST_SEARCH_PATTERN, flags=re.MULTILINE)
     matches = sha_pattern.findall(release["body"])
@@ -74,33 +75,44 @@ if __name__ == "__main__":
     if not matches:
         error(f"ERROR: No lines match digest search regex: '{DIGEST_SEARCH_PATTERN}'")
 
-    if len(matches) > 1:
-        error(f"ERROR: Multiple lines match digest search regex:", matches)
+    arch_to_digest = {}
+    for arch, digest in matches:
+        if arch in arch_to_digest:
+            error(f"ERROR: Multiple digests of the same architecture:", matches)
+        arch_to_digest[arch] = digest
 
-    digest = matches[0]
+    for arch in RUNNER_ARCHITECTURES:
+        archive = RUNNER_ARCHIVE_TEMPLATE.substitute(arch=arch, version=version)
+        asset_url = ASSET_URL_TEMPLATE.substitute(version=version, archive=archive)
 
-    archive = RUNNER_ARCHIVE_TEMPLATE.substitute(version=version)
-    asset_url = ASSET_URL_TEMPLATE.substitute(version=version, archive=archive)
+        # With Python 3.11 we could use hashlib.file_digest
+        hasher = hashlib.sha256()
+        with urllib.request.urlopen(asset_url) as f:
+            hasher.update(f.read())
 
-    # With Python 3.11 we could use hashlib.file_digest
-    hash = hashlib.sha256()
-    with urllib.request.urlopen(asset_url) as f:
-        hash.update(f.read())
+        actual_digest = hasher.hexdigest()
+        published_digest = arch_to_digest.get(arch)
 
-    actual_digest = hash.hexdigest()
-
-    if digest != actual_digest:
-        error(
-            f"Digest extracted from release notes ('{digest}') does not match"
-            f" digest obtained from fetching '{asset_url}' ('{actual_digest}')"
-        )
+        if published_digest != actual_digest:
+            error(
+                f"Digest extracted from release notes ('{published_digest}')"
+                f" does not match digest obtained from fetching '{asset_url}'"
+                " ('{actual_digest}')"
+            )
 
     for line in fileinput.input(files=[TARGET_SCRIPT], inplace=True):
         if line.startswith("GITHUB_RUNNER_VERSION"):
             print(VERSION_LINE_FORMAT_STRING % (version,))
-        elif line.startswith("GITHUB_RUNNER_ARCHIVE_DIGEST"):
-            print(DIGEST_LINE_FORMAT_STRING % (digest,))
-        else:
+            continue
+
+        found = False
+        for arch in RUNNER_ARCHITECTURES:
+            if line.startswith(DIGEST_VARIABLE_FORMAT_STRING % arch.upper()):
+                print(DIGEST_LINE_FORMAT_STRING % (arch.upper(), arch_to_digest[arch]))
+                found = True
+                break
+
+        if not found:
             print(line, end="")
 
     print(f"Successfully updated {TARGET_SCRIPT}")

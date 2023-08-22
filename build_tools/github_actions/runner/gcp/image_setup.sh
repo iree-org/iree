@@ -210,15 +210,18 @@ EOF
 
   ########################### Install the ops agent ############################
 
-  nice_curl https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh \
-    | bash -s -- --also-install --remove-repo --version=2.24.0
-  cat <<EOF >> /etc/google-cloud-ops-agent/config.yaml
-logging:
-  receivers:
-    systemd:
-      type: systemd_journald
+  # TODO(#14766): google cloud ops agent hasn't support ARM64 ubuntu 22.04 yet.
+  if [[ "${RUNNER_TYPE^^}" != ARM64 ]]; then
+    nice_curl https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh \
+      | bash -s -- --also-install --remove-repo --version=2.24.0
+    cat <<EOF >> /etc/google-cloud-ops-agent/config.yaml
+  logging:
+    receivers:
+      systemd:
+        type: systemd_journald
 EOF
-  service google-cloud-ops-agent restart
+    service google-cloud-ops-agent restart
+  fi
 
   ############################### Install Docker ###############################
 
@@ -234,7 +237,7 @@ EOF
     https://download.docker.com/linux/ubuntu/gpg \
     | gpg --dearmor -o "${docker_gpg_file}"
   echo \
-    "deb [arch=amd64 signed-by=${docker_gpg_file}] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+    "deb [signed-by=${docker_gpg_file}] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
     > "${docker_apt_file}"
   apt-get update
   apt-get install docker-ce docker-ce-cli containerd.io
