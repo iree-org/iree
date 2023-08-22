@@ -49,9 +49,9 @@ class Android_Adreno_Benchmarks(object):
             # tflite_models.DEEPLABV3_FP32,
             # tflite_models.MOBILESSD_FP32,
             # tflite_models.POSENET_FP32,
-            tflite_models.MOBILEBERT_FP32,
+            # tflite_models.MOBILEBERT_FP32,
             # tflite_models.MOBILENET_V2,
-            tflite_models.MOBILENET_V3SMALL,
+            # tflite_models.MOBILENET_V3SMALL,
         ]
         default_gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
@@ -77,7 +77,7 @@ class Android_Adreno_Benchmarks(object):
                 # tflite_models.MOBILESSD_FP32,
                 # tflite_models.POSENET_FP32,
                 # tflite_models.MOBILENET_V2,
-                tflite_models.MOBILENET_V3SMALL,
+                # tflite_models.MOBILENET_V3SMALL,
             ]
         ]
 

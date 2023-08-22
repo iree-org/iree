@@ -13,20 +13,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-MobileBertSquad_fp16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebertsquad.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp16.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-MobileBertSquad_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-float.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp32.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-EfficientNetV2STF"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/EfficientNetV2STF_2023-05-07.timestamp_1683504734.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF.timestamp_1683504734.mlirbc"
@@ -499,19 +485,5 @@ iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH32"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.14_1691969180/T5_LARGE_FP32_JAX_512XI32_BATCH32/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH32.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-MobileSSD_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobile_ssd_v2_float_coco.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileSSD_fp32.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-DeepLabV3_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_DeepLabV3_fp32.tflite"
   UNPACK
 )

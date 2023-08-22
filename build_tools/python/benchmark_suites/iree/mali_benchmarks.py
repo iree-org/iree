@@ -60,14 +60,16 @@ class Android_Mali_Benchmarks(object):
 
     # TODO(#14775): Re-enable the benchmarks.
     FP32_MODELS = [
-        tflite_models.DEEPLABV3_FP32,
+        # tflite_models.DEEPLABV3_FP32,
         # tflite_models.MOBILESSD_FP32,
         # tflite_models.POSENET_FP32,
-        tflite_models.MOBILEBERT_FP32,
+        # tflite_models.MOBILEBERT_FP32,
         # tflite_models.MOBILENET_V2,
-        tflite_models.MOBILENET_V3SMALL,
+        # tflite_models.MOBILENET_V3SMALL,
     ]
-    FP16_MODELS = [tflite_models.MOBILEBERT_FP16]
+    FP16_MODELS = [
+        # tflite_models.MOBILEBERT_FP16
+    ]
     QUANT_MODELS = [
         # tflite_models.MOBILEBERT_INT8,
         # tflite_models.EFFICIENTNET_INT8,

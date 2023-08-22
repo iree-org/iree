@@ -30,7 +30,7 @@ class Linux_RV64_Benchmarks(object):
     MODELS = [
         # TODO(#14775): Re-enable the benchmarks.
         # tflite_models.DEEPLABV3_FP32,
-        tflite_models.MOBILEBERT_FP32,
+        # tflite_models.MOBILEBERT_FP32,
         # tflite_models.MOBILENET_V1,
         # tflite_models.MOBILEBERT_INT8,
         # tflite_models.PERSON_DETECT_INT8,

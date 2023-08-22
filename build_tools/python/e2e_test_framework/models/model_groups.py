@@ -53,13 +53,13 @@ X86_64_BENCHMARK_CONFIG = [
     # ),
     # Medium models.
     # TODO: Add 13 threads once we move to new hardware.
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILEBERT_FP16, threads=[1, 8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILEBERT_FP32, threads=[1, 8]
-    ),
     # TODO(#14775): Re-enable the benchmarks.
+    # common_definitions.CpuBenchmarkConfig(
+    # model=tflite_models.MOBILEBERT_FP16, threads=[1, 8]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    # model=tflite_models.MOBILEBERT_FP32, threads=[1, 8]
+    # ),
     # common_definitions.CpuBenchmarkConfig(
     # model=tflite_models.MOBILEBERT_INT8, threads=[1, 8]
     # ),
@@ -117,10 +117,10 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     # model=tflite_models.POSENET_FP32, threads=[8]
     # ),
     # Medium models.
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILEBERT_FP32, threads=[8]
-    ),
     # TODO(#14775): Re-enable the benchmarks.
+    # common_definitions.CpuBenchmarkConfig(
+    # model=tflite_models.MOBILEBERT_FP32, threads=[8]
+    # ),
     # common_definitions.CpuBenchmarkConfig(
     # model=tflite_models.MOBILEBERT_INT8, threads=[8]
     # ),
