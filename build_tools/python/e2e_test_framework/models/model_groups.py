@@ -22,7 +22,7 @@ X86_64_BENCHMARK_CONFIG = [
     # Tiny models.
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
+    # model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
     # ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V3SMALL, threads=[0, 1]
@@ -30,26 +30,26 @@ X86_64_BENCHMARK_CONFIG = [
     # Small models.
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.DEEPLABV3_FP32, threads=[1, 8]
+    # model=tflite_models.DEEPLABV3_FP32, threads=[1, 8]
     # ),
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.EFFICIENTNET_INT8, threads=[1, 8]
+    # model=tflite_models.EFFICIENTNET_INT8, threads=[1, 8]
     # ),
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.MOBILENET_V1, threads=[1, 8]
+    # model=tflite_models.MOBILENET_V1, threads=[1, 8]
     # ),
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.MOBILENET_V2, threads=[1, 8]
+    # model=tflite_models.MOBILENET_V2, threads=[1, 8]
     # ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V2_INT8, threads=[1, 8]
     ),
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.MOBILESSD_FP32, threads=[1, 8]
+    # model=tflite_models.MOBILESSD_FP32, threads=[1, 8]
     # ),
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.POSENET_FP32, threads=[1, 8]
+    # model=tflite_models.POSENET_FP32, threads=[1, 8]
     # ),
     # Medium models.
     # TODO: Add 13 threads once we move to new hardware.
@@ -61,7 +61,7 @@ X86_64_BENCHMARK_CONFIG = [
     ),
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.MOBILEBERT_INT8, threads=[1, 8]
+    # model=tflite_models.MOBILEBERT_INT8, threads=[1, 8]
     # ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.EFFICIENTNET_V2_S_FP32, threads=[1, 8]
@@ -90,7 +90,7 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     # Tiny models.
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.PERSON_DETECT_INT8, threads=[1]
+    # model=tflite_models.PERSON_DETECT_INT8, threads=[1]
     # ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V3SMALL, threads=[1]
@@ -98,23 +98,23 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     # Small models.
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.DEEPLABV3_FP32, threads=[8]
+    # model=tflite_models.DEEPLABV3_FP32, threads=[8]
     # ),
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.EFFICIENTNET_INT8, threads=[8]
+    # model=tflite_models.EFFICIENTNET_INT8, threads=[8]
     # ),
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.MOBILENET_V2, threads=[8]
+    # model=tflite_models.MOBILENET_V2, threads=[8]
     # ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V2_INT8, threads=[8]
     ),
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.MOBILESSD_FP32, threads=[8]
+    # model=tflite_models.MOBILESSD_FP32, threads=[8]
     # ),
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.POSENET_FP32, threads=[8]
+    # model=tflite_models.POSENET_FP32, threads=[8]
     # ),
     # Medium models.
     common_definitions.CpuBenchmarkConfig(
@@ -122,7 +122,7 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     ),
     # TODO(#14775): Re-enable the benchmarks.
     # common_definitions.CpuBenchmarkConfig(
-        # model=tflite_models.MOBILEBERT_INT8, threads=[8]
+    # model=tflite_models.MOBILEBERT_INT8, threads=[8]
     # ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.EFFICIENTNET_V2_S_FP32, threads=[8]

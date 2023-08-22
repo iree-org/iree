@@ -27,7 +27,7 @@ class Android_ARMv8_A_Benchmarks(object):
         tflite_models.MOBILENET_V3SMALL,
     ]
     QUANT_MODELS = [
-        #tflite_models.MOBILEBERT_INT8
+        # tflite_models.MOBILEBERT_INT8
     ]
 
     ARMV8_A_CPU_TARGET = iree_definitions.CompileTarget(
