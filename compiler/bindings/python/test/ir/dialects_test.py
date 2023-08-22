@@ -4,16 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_py_test(
-  NAME
-    registration_test
-  SRCS
-    "registration_test.py"
-)
+from iree.compiler import ir
 
-iree_py_test(
-  NAME
-    dialects_test
-  SRCS
-    "dialects_test.py"
+# Make sure that our dialects import.
+from iree.compiler.dialects import (
+    flow,
+    hal,
+    stream,
+    vm,
+    util,
 )
