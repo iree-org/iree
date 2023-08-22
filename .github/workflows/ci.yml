@@ -350,7 +350,7 @@ jobs:
         env:
           IREE_NVIDIA_SM80_TESTS_DISABLE: 0
           IREE_MULTI_DEVICE_TESTS_DISABLE: 1
-          IREE_CTEST_LABEL_REGEX: ^requires-gpu-sm80$
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu-sm80|^requires-gpu|^driver=vulkan$|^driver=cuda$
         run: |
           ./build_tools/github_actions/docker_run.sh \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
@@ -359,7 +359,7 @@ jobs:
               --env IREE_VULKAN_F16_DISABLE=0 \
               --env IREE_CUDA_DISABLE=0 \
               --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
-              --env CTEST_PARALLEL_LEVEL=2 \
+              --env CTEST_PARALLEL_LEVEL=4 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
               gcr.io/iree-oss/nvidia@sha256:1717431fd46b8b1e96d95fa72508e3e3eacb5c95f1245b9b7dbeec23ae823d02 \
