@@ -62,7 +62,7 @@ static llvm::cl::opt<uint64_t> clResourceMaxRange(
 static llvm::cl::opt<unsigned> clResourceIndexBits(
     "iree-stream-resource-index-bits",
     llvm::cl::desc("Bit width of indices used to reference resource offsets."),
-    llvm::cl::init(32));
+    llvm::cl::init(64));
 static llvm::cl::opt<bool> clResourceAliasMutableBindings(
     "iree-stream-resource-alias-mutable-bindings",
     llvm::cl::desc(
