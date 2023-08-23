@@ -23,6 +23,7 @@ concurrency:
 
 jobs:
   build_packages:
+    name: Build Packages
     uses: ./.github/workflows/pkgci_build_packages.yml
     with:
       package_version: 0.dev1
