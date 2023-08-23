@@ -26,6 +26,7 @@ jobs:
     env:
       CACHE_DIR: ${{ github.workspace }}/.iree-container-cache
       MANYLINUX_DOCKER_IMAGE: ghcr.io/nod-ai/manylinux_x86_64:main
+      PACKAGE_SUFFIX: "-asserts"
     steps:
       - name: Prefetch Docker
         run: |
@@ -39,7 +40,7 @@ jobs:
         run: |
           cat << EOF > version_info.json
           {
-            "package-suffix": "",
+            "package-suffix": "${PACKAGE_SUFFIX}",
             "package-version": "${{ inputs.package_version }}",
             "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
           }
@@ -53,13 +54,16 @@ jobs:
           key: iree-pkgci-linux-release-x86_64-v1-${{ github.sha }}
           restore-keys: |
             iree-pkgci-linux-release-x86_64-v1-
-      - name: Build
+      - name: Wait for docker pull
         run: |
           wait
+      - name: Build
+        run: |
           export cache_dir="${{ env.CACHE_DIR }}"
           export output_dir="${{ github.workspace }}/wheelhouse"
           export toolchain_suffix=release
           export manylinux_docker_image="$MANYLINUX_DOCKER_IMAGE"
+          export package_suffix="$PACKAGE_SUFFIX"
           # If just iterating locally, uncomment this to build a cheap wheel.
           # export packages="iree-runtime"
           bash build_tools/pkgci/build_linux_packages.sh
@@ -87,6 +91,7 @@ jobs:
     env:
       CACHE_DIR: ${{ github.workspace }}/.iree-container-cache
       MANYLINUX_DOCKER_IMAGE: ghcr.io/nod-ai/manylinux_x86_64:main
+      PACKAGE_SUFFIX: "-asserts"
     steps:
       - name: Prefetch Docker
         run: |
@@ -100,9 +105,9 @@ jobs:
         run: |
           cat << EOF > version_info.json
           {
-            "package-suffix": "-asserts",
+            "package-suffix": "${PACKAGE_SUFFIX}",
             "package-version": "${{ inputs.package_version }}",
-            "iree-revision": "$(cd ../iree && git rev-parse HEAD)",
+            "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
           }
           EOF
           realpath version_info.json
@@ -114,12 +119,16 @@ jobs:
           key: iree-pkgci-linux-release-asserts-x86_64-v1-${{ github.sha }}
           restore-keys: |
             iree-pkgci-linux-release-asserts-x86_64-v1-
+      - name: Wait for docker pull
+        run: |
+          wait
       - name: Build
         run: |
           export cache_dir="${{ env.CACHE_DIR }}"
           export output_dir="${{ github.workspace }}/wheelhouse"
           export toolchain_suffix=release_asserts
           export manylinux_docker_image="$MANYLINUX_DOCKER_IMAGE"
+          export package_suffix="$PACKAGE_SUFFIX"
           # If just iterating locally, uncomment this to build a cheap wheel.
           # export packages="iree-runtime"
           bash build_tools/pkgci/build_linux_packages.sh
