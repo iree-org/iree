@@ -2026,6 +2026,10 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     if (hasChanged)
       return WalkResult::interrupt();
 
+    // Skip the adjustment if the pack op is not one of consumer ops.
+    if (packOp->isBeforeInBlock(rootOp))
+      return WalkResult::advance();
+
     hasChanged = true;
     LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n");
 
