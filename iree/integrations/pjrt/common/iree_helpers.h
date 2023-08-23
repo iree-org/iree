@@ -63,9 +63,9 @@ std::string FenceToString(iree_hal_fence_t* fence) {
 iree_status_t hal_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
-    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
-  auto status = iree_hal_allocator_allocate_buffer(
-      allocator, params, allocation_size, initial_data, out_buffer);
+    iree_hal_buffer_t** out_buffer) {
+  auto status = iree_hal_allocator_allocate_buffer(allocator, params,
+                                                   allocation_size, out_buffer);
   if (LOGGING_ENABLED) {
     LogInvoke(__func__, "allocator=%p, size=%zu, buffer=%p", allocator,
               (size_t)allocation_size, *out_buffer);

@@ -1060,8 +1060,11 @@ iree_status_t DeviceInstance::AcquireHostStagingBuffer(
   params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
   params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   IREE_RETURN_IF_ERROR(IreeApi::hal_allocator_allocate_buffer(
-      device_allocator(), params, initial_contents.data_length,
-      initial_contents, out_buffer));
+      device_allocator(), params, initial_contents.data_length, out_buffer));
+  IREE_RETURN_IF_ERROR(iree_hal_device_transfer_h2d(
+      device(), initial_contents.data, *out_buffer, 0,
+      initial_contents.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
   // We did a synchronous snapshot (memcpy).
   *initial_contents_snapshotted = true;
   return iree_ok_status();
