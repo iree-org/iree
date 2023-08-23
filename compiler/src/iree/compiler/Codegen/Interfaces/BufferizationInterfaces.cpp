@@ -70,22 +70,23 @@ getMemrefTypeForTensor(IREE::Flow::DispatchTensorType tensorType,
                          tensorType.getBoundElementType(), layout, memorySpace);
 }
 
-/// Find the memref version of the given InterfaceBindingSubspanOp. If no such
-/// op exists in the same block (before the given op), create a new op.
-// TODO(#12933): Because of regressions in CUDA backend, there is an
-// option to keep a legacy mode of not representing the offset in the
-// type. Remove once the bug is fixed.
-static Value
-findOrCreateSubspanBuffer(RewriterBase &rewriter,
-                          IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+/// Compute the future buffer tyoe if a tensor subspan op.
+// TODO: This function should not modify any IR.
+static MemRefType
+computeSubspanBufferType(IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
   // Ensure that this a tensor subspan op.
   auto shapedType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
       subspanOp.getResult().getType());
   assert(shapedType && shapedType.hasRank());
 
+  IRRewriter rewriter(subspanOp.getContext());
+  rewriter.setInsertionPoint(subspanOp);
+
   Value byteOffset = subspanOp.getByteOffset();
   MemRefLayoutAttrInterface layoutAttr = {};
   if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
+    // TODO: Find a way to call convertByteOffsetToElementOffset without a
+    // rewriter and without modifying any IR.
     OpFoldResult elementOffset = convertByteOffsetToElementOffset(
         rewriter, subspanOp->getLoc(), subspanOp.getByteOffset(),
         shapedType.getBoundElementType());
@@ -96,11 +97,22 @@ findOrCreateSubspanBuffer(RewriterBase &rewriter,
     }
     auto tensorType = llvm::cast<RankedTensorType>(shapedType.getBoundType());
     SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
-    layoutAttr = StridedLayoutAttr::get(rewriter.getContext(),
+    layoutAttr = StridedLayoutAttr::get(subspanOp.getContext(),
                                         elementOffsetInt.value(), strides);
   }
-  auto memRefType = getMemrefTypeForTensor(shapedType, layoutAttr,
-                                           subspanOp.getDescriptorTypeAttr());
+  return getMemrefTypeForTensor(shapedType, layoutAttr,
+                                subspanOp.getDescriptorTypeAttr());
+}
+
+/// Find the memref version of the given InterfaceBindingSubspanOp. If no such
+/// op exists in the same block (before the given op), create a new op.
+// TODO(#12933): Because of regressions in CUDA backend, there is an
+// option to keep a legacy mode of not representing the offset in the
+// type. Remove once the bug is fixed.
+static Value
+findOrCreateSubspanBuffer(RewriterBase &rewriter,
+                          IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+  MemRefType memRefType = computeSubspanBufferType(subspanOp);
 
   // Look for an existing op.
   Block *block = subspanOp->getBlock();
@@ -162,6 +174,13 @@ static bool equalTensorShape(RankedTensorType tensorType,
 struct DispatchTensorLoadOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
+  static bool entireTensorLoaded(IREE::Flow::DispatchTensorLoadOp loadOp) {
+    return equalTensorShape(loadOp.getType(), loadOp.sizes(),
+                            llvm::cast<IREE::Flow::DispatchTensorType>(
+                                loadOp.getSource().getType()),
+                            loadOp.getSourceDims());
+  }
+
   bool isWritable(Operation *op, Value value,
                   const AnalysisState &state) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
@@ -169,6 +188,22 @@ struct DispatchTensorLoadOpInterface
         loadOp.getSource().getType());
     assert(shapedType && "unexpected source type");
     return shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly;
+  }
+
+  FailureOr<BaseMemRefType>
+  getBufferType(Operation *op, Value value, const BufferizationOptions &options,
+                SmallVector<Value> &invocationStack) const {
+    auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
+    auto tensorSubspanOp =
+        loadOp.getSource()
+            .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    assert(tensorSubspanOp && "expected that source is a SubspanOp");
+    auto memRefType = computeSubspanBufferType(tensorSubspanOp);
+    if (entireTensorLoaded(loadOp))
+      return memRefType;
+    return cast<BaseMemRefType>(memref::SubViewOp::inferRankReducedResultType(
+        loadOp.getType().getShape(), memRefType, loadOp.getMixedOffsets(),
+        loadOp.getMixedSizes(), loadOp.getMixedStrides()));
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -180,22 +215,19 @@ struct DispatchTensorLoadOpInterface
     assert(tensorSubspanOp && "expected that source is a SubspanOp");
     Value source = findOrCreateSubspanBuffer(rewriter, tensorSubspanOp);
 
-    if (equalTensorShape(loadOp.getType(), loadOp.sizes(),
-                         llvm::cast<IREE::Flow::DispatchTensorType>(
-                             loadOp.getSource().getType()),
-                         loadOp.getSourceDims())) {
+    if (entireTensorLoaded(loadOp)) {
       // The entire tensor is loaded.
       replaceOpWithBufferizedValues(rewriter, op, source);
       return success();
     }
 
     // Bufferize to subview.
-    auto subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
-        loadOp.getType().getShape(), llvm::cast<MemRefType>(source.getType()),
-        loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
-        loadOp.getMixedStrides());
+    FailureOr<BaseMemRefType> bufferType =
+        bufferization::getBufferType(op->getResult(0), options);
+    if (failed(bufferType))
+      return failure();
     replaceOpWithNewBufferizedOp<memref::SubViewOp>(
-        rewriter, op, llvm::cast<MemRefType>(subviewMemRefType), source,
+        rewriter, op, llvm::cast<MemRefType>(*bufferType), source,
         loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
 

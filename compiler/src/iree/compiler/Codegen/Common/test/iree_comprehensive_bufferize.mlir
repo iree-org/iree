@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-iree-comprehensive-bufferize --canonicalize -cse --canonicalize --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-codegen-iree-comprehensive-bufferize --canonicalize -cse --canonicalize --split-input-file -verify-diagnostics | FileCheck %s
 
 func.func @matmul() {
   %c0 = arith.constant 0 : index
@@ -2591,3 +2591,19 @@ func.func @sub_byte_bufferize_with_offset() {
 //       CHECK:   %[[C64:.+]] = arith.constant 64 : index
 //       CHECK:   hal.interface.binding.subspan set(0) binding(0)
 //  CHECK-SAME:       memref<64xi4, strided<[1], offset: 128>
+
+// -----
+
+func.func @tensor_load_inconsistent_buffer_type(%c: i1) {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(uniform_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32xf32>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xf32>> -> tensor<32xf32>
+  %3 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xf32>> -> tensor<32xf32>
+  // expected-error @below{{inconsistent memory space on true/false operands}}
+  // expected-error @below{{failed to bufferize op}}
+  %4 = arith.select %c, %2, %3 : tensor<32xf32>
+  %5 = tensor.extract %4[%c0] : tensor<32xf32>
+  vector.print %5 : f32
+  return
+}
