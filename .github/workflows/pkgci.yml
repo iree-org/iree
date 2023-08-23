@@ -24,7 +24,6 @@ concurrency:
 jobs:
   build_packages:
     uses: ./.github/workflows/pkgci_build_packages.yml
-    needs: create_release
     with:
       package_version: 0.dev1
 
