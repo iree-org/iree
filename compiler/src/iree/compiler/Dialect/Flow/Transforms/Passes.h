@@ -25,6 +25,10 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
+/// This is a placeholder for future. We should pass all the options through the
+/// struct.
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
+
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
 //
@@ -36,7 +40,8 @@ namespace Flow {
 //     - Directly passing supported flow plus core ops
 //   buildFlowTransformPassPipeline
 //   <run conversion from flow to sequencer/hal/vm/etc>
-void buildFlowTransformPassPipeline(OpPassManager &passManager);
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    const TransformOptions &transformOptions);
 
 void registerFlowTransformPassPipeline();
 

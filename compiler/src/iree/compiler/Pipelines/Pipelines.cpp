@@ -200,9 +200,10 @@ void buildIREEVMTransformPassPipeline(
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
     }
 
+    IREE::Flow::TransformOptions flowOptions;
     if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
-      IREE::Flow::buildFlowTransformPassPipeline(passManager);
+      IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Flow");
     }
     if (compileTo == IREEVMPipelinePhase::Flow)

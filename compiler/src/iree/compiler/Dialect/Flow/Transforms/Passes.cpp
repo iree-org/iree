@@ -144,7 +144,8 @@ namespace Flow {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
-void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+void buildFlowTransformPassPipeline(OpPassManager &passManager,
+                                    const TransformOptions &transformOptions) {
   // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
@@ -342,11 +343,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 }
 
 void registerFlowTransformPassPipeline() {
-  PassPipelineRegistration<> transformPassPipeline(
+  PassPipelineRegistration<TransformOptions> transformPassPipeline(
       "iree-flow-transformation-pipeline",
       "Runs the full IREE flow dialect transformation pipeline",
-      [](OpPassManager &passManager) {
-        buildFlowTransformPassPipeline(passManager);
+      [](OpPassManager &passManager, const TransformOptions &transformOptions) {
+        buildFlowTransformPassPipeline(passManager, transformOptions);
       });
 }
 
