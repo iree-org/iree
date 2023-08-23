@@ -31,5 +31,6 @@ jobs:
   validate:
     runs-on: ubuntu-20.04
     steps:
-      - run: |
-        echo "Hi"
+      - name: Hello
+        run: |
+          echo "Hi"
