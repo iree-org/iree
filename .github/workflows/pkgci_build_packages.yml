@@ -26,7 +26,7 @@ jobs:
     env:
       CACHE_DIR: ${{ github.workspace }}/.iree-container-cache
       MANYLINUX_DOCKER_IMAGE: ghcr.io/nod-ai/manylinux_x86_64:main
-      PACKAGE_SUFFIX: "-asserts"
+      PACKAGE_SUFFIX: ""
     steps:
       - name: Prefetch Docker
         run: |
