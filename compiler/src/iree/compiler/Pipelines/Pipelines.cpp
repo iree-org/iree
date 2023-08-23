@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
@@ -146,10 +147,10 @@ void buildIREEVMTransformPassPipeline(
   if (compileTo == IREEVMPipelinePhase::ABI)
     return; // early-exit
 
-  IREE::Flow::TransformOptions flowOptions;
-  flowOptions.constExprHoisting =
+  GlobalOptimization::TransformOptions globalOptOptions;
+  globalOptOptions.constExprHoisting =
       highLevelOptimizationOptions.constExprHoisting;
-  flowOptions.numericPrecisionReduction =
+  globalOptOptions.numericPrecisionReduction =
       highLevelOptimizationOptions.numericPrecisionReduction;
 
   // Enable const-eval via hook. For debug builds, we assert if enabled
@@ -161,7 +162,7 @@ void buildIREEVMTransformPassPipeline(
   }
   if (highLevelOptimizationOptions.constEval &&
       hooks.buildConstEvalPassPipelineCallback) {
-    flowOptions.buildConstEvalPassPipeline =
+    globalOptOptions.buildConstEvalPassPipeline =
         hooks.buildConstEvalPassPipelineCallback;
   }
 
@@ -192,6 +193,14 @@ void buildIREEVMTransformPassPipeline(
     if (compileTo == IREEVMPipelinePhase::Preprocessing)
       return; // early-exit
 
+    if (compileFrom < IREEVMPipelinePhase::GlobalOptimization) { // late-entry
+      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimization");
+      GlobalOptimization::buildGlobalOptimizationPassPipeline(passManager,
+                                                              globalOptOptions);
+      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
+    }
+
+    IREE::Flow::TransformOptions flowOptions;
     if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
       IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
