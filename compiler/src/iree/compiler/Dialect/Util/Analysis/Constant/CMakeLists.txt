@@ -20,6 +20,7 @@ iree_cc_library(
     "ConstExpr.cpp"
     "OpOracle.cpp"
   DEPS
+    IREELinalgExtDialect
     LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
@@ -27,6 +28,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRSupport
     MLIRTensorDialect
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
   PUBLIC
