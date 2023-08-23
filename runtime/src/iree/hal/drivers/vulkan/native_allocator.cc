@@ -14,6 +14,10 @@
 #include "iree/hal/drivers/vulkan/sparse_buffer.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
+#if defined(IREE_PLATFORM_LINUX)
+#include <sys/mman.h>
+#endif  // IREE_PLATFORM_LINUX
+
 using namespace iree::hal::vulkan;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
@@ -607,6 +611,27 @@ static iree_status_t iree_hal_vulkan_native_allocator_import_host_buffer(
         IREE_STATUS_UNIMPLEMENTED,
         "external host memory import is not supported on this device");
   }
+
+#if defined(IREE_PLATFORM_LINUX)
+  // First check if the memory is importable.
+  // Some drivers incorrectly succeed when attempting to import already-mapped
+  // memory: https://gitlab.freedesktop.org/mesa/mesa/-/issues/9251.
+  //
+  // Attempt to synchronize the file with its memory map.
+  // If the memory is not mapped from a file, attempting to synchronize it with
+  // its memory map should fail fast and we can import the buffer. If the memory
+  // *is* mapped, import may fail on some drivers (this may also be slow).
+
+  // TODO(scotttodd): Further restrict this slow path to buggy drivers only?
+  //                  We'd need to plumb some driver information through to here
+  errno = 0;
+  (void)msync(external_buffer->handle.host_allocation.ptr,
+              external_buffer->size, MS_SYNC);
+  if (errno != ENOMEM) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "cannot import mapped memory");
+  }
+#endif  // IREE_PLATFORM_LINUX
 
   // Query the properties of the pointer to see what memory types it can be
   // imported with. This can be very expensive as on some platforms it does
