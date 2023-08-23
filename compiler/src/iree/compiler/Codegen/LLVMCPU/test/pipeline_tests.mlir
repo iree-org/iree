@@ -483,7 +483,7 @@ hal.executable private @quant_matmul_fusion {
           %18 = arith.muli %in_1, %c12_i32 : i32
           %19 = arith.subi %in_0, %18 : i32
           %20 = arith.addi %in, %19 : i32
-          %21 = "tosa.apply_scale"(%20, %in_2, %in_3) {double_round = true} : (i32, i32, i8) -> i32
+          %21 = tosa.apply_scale %20, %in_2, %in_3 {double_round = true} : (i32, i32, i8) -> i32
           %22 = arith.addi %21, %c-128_i32 : i32
           %23 = arith.cmpi slt, %22, %c-128_i32 : i32
           %24 = arith.select %23, %c-128_i32, %22 : i32
@@ -518,7 +518,7 @@ hal.executable private @quant_matmul_fusion {
 //     CHECK-NEXT:         arith.addi
 //          CHECK:         arith.muli
 //     CHECK-NEXT:         arith.addi
-//          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) <{double_round = true}> : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
+//          CHECK:       %{{.+}} = tosa.apply_scale {{.+}} {double_round = true} : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
 
 // -----
 

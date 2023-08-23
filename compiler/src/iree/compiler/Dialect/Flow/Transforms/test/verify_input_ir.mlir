@@ -14,7 +14,7 @@ func.func @check_no_stablehlo(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -
 // expected-error@below {{illegal operations still remain}}
 func.func @check_no_tosa(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error@+1 {{illegal op still exists}}
-  %0 = "tosa.add"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  %0 = tosa.add %arg0, %arg1 : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
 
