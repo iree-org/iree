@@ -115,8 +115,12 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
     // 1. Indexing value is a constant.
     APInt constantIndex;
     if (matchPattern(indexValue, m_ConstantInt(&constantIndex))) {
-      exprs.push_back(getAffineConstantExpr(constantIndex.getLimitedValue(),
-                                            rewriter.getContext()));
+      // Restrict to cases where the constant is 0. This is because handling
+      // constants other than 0 in indexing map, may cause problems in the
+      // lowering pipeline later.
+      if (constantIndex.getLimitedValue() != 0)
+        return failure();
+      exprs.push_back(getAffineConstantExpr(0, rewriter.getContext()));
       continue;
     }
     // 2. The indexing value is a linalg.index.
@@ -306,6 +310,8 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
 
     getOperation()->walk([&](linalg::GenericOp op) {
       linalg::GenericOp linalgOp = op;
+
+      OpBuilder::InsertionGuard guard(rewriter);
 
       // Try raising to tensor.export and create an intermediate linalg.generic.
       rewriter.setInsertionPoint(op);
