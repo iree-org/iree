@@ -36,6 +36,8 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createTopLevelSCFToCFGPass);
   mainPassManager.addPass(IREE::Flow::createExpandTensorShapesPass());
 
+  mainPassManager.addPass(IREE::Flow::createTensorPadToTensorInsertSlicePass(
+      /*skipSingleLinalgOpUses=*/false));
   FunctionLikeNest(mainPassManager)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
