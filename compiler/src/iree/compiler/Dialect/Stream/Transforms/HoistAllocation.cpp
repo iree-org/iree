@@ -44,7 +44,7 @@ public:
 
     CFGLoopInfo loopInfo(domInfo.getDomTree(region));
 
-    // Checks if storage size is known at compiled time and below a threshold.
+    // Checks if storage size is known at compile time and below a threshold.
     auto isBelowMaxHoistedAllocSize = [&](Value storageSize) -> bool {
       llvm::APInt constantSize;
       return matchPattern(storageSize, m_ConstantInt(&constantSize)) &&
