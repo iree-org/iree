@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <optional>
+
 #include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -15,6 +17,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -1173,6 +1176,8 @@ struct ResultReservation {
   Value resultSize;
   // Value passed to the stream.yield inside of the execution region.
   Value yieldValue;
+  // True if allocation for this result should be hoisted out of a loop.
+  bool hoist;
 };
 
 struct ResultReservationSet {
@@ -1186,7 +1191,7 @@ struct ResultReservationSet {
 };
 
 struct ResultAllocation {
-  // Reservations bucketed by lifetime.
+  // Reservations bucketed by lifetime and hoist flag.
   SmallVector<ResultReservationSet> reservationSets;
 };
 
@@ -1194,14 +1199,16 @@ struct ResultAllocation {
 // set of |reservations| with matching lifetimes.
 static ResultAllocation
 reserveResultAllocation(ArrayRef<ResultReservation> reservations) {
+  unsigned numLifetimes = IREE::Stream::getMaxEnumValForLifetime() + 1;
+
   // We want deterministic ordering of the allocations for each lifetime type
   // so we build them all here and then just nuke the ones we don't end up
-  // using.
-  SmallVector<ResultReservationSet> sets(
-      IREE::Stream::getMaxEnumValForLifetime() + 1);
+  // using. Also reserve extra space for hoisted allocations.
+  SmallVector<ResultReservationSet> sets(2 * numLifetimes);
+
   for (auto &reservation : reservations) {
-    auto &set =
-        sets[static_cast<unsigned>(reservation.resultType.getLifetime())];
+    unsigned idx = static_cast<unsigned>(reservation.resultType.getLifetime());
+    auto &set = sets[reservation.hoist ? numLifetimes + idx : idx];
     set.reservationLocs.push_back(reservation.loc);
     set.reservationTypes.push_back(reservation.resultType);
     set.reservationSizes.push_back(reservation.resultSize);
@@ -1302,6 +1309,32 @@ static ResourceRange deriveResourceRangeFromResult(Value resultValue,
                        offset, resultSize);
 }
 
+// Returns true if |resource| allocation can be safely hoisted out of a loop
+// into the predecessor block.
+static bool
+resourceAllocationCanBeHoisted(Value resource, Value resourceSize,
+                               int64_t maxHoistedResourceAllocSize) {
+  // Check if we statically know the size of the resource.
+  llvm::APInt constantSize;
+  if (!matchPattern(resourceSize, m_ConstantInt(&constantSize)) ||
+      constantSize.getSExtValue() > maxHoistedResourceAllocSize) {
+    return false;
+  }
+
+  for (Operation *user : resource.getUsers()) {
+    // Conservatibely only allow users in the same block as result.
+    if (user->getBlock() != resource.getParentBlock())
+      return false;
+
+    // Conservatively allow only timepoint.await and async.load users as they
+    // do not capture resource argument.
+    if (!isa<IREE::Stream::AsyncLoadOp, IREE::Stream::TimepointAwaitOp>(user))
+      return false;
+  }
+
+  return true;
+}
+
 // TODO(benvanik): find a way to split this up. We could probably do this in
 // several passes each time pulling out different resource types, however the
 // analysis we perform needs to see the original form and getting a shared
@@ -1312,8 +1345,14 @@ static ResourceRange deriveResourceRangeFromResult(Value resultValue,
 
 // Performs allocation for all results and local region transients of the given
 // |executeOp| region. IR will be inserted around the op in its parent block.
+//
+// Use |loopInfo| to optimize allocation of resources if |executeOp| is inside
+// a loop: avoid allocating resource in every iteration if it can be allocated
+// in the predecessor block.
 static LogicalResult
-allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
+allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
+                        const std::optional<CFGLoopInfo> &loopInfo,
+                        int64_t maxHoistedResourceAllocSize) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Allocating execution region ]]\n");
 
   AllocationScope scope(executeOp);
@@ -1424,6 +1463,15 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     LLVM_DEBUG(llvm::dbgs() << "  - no constants found\n");
   }
 
+  // Find if execute operation is nested in a loop CFG. We will optimize
+  // allocation of resources with statically known size inside a loop CFG by
+  // hoisting them into the predecessor block.
+  Block *loopPredecessor = nullptr;
+  if (loopInfo.has_value()) {
+    if (auto *loop = loopInfo->getLoopFor(executeOp->getBlock()))
+      loopPredecessor = loop->getOutermostLoop()->getLoopPredecessor();
+  }
+
   // Compute an updated set of operands/results. After allocation all results
   // must be tied to operands; it's possible though that this is already the
   // case by construction.
@@ -1526,20 +1574,36 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
       continue;
     }
 
+    // Check if allocation can be hoisted out of the loop.
+    bool hoist = loopPredecessor &&
+                 resourceAllocationCanBeHoisted(result, resultSize,
+                                                maxHoistedResourceAllocSize);
     // Queue up the allocation for packing.
-    ResultReservation resultReservation = {
-        definingOp->getLoc(), result, resultType, resultSize, yieldValue,
-    };
+    ResultReservation resultReservation = {definingOp->getLoc(), result,
+                                           resultType,           resultSize,
+                                           yieldValue,           hoist};
     LLVM_DEBUG({
       AsmState asmState(executeOp->getParentOp());
-      llvm::dbgs() << "  + queuing pending result reservation allocation for ";
+      llvm::dbgs()
+          << "  + queuing pending result reservation allocation (hoist = "
+          << (hoist ? "yes" : "no") << ") for ";
       resultReservation.result.printAsOperand(llvm::dbgs(), asmState);
       llvm::dbgs() << "\n";
     });
     resultReservations.push_back(resultReservation);
   }
   auto resultAllocation = reserveResultAllocation(resultReservations);
+
   for (auto &reservationSet : resultAllocation.reservationSets) {
+    OpBuilder::InsertionGuard guard(externalBuilder);
+
+    // Check if allocation should be hoisted into the loop predecessor.
+    bool hoistAllocation = llvm::all_of(
+        reservationSet.reservations,
+        [](ResultReservation &reservation) { return reservation.hoist; });
+    if (hoistAllocation)
+      externalBuilder.setInsertionPoint(loopPredecessor->getTerminator());
+
     // Allocate and tie an operand to the result.
     // TODO(benvanik): change this to an alloca. We may need a higher-level
     // analysis to decide when to deallocate, or just leave it to be deallocated
@@ -1552,7 +1616,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
 
     auto asmState = getRootAsmState(executeOp->getParentOp());
     LLVM_DEBUG({
-      llvm::dbgs() << "  + alloc for result reservation set: ";
+      llvm::dbgs() << "  + alloc for result reservation set (hoist = "
+                   << (hoistAllocation ? "yes" : "no") << "): ";
       allocOp.print(llvm::dbgs(), *asmState);
       llvm::dbgs() << ":\n";
     });
@@ -1775,6 +1840,17 @@ public:
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
+
+    // Prepare a CFG loop info for all functions in the module to potentially
+    // optimize resource allocation inside loops.
+    DominanceInfo &domInfo = getAnalysis<DominanceInfo>();
+    DenseMap<func::FuncOp, std::optional<CFGLoopInfo>> loopInfo;
+    moduleOp->walk([&](func::FuncOp func) {
+      auto &body = func.getFunctionBody();
+      if (!body.hasOneBlock())
+        loopInfo[func] = CFGLoopInfo(domInfo.getDomTree(&body));
+    });
+
     for (auto &parentOp : llvm::make_early_inc_range(moduleOp.getOps())) {
       if (auto asyncFuncOp = dyn_cast<IREE::Stream::AsyncFuncOp>(parentOp)) {
         convertAsyncFuncOp(asyncFuncOp);
@@ -1789,7 +1865,9 @@ public:
                callableOp.getCallableRegion()->getOps())) {
         if (failed(TypeSwitch<Operation *, LogicalResult>(&op)
                        .Case([&](IREE::Stream::AsyncExecuteOp op) {
-                         return allocateExecutionRegion(op);
+                         auto func = op->getParentOfType<func::FuncOp>();
+                         return allocateExecutionRegion(
+                             op, loopInfo[func], maxHoistedResourceAllocSize);
                        })
                        .Case([&](IREE::Stream::AsyncLoadOp op) {
                          return convertAsyncLoadOp(op);

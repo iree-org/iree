@@ -127,6 +127,12 @@ def ScheduleAllocation :
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createScheduleAllocationPass()
   }];
+  let options = [
+    Option<"maxHoistedResourceAllocSize", "max-hoisted-resource-alloc-size",
+           "int64_t", /*default=*/"64",
+           "When safe hoist resource allocations from the loop to the "
+           "predecessor block if it's smaller than the maximum allocation size">
+  ];
 }
 
 def PackConstants :

@@ -205,6 +205,40 @@ func.func @producedResults(%size0: index, %size1: index) {
 
 // -----
 
+// Tests that results allocations hoisted out of the loop.
+
+// CHECK-LABEL: @hoistProducedResults
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[SIZE:.+]]: index)
+func.func @hoistProducedResults(%resource: !stream.resource<external>, %size: index) {
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK: %[[C1:.+]] = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<staging>{%[[C1]]}
+  // CHECK: cf.br ^bb1
+  cf.br ^bb1
+^bb1:
+  // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
+  // CHECK-SAME: (%[[OPERAND]] as %[[ARG0:.+]]: !stream.resource<external>
+  // CHECK-SAME:  %[[ALLOC]] as %[[ARG1:.+]]: !stream.resource<staging>
+  // CHECK: stream.cmd.copy %[[ARG0]]{{.*}}, %[[ARG1]]
+  // CHECK: stream.cmd.flush %[[ARG1]]
+  // CHECK: %[[AWAIT:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[ALLOC]]
+  // CHECK: stream.resource.load %[[AWAIT]]
+  %result, %result_timepoint = stream.async.execute with(%resource as %arg : !stream.resource<external>{%c1}) -> !stream.resource<staging>{%c1} {
+    %transfer = stream.async.transfer %arg : !stream.resource<external>{%c1} -> !stream.resource<staging>{%c1}
+    stream.yield %transfer : !stream.resource<staging>{%c1}
+  } => !stream.timepoint
+  %await = stream.timepoint.await %result_timepoint => %result : !stream.resource<staging>{%c1}
+  %pred = stream.async.load %await[%c0] : !stream.resource<staging>{%c1} -> i1
+  cf.cond_br %pred, ^bb1, ^bb2
+^bb2:
+  return
+}
+
+// -----
+
 // Tests local values that are produced and consumed exclusively within the
 // execution region. We expect them to be placed into packed slices and
 // allocated with the async stream-ordered alloca/dealloca ops.
