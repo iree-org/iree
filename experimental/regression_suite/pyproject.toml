@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 markers = [
-    "plat_rdna_vulkan: mark tests as running on AMD RDNA Vulkan device",
+    "plat_rdna3_vulkan: mark tests as running on AMD RDNA3 Vulkan device",
     "presubmit: mark test as running on presubmit",
     "unstable_linalg: mark test as depending on unstable, serialized linalg IR",
 ]

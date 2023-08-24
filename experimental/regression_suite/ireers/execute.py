@@ -4,12 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import pytest
+
+def execute_module(vmfb, driver, inputs, expected_outputs):
+    ...
 
 
-def fetch_source_fixture(url: str):
-    @pytest.fixture
-    def fetcher(tmp_path_factory, worker_id):
-        return f"Hi: {tmp_path_factory}, {worker_id}"
-
-    return fetcher
+def benchmark_module(vmfb, driver, inputs):
+    ...

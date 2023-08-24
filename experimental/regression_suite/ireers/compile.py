@@ -7,3 +7,5 @@
 import pytest
 
 
+def compile_iree(source, flags):
+    return "Compiled"
