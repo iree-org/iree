@@ -140,7 +140,7 @@ hal.executable @i4_dequant_matvec_f32 {
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 // CHECK-LABEL: hal.executable.export public @i4_dequant_matvec_f32
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
-//  CHECK-SAME:   workgroup_size = [1024 : index, 1 : index, 1 : index]
+//  CHECK-SAME:   workgroup_size = [128 : index, 1 : index, 1 : index]
 //       CHECK: func.func @i4_dequant_matvec_f32()
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     lowering_config = #[[$CONFIG]]
