@@ -58,7 +58,9 @@ def parse_arguments(argv=None):
     )
     add_ouptut_options(copy_parser)
     copy_parser.add_argument("input_file", help="File to process")
-    copy_parser.add_argument("-o", required=True, dest="output_file", help="Output file")
+    copy_parser.add_argument(
+        "-o", required=True, dest="output_file", help="Output file"
+    )
     copy_parser.set_defaults(func=do_copy)
 
     # strip-data command.
