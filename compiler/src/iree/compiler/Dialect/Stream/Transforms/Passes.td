@@ -129,6 +129,20 @@ def ScheduleAllocation :
   }];
 }
 
+def HoistAllocation :
+    InterfacePass<"iree-stream-hoist-allocation", "mlir::CallableOpInterface"> {
+  let summary = "Hoists resource allocations from loops.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createHoistAllocationPass()
+  }];
+  let options = [
+    Option<"maxHoistedAllocSize", "max-hoisted-alloc-size",
+           "int64_t", /*default=*/"64",
+           "When safe hoist resource allocations from the loop to the "
+           "predecessor block if it's smaller than the maximum allocation size">
+  ];  
+}
+
 def PackConstants :
     InterfacePass<"iree-stream-pack-constants", "mlir::CallableOpInterface"> {
   let summary = "Packs and allocate backing storage for fused constant resources.";

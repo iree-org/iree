@@ -191,6 +191,9 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // lifetime allocations.
   passManager.addPass(IREE::Stream::createScheduleAllocationPass());
   FunctionLikeNest(passManager)
+      // Hoist allocations out of the loops to avoid allocate/deallocate cycles.
+      .addPass(IREE::Stream::createHoistAllocationPass)
+
       // TODO(benvanik): passes to convert alloc to alloca and thread through
       // streams. Ideally all transient allocs become stream-ordered allocas.
       // createPropagateTransientsPass()

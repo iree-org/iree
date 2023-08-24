@@ -26,6 +26,7 @@ iree_cc_library(
     "EncodeTensors.cpp"
     "FoldUniformOperands.cpp"
     "FuseDispatchBindings.cpp"
+    "HoistAllocation.cpp"    
     "LayoutSlices.cpp"
     "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"

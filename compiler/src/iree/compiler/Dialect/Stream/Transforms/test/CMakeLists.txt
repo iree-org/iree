@@ -29,6 +29,7 @@ iree_lit_test_suite(
     "fold_uniform_operands.mlir"
     "fuse_dispatch_bindings.mlir"
     "fuse_dispatch_bindings_noalias.mlir"
+    "hoist_allocation.mlir"
     "layout_slices.mlir"
     "materialize_builtins.mlir"
     "materialize_copy_on_write.mlir"

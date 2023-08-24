@@ -126,6 +126,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideTimepointsPass();
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createScheduleAllocationPass();
+std::unique_ptr<InterfacePass<CallableOpInterface>> createHoistAllocationPass();
 
 std::unique_ptr<InterfacePass<CallableOpInterface>> createPackConstantsPass();
 std::unique_ptr<InterfacePass<CallableOpInterface>> createPackAllocationsPass();
