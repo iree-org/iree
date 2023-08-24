@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -57,6 +58,10 @@ public:
     // in order without depending on globals that have not been initialized
     // yet.
     getOperation().walk<WalkOrder::PreOrder>([&](Operation *iterOp) {
+      // We cannot hoist within a hal.executable.
+      if (iterOp->getParentOfType<HAL::ExecutableOp>()) {
+        return WalkResult::advance();
+      }
       // We only want to look at const-expr ops (non roots) since they may
       // have interesting escapes. Early exit here for efficiency.
       auto *iterInfo = constExprs.lookup(iterOp);

@@ -57,6 +57,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     MLIRVectorDialect
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::Constant
