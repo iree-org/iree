@@ -21,9 +21,10 @@
 
 // Filter to only supported features.
 #if !defined(IREE_TRACING_FEATURES)
-#define IREE_TRACING_FEATURES          \
-  ((IREE_TRACING_FEATURES_REQUESTED) & \
-   (IREE_TRACING_FEATURE_INSTRUMENTATION | IREE_TRACING_FEATURE_LOG_MESSAGES))
+#define IREE_TRACING_FEATURES                                                  \
+  ((IREE_TRACING_FEATURES_REQUESTED) &                                         \
+   (IREE_TRACING_FEATURE_INSTRUMENTATION | IREE_TRACING_FEATURE_LOG_MESSAGES | \
+    IREE_TRACING_FEATURE_ALLOCATION_TRACKING))
 #endif  // !IREE_TRACING_FEATURES
 
 // File handle that tracing information will be dumped to.
@@ -94,6 +95,10 @@ void iree_tracing_message_cstring(const char* value, const char* symbol,
                                   uint32_t color);
 void iree_tracing_message_string_view(const char* value, size_t value_length,
                                       const char* symbol, uint32_t color);
+
+void iree_tracing_memory_alloc(const char* name, size_t name_length, void* ptr,
+                               size_t size);
+void iree_tracing_memory_free(const char* name, size_t name_length, void* ptr);
 
 #endif  // IREE_TRACING_FEATURES
 
@@ -237,10 +242,15 @@ static inline void* iree_tracing_obscure_ptr(void* ptr) { return ptr; }
 
 // TODO(benvanik): console tracing allocation support. We could just print out
 // pointers or keep track of statistics and dump them in IREE_TRACE_APP_EXIT.
-#define IREE_TRACE_ALLOC(ptr, size)
-#define IREE_TRACE_FREE(ptr)
-#define IREE_TRACE_ALLOC_NAMED(name_literal, ptr, size)
-#define IREE_TRACE_FREE_NAMED(name_literal, ptr)
+#define IREE_TRACE_ALLOC(ptr, size) \
+  iree_tracing_memory_alloc("heap", 4, (ptr), (size))
+#define IREE_TRACE_FREE(ptr) iree_tracing_memory_free("heap", 4, (ptr))
+#define IREE_TRACE_ALLOC_NAMED(name_literal, ptr, size)                      \
+  iree_tracing_memory_alloc((name_literal), IREE_TRACE_STRLEN(name_literal), \
+                            (ptr), (size))
+#define IREE_TRACE_FREE_NAMED(name_literal, ptr)                            \
+  iree_tracing_memory_free((name_literal), IREE_TRACE_STRLEN(name_literal), \
+                           (ptr))
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 

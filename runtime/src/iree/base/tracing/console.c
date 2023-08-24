@@ -209,4 +209,25 @@ void iree_tracing_message_string_view(const char* value, size_t value_length,
 #endif  // IREE_TRACING_CONSOLE_FLUSH
 }
 
+void iree_tracing_memory_alloc(const char* name, size_t name_length, void* ptr,
+                               size_t size) {
+  fprintf(_console.file, "[%08" PRIX64 "][%.*s%*s] %*s● %.*s alloc %p (%zu)\n",
+          iree_thread_id(), (int)_thread.name_length, _thread.name,
+          (int)(IREE_TRACING_MAX_THREAD_LENGTH - _thread.name_length), "",
+          _thread.depth, "", (int)name_length, name, ptr, size);
+#if IREE_TRACING_CONSOLE_FLUSH
+  fflush(_console.file);
+#endif  // IREE_TRACING_CONSOLE_FLUSH
+}
+
+void iree_tracing_memory_free(const char* name, size_t name_length, void* ptr) {
+  fprintf(_console.file, "[%08" PRIX64 "][%.*s%*s] %*s◌ %.*s free %p\n",
+          iree_thread_id(), (int)_thread.name_length, _thread.name,
+          (int)(IREE_TRACING_MAX_THREAD_LENGTH - _thread.name_length), "",
+          _thread.depth, "", (int)name_length, name, ptr);
+#if IREE_TRACING_CONSOLE_FLUSH
+  fflush(_console.file);
+#endif  // IREE_TRACING_CONSOLE_FLUSH
+}
+
 #endif  // IREE_TRACING_FEATURES
