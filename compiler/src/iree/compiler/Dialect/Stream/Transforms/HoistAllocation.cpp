@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/IR/AsmState.h"
@@ -28,6 +29,29 @@ namespace {
 //===----------------------------------------------------------------------===//
 // -iree-stream-hoist-allocation
 //===----------------------------------------------------------------------===//
+
+// Returns a set of values tied to |values| through tied operands.
+static llvm::SetVector<Value>
+getTiedValues(IREE::Stream::ResourceAllocOp alloc) {
+  llvm::SetVector<Value> tiedValued;
+  tiedValued.insert(alloc.result_begin(), alloc.result_end());
+
+  SmallVector<Value> worklist;
+  worklist.append(alloc.result_begin(), alloc.result_end());
+
+  while (!worklist.empty()) {
+    Value value = worklist.pop_back_val();
+    for (auto &use : value.getUses()) {
+      if (auto tiedOp = dyn_cast<Util::TiedOpInterface>(use.getOwner())) {
+        auto tiedResults = tiedOp.getOperandTiedResults(use.getOperandNumber());
+        tiedValued.insert(tiedResults.begin(), tiedResults.end());
+        worklist.append(tiedResults.begin(), tiedResults.end());
+      }
+    }
+  }
+
+  return tiedValued;
+}
 
 class HoistAllocationPass : public HoistAllocationBase<HoistAllocationPass> {
 public:
@@ -70,17 +94,38 @@ public:
       if (!llvm::all_of(alloc.getStorageSizes(), isBelowMaxHoistedAllocSize))
         continue;
 
-      // Check that allocation dies in the same block where it's defined.
+      // Find all tied values derived from alloc results.
+      llvm::SetVector<Value> tiedValues = getTiedValues(alloc);
+
+      // Check that all tied values defined in the same block.
+      bool sameBlock = llvm::all_of(tiedValues, [&](Value value) {
+        return value.getDefiningOp()->getBlock() == alloc->getBlock();
+      });
+      if (!sameBlock)
+        continue;
+
+      // Check that none of the tied values leave the block via termiantor.
+      auto *terminator = alloc->getBlock()->getTerminator();
+      bool doNotLeak = llvm::all_of(tiedValues, [&](Value value) {
+        return llvm::find(terminator->getOperands(), value) ==
+               terminator->getOperands().end();
+      });
+      if (!doNotLeak)
+        continue;
+
+      // Check that all values tied to allocation die in the allocation block.
       auto *livenessBlockInfo = liveness.getLiveness(alloc->getBlock());
       if (!livenessBlockInfo)
         continue;
 
-      bool liveOut = llvm::any_of(alloc->getResults(), [&](Value result) {
-        return livenessBlockInfo->isLiveOut(result);
+      bool doNotLiveOut = llvm::any_of(tiedValues, [&](Value value) {
+        return !livenessBlockInfo->isLiveOut(value);
       });
+      if (!doNotLiveOut)
+        continue;
 
-      if (!liveOut)
-        alloc->moveBefore(predecessor->getTerminator());
+      // It's safe to move allocation to the predecessor block.
+      alloc->moveBefore(predecessor->getTerminator());
     }
   }
 };
