@@ -55,8 +55,6 @@ void buildGlobalOptimizationPassPipeline(
   // The more we are able to equate shape dimensions at this level the
   // better our fusions will be.
   mainPassManager.addPass(IREE::Flow::createExpandTensorShapesPass());
-  FunctionLikeNest(mainPassManager)
-      .addPass(IREE::Flow::createTopLevelSCFToCFGPass);
 
   FunctionLikeNest(mainPassManager)
       // Preprocess the input to a form more amenable for fusion
