@@ -7,13 +7,16 @@
 import pytest
 from ireers import *
 
-llama2_7b_f16qi4_source = fetch_source_fixture("foobar")
+llama2_7b_f16qi4_source = fetch_source_fixture(
+    "file:/home/stella/tmp/pkgci/llama2_7b_int4_stripped.mlir", group="llama2_7b_f16qi4"
+)
 
 
 @pytest.fixture
-def llama2_7b_f16qi4_rdna3_vmfb(llama2_7b_f16qi4_source):
-    return compile_iree(
+def llama2_7b_f16qi4_rdna3_vulkan_vmfb(llama2_7b_f16qi4_source):
+    return iree_compile(
         llama2_7b_f16qi4_source,
+        "rdna3_vulkan",
         flags=[
             "--iree-input-type=none",
             "--iree-hal-target-backends=vulkan",
@@ -30,17 +33,21 @@ def llama2_7b_f16qi4_rdna3_vmfb(llama2_7b_f16qi4_source):
 @pytest.mark.presubmit
 @pytest.mark.unstable_linalg
 @pytest.mark.plat_rdna3_vulkan
-def test_step_rdna3_vulkan(llama2_7b_f16qi4_rdna3_vmfb):
-    golden_inputs = "TODO"
-    expected_outputs = "TODO"
-    execute_module(
-        llama2_7b_f16qi4_rdna3_vmfb,
-        driver="vulkan",
-        inputs=golden_inputs,
-        expected_outputs=expected_outputs,
+def test_step_rdna3_vulkan_stripped(llama2_7b_f16qi4_rdna3_vulkan_vmfb):
+    iree_benchmark_module(
+        llama2_7b_f16qi4_rdna3_vulkan_vmfb,
+        device="vulkan",
+        function="first_vicuna_forward",
+        args=[
+            "--input=1x1xi64",
+        ],
     )
-    benchmark_module(
-        llama2_7b_f16qi4_rdna3_vmfb,
-        driver="vulkan",
-        inputs=golden_inputs,
+    iree_benchmark_module(
+        llama2_7b_f16qi4_rdna3_vulkan_vmfb,
+        device="vulkan",
+        function="second_vicuna_forward",
+        args=[
+            "--input=1x1xi64",
+        ]
+        + (["--input=1x32x1x128xf16"] * 64),
     )

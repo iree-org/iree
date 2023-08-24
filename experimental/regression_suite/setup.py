@@ -9,16 +9,16 @@ from setuptools import find_namespace_packages, setup
 setup(
     name=f"iree-regression-suite",
     version=f"0.1dev1",
-    packages=find_namespace_packages(include=[
-        "ireers",
-    ],),
+    packages=find_namespace_packages(
+        include=[
+            "ireers",
+        ],
+    ),
     install_requires=[
         "numpy",
         "pytest",
         "pytest-xdist",
-        "wget",
         "PyYAML",
     ],
-    extras_require={
-    },
+    extras_require={},
 )
