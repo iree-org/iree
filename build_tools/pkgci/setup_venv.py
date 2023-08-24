@@ -116,6 +116,16 @@ def main(args):
             args.artifact_path = td
             return main(args)
 
+    # Find the regression suite project.
+    rs_dir = (
+        (Path(__file__).resolve().parent.parent.parent)
+        / "experimental"
+        / "regression_suite"
+    )
+    if not rs_dir.exists():
+        print(f"Could not find regression_suite project: {rs_dir}")
+        return 1
+
     artifact_prefix = f"{platform.system().lower()}_{platform.machine()}"
     wheels = []
     for package_stem, variant in [
@@ -138,9 +148,12 @@ def main(args):
         if not python_exe:
             raise RuntimeError("Error creating venv")
 
+    # Install each of the built wheels without deps or consulting an index.
+    # This is because we absolutely don't want this falling back to anything
+    # but what we said.
     for artifact_path, package_name in wheels:
         cmd = [
-            python_exe,
+            str(python_exe),
             "-m",
             "pip",
             "install",
@@ -153,6 +166,20 @@ def main(args):
         ]
         print(f"Running command: {' '.join([str(c) for c in cmd])}")
         subprocess.check_call(cmd)
+
+    # Now install the regression suite project, which will bring in any
+    # deps.
+    cmd = [
+        str(python_exe),
+        "-m",
+        "pip",
+        "install",
+        "--force-reinstall",
+        "-e",
+        str(rs_dir) + "/",
+    ]
+    print(f"Running command: {' '.join(cmd)}")
+    subprocess.check_call(cmd)
 
     return 0
 
