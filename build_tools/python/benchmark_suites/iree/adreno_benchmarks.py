@@ -45,12 +45,13 @@ class Android_Adreno_Benchmarks(object):
         self,
     ) -> List[iree_definitions.E2EModelRunConfig]:
         default_models = [
-            tflite_models.DEEPLABV3_FP32,
-            tflite_models.MOBILESSD_FP32,
-            tflite_models.POSENET_FP32,
-            tflite_models.MOBILEBERT_FP32,
-            tflite_models.MOBILENET_V2,
-            tflite_models.MOBILENET_V3SMALL,
+            # TODO(#14775): Re-enable the benchmarks.
+            # tflite_models.DEEPLABV3_FP32,
+            # tflite_models.MOBILESSD_FP32,
+            # tflite_models.POSENET_FP32,
+            # tflite_models.MOBILEBERT_FP32,
+            # tflite_models.MOBILENET_V2,
+            # tflite_models.MOBILENET_V3SMALL,
         ]
         default_gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
@@ -72,10 +73,11 @@ class Android_Adreno_Benchmarks(object):
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
             for model in [
-                tflite_models.MOBILESSD_FP32,
-                tflite_models.POSENET_FP32,
-                tflite_models.MOBILENET_V2,
-                tflite_models.MOBILENET_V3SMALL,
+                # TODO(#14775): Re-enable the benchmarks.
+                # tflite_models.MOBILESSD_FP32,
+                # tflite_models.POSENET_FP32,
+                # tflite_models.MOBILENET_V2,
+                # tflite_models.MOBILENET_V3SMALL,
             ]
         ]
 

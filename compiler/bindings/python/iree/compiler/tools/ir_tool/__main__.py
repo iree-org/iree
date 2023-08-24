@@ -50,15 +50,18 @@ def parse_arguments(argv=None):
         )
 
     # copy (cp) command.
-    cp_parser = subparsers.add_parser(
+    copy_parser = subparsers.add_parser(
         "copy",
         aliases=["cp"],
         help="Read a file and then output it using the given options, without "
         "modification",
     )
-    add_ouptut_options(cp_parser)
-    cp_parser.add_argument("input_file", help="File to process")
-    cp_parser.add_argument("-o", required=True, dest="output_file", help="Output file")
+    add_ouptut_options(copy_parser)
+    copy_parser.add_argument("input_file", help="File to process")
+    copy_parser.add_argument(
+        "-o", required=True, dest="output_file", help="Output file"
+    )
+    copy_parser.set_defaults(func=do_copy)
 
     # strip-data command.
     strip_data_parser = subparsers.add_parser(
@@ -77,19 +80,14 @@ def parse_arguments(argv=None):
     strip_data_parser.add_argument(
         "-o", required=True, dest="output_file", help="Output file"
     )
+    strip_data_parser.set_defaults(func=do_strip_data)
 
     args = parser.parse_args(argv)
     return args
 
 
 def main(args) -> int:
-    if args.sub_command == "copy":
-        return do_copy(args)
-    if args.sub_command == "strip-data":
-        return do_strip_data(args)
-    else:
-        print("error: Unrecognized sub-command {args.sub_command}", file=sys.stderr)
-        return 1
+    args.func(args)
     return 0
 
 
