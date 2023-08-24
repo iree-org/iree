@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/EncodingUtils.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -89,19 +90,23 @@ chooseEncodingInfo(RankedTensorType tensorType) {
   auto encoding = getEncodingAttr(tensorType);
   if (!encoding)
     return failure();
+
+  auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
-  switch (role) {
-  case EncodingRole::LHS:
-    return MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
-    break;
-  case EncodingRole::RHS:
-    return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
-    break;
-  case EncodingRole::RESULT:
-    return MaterializeEncodingInfo{{0, 1}, {8, 8}, {}};
-    break;
-  default:
-    return failure();
+  switch (user) {
+  case EncodingUser::MATMUL_F32F32F32:
+  case EncodingUser::MATMUL_F16F16F32:
+  case EncodingUser::MATMUL_F16F16F16:
+  case EncodingUser::MATMUL_BF16BF16F32:
+  case EncodingUser::MATMUL_BF16BF16BF16:
+  case EncodingUser::MATMUL_I8I8I32:
+  case EncodingUser::BATCH_MATMUL_F32F32F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F16:
+  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
+  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
+  case EncodingUser::BATCH_MATMUL_I8I8I32:
+    return chooseEncodingInfoForMatmul(user, role, /*tileParams=*/{8, 4, 8});
   }
 }
 

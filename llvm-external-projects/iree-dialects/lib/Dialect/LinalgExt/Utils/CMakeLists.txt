@@ -11,3 +11,11 @@ add_mlir_library(IREELinalgExtUtils
   MLIRTensorDialect
   MLIRMemRefDialect
 )
+
+add_mlir_library(IREELinalgExtEncodingUtils
+  EncodingUtils.cpp
+
+  LINK_LIBS PUBLIC
+  IREELinalgExtDialect
+  IREELinalgExtUtils
+)

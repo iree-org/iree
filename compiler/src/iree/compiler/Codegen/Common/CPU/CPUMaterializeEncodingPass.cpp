@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/EncodingUtils.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
@@ -171,7 +172,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
   MatmulTileParams tileParams = chooseMatmulTileParams(user, targetAttr);
-  auto encodingInfo = chooseEncodingInfoForMatmul(user, role, tileParams);
+  auto encodingInfo =
+      IREE::LinalgExt::chooseEncodingInfoForMatmul(user, role, tileParams);
   auto originalTypeAttr = encoding.getOriginalType();
   auto originalType = originalTypeAttr
                           ? originalTypeAttr.getValue().cast<RankedTensorType>()

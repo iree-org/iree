@@ -14,20 +14,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-struct MatmulTileParams {
-  int64_t M = 1;
-  int64_t K = 1;
-  int64_t N = 1;
-};
-
 void adjustTileSizesToNarrowStaticShape(
     IREE::LinalgExt::MaterializeEncodingInfo &encodingInfo,
     ArrayRef<int64_t> shape);
-
-IREE::LinalgExt::MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(IREE::LinalgExt::EncodingUser user,
-                            IREE::LinalgExt::EncodingRole role,
-                            MatmulTileParams tileParams);
 
 IREE::LinalgExt::MaterializeEncodingValueFn
 getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr);
