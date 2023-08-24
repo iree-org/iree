@@ -48,7 +48,7 @@ jobs:
           realpath version_info.json
           cat version_info.json
       - name: Enable cache
-        uses: actions/cache@v3
+        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # v3.3.1
         with:
           path: ${{ env.CACHE_DIR }}
           key: iree-pkgci-linux-release-x86_64-v1-${{ github.sha }}
@@ -66,12 +66,12 @@ jobs:
           export package_suffix="$PACKAGE_SUFFIX"
           # If just iterating locally, uncomment this to build a cheap wheel.
           # export packages="iree-runtime"
-          bash build_tools/pkgci/build_linux_packages.sh
+          ./build_tools/pkgci/build_linux_packages.sh
           # Some things put stuff in cache with weird, root read-only
           # permissions. Take them back.
           sudo chown -R "$(whoami)" "${cache_dir}"
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: linux_x86_64_release_packages
           path: |
@@ -114,7 +114,7 @@ jobs:
   #         realpath version_info.json
   #         cat version_info.json
   #     - name: Enable cache
-  #       uses: actions/cache@v3
+  #       uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # v3.3.1
   #       with:
   #         path: ${{ env.CACHE_DIR }}
   #         key: iree-pkgci-linux-release-asserts-x86_64-v1-${{ github.sha }}
@@ -132,12 +132,12 @@ jobs:
   #         export package_suffix="$PACKAGE_SUFFIX"
   #         # If just iterating locally, uncomment this to build a cheap wheel.
   #         # export packages="iree-runtime"
-  #         bash build_tools/pkgci/build_linux_packages.sh
+  #         ./build_tools/pkgci/build_linux_packages.sh
   #         # Some things put stuff in cache with weird, root read-only
   #         # permissions. Take them back.
   #         sudo chown -R "$(whoami)" "${cache_dir}"
   #     - name: Upload wheel artifacts
-  #       uses: actions/upload-artifact@v3
+  #       uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
   #       with:
   #         name: linux_x86_64_release_asserts_packages
   #         path: |

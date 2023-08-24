@@ -29,5 +29,6 @@ jobs:
       package_version: 0.dev1
 
   regression_test_cpu:
+    name: Regression Test CPU
     uses: ./.github/workflows/pkgci_regression_test_cpu.yml
     needs: [build_packages]
