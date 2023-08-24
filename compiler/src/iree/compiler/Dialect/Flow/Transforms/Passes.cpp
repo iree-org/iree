@@ -170,6 +170,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // compute op into the dispatch region, so that we can run additional
       // transformations afterwards with a simple region and without bothering
       // producers.
+      .addPass(IREE::Flow::createTopLevelSCFToCFGPass)
       .addPass([&]() {
         return createFormDispatchRegionsPass(FormDispatchRegionsOptions{
             clEnableFuseMultiUse, clDispatchGenerateWorkloadRegion,
