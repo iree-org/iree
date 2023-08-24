@@ -1846,9 +1846,7 @@ public:
     DominanceInfo &domInfo = getAnalysis<DominanceInfo>();
     DenseMap<func::FuncOp, std::optional<CFGLoopInfo>> loopInfo;
     for (auto func : moduleOp.getOps<func::FuncOp>()) {
-      if (func.isDeclaration())
-        continue;
-      if (!func.getFunctionBody().hasOneBlock())
+      if (!func.isDeclaration() && !func.getFunctionBody().hasOneBlock())
         loopInfo.try_emplace(func, domInfo.getDomTree(&func.getFunctionBody()));
     }
 
