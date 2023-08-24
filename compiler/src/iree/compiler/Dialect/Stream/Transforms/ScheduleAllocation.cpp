@@ -1845,11 +1845,12 @@ public:
     // optimize resource allocation inside loops.
     DominanceInfo &domInfo = getAnalysis<DominanceInfo>();
     DenseMap<func::FuncOp, std::optional<CFGLoopInfo>> loopInfo;
-    moduleOp->walk([&](func::FuncOp func) {
-      auto &body = func.getFunctionBody();
-      if (!body.hasOneBlock())
-        loopInfo[func] = CFGLoopInfo(domInfo.getDomTree(&body));
-    });
+    for (auto func : moduleOp.getOps<func::FuncOp>()) {
+      if (func.isDeclaration())
+        continue;
+      if (!func.getFunctionBody().hasOneBlock())
+        loopInfo.try_emplace(func, domInfo.getDomTree(&func.getFunctionBody()));
+    }
 
     for (auto &parentOp : llvm::make_early_inc_range(moduleOp.getOps())) {
       if (auto asyncFuncOp = dyn_cast<IREE::Stream::AsyncFuncOp>(parentOp)) {
