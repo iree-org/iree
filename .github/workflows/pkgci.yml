@@ -28,9 +28,6 @@ jobs:
     with:
       package_version: 0.dev1
 
-  validate:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Hello
-        run: |
-          echo "Hi"
+  regression_test_cpu:
+    uses: ./.github/workflows/pkgci_regression_test_cpu.yml
+    needs: [build_packages]
