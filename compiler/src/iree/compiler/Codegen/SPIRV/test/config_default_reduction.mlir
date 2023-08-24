@@ -47,7 +47,7 @@ hal.executable private @subgroup_reduce_f32 {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 //      CHECK: hal.executable.export public @subgroup_reduce_f32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [128 : index, 1 : index, 1 : index]
+// CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //      CHECK: func.func @subgroup_reduce_f32()
 //      CHECK:   linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -105,7 +105,7 @@ hal.executable private @subgroup_reduce_f16 {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 //      CHECK: hal.executable.export public @subgroup_reduce_f16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [512 : index, 1 : index, 1 : index]
+// CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
 //      CHECK: func.func @subgroup_reduce_f16()
 //      CHECK:   linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
