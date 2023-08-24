@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-raise-special-ops -canonicalize %s | FileCheck %s
+// RUN: iree-opt --iree-flow-raise-special-ops -canonicalize --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @softmax
 //  CHECK-SAME: %[[ARG:.+]]: tensor<?x?x?xf32>
@@ -186,3 +186,52 @@ func.func @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
 //       CHECK:   %[[RESULT:.+]] = linalg.matmul_transpose_b
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+func.func @test(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) -> tensor<5120xf32> {
+  %c0 = arith.constant 0 : index
+  // CHECK: tensor.extract_slice
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%B : tensor<5120xf32>) {
+  ^bb0(%out: f32):
+    %12 = linalg.index 0 : index
+    %extracted = tensor.extract %A[%c0, %c0, %12] : tensor<1x1x5120xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<5120xf32>
+  return %0 : tensor<5120xf32>
+}
+
+// -----
+
+// This currently should not be raised as the operation does not remain
+// elementwise after raising the tensor.extract to input.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @test(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  // CHECK: linalg.generic
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
+  ^bb0(%out: f32):
+    %i1 = linalg.index 0 : index
+    %i2 = linalg.index 1 : index
+    %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<128x128x128xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<64x64xf32>
+  return %0 : tensor<64x64xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @test(%A : tensor<64x64x64xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
+  ^bb0(%out: f32):
+    %i1 = linalg.index 0 : index
+    %i2 = linalg.index 1 : index
+    // CHECK: tensor.extract_slice
+    %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<64x64x64xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<64x64xf32>
+  return %0 : tensor<64x64xf32>
+}
