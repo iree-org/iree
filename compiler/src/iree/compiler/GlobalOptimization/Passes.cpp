@@ -28,6 +28,14 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
   mainPassManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
+
+  // Expand tensor shapes into SSA values and optimize the whole program.
+  // The more we are able to equate shape dimensions at this level the
+  // better our fusions will be.
+  FunctionLikeNest(mainPassManager)
+      .addPass(IREE::Flow::createTopLevelSCFToCFGPass);
+  mainPassManager.addPass(IREE::Flow::createExpandTensorShapesPass());
+
   FunctionLikeNest(mainPassManager)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
@@ -42,13 +50,6 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
-
-  // Expand tensor shapes into SSA values and optimize the whole program.
-  // The more we are able to equate shape dimensions at this level the
-  // better our fusions will be.
-  FunctionLikeNest(mainPassManager)
-      .addPass(IREE::Flow::createTopLevelSCFToCFGPass);
-  mainPassManager.addPass(IREE::Flow::createExpandTensorShapesPass());
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
