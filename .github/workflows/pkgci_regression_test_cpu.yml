@@ -54,4 +54,3 @@ jobs:
           pytest \
             -s -m "plat_host_cpu and presubmit" \
             experimental/regression_suite
-
