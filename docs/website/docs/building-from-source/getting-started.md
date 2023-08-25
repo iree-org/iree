@@ -357,6 +357,9 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
 
     ``` shell
     source ../iree-build/.env && export PYTHONPATH
+    # The 'PYTHONPATH' environment variable should now contain
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+
     python -c "import iree.compiler"
     python -c "import iree.runtime"
     ```
@@ -365,6 +368,9 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
 
     ``` shell
     source ../iree-build/.env && export PYTHONPATH
+    # The 'PYTHONPATH' environment variable should now contain
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+
     python -c "import iree.compiler"
     python -c "import iree.runtime"
     ```
@@ -372,7 +378,10 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
 === "Windows"
 
     ``` powershell
-    ../iree-build/.env.bat
+    ..\iree-build\.env.bat
+    # The 'PYTHONPATH' environment variable should now contain
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+
     python -c "import iree.compiler"
     python -c "import iree.runtime"
     ```
