@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from typing import Callable, Collection, Dict, Union
+from typing import Any, Callable, Collection, Dict, Union
 import functools
 from pathlib import Path
 import urllib.parse
@@ -72,7 +72,7 @@ class ProducedArtifact(Artifact):
         self,
         group: Union[ArtifactGroup, str],
         name: str,
-        callback: Callable[["ProducedArtifact"], None],
+        callback: Callable[["ProducedArtifact"], Any],
         *,
         always_produce: bool = False,
         depends: Collection["Artifact"] = (),
