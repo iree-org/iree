@@ -9,6 +9,7 @@
 
 #include <functional>
 
+#include "iree/compiler/Pipelines/Options.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -16,13 +17,11 @@ namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
 
+// We have a layer of indirection around the GlobalOptimizationOptions because
+// we also need a reference to the const-eval builder, which is injected
+// in by callers.
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  // Enables the iree-util-hoist-into-globals pass. This should eventually
-  // become the default.
-  bool constExprHoisting = false;
-
-  // Enables passes to perform numeric precision reduction.
-  bool numericPrecisionReduction = false;
+  GlobalOptimizationOptions options;
 
   // Hook to populate a constant evaluation pass pipeline. If nullptr, then
   // no passes are added for constant evaluation. This must be injected in

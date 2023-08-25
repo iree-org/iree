@@ -20,6 +20,28 @@ using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
+  // ML frontends have very uneven support for user-controlled types _and_ users
+  // tend to use types not well suited for the work they are doing. These
+  // demotions/promotions allow users to change the types after lowering out of
+  // the frontends. It'll always be better to do this higher up in the stack
+  // as these kind of blanket conversions have corner cases and potential
+  // accuracy/precision losses beyond what the user may expect.
+  if (transformOptions.options.demoteF64ToF32) {
+    mainPassManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
+  }
+  if (transformOptions.options.demoteF32ToF16) {
+    mainPassManager.addPass(IREE::Util::createDemoteF32ToF16Pass());
+  }
+  if (transformOptions.options.promoteF16ToF32) {
+    mainPassManager.addPass(IREE::Util::createPromoteF16ToF32Pass());
+  }
+  if (transformOptions.options.promoteBF16ToF32) {
+    mainPassManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
+  }
+  if (transformOptions.options.demoteI64ToI32) {
+    mainPassManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
+  }
+
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(mainPassManager)
       .addPass(IREE::Flow::createRemoveZeroExtentTensorsPass)
@@ -47,7 +69,7 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
   pipeline.addPass(IREE::Util::createIPOPass());
 
-  if (transformOptions.constExprHoisting) {
+  if (transformOptions.options.constExprHoisting) {
     pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());
   }
 
@@ -55,7 +77,7 @@ void buildGlobalOptimizationPassPipeline(
     transformOptions.buildConstEvalPassPipeline(pipeline);
   }
 
-  if (transformOptions.numericPrecisionReduction) {
+  if (transformOptions.options.numericPrecisionReduction) {
     pipeline.addPass(IREE::Flow::createInferNumericNarrowingPass());
     pipeline.addPass(IREE::Flow::createOptimizeNumericsPass());
     pipeline.addPass(IREE::Flow::createCleanupNumericNarrowingPass());
@@ -68,6 +90,13 @@ void buildGlobalOptimizationPassPipeline(
   // Add the whole fixed point iterator.
   mainPassManager.addPass(
       IREE::Util::createFixedPointIteratorPass(std::move(pipeline)));
+
+  // Strip std.assert & co after we perform optimizations; prior to this we
+  // may use the assertions to derive information during analysis.
+  if (transformOptions.options.stripAssertions) {
+    FunctionLikeNest(mainPassManager)
+        .addPass(IREE::Util::createStripDebugOpsPass);
+  }
 }
 
 void registerGlobalOptimizationPipeline() {
