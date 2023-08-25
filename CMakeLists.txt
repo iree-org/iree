@@ -239,8 +239,10 @@ option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL driv
 # not cross compiling. Note: a CUDA-compatible GPU with drivers is still
 # required to actually run CUDA workloads.
 set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+set(IREE_HAL_DRIVER_CUDA2_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
   set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
+  set(IREE_HAL_DRIVER_CUDA2_DEFAULT OFF)
 endif()
 
 # Vulkan support is enabled by default if the platform might support Vulkan.
@@ -258,6 +260,7 @@ if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
 endif()
 
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
+option(IREE_HAL_DRIVER_CUDA2 "Enables the 'cuda2' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA2_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
@@ -312,6 +315,9 @@ endif()
 message(STATUS "IREE HAL drivers:")
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
+endif()
+if(IREE_HAL_DRIVER_CUDA2)
+  message(STATUS "  - cuda2")
 endif()
 if(IREE_HAL_DRIVER_LOCAL_SYNC)
   message(STATUS "  - local-sync")
@@ -574,22 +580,6 @@ set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "iree")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-
-#-------------------------------------------------------------------------------
-# Experimental next-generation CUDA HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=cuda2
-#-------------------------------------------------------------------------------
-
-iree_register_external_hal_driver(
-  NAME
-    cuda2
-  SOURCE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2"
-  DRIVER_TARGET
-    iree::experimental::cuda2::registration
-  REGISTER_FN
-    iree_hal_cuda2_driver_module_register
-)
 
 #-------------------------------------------------------------------------------
 # Experimental ROCM HAL driver
