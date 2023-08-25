@@ -1,5 +1,4 @@
 ---
-title: Matrix Multiplication with MMT4D
 date: 2021-10-13
 authors:
   - ataei
@@ -10,7 +9,7 @@ tags:
   - CPU
 ---
 
-# Work in progress on Matrix Multiplication on CPU
+# Matrix Multiplication with MMT4D
 
 ## Introduction
 

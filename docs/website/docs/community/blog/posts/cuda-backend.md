@@ -1,5 +1,4 @@
 ---
-title: CUDA Backend
 date: 2021-10-15
 authors:
   - thomasraoux
@@ -10,7 +9,7 @@ tags:
   - CUDA
 ---
 
-# CUDA backend in IREE
+# CUDA backend
 
 IREE is being designed with re-targetability as a core goal: it should be
 possible to use IREE to target a broad spectrum of power regimes, from embedded
