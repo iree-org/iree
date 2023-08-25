@@ -762,6 +762,12 @@ static iree_status_t iree_hal_cuda2_device_profiling_begin(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_cuda2_device_profiling_flush(
+    iree_hal_device_t* base_device) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_cuda2_device_profiling_end(
     iree_hal_device_t* base_device) {
   // Unimplemented (and that's ok).
@@ -797,5 +803,6 @@ static const iree_hal_device_vtable_t iree_hal_cuda2_device_vtable = {
     .queue_flush = iree_hal_cuda2_device_queue_flush,
     .wait_semaphores = iree_hal_cuda2_device_wait_semaphores,
     .profiling_begin = iree_hal_cuda2_device_profiling_begin,
+    .profiling_flush = iree_hal_cuda2_device_profiling_flush,
     .profiling_end = iree_hal_cuda2_device_profiling_end,
 };

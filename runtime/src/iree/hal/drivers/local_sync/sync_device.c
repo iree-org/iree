@@ -464,7 +464,7 @@ static iree_status_t iree_hal_sync_device_wait_semaphores(
 }
 
 static iree_status_t iree_hal_sync_device_profiling_begin(
-    iree_hal_device_t* device,
+    iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
   // Unimplemented (and that's ok).
   // We could hook in to vendor APIs (Intel/ARM/etc) or generic perf infra:
@@ -477,8 +477,14 @@ static iree_status_t iree_hal_sync_device_profiling_begin(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_sync_device_profiling_flush(
+    iree_hal_device_t* base_device) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_sync_device_profiling_end(
-    iree_hal_device_t* device) {
+    iree_hal_device_t* base_device) {
   // Unimplemented (and that's ok).
   return iree_ok_status();
 }
@@ -512,5 +518,6 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .queue_flush = iree_hal_sync_device_queue_flush,
     .wait_semaphores = iree_hal_sync_device_wait_semaphores,
     .profiling_begin = iree_hal_sync_device_profiling_begin,
+    .profiling_flush = iree_hal_sync_device_profiling_flush,
     .profiling_end = iree_hal_sync_device_profiling_end,
 };
