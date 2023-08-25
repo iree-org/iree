@@ -158,6 +158,7 @@ namespace {
 
 static void BenchmarkGenericFunction(const std::string& benchmark_name,
                                      int32_t batch_size,
+                                     iree_hal_device_t* device,
                                      iree_vm_context_t* context,
                                      iree_vm_function_t function,
                                      iree_vm_list_t* inputs,
@@ -179,6 +180,11 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
         inputs, outputs.get(), iree_allocator_system()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
     IREE_TRACE_ZONE_END(z1);
+    if (device) {
+      state.PauseTiming();
+      IREE_CHECK_OK(iree_hal_device_profiling_flush(device));
+      state.ResumeTiming();
+    }
   }
   state.SetItemsProcessed(state.iterations());
 
@@ -186,6 +192,7 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
 }
 
 void RegisterGenericBenchmark(const std::string& function_name,
+                              iree_hal_device_t* device,
                               iree_vm_context_t* context,
                               iree_vm_function_t function,
                               iree_vm_list_t* inputs) {
@@ -194,8 +201,8 @@ void RegisterGenericBenchmark(const std::string& function_name,
   benchmark::RegisterBenchmark(benchmark_name.c_str(),
                                [=](benchmark::State& state) -> void {
                                  BenchmarkGenericFunction(
-                                     benchmark_name, batch_size, context,
-                                     function, inputs, state);
+                                     benchmark_name, batch_size, device,
+                                     context, function, inputs, state);
                                })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
@@ -328,6 +335,9 @@ static void BenchmarkAsyncFunction(
     IREE_TRACE_ZONE_END(z_end);
 
     IREE_TRACE_ZONE_END(z1);
+    if (device) {
+      IREE_CHECK_OK(iree_hal_device_profiling_flush(device));
+    }
     state.ResumeTiming();
   }
   state.SetItemsProcessed(state.iterations());
@@ -502,8 +512,8 @@ class IREEBenchmark {
                                    function, inputs_.get());
     } else {
       // Synchronous invocation.
-      iree::RegisterGenericBenchmark(function_name, context_.get(), function,
-                                     inputs_.get());
+      iree::RegisterGenericBenchmark(function_name, device_.get(),
+                                     context_.get(), function, inputs_.get());
     }
     return iree_ok_status();
   }
@@ -530,8 +540,8 @@ class IREEBenchmark {
             function);
       } else if (iree_string_view_equal(benchmark_type, IREE_SV("entry"))) {
         iree::RegisterGenericBenchmark(
-            std::string(function_name.data, function_name.size), context_.get(),
-            function,
+            std::string(function_name.data, function_name.size), device_.get(),
+            context_.get(), function,
             /*inputs=*/nullptr);
       } else {
         // Pick up generic () -> () functions.
@@ -570,7 +580,7 @@ class IREEBenchmark {
             // anything).
             iree::RegisterGenericBenchmark(
                 std::string(function_name.data, function_name.size),
-                context_.get(), function,
+                device_.get(), context_.get(), function,
                 /*inputs=*/nullptr);
           }
         }

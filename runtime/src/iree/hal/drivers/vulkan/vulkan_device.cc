@@ -1489,6 +1489,28 @@ static iree_status_t iree_hal_vulkan_device_profiling_begin(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_device_profiling_flush(
+    iree_hal_device_t* base_device) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  (void)device;
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+  if (iree_all_bits_set(device->logical_device->enabled_features(),
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
+    for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
+      iree_hal_vulkan_tracing_context_t* tracing_context =
+          device->queues[i]->tracing_context();
+      if (tracing_context) {
+        iree_hal_vulkan_tracing_context_collect(tracing_context,
+                                                VK_NULL_HANDLE);
+      }
+    }
+  }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_device_profiling_end(
     iree_hal_device_t* base_device) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
@@ -1545,6 +1567,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.queue_flush=*/iree_hal_vulkan_device_queue_flush,
     /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
     /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
+    /*.profiling_flush=*/iree_hal_vulkan_device_profiling_flush,
     /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,
 };
 }  // namespace
