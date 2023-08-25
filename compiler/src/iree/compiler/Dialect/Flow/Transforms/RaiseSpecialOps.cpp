@@ -76,6 +76,34 @@ std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
   return std::nullopt;
 }
 
+// Method to match a linalg.generic op representing a linalg.fill op. Returns
+// the fill value (input operand to linalg.fill) on success.
+std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
+  if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
+      linalgOp.getNumDpsInputs() == 0 && linalgOp.getNumDpsInits() == 1 &&
+      linalgOp.getNumParallelLoops() == linalgOp.getNumLoops() &&
+      linalgOp.getIndexingMapsArray()[0].isIdentity()) {
+    // Check that the op body is only a linalg.yield op.
+    Value yieldOperand;
+    for (Operation &bodyOp : linalgOp.getBlock()->getOperations()) {
+      if (isa<linalg::YieldOp>(bodyOp)) {
+        yieldOperand = bodyOp.getOperand(0);
+      } else {
+        return std::nullopt;
+      }
+    }
+    // Check that the operand of the linalg.yield op is not an argument of the
+    // linalg.generic basic block
+    for (Value blockArg : linalgOp.getBlock()->getArguments()) {
+      if (yieldOperand == blockArg) {
+        return std::nullopt;
+      }
+    }
+    return yieldOperand;
+  }
+  return std::nullopt;
+}
+
 /// Matches a linalg.generic operation reading data from a tensor `source` using
 /// tensor.extract, and raises the `source` tensor to an input of the linalg
 /// operation.
@@ -333,6 +361,7 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
 
     SmallVector<std::pair<linalg::LinalgOp, Value>> softmaxRoots;
     SmallVector<std::pair<linalg::MatmulOp, Value>> transposeMatmulRoots;
+    SmallVector<std::pair<linalg::GenericOp, Value>> genericFills;
     getOperation()->walk([&](linalg::LinalgOp op) {
       {
         transform_ext::MatcherContext matcherContext;
@@ -346,6 +375,10 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
         if (std::optional<Value> newRhs = matchATransposeBMatmul(op)) {
           transposeMatmulRoots.push_back(std::make_pair(
               cast<linalg::MatmulOp>(op.getOperation()), newRhs.value()));
+        }
+        if (std::optional<Value> fillInput = matchGenericFill(op)) {
+          genericFills.push_back(
+              std::make_pair(cast<linalg::GenericOp>(op), fillInput.value()));
         }
       }
     });
@@ -368,6 +401,15 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       SmallVector<NamedAttribute> attrs = getPrunedAttributeList(matmulOp);
       rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
           matmulOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
+    }
+    for (std::pair<linalg::GenericOp, Value> genericFill : genericFills) {
+      auto genericOp = genericFill.first;
+      Value fillInput = genericFill.second;
+      Value init = genericOp.getDpsInitOperand(0)->get();
+      rewriter.setInsertionPoint(genericOp);
+      SmallVector<NamedAttribute> attrs = getPrunedAttributeList(genericOp);
+      rewriter.replaceOpWithNewOp<linalg::FillOp>(
+          genericOp, ValueRange{fillInput}, ValueRange{init}, attrs);
     }
   }
 };
