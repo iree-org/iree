@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+markers = [
+    "plat_host_cpu: mark tests as running on the host CPU",
+    "plat_rdna3_vulkan: mark tests as running on AMD RDNA3 Vulkan device",
+    "presubmit: mark test as running on presubmit",
+    "unstable_linalg: mark test as depending on unstable, serialized linalg IR",
+]

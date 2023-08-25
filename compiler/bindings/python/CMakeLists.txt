@@ -50,6 +50,51 @@ set(CMAKE_PLATFORM_NO_VERSIONED_SONAME 1)
 # Sources
 ################################################################################
 
+declare_mlir_python_sources(IREEPythonSources)
+declare_mlir_python_sources(IREEPythonSources.Dialects
+  ADD_TO_PARENT IREEPythonSources
+)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/FlowBinding.td
+  SOURCES dialects/flow.py
+  DIALECT_NAME flow
+)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/HALBinding.td
+  SOURCES dialects/hal.py
+  DIALECT_NAME hal
+)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/StreamBinding.td
+  SOURCES dialects/stream.py
+  DIALECT_NAME stream
+)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/UtilBinding.td
+  SOURCES dialects/util.py
+  DIALECT_NAME util
+)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT IREEPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  TD_FILE dialects/VMBinding.td
+  SOURCES dialects/vm.py
+  DIALECT_NAME vm
+)
+
 declare_mlir_python_sources(IREECompilerAPIPythonTools
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   SOURCES
@@ -88,6 +133,7 @@ set(_SOURCE_COMPONENTS
   # Local sources.
   IREECompilerAPIPythonTools
   IREECompilerPythonExtensions
+  IREEPythonSources
 
   MLIRPythonSources.Core
 

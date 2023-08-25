@@ -84,6 +84,8 @@ typedef struct iree_hal_vulkan_device_extensions_t {
   bool subgroup_size_control : 1;
   // VK_EXT_external_memory_host is enabled.
   bool external_memory_host : 1;
+  // VK_KHR_buffer_device_address is enabled.
+  bool buffer_device_address : 1;
 } iree_hal_vulkan_device_extensions_t;
 
 // Returns a bitfield with all of the provided extension names.

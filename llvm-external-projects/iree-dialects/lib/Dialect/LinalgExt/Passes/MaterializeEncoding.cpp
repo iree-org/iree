@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/EncodingUtils.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -89,19 +90,23 @@ chooseEncodingInfo(RankedTensorType tensorType) {
   auto encoding = getEncodingAttr(tensorType);
   if (!encoding)
     return failure();
+
+  auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
-  switch (role) {
-  case EncodingRole::LHS:
-    return MaterializeEncodingInfo{{0, 1}, {8, 4}, {}};
-    break;
-  case EncodingRole::RHS:
-    return MaterializeEncodingInfo{{1, 0}, {8, 4}, {1, 0}};
-    break;
-  case EncodingRole::RESULT:
-    return MaterializeEncodingInfo{{0, 1}, {8, 8}, {}};
-    break;
-  default:
-    return failure();
+  switch (user) {
+  case EncodingUser::MATMUL_F32F32F32:
+  case EncodingUser::MATMUL_F16F16F32:
+  case EncodingUser::MATMUL_F16F16F16:
+  case EncodingUser::MATMUL_BF16BF16F32:
+  case EncodingUser::MATMUL_BF16BF16BF16:
+  case EncodingUser::MATMUL_I8I8I32:
+  case EncodingUser::BATCH_MATMUL_F32F32F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F32:
+  case EncodingUser::BATCH_MATMUL_F16F16F16:
+  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
+  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
+  case EncodingUser::BATCH_MATMUL_I8I8I32:
+    return chooseEncodingInfoForMatmul(user, role, /*tileParams=*/{8, 4, 8});
   }
 }
 
@@ -243,7 +248,10 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }
-  if (lhsEncoding.getRole().getValue() !=
+  if (!isMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
+      !isMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
+      !isMatmulEncodingUser(resultEncoding.getUser().getValue()) ||
+      lhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::LHS ||
       rhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::RHS ||
@@ -257,8 +265,46 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   return mmt4DOp;
 }
 
-/// Utility method to convert from `linalg.fill` on `tensor` type with encoding
-/// to fill of the materialized type
+/// Utility method to convert from `linalg.batch_matmul` with
+/// - lhs encoding with user=BATCH_MATMUL_*, role=LHS
+/// - rhs encoding with user=BATCH_MATMUL_*, role=RHS
+/// - result encoding with user=BATCH_MATMUL_*, role=RESULT
+/// to linalg.batch_mmt4d op.
+static FailureOr<Operation *>
+lowerOpWithEncoding(RewriterBase &rewriter, linalg::BatchMatmulOp batchMatmulOp,
+                    ValueRange convertedInputOperands,
+                    ValueRange convertedOutputOperands, MaterializeEncodingFn,
+                    MaterializeEncodingValueFn) {
+  if (!batchMatmulOp.hasTensorSemantics())
+    return failure();
+  auto inputs = batchMatmulOp.getDpsInputOperands();
+  auto outputs = batchMatmulOp.getDpsInitOperands();
+  auto lhsEncoding =
+      getEncodingAttr(inputs[0]->get().getType().cast<RankedTensorType>());
+  auto rhsEncoding =
+      getEncodingAttr(inputs[1]->get().getType().cast<RankedTensorType>());
+  auto resultEncoding =
+      getEncodingAttr(outputs[0]->get().getType().cast<RankedTensorType>());
+  if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
+    return failure();
+  }
+
+  if (!isBatchMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
+      !isBatchMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
+      !isBatchMatmulEncodingUser(resultEncoding.getUser().getValue()) ||
+      lhsEncoding.getRole().getValue() != EncodingRole::LHS ||
+      rhsEncoding.getRole().getValue() != EncodingRole::RHS ||
+      resultEncoding.getRole().getValue() != EncodingRole::RESULT) {
+    return failure();
+  }
+  Operation *batchMmt4DOp = rewriter.create<linalg::BatchMmt4DOp>(
+      batchMatmulOp.getLoc(), convertedOutputOperands[0].getType(),
+      convertedInputOperands, convertedOutputOperands);
+  return batchMmt4DOp;
+}
+
+/// Utility method to convert from `linalg.fill` on `tensor` type with
+/// encoding to fill of the materialized type
 static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, linalg::FillOp fillOp,
                     ValueRange convertedInputOperands,
@@ -510,9 +556,11 @@ void populateMaterializeEncodingPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
 
-  // Add all patterns for converting from encoded type to the materialized type
+  // Add all patterns for converting from encoded type to the materialized
+  // type
   patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
                   MaterializeDPSOperation<linalg::MatmulOp>,
+                  MaterializeDPSOperation<linalg::BatchMatmulOp>,
                   MaterializeOperation<tensor::EmptyOp>,
                   SetEncodingOpToPackOpConversion,
                   UnsetEncodingOpToPackOpConversion>(

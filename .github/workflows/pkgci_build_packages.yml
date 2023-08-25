@@ -1,0 +1,145 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: PkgCI Build Packages
+on:
+  workflow_call:
+    inputs:
+      package_version:
+        type: string
+        required: true
+
+jobs:
+  linux_x86_64_release_packages:
+    name: Linux Release (x86_64)
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - environment=prod
+      - cpu
+      - os-family=Linux
+    strategy:
+      fail-fast: false
+    env:
+      CACHE_DIR: ${{ github.workspace }}/.iree-container-cache
+      MANYLINUX_DOCKER_IMAGE: ghcr.io/nod-ai/manylinux_x86_64:main
+      PACKAGE_SUFFIX: ""
+    steps:
+      - name: Prefetch Docker
+        run: |
+          docker pull "$MANYLINUX_DOCKER_IMAGE" &
+      - name: Checking out repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          submodules: true
+      - name: Write version info
+        shell: bash
+        run: |
+          cat << EOF > version_info.json
+          {
+            "package-suffix": "${PACKAGE_SUFFIX}",
+            "package-version": "${{ inputs.package_version }}",
+            "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
+          }
+          EOF
+          realpath version_info.json
+          cat version_info.json
+      - name: Enable cache
+        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # v3.3.1
+        with:
+          path: ${{ env.CACHE_DIR }}
+          key: iree-pkgci-linux-release-x86_64-v1-${{ github.sha }}
+          restore-keys: |
+            iree-pkgci-linux-release-x86_64-v1-
+      - name: Wait for docker pull
+        run: |
+          wait
+      - name: Build
+        run: |
+          export cache_dir="${{ env.CACHE_DIR }}"
+          export output_dir="${{ github.workspace }}/wheelhouse"
+          export toolchain_suffix=release
+          export manylinux_docker_image="$MANYLINUX_DOCKER_IMAGE"
+          export package_suffix="$PACKAGE_SUFFIX"
+          # If just iterating locally, uncomment this to build a cheap wheel.
+          # export packages="iree-runtime"
+          ./build_tools/pkgci/build_linux_packages.sh
+          # Some things put stuff in cache with weird, root read-only
+          # permissions. Take them back.
+          sudo chown -R "$(whoami)" "${cache_dir}"
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+        with:
+          name: linux_x86_64_release_packages
+          path: |
+            ${{ github.workspace }}/wheelhouse/iree*.whl
+          if-no-files-found: error
+
+# TODO: Debug low ccache hit rate and re-enable.
+# linux_x86_64_release_asserts_packages:
+#   name: Linux Release Asserts (x86_64)
+#   runs-on:
+#     - self-hosted # must come first
+#     - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+#     - environment=prod
+#     - cpu
+#     - os-family=Linux
+#   strategy:
+#     fail-fast: false
+#   env:
+#     CACHE_DIR: ${{ github.workspace }}/.iree-container-cache
+#     MANYLINUX_DOCKER_IMAGE: ghcr.io/nod-ai/manylinux_x86_64:main
+#     PACKAGE_SUFFIX: "-asserts"
+#   steps:
+#     - name: Prefetch Docker
+#       run: |
+#         docker pull "$MANYLINUX_DOCKER_IMAGE" &
+#     - name: "Checking out repository"
+#       uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+#       with:
+#         submodules: true
+#     - name: Write version info
+#       shell: bash
+#       run: |
+#         cat << EOF > version_info.json
+#         {
+#           "package-suffix": "${PACKAGE_SUFFIX}",
+#           "package-version": "${{ inputs.package_version }}",
+#           "iree-revision": "$(cd ../iree && git rev-parse HEAD)"
+#         }
+#         EOF
+#         realpath version_info.json
+#         cat version_info.json
+#     - name: Enable cache
+#       uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8  # v3.3.1
+#       with:
+#         path: ${{ env.CACHE_DIR }}
+#         key: iree-pkgci-linux-release-asserts-x86_64-v1-${{ github.sha }}
+#         restore-keys: |
+#           iree-pkgci-linux-release-asserts-x86_64-v1-
+#     - name: Wait for docker pull
+#       run: |
+#         wait
+#     - name: Build
+#       run: |
+#         export cache_dir="${{ env.CACHE_DIR }}"
+#         export output_dir="${{ github.workspace }}/wheelhouse"
+#         export toolchain_suffix=release_asserts
+#         export manylinux_docker_image="$MANYLINUX_DOCKER_IMAGE"
+#         export package_suffix="$PACKAGE_SUFFIX"
+#         # If just iterating locally, uncomment this to build a cheap wheel.
+#         # export packages="iree-runtime"
+#         ./build_tools/pkgci/build_linux_packages.sh
+#         # Some things put stuff in cache with weird, root read-only
+#         # permissions. Take them back.
+#         sudo chown -R "$(whoami)" "${cache_dir}"
+#     - name: Upload wheel artifacts
+#       uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+#       with:
+#         name: linux_x86_64_release_asserts_packages
+#         path: |
+#           ${{ github.workspace }}/wheelhouse/iree*.whl
+#         if-no-files-found: error

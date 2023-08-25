@@ -28,7 +28,7 @@
 
 using mlir::bufferization::AliasingOpOperand;
 using mlir::bufferization::AliasingOpOperandList;
-using mlir::bufferization::AliasingOpResult;
+using mlir::bufferization::AliasingValue;
 using mlir::bufferization::AnalysisState;
 using mlir::bufferization::BufferizableOpInterface;
 using mlir::bufferization::BufferizationOptions;
@@ -216,9 +216,9 @@ struct DispatchTensorStoreOpInterface
     return false;
   }
 
-  bufferization::AliasingOpResultList
-  getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                       const AnalysisState &state) const {
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
     return {};
   }
 
@@ -370,33 +370,35 @@ struct LinalgExtOpInterface
                                const AnalysisState &state) const {
     // Operand is written to if it has an aliasing OpResult.
     auto bufferizableOp = cast<BufferizableOpInterface>(op);
-    return !bufferizableOp.getAliasingOpResults(opOperand, state)
+    return !bufferizableOp.getAliasingValues(opOperand, state)
                 .getAliases()
                 .empty();
   }
 
   bufferization::AliasingOpOperandList
-  getAliasingOpOperands(Operation *op, OpResult opResult,
+  getAliasingOpOperands(Operation *op, Value value,
                         const AnalysisState &state) const {
     auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
 
+    size_t resultNum = std::distance(op->getOpResults().begin(),
+                                     llvm::find(op->getOpResults(), value));
     // The i-th OpResult may alias with the i-th "out" tensor.
-    return {AliasingOpOperand(
-        linalgExtOp.getOutputOperand(opResult.getResultNumber()) /*result*/,
-        BufferRelation::Equivalent,
-        /*isDefinite=*/false)};
+    return {
+        AliasingOpOperand(linalgExtOp.getOutputOperand(resultNum) /*result*/,
+                          BufferRelation::Equivalent,
+                          /*isDefinite=*/false)};
   }
 
-  bufferization::AliasingOpResultList
-  getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                       const AnalysisState &state) const {
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
     if (dspOp.isDpsInit(&opOperand)) {
-      return {AliasingOpResult(dspOp.getTiedOpResult(&opOperand) /*result*/,
-                               BufferRelation::Equivalent,
-                               /*isDefinite=*/false)};
+      return {AliasingValue(dspOp.getTiedOpResult(&opOperand) /*result*/,
+                            BufferRelation::Equivalent,
+                            /*isDefinite=*/false)};
     }
     return {};
   }
@@ -513,8 +515,8 @@ struct PackUnPackOpInterface
     return {dpsOp.getDpsInitOperand(opResult.getResultNumber())};
   }
 
-  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
-                                            const AnalysisState &state) const {
+  SmallVector<OpResult> getAliasingValue(Operation *op, OpOperand &opOperand,
+                                         const AnalysisState &state) const {
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
@@ -523,16 +525,16 @@ struct PackUnPackOpInterface
     return {};
   }
 
-  bufferization::AliasingOpResultList
-  getAliasingOpResults(Operation *op, OpOperand &opOperand,
-                       const AnalysisState &state) const {
+  bufferization::AliasingValueList
+  getAliasingValues(Operation *op, OpOperand &opOperand,
+                    const AnalysisState &state) const {
     auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
     if (dspOp.isDpsInit(&opOperand))
-      return {AliasingOpResult(dspOp.getTiedOpResult(&opOperand),
-                               BufferRelation::Equivalent,
-                               /*isDefinite=*/false)};
+      return {AliasingValue(dspOp.getTiedOpResult(&opOperand),
+                            BufferRelation::Equivalent,
+                            /*isDefinite=*/false)};
     return {};
   }
 

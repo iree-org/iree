@@ -11,3 +11,9 @@ iree_py_test(
     "registration_test.py"
 )
 
+iree_py_test(
+  NAME
+    dialects_test
+  SRCS
+    "dialects_test.py"
+)

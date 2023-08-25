@@ -1,12 +1,15 @@
 ---
+date: 2021-10-13
+authors:
+  - ataei
+  - bjacob
+categories:
+  - Performance
 tags:
   - CPU
 ---
 
-Wednesday, October 13, 2021<br>
-By Ahmed Taei, Benoit Jacob
-
-# Work in progress on Matrix Multiplication on CPU
+# Matrix Multiplication with MMT4D
 
 ## Introduction
 
@@ -28,6 +31,8 @@ This article is about an in-development MLIR operation,
 offering a compilation path for
 [`linalg.matmul`](https://github.com/llvm/llvm-project/blob/6e98ec9b2099475c057612a7af680a27c0b91a24/mlir/python/mlir/dialects/linalg/opdsl/ops/core_named_ops.py#L9-L21)
 that is designed from the ground up for these efficiency considerations.
+
+<!-- more -->
 
 We are still in the early implementation phase of this
 [`linalg.mmt4d`](https://github.com/llvm/llvm-project/blob/6e98ec9b2099475c057612a7af680a27c0b91a24/mlir/python/mlir/dialects/linalg/opdsl/ops/core_named_ops.py#L54-L71)
@@ -150,7 +155,7 @@ with both the left and right-hand sides being row-major-tiled.
 The following example illustrates that. In these diagrams, each matrix element
 is rendered its memory offset.
 
-![4x4-tiled](2021-10-13-mmt4d-4x4_tiled.png)
+![4x4-tiled](mmt4d-4x4_tiled.png)
 
 To compute the 2x2 block in the destination matrix, we will have to load two
 yellow blocks from LHS, RHS matrices respectively compute their matmul results
@@ -158,7 +163,7 @@ yellow blocks from LHS, RHS matrices respectively compute their matmul results
 tile loads data that is not contiguous. It would be better if we rearranged the
 elements in the following layout:
 
-![4x4-mmt4d](2021-10-13-mmt4d-4x4_mmt4d.png)
+![4x4-mmt4d](mmt4d-4x4_mmt4d.png)
 
 Now tiles are stored contiguously in memory and the kernel can simply load them
 from memory into the registers that will be directly consumed by the SIMD
@@ -174,7 +179,7 @@ matrices represented as 4D tensors. Moreover, these conversions should be
 tileable and decompose well. Thankfully, the transformation from 2D to 4D can be
 written as a reshape followed by a transpose as in the following digram:
 
-![graphviz](2021-10-13-mmt4d-graph_flow.svg)
+![graphviz](mmt4d-graph_flow.svg)
 
 So we can think of the outermost two dimensions of the 4D representations as the
 tile position in the overall matrix, and the innermost two as the element
@@ -238,7 +243,7 @@ We benchmarked various float32 matmul problems of different sizes and the result
 showed that mmt4d is faster than the existing matmul implementation for bigger
 matrices as we can see the in the following chart:
 
-![performance](2021-10-13-mmt4d-mmt4d_vs_matmul.png)
+![performance](mmt4d-mmt4d_vs_matmul.png)
 
 The SIMD instruction being used here is the simplest kind, a `vector*scalar`
 multiplication, and the storage orders of the matrices allow the existing
@@ -248,7 +253,7 @@ code, which is why the mmt4d code is only faster for bigger matrices. To
 understand why mmt4d is faster in that case, we collected statistics of L1 cache
 misses:
 
-![load-misses](2021-10-13-mmt4d-L1-dcache-load-misses.png)
+![load-misses](mmt4d-L1-dcache-load-misses.png)
 
 This shows that in this case, the better cache-friendliness of mmt4d, thanks to
 its simple contiguous memory access pattern, accounts for its higher

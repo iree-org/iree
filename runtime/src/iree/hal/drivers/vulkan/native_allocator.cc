@@ -293,6 +293,17 @@ static iree_status_t iree_hal_vulkan_native_allocator_commit_and_wrap(
   allocate_info.pNext = NULL;
   allocate_info.allocationSize = requirements.size;
   allocate_info.memoryTypeIndex = memory_type_index;
+  VkMemoryAllocateFlagsInfo allocate_flags_info = {};
+  allocate_flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+  allocate_flags_info.pNext = NULL;
+  allocate_flags_info.flags = 0;
+  if (iree_all_bits_set(
+          logical_device->enabled_features(),
+          IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES)) {
+    allocate_flags_info.flags |= VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+  }
+  allocate_flags_info.deviceMask = 0;
+  allocate_info.pNext = &allocate_flags_info;
   VkDeviceMemory device_memory = VK_NULL_HANDLE;
   VK_RETURN_IF_ERROR(logical_device->syms()->vkAllocateMemory(
                          *logical_device, &allocate_info,
@@ -449,7 +460,8 @@ static iree_status_t iree_hal_vulkan_native_allocator_allocate_internal(
   const bool use_sparse_allocation =
       iree_hal_vulkan_buffer_needs_sparse_binding(allocator, params,
                                                   allocation_size);
-  if (!iree_all_bits_set(allocator->logical_device->enabled_features(),
+  if (use_sparse_allocation &&
+      !iree_all_bits_set(allocator->logical_device->enabled_features(),
                          IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING)) {
     return iree_make_status(
         IREE_STATUS_RESOURCE_EXHAUSTED,

@@ -20,15 +20,14 @@ chown -R runner:runner /runner-root/
 
 echo "Fetching the runner archive"
 RUNNER_VERSION="$(get_attribute github-runner-version)"
-RUNNER_ARCHIVE="actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+RUNNER_ARCHIVE_URL="$(get_attribute github-runner-archive-url)"
 RUNNER_ARCHIVE_DIGEST="$(get_attribute github-runner-archive-digest)"
+RUNNER_ARCHIVE="actions-runner.tar.gz"
 
 cd /runner-root
 mkdir actions-runner
 cd actions-runner
-nice_curl \
-  "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_ARCHIVE}" \
-  -o "${RUNNER_ARCHIVE}"
+nice_curl "${RUNNER_ARCHIVE_URL}" -o "${RUNNER_ARCHIVE}"
 
 echo "${RUNNER_ARCHIVE_DIGEST} *${RUNNER_ARCHIVE}" | shasum -a 256 -c
 tar xzf "${RUNNER_ARCHIVE}"

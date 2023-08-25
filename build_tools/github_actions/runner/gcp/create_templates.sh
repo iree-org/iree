@@ -19,6 +19,7 @@ TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
 GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-06-21-1687374093}"
 CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-06-02-1685725199}"
+ARM64_IMAGE="${ARM64_IMAGE:-github-runner-arm64-2023-08-21-1692581800}"
 DISK_SIZE_GB="${DISK_SIZE_GB:-1000}"
 
 PROD_TEMPLATE_CONFIG_REPO="${PROD_TEMPLATE_CONFIG_REPO:-openxla/iree}"
@@ -51,7 +52,8 @@ if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
 GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.307.1}"
-GITHUB_RUNNER_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARCHIVE_DIGEST:-038c9e98b3912c5fd6d0b277f2e4266b2a10accc1ff8ff981b9971a8e76b5441}"
+GITHUB_RUNNER_X64_ARCHIVE_DIGEST="${GITHUB_RUNNER_X64_ARCHIVE_DIGEST:-038c9e98b3912c5fd6d0b277f2e4266b2a10accc1ff8ff981b9971a8e76b5441}"
+GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST:-01edc84342ef4128a8f19bc2f33709b40f2f1c40e250e2a4c5e0adf620044ab3}"
 GITHUB_TOKEN_PROXY_URL="${GITHUB_TOKEN_PROXY_URL:-https://ght-proxy-openxla-zbhz5clunq-ue.a.run.app}"
 
 if (( TESTING_SELF_DELETER==1 )); then
@@ -62,7 +64,6 @@ fi
 
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
-  "github-runner-archive-digest=${GITHUB_RUNNER_ARCHIVE_DIGEST}"
   "github-runner-config-ref=${TEMPLATE_CONFIG_REF}"
   "github-runner-config-repo=${TEMPLATE_CONFIG_REPO}"
   "github-runner-scope=${GITHUB_RUNNER_SCOPE}"
@@ -110,6 +111,18 @@ function create_template() {
     "github-runner-type=${type}"
   )
 
+  if [[ "${type}" == "arm64" ]]; then
+    local runner_arch="arm64"
+    local runner_archive_digest="${GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST}"
+  else
+    local runner_arch="x64"
+    local runner_archive_digest="${GITHUB_RUNNER_X64_ARCHIVE_DIGEST}"
+  fi
+  metadata+=(
+    "github-runner-archive-url=https://github.com/actions/runner/releases/download/v${GITHUB_RUNNER_VERSION}/actions-runner-linux-${runner_arch}-${GITHUB_RUNNER_VERSION}.tar.gz"
+    "github-runner-archive-digest=${runner_archive_digest}"
+  )
+
   # Join on commas
   local metadata_string="$(IFS="," ; echo "${metadata[*]}")"
 
@@ -125,43 +138,58 @@ function create_template() {
     --metadata="${metadata_string}"
   )
 
-  if [[ "${type}" == gpu ]]; then
-    cmd+=(
-      --machine-type=n1-standard-16
-      --maintenance-policy=TERMINATE
-      --accelerator=count=1,type=nvidia-tesla-t4
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
-    )
-  elif [[ "${type}" == a100 ]]; then
-    cmd+=(
-      --machine-type=a2-highgpu-1g
-      --maintenance-policy=TERMINATE
-      --accelerator=count=1,type=nvidia-tesla-a100
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
-    )
-  elif [[ "${type}" == cpu ]]; then
-    cmd+=(
-      --machine-type=n1-standard-96
-      --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
-    )
-  elif [[ "${type}" == c2s16 ]]; then
-    cmd+=(
-      --machine-type=c2-standard-16
-      --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
-    )
-  elif [[ "${type}" == c2s601t ]]; then
-    cmd+=(
-      --machine-type=c2-standard-60
-      --threads-per-core=1
-      --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
-    )
-  else
-    echo "Got unrecognized type '${type}'" >2
-    exit 1
-  fi
+  case "${type}" in
+    gpu)
+      cmd+=(
+        --machine-type=n1-standard-16
+        --maintenance-policy=TERMINATE
+        --accelerator=count=1,type=nvidia-tesla-t4
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    a100)
+      cmd+=(
+        --machine-type=a2-highgpu-1g
+        --maintenance-policy=TERMINATE
+        --accelerator=count=1,type=nvidia-tesla-a100
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    cpu)
+      cmd+=(
+        --machine-type=n1-standard-96
+        --maintenance-policy=MIGRATE
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    c2s16)
+      cmd+=(
+        --machine-type=c2-standard-16
+        --maintenance-policy=MIGRATE
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    c2s601t)
+      cmd+=(
+        --machine-type=c2-standard-60
+        --threads-per-core=1
+        --maintenance-policy=MIGRATE
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    arm64)
+      cmd+=(
+        --machine-type=t2a-standard-8
+        --maintenance-policy=MIGRATE
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${ARM64_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    *)
+      echo "Got unrecognized type '${type}'" >2
+      exit 1
+      ;;
+  esac
+
   if (( DRY_RUN==1 )); then
     # Prefix the command with a noop. It will still be printed by set -x
     cmd=(":" "${cmd[@]}")
@@ -173,7 +201,7 @@ function create_template() {
 
 for group in presubmit postsubmit; do
   # TODO(#14661): Remove c2s601t if we decide not to migrate benchmarks to it.
-  for type in gpu a100 cpu c2s16 c2s601t; do
+  for type in gpu a100 cpu c2s16 c2s601t arm64; do
     create_template "${group}" "${type}"
   done
 done

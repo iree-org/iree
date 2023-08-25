@@ -2270,6 +2270,12 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       continue;
     }
 
+    // For now pick the default for functions with control flow, cause
+    // the currently built pipelines dont work so well with control flow.
+    if (funcOp.getBody().empty() || !llvm::hasSingleElement(funcOp.getBody())) {
+      return lowerUsingDefaultPipeline(funcOp);
+    }
+
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
       return failure();

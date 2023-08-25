@@ -109,7 +109,7 @@ public:
           {indicesTy.getDimSize(0), indicesTy.getDimSize(1), 2}));
       indices = builder.create<tosa::ConcatOp>(indicesTy,
                                                ValueRange{batchIdx, indices},
-                                               rewriter.getI64IntegerAttr(2));
+                                               rewriter.getI32IntegerAttr(2));
     }
 
     auto collapseBatch = [](Value value, ImplicitLocOpBuilder &b) -> Value {

@@ -90,6 +90,10 @@ enum iree_hal_vulkan_feature_bits_t {
   // to allow for queue-ordered virtual memory management.
   IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED =
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING | (1u << 5),
+
+  // Enables buffer device addresses when supported and uses them when
+  // appropriately compiled SPIR-V executables require them.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES = 1u << 6,
 };
 typedef uint32_t iree_hal_vulkan_features_t;
 

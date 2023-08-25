@@ -94,9 +94,10 @@ static iree_status_t iree_allocator_system_alloc(
     }
   });
 
-  void* existing_ptr_value = iree_tracing_obscure_ptr(existing_ptr);
+  void* existing_ptr_value = NULL;
   void* new_ptr = NULL;
   if (existing_ptr && command == IREE_ALLOCATOR_COMMAND_REALLOC) {
+    existing_ptr_value = iree_tracing_obscure_ptr(existing_ptr);
     new_ptr = realloc(existing_ptr, byte_length);
   } else {
     existing_ptr = NULL;

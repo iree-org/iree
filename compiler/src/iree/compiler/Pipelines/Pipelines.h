@@ -38,6 +38,7 @@ enum class IREEVMPipelinePhase {
   Input,
   ABI,
   Preprocessing,
+  GlobalOptimization,
   Flow,
   Stream,
   ExecutableSources,
@@ -60,6 +61,8 @@ inline static void enumerateIREEVMPipelinePhases(
            "Adjusts program ABI for the specified execution environment.");
   callback(IREEVMPipelinePhase::Preprocessing, "preprocessing",
            "Compiles up to the `preprocessing` specified");
+  callback(IREEVMPipelinePhase::GlobalOptimization, "global-optimization",
+           "Compiles up to global optimization.");
   callback(IREEVMPipelinePhase::Flow, "flow",
            "Compiles up to the `flow` dialect.");
   callback(IREEVMPipelinePhase::Stream, "stream",

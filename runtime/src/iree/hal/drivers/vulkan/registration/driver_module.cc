@@ -38,11 +38,14 @@ IREE_FLAG(
 IREE_FLAG(bool, vulkan_sparse_residency, true,
           "Enables the Vulkan 'sparseResidencyBuffer' feature (and others) "
           "when available.");
+IREE_FLAG(bool, vulkan_buffer_device_addresses, true,
+          "Enables the Vulkan 'bufferDeviceAddress` feature and support for "
+          "SPIR-V executables compiled to use it.");
 
 IREE_FLAG(
     bool, vulkan_dedicated_compute_queue, false,
     "Use a dedicated queue with VK_QUEUE_COMPUTE_BIT for dispatch workloads.");
-IREE_FLAG(bool, vulkan_vma_allocator, true,
+IREE_FLAG(bool, vulkan_vma_allocator, false,
           "Whether to use the VMA allocator instead of native Vulkan API "
           "memory allocations.");
 IREE_FLAG(
@@ -93,6 +96,10 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   if (FLAG_vulkan_sparse_residency) {
     driver_options.requested_features |=
         IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED;
+  }
+  if (FLAG_vulkan_buffer_device_addresses) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES;
   }
 
   if (FLAG_vulkan_dedicated_compute_queue) {

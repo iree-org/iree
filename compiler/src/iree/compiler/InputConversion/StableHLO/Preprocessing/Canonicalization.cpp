@@ -978,6 +978,31 @@ struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
   }
 };
 
+struct MergeConsecutiveReshapes final
+    : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ReshapeOp op,
+                                PatternRewriter &rewriter) const override {
+    // Fold noop reshape.
+    auto operand = op.getOperand();
+    if (op.getType() == operand.getType()) {
+      rewriter.replaceOp(op, op.getOperand());
+      return success();
+    }
+
+    // Fold reshape(reshape(x)).
+    auto reshapeOp = operand.getDefiningOp<mlir::stablehlo::ReshapeOp>();
+    if (!reshapeOp) {
+      return rewriter.notifyMatchFailure(
+          op, "requires defining op of operand to be Reshape");
+    }
+
+    op.setOperand(reshapeOp->getOperand(0));
+    return success();
+  }
+};
+
 struct TransposeIsReshape final
     : OpRewritePattern<mlir::stablehlo::TransposeOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1156,7 +1181,7 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
       ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon, GatherOpCanon,
-      ReshapeOpCanon, TransposeIsReshape,
+      ReshapeOpCanon, MergeConsecutiveReshapes, TransposeIsReshape,
       // Types.
       ZeroExtentTensorCanon>(context, benefit);
   patterns->add<ReorderElementwiseAndShapeOp>(context);

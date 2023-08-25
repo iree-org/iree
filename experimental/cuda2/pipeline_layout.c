@@ -51,21 +51,19 @@ iree_status_t iree_hal_cuda2_descriptor_set_layout_create(
   *out_descriptor_set_layout = NULL;
 
   iree_hal_cuda2_descriptor_set_layout_t* descriptor_set_layout = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(host_allocator, sizeof(*descriptor_set_layout),
-                            (void**)&descriptor_set_layout);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*descriptor_set_layout),
+                                (void**)&descriptor_set_layout));
 
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda2_descriptor_set_layout_vtable,
-                                 &descriptor_set_layout->resource);
-    descriptor_set_layout->host_allocator = host_allocator;
-    descriptor_set_layout->binding_count = binding_count;
-    *out_descriptor_set_layout =
-        (iree_hal_descriptor_set_layout_t*)descriptor_set_layout;
-  }
+  iree_hal_resource_initialize(&iree_hal_cuda2_descriptor_set_layout_vtable,
+                               &descriptor_set_layout->resource);
+  descriptor_set_layout->host_allocator = host_allocator;
+  descriptor_set_layout->binding_count = binding_count;
+  *out_descriptor_set_layout =
+      (iree_hal_descriptor_set_layout_t*)descriptor_set_layout;
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 iree_host_size_t iree_hal_cuda2_descriptor_set_layout_binding_count(
@@ -155,30 +153,29 @@ iree_status_t iree_hal_cuda2_pipeline_layout_create(
   iree_host_size_t total_size =
       sizeof(*pipeline_layout) +
       set_layout_count * sizeof(*pipeline_layout->set_layouts);
-  iree_status_t status = iree_allocator_malloc(host_allocator, total_size,
-                                               (void**)&pipeline_layout);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_size,
+                                (void**)&pipeline_layout));
 
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda2_pipeline_layout_vtable,
-                                 &pipeline_layout->resource);
-    pipeline_layout->host_allocator = host_allocator;
-    pipeline_layout->set_layout_count = set_layout_count;
-    iree_host_size_t base_index = 0;
-    for (iree_host_size_t i = 0; i < set_layout_count; ++i) {
-      pipeline_layout->set_layouts[i].set_layout = set_layouts[i];
-      // Copy and retain all descriptor sets so we don't lose them.
-      iree_hal_descriptor_set_layout_retain(set_layouts[i]);
-      pipeline_layout->set_layouts[i].base_index = base_index;
-      base_index +=
-          iree_hal_cuda2_descriptor_set_layout_binding_count(set_layouts[i]);
-    }
-    pipeline_layout->push_constant_base_index = base_index;
-    pipeline_layout->push_constant_count = push_constant_count;
-    *out_pipeline_layout = (iree_hal_pipeline_layout_t*)pipeline_layout;
+  iree_hal_resource_initialize(&iree_hal_cuda2_pipeline_layout_vtable,
+                               &pipeline_layout->resource);
+  pipeline_layout->host_allocator = host_allocator;
+  pipeline_layout->set_layout_count = set_layout_count;
+  iree_host_size_t base_index = 0;
+  for (iree_host_size_t i = 0; i < set_layout_count; ++i) {
+    pipeline_layout->set_layouts[i].set_layout = set_layouts[i];
+    // Copy and retain all descriptor sets so we don't lose them.
+    iree_hal_descriptor_set_layout_retain(set_layouts[i]);
+    pipeline_layout->set_layouts[i].base_index = base_index;
+    base_index +=
+        iree_hal_cuda2_descriptor_set_layout_binding_count(set_layouts[i]);
   }
+  pipeline_layout->push_constant_base_index = base_index;
+  pipeline_layout->push_constant_count = push_constant_count;
+  *out_pipeline_layout = (iree_hal_pipeline_layout_t*)pipeline_layout;
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static void iree_hal_cuda2_pipeline_layout_destroy(

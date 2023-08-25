@@ -142,55 +142,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-namespace {
-
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
-
-// Subset of the overall pass pipeline for optimizing globals and numerics.
-// We may ultimately break this out separately so creating a syntactic
-// distinction to keep that as an option.
-void buildGlobalOptimizationPassPipeline(
-    OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
-  OpPassManager pipeline(ModuleOp::getOperationName());
-
-  FunctionLikeNest(pipeline)
-      // Simplify util.global accesses early on; this can help with dispatch
-      // region formation as redundant store-loads are removed.
-      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
-
-  // Module level cleanup and canonicalization of util.global (and other util
-  // ops).
-  pipeline.addPass(IREE::Util::createApplyPatternsPass());
-  pipeline.addPass(IREE::Util::createFoldGlobalsPass());
-  pipeline.addPass(IREE::Util::createIPOPass());
-
-  if (transformOptions.constExprHoisting) {
-    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());
-  }
-
-  if (transformOptions.buildConstEvalPassPipeline) {
-    transformOptions.buildConstEvalPassPipeline(pipeline);
-  }
-
-  if (transformOptions.numericPrecisionReduction) {
-    pipeline.addPass(createInferNumericNarrowingPass());
-    pipeline.addPass(createOptimizeNumericsPass());
-    pipeline.addPass(createCleanupNumericNarrowingPass());
-  }
-
-  FunctionLikeNest(pipeline)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
-
-  // Add the whole fixed point iterator.
-  mainPassManager.addPass(
-      IREE::Util::createFixedPointIteratorPass(std::move(pipeline)));
-}
-
-} // namespace
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
+  // Start of Flow pipeline, verify input legality.
+  passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
+
   // ML frontends have very uneven support for user-controlled types _and_ users
   // tend to use types not well suited for the work they are doing. These
   // demotions/promotions allow users to change the types after lowering out of
@@ -212,24 +170,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   if (clPromoteBF16ToF32) {
     passManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
   }
-
-  // Preprocessing passes to get the program into a canonical state.
-  FunctionLikeNest(passManager)
-      .addPass(IREE::Flow::createRemoveZeroExtentTensorsPass)
-      .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
-      .addPass(mlir::createLinalgNamedOpConversionPass)
-      .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
-  passManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
-
-  // Start of Flow pipeline, verify input legality.
-  passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
-
-  // Expand tensor shapes into SSA values and optimize the whole program.
-  // The more we are able to equate shape dimensions at this level the better
-  // our fusions will be.
-  FunctionLikeNest(passManager).addPass(createTopLevelSCFToCFGPass);
-  passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
-  buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
   // Transform pad operations into linalg.fill + tensor.insert_slice.
   // This is a WAR for not having native pad handling.

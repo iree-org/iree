@@ -131,6 +131,7 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 # The file paths should be specified using Unix shell-style wildcards.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
+    ("build_test_all_windows", ["*win32*", "*windows*", "*msvc*"]),
 ]
 
 DEFAULT_BENCHMARK_PRESET_GROUP = [

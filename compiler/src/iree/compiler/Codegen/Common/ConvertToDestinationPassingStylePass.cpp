@@ -607,6 +607,12 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
   MLIRContext *context = &getContext();
 
+  // Dont do anything for functions that have multiple blocks for now.
+  // TODO: This needs to be fixed, but need to proceed incrementally.
+  if (!llvm::hasSingleElement(funcOp.getBody())) {
+    return;
+  }
+
   OpBuilder b(context);
   SmallVector<tensor::EmptyOp> emptyOps;
   funcOp.walk([&](tensor::EmptyOp emptyOp) { emptyOps.push_back(emptyOp); });

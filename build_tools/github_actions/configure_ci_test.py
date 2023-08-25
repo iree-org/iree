@@ -275,6 +275,35 @@ class ConfigureCITest(unittest.TestCase):
         expected_jobs = {"job1", "build_test_all_macos_arm64"}
         self.assertCountEqual(jobs, expected_jobs)
 
+    def test_get_enabled_jobs_windows(self):
+        trailers = {}
+        all_jobs = {"job1"}
+        is_pr = True
+        modified_paths = ["runtime/src/iree/base/internal/threading_win32.c"]
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modified_paths=modified_paths,
+            is_pr=is_pr,
+        )
+        expected_jobs = {"job1", "build_test_all_windows"}
+        self.assertCountEqual(jobs, expected_jobs)
+
+    def test_get_enabled_jobs_windows_docs(self):
+        # docs/ directory is excluded from CI, superceding "windows" inclusion
+        trailers = {}
+        all_jobs = {"job1"}
+        is_pr = True
+        modified_paths = ["docs/windows.md"]
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modified_paths=modified_paths,
+            is_pr=is_pr,
+        )
+        expected_jobs = {}
+        self.assertCountEqual(jobs, expected_jobs)
+
     def test_parse_path_from_workflow_ref(self):
         path = configure_ci.parse_path_from_workflow_ref(
             "octocat/example", "octocat/example/.github/test.yml@1234"
