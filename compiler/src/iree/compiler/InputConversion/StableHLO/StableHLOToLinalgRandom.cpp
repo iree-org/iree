@@ -196,6 +196,16 @@ std::pair<Value, Value> extractKey32(OpBuilder &builder, Location loc,
     return std::pair<Value, Value>(pair.first, pair.second);
   }
 
+  // TODO(suderman): This gets the 128-bit counter to work however
+  // may not match XLA.
+  if (storeTy.getDimSize(0) == 3 && storeETy.isInteger(64)) {
+    Value idx1 = builder.create<arith::ConstantIndexOp>(loc, 0);
+    Value state = builder.create<tensor::ExtractOp>(loc, store, idx1);
+    Value cast = builder.create<arith::BitcastOp>(loc, i64Ty, state);
+    auto pair = splitI64(ArithOpBuilder(builder, loc, cast));
+    return std::pair<Value, Value>(pair.first, pair.second);
+  }
+
   return {nullptr, nullptr};
 }
 
@@ -209,6 +219,15 @@ Value extractState64(OpBuilder &builder, Location loc, Value store) {
   IntegerType i64Ty = builder.getIntegerType(64);
 
   if (storeTy.getDimSize(0) == 2 && storeETy.isInteger(64)) {
+    Value idx1 = builder.create<arith::ConstantIndexOp>(loc, 1);
+    Value state = builder.create<tensor::ExtractOp>(loc, store, idx1);
+    Value cast = builder.create<arith::BitcastOp>(loc, i64Ty, state);
+    return cast;
+  }
+
+  // TODO(suderman): This gets the 128-bit counter to work however
+  // may not match XLA.
+  if (storeTy.getDimSize(0) == 3 && storeETy.isInteger(64)) {
     Value idx1 = builder.create<arith::ConstantIndexOp>(loc, 1);
     Value state = builder.create<tensor::ExtractOp>(loc, store, idx1);
     Value cast = builder.create<arith::BitcastOp>(loc, i64Ty, state);
@@ -238,6 +257,15 @@ Value setState64(OpBuilder &b, Location loc, Value store, Value state) {
   Type storeETy = storeTy.getElementType();
 
   if (storeTy.getDimSize(0) == 2 && storeETy.isInteger(64)) {
+    state = b.create<arith::BitcastOp>(loc, storeETy, state);
+    Value idx1 = b.create<arith::ConstantIndexOp>(loc, 1);
+    return b.create<tensor::InsertOp>(loc, storeTy, state, store,
+                                      ValueRange{idx1});
+  }
+
+  // TODO(suderman): This gets the 128-bit counter to work however
+  // may not match XLA.
+  if (storeTy.getDimSize(0) == 3 && storeETy.isInteger(64)) {
     state = b.create<arith::BitcastOp>(loc, storeETy, state);
     Value idx1 = b.create<arith::ConstantIndexOp>(loc, 1);
     return b.create<tensor::InsertOp>(loc, storeTy, state, store,
