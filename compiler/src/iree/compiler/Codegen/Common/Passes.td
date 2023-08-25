@@ -177,8 +177,8 @@ def EraseDeadAllocAndStores :
       "mlir::iree_compiler::createEraseDeadAllocAndStoresPass()";
 }
 
-def EraseHALDescriptorTypeFromMemRef :
-    Pass<"iree-codegen-erase-hal-descriptor-type-from-memref", "func::FuncOp"> {
+def EraseHALDescriptorTypeFromMemRef
+    : Pass<"iree-codegen-erase-hal-descriptor-type-from-memref"> {
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
   let constructor =
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";

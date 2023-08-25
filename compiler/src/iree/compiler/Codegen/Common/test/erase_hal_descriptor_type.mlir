@@ -41,3 +41,20 @@ func.func @shared_memory_address_space() {
   "dialect.memref_consumer"(%3) : (memref<?x8xf32, 3>) -> ()
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @multi_block()
+func.func @multi_block() {
+  // CHECK:   %[[P:.+]] = "dialect.memref_producer"() : () -> memref<?x8xf32>
+  // CHECK:   cf.br ^[[B:bb.+]](%[[P]] : memref<?x8xf32>)
+  // CHECK: ^[[B]](%[[A:.+]]: memref<?x8xf32>):
+  // CHECK:   "dialect.memref_consumer"(%[[A]]) : (memref<?x8xf32>) -> ()
+  %0 = "dialect.memref_producer"() : () -> (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>)
+  cf.br ^bb2(%0: memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>)
+^bb2(%1 : memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>):
+  "dialect.memref_consumer"(%1) : (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>) -> ()
+  return
+}
+
+
