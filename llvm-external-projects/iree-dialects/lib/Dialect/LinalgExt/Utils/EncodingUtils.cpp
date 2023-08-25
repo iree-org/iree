@@ -11,11 +11,21 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
-MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
-                            MatmulTileParams tileParams) {
-  // Start dim of the MxK (LHS), KxN (RHS), or MxN (RESULT) 2D matrix.
-  int64_t matmulDimBase = 0;
+bool isMatmulEncodingUser(EncodingUser user) {
+  switch (user) {
+  case EncodingUser::MATMUL_F32F32F32:
+  case EncodingUser::MATMUL_F16F16F32:
+  case EncodingUser::MATMUL_F16F16F16:
+  case EncodingUser::MATMUL_BF16BF16F32:
+  case EncodingUser::MATMUL_BF16BF16BF16:
+  case EncodingUser::MATMUL_I8I8I32:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool isBatchMatmulEncodingUser(EncodingUser user) {
   switch (user) {
   case EncodingUser::BATCH_MATMUL_F32F32F32:
   case EncodingUser::BATCH_MATMUL_F16F16F32:
@@ -23,11 +33,17 @@ chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
   case EncodingUser::BATCH_MATMUL_BF16BF16F32:
   case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
   case EncodingUser::BATCH_MATMUL_I8I8I32:
-    matmulDimBase = 1;
-    break;
+    return true;
   default:
-    break;
+    return false;
   }
+}
+
+MaterializeEncodingInfo
+chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
+                            MatmulTileParams tileParams) {
+  // Start dim of the MxK (LHS), KxN (RHS), or MxN (RESULT) 2D matrix.
+  int64_t matmulDimBase = isBatchMatmulEncodingUser(user) ? 1 : 0;
 
   MaterializeEncodingInfo encodingInfo;
   encodingInfo.innerDimsPos = {matmulDimBase, matmulDimBase + 1};
