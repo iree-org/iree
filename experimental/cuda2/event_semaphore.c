@@ -390,6 +390,7 @@ iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
     if (signal_timepoint->kind == IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL &&
         signal_timepoint->base.minimum_value >= min_value) {
       iree_hal_cuda2_event_t* event = signal_timepoint->timepoint.device_signal;
+      iree_hal_cuda2_event_release(wait_timepoint->timepoint.device_wait);
       iree_hal_cuda2_event_retain(event);
       wait_timepoint->timepoint.device_wait = event;
     }
