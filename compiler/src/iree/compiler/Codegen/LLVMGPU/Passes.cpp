@@ -547,7 +547,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
+  pm.addPass(memref::createFoldMemRefAliasOpsPass());
+  pm.addPass(createEmulateNarrowTypePass());
   pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
