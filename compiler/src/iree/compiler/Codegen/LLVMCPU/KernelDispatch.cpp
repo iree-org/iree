@@ -1154,8 +1154,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   auto getDistTileSizes = [&]() -> SmallVector<int64_t> {
     if (!mmt4dDistributionTileSizes.empty()) {
       SmallVector<int64_t> tileSizes;
-      // If mmt4dDistributionTileSizes is set, tile batch dim to 1 + specified
-      // tile sizes.
+      // If mmt4dDistributionTileSizes is set, tile batch dim to 1 + the
+      // specified mmt4d tile sizes.
       tileSizes.push_back(1);
       tileSizes.append(mmt4dDistributionTileSizes.begin(),
                        mmt4dDistributionTileSizes.end());
@@ -1195,9 +1195,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     int M0 = lhsShape[3];
     int N0 = rhsShape[3];
     int K0 = lhsShape[4];
-    tileSizes.push_back(M0);
-    tileSizes.push_back(N0);
-    tileSizes.push_back(K0);
+    tileSizes.append({1, 1, 1, M0, N0, K0});
     return tileSizes;
   };
 
