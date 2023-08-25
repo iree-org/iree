@@ -26,6 +26,7 @@ import argparse
 import functools
 from glob import glob
 import json
+import os
 import sys
 from pathlib import Path
 import platform
@@ -76,8 +77,7 @@ def fetch_gh_artifact(api_path: str, file: Path):
             api_path,
         ]
     )
-    with open(file, "wb") as f:
-        f.write(contents)
+    file.write_bytes(contents)
 
 
 def find_venv_python(venv_path: Path) -> Optional[Path]:
@@ -104,7 +104,9 @@ def parse_arguments(argv=None):
         default="",
         help="Package variant to install for the runtime ('', 'asserts')",
     )
-    parser.add_argument("venv_dir", help="Directory in which to create the venv")
+    parser.add_argument(
+        "venv_dir", type=Path, help="Directory in which to create the venv"
+    )
     args = parser.parse_args(argv)
     return args
 
@@ -138,7 +140,7 @@ def main(args):
     print("Installing wheels:", wheels)
 
     # Set up venv.
-    venv_path = Path(args.venv_dir)
+    venv_path = args.venv_dir
     python_exe = find_venv_python(venv_path)
 
     if not python_exe:
@@ -176,7 +178,7 @@ def main(args):
         "install",
         "--force-reinstall",
         "-e",
-        str(rs_dir) + "/",
+        str(rs_dir) + os.sep,
     ]
     print(f"Running command: {' '.join(cmd)}")
     subprocess.check_call(cmd)

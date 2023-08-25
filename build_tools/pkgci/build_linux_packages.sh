@@ -80,7 +80,6 @@ function run_on_host() {
   mkdir -p "${output_dir}"
   output_dir="$(cd "${output_dir}" && pwd)"
   echo "Outputting to ${output_dir}"
-  mkdir -p "${output_dir}"
   extra_args=""
   if ! [ -z "$cache_dir" ]; then
     echo "Setting up host cache dir ${cache_dir}"
@@ -99,7 +98,7 @@ function run_on_host() {
     -e "toolchain_suffix=${toolchain_suffix}" \
     ${extra_args} \
     "${manylinux_docker_image}" \
-    -- ${this_dir}/${script_name}
+    -- "${this_dir}/${script_name}"
 }
 
 function run_in_docker() {
@@ -111,7 +110,7 @@ function run_in_docker() {
   local orig_path="${PATH}"
 
   # Configure toolchain.
-  export CMAKE_TOOLCHAIN_FILE="$this_dir/linux_toolchain_${toolchain_suffix}.cmake"
+  export CMAKE_TOOLCHAIN_FILE="${this_dir}/linux_toolchain_${toolchain_suffix}.cmake"
   echo "Using CMake toolchain ${CMAKE_TOOLCHAIN_FILE}"
   if ! [ -f "$CMAKE_TOOLCHAIN_FILE" ]; then
     echo "CMake toolchain not found (wrong toolchain_suffix?)"
