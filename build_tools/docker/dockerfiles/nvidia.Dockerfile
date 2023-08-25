@@ -11,9 +11,9 @@
 # We use .deb files that we host because we have to pin the version and packages
 # routinely dissapear from the Ubuntu apt repositories. The versions need to be
 # compatible with the host driver (usually <= host driver version).
-ARG NVIDIA_GL_DEB="libnvidia-gl-530_530.41.03-0ubuntu0.20.04.2_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_530.41.03-0ubuntu0.20.04.2_amd64.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-530_530.41.03-0ubuntu0.20.04.2_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-530_535.86.05-0ubuntu0.20.04.2_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_535.86.05-0ubuntu0.20.04.2_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-530_535.86.05-0ubuntu0.20.04.2_all.deb"
 
 
 FROM gcr.io/iree-oss/base@sha256:ec7faf4d80655fd436b324716bea4504ed47375dbf018e36b835f1d8ed10991c AS fetch-nvidia
@@ -46,16 +46,18 @@ COPY --from=fetch-nvidia \
   "/fetch-nvidia/${NVIDIA_COMPUTE_DEB}" \
   /tmp/
 
-RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
+# The local .deb files have dependencies that requires apt-get update to locate.
+RUN apt-get update \
+  && apt-get -y install "/tmp/${NVIDIA_COMMON_DEB}" \
   "/tmp/${NVIDIA_GL_DEB}" \
   "/tmp/${NVIDIA_COMPUTE_DEB}"
 
 # Install the CUDA SDK
-RUN wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_amd64.deb \
-  && dpkg --install cuda-repo-ubuntu2004-12-1-local_12.1.1-530.30.02-1_amd64.deb \
-  && cp /var/cuda-repo-ubuntu2004-12-1-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.2.1/local_installers/cuda-repo-ubuntu2004-12-2-local_12.2.1-535.86.10-1_amd64.deb \
+  && dpkg --install cuda-repo-ubuntu2004-12-2-local_12.2.1-535.86.10-1_amd64.deb \
+  && cp /var/cuda-repo-ubuntu2004-12-2-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
   && apt-get update \
-  && apt-get -y install cuda-toolkit-12-1
+  && apt-get -y install cuda-toolkit-12-2
 
 # Adding CUDA binaries to Path
 ENV PATH=${PATH}:/usr/local/cuda/bin/
