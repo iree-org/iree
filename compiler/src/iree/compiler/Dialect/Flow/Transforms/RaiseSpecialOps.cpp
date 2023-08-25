@@ -11,15 +11,22 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 using transform_ext::StructuredOpMatcher;
+
+#define DEBUG_TYPE "iree-raise-special-ops"
+
+#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir {
 namespace iree_compiler {
@@ -145,14 +152,12 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
   if (!llvm::hasSingleElement(extractOps)) {
     return failure();
   }
-  tensor::ExtractOp extractOp = *extractOps.begin();
-  auto resultType = dyn_cast<TensorType>(linalgOp.getResult(0).getType());
-  if (!resultType) {
-    return failure();
-  }
 
-  ArrayRef<int64_t> sourceShape = extractOp.getTensor().getType().getShape();
-  ArrayRef<int64_t> resultShape = resultType.getShape();
+  LDBG("Attempting to raise extracting generic to elementwise: " << linalgOp);
+
+  tensor::ExtractOp extractOp = *extractOps.begin();
+  Value source = extractOp.getTensor();
+  Value result = linalgOp.getResult(0);
 
   // Raise the tensor.extract op to an input.
   SmallVector<AffineExpr> exprs;
@@ -167,29 +172,31 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
       // Restrict to cases where the constant is 0. This is because handling
       // constants other than 0 in indexing map, may cause problems in the
       // lowering pipeline later.
-      if (constantIndex.getLimitedValue() != 0)
+      if (constantIndex.getLimitedValue() != 0) {
+        LDBG("    non-zero constant index -> FAIL");
         return failure();
+      }
       exprs.push_back(getAffineConstantExpr(0, rewriter.getContext()));
       continue;
     }
     // 2. The indexing value is a linalg.index.
     if (auto indexOp = indexValue.getDefiningOp<linalg::IndexOp>()) {
       // Make sure that for this index, the size of the input and output
-      // match and are not dynamic. We need this to maintain the op to be
+      // match. We need this to maintain the op to be
       // elementwise.
-      // TODO: This restriction can be relaxed by adding a extract_slice op
-      // on the `source` tensor. This is not same as raising the whole
-      // operation to an extract_slice, as there can be permutations and
-      // projections involved.
-      if (sourceShape[idx] == ShapedType::kDynamic ||
-          resultShape[indexOp.getDim()] == ShapedType::kDynamic ||
-          sourceShape[idx] != resultShape[indexOp.getDim()]) {
+      FailureOr<bool> dimsEqual = ValueBoundsConstraintSet::areEqual(
+          source, result, idx, indexOp.getDim());
+      if (failed(dimsEqual) || !*dimsEqual) {
+        LDBG("    Dimension sizes at index " << idx << " and "
+                                             << indexOp.getDim() << " -> FAIL");
         return failure();
       }
       exprs.push_back(
           getAffineDimExpr(indexOp.getDim(), rewriter.getContext()));
       continue;
     }
+    LDBG("    Dimension size at index "
+         << idx << " not indexed by linalg.index op -> FAIL");
     return failure();
   }
   AffineMap indexingMap = AffineMap::get(
@@ -232,6 +239,8 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
       linalgOp.getIteratorTypesAttr(), linalgOp.getDocAttr(),
       linalgOp.getLibraryCallAttr(), bodyBuilder);
 
+  LDBG("    Successfully raised to elementwise linalg: " << newLinalgOp);
+
   return newLinalgOp;
 }
 
@@ -242,12 +251,19 @@ static FailureOr<tensor::ExtractSliceOp>
 tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
                        Value input, Value output, linalg::GenericOp linalgOp,
                        RewriterBase &rewriter) {
-  // Output shape must be smaller than input shape.
-  if (outputIndexingMap.getNumResults() >= inputIndexingMap.getNumResults()) {
+  // Output rank cannot exceed input rank.
+  if (outputIndexingMap.getNumResults() > inputIndexingMap.getNumResults()) {
+    LDBG("    Not (rank reducing) slice -> FAIL");
     return failure();
   }
   // Output map should be identity.
   if (!outputIndexingMap.isIdentity()) {
+    LDBG("    Output map not identity -> FAIL");
+    return failure();
+  }
+  // All iterator types must be parallel.
+  if (linalgOp.getNumLoops() != linalgOp.getNumParallelLoops()) {
+    LDBG("    Has reduction iterators -> FAIL");
     return failure();
   }
 
@@ -255,6 +271,7 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
   if (!outType) {
     return failure();
   }
+
   ArrayRef<int64_t> outShape = outType.getShape();
 
   // Try to match each output dimension to an input dimension, in order.
@@ -266,35 +283,42 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
   IntegerAttr zero = rewriter.getI64IntegerAttr(0);
   IntegerAttr one = rewriter.getI64IntegerAttr(1);
   unsigned currOutDim = 0;
+  unsigned leadOutDim = 0;
   for (auto [idx, expr] : llvm::enumerate(inputIndexingMap.getResults())) {
-    // Check if the input dimension matches the current output dimension.
-    if (expr == outputIndexingMap.getResult(currOutDim)) {
-      offsets.push_back(zero);
-      // Get the dim size from the output tensor.
-      if (outShape[currOutDim] == ShapedType::kDynamic) {
-        auto dim = rewriter.create<tensor::DimOp>(linalgOp.getLoc(), output,
-                                                  currOutDim);
-        sizes.push_back(dim.getResult());
-      } else {
-        sizes.push_back(rewriter.getI64IntegerAttr(outShape[currOutDim]));
-      }
-      ++currOutDim;
-      continue;
-    }
-    // Assume that the constant access is a rank reducing access.
+    // Constant accesses can either be rank reducing or an access into a unit
+    // dim. This is tracked by counting the number of unit output dimensions
+    // between non-unit ones.
     if (expr.isa<AffineConstantExpr>()) {
       IntegerAttr constIdx = rewriter.getI64IntegerAttr(
           expr.cast<AffineConstantExpr>().getValue());
       offsets.push_back(constIdx);
       sizes.push_back(one);
+      if (outShape[leadOutDim] == 1) {
+        ++leadOutDim;
+      }
       continue;
     }
+    // Check if the input dimension matches the current output dimension.
+    if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+      int dimPos = dimExpr.getPosition();
+      if (dimPos >= currOutDim && dimPos <= leadOutDim) {
+        offsets.push_back(zero);
+        // Get the dim size from the output tensor.
+        sizes.push_back(
+            tensor::getMixedSize(rewriter, linalgOp.getLoc(), output, dimPos));
+        currOutDim = dimPos + 1;
+        leadOutDim = currOutDim;
+        continue;
+      }
+    }
     // Unknown access, fail.
+    LDBG("    Unknown access type along index " << idx << " -> FAIL");
     return failure();
   }
 
   // All output dimensions did not match an input dimension.
   if (currOutDim != outputIndexingMap.getNumResults()) {
+    LDBG("    Not all output dimensions match an input dimension -> FAIL");
     return failure();
   }
 
@@ -302,6 +326,7 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
   // will always be 1.
   SmallVector<OpFoldResult> strides(inputIndexingMap.getNumResults(), one);
 
+  LDBG("    Lowering to slice -> SUCCESS");
   return rewriter.create<tensor::ExtractSliceOp>(
       linalgOp.getLoc(), outType, input, offsets, sizes, strides);
 }
