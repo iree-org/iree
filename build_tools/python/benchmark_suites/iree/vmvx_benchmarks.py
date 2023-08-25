@@ -38,11 +38,7 @@ class Android_VMVX_Benchmarks(object):
                 compile_config=self.EXPERIMENTAL_COMPILE_CONFIG,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
-            for model in [
-                # TODO(#14775): Re-enable the benchmarks.
-                # tflite_models.MOBILENET_V2,
-                # tflite_models.MOBILENET_V3SMALL
-            ]
+            for model in [tflite_models.MOBILENET_V2, tflite_models.MOBILENET_V3SMALL]
         ]
         default_execution_configs = [
             module_execution_configs.get_vmvx_system_scheduling_local_task_config(
