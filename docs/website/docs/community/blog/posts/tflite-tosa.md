@@ -1,12 +1,15 @@
 ---
+date: 2021-07-19
+authors:
+  - rsuderman
+  - jennik
+categories:
+  - Frontends
 tags:
   - TensorFlow
 ---
 
-Monday, July 19, 2021<br>
-By Rob Suderman and Jenni Kilduff
-
-# TFLite Support via TOSA
+# TFLite support via TOSA
 
 IREE can now execute [TensorFlow Lite](https://www.tensorflow.org/lite)
 (TFLite) models through the use of
@@ -17,7 +20,9 @@ ingesting models from different frameworks. In this case we ingest a TFLite
 FlatBuffer and compile it to TOSA IR, which IREE takes as an input format to
 compile to its various backends.
 
-![Compilation diagram](./2021-07-19-tflite-tosa-compilation-diagram.png){align=left}
+<!-- more -->
+
+![Compilation diagram](./tflite-tosa-compilation-diagram.png){align=left}
 
 Using TFLite as a frontend for IREE provides an alternative ingestion method for
 already existing models that could benefit from IREE’s design. This enables
@@ -46,4 +51,4 @@ also have an
 [Android Java app](https://github.com/not-jenni/iree-android-tflite-demo) that
 was forked from an existing TFLite demo app, swapping out the TFLite library
 for our own AAR.  More information on IREE’s TFLite frontend is available
-[here](../../guides/ml-frameworks/tflite.md).
+[here](../../../guides/ml-frameworks/tflite.md).

@@ -1,13 +1,15 @@
 ---
+date: 2021-10-15
+authors:
+  - thomasraoux
+categories:
+  - Platforms
 tags:
   - GPU
   - CUDA
 ---
 
-Friday, October 15, 2021<br>
-By Thomas Raoux
-
-# CUDA Backend in IREE
+# CUDA backend
 
 IREE is being designed with re-targetability as a core goal: it should be
 possible to use IREE to target a broad spectrum of power regimes, from embedded
@@ -19,6 +21,8 @@ mobile deployments with a goal of using IREE to target data center workloads on
 Nvidia CUDA. This post describes how we quickly brought up a CUDA back-end for
 IREE and used it to train [BERT](https://en.wikipedia.org/wiki/BERT_(language_model)),
 then shares some metrics and next steps.
+
+<!-- more -->
 
 ## Bring up
 
@@ -40,7 +44,7 @@ create CUDA kernels yet we can test a large portion of the CUDA driver using
 [CTS tests](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/cts/README.md).
 Those can be run to make sure a system has the required CUDA support.
 
- ![Compilation flow](./2021-10-15-cuda-compiler-flow.png){ align=left }
+ ![Compilation flow](./cuda-compiler-flow.png){ align=left }
 
 ### Compiler support
 
@@ -89,7 +93,7 @@ table CUDAExecutableDef {
 Together those 3 steps are enough to provide most of the functionality and we
 can now successfully compile full models.
 
-![Compilation diagram](./2021-10-15-cuda-bring_up.png)
+![Compilation diagram](./cuda-bring_up.png)
 
 The steps to reproduce running a simple op end to end through CUDA backend are
 described [here](https://github.com/openxla/iree/blob/main/docs/developers/design_docs/cuda_backend.md#example).
@@ -175,7 +179,7 @@ memory that can be interleaved with the compute work.
 
 Those different transformations compose to this flow:
 
-![Compilation diagram](./2021-10-15-cuda-optimization-flow.png)
+![Compilation diagram](./cuda-optimization-flow.png)
 
 The full dump step by step of a linalg.matmul operation can be found [here](https://gist.github.com/ThomasRaoux/8bded9d7c3f7426fc1ca8598deb53220).
 
@@ -186,7 +190,7 @@ The full dump step by step of a linalg.matmul operation can be found [here](http
 We compare the performance of a single GEMM operation to highly optimized
 library cuBLAS using [mmperf framework](https://github.com/mmperf/mmperf).
 
-![Compilation diagram](./2021-10-15-cuda-memperf.png)
+![Compilation diagram](./cuda-memperf.png)
 
 The graph can be re-produced based on [instructions on mmperf](https://github.com/mmperf/mmperf#compare-mmperf-results-among-different-backends)
 
