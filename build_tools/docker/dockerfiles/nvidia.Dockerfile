@@ -16,7 +16,7 @@ ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_535.86.05-0ubuntu0.20.04.2_amd64.d
 ARG NVIDIA_COMMON_DEB="libnvidia-common-530_535.86.05-0ubuntu0.20.04.2_all.deb"
 
 
-FROM gcr.io/iree-oss/base@sha256:ec7faf4d80655fd436b324716bea4504ed47375dbf018e36b835f1d8ed10991c AS fetch-nvidia
+FROM gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33 AS fetch-nvidia
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
@@ -35,7 +35,7 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_D
 # This allows to share configuration with base CMake and better control the
 # installed packages. But it does mean we need to carefully manage the MATCHING
 # of the driver version between the host machine and the docker image.
-FROM gcr.io/iree-oss/base@sha256:ec7faf4d80655fd436b324716bea4504ed47375dbf018e36b835f1d8ed10991c AS final
+FROM gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33 AS final
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
