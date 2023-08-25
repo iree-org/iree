@@ -80,7 +80,8 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     transform::TransformRewriter &rewriter, func::FuncOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp = getEntryPoint(target);
+  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
+      getEntryPoint(target);
   if (failed(maybeExportOp)) {
     state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
     return emitDefaultDefiniteFailure(target);
@@ -598,7 +599,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
     transform::TransformRewriter &rewriter, func::FuncOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp = getEntryPoint(target);
+  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
+      getEntryPoint(target);
   if (failed(maybeExportOp)) {
     state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
     return emitDefaultDefiniteFailure(target);
