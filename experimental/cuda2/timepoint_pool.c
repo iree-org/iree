@@ -18,7 +18,7 @@
 #include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
-#include "iree/hal/utils/semaphore_base.c"
+#include "iree/hal/utils/semaphore_base.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda2_timepoint_t
