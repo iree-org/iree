@@ -157,7 +157,9 @@ func.func @KCRSsr_to_KCRS(%arg0: tensor<13x12x4x8x8x32xf32>, %arg1: tensor<13x12
 // CHECK-SAME:      permutation = [0, 1, 2, 5, 3, 4]
 // CHECK:         %[[COLLAPSE:.+]] = tensor.collapse_shape %[[TRANSP]]
 // CHECK-SAME:      {{\[}}[0], [1], [2, 3], [4, 5]] : tensor<13x12x4x32x8x8xf32> into tensor<13x12x128x64xf32>
-// CHECK:         return %[[COLLAPSE]]
+// CHECK:         %[[COPY:.]] = linalg.copy ins(%[[COLLAPSE]]
+// CHECK-SAME:        outs(%[[OUT]]
+// CHECK:         return %[[COPY]]
 
 // -----
 
@@ -175,9 +177,11 @@ func.func @unpack_and_extract_slice(%arg0: tensor<2x8x8x2xf32>, %arg1: tensor<13
 // CHECK-SAME:       permutation = [0, 2, 1, 3]
 // CHECK:          %[[COLLAPSE:.+]] = tensor.collapse_shape %[[TRANSP]]
 // CHECK-SAME:       {{\[}}[0, 1], [2, 3]] : tensor<2x8x8x2xf32> into tensor<16x16xf32>
-// CHECK:          %[[RES:.+]] = tensor.extract_slice %[[COLLAPSE]]
+// CHECK:          %[[SLICE:.+]] = tensor.extract_slice %[[COLLAPSE]]
 // CHECK-SAME:       [0, 0] [13, 15] [1, 1] : tensor<16x16xf32> to tensor<13x15xf32>
-// CHECK:          return %[[RES]]
+// CHECK:          %[[COPY:.]] = linalg.copy ins(%[[SLICE]]
+// CHECK-SAME:         outs(%[[OUT]]
+// CHECK:          return %[[COPY]]
 // -----
 
 func.func @CKck_to_KC(%arg0: tensor<32x4x32x8xf32>, %arg1: tensor<128x256xf32>) -> tensor<128x256xf32> {
