@@ -12,6 +12,8 @@ on:
   push:
     branches:
       - main
+      # Experimental branches can also get packages and tests automatically.
+      - exppkg-*
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
