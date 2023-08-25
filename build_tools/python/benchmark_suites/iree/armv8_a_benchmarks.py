@@ -17,18 +17,15 @@ from e2e_test_framework.models import tflite_models
 class Android_ARMv8_A_Benchmarks(object):
     """Benchmarks on ARMv8-A Android devices."""
 
-    # TODO(#14775): Re-enable the benchmarks.
     NONQUANT_MODELS = [
-        # tflite_models.DEEPLABV3_FP32,
-        # tflite_models.MOBILESSD_FP32,
-        # tflite_models.POSENET_FP32,
-        # tflite_models.MOBILEBERT_FP32,
-        # tflite_models.MOBILENET_V2,
-        # tflite_models.MOBILENET_V3SMALL,
+        tflite_models.DEEPLABV3_FP32,
+        tflite_models.MOBILESSD_FP32,
+        tflite_models.POSENET_FP32,
+        tflite_models.MOBILEBERT_FP32,
+        tflite_models.MOBILENET_V2,
+        tflite_models.MOBILENET_V3SMALL,
     ]
-    QUANT_MODELS = [
-        # tflite_models.MOBILEBERT_INT8
-    ]
+    QUANT_MODELS = [tflite_models.MOBILEBERT_INT8]
 
     ARMV8_A_CPU_TARGET = iree_definitions.CompileTarget(
         target_architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,

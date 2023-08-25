@@ -28,13 +28,12 @@ class Linux_RV64_Benchmarks(object):
         compile_targets=[RV64_CPU_TARGET],
     )
     MODELS = [
-        # TODO(#14775): Re-enable the benchmarks.
-        # tflite_models.DEEPLABV3_FP32,
-        # tflite_models.MOBILEBERT_FP32,
-        # tflite_models.MOBILENET_V1,
-        # tflite_models.MOBILEBERT_INT8,
-        # tflite_models.PERSON_DETECT_INT8,
-        # tflite_models.EFFICIENTNET_INT8,
+        tflite_models.DEEPLABV3_FP32,
+        tflite_models.MOBILEBERT_FP32,
+        tflite_models.MOBILENET_V1,
+        tflite_models.MOBILEBERT_INT8,
+        tflite_models.PERSON_DETECT_INT8,
+        tflite_models.EFFICIENTNET_INT8,
         tflite_models.MOBILENET_V2_INT8,
     ]
 
@@ -72,10 +71,9 @@ class Linux_RV32_Benchmarks(object):
         compile_targets=[RV32_CPU_TARGET],
     )
     MODELS = [
-        # TODO(#14775): Re-enable the benchmarks.
-        # tflite_models.EFFICIENTNET_INT8,
-        # tflite_models.MOBILEBERT_INT8,
-        # tflite_models.PERSON_DETECT_INT8,
+        tflite_models.EFFICIENTNET_INT8,
+        tflite_models.MOBILEBERT_INT8,
+        tflite_models.PERSON_DETECT_INT8,
         tflite_models.MOBILENET_V2_INT8,
     ]
 
