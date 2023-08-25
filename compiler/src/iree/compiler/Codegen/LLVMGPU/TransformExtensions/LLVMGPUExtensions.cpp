@@ -574,11 +574,13 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 
 static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
-                                                PatternBenefit benefit) {
-  auto groupReductionFn = [](Location loc, OpBuilder &builder, Value input,
-                             vector::CombiningKind kind, uint32_t size) {
+                                                PatternBenefit benefit,
+                                                unsigned subgroupSize) {
+  auto groupReductionFn = [subgroupSize](
+                              Location loc, OpBuilder &builder, Value input,
+                              vector::CombiningKind kind, uint32_t size) {
     return mlir::iree_compiler::emitGPUGroupReduction(loc, builder, input, kind,
-                                                      size, 32);
+                                                      size, subgroupSize);
   };
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
@@ -604,14 +606,30 @@ static void populateWarpExecuteOnLane0ToScf(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorWarpDistributionOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    target->emitOpError(
-        "applies only to isolated-from-above targets because it "
-        "needs to apply "
-        "patterns greedily");
+  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
+    state.getTopLevel()->emitOpError(
+        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp "
+        "toplevel to extract subgroup size information");
+    return emitDefaultDefiniteFailure(target);
+  }
+
+  IREE::HAL::ExecutableExportOp exportOp;
+  state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
+    if (op.getSymName() == target.getName())
+      exportOp = op;
+  });
+  if (!exportOp) {
+    state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
+    return emitDefaultDefiniteFailure(target);
+  }
+
+  std::optional<llvm::APInt> subgroupSize = exportOp.getSubgroupSize();
+  if (!subgroupSize) {
+    state.getTopLevel()->emitOpError(
+        "could not extract subgroup size from IREE::HAL::ExecutableExportOp");
     return emitDefaultDefiniteFailure(target);
   }
 
@@ -645,7 +663,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   populateVectorTransferWriteDistribution(target, patterns,
                                           /*benefit=*/2);
   populatePropagateVectorDistribution(target, patterns,
-                                      /*benefit=*/1);
+                                      /*benefit=*/1,
+                                      subgroupSize->getSExtValue());
   if (failed(
           applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
     return mlir::emitDefiniteFailure(
