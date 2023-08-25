@@ -15,6 +15,9 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
+// Check if encoding user is one of matmul encodings.
+bool isMatmulEncodingUser(EncodingUser user);
+
 // Check if encoding user is one of batch matmul encodings.
 bool isBatchMatmulEncodingUser(EncodingUser user);
 
