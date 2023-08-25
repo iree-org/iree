@@ -263,9 +263,9 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
 }
 
 /// Utility method to convert from `linalg.batch_matmul` with
-/// - lhs encoding with role=LHS
-/// - rhs encoding with role=RHS
-/// - result encoding with role=RESULT
+/// - lhs encoding with user=BATCH_MATMUL_*, role=LHS
+/// - rhs encoding with user=BATCH_MATMUL_*, role=RHS
+/// - result encoding with user=BATCH_MATMUL_*, role=RESULT
 /// to linalg.batch_mmt4d op.
 static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, linalg::BatchMatmulOp batchMatmulOp,
@@ -285,12 +285,13 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::BatchMatmulOp batchMatmulOp,
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }
-  if (lhsEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::LinalgExt::EncodingRole::LHS ||
-      rhsEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::LinalgExt::EncodingRole::RHS ||
-      resultEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::LinalgExt::EncodingRole::RESULT) {
+
+  if (!isBatchMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
+      !isBatchMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
+      !isBatchMatmulEncodingUser(resultEncoding.getUser().getValue()) ||
+      lhsEncoding.getRole().getValue() != EncodingRole::LHS ||
+      rhsEncoding.getRole().getValue() != EncodingRole::RHS ||
+      resultEncoding.getRole().getValue() != EncodingRole::RESULT) {
     return failure();
   }
   Operation *batchMmt4DOp = rewriter.create<linalg::BatchMmt4DOp>(
@@ -299,8 +300,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::BatchMatmulOp batchMatmulOp,
   return batchMmt4DOp;
 }
 
-/// Utility method to convert from `linalg.fill` on `tensor` type with encoding
-/// to fill of the materialized type
+/// Utility method to convert from `linalg.fill` on `tensor` type with
+/// encoding to fill of the materialized type
 static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, linalg::FillOp fillOp,
                     ValueRange convertedInputOperands,
@@ -552,7 +553,8 @@ void populateMaterializeEncodingPatterns(
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
 
-  // Add all patterns for converting from encoded type to the materialized type
+  // Add all patterns for converting from encoded type to the materialized
+  // type
   patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
                   MaterializeDPSOperation<linalg::MatmulOp>,
                   MaterializeDPSOperation<linalg::BatchMatmulOp>,
