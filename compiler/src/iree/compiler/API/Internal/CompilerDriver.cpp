@@ -167,8 +167,7 @@ void GlobalInit::registerCommandLineOptions() {
   clBindingOptions = &BindingOptions::FromFlags::get();
   clInputOptions = &InputDialectOptions::FromFlags::get();
   clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
-  clGlobalOptimizationOptions =
-      &GlobalOptimizationOptions::FromFlags::get();
+  clGlobalOptimizationOptions = &GlobalOptimizationOptions::FromFlags::get();
   clSchedulingOptions = &SchedulingOptions::FromFlags::get();
   clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
   clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
