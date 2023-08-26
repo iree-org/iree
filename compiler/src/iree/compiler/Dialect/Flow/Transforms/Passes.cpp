@@ -180,10 +180,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
-      // - Convert all elementwise ops to Linalg
-      // - Remove unit-extent dimensions.
-      .addPass(createRaiseSpecialOps)
-      .addPass(createInterchangeGenericOpsPass)
       .addPass(createCollapseDimsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)

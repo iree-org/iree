@@ -43,7 +43,9 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
       .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
-      .addPass(IREE::Flow::createFoldUnitExtentDimsPass);
+      .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      .addPass(IREE::Flow::createRaiseSpecialOps)
+      .addPass(IREE::Flow::createInterchangeGenericOpsPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
