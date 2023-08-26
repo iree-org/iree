@@ -53,6 +53,8 @@ func.func @softmax(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
   return %10 : tensor<?x?x?xf32>
 }
 
+// -----
+
 // CHECK-LABEL: @softmax_no_rcp
 //  CHECK-SAME: %[[ARG:.+]]: tensor<10x4096x4096xf16>
 //       CHECK:   %[[E:.+]] = tensor.empty() : tensor<10x4096x4096xf16>
@@ -109,6 +111,7 @@ func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x40
   return %232 : tensor<10x4096x4096xf16>
 }
 
+// -----
 
 // CHECK-LABEL: @softmax_broadcast
 //  CHECK-SAME: %[[ARG:.+]]: tensor<12x128x128xf32>
@@ -163,6 +166,8 @@ func.func @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x128x128
   return %109 : tensor<12x128x128xf32>
 }
 
+// -----
+
 func.func @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
     %arg1 : tensor<40x20xf32>) -> tensor<10x40xf32> {
   %0 = tensor.empty() : tensor<20x40xf32>
@@ -187,6 +192,8 @@ func.func @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 //       CHECK:   return %[[RESULT]]
 
+// -----
+
 func.func @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
@@ -204,6 +211,36 @@ func.func @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
     return %1 : tensor<1x1x?x?xf32>
 }
 // CHECK-LABEL: func @generic_fill
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+//       CHECK:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty
+//  CHECK-SAME:   : tensor<1x1x?x?xf32>
+//       CHECK:   %[[RESULT:.+]] = linalg.fill
+//  CHECK-SAME:       ins(%[[CST]] : f32)
+//  CHECK-SAME:       outs(%[[EMPTY]] : tensor<1x1x?x?xf32>)
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @generic_fill_input(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %dim = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+    %dim_0 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+    %0 = tensor.empty(%dim, %dim_0) : tensor<1x1x?x?xf32>
+    %1 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> ()>,
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+        ins(%cst : f32)
+        outs(%0 : tensor<1x1x?x?xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+    } -> tensor<1x1x?x?xf32>
+    return %1 : tensor<1x1x?x?xf32>
+}
+// CHECK-LABEL: func @generic_fill_input
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
 //       CHECK:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty

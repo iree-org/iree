@@ -87,9 +87,9 @@ std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
 // the fill value (input operand to linalg.fill) on success.
 std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
   if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
-      linalgOp.getNumDpsInputs() == 0 && linalgOp.getNumDpsInits() == 1 &&
       linalgOp.getNumParallelLoops() == linalgOp.getNumLoops() &&
-      linalgOp.getIndexingMapsArray()[0].isIdentity()) {
+      linalgOp.getNumDpsInits() == 1 &&
+      linalgOp.getIndexingMapsArray().back().isIdentity()) {
     // Check that the op body is only a linalg.yield op.
     Value yieldOperand;
     for (Operation &bodyOp : linalgOp.getBlock()->getOperations()) {
@@ -99,14 +99,25 @@ std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
         return std::nullopt;
       }
     }
-    // Check that the operand of the linalg.yield op is not an argument of the
-    // linalg.generic basic block
-    for (Value blockArg : linalgOp.getBlock()->getArguments()) {
-      if (yieldOperand == blockArg) {
-        return std::nullopt;
+    if (linalgOp.getNumDpsInputs() == 0) {
+      // Check that the operand of the linalg.yield op is not an argument of the
+      // linalg.generic basic block.
+      for (Value blockArg : linalgOp.getBlock()->getArguments()) {
+        if (yieldOperand == blockArg) {
+          return std::nullopt;
+        }
+      }
+      return yieldOperand;
+    }
+    if (linalgOp.getNumDpsInputs() == 1) {
+      // Check that the operand of the linalg.yield op is the single input block
+      // argument and a scalar.
+      Value input = linalgOp.getDpsInputOperand(0)->get();
+      if (!isa<ShapedType>(input.getType()) &&
+          yieldOperand == linalgOp.getBlock()->getArgument(0)) {
+        return input;
       }
     }
-    return yieldOperand;
   }
   return std::nullopt;
 }
@@ -324,6 +335,11 @@ static FailureOr<Operation *> tryRaiseToView(linalg::GenericOp linalgOp,
   }
   OpOperand *inputOperand = linalgOp.getDpsInputOperand(0);
   OpOperand *outputOperand = linalgOp.getDpsInitOperand(0);
+
+  // Input must be a tensor type.
+  if (!isa<RankedTensorType>(inputOperand->get().getType())) {
+    return failure();
+  }
 
   // Check if linalg.yield yields a block arguement.
   auto yieldOp = dyn_cast<linalg::YieldOp>(linalgOp.getBody()->getTerminator());
