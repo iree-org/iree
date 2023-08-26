@@ -45,7 +45,6 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPass(IREE::Flow::createRaiseSpecialOps)
-      .addPass(IREE::Flow::createInterchangeGenericOpsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
