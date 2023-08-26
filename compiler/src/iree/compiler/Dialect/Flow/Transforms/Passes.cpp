@@ -185,6 +185,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(createGeneralizeLinalgNamedOpsPass)
       .addPass(createFuseDequantizationMatmulPass)
+      .addPass(createRaiseSpecialOps)
       .addPass(createFoldUnitExtentDimsPass)
       .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
