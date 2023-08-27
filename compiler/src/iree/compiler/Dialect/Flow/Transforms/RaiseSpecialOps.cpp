@@ -28,23 +28,30 @@ namespace Flow {
 
 namespace {
 
-// Method to match a transpose operation.
-static bool match2DTranspose(linalg::LinalgOp genericOp) {
+// Method to match a transpose operation on the two most minor dimensions of the
+// specified rank.
+static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
+  // Only makes sense for minimum rank 2.
+  if (rank < 2) {
+    return false;
+  }
   if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
     return false;
   }
-  // Check only for 2D ops.
-  if (genericOp.getNumLoops() != 2 ||
+  // Check only for ops of the specified rank.
+  if (genericOp.getNumLoops() != rank ||
       genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
     return false;
   }
   // Check for transpose map.
-  AffineExpr d0, d1;
+  SmallVector<AffineExpr> exprList(rank);
   MLIRContext *context = genericOp.getContext();
-  bindDims(context, d0, d1);
+  bindDimsList(context, MutableArrayRef{exprList});
+  SmallVector<AffineExpr> transposeExprList(exprList);
+  std::swap(transposeExprList[rank - 1], transposeExprList[rank - 2]);
   SmallVector<AffineMap> expectedMaps = {
-      AffineMap::get(2, 0, {d0, d1}, context),
-      AffineMap::get(2, 0, {d1, d0}, context)};
+      AffineMap::get(rank, 0, exprList, context),
+      AffineMap::get(rank, 0, transposeExprList, context)};
   if (genericOp.getIndexingMapsArray() != expectedMaps) {
     return false;
   }
@@ -70,7 +77,21 @@ std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
   }
   auto rhs = matmulOp.getDpsInputOperand(1);
   auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-  if (genericOp && match2DTranspose(genericOp)) {
+  if (genericOp && matchInner2DTranspose(genericOp, 2)) {
+    return genericOp.getDpsInputOperand(0)->get();
+  }
+  return std::nullopt;
+}
+
+// Method to match a linalg.batch_matmul(a, linalg.transpose(b)). Returns `b` on
+// success.
+std::optional<Value> matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
+  if (!isa<linalg::BatchMatmulOp>(bmmOp.getOperation())) {
+    return std::nullopt;
+  }
+  auto rhs = bmmOp.getDpsInputOperand(1);
+  auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
+  if (genericOp && matchInner2DTranspose(genericOp, 3)) {
     return genericOp.getDpsInputOperand(0)->get();
   }
   return std::nullopt;
@@ -361,6 +382,8 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
 
     SmallVector<std::pair<linalg::LinalgOp, Value>> softmaxRoots;
     SmallVector<std::pair<linalg::MatmulOp, Value>> transposeMatmulRoots;
+    SmallVector<std::pair<linalg::BatchMatmulOp, Value>>
+        transposeBatchMatmulRoots;
     SmallVector<std::pair<linalg::GenericOp, Value>> genericFills;
     getOperation()->walk([&](linalg::LinalgOp op) {
       {
@@ -375,6 +398,10 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
         if (std::optional<Value> newRhs = matchATransposeBMatmul(op)) {
           transposeMatmulRoots.push_back(std::make_pair(
               cast<linalg::MatmulOp>(op.getOperation()), newRhs.value()));
+        }
+        if (std::optional<Value> newRhs = matchATransposeBBatchMatmul(op)) {
+          transposeBatchMatmulRoots.push_back(std::make_pair(
+              cast<linalg::BatchMatmulOp>(op.getOperation()), newRhs.value()));
         }
         if (std::optional<Value> fillInput = matchGenericFill(op)) {
           genericFills.push_back(
@@ -401,6 +428,17 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       SmallVector<NamedAttribute> attrs = getPrunedAttributeList(matmulOp);
       rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
           matmulOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
+    }
+    for (std::pair<linalg::BatchMatmulOp, Value> aTransposeBBatchMatmul :
+         transposeBatchMatmulRoots) {
+      auto bmmOp = aTransposeBBatchMatmul.first;
+      Value lhs = bmmOp.getDpsInputOperand(0)->get();
+      auto newRhs = aTransposeBBatchMatmul.second;
+      Value init = bmmOp.getDpsInitOperand(0)->get();
+      rewriter.setInsertionPoint(bmmOp);
+      SmallVector<NamedAttribute> attrs = getPrunedAttributeList(bmmOp);
+      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
+          bmmOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
     }
     for (std::pair<linalg::GenericOp, Value> genericFill : genericFills) {
       auto genericOp = genericFill.first;
