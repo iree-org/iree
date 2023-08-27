@@ -28,8 +28,9 @@ namespace Flow {
 
 namespace {
 
-// Method to match a transpose operation.
-static bool matchNDTranspose(linalg::LinalgOp genericOp, unsigned rank) {
+// Method to match a transpose operation on the two most minor dimensions of the
+// specified rank.
+static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
   // Only makes sense for minimum rank 2.
   if (rank < 2) {
     return false;
@@ -76,7 +77,7 @@ std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
   }
   auto rhs = matmulOp.getDpsInputOperand(1);
   auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-  if (genericOp && matchNDTranspose(genericOp, 2)) {
+  if (genericOp && matchInner2DTranspose(genericOp, 2)) {
     return genericOp.getDpsInputOperand(0)->get();
   }
   return std::nullopt;
@@ -90,7 +91,7 @@ std::optional<Value> matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
   }
   auto rhs = bmmOp.getDpsInputOperand(1);
   auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-  if (genericOp && matchNDTranspose(genericOp, 3)) {
+  if (genericOp && matchInner2DTranspose(genericOp, 3)) {
     return genericOp.getDpsInputOperand(0)->get();
   }
   return std::nullopt;
