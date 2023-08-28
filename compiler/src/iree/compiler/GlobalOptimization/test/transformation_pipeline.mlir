@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-flow-transformation-pipeline %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-global-optimization-transformation-pipeline %s | FileCheck %s
 
 // CHECK-LABEL: @empty
 func.func @empty() {
