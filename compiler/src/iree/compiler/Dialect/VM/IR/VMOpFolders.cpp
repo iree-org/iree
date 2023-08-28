@@ -1625,7 +1625,7 @@ struct PseudoIntegerConversionToSplitConversionOp
 void TruncI16I8Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   results.insert<PseudoIntegerConversionToSplitConversionOp<
-      TruncI16I8Op, ExtI16I32SOp, 32, TruncI32I8Op>>(context);
+      TruncI16I8Op, ExtI16I32UOp, 32, TruncI32I8Op>>(context);
 }
 
 void TruncI64I8Op::getCanonicalizationPatterns(RewritePatternSet &results,
