@@ -12,10 +12,7 @@ iree_uk_mmt4d_select_tile_func_arm_64_i8i8i32_8x8x8(
     const iree_uk_mmt4d_params_t* params) {
 #ifdef IREE_UK_BUILD_ARM_64_I8MM
   if (iree_uk_cpu_supports_i8mm(params->cpu_data)) {
-    return IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(
-        iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm_inline_asm,
-        iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm_intrinsics,
-        params->flags & IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS);
+    return iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm;
   }
 #else
   (void)params;

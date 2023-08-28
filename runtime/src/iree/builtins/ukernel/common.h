@@ -642,43 +642,6 @@ static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
 #define IREE_UK_PREFETCH_LOCALITY_L1 3    // Most locality. Try to keep in L1.
 
 //===----------------------------------------------------------------------===//
-// Selection between inline asm and intrinsics code paths.
-//===----------------------------------------------------------------------===//
-
-// IREE_UK_ENABLE_INLINE_ASM controls whether we enabled inline assembly at all.
-// Our inline asm is GCC-extended-syntax, supported by Clang and GCC.
-#if defined(IREE_UK_COMPILER_CLANG_OR_GCC)
-#define IREE_UK_ENABLE_INLINE_ASM
-#endif
-
-// Undefine this to save code size by dropping intrinsics code paths that are
-// redundant with an inline asm code path. This shouldn't make a difference in
-// bitcode with reflection, flags being compile-time constant, allowing the
-// compiler to DCE unused intrinsics code paths no matter what.
-#define IREE_UK_ENABLE_INTRINSICS_EVEN_WHEN_INLINE_ASM_AVAILABLE
-
-// Some ukernels have both intrinsics and inline asm code paths. The
-// IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS macro helps selecting the one to use
-// based on what's enabled in the build. If both intrinsics and inline asm are
-// enabled in the build, by default inline asm is preferred, unless
-// `prefer_intrinsics` is true. Useful for testing.
-#if defined(IREE_UK_ENABLE_INLINE_ASM) && \
-    defined(IREE_UK_ENABLE_INTRINSICS_EVEN_WHEN_INLINE_ASM_AVAILABLE)
-#define IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS
-#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
-                                                prefer_intrinsics)      \
-  ((prefer_intrinsics) ? (intrinsics) : (inline_asm))
-#elif defined(IREE_UK_ENABLE_INLINE_ASM)
-#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
-                                                prefer_intrinsics)      \
-  (inline_asm)
-#else  // not defined(IREE_UK_ENABLE_INLINE_ASM)
-#define IREE_UK_SELECT_INLINE_ASM_OR_INTRINSICS(inline_asm, intrinsics, \
-                                                prefer_intrinsics)      \
-  (intrinsics)
-#endif  // not defined(IREE_UK_ENABLE_INLINE_ASM)
-
-//===----------------------------------------------------------------------===//
 // 16-bit <-> 32-bit floating point conversions.
 // Adapted from runtime/src/iree/base/internal/math.h.
 //===----------------------------------------------------------------------===//

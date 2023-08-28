@@ -98,3 +98,13 @@ func.func public @empty_zero_extent(%arg0: tensor<ui8>, %arg1: tensor<0x4xui32>)
   // CHECK: return %[[EMPTY]]
   return %0 : tensor<0x4xui32>
 }
+
+// -----
+
+// CHECK-LABEL: @convert_return
+func.func @convert_return() -> tensor<i32> {
+  // CHECK: %[[CST:.+]] = arith.constant dense<1>
+  %cst = arith.constant dense<1> : tensor<i32>
+  // CHECK: return %[[CST]]
+  stablehlo.return %cst : tensor<i32>
+}

@@ -15,7 +15,6 @@ COMMON_FLAGS = [
     "--iree-input-type=none",
     "--iree-stream-resource-index-bits=64",
     "--iree-vm-target-index-bits=64",
-    "--iree-opt-const-expr-hoisting=false",
     "--iree-stream-resource-max-allocation-size=3221225472",
 ]
 
