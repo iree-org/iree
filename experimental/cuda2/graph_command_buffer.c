@@ -7,8 +7,6 @@
 #include "experimental/cuda2/graph_command_buffer.h"
 
 #include <assert.h>
-#include <iree/base/assert.h>
-#include <iree/base/attributes.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -443,6 +441,9 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_fill_buffer(
   CUgraphNode dep[] = {command_buffer->barrier_node};
   size_t numDeps = command_buffer->barrier_node ? 1 : 0;
 
+  IREE_ASSERT_LT(command_buffer->node_count, IREE_HAL_CUDA_MAX_CONCURRENT_NODES,
+                 "number of concurrent graph nodes larger than expected");
+
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
       cuGraphAddMemsetNode(&command_buffer->nodes[command_buffer->node_count++],
@@ -498,6 +499,9 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_update_buffer(
   CUgraphNode dep[] = {command_buffer->barrier_node};
   size_t numDeps = command_buffer->barrier_node ? 1 : 0;
 
+  IREE_ASSERT_LT(command_buffer->node_count, IREE_HAL_CUDA_MAX_CONCURRENT_NODES,
+                 "number of concurrent graph nodes larger than expected");
+
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
       cuGraphAddMemcpyNode(&command_buffer->nodes[command_buffer->node_count++],
@@ -548,6 +552,9 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_copy_buffer(
 
   CUgraphNode dep[] = {command_buffer->barrier_node};
   size_t numDeps = command_buffer->barrier_node ? 1 : 0;
+
+  IREE_ASSERT_LT(command_buffer->node_count, IREE_HAL_CUDA_MAX_CONCURRENT_NODES,
+                 "number of concurrent graph nodes larger than expected");
 
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
@@ -704,6 +711,9 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_dispatch(
 
   CUgraphNode dep[] = {command_buffer->barrier_node};
   size_t numDeps = command_buffer->barrier_node ? 1 : 0;
+
+  IREE_ASSERT_LT(command_buffer->node_count, IREE_HAL_CUDA_MAX_CONCURRENT_NODES,
+                 "number of concurrent graph nodes larger than expected");
 
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
