@@ -13,6 +13,11 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
+static llvm::cl::opt<bool>
+    clEnableDataTiling("iree-global-opt-enable-data-tiling",
+                       llvm::cl::desc("Enable data tiling path."),
+                       llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
@@ -66,8 +71,11 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
       .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      // Enable data tiling after they are in a canonical form.
+      .addPredicatedPass(clEnableDataTiling, IREE::Flow::createSetEncodingPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
+  mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
@@ -75,8 +83,8 @@ void buildGlobalOptimizationPassPipeline(
       // region formation as redundant store-loads are removed.
       .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
-  // Module level cleanup and canonicalization of util.global (and other util
-  // ops).
+  // Module level cleanup and canonicalization of util.global (and other
+  // util ops).
   pipeline.addPass(IREE::Util::createApplyPatternsPass());
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
   pipeline.addPass(IREE::Util::createIPOPass());
@@ -111,7 +119,14 @@ void buildGlobalOptimizationPassPipeline(
   }
 }
 
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/GlobalOptimization/Passes.h.inc" // IWYU pragma: export
+} // namespace
+
 void registerGlobalOptimizationPipeline() {
+  registerPasses();
+
   PassPipelineRegistration<TransformOptions>
       globalOptimizationTransformPassPipeline(
           "iree-global-optimization-transformation-pipeline",
