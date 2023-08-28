@@ -97,6 +97,9 @@ def benchmark_module(module, entry_functiong=None, inputs=[], timeout=None, **kw
         args.append(f"--input={shape}x{abitype}={values}")
     args.append(f"--module=-")
 
+    # DEBUG - DO NOT SUBMIT
+    print(f"running process with args: '{args}'")
+
     try:
         benchmark_process = subprocess.run(
             args=args,

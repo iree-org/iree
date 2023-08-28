@@ -191,6 +191,13 @@ iree_py_test(
 
 iree_py_test(
   NAME
+    benchmark_test
+  SRCS
+    "tests/benchmark_test.py"
+)
+
+iree_py_test(
+  NAME
     flags_test
   SRCS
     "tests/flags_test.py"
