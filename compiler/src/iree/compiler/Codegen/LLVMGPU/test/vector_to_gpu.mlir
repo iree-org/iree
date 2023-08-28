@@ -145,9 +145,9 @@ func.func @ksplitmatmul_4D_allone(%a: memref<128x16x32x256xf32>) -> vector<1x1x1
 //   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
 //       CHECK: %[[M:.*]] = memref.subview
 //  CHECK-SAME:[2, 3, 4, 5] [1, 1, 1, 1] [1, 1, 1, 1]
-//  CHECK-SAME: memref<128x16x32x256xf32> to memref<1x1xf32, strided<[131072, 8192], offset: 287749>>
+//  CHECK-SAME: memref<128x16x32x256xf32> to memref<1x1xf32, strided<[256, 1], offset: 287749>>
 //       CHECK: vector.transfer_read %[[M]][%[[ID]], %[[ID]]]
-//  CHECK-SAME: {in_bounds = [true]} :  memref<1x1xf32, strided<[131072, 8192], offset: 287749>>, vector<1xf32>
+//  CHECK-SAME: {in_bounds = [true]} :  memref<1x1xf32, strided<[256, 1], offset: 287749>>, vector<1xf32>
 //       CHECK: vector.broadcast %{{.*}} : vector<1xf32> to vector<1x1x1x1xf32>
 //   CHECK-NOT: vector.transpose
 //       CHECK: return %{{.*}} : vector<1x1x1x1xf32>
