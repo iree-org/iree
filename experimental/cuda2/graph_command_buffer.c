@@ -308,7 +308,7 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_execution_barrier(
       iree_hal_cuda2_graph_command_buffer_flush_collectives(command_buffer));
 
   IREE_ASSERT_GT(command_buffer->node_count, 0,
-                 "expected at least one node before barrier");
+                 "expected at least one node before a barrier");
 
   // Use last node as a barrier to avoid creating redundant empty nodes.
   if (IREE_LIKELY(command_buffer->node_count == 1)) {
