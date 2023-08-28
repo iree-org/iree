@@ -10,6 +10,7 @@
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
@@ -51,11 +52,22 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
-  // The more we are able to equate shape dimensions at this level the better
-  // our fusions will be.
+  // The more we are able to equate shape dimensions at this level the
+  // better our fusions will be.
   FunctionLikeNest(mainPassManager)
       .addPass(IREE::Flow::createTopLevelSCFToCFGPass);
   mainPassManager.addPass(IREE::Flow::createExpandTensorShapesPass());
+
+  FunctionLikeNest(mainPassManager)
+      // Preprocess the input to a form more amenable for fusion
+      // - Convert all elementwise ops to Linalg
+      // - Remove unit-extent dimensions.
+      .addPass(mlir::createConvertElementwiseToLinalgPass)
+      .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
+      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
+      .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
