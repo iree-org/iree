@@ -355,15 +355,6 @@ static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
   iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
 }
 
-static void iree_uk_test_mmt4d_default_and_intrinsics(
-    iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
-  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
-#if defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
-  iree_uk_test_mmt4d_impl(flags | IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS, M0, N0,
-                          K0, cpu_features, " intrinsics");
-#endif  // defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
-}
-
 static void iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
     iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
   iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
@@ -384,8 +375,6 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 2, 9, 3, "");
 
 #if defined(IREE_ARCH_ARM_64)
-  // On arm64, some code paths have inline asm and intrinsics variants. For them
-  // we use iree_uk_test_mmt4d_default_and_intrinsics to test both.
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
@@ -396,8 +385,7 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4, "bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4, "dotprod");
-  iree_uk_test_mmt4d_default_and_intrinsics(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8,
-                                            8, 8, "i8mm");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 8, "i8mm");
 #elif defined(IREE_ARCH_X86_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 4, 1, "");  // SSE
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
