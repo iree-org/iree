@@ -849,6 +849,9 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32SOp>(srcOp, dstType,
                                                           adaptor.getIn());
+    } else if (srcType.isInteger(16) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I64SOp>(srcOp, dstType,
+                                                          adaptor.getIn());
     } else if (srcType.isInteger(32) && dstType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64SOp>(srcOp, dstType,
                                                           adaptor.getIn());
@@ -879,6 +882,9 @@ class TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
       rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
           srcOp, dstType, value,
           rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+    } else if (srcType.isInteger(16) && resultType.isInteger(8)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::TruncI16I8Op>(srcOp, dstType,
+                                                          adaptor.getIn());
     } else if (srcType.isInteger(32) && resultType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI32I8Op>(srcOp, dstType,
                                                           adaptor.getIn());
