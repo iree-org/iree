@@ -128,7 +128,7 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
 //===========Link LLVM Module to ROCDL End===================/
 
 //=====================Create HSACO Begin=============//
-// Link object file using ld.lld lnker to generate code object
+// Link object file using lld lnker to generate code object
 // Inspiration from this section comes from LLVM-PROJECT-MLIR by
 // ROCmSoftwarePlatform
 // https://github.com/ROCmSoftwarePlatform/llvm-project-mlir/blob/miopen-dialect/mlir/lib/ExecutionEngine/ROCm/BackendUtils.cpp

@@ -68,6 +68,7 @@ docs/website/site/
 
 # Temporary files
 iree/builtins/**/bin/*.ll
+artifacts/
 
 # Archive files
 *.tar
