@@ -191,13 +191,6 @@ iree_py_test(
 
 iree_py_test(
   NAME
-    benchmark_test
-  SRCS
-    "tests/benchmark_test.py"
-)
-
-iree_py_test(
-  NAME
     flags_test
   SRCS
     "tests/flags_test.py"
@@ -234,6 +227,13 @@ iree_py_test(
 # These tests perform linking via the Compiler API, which is only supported
 # in bundled-LLVM builds at the moment (#14086).
 if(IREE_BUILD_BUNDLED_LLVM)
+  iree_py_test(
+    NAME
+      benchmark_test
+    SRCS
+      "tests/benchmark_test.py"
+  )
+
   iree_py_test(
     NAME
       system_api_test
