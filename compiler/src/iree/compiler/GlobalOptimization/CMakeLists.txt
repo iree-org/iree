@@ -26,6 +26,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Pipelines::Options
     iree::compiler::Utils
   PUBLIC
 )

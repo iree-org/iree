@@ -131,13 +131,12 @@ hal.executable private @pad_with_producer {
 //       CHECK:         scf.for
 //       CHECK:           scf.for
 //   CHECK-DAG:             %[[INPUT_SLICE:.+]] = memref.subview %[[INPUT_SUBVIEW]]
-//   CHECK-DAG:             %[[BIAS_ALLOC:.+]] = memref.alloca
+//   CHECK-DAG:             %[[ALLOC:.+]] = memref.alloca
+//       CHECK:             %[[CONV_OUTPUT:.+]] = memref.subview %[[ALLOC]]
 //       CHECK:               scf.for
 //       CHECK:               %[[FILTER_SLICE:.+]] = memref.subview %[[FILTER_SUBVIEW]]
-//       CHECK:               %[[FILL_ALLOC:.+]] = memref.alloca
 //       CHECK:               linalg.fill
-//  CHECK-SAME:                   outs(%[[FILL_ALLOC]]
-//       CHECK:               %[[CONV_OUTPUT:.+]] = memref.subview %[[FILL_ALLOC]]
+//  CHECK-SAME:                   outs(%[[ALLOC]]
 //       CHECK:               scf.for
 //       CHECK:                 %[[CONV_INPUT:.+]] = memref.subview %[[INPUT_SLICE]]
 //       CHECK:                 %[[CONV_FILTER:.+]] = memref.subview %[[FILTER_SLICE]]
@@ -146,13 +145,13 @@ hal.executable private @pad_with_producer {
 //  CHECK-SAME:                     outs(%[[CONV_OUTPUT]] :
 //       CHECK:               %[[BIAS_INPUT:.+]] = memref.subview %[[BIAS_SUBVIEW]]
 //       CHECK:               linalg.generic
-//  CHECK-SAME:                   ins(%[[FILL_ALLOC]], %[[BIAS_INPUT]] :
-//  CHECK-SAME:                   outs(%[[BIAS_ALLOC]]
+//  CHECK-SAME:                   ins(%[[ALLOC]], %[[BIAS_INPUT]] :
+//  CHECK-SAME:                   outs(%[[ALLOC]]
 //       CHECK:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
 //       CHECK:               linalg.fill ins(%{{.+}} :   f32) outs(%[[OUTPUT_SLICE]]
 //       CHECK:               %[[INTERIOR_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
 //       CHECK:               linalg.generic
-//  CHECK-SAME:                   ins(%[[BIAS_ALLOC]] :
+//  CHECK-SAME:                   ins(%[[ALLOC]] :
 //  CHECK-SAME:                   outs(%[[INTERIOR_SLICE]] :
 
 // -----

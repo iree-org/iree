@@ -9,7 +9,7 @@
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::BindingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::InputDialectOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
-    mlir::iree_compiler::HighLevelOptimizationOptions);
+    mlir::iree_compiler::GlobalOptimizationOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::SchedulingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PreprocessingOptions);
 
@@ -98,9 +98,35 @@ InputDialectOptions::Type InputDialectOptions::parseInputTypeMnemonic() {
   }
 }
 
-void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
+void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
-      "IREE options for controlling high level optimizations.");
+      "IREE options for controlling global optimizations.");
+  // Type promotion/demotion options.
+  binder.opt<bool>(
+      "iree-opt-demote-f64-to-f32", demoteF64ToF32,
+      llvm::cl::desc("Converts all f64 ops and values into f32 counterparts "
+                     "unconditionally before main global optimizations."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-demote-f32-to-f16", demoteF32ToF16,
+      llvm::cl::desc("Converts all f32 ops and values into f16 counterparts "
+                     "unconditionally before main global optimizations."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-promote-f16-to-f32", promoteF16ToF32,
+      llvm::cl::desc("Converts all f16 ops and values into f32 counterparts "
+                     "unconditionally before main global optimizations."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-promote-bf16-to-f32", promoteBF16ToF32,
+      llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts "
+                     "unconditionally before main global optimizations."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-demote-i64-to-i32", demoteI64ToI32,
+      llvm::cl::desc("Converts all i64 ops and values into i32 counterparts "
+                     "unconditionally before main global optimizations."),
+      llvm::cl::cat(category));
 
   binder.opt<bool>(
       "iree-opt-const-eval", constEval,

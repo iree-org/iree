@@ -58,22 +58,19 @@ class Android_Mali_Benchmarks(object):
     )
     EXPERIMENTAL_REPEATED_KERNEL_RUN_FLAGS = ["--batch_size=32"]
 
-    # TODO(#14775): Re-enable the benchmarks.
     FP32_MODELS = [
-        # tflite_models.DEEPLABV3_FP32,
-        # tflite_models.MOBILESSD_FP32,
-        # tflite_models.POSENET_FP32,
-        # tflite_models.MOBILEBERT_FP32,
-        # tflite_models.MOBILENET_V2,
-        # tflite_models.MOBILENET_V3SMALL,
+        tflite_models.DEEPLABV3_FP32,
+        tflite_models.MOBILESSD_FP32,
+        tflite_models.POSENET_FP32,
+        tflite_models.MOBILEBERT_FP32,
+        tflite_models.MOBILENET_V2,
+        tflite_models.MOBILENET_V3SMALL,
     ]
-    FP16_MODELS = [
-        # tflite_models.MOBILEBERT_FP16
-    ]
+    FP16_MODELS = [tflite_models.MOBILEBERT_FP16]
     QUANT_MODELS = [
-        # tflite_models.MOBILEBERT_INT8,
-        # tflite_models.EFFICIENTNET_INT8,
-        # tflite_models.PERSON_DETECT_INT8,
+        tflite_models.MOBILEBERT_INT8,
+        tflite_models.EFFICIENTNET_INT8,
+        tflite_models.PERSON_DETECT_INT8,
     ]
 
     def generate(
@@ -130,7 +127,7 @@ class Android_Mali_Benchmarks(object):
             id=compile_config.id + "-demote-f32-to-16",
             tags=compile_config.tags + ["demote-f32-to-f16"],
             compile_targets=compile_config.compile_targets,
-            extra_flags=compile_config.extra_flags + ["--iree-flow-demote-f32-to-f16"],
+            extra_flags=compile_config.extra_flags + ["--iree-opt-demote-f32-to-f16"],
         )
         return (
             [

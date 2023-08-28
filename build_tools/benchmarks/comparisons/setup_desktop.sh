@@ -96,7 +96,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-input-type=tosa \
     --iree-hal-target-backends=cuda \
     --iree-hal-cuda-llvm-target-arch=sm_80 \
-    --iree-flow-demote-f32-to-f16 \
+    --iree-opt-demote-f32-to-f16 \
     --iree-llvmcpu-debug-symbols=false \
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \

@@ -123,7 +123,7 @@ struct GlobalInit {
   BindingOptions *clBindingOptions = nullptr;
   InputDialectOptions *clInputOptions = nullptr;
   PreprocessingOptions *clPreprocessingOptions = nullptr;
-  HighLevelOptimizationOptions *clHighLevelOptimizationOptions = nullptr;
+  GlobalOptimizationOptions *clGlobalOptimizationOptions = nullptr;
   SchedulingOptions *clSchedulingOptions = nullptr;
   IREE::HAL::TargetOptions *clHalTargetOptions = nullptr;
   IREE::VM::TargetOptions *clVmTargetOptions = nullptr;
@@ -167,8 +167,7 @@ void GlobalInit::registerCommandLineOptions() {
   clBindingOptions = &BindingOptions::FromFlags::get();
   clInputOptions = &InputDialectOptions::FromFlags::get();
   clPreprocessingOptions = &PreprocessingOptions::FromFlags::get();
-  clHighLevelOptimizationOptions =
-      &HighLevelOptimizationOptions::FromFlags::get();
+  clGlobalOptimizationOptions = &GlobalOptimizationOptions::FromFlags::get();
   clSchedulingOptions = &SchedulingOptions::FromFlags::get();
   clHalTargetOptions = &IREE::HAL::TargetOptions::FromFlags::get();
   clVmTargetOptions = &IREE::VM::TargetOptions::FromFlags::get();
@@ -252,7 +251,7 @@ struct Session {
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
-  HighLevelOptimizationOptions highLevelOptimizationOptions;
+  GlobalOptimizationOptions highLevelOptimizationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions halTargetOptions;
   IREE::VM::TargetOptions vmTargetOptions;
@@ -275,7 +274,7 @@ Session::Session(GlobalInit &globalInit)
     bindingOptions = *globalInit.clBindingOptions;
     inputOptions = *globalInit.clInputOptions;
     preprocessingOptions = *globalInit.clPreprocessingOptions;
-    highLevelOptimizationOptions = *globalInit.clHighLevelOptimizationOptions;
+    highLevelOptimizationOptions = *globalInit.clGlobalOptimizationOptions;
     schedulingOptions = *globalInit.clSchedulingOptions;
     halTargetOptions = *globalInit.clHalTargetOptions;
     vmTargetOptions = *globalInit.clVmTargetOptions;

@@ -75,7 +75,14 @@ struct InputDialectOptions {
 };
 
 // Options controlling high level optimizations.
-struct HighLevelOptimizationOptions {
+struct GlobalOptimizationOptions {
+  // Gate various type based demotion passes that run before anything else.
+  bool demoteF64ToF32 = true;
+  bool demoteF32ToF16 = false;
+  bool promoteF16ToF32 = false;
+  bool promoteBF16ToF32 = false;
+  bool demoteI64ToI32 = false;
+
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;
 
@@ -90,7 +97,7 @@ struct HighLevelOptimizationOptions {
   bool stripAssertions = false;
 
   void bindOptions(OptionsBinder &binder);
-  using FromFlags = OptionsFromFlags<HighLevelOptimizationOptions>;
+  using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };
 
 // Options controlling scheduling across host/device.
