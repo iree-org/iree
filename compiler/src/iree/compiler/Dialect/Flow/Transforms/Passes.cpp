@@ -180,8 +180,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
-      .addPass(IREE::Flow::createRaiseSpecialOps)
-      .addPass(IREE::Flow::createInterchangeGenericOpsPass)
+      .addPass(createRaiseSpecialOps)
+      .addPass(createInterchangeGenericOpsPass)
       .addPass(createCollapseDimsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
