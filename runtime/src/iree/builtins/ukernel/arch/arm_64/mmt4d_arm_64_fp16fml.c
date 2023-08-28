@@ -18,9 +18,9 @@
 //      https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
 #define iree_workaround_vfmlalq_laneq_x_f16(INSTR, A, B, C, L) \
   ({                                                           \
-    asm(INSTR " %[a].4s, %[b].4h, %[c].h[%[l]]"                \
+    asm(INSTR " %[a].4s, %[b].4h, %[c].h[" #L "]"              \
         : [a] "+w"(A)                                          \
-        : [b] "w"(B), [c] "x"(C), [l] "i"(L)                   \
+        : [b] "w"(B), [c] "x"(C)                               \
         :);                                                    \
     A;                                                         \
   })
