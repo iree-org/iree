@@ -53,8 +53,8 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::HAL::Dialect
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Pipelines::Options
     iree::compiler::Utils
