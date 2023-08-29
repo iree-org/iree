@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%s | \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%s --mlir-print-ir-after-failure | \
 // RUN: FileCheck --check-prefix=CHECK %s
 
 hal.executable @_attention_dispatch_0 {
@@ -125,6 +125,19 @@ transform.sequence failures(propagate) {
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   transform.apply_patterns to %func_3 { transform.apply_patterns.linalg.erase_unnecessary_inputs } : !transform.any_op
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> (!transform.any_op)
+  %mfunc_0 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+  %mfunc_1 = transform.apply_registered_pass "buffer-deallocation" to %mfunc_0 : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %mfunc_1 {
+    transform.apply_patterns.canonicalization
+  } : !transform.any_op
+  %mfunc_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+  %mfunc_3 = transform.apply_registered_pass "buffer-deallocation-simplification" to %mfunc_2 : (!transform.any_op) -> !transform.any_op
+  %mfunc_4 = transform.apply_registered_pass "bufferization-lower-deallocations" to %mfunc_3 : (!transform.any_op) -> !transform.any_op
+  transform.apply_cse to %mfunc_4 : !transform.any_op
+  %mfunc_5 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+  transform.apply_patterns to %mfunc_5 {
+    transform.apply_patterns.canonicalization
+  } : !transform.any_op
 
   // Step 5. Pre-process the contract and transfer ops to put it in the right form.
   // ===========================================================================
@@ -293,8 +306,6 @@ transform.sequence failures(propagate) {
 // CHECK:        vector.transfer_write %[[D12]], %[[ALLOC_7]][%[[C0]], %[[D8]], %[[C0]]] {in_bounds = [true, true]} :
 // CHECK-SAME:     vector<32x64xf16>, memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:        gpu.barrier
-// CHECK:        memref.dealloc %[[ALLOC]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
-// CHECK:        gpu.barrier
 // CHECK:        linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]]], iterator_types = ["parallel", "parallel",
 // CHECK-SAME:     "parallel"]} ins(%[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>)
 // CHECK-SAME:     outs(%[[SUBVIEW_6]] : memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>) {
@@ -302,4 +313,5 @@ transform.sequence failures(propagate) {
 // CHECK:          linalg.yield %[[IN]] : f16
 // CHECK:        }
 // CHECK:        gpu.barrier
+// CHECK:        memref.dealloc %[[ALLOC]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:        memref.dealloc %[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>

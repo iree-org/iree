@@ -82,6 +82,14 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       CHECK:   {{.*}} = transform.iree.bufferize {target_gpu} {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.iree.apply_buffer_optimizations {{.*}} : (!transform.any_op) -> ()
+//       CHECK:   apply_registered_pass "buffer-deallocation"
+//       CHECK:   apply_patterns
+//       CHECK:     transform.apply_patterns.canonicalization
+//       CHECK:   apply_registered_pass "buffer-deallocation-simplification"
+//       CHECK:   apply_registered_pass "bufferization-lower-deallocations"
+//       CHECK:   apply_cse
+//       CHECK:   apply_patterns
+//       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.iree.forall_to_workgroup {{.*}} : (!transform.any_op) -> ()
 //       CHECK:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [16, 16, 1] subgroup_size = 32 : (!transform.any_op) -> ()

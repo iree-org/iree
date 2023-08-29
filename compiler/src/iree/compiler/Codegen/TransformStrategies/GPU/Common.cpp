@@ -690,5 +690,25 @@ Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,
   Value memrefFunc =
       b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   b.create<ApplyBufferOptimizationsOp>(memrefFunc);
+  memrefFunc =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  memrefFunc = b.create<transform::ApplyRegisteredPassOp>(
+      memrefFunc.getType(), memrefFunc, "buffer-deallocation");
+  b.create<transform::ApplyPatternsOp>(
+      memrefFunc, [&](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+      });
+  memrefFunc = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  memrefFunc = b.create<transform::ApplyRegisteredPassOp>(
+      memrefFunc.getType(), memrefFunc, "buffer-deallocation-simplification");
+  memrefFunc = b.create<transform::ApplyRegisteredPassOp>(
+      memrefFunc.getType(), memrefFunc, "bufferization-lower-deallocations");
+  b.create<transform::ApplyCommonSubexpressionEliminationOp>(memrefFunc);
+  memrefFunc =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<transform::ApplyPatternsOp>(
+      memrefFunc, [&](OpBuilder &b, Location loc) {
+        b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+      });
   return variantH;
 }

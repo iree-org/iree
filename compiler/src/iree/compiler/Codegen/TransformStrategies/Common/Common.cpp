@@ -351,6 +351,25 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
       });
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
+  funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = b.create<transform::ApplyRegisteredPassOp>(funcH.getType(), funcH,
+                                                     "buffer-deallocation");
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+  });
+  funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = b.create<transform::ApplyRegisteredPassOp>(
+      funcH.getType(), funcH, "buffer-deallocation-simplification");
+  funcH = b.create<transform::ApplyRegisteredPassOp>(
+      funcH.getType(), funcH, "bufferization-lower-deallocations");
+  b.create<transform::ApplyCommonSubexpressionEliminationOp>(funcH);
+  funcH =
+      b.create<transform::MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<transform::ApplyPatternsOp>(funcH, [&](OpBuilder &b, Location loc) {
+    b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
+  });
   return variantH;
 }
 

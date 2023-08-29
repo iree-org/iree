@@ -114,11 +114,6 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
-static LogicalResult cpuDeallocationFn(OpBuilder &builder, Location loc,
-                                       Value allocation) {
-  return success();
-}
-
 static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   createLinalgCopyOp(builder, loc, from, to);
@@ -127,10 +122,8 @@ static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
 
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = cpuAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn = cpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
 }
 
 static void addTileAndDistributePasses(OpPassManager &pm) {

@@ -125,11 +125,14 @@ iree_cc_library(
   DEPS
     MLIRAffineDialect
     MLIRAffineTransforms
+    MLIRArithTransforms
     MLIRArmNeonDialect
     MLIRArmNeon2dToIntr
     MLIRBufferizationDialect
+    MLIRBufferizationToMemRef
     MLIRComplexDialect
     MLIRControlFlowDialect
+    MLIRControlFlowTransforms
     MLIRFuncInlinerExtension
     MLIRGPUDialect
     MLIRGPUToSPIRV

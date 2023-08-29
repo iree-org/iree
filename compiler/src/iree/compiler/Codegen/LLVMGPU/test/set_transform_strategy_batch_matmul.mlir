@@ -173,6 +173,14 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 
 // CHECK:   transform.iree.bufferize {target_gpu}
 // CHECK:   transform.iree.apply_buffer_optimizations
+// CHECK:   apply_registered_pass "buffer-deallocation"
+// CHECK:   apply_patterns
+// CHECK:     transform.apply_patterns.canonicalization
+// CHECK:   apply_registered_pass "buffer-deallocation-simplification"
+// CHECK:   apply_registered_pass "bufferization-lower-deallocations"
+// CHECK:   apply_cse
+// CHECK:   apply_patterns
+// CHECK:     transform.apply_patterns.canonicalization
 // CHECK:   transform.iree.forall_to_workgroup
 // CHECK:   transform.iree.map_nested_forall_to_gpu_threads
 // DEFAULT:  workgroup_dims = [64, 2, 1]

@@ -81,11 +81,6 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
       .getResult();
 }
 
-static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
-                                       Value allocation) {
-  return success();
-}
-
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   auto fromType = llvm::cast<MemRefType>(from.getType());
@@ -106,10 +101,8 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
 static void addBufferizePasses(OpPassManager &passManager,
                                BufferizationOptions::AllocationFn fn) {
   BufferizationOptions::AllocationFn allocationFn = fn;
-  BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
 }
 
 //===----------------------------------------------------------------------===//

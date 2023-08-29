@@ -719,12 +719,6 @@ static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
       .getResult();
 }
 
-static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
-  return success();
-}
-
 static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
@@ -749,13 +743,6 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
       .create<memref::AllocOp>(loc, allocType, dynamicSizes,
                                builder.getI64IntegerAttr(alignment))
       .getResult();
-}
-
-static LogicalResult gpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
-  builder.create<memref::DeallocOp>(loc, allocation);
-  return success();
 }
 
 static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
@@ -846,12 +833,9 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   using mlir::bufferization::BufferizationOptions;
   BufferizationOptions::AllocationFn allocationFn =
       cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
   BufferizationOptions::MemCpyFn memCpyFn = cpuComprehensiveBufferizeCopyFn;
   if (getTargetGpu()) {
     allocationFn = gpuComprehensiveBufferizeAllocationFn;
-    deallocationFn = gpuComprehensiveBufferizeDeallocationFn;
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
@@ -883,7 +867,6 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   //   2. Run one-shot-bufferize, without the pass baggage.
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();

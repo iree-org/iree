@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-iree-comprehensive-bufferize --canonicalize -cse --canonicalize --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-codegen-iree-comprehensive-bufferize --canonicalize --buffer-deallocation --canonicalize --buffer-deallocation-simplification -bufferization-lower-deallocations -cse --canonicalize --split-input-file | FileCheck %s
 
 func.func @matmul() {
   %c0 = arith.constant 0 : index
@@ -68,6 +68,7 @@ func.func @matmul() {
 //      CHECK:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
 //      CHECK:       linalg.generic {{.*}} ins(%[[ALLOC]] {{.*}} outs(%[[RESULT_TILE]]
 //      CHECK:       memref.dealloc %[[ALLOC]]
+//  CHECK-NOT: retain
 
 
 // -----
@@ -401,6 +402,7 @@ module {
 //  CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
 //  CHECK-SAME:         outs(%[[RESULT]]
 //       CHECK:       memref.dealloc %[[ALLOC]]
+//   CHECK-NOT: retain
 
 // -----
 
@@ -930,6 +932,7 @@ module {
 //       CHECK:   linalg.generic {{.*}} ins(%[[ARG0]] {{.*}} outs(%[[SUB_ALLOC]]
 //       CHECK:   linalg.generic {{.*}} ins(%[[ALLOC]] {{.*}} outs(%[[RET0]]
 //       CHECK:   memref.dealloc %[[ALLOC]]
+//   CHECK-NOT: retain
 
 // -----
 
@@ -2195,6 +2198,7 @@ module {
 //  CHECK-SAME:       outs(%[[alloc]] :
 //       CHECK:   %[[load:.*]] = memref.load %[[alloc]]
 //       CHECK:   memref.dealloc %[[alloc]]
+//   CHECK-NOT: retain
 //       CHECK:   return %[[load]]
 func.func @reverse_dim(%pos: index) -> f32 {
   %input = arith.constant dense<[[1.0, 2.0, 3.0],
