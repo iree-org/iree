@@ -513,10 +513,6 @@ void addMultiTilingExpertPassPipeline(
 
   addBufferizePasses(nestedModulePM);
 
-  // Perform memref-based transfer_read/write optimizations.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass(/*flatten=*/false));
-
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
