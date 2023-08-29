@@ -36,7 +36,7 @@ from typing import Dict, List, Sequence, Union
 
 import utils
 
-# TODO: Remove: localhost:5000/myrepo
+
 IREE_GCR_URL = "gcr.io/iree-oss/"
 DIGEST_REGEX = r"sha256:[a-zA-Z0-9]+"
 DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
@@ -261,7 +261,6 @@ if __name__ == "__main__":
                 ],
                 dry_run=args.dry_run,
             )
-
 
             utils.run_command(
                 ["docker", "push", tagged_image_url], dry_run=args.dry_run
