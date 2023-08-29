@@ -522,6 +522,7 @@ setup(
         "Programming Language :: Python :: 3.11",
     ],
     url="https://github.com/openxla/iree",
+    python_requires=">=3.9",
     ext_modules=(
         [
             CMakeExtension("iree._runtime_libs._runtime"),
