@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
+#include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
@@ -161,39 +162,38 @@ std::string createHsaco(const std::string isa, StringRef name) {
 
   // Invoke lld. Expect a true return value from lld.
   // Searching for LLD
-  std::string lldProgram;
-  std::string toolName = "ld.lld";
-  if (llvm::sys::fs::exists(toolName)) {
-    llvm::SmallString<256> absolutePath(toolName);
-    llvm::sys::fs::make_absolute(absolutePath);
-    lldProgram = std::string(absolutePath);
-  } else {
-    // Next search the environment path.
-    if (auto result = llvm::sys::Process::FindInEnvPath("PATH", toolName)) {
-      lldProgram = std::string(*result);
-    }
-  }
+  const SmallVector<std::string> &toolNames{"iree-lld"};
+  std::string lldProgram = findTool(toolNames);
   if (lldProgram.empty()) {
     llvm::WithColor::error(llvm::errs(), name)
-        << "unable to find ld.lld in PATH\n";
+        << "unable to find iree-lld.\n";
     return {};
   }
   // Setting Up LLD Args
+  if ( lldProgram.front() == '"' ) {
+    lldProgram.erase( 0, 1 ); // erase the first character
+    lldProgram.erase( lldProgram.size() - 1 ); // erase the last character
+  }
+#if defined(_WIN32)
+  llvm::StringRef lldName = "iree-lld.exe";
+#else
+  llvm::StringRef lldName = "iree-lld";
+#endif // _WIN32
   std::vector<llvm::StringRef> lldArgs{
-      llvm::StringRef("ld.lld"),   llvm::StringRef("-flavor"),
+      lldName,   llvm::StringRef("-flavor"),
       llvm::StringRef("gnu"),      llvm::StringRef("-shared"),
       tempIsaBinaryFilename.str(), llvm::StringRef("-o"),
       tempHsacoFilename.str(),
   };
-
+ 
   // Executing LLD
   std::string errorMessage;
   int lldResult = llvm::sys::ExecuteAndWait(
-      lldProgram, llvm::ArrayRef<llvm::StringRef>(lldArgs), std::nullopt, {}, 5,
+      lldProgram, llvm::ArrayRef<llvm::StringRef>(lldArgs), llvm::StringRef("LLD_VERSION=IREE"), {}, 5,
       0, &errorMessage);
   if (lldResult) {
     llvm::WithColor::error(llvm::errs(), name)
-        << "ld.lld execute fail:" << errorMessage << "Error Code:" << lldResult
+        << "iree-lld execute fail:" << errorMessage << "Error Code:" << lldResult
         << "\n";
     return {};
   }
