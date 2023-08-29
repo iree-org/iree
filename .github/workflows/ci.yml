@@ -399,6 +399,37 @@ jobs:
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
+  build_test_runtime_arm64:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime_arm64')
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - arm64
+      - os-family=Linux
+    env:
+      BUILD_DIR: build-runtime-arm64
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Building runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "BUILD_PRESET=test" \
+            gcr.io/iree-oss/base-arm64@sha256:31cdb58f556e415c3c65afae31ae9c54e43c1eb3dcd845f3d107abd9b368ff3d \
+            ./build_tools/cmake/build_runtime.sh \
+            "${BUILD_DIR}"
+      - name: "Testing runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base-arm64@sha256:31cdb58f556e415c3c65afae31ae9c54e43c1eb3dcd845f3d107abd9b368ff3d \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+
   build_test_runtime_windows:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime_windows')
