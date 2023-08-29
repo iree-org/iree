@@ -229,6 +229,13 @@ iree_py_test(
 if(IREE_BUILD_BUNDLED_LLVM)
   iree_py_test(
     NAME
+      benchmark_test
+    SRCS
+      "tests/benchmark_test.py"
+  )
+
+  iree_py_test(
+    NAME
       system_api_test
     SRCS
       "tests/system_api_test.py"

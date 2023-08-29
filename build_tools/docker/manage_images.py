@@ -36,6 +36,7 @@ from typing import Dict, List, Sequence, Union
 
 import utils
 
+
 IREE_GCR_URL = "gcr.io/iree-oss/"
 DIGEST_REGEX = r"sha256:[a-zA-Z0-9]+"
 DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
@@ -43,6 +44,7 @@ DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
     "base": [],
+    "base-arm64": [],
     "manylinux2014_x86_64-release": [],
     "android": ["base"],
     "emscripten": ["base"],
@@ -248,9 +250,11 @@ if __name__ == "__main__":
             utils.run_command(
                 [
                     "docker",
+                    "buildx",
                     "build",
                     "--file",
                     image_path,
+                    "--load",
                     "--tag",
                     tagged_image_url,
                     ".",

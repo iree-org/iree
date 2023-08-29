@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # 20.04
-FROM ubuntu@sha256:b795f8e0caaaacad9859a9a38fe1c78154f8301fdaf0872eaf1520d66d9c0b98
+FROM --platform=linux/arm64 ubuntu@sha256:7bdccf116db125b3e6e39eb67ca9e2ae890386acf95a13a4e8b69466b6eba5e2
 
 SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
 
@@ -72,29 +72,6 @@ RUN sed -i 's/>=/==/' build_requirements.txt \
 
 ENV PYTHON_BIN /usr/bin/python3
 
-##############
-
-######## IREE ROCM DEPS ########
-WORKDIR /install-rocm
-ARG ROCM_VERSION=5.2.1
-ARG AMDGPU_VERSION=22.20.1
-COPY build_tools/docker/context/install_rocm.sh ./
-RUN ./install_rocm.sh "${ROCM_VERSION}" "${AMDGPU_VERSION}" && rm -rf /install-rocm
-WORKDIR /
-##############
-
-######## IREE CUDA DEPS ########
-ENV IREE_CUDA_DEPS_DIR="/usr/local/iree_cuda_deps"
-COPY build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
-RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR}"
-##############
-
-######## Vulkan ########
-WORKDIR /install-vulkan
-ARG VULKAN_SDK_VERSION=1.3.250
-COPY build_tools/docker/context/install_vulkan.sh ./
-RUN ./install_vulkan.sh "${VULKAN_SDK_VERSION}" && rm -rf /install-vulkan
-WORKDIR /
 ##############
 
 ### Clean up

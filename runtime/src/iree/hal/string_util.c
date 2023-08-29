@@ -366,6 +366,14 @@ static iree_status_t iree_hal_parse_element_unsafe(
       return iree_string_view_atoi_uint64(data_str, (uint64_t*)out_data)
                  ? iree_ok_status()
                  : iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16: {
+      float temp = 0;
+      if (!iree_string_view_atof(data_str, &temp)) {
+        return iree_status_from_code(IREE_STATUS_INVALID_ARGUMENT);
+      }
+      *(uint16_t*)out_data = iree_math_f32_to_bf16(temp);
+      return iree_ok_status();
+    }
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
       float temp = 0;
       if (!iree_string_view_atof(data_str, &temp)) {
@@ -488,6 +496,10 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element(
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%" PRIu64,
                    *(const uint64_t*)data.data);
+      break;
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
+                   iree_math_bf16_to_f32(*(const uint16_t*)data.data));
       break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       n = snprintf(buffer, buffer ? buffer_capacity : 0, "%G",
