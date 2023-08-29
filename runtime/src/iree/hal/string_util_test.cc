@@ -31,7 +31,7 @@ using Shape = std::vector<iree_hal_dim_t>;
 
 // Parses a serialized set of shape dimensions using the canonical shape format
 // (the same as produced by FormatShape).
-StatusOr<Shape> ParseShape(const std::string& value) {
+static StatusOr<Shape> ParseShape(const std::string& value) {
   Shape shape(6);
   iree_host_size_t actual_rank = 0;
   iree_status_t status = iree_ok_status();
@@ -46,7 +46,8 @@ StatusOr<Shape> ParseShape(const std::string& value) {
 }
 
 // Converts shape dimensions into a `4x5x6` format.
-StatusOr<std::string> FormatShape(iree::span<const iree_hal_dim_t> value) {
+static StatusOr<std::string> FormatShape(
+    iree::span<const iree_hal_dim_t> value) {
   std::string buffer(16, '\0');
   iree_host_size_t actual_length = 0;
   iree_status_t status = iree_ok_status();
@@ -62,7 +63,8 @@ StatusOr<std::string> FormatShape(iree::span<const iree_hal_dim_t> value) {
 
 // Parses a serialized iree_hal_element_type_t. The format is the same as
 // produced by FormatElementType.
-StatusOr<iree_hal_element_type_t> ParseElementType(const std::string& value) {
+static StatusOr<iree_hal_element_type_t> ParseElementType(
+    const std::string& value) {
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
   iree_status_t status = iree_hal_parse_element_type(
       iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
@@ -74,7 +76,7 @@ StatusOr<iree_hal_element_type_t> ParseElementType(const std::string& value) {
 
 // Converts an iree_hal_element_type_t enum value to a canonical string
 // representation, like `IREE_HAL_ELEMENT_TYPE_FLOAT_16` to `f16`.
-StatusOr<std::string> FormatElementType(iree_hal_element_type_t value) {
+static StatusOr<std::string> FormatElementType(iree_hal_element_type_t value) {
   std::string buffer(16, '\0');
   iree_host_size_t actual_length = 0;
   iree_status_t status = iree_ok_status();
@@ -100,7 +102,8 @@ static bool operator==(const ShapeAndType& lhs,
 }
 
 // Parses a serialized set of shape dimensions and an element type.
-StatusOr<ShapeAndType> ParseShapeAndElementType(const std::string& value) {
+static StatusOr<ShapeAndType> ParseShapeAndElementType(
+    const std::string& value) {
   Shape shape(6);
   iree_host_size_t actual_rank = 0;
   iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
@@ -120,9 +123,9 @@ StatusOr<ShapeAndType> ParseShapeAndElementType(const std::string& value) {
 // For example, "1.2" of type IREE_HAL_ELEMENT_TYPE_FLOAT32 will write the 4
 // byte float value of 1.2 to |buffer|.
 template <typename T>
-Status ParseElement(const std::string& value,
-                    iree_hal_element_type_t element_type,
-                    iree::span<T> buffer) {
+static Status ParseElement(const std::string& value,
+                           iree_hal_element_type_t element_type,
+                           iree::span<T> buffer) {
   return iree_hal_parse_element(
       iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
       element_type,
@@ -133,8 +136,8 @@ Status ParseElement(const std::string& value,
 
 // Converts a single element of |element_type| to a string.
 template <typename T>
-StatusOr<std::string> FormatElement(T value,
-                                    iree_hal_element_type_t element_type) {
+static StatusOr<std::string> FormatElement(
+    T value, iree_hal_element_type_t element_type) {
   std::string result(16, '\0');
   iree_status_t status;
   do {
@@ -155,9 +158,9 @@ StatusOr<std::string> FormatElement(T value,
 // produced by FormatBufferElements. Supports additional inputs of
 // empty to denote a 0 fill and a single element to denote a splat.
 template <typename T>
-Status ParseBufferElements(const std::string& value,
-                           iree_hal_element_type_t element_type,
-                           iree::span<T> buffer) {
+static Status ParseBufferElements(const std::string& value,
+                                  iree_hal_element_type_t element_type,
+                                  iree::span<T> buffer) {
   IREE_RETURN_IF_ERROR(
       iree_hal_parse_buffer_elements(
           iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
@@ -177,10 +180,9 @@ Status ParseBufferElements(const std::string& value,
 // |max_element_count| can be used to limit the total number of elements printed
 // when the count may be large. Elided elements will be replaced with `...`.
 template <typename T>
-StatusOr<std::string> FormatBufferElements(iree::span<const T> data,
-                                           const Shape& shape,
-                                           iree_hal_element_type_t element_type,
-                                           size_t max_element_count) {
+static StatusOr<std::string> FormatBufferElements(
+    iree::span<const T> data, const Shape& shape,
+    iree_hal_element_type_t element_type, size_t max_element_count) {
   std::string result(255, '\0');
   iree_status_t status;
   do {
@@ -263,11 +265,20 @@ inline StatusOr<T> ParseElement(const std::string& value) {
                                     iree::span<T>(&result, 1)));
   return result;
 }
+inline StatusOr<uint16_t> ParseElementBF16(const std::string& value) {
+  uint16_t result = uint16_t();
+  IREE_RETURN_IF_ERROR(ParseElement(value, IREE_HAL_ELEMENT_TYPE_BFLOAT_16,
+                                    iree::span<uint16_t>(&result, 1)));
+  return result;
+}
 
 // Converts a single element of to a string value.
 template <typename T>
 inline StatusOr<std::string> FormatElement(T value) {
   return FormatElement(value, ElementTypeFromCType<T>::value);
+}
+inline StatusOr<std::string> FormatElementBF16(uint16_t value) {
+  return FormatElement(value, IREE_HAL_ELEMENT_TYPE_BFLOAT_16);
 }
 
 // Parses a serialized set of elements of type T.
@@ -695,6 +706,7 @@ TEST(ElementStringUtilTest, ParseElement) {
               IsOkAndHolds(Eq(INT64_MAX)));
   EXPECT_THAT(ParseElement<uint64_t>("18446744073709551615"),
               IsOkAndHolds(Eq(UINT64_MAX)));
+  EXPECT_THAT(ParseElementBF16("1.5"), IsOkAndHolds(Eq(0x3FC0u)));
   EXPECT_THAT(ParseElement<float>("1.5"), IsOkAndHolds(Eq(1.5f)));
   EXPECT_THAT(ParseElement<double>("1.567890123456789"),
               IsOkAndHolds(Eq(1.567890123456789)));
@@ -759,6 +771,8 @@ TEST(ElementStringUtilTest, ParseElementInvalid) {
   EXPECT_THAT(ParseElement<int32_t>("asdfasdf"),
               StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(ParseElement<uint32_t>("asdfasdf"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseElementBF16("asdfasdf"),
               StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(ParseElement<float>("asdfasdf"),
               StatusIs(StatusCode::kInvalidArgument));
@@ -832,6 +846,7 @@ TEST(ElementStringUtilTest, FormatElement) {
               IsOkAndHolds(Eq("9223372036854775807")));
   EXPECT_THAT(FormatElement<uint64_t>(UINT64_MAX),
               IsOkAndHolds(Eq("18446744073709551615")));
+  EXPECT_THAT(FormatElementBF16(0x3FC0u), IsOkAndHolds(Eq("1.5")));
   EXPECT_THAT(FormatElement<float>(1.5f), IsOkAndHolds(Eq("1.5")));
   EXPECT_THAT(FormatElement<double>(1123.56789456789),
               IsOkAndHolds(Eq("1123.57")));
