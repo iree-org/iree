@@ -248,6 +248,9 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
   }
 }
 
+// Insert shape ties on results that we are sinking across the call edge. The
+// hope is that by moving the ties here we can fold with queries inside of
+// this function.
 static void retieResults(Operation *op, Operation *newOp,
                          TensorDimMap &tensorDimMap) {
   OpBuilder builder(newOp);
@@ -389,9 +392,6 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
   auto newOp = builder.create<mlir::func::CallOp>(op.getLoc(), op.getCallee(),
                                                   resultTypes, operands);
 
-  // Insert shape ties on results that we are sinking across the call edge.
-  // The hope is that by moving the ties here we can fold with queries inside of
-  // this function.
   retieResults(op, newOp, tensorDimMap);
   op.erase();
 }
@@ -502,7 +502,6 @@ static void expandWhileOp(mlir::scf::WhileOp op, ExpandedGlobalMap &globalMap,
                                             /*beforeBody*/ nullptr,
                                             /*afterBody*/ nullptr);
 
-  IRMapping mapping;
   newOp.getBefore().takeBody(op.getBefore());
   newOp.getAfter().takeBody(op.getAfter());
 
@@ -520,7 +519,6 @@ static void expandIfOp(mlir::scf::IfOp op, ExpandedGlobalMap &globalMap,
   auto newOp = builder.create<scf::IfOp>(
       op.getLoc(), resultTypes, op.getOperand(), op.elseBlock() != nullptr);
 
-  IRMapping mapping;
   newOp.getBodyRegion().takeBody(op.getBodyRegion());
   expandRegion(newOp.getBodyRegion(), globalMap, indexSet, tensorDimMap);
 
