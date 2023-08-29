@@ -59,7 +59,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.vectorize_children_and_apply_patterns %{{.*}} {vectorize_nd_extract}
 // CHECK: transform.iree.eliminate_empty_tensors
 // CHECK: transform.iree.bufferize {target_gpu}
-// CHECK: transform.iree.apply_buffer_optimizations
+// CHECK: transform.memref.erase_dead_alloc_and_stores
 // CHECK: transform.iree.forall_to_workgroup
 // CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1]
 // CHECK: transform.iree.hoist_static_alloc %{{.*}}

@@ -69,32 +69,6 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyBufferOptimizationsOp
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  // Apply store to load forwarding and dead store elimination.
-  vector::transferOpflowOpt(rewriter, target);
-  eraseDeadAllocAndStores(target);
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
-}
-
-void transform_dialect::ApplyBufferOptimizationsOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
-  result.addOperands(target);
-}
-
-//===---------------------------------------------------------------------===//
 // ApplyIreeLinalgElementwiseGreedyFusionPatternsOp
 //===---------------------------------------------------------------------===//
 
