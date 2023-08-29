@@ -23,9 +23,8 @@ namespace iree_compiler {
 ///   linalg_ext.set_encoding   -> tensor.pack
 ///   linalg_ext.unset_encoding -> tensor.unpack
 ///   linalg.matmul             -> linalg.mmt4d
-std::unique_ptr<OperationPass<func::FuncOp>> createCPUMaterializeEncodingPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createCPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr targetAttr);
+std::unique_ptr<OperationPass<func::FuncOp>> createCPUMaterializeEncodingPass(
+    IREE::HAL::ExecutableTargetAttr targetAttr = nullptr);
 
 /// Like createLLVMCPUMaterializeEncodingPass, but specifically for
 /// linalg_ext.upper_bound_tile_size, converting it to constants.
@@ -43,10 +42,8 @@ createCPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// that is the largest tile size that we can use in VMVX, and can be adjusted
 // as needed.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCPUMaterializeUpperBoundTileSizePass();
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeUpperBoundTileSizePass(
-    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs);
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs = {});
 
 void registerCodegenCommonCPUPasses();
 

@@ -103,8 +103,8 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   }
 
   // Target-dependent ops are not const-expr.
-  if (isa<IREE::LinalgExt::UpperBoundTileSizeOp, IREE::LinalgExt::SetEncodingOp,
-          IREE::Codegen::QueryTileSizesOp>(op)) {
+  if (isa<IREE::LinalgExt::UpperBoundTileSizeOp,
+          IREE::LinalgExt::SetEncodingOp>(op)) {
     return {};
   }
 

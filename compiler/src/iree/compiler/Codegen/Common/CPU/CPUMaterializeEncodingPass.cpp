@@ -317,18 +317,10 @@ void CPUMaterializeUpperBoundTileSizePass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createCPUMaterializeEncodingPass() {
-  return std::make_unique<CPUMaterializeEncodingPass>();
-}
-std::unique_ptr<OperationPass<func::FuncOp>>
 createCPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return std::make_unique<CPUMaterializeEncodingPass>(targetAttr);
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCPUMaterializeUpperBoundTileSizePass() {
-  return std::make_unique<CPUMaterializeUpperBoundTileSizePass>();
-}
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeUpperBoundTileSizePass(
     ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs) {
