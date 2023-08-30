@@ -360,8 +360,8 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     # The 'PYTHONPATH' environment variable should now contain
     #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
 
-    python -c "import iree.compiler"
-    python -c "import iree.runtime"
+    python -c "import iree.compiler; help(iree.compiler)"
+    python -c "import iree.runtime; help(iree.runtime)"
     ```
 
 === "macOS"
@@ -371,8 +371,8 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     # The 'PYTHONPATH' environment variable should now contain
     #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
 
-    python -c "import iree.compiler"
-    python -c "import iree.runtime"
+    python -c "import iree.compiler; help(iree.compiler)"
+    python -c "import iree.runtime; help(iree.runtime)"
     ```
 
 === "Windows"
@@ -382,8 +382,8 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     # The 'PYTHONPATH' environment variable should now contain
     #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
 
-    python -c "import iree.compiler"
-    python -c "import iree.runtime"
+    python -c "import iree.compiler; help(iree.compiler)"
+    python -c "import iree.runtime; help(iree.runtime)"
     ```
 
 Using IREE's ML framework importers requires a few extra steps:
