@@ -7,7 +7,7 @@ tags:
 icon: octicons/server-16
 ---
 
-# GPU Deployment using Vulkan
+# GPU deployment using Vulkan
 
 IREE can accelerate model execution on GPUs via
 [Vulkan](https://www.khronos.org/vulkan/), a low-overhead graphics and compute

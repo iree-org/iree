@@ -7,7 +7,7 @@ tags:
 icon: simple/python
 ---
 
-# JAX Integration
+# JAX integration
 
 !!! note
     IREE's JAX support is under active development. This page is still under
