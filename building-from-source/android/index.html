@@ -655,7 +655,7 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
     <nav class="md-nav" aria-label="Prerequisites">
@@ -682,7 +682,7 @@
       
         <li class="md-nav__item">
   <a href="#configure-and-build" class="md-nav__link">
-    Configure and build
+     Configure and build
   </a>
   
     <nav class="md-nav" aria-label="Configure and build">
@@ -709,14 +709,14 @@
       
         <li class="md-nav__item">
   <a href="#running-android-tests" class="md-nav__link">
-    Running Android tests
+     Running Android tests
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#running-tools-directly" class="md-nav__link">
-    Running tools directly
+     Running tools directly
   </a>
   
 </li>
@@ -2302,7 +2302,7 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
     <nav class="md-nav" aria-label="Prerequisites">
@@ -2329,7 +2329,7 @@
       
         <li class="md-nav__item">
   <a href="#configure-and-build" class="md-nav__link">
-    Configure and build
+     Configure and build
   </a>
   
     <nav class="md-nav" aria-label="Configure and build">
@@ -2356,14 +2356,14 @@
       
         <li class="md-nav__item">
   <a href="#running-android-tests" class="md-nav__link">
-    Running Android tests
+     Running Android tests
   </a>
   
 </li>
       
         <li class="md-nav__item">
   <a href="#running-tools-directly" class="md-nav__link">
-    Running tools directly
+     Running tools directly
   </a>
   
 </li>
@@ -2410,7 +2410,7 @@ system architecture):</p>
   either pushed to the target to run natively or is bundled into an Android
   <a href="https://en.wikipedia.org/wiki/Android_application_package">APK</a></li>
 </ul>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
+<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <h3 id="host-environment-setup">Host environment setup<a class="headerlink" href="#host-environment-setup" title="Permanent link">link</a></h3>
 <p>You should already be able to build IREE from source on your host platform.
 Please make sure you have followed the <a href="../getting-started/">getting started</a>
@@ -2430,7 +2430,7 @@ the NDK.</p>
 <p>ADB (the Android Debug Bridge) is also needed to communicate with Android
 devices from the command line. Install it following the
 <a href="https://developer.android.com/studio/command-line/adb">official user guide</a>.</p>
-<h2 id="configure-and-build">Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">link</a></h2>
+<h2 id="configure-and-build"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75Zm-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5H6.5Zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5h6ZM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8Zm-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0v-2Zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75Z"/></svg></span> Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">link</a></h2>
 <h3 id="host-configuration">Host configuration<a class="headerlink" href="#host-configuration" title="Permanent link">link</a></h3>
 <p>Build and install on your host machine:</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span><span class="se">\</span>
@@ -2488,17 +2488,24 @@ for details on configuring CMake for Android.</p>
 <p>The specific <code>ANDROID_ABI</code> and <code>ANDROID_PLATFORM</code> used should match your
 target device.</p>
 </div>
-<h2 id="running-android-tests">Running Android tests<a class="headerlink" href="#running-android-tests" title="Permanent link">link</a></h2>
+<h2 id="running-android-tests"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Running Android tests<a class="headerlink" href="#running-android-tests" title="Permanent link">link</a></h2>
 <p>Make sure you
 <a href="https://developer.android.com/studio/debug/dev-options#enable">enable developer options and USB debugging</a>
 on your Android device and can see your it when you run <code>adb devices</code>, then run
-all built tests through
-<a href="https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest">CTest</a>:</p>
-<div class="highlight"><pre><span></span><code>ctest<span class="w"> </span>--test-dir<span class="w"> </span>../iree-build-android/<span class="w"> </span>--output-on-failure
+all tests through
+<a href="https://cmake.org/cmake/help/latest/manual/ctest.1.html">ctest</a>:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Build test dependencies</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build-android/<span class="w"> </span>--target<span class="w"> </span>iree-test-deps
+
+<span class="c1"># Ensure that your Android device is visible</span>
+adb<span class="w"> </span>devices
+
+<span class="c1"># Run tests</span>
+ctest<span class="w"> </span>--test-dir<span class="w"> </span>../iree-build-android/<span class="w"> </span>--output-on-failure
 </code></pre></div>
 <p>This will automatically upload build artifacts to the connected Android device,
 run the tests, then report the status back to your host machine.</p>
-<h2 id="running-tools-directly">Running tools directly<a class="headerlink" href="#running-tools-directly" title="Permanent link">link</a></h2>
+<h2 id="running-tools-directly"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Running tools directly<a class="headerlink" href="#running-tools-directly" title="Permanent link">link</a></h2>
 <p>Invoke the host compiler tools to produce a bytecode module FlatBuffer:</p>
 <div class="highlight"><pre><span></span><code>../iree-build/install/bin/iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
