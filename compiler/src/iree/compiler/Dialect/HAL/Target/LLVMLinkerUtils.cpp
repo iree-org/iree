@@ -21,8 +21,8 @@ static llvm::cl::opt<std::string> clBitcodeFiles(
     "iree-link-bitcode",
     llvm::cl::desc(
         "Paths of additional bitcode files to load and link. Comma-separated. "
-        "Any list entry that contains a colon (:) is parsed as `arch:path` and "
-        "is only linked if `arch` matches the target triple."),
+        "Any list entry that contains an equals (=) is parsed as `arch=path` "
+        "and is only linked if `arch` matches the target triple."),
     llvm::cl::init(""));
 
 bool anyRequiredSymbols(const llvm::Module &module, StringRef prefix) {
@@ -134,8 +134,8 @@ LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
   StringRef(clBitcodeFiles.getValue()).split(entries, ',');
   for (StringRef entry : entries) {
     StringRef path = entry;
-    if (entry.contains(':')) {
-      std::pair<StringRef, StringRef> components = entry.split(':');
+    if (entry.contains('=')) {
+      std::pair<StringRef, StringRef> components = entry.split('=');
       StringRef filterArch = components.first;
       const char *archName =
           getIreeArchNameForTargetTriple(targetMachine.getTargetTriple());
