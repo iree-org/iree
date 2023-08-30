@@ -1236,6 +1236,12 @@ getDefaultDistributionTileSizes(TilingInterface op) {
 }
 
 static bool isPackMatmulLHS(tensor::PackOp op) {
+  // linalg.batch_matmul LHS shape
+  if (op.getSourceRank() == 3 && op.getInnerDimsPos().size() == 2 &&
+      op.getInnerDimsPos()[0] == 1 && op.getInnerDimsPos()[1] == 2) {
+    return true;
+  }
+  // linalg.matmul LHS shape
   return op.getSourceRank() == 2 && op.getInnerDimsPos().size() == 2 &&
          op.getInnerDimsPos()[0] == 0 && op.getInnerDimsPos()[1] == 1;
 }
