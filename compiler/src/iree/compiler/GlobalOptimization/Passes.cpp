@@ -14,7 +14,7 @@
 #include "mlir/Transforms/Passes.h"
 
 static llvm::cl::opt<bool>
-    clEnableDataTiling("iree-global-opt-enable-data-tiling",
+    clEnableDataTiling("iree-global-opt-data-tiling",
                        llvm::cl::desc("Enable data tiling path."),
                        llvm::cl::init(false));
 
