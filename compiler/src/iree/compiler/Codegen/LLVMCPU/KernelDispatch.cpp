@@ -1082,8 +1082,8 @@ setRootConfig(func::FuncOp entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
 
-  // Non-SVE ARM codgen does not switch to use codegen driver based approach,
-  // so we have special logic for it. All the new pipeline is expected to use
+  // ARM SVE codgen switches to use codegen driver based approach. In non-SVE
+  // cases we use special logic instead. All the new pipeline is expected to use
   // codegen driver based approach.
   if (isAArch64(targetAttr) && !isQuantized && !hasAnySVEFeature(targetAttr)) {
     return setMmt4dAArch64RootConfig(entryPointFn, contractionOp, distTileSizes,
