@@ -465,3 +465,25 @@ func.func @sort_secondary() {
 //   CHECK-DAG:       %[[CMPI:.+]] = arith.cmpi ult, %[[ARG0]], %[[ARG1]] : i32
 //       CHECK:       iree_linalg_ext.yield %[[CMPI]]
 //       CHECK:   flow.dispatch.tensor.store %[[SORT]]#1, %[[B]]
+
+// -----
+
+func.func @branch_op() {
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<i8>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<i8>>
+  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<i8>>
+  %3 = hal.interface.constant.load[0] : i8
+  %4 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<i8>> -> tensor<i8>
+  %5 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:tensor<i8>> -> tensor<i8>
+  %6 = arith.trunci %3 : i8 to i1
+  %7 = arith.trunci %4 : tensor<i8> to tensor<i1>
+  %8 = arith.trunci %5 : tensor<i8> to tensor<i1>
+  cf.cond_br %6, ^bb1(%7 : tensor<i1>), ^bb1(%8 : tensor<i1>)
+^bb1(%arg1 : tensor<i1>):
+  %9 = arith.extui %arg1 : tensor<i1> to tensor<i8>
+  flow.dispatch.tensor.store %9, %2, offsets = [], sizes = [], strides = [] : tensor<i8> -> !flow.dispatch.tensor<writeonly:tensor<i8>>
+  return
+}
+// CHECK-LABEL: func @branch_op()
+//       CHECK:   cf.cond_br %{{.+}}, ^bb1(%{{.+}} : tensor<i8>), ^bb1(%{{.+}} : tensor<i8>)
+//       CHECK: ^bb1(%{{.+}}: tensor<i8>)

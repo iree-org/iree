@@ -27,7 +27,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
-#include "mlir/Dialect/GPU/Transforms/Passes.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
@@ -202,6 +202,8 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Turn scalar load/store from memrefs into vectorized ones if possible. This
   // gives better memory access patterns, which is very important for perf.
   pm.addPass(createSPIRVVectorizeLoadStore());
+  // Perform optimizations that need to across the scf.for region boundary.
+  pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
   pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
@@ -411,9 +413,19 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
       createGPUTensorTile(/*distributeToWarp=*/false));
 
   // High-level n-D vectorization.
-  nestedPM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
-  nestedPM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedPM.addNestedPass<func::FuncOp>(createCSEPass());
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    options.enableCleanup = false;
+    options.maxVectorSize = 4096;
+    nestedPM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+    nestedPM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
+    nestedPM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedPM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   // Bufferize.
   addBufferizePasses(nestedPM, gpuAllocateWorkgroupMemoryFn);
@@ -501,15 +513,33 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
       pm, /*useFuseTensorPadWithConsumerPass=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  // Fuse input parallel ops into the reduction op so that we don't need to
+  // create temporary allocations during bufferization.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   // Performs mechanical vectorization. This does not perform unrolling or
   // lowering, which is done later.
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
-      /*generateContract=*/false, /*maxVectorSize=*/32768));
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    options.enableCleanup = false;
+    options.generateContract = false;
+    options.maxVectorSize = 32768;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -600,6 +630,9 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createSPIRVGeneralizeNamedOpsPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());

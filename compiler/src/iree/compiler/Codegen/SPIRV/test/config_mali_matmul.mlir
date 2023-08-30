@@ -270,7 +270,7 @@ hal.executable @matmul_49x160x576 {
   ]>
 ]>
 
-hal.executable @matmul_1x1024x576 {
+hal.executable @matmul_2x1024x576 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
@@ -278,9 +278,9 @@ hal.executable @matmul_1x1024x576 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @matmul_1x1024x576 layout(#pipeline_layout)
+    hal.executable.export @matmul_2x1024x576 layout(#pipeline_layout)
     builtin.module {
-      func.func @matmul_1x1024x576() {
+      func.func @matmul_2x1024x576() {
         %cst = arith.constant 0.000000e+00 : f32
         %cst_0 = arith.constant 3.000000e+00 : f32
         %cst_1 = arith.constant 6.000000e+00 : f32
@@ -289,29 +289,29 @@ hal.executable @matmul_1x1024x576 {
         %c3436864 = arith.constant 3436864 : index
         %c10141312 = arith.constant 10141312 : index
         %c2304 = arith.constant 2304 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<1x576xf32>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x576xf32>>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c3436864) : !flow.dispatch.tensor<readonly:tensor<576x1024xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c10141312) : !flow.dispatch.tensor<readonly:tensor<1x1024xf32>>
-        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1024xf32>>
-        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 576], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x576xf32>> -> tensor<1x576xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c10141312) : !flow.dispatch.tensor<readonly:tensor<2x1024xf32>>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x1024xf32>>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 576], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x576xf32>> -> tensor<2x576xf32>
         %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [576, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<576x1024xf32>> -> tensor<576x1024xf32>
-        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1024xf32>> -> tensor<1x1024xf32>
-        %7 = tensor.empty() : tensor<1x1024xf32>
-        %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x1024xf32>) -> tensor<1x1024xf32>
-        %9 = linalg.matmul ins(%4, %5 : tensor<1x576xf32>, tensor<576x1024xf32>) outs(%8 : tensor<1x1024xf32>) -> tensor<1x1024xf32>
-        flow.dispatch.tensor.store %9, %3, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : tensor<1x1024xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x1024xf32>>
+        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x1024xf32>> -> tensor<2x1024xf32>
+        %7 = tensor.empty() : tensor<2x1024xf32>
+        %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<2x1024xf32>) -> tensor<2x1024xf32>
+        %9 = linalg.matmul ins(%4, %5 : tensor<2x576xf32>, tensor<576x1024xf32>) outs(%8 : tensor<2x1024xf32>) -> tensor<2x1024xf32>
+        flow.dispatch.tensor.store %9, %3, offsets = [0, 0], sizes = [1, 1024], strides = [1, 1] : tensor<2x1024xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x1024xf32>>
         return
       }
     }
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 256], [1, 4], [0, 0, 8]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 128], [2, 4], [0, 0, 8]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
-//      CHECK: hal.executable.export public @matmul_1x1024x576
+//      CHECK: hal.executable.export public @matmul_2x1024x576
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
-//      CHECK: func.func @matmul_1x1024x576()
+// CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
+//      CHECK: func.func @matmul_2x1024x576()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 

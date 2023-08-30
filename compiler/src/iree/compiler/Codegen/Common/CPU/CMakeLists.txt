@@ -48,6 +48,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
+    IREELinalgExtEncodingUtils
     IREELinalgExtTransforms
     IREELinalgExtUtils
     LLVMSupport

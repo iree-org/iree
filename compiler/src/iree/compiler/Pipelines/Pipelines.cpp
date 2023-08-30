@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
@@ -36,7 +37,7 @@ void buildIREEVMTransformPassPipeline(
     const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
-    HighLevelOptimizationOptions highLevelOptimizationOptions,
+    GlobalOptimizationOptions globalOptimizationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
@@ -146,29 +147,20 @@ void buildIREEVMTransformPassPipeline(
   if (compileTo == IREEVMPipelinePhase::ABI)
     return; // early-exit
 
-  IREE::Flow::TransformOptions flowOptions;
-  flowOptions.constExprHoisting =
-      highLevelOptimizationOptions.constExprHoisting;
-  flowOptions.numericPrecisionReduction =
-      highLevelOptimizationOptions.numericPrecisionReduction;
+  GlobalOptimization::TransformOptions globalTransformOptions;
+  globalTransformOptions.options = globalOptimizationOptions;
 
   // Enable const-eval via hook. For debug builds, we assert if enabled
   // without a hook. For release, we just silently skip enabling const-eval.
-  if (highLevelOptimizationOptions.constEval) {
+  if (globalOptimizationOptions.constEval) {
     assert(hooks.buildConstEvalPassPipelineCallback &&
            "if const-eval is enabled the buildConstEvalPassPipelineCallback "
            "hook must be enabled");
   }
-  if (highLevelOptimizationOptions.constEval &&
+  if (globalOptimizationOptions.constEval &&
       hooks.buildConstEvalPassPipelineCallback) {
-    flowOptions.buildConstEvalPassPipeline =
+    globalTransformOptions.buildConstEvalPassPipeline =
         hooks.buildConstEvalPassPipelineCallback;
-  }
-
-  if (highLevelOptimizationOptions.stripAssertions) {
-    // Strip std.assert & co after we perform optimizations; prior to this we
-    // may use the assertions to derive information during analysis.
-    passManager.addPass(IREE::Util::createStripDebugOpsPass());
   }
 
   IREE::Stream::TransformOptions streamOptions;
@@ -192,6 +184,14 @@ void buildIREEVMTransformPassPipeline(
     if (compileTo == IREEVMPipelinePhase::Preprocessing)
       return; // early-exit
 
+    if (compileFrom < IREEVMPipelinePhase::GlobalOptimization) { // late-entry
+      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimization");
+      GlobalOptimization::buildGlobalOptimizationPassPipeline(
+          passManager, globalTransformOptions);
+      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
+    }
+
+    IREE::Flow::TransformOptions flowOptions;
     if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
       IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
@@ -286,7 +286,7 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
 
   // Since a JIT hook cannot be provided in such a default pipeline, we
   // force disable const eval, which relies on the JIT.
-  auto highLevelOptimizations = HighLevelOptimizationOptions::FromFlags::get();
+  auto highLevelOptimizations = GlobalOptimizationOptions::FromFlags::get();
   highLevelOptimizations.constEval = false;
 
   buildIREEVMTransformPassPipeline(

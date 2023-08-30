@@ -1720,6 +1720,9 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
     int64_t k;
     // Check that the output of the sort op gets fed into a slice.
     for (auto [idx, result] : llvm::enumerate(opResults)) {
+      if (result.getUsers().empty())
+        return rewriter.notifyMatchFailure(
+            op, "Sort isn't calling into a slice op.");
       auto sliceOp =
           dyn_cast<mlir::stablehlo::SliceOp>(*result.getUsers().begin());
       if (!sliceOp) {

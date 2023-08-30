@@ -181,6 +181,13 @@ static unsigned isMemRefVectorizable(Value value,
     LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
     if (!vectorBits)
       return 0;
+
+    // TODO: Fix sub-byte type support in vector.bitcast lowering.
+    if (vectorBits % 32 != 0) {
+      LLVM_DEBUG(llvm::dbgs() << "failed: less than 32-bit vector\n");
+      return 0;
+    }
+
     unsigned vectorSize = vectorBits / elementNumBits;
     // Again make sure we don't have vectors of odd numbers.
     if (vectorSize % 2 != 0) {

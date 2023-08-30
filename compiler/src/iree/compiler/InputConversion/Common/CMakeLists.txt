@@ -54,7 +54,6 @@ iree_cc_library(
     "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"
     "SanitizeModuleNames.cpp"
-    "TopLevelSCFToCFG.cpp"
     "Utils.cpp"
   DEPS
     ::PassHeaders

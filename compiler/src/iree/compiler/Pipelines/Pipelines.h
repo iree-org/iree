@@ -21,7 +21,7 @@ class PipelineExtensions;
 // Hooks for injecting behavior into the IREEVM pipeline. Since these are not
 // derived from CLI options, we maintain them as a separate struct.
 struct IREEVMPipelineHooks {
-  // If the HighLevelOptimizationOptions::constEval option is true, then
+  // If the GlobalOptimizationOptions::constEval option is true, then
   // this callback must be set to populate a pass manager to perform
   // constant eval. It typically just adds a ConstEval::createJitGlobalsPass()
   // pass. It must be injected like this to avoid circular dependencies from
@@ -38,6 +38,7 @@ enum class IREEVMPipelinePhase {
   Input,
   ABI,
   Preprocessing,
+  GlobalOptimization,
   Flow,
   Stream,
   ExecutableSources,
@@ -60,6 +61,8 @@ inline static void enumerateIREEVMPipelinePhases(
            "Adjusts program ABI for the specified execution environment.");
   callback(IREEVMPipelinePhase::Preprocessing, "preprocessing",
            "Compiles up to the `preprocessing` specified");
+  callback(IREEVMPipelinePhase::GlobalOptimization, "global-optimization",
+           "Compiles up to global optimization.");
   callback(IREEVMPipelinePhase::Flow, "flow",
            "Compiles up to the `flow` dialect.");
   callback(IREEVMPipelinePhase::Stream, "stream",
@@ -85,7 +88,7 @@ void buildIREEVMTransformPassPipeline(
     const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
-    HighLevelOptimizationOptions highLevelOptimizationOptions,
+    GlobalOptimizationOptions highLevelOptimizationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,

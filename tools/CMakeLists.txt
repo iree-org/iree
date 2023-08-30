@@ -40,6 +40,8 @@ if(IREE_HOST_BIN_DIR AND NOT IREE_BUILD_COMPILER)
   iree_import_binary(NAME iree-compile)
   iree_import_binary(NAME iree-opt)
   iree_import_binary(NAME iree-run-mlir)
+  iree_import_binary(NAME clang)
+  iree_import_binary(NAME llvm-link)
 endif()
 
 # TODO(#6353): Tools has thread dependencies in gtest, benchmark, yaml, etc.
@@ -224,6 +226,22 @@ if(IREE_BUILD_COMPILER)
   if(IREE_LLD_TARGET)
     install(
       TARGETS lld
+      COMPONENT Compiler
+      RUNTIME DESTINATION bin
+    )
+  endif()
+
+  if(IREE_LLVM_LINK_TARGET)
+    install(
+      TARGETS llvm-link
+      COMPONENT Compiler
+      RUNTIME DESTINATION bin
+    )
+  endif()
+
+  if(IREE_CLANG_TARGET)
+    install(
+      TARGETS clang
       COMPONENT Compiler
       RUNTIME DESTINATION bin
     )

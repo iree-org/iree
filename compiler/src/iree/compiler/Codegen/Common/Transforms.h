@@ -48,6 +48,11 @@ tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options);
 
+/// Populate IREE patterns related to resolving
+/// `memref.extract_strided_metadata`.
+void populateIREEResolveExtractStridedMetadataPatterns(
+    MLIRContext *context, RewritePatternSet &patterns);
+
 } // namespace iree_compiler
 } // namespace mlir
 

@@ -25,20 +25,9 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  // Enables the iree-util-hoist-into-globals pass. This should eventually
-  // become the default.
-  bool constExprHoisting = false;
-
-  // Enables passes to perform numeric precision reduction.
-  bool numericPrecisionReduction = false;
-
-  // Hook to populate a constant evaluation pass pipeline. If nullptr, then
-  // no passes are added for constant evaluation. This must be injected in
-  // because constant-evaluators can depend on the whole compiler, of which
-  // this is a part, and we maintain strict optionality for this component.
-  std::function<void(OpPassManager &passManager)> buildConstEvalPassPipeline;
-};
+/// This is a placeholder for future. We should pass all the options through the
+/// struct.
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
 
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
@@ -141,6 +130,10 @@ createStripSignednessPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveZeroExtentTensorsPass();
 
+// Decomposes top-level SCF operations to CFG.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTopLevelSCFToCFGPass();
+
 // Verifies that the input to the Flow transformation pipeline is legal.
 // This includes checking for operations from dialects that are expected
 // to be legalized before this pass.
@@ -180,6 +173,9 @@ createCollapseDimensionsPass();
 // converting to dispatch workgroups with explicit captures.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCloneProducersIntoDispatchRegionsPass();
+
+// A pass to fuse dequantization and matmul linalg.generic ops
+std::unique_ptr<Pass> createFuseDequantizationMatmulPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)

@@ -15,7 +15,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
-#define DEBUG_TYPE "iree-util-hoist-into-globals"
+#define DEBUG_TYPE "iree-constexpr"
 
 using llvm::dbgs;
 

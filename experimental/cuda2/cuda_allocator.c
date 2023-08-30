@@ -88,8 +88,8 @@ iree_status_t iree_hal_cuda2_allocator_create(
   int supports_read_only_host_register = 0;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      CU_RESULT_TO_STATUS(
-          context->syms,
+      IREE_CURESULT_TO_STATUS(
+          cuda_symbols,
           cuDeviceGetAttribute(
               &supports_read_only_host_register,
               CU_DEVICE_ATTRIBUTE_READ_ONLY_HOST_REGISTER_SUPPORTED, device),
@@ -99,25 +99,25 @@ iree_status_t iree_hal_cuda2_allocator_create(
                                       : "no READ_ONLY_HOST_REGISTER_SUPPORTED");
 
   iree_hal_cuda2_allocator_t* allocator = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      host_allocator, sizeof(*allocator), (void**)&allocator);
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda2_allocator_vtable,
-                                 &allocator->resource);
-    allocator->device = device;
-    allocator->stream = stream;
-    allocator->pools = pools;
-    allocator->symbols = cuda_symbols;
-    allocator->host_allocator = host_allocator;
-    allocator->supports_concurrent_managed_access =
-        supports_concurrent_managed_access != 0;
-    allocator->supports_read_only_host_register =
-        supports_read_only_host_register != 0;
-    *out_allocator = (iree_hal_allocator_t*)allocator;
-  }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*allocator),
+                                (void**)&allocator));
+
+  iree_hal_resource_initialize(&iree_hal_cuda2_allocator_vtable,
+                               &allocator->resource);
+  allocator->device = device;
+  allocator->stream = stream;
+  allocator->pools = pools;
+  allocator->symbols = cuda_symbols;
+  allocator->host_allocator = host_allocator;
+  allocator->supports_concurrent_managed_access =
+      supports_concurrent_managed_access != 0;
+  allocator->supports_read_only_host_register =
+      supports_read_only_host_register != 0;
+  *out_allocator = (iree_hal_allocator_t*)allocator;
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static void iree_hal_cuda2_allocator_destroy(

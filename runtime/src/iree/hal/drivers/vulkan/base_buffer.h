@@ -65,13 +65,14 @@ typedef union {
 } iree_hal_vulkan_memory_types_t;
 
 // Finds the memory type that satisfies the required and preferred buffer
-// |params| and returns it in |out_memory_type_index|. Fails if no memory type
-// satisfies the requirements.
+// |params| and returns it in |out_memory_type_index|. Only memory types present
+// in |allowed_type_indices| will be returned. Fails if no memory type satisfies
+// the requirements.
 iree_status_t iree_hal_vulkan_find_memory_type(
     const VkPhysicalDeviceProperties* device_props,
     const VkPhysicalDeviceMemoryProperties* memory_props,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    uint32_t* out_memory_type_index);
+    uint32_t allowed_type_indices, uint32_t* out_memory_type_index);
 
 // Queries the underlying Vulkan implementation to decide which memory type
 // should be used for particular operations.

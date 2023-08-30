@@ -395,7 +395,7 @@ serializeGenericElementData(Location loc, DenseElementsAttr elementsAttr,
     case 64:
       return serializeGenericIntegerElements<uint64_t>(attr, endian, os);
     default:
-      if (bitWidth != 1 && bitWidth < 64) {
+      if (bitWidth < 64) {
         // Special case for bit-packing of sub-byte aligned types.
         // This could be extended to handle larger widths (i33, etc) but they
         // are rare today.

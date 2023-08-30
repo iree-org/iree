@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
@@ -47,6 +48,7 @@ inline void registerAllIreePasses() {
   IREE::TFLite::registerTransformPassPipeline();
 
   ConstEval::registerConstEvalPasses();
+  GlobalOptimization::registerGlobalOptimizationPipeline();
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
   IREE::HAL::Inline::registerHALInlinePasses();

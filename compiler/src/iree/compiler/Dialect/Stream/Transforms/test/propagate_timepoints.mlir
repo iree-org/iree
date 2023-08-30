@@ -156,6 +156,39 @@ func.func private @br(%arg0: !stream.resource<external>, %arg1: !stream.resource
 
 // -----
 
+// Tests switch terminator expansion similar to a branch test above.
+
+// CHECK-LABEL: @switch
+// CHECK-SAME: (%[[TIMEPOINT0:.+]]: !stream.timepoint, %[[UNREADY0:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
+func.func private @switch(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
+  %flag = arith.constant 1 : i32
+
+  // CHECK:      cf.switch
+  // CHECK-NEXT: default: ^bb1(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]]
+  // CHECK-NEXT: 0: ^bb1(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]]
+  cf.switch %flag : i32, [
+    default: ^bb1(%arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>),
+    0: ^bb1(%arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>)
+  ]
+
+// CHECK: ^bb1(%[[BB1_TIMEPOINT0:.+]]: !stream.timepoint, %[[BB1_UNREADY0:.+]]: !stream.resource<external>,
+// CHECK-SAME:      %[[BB1_TIMEPOINT1:.+]]: !stream.timepoint, %[[BB1_UNREADY1:.+]]: !stream.resource<transient>):
+^bb1(%bb1_arg0: !stream.resource<external>, %bb1_arg1: !stream.resource<transient>):
+  // CHECK-NEXT: %[[SIZE0:.+]] = stream.resource.size %[[BB1_UNREADY0]] : !stream.resource<external>
+  // CHECK-NEXT: %[[READY0:.+]] = stream.timepoint.await %[[BB1_TIMEPOINT0]] => %[[BB1_UNREADY0]] : !stream.resource<external>{%8}
+  // CHECK-NEXT: %[[SIZE1:.+]] = stream.resource.size %[[BB1_UNREADY1]] : !stream.resource<transient>
+  // CHECK-NEXT: %[[READY1:.+]] = stream.timepoint.await %[[BB1_TIMEPOINT1]] => %[[BB1_UNREADY1]] : !stream.resource<transient>{%10}
+
+  // CHECK-NEXT: util.optimization_barrier %[[READY0]]
+  util.optimization_barrier %bb1_arg0 : !stream.resource<external>
+  // CHECK-NEXT: util.optimization_barrier %[[READY1]]
+  util.optimization_barrier %bb1_arg1 : !stream.resource<transient>
+  return
+}
+
+// -----
+
 // Tests that stream.async.execute consumes incoming timepoints.
 // If multiple timepoints are required for the captures then a
 // stream.timepoint.join should be emitted.

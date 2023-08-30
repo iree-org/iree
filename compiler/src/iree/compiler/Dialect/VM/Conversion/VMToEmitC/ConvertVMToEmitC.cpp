@@ -4428,6 +4428,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                                          "vm_ctlz_i32");
 
   // Casting and type conversion/emulation ops
+  patterns.add<GenericOpConversion<IREE::VM::TruncI16I8Op>>(
+      typeConverter, context, "vm_trunc_i16i8");
   patterns.add<GenericOpConversion<IREE::VM::TruncI32I8Op>>(
       typeConverter, context, "vm_trunc_i32i8");
   patterns.add<GenericOpConversion<IREE::VM::TruncI32I16Op>>(

@@ -269,36 +269,9 @@ struct MaterializeFlowDispatchTensorStoreOp
 
 } // namespace
 
-IREE::LinalgExt::MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(EncodingRole role, MatmulTileParams tileParams) {
-  MaterializeEncodingInfo encodingInfo;
-  encodingInfo.innerDimsPos = {0, 1};
-  switch (role) {
-  case (EncodingRole::LHS): {
-    encodingInfo.innerTileSizes = {tileParams.M, tileParams.K};
-    break;
-  }
-  case (EncodingRole::RHS): {
-    encodingInfo.innerTileSizes = {tileParams.N, tileParams.K};
-    encodingInfo.innerDimsPos = {1, 0};
-    encodingInfo.outerDimsPerm = {1, 0};
-    break;
-  }
-  case (EncodingRole::RESULT): {
-    encodingInfo.innerTileSizes = {tileParams.M, tileParams.N};
-    break;
-  }
-  default: {
-    assert(false);
-    return {};
-  }
-  }
-  return encodingInfo;
-}
-
 void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
                                         ArrayRef<int64_t> shape) {
-  for (size_t i = 0; i < shape.size(); i++) {
+  for (size_t i = 0; i < encodingInfo.innerDimsPos.size(); i++) {
     int64_t size = shape[encodingInfo.innerDimsPos[i]];
     // Dynamic sizes are assumed to be large enough, not to be candidates for
     // narrow kernels.

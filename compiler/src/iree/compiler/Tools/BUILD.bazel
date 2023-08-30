@@ -205,7 +205,7 @@ iree_compiler_cc_library(
     hdrs = ["iree_compile_lib.h"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API/Internal:Embed",
+        "//compiler/src/iree/compiler/API/Internal:CompilerDriver",
         "//compiler/src/iree/compiler/Pipelines",
         "@llvm-project//llvm:Support",
     ],

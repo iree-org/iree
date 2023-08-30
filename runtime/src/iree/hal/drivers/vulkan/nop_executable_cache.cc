@@ -73,14 +73,34 @@ static bool iree_hal_vulkan_nop_executable_cache_can_prepare_format(
     iree_hal_executable_cache_t* base_executable_cache,
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format) {
-  return iree_string_view_equal(executable_format,
-                                iree_make_cstring_view("SPVE"));
+  iree_hal_vulkan_nop_executable_cache_t* executable_cache =
+      iree_hal_vulkan_nop_executable_cache_cast(base_executable_cache);
+  if (iree_string_view_equal(executable_format,
+                             iree_make_cstring_view("vulkan-spirv-fb"))) {
+    return true;
+  } else if (iree_string_view_equal(
+                 executable_format,
+                 iree_make_cstring_view("vulkan-spirv-fb-ptr"))) {
+    return iree_all_bits_set(
+        executable_cache->logical_device->enabled_features(),
+        IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES);
+  }
+  return false;
 }
 
 static iree_status_t iree_hal_vulkan_nop_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* base_executable_cache,
     const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
+  if (!iree_hal_vulkan_nop_executable_cache_can_prepare_format(
+          base_executable_cache, executable_params->caching_mode,
+          executable_params->executable_format)) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "no Vulkan executable implementation registered "
+                            "for the given executable format '%.*s'",
+                            (int)executable_params->executable_format.size,
+                            executable_params->executable_format.data);
+  }
   iree_hal_vulkan_nop_executable_cache_t* executable_cache =
       iree_hal_vulkan_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_vulkan_native_executable_create(

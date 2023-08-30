@@ -121,25 +121,24 @@ iree_status_t iree_hal_cuda2_nccl_channel_create(
       "ncclCommInitRankConfig");
 
   iree_hal_cuda2_nccl_channel_t* channel = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(host_allocator, sizeof(*channel), (void**)&channel);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*channel),
+                                (void**)&channel));
 
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda2_nccl_channel_vtable,
-                                 &channel->resource);
-    channel->cuda_symbols = cuda_symbols;
-    channel->nccl_symbols = nccl_symbols;
-    channel->host_allocator = host_allocator;
-    channel->parent_channel = NULL;
-    channel->rank = rank;
-    channel->count = count;
-    channel->comm = comm;
-    IREE_TRACE(channel->id_hash = id_hash);
-    *out_channel = (iree_hal_channel_t*)channel;
-  }
+  iree_hal_resource_initialize(&iree_hal_cuda2_nccl_channel_vtable,
+                               &channel->resource);
+  channel->cuda_symbols = cuda_symbols;
+  channel->nccl_symbols = nccl_symbols;
+  channel->host_allocator = host_allocator;
+  channel->parent_channel = NULL;
+  channel->rank = rank;
+  channel->count = count;
+  channel->comm = comm;
+  IREE_TRACE(channel->id_hash = id_hash);
+  *out_channel = (iree_hal_channel_t*)channel;
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static void iree_hal_cuda2_nccl_channel_destroy(

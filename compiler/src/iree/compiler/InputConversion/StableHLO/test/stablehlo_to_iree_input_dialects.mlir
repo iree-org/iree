@@ -98,3 +98,35 @@ func.func public @empty_zero_extent(%arg0: tensor<ui8>, %arg1: tensor<0x4xui32>)
   // CHECK: return %[[EMPTY]]
   return %0 : tensor<0x4xui32>
 }
+
+// -----
+
+// CHECK-LABEL: @convert_return
+func.func @convert_return() -> tensor<i32> {
+  // CHECK: %[[CST:.+]] = arith.constant dense<1>
+  %cst = arith.constant dense<1> : tensor<i32>
+  // CHECK: return %[[CST]]
+  stablehlo.return %cst : tensor<i32>
+}
+
+// -----
+
+// CHECK-LABEL: @while_unsigned
+func.func @while_unsigned(%arg0: tensor<ui32>) -> tensor<ui32> {
+  // CHECK: scf.while
+  %0 = scf.while (%arg1 = %arg0) : (tensor<ui32>) -> tensor<ui32> {
+    // CHECK: linalg.generic
+    %1 = stablehlo.compare  LT, %arg1, %arg1 : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
+    // CHECK: tensor.extract
+    %extracted = tensor.extract %1[] : tensor<i1>
+    // CHECK: scf.condition
+    scf.condition(%extracted) %arg1 : tensor<ui32>
+  } do {
+  ^bb0(%arg1: tensor<ui32>):
+    // CHECK: linalg.generic
+    %1 = stablehlo.add %arg1, %arg1 : tensor<ui32>
+    // CHECK: scf.yield
+    scf.yield %1 : tensor<ui32>
+  }
+  return %0 : tensor<ui32>
+}

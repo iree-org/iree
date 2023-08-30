@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -49,6 +50,16 @@ struct RematerializeParallelOpsPattern
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
       if (succeeded(fusionResult)) {
+        // Copy over lowering_config if after fusion we still see the same loop
+        // count to enable using this pass inside a CodeGen pipeline.
+        // TODO: This is hacky and it pretty much assumes all parallel producer
+        // ops which does not change loop structure at all.
+        if (auto linalgOp = dyn_cast<linalg::LinalgOp>(fusionResult->fusedOp)) {
+          if (genericOp.getNumLoops() == linalgOp.getNumLoops())
+            if (Attribute attr = genericOp->getAttr("lowering_config"))
+              linalgOp->setAttr("lowering_config", attr);
+        }
+
         auto replacements = fusionResult->fusedOp->getResults().take_back(
             genericOp.getNumResults());
         rewriter.replaceOp(genericOp, replacements);

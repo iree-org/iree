@@ -17,7 +17,8 @@
 typedef struct iree_hal_vulkan_native_buffer_t {
   iree_hal_vulkan_base_buffer_t base;
   iree::hal::vulkan::VkDeviceHandle* logical_device;
-  iree_hal_vulkan_native_buffer_release_callback_t release_callback;
+  iree_hal_vulkan_native_buffer_release_callback_t internal_release_callback;
+  iree_hal_buffer_release_callback_t user_release_callback;
 } iree_hal_vulkan_native_buffer_t;
 
 namespace {
@@ -37,11 +38,11 @@ iree_status_t iree_hal_vulkan_native_buffer_wrap(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     VkDeviceMemory device_memory, VkBuffer handle,
-    iree_hal_vulkan_native_buffer_release_callback_t release_callback,
+    iree_hal_vulkan_native_buffer_release_callback_t internal_release_callback,
+    iree_hal_buffer_release_callback_t user_release_callback,
     iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(logical_device);
-  IREE_ASSERT_ARGUMENT(device_memory);
   IREE_ASSERT_ARGUMENT(handle);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -60,7 +61,8 @@ iree_status_t iree_hal_vulkan_native_buffer_wrap(
     buffer->base.device_memory = device_memory;
     buffer->base.handle = handle;
     buffer->logical_device = logical_device;
-    buffer->release_callback = release_callback;
+    buffer->internal_release_callback = internal_release_callback;
+    buffer->user_release_callback = user_release_callback;
 
     *out_buffer = &buffer->base.base;
   }
@@ -78,10 +80,14 @@ static void iree_hal_vulkan_native_buffer_destroy(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));
 
-  if (buffer->release_callback.fn) {
-    buffer->release_callback.fn(
-        buffer->release_callback.user_data, buffer->logical_device,
+  if (buffer->internal_release_callback.fn) {
+    buffer->internal_release_callback.fn(
+        buffer->internal_release_callback.user_data, buffer->logical_device,
         buffer->base.device_memory, buffer->base.handle);
+  }
+  if (buffer->user_release_callback.fn) {
+    buffer->user_release_callback.fn(buffer->user_release_callback.user_data,
+                                     &buffer->base.base);
   }
 
   iree_allocator_free(host_allocator, buffer);
@@ -96,6 +102,11 @@ static iree_status_t iree_hal_vulkan_native_buffer_map_range(
     iree_hal_buffer_mapping_t* mapping) {
   iree_hal_vulkan_native_buffer_t* buffer =
       iree_hal_vulkan_native_buffer_cast(base_buffer);
+  if (IREE_UNLIKELY(!buffer->base.device_memory)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "buffer does not have device memory attached and cannot be mapped");
+  }
   auto* logical_device = buffer->logical_device;
 
   // TODO(benvanik): add upload/download for unmapped buffers.
@@ -137,6 +148,11 @@ static iree_status_t iree_hal_vulkan_native_buffer_unmap_range(
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
   iree_hal_vulkan_native_buffer_t* buffer =
       iree_hal_vulkan_native_buffer_cast(base_buffer);
+  if (IREE_UNLIKELY(!buffer->base.device_memory)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "buffer does not have device memory attached and cannot be mapped");
+  }
   auto* logical_device = buffer->logical_device;
   logical_device->syms()->vkUnmapMemory(*logical_device,
                                         buffer->base.device_memory);
@@ -148,6 +164,11 @@ static iree_status_t iree_hal_vulkan_native_buffer_invalidate_range(
     iree_device_size_t local_byte_length) {
   iree_hal_vulkan_native_buffer_t* buffer =
       iree_hal_vulkan_native_buffer_cast(base_buffer);
+  if (IREE_UNLIKELY(!buffer->base.device_memory)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "buffer does not have device memory attached and cannot be mapped");
+  }
   auto* logical_device = buffer->logical_device;
   VkMappedMemoryRange range;
   range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
@@ -166,6 +187,11 @@ static iree_status_t iree_hal_vulkan_native_buffer_flush_range(
     iree_device_size_t local_byte_length) {
   iree_hal_vulkan_native_buffer_t* buffer =
       iree_hal_vulkan_native_buffer_cast(base_buffer);
+  if (IREE_UNLIKELY(!buffer->base.device_memory)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "buffer does not have device memory attached and cannot be mapped");
+  }
   auto* logical_device = buffer->logical_device;
   VkMappedMemoryRange range;
   range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;

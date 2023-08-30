@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Upload benchmark results to IREE Benchmark Dashboards.
 
-This script is meant to be used by Buildkite for automation.
+This script is meant to be used by GitHub Actions workflows for automation.
 
 Example usage:
   # Export necessary environment variables:

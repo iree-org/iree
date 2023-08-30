@@ -39,6 +39,8 @@ target_link_options(${_NAME} PRIVATE
   "-sEXPORTED_FUNCTIONS=['_setup_sample', '_cleanup_sample', '_load_program', '_inspect_program', '_unload_program', '_call_function', '_malloc', '_free']"
   "-sEXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'UTF8ToString', 'dynCall', 'addFunction']"
   #
+  "-sUSE_WEBGPU=1"
+  #
   "-sASSERTIONS=1"
   #
   # Programs loaded dynamically can require additional memory, so allow growth.

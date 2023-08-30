@@ -25,6 +25,12 @@
 #   ./fetch_cuda_deps.sh /usr/local/iree_cuda_deps
 set -e
 
+ARCH="$(uname -m)"
+if [[ "${ARCH}" == "aarch64" ]]; then
+  echo "ERROR: Script does not support ${ARCH}."
+  exit 1
+fi
+
 TARGET_DIR="$1"
 if [ -z "$TARGET_DIR" ]; then
   echo "ERROR: Expected target directory (typically /usr/local/iree_cuda_deps for CI or $HOME/.iree_cuda_deps for local)"

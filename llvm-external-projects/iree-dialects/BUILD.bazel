@@ -312,12 +312,13 @@ gentbl_cc_library(
 
 cc_library(
     name = "IREELinalgExtUtils",
-    srcs = glob([
-        "lib/Dialect/LinalgExt/Utils/*.cpp",
-    ]),
-    hdrs = glob([
-        "include/iree-dialects/Dialect/LinalgExt/Utils/*.h",
-    ]),
+    srcs = [
+        "lib/Dialect/LinalgExt/Utils/Utils.cpp",
+    ],
+    hdrs = [
+        "include/iree-dialects/Dialect/LinalgExt/Utils/Utils.h",
+        "include/iree-dialects/Dialect/LinalgExt/Utils/WinogradConstants.h",
+    ],
     includes = ["include"],
     deps = [
         "@llvm-project//llvm:Support",
@@ -328,6 +329,21 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorUtils",
+    ],
+)
+
+cc_library(
+    name = "IREELinalgExtEncodingUtils",
+    srcs = [
+        "lib/Dialect/LinalgExt/Utils/EncodingUtils.cpp",
+    ],
+    hdrs = [
+        "include/iree-dialects/Dialect/LinalgExt/Utils/EncodingUtils.h",
+    ],
+    includes = ["include"],
+    deps = [
+        ":IREELinalgExtDialect",
+        ":IREELinalgExtUtils",
     ],
 )
 
@@ -437,6 +453,7 @@ cc_library(
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
+        ":IREELinalgExtEncodingUtils",
         ":IREELinalgExtPassIncGen",
         ":IREELinalgExtUtils",
         "@llvm-project//llvm:Support",

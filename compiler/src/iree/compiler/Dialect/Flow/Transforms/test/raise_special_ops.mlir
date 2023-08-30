@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-raise-special-ops -canonicalize %s | FileCheck %s
+// RUN: iree-opt --iree-flow-raise-special-ops -canonicalize --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @softmax
 //  CHECK-SAME: %[[ARG:.+]]: tensor<?x?x?xf32>
@@ -161,4 +161,127 @@ func.func @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x128x128
     linalg.yield %2460 : f32
   } -> tensor<12x128x128xf32>
   return %109 : tensor<12x128x128xf32>
+}
+
+func.func @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
+    %arg1 : tensor<40x20xf32>) -> tensor<10x40xf32> {
+  %0 = tensor.empty() : tensor<20x40xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg1 : tensor<40x20xf32>) outs(%0 : tensor<20x40xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      linalg.yield %b0 : f32
+  } -> tensor<20x40xf32>
+  %2 = tensor.empty() : tensor<10x40xf32>
+  %3 = arith.constant 0.0 : f32
+  %4 = linalg.fill ins(%3 : f32) outs(%2 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %5 = linalg.matmul ins(%arg0, %1 : tensor<10x20xf32>, tensor<20x40xf32>)
+      outs(%4 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  return %5 : tensor<10x40xf32>
+}
+// CHECK-LABEL: func @aTransposeBMatmul
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf32>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<40x20xf32>
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul_transpose_b
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
+//       CHECK:   return %[[RESULT]]
+
+func.func @aTransposeBBatchMatmul(%arg0 : tensor<5x10x20xf32>,
+    %arg1 : tensor<5x40x20xf32>) -> tensor<5x10x40xf32> {
+  %0 = tensor.empty() : tensor<5x20x40xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d2, d1)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%arg1 : tensor<5x40x20xf32>) outs(%0 : tensor<5x20x40xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      linalg.yield %b0 : f32
+  } -> tensor<5x20x40xf32>
+  %2 = tensor.empty() : tensor<5x10x40xf32>
+  %3 = arith.constant 0.0 : f32
+  %4 = linalg.fill ins(%3 : f32) outs(%2 : tensor<5x10x40xf32>) -> tensor<5x10x40xf32>
+  %5 = linalg.batch_matmul ins(%arg0, %1 : tensor<5x10x20xf32>, tensor<5x20x40xf32>)
+      outs(%4 : tensor<5x10x40xf32>) -> tensor<5x10x40xf32>
+  return %5 : tensor<5x10x40xf32>
+}
+// CHECK-LABEL: func @aTransposeBBatchMatmul
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<5x10x20xf32>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<5x40x20xf32>
+//       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul_transpose_b
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
+//       CHECK:   return %[[RESULT]]
+
+func.func @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %dim = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+    %dim_0 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+    %0 = tensor.empty(%dim, %dim_0) : tensor<1x1x?x?xf32>
+    %1 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+        outs(%0 : tensor<1x1x?x?xf32>) {
+      ^bb0(%out: f32):
+        linalg.yield %cst : f32
+    } -> tensor<1x1x?x?xf32>
+    return %1 : tensor<1x1x?x?xf32>
+}
+// CHECK-LABEL: func @generic_fill
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+//       CHECK:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty
+//  CHECK-SAME:   : tensor<1x1x?x?xf32>
+//       CHECK:   %[[RESULT:.+]] = linalg.fill
+//  CHECK-SAME:       ins(%[[CST]] : f32)
+//  CHECK-SAME:       outs(%[[EMPTY]] : tensor<1x1x?x?xf32>)
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+func.func @test(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) -> tensor<5120xf32> {
+  %c0 = arith.constant 0 : index
+  // CHECK: tensor.extract_slice
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%B : tensor<5120xf32>) {
+  ^bb0(%out: f32):
+    %12 = linalg.index 0 : index
+    %extracted = tensor.extract %A[%c0, %c0, %12] : tensor<1x1x5120xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<5120xf32>
+  return %0 : tensor<5120xf32>
+}
+
+// -----
+
+// This currently should not be raised as the operation does not remain
+// elementwise after raising the tensor.extract to input.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @test(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  // CHECK: linalg.generic
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
+  ^bb0(%out: f32):
+    %i1 = linalg.index 0 : index
+    %i2 = linalg.index 1 : index
+    %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<128x128x128xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<64x64xf32>
+  return %0 : tensor<64x64xf32>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @test(%A : tensor<64x64x64xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
+  ^bb0(%out: f32):
+    %i1 = linalg.index 0 : index
+    %i2 = linalg.index 1 : index
+    // CHECK: tensor.extract_slice
+    %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<64x64x64xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<64x64xf32>
+  return %0 : tensor<64x64xf32>
 }
