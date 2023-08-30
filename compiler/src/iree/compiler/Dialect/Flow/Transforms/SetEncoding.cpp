@@ -367,8 +367,7 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);
-    patterns.insert<SetMatmulEncoding>(context);
-    patterns.insert<SetBatchMatmulEncoding>(context);
+    patterns.insert<SetBatchMatmulEncoding, SetMatmulEncoding>(context);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
