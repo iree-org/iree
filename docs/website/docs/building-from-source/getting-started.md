@@ -258,7 +258,7 @@ about the bindings themselves.
 
 ### Dependencies
 
-You will need a recent Python installation >=3.8 (we aim to support
+You will need a recent Python installation >=3.9 (we aim to support
 [non-eol Python versions](https://endoflife.date/python)).
 
 ???+ Tip "Tip - Managing Python versions"

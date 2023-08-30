@@ -16,14 +16,14 @@
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Build specific Python versions and packages to custom directory:
-#   override_python_versions="cp38-cp38 cp39-cp39" \
+#   override_python_versions="cp39-cp39 cp310-cp310" \
 #   packages="iree-runtime" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Valid Python versions match a subdirectory under /opt/python in the docker
 # image. Typically:
-#   cp38-cp38 cp39-cp39 cp310-cp310
+#   cp39-cp39 cp310-cp310
 #
 # Valid packages:
 #   iree-runtime
