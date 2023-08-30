@@ -413,9 +413,19 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
       createGPUTensorTile(/*distributeToWarp=*/false));
 
   // High-level n-D vectorization.
-  nestedPM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
-  nestedPM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedPM.addNestedPass<func::FuncOp>(createCSEPass());
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    options.enableCleanup = false;
+    options.maxVectorSize = 4096;
+    nestedPM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+    nestedPM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
+    nestedPM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedPM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   // Bufferize.
   addBufferizePasses(nestedPM, gpuAllocateWorkgroupMemoryFn);
@@ -515,8 +525,21 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
 
   // Performs mechanical vectorization. This does not perform unrolling or
   // lowering, which is done later.
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
-      /*generateContract=*/false, /*maxVectorSize=*/32768));
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    options.enableCleanup = false;
+    options.generateContract = false;
+    options.maxVectorSize = 32768;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());

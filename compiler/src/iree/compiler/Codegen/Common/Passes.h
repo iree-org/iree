@@ -12,6 +12,8 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
 #define IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
 
+#include <limits>
+
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -143,6 +145,13 @@ struct GenericVectorizationPassOptions {
   bool enableVectorMasking = false;
   bool vectorizePadding = false;
   bool vectorizeGatherAccesses = false;
+  // The flag controls whether it touches the structure generated from tiling,
+  // which affects later steps like bufferization and vector hoisting.
+  bool enableCleanup = true;
+  // Enable conversion for reduction ops to contraction ops.
+  bool generateContract = true;
+  // Max vector size allowed to avoid creating large vectors.
+  int64_t maxVectorSize = std::numeric_limits<int64_t>::max();
 };
 /// Creates a pass to perform vectorization on LinAlg and tensor ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createGenericVectorizationPass();
