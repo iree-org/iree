@@ -62,19 +62,24 @@ jobs:
           if [ -z "$status" ]; then
             echo "No updates made"
           else
-            echo "Dependencies updated"
-            git diff
-            branch="roll_nightly_${{ github.run_number }}"
-            git add -A
-            git checkout -b "$branch"
-            git commit -m "Update nightly dependencies"
-            git push origin "HEAD:$branch"
-            body="$(openxla-workspace show-pins)"
-            pr="$(gh pr create --base main --head "$branch" --title "Update nightly dependencies" --body "$body")"
-            echo "Created pull request $pr"
-            gh pr merge $pr --auto --delete-branch --squash
-            # Can't approve your own PR, so approve with the github actions bot.
-            echo "Approving PR"
-            export GH_TOKEN="$APPROVAL_TOKEN"
-            gh pr review $pr -a
+            status="$(gh pr list -S 'Update nightly' -L 1 -A 'iree-github-actions-bot' | grep -q -v 'no pull')"
+            if [ -z "$status" ]; then
+              echo "Dependencies updated"
+              git diff
+              branch="roll_nightly_${{ github.run_number }}"
+              git add -A
+              git checkout -b "$branch"
+              git commit -m "Update nightly dependencies"
+              git push origin "HEAD:$branch"
+              body="$(openxla-workspace show-pins)"
+              pr="$(gh pr create --base main --head "$branch" --title "Update nightly dependencies" --body "$body")"
+              echo "Created pull request $pr"
+              gh pr merge $pr --auto --delete-branch --squash
+              # Can't approve your own PR, so approve with the github actions bot.
+              echo "Approving PR"
+              export GH_TOKEN="$APPROVAL_TOKEN"
+              gh pr review $pr -a
+            else
+              echo "Pending failed integrate"
+            fi
           fi
