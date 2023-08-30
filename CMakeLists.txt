@@ -50,7 +50,7 @@ include(CMakeDependentOption)
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
-option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the RenderDoc tool." OFF)
+option(IREE_ENABLE_HAL_PROFILING "Enables profiling HAL devices with external tooling." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
 

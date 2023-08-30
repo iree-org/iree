@@ -179,7 +179,7 @@ namespace vulkan {
   DEV_PFN(EXCLUDED, vkCreateSwapchainKHR)                               \
   DEV_PFN(EXCLUDED, vkCreateValidationCacheEXT)                         \
   DEV_PFN(EXCLUDED, vkDebugMarkerSetObjectNameEXT)                      \
-  DEV_PFN(EXCLUDED, vkDebugMarkerSetObjectTagEXT)                       \
+  DEV_PFN(OPTIONAL, vkDebugMarkerSetObjectTagEXT)                       \
   DEV_PFN(EXCLUDED, vkDestroyAccelerationStructureNV)                   \
   DEV_PFN(REQUIRED, vkDestroyBuffer)                                    \
   DEV_PFN(REQUIRED, vkDestroyBufferView)                                \

@@ -35,6 +35,9 @@ typedef struct iree_hal_vulkan_driver_t {
 
   iree_hal_vulkan_features_t enabled_features;
 
+  // Optionally populated profiling context passed to each device.
+  iree_hal_vulkan_profiling_context_t profiling_context;
+
   // Which optional extensions are active and available on the instance.
   iree_hal_vulkan_instance_extensions_t instance_extensions;
 
@@ -90,6 +93,7 @@ static void iree_hal_vulkan_driver_populate_default_app_info(
 static iree_status_t iree_hal_vulkan_driver_create_internal(
     iree_string_view_t identifier,
     const iree_hal_vulkan_driver_options_t* options,
+    iree_hal_vulkan_profiling_context_t profiling_context,
     const iree_hal_vulkan_string_list_t* enabled_extensions,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,
     bool owns_instance, iree_allocator_t host_allocator,
@@ -127,6 +131,7 @@ static iree_status_t iree_hal_vulkan_driver_create_internal(
   memcpy(&driver->device_options, &options->device_options,
          sizeof(driver->device_options));
   driver->enabled_features = options->requested_features;
+  driver->profiling_context = profiling_context;
   driver->syms = iree::add_ref(instance_syms);
   driver->instance = instance;
   driver->owns_instance = owns_instance;
@@ -140,11 +145,15 @@ static void iree_hal_vulkan_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_vulkan_deinitialize_profiling_context(&driver->profiling_context);
+
   iree_hal_vulkan_debug_reporter_free(driver->debug_reporter);
+
   if (driver->owns_instance) {
     driver->syms->vkDestroyInstance(driver->instance, /*pAllocator=*/NULL);
   }
   driver->syms.reset();
+
   iree_allocator_free(host_allocator, driver);
 
   IREE_TRACE_ZONE_END(z0);
@@ -225,6 +234,11 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create(
           instance_syms, options->requested_features, &arena, &enabled_layers,
           &enabled_extensions));
 
+  // Configure profiling prior to creating the instance.
+  iree_hal_vulkan_profiling_context_t profiling_context = {0};
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_initialize_profiling_context(
+      options->requested_features, host_allocator, &profiling_context));
+
   // Create the instance this driver will use for all requests.
   VkApplicationInfo app_info;
   iree_hal_vulkan_driver_populate_default_app_info(options, &app_info);
@@ -256,12 +270,14 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_driver_create_internal(
-        identifier, options, &enabled_extensions, opaque_syms, instance,
+        identifier, options, profiling_context, &enabled_extensions,
+        opaque_syms, instance,
         /*owns_instance=*/true, host_allocator, out_driver);
   }
 
   if (!iree_status_is_ok(status)) {
     instance_syms->vkDestroyInstance(instance, /*pAllocator=*/NULL);
+    iree_hal_vulkan_deinitialize_profiling_context(&profiling_context);
   }
   return status;
 }
@@ -285,6 +301,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create_using_instance(
   auto* instance_syms = (DynamicSymbols*)opaque_syms;
   IREE_RETURN_IF_ERROR(instance_syms->LoadFromInstance(instance));
 
+  // Not yet supported via this API.
+  iree_hal_vulkan_profiling_context_t profiling_context = {0};
+
   // Since the instance is already created we can't actually enable any
   // extensions or even query if they are really enabled - we just have to trust
   // that the caller already enabled them for us (or we may fail later).
@@ -297,7 +316,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create_using_instance(
           &enabled_extensions));
 
   iree_status_t status = iree_hal_vulkan_driver_create_internal(
-      identifier, options, &enabled_extensions, opaque_syms, instance,
+      identifier, options, profiling_context, &enabled_extensions, opaque_syms,
+      instance,
       /*owns_instance=*/false, host_allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -586,8 +606,9 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
   // disabled by the system, or permission is denied.
   iree_status_t status = iree_hal_vulkan_device_create(
       base_driver, device_name, driver->enabled_features,
-      &driver->device_options, (iree_hal_vulkan_syms_t*)driver->syms.get(),
-      driver->instance, physical_device, host_allocator, out_device);
+      &driver->device_options, &driver->profiling_context,
+      (iree_hal_vulkan_syms_t*)driver->syms.get(), driver->instance,
+      physical_device, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

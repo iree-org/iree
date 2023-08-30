@@ -40,10 +40,10 @@ using namespace iree::hal::vulkan;
 // RenderDoc integration
 //===----------------------------------------------------------------------===//
 
-// Configure cmake with -DIREE_ENABLE_RENDERDOC_PROFILING=ON in order to
+// Configure cmake with -DIREE_ENABLE_HAL_PROFILING=ON in order to
 // enable profiling support. This should be left off in production builds to
 // avoid introducing a backdoor.
-#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING)
 
 #if !defined(IREE_PLATFORM_WINDOWS)
 #include <dlfcn.h>
@@ -128,7 +128,378 @@ static void iree_hal_vulkan_end_renderdoc_capture(
   }
 }
 
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING
+
+//===----------------------------------------------------------------------===//
+// Radeon Graphics Profiler (RGP) integration
+//===----------------------------------------------------------------------===//
+
+// Configure cmake with -DIREE_ENABLE_HAL_PROFILING=ON in order to
+// enable profiling support. This should be left off in production builds to
+// avoid introducing a backdoor.
+#if defined(IREE_HAL_VULKAN_HAVE_RGP_TOOLING)
+
+#if !defined(IREE_PLATFORM_WINDOWS)
+#include <dlfcn.h>
+#endif  // IREE_PLATFORM_WINDOWS
+
+#include "third_party/amd_dev_driver/DevDriverAPI.h"
+
+static iree_status_code_t iree_status_code_from_rgp_status(
+    DevDriverStatus status) {
+  switch (status) {
+    case DEV_DRIVER_STATUS_SUCCESS:
+      return IREE_STATUS_OK;
+    default:
+    case DEV_DRIVER_STATUS_ERROR:
+      return IREE_STATUS_UNKNOWN;
+    case DEV_DRIVER_STATUS_FAILED:
+    case DEV_DRIVER_STATUS_NULL_POINTER:
+    case DEV_DRIVER_STATUS_BAD_ALLOC:
+      return IREE_STATUS_INVALID_ARGUMENT;
+    case DEV_DRIVER_STATUS_CAPTURE_FAILED:
+      return IREE_STATUS_INTERNAL;
+    case DEV_DRIVER_STATUS_NOT_CAPTURED:
+      return IREE_STATUS_FAILED_PRECONDITION;
+    case DEV_DRIVER_STATUS_INVALID_MAJOR_VERSION:
+      return IREE_STATUS_UNIMPLEMENTED;
+    case DEV_DRIVER_STATUS_INVALID_PARAMETERS:
+      return IREE_STATUS_INVALID_ARGUMENT;
+  }
+}
+
+static iree_status_t iree_hal_vulkan_initialize_rgp_context(
+    iree_hal_vulkan_profiling_context_t* context) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  typedef DevDriverStatus (*PFN_DevDriverGetFuncTableType)(void*);
+  PFN_DevDriverGetFuncTableType DevDriverGetFuncTable = NULL;
+
+#if defined(IREE_PLATFORM_WINDOWS)
+#if defined(IREE_ARCH_X86_64)
+#define IREE_RGP_LIBRARY_NAME "DevDriverAPI-x64.dll"
+#else
+#define IREE_RGP_LIBRARY_NAME "DevDriverAPI.dll"
+#endif  // IREE_ARCH_*
+  HMODULE module = LoadLibraryA(IREE_RGP_LIBRARY_NAME);
+  if (module) {
+    DevDriverGetFuncTable = (PFN_DevDriverGetFuncTableType)GetProcAddress(
+        module, "DevDriverGetFuncTable");
+  }
+#elif defined(IREE_PLATFORM_LINUX)
+  // DO NOT SUBMIT
+  void* library = dlopen("libDevDriverAPI.so", RTLD_NOW);
+  if (library) {
+    DevDriverGetFuncTable =
+        (PFN_DevDriverGetFuncTableType)dlsym(library, "DevDriverGetFuncTable");
+  }
+#endif  // IREE_PLATFORM_*
+  if (!DevDriverGetFuncTable) {
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, "AMD DevDriverAPI library not found");
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
+  iree_status_t status = iree_ok_status();
+
+  DevDriverAPI* rgp_api = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(context->host_allocator, sizeof(*rgp_api),
+                                (void**)&rgp_api));
+  rgp_api->majorVersion = DEV_DRIVER_API_MAJOR_VERSION;
+  rgp_api->minorVersion = DEV_DRIVER_API_MINOR_VERSION;
+  DevDriverStatus rgp_status = DevDriverGetFuncTable(rgp_api);
+  if (rgp_status != DEV_DRIVER_STATUS_SUCCESS) {
+    status = iree_make_status(iree_status_code_from_rgp_status(rgp_status),
+                              "unable to query AMD DevDriverAPI function "
+                              "table; possible version mismatch");
+  }
+
+  DevDriverAPIContext rgp_context = NULL;
+  if (iree_status_is_ok(status)) {
+    DevDriverFeatureRGP rgp_features = {0};
+    DevDriverFeatures features[] = {
+        {DEV_DRIVER_FEATURE_ENABLE_RGP, sizeof(rgp_features), rgp_features},
+    };
+    rgp_status = rgp_api->DevDriverInit(features, IREE_ARRAYSIZE(features),
+                                        &rgp_context);
+    if (rgp_status != DEV_DRIVER_STATUS_SUCCESS) {
+      status = iree_make_status(
+          iree_status_code_from_rgp_status(rgp_status),
+          "AMD DevDriverAPI initialization failed; possibly missing a valid "
+          "Radeon Graphics Profiler (RGP) service");
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    context->rgp_api = rgp_api;
+    context->rgp_context = rgp_context;
+  } else {
+    iree_allocator_free(context->host_allocator, rgp_api);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static void iree_hal_vulkan_deinitialize_rgp_context(
+    iree_hal_vulkan_profiling_context_t* context) {
+  if (!context->rgp_api) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (context->rgp_context) {
+    // ((DevDriverAPI*)context->rgp_api)->DevDriverFinish(context->rgp_context);
+  }
+
+  iree_allocator_free(context->host_allocator, context->rgp_api);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+#define IREE_HAL_VULKAN_RGP_MARKER_BEGIN "AmdFrameBegin"
+#define IREE_HAL_VULKAN_RGP_MARKER_END "AmdFrameEnd"
+
+// From RenderDoc: renderdoc/driver/ihv/amd/amd_rgp.cpp
+static uint64_t iree_hal_vulkan_make_rgp_tag(const char* marker) {
+  if (!marker) return 0;
+  uint64_t tag = 0;
+  for (int i = 0; marker[i]; ++i) {
+    tag |= (uint64_t)(marker[i]) << (i * 8);
+  }
+  return tag;
+}
+
+// This is a horrendous API.
+static iree_status_t iree_hal_vulkan_emit_rgp_marker(
+    VkDeviceHandle* logical_device, VkQueue queue,
+    VkCommandPoolHandle* command_pool, uint64_t marker) {
+  auto& syms = logical_device->syms();
+
+  VkCommandBufferAllocateInfo allocate_info = {};
+  allocate_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocate_info.pNext = NULL;
+  allocate_info.commandPool = *command_pool;
+  allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocate_info.commandBufferCount = 1;
+  VkCommandBuffer command_buffer = VK_NULL_HANDLE;
+  VK_RETURN_IF_ERROR(syms->vkAllocateCommandBuffers(
+                         *logical_device, &allocate_info, &command_buffer),
+                     "vkAllocateCommandBuffers");
+
+  VkCommandBufferBeginInfo begin_info = {};
+  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.pNext = NULL;
+  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  iree_status_t status = VK_RESULT_TO_STATUS(
+      syms->vkBeginCommandBuffer(command_buffer, &begin_info));
+  if (iree_status_is_ok(status)) {
+    status = VK_RESULT_TO_STATUS(syms->vkEndCommandBuffer(command_buffer));
+  }
+
+  if (iree_status_is_ok(status)) {
+#if 1
+    VkDebugMarkerObjectTagInfoEXT tag_info = {};
+    tag_info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_TAG_INFO_EXT;
+    tag_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT;
+    tag_info.object = (uint64_t)command_buffer;
+    tag_info.tagName =
+        iree_hal_vulkan_make_rgp_tag(IREE_HAL_VULKAN_RGP_MARKER_BEGIN);
+    tag_info.tagSize = 0;
+    tag_info.pTag = NULL;
+    status = VK_RESULT_TO_STATUS(
+        syms->vkDebugMarkerSetObjectTagEXT(*logical_device, &tag_info));
+#else
+    VkDebugUtilsObjectTagInfoEXT tag_info = {};
+    tag_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_TAG_INFO_EXT;
+    tag_info.pNext = NULL;
+    tag_info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
+    tag_info.objectHandle = (uint64_t)command_buffer;
+    tag_info.tagName =
+        iree_hal_vulkan_make_rgp_tag(IREE_HAL_VULKAN_RGP_MARKER_BEGIN);
+    tag_info.tagSize = 0;
+    tag_info.pTag = NULL;
+    status = VK_RESULT_TO_STATUS(
+        syms->vkSetDebugUtilsObjectTagEXT(*logical_device, &tag_info));
+#endif
+  }
+
+  VkFence fence = VK_NULL_HANDLE;
+  if (iree_status_is_ok(status)) {
+    VkFenceCreateInfo fence_info = {};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.pNext = NULL;
+    fence_info.flags = 0;
+    status = VK_RESULT_TO_STATUS(syms->vkCreateFence(
+        *logical_device, &fence_info, logical_device->allocator(), &fence));
+  }
+
+  if (iree_status_is_ok(status)) {
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.pNext = NULL;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &command_buffer;
+    status =
+        VK_RESULT_TO_STATUS(syms->vkQueueSubmit(queue, 1, &submit_info, fence));
+  }
+
+  if (iree_status_is_ok(status)) {
+    status = VK_RESULT_TO_STATUS(
+        syms->vkWaitForFences(*logical_device, 1, &fence, /*waitAll=*/VK_TRUE,
+                              /*timeout=*/UINT64_MAX));
+  }
+
+  if (iree_status_is_ok(status)) {
+    status = VK_RESULT_TO_STATUS(syms->vkDeviceWaitIdle(*logical_device));
+  }
+
+  if (fence) {
+    syms->vkDestroyFence(*logical_device, fence, logical_device->allocator());
+  }
+  if (command_buffer) {
+    syms->vkFreeCommandBuffers(*logical_device, *command_pool, 1,
+                               &command_buffer);
+  }
+
+  return status;
+}
+
+// Begins a new RGP capture.
+static iree_status_t iree_hal_vulkan_begin_rgp_capture(
+    const iree_hal_vulkan_profiling_context_t* context,
+    const iree_hal_device_profiling_options_t* options,
+    VkDeviceHandle* logical_device, VkQueue queue,
+    VkCommandPoolHandle* command_pool) {
+  if (!context->rgp_context) return iree_ok_status();
+
+  RGPProfileOptions profile_options = {0};
+  profile_options.m_pBeginFrameTerminatorString =
+      IREE_HAL_VULKAN_RGP_MARKER_BEGIN;
+  profile_options.m_pEndFrameTerminatorString = IREE_HAL_VULKAN_RGP_MARKER_END;
+  profile_options.m_beginFrameTerminatorTag =
+      iree_hal_vulkan_make_rgp_tag(IREE_HAL_VULKAN_RGP_MARKER_BEGIN);
+  profile_options.m_endFrameTerminatorTag =
+      iree_hal_vulkan_make_rgp_tag(IREE_HAL_VULKAN_RGP_MARKER_END);
+
+  if (options->file_path) {
+    profile_options.m_pProfileFilePath = options->file_path;
+  }
+
+  DevDriverStatus rgp_status =
+      ((DevDriverAPI*)context->rgp_api)
+          ->TriggerRgpProfile(context->rgp_context, &profile_options);
+  if (rgp_status != DEV_DRIVER_STATUS_SUCCESS) {
+    return iree_make_status(
+        iree_status_code_from_rgp_status(rgp_status),
+        "AMD DevDriverAPI failed to trigger an RGP capture");
+  }
+
+  // TODO(benvanik): figure out if we need to do this for all queues.
+  auto& syms = logical_device->syms();
+#if 0
+  if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+    VkDebugUtilsLabelEXT begin_label = {};
+    begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    begin_label.pNext = NULL;
+    begin_label.pLabelName = IREE_HAL_VULKAN_RGP_MARKER_BEGIN;
+    syms->vkQueueInsertDebugUtilsLabelEXT(queue, &begin_label);
+  }
+#endif
+  return iree_hal_vulkan_emit_rgp_marker(
+      logical_device, queue, command_pool,
+      iree_hal_vulkan_make_rgp_tag(IREE_HAL_VULKAN_RGP_MARKER_BEGIN));
+
+  return iree_ok_status();
+}
+
+// Flushes and RGP capture by ending and beginning a new frame.
+static void iree_hal_vulkan_flush_rgp_capture(
+    const iree_hal_vulkan_profiling_context_t* context,
+    VkDeviceHandle* logical_device, VkQueue queue,
+    VkCommandPoolHandle* command_pool) {
+  return;
+#if 0
+  auto& syms = logical_device->syms();
+  if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+    VkDebugUtilsLabelEXT end_label = {};
+    end_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    end_label.pNext = NULL;
+    end_label.pLabelName = IREE_HAL_VULKAN_RGP_MARKER_END;
+    syms->vkQueueInsertDebugUtilsLabelEXT(queue, &end_label);
+    VkDebugUtilsLabelEXT begin_label = {};
+    begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    begin_label.pNext = NULL;
+    begin_label.pLabelName = IREE_HAL_VULKAN_RGP_MARKER_BEGIN;
+    syms->vkQueueInsertDebugUtilsLabelEXT(queue, &begin_label);
+  }
+#endif
+  // DO NOT SUBMIT handling
+  iree_hal_vulkan_emit_rgp_marker(
+      logical_device, queue, command_pool,
+      iree_hal_vulkan_make_rgp_tag(IREE_HAL_VULKAN_RGP_MARKER_END));
+  iree_hal_vulkan_emit_rgp_marker(
+      logical_device, queue, command_pool,
+      iree_hal_vulkan_make_rgp_tag(IREE_HAL_VULKAN_RGP_MARKER_BEGIN));
+}
+
+// Ends the active RGP capture, if any active.
+static void iree_hal_vulkan_end_rgp_capture(
+    const iree_hal_vulkan_profiling_context_t* context,
+    VkDeviceHandle* logical_device, VkQueue queue,
+    VkCommandPoolHandle* command_pool) {
+  if (!context->rgp_context) return;
+
+#if 0
+  auto& syms = logical_device->syms();
+  if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+    VkDebugUtilsLabelEXT end_label = {};
+    end_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    end_label.pNext = NULL;
+    end_label.pLabelName = IREE_HAL_VULKAN_RGP_MARKER_END;
+    syms->vkQueueInsertDebugUtilsLabelEXT(queue, &end_label);
+  }
+#endif
+  // DO NOT SUBMIT handling
+  iree_hal_vulkan_emit_rgp_marker(
+      logical_device, queue, command_pool,
+      iree_hal_vulkan_make_rgp_tag(IREE_HAL_VULKAN_RGP_MARKER_END));
+}
+
+#endif  // IREE_HAL_VULKAN_HAVE_RGP_TOOLING
+
+//===----------------------------------------------------------------------===//
+// Tooling support
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_hal_vulkan_initialize_profiling_context(
+    iree_hal_vulkan_features_t features, iree_allocator_t host_allocator,
+    iree_hal_vulkan_profiling_context_t* out_context) {
+  IREE_ASSERT_ARGUMENT(out_context);
+  memset(out_context, 0, sizeof(*out_context));
+  IREE_TRACE_ZONE_BEGIN(z0);
+  out_context->host_allocator = host_allocator;
+
+#if defined(IREE_HAL_VULKAN_HAVE_RGP_TOOLING)
+  if (iree_all_bits_set(features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_RGP_PROFILING)) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_vulkan_initialize_rgp_context(out_context));
+  }
+#endif  // IREE_HAL_VULKAN_HAVE_RGP_TOOLING
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_hal_vulkan_deinitialize_profiling_context(
+    iree_hal_vulkan_profiling_context_t* context) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+#if defined(IREE_HAL_VULKAN_HAVE_RGP_TOOLING)
+  iree_hal_vulkan_deinitialize_rgp_context(context);
+#endif  // IREE_HAL_VULKAN_HAVE_RGP_TOOLING
+
+  IREE_TRACE_ZONE_END(z0);
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_vulkan_device_t extensibility util
@@ -283,6 +654,15 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
                         IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS)) {
     ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_OPTIONAL,
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+  }
+
+  // VK_EXT_debug_marker:
+  // only enabled if RGP profiling is used as it's a terrible ancient extension
+  // that should never be used under any other circumstances.
+  if (iree_all_bits_set(requested_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_RGP_PROFILING)) {
+    ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+            VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
   }
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
@@ -494,6 +874,9 @@ typedef struct iree_hal_vulkan_device_t {
   // ensure the instance remains valid.
   iree_hal_driver_t* driver;
 
+  // Shared profiling context owned by the parent driver.
+  const iree_hal_vulkan_profiling_context_t* profiling_context;
+
   // Flags overriding default device behavior.
   iree_hal_vulkan_device_flags_t flags;
   // Which optional extensions are active and available on the device.
@@ -537,9 +920,9 @@ typedef struct iree_hal_vulkan_device_t {
 
   BuiltinExecutables* builtin_executables;
 
-#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING)
   RENDERDOC_API_LATEST* renderdoc_api;
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING
 } iree_hal_vulkan_device_t;
 
 namespace {
@@ -689,8 +1072,10 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
 static iree_status_t iree_hal_vulkan_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t enabled_features,
-    const iree_hal_vulkan_device_options_t* options, VkInstance instance,
-    VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
+    const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_vulkan_profiling_context_t* profiling_context,
+    VkInstance instance, VkPhysicalDevice physical_device,
+    VkDeviceHandle* logical_device,
     const iree_hal_vulkan_device_extensions_t* device_extensions,
     const iree_hal_vulkan_device_properties_t* device_properties,
     const iree_hal_vulkan_queue_set_t* compute_queue_set,
@@ -718,6 +1103,7 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   device->host_allocator = host_allocator;
   device->driver = driver;
   iree_hal_driver_retain(device->driver);
+  device->profiling_context = profiling_context;
   uint8_t* buffer_ptr = (uint8_t*)device + sizeof(*device);
   buffer_ptr += iree_string_view_append_to_buffer(
       identifier, &device->identifier, (char*)buffer_ptr);
@@ -730,9 +1116,9 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   device->logical_device = logical_device;
   device->logical_device->AddReference();
 
-#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING)
   device->renderdoc_api = iree_hal_vulkan_query_renderdoc_api(instance);
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING
 
   iree_arena_block_pool_initialize(32 * 1024, host_allocator,
                                    &device->block_pool);
@@ -1016,6 +1402,7 @@ iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t requested_features,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_vulkan_profiling_context_t* profiling_context,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
@@ -1229,6 +1616,16 @@ iree_status_t iree_hal_vulkan_device_create(
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES;
   }
 
+  if (iree_all_bits_set(requested_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_RGP_PROFILING) &&
+      profiling_context && profiling_context->rgp_context) {
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_RGP_PROFILING;
+  }
+  if (iree_all_bits_set(requested_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_RENDERDOC_PROFILING)) {
+    enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_RENDERDOC_PROFILING;
+  }
+
   VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
   memset(&semaphore_features, 0, sizeof(semaphore_features));
   semaphore_features.sType =
@@ -1306,8 +1703,8 @@ iree_status_t iree_hal_vulkan_device_create(
   // Allocate and initialize the device.
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_device_create_internal(
-        driver, identifier, enabled_features, options, instance,
-        physical_device, logical_device, &enabled_device_extensions,
+        driver, identifier, enabled_features, options, profiling_context,
+        instance, physical_device, logical_device, &enabled_device_extensions,
         &device_properties, &compute_queue_set, &transfer_queue_set,
         host_allocator, out_device);
   }
@@ -1319,6 +1716,7 @@ iree_status_t iree_hal_vulkan_device_create(
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     iree_string_view_t identifier,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_vulkan_profiling_context_t* profiling_context,
     const iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, VkDevice logical_device,
     const iree_hal_vulkan_queue_set_t* compute_queue_set,
@@ -1368,10 +1766,10 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
 
   // Allocate and initialize the device.
   iree_status_t status = iree_hal_vulkan_device_create_internal(
-      /*driver=*/NULL, identifier, enabled_features, options, instance,
-      physical_device, logical_device_handle, &enabled_device_extensions,
-      &device_properties, compute_queue_set, transfer_queue_set, host_allocator,
-      out_device);
+      /*driver=*/NULL, identifier, enabled_features, options, profiling_context,
+      instance, physical_device, logical_device_handle,
+      &enabled_device_extensions, &device_properties, compute_queue_set,
+      transfer_queue_set, host_allocator, out_device);
 
   logical_device_handle->ReleaseReference();
   return status;
@@ -1750,33 +2148,30 @@ static iree_status_t iree_hal_vulkan_device_profiling_begin(
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   (void)device;
 
+  // As much as possible we should try to use standardized Vulkan layers to do
+  // profiling configuration/control like
+  // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
+  // to avoid the combinatorial explosion of vendor tooling hooks.
+  // We grow this list carefully (once per vendor or generic tool) and only
+  // when there's no other good way to do so.
+
   if (iree_all_bits_set(options->mode,
                         IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
-    // AMD-specific - we could snoop the device to only do this for the vendor
-    // but this is relatively cheap and could be useful to others. Ideally
-    // there would be a khronos standard for this.
-    // TODO(benvanik): figure out if we need to do this for all queues.
-    auto& syms = device->logical_device->syms();
-    if (syms->vkQueueInsertDebugUtilsLabelEXT) {
-      VkDebugUtilsLabelEXT begin_label = {};
-      begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-      begin_label.pNext = NULL;
-      begin_label.pLabelName = "AmdFrameBegin";
-      device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
-          device->dispatch_queues[0]->handle(), &begin_label);
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING)
+    if (iree_all_bits_set(device->logical_device->enabled_features(),
+                          IREE_HAL_VULKAN_FEATURE_ENABLE_RENDERDOC_PROFILING)) {
+      iree_hal_vulkan_begin_renderdoc_capture(device->renderdoc_api,
+                                              device->instance, options);
     }
-
-    // For now we only support RenderDoc. As much as possible we should try to
-    // use standardized Vulkan layers to do profiling configuration/control like
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
-    // to avoid the combinatorial explosion of vendor tooling hooks.
-    // Since RenderDoc is fairly simple, cross-platform, and cross-vendor we
-    // support it here. If this grows beyond a few lines of code we should
-    // shuffle it off to another file.
-#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
-    iree_hal_vulkan_begin_renderdoc_capture(device->renderdoc_api,
-                                            device->instance, options);
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING
+#if defined(IREE_HAL_VULKAN_HAVE_RGP_TOOLING)
+    if (iree_all_bits_set(device->logical_device->enabled_features(),
+                          IREE_HAL_VULKAN_FEATURE_ENABLE_RGP_PROFILING)) {
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_begin_rgp_capture(
+          device->profiling_context, options, device->logical_device,
+          device->dispatch_queues[0]->handle(), device->dispatch_command_pool));
+    }
+#endif  // IREE_HAL_VULKAN_HAVE_RGP_TOOLING
   }
 
   return iree_ok_status();
@@ -1801,6 +2196,15 @@ static iree_status_t iree_hal_vulkan_device_profiling_flush(
   }
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
+#if defined(IREE_HAL_VULKAN_HAVE_RGP_TOOLING)
+  if (iree_all_bits_set(device->logical_device->enabled_features(),
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_RGP_PROFILING)) {
+    iree_hal_vulkan_flush_rgp_capture(
+        device->profiling_context, device->logical_device,
+        device->dispatch_queues[0]->handle(), device->dispatch_command_pool);
+  }
+#endif  // IREE_HAL_VULKAN_HAVE_RGP_TOOLING
+
   return iree_ok_status();
 }
 
@@ -1809,21 +2213,21 @@ static iree_status_t iree_hal_vulkan_device_profiling_end(
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   (void)device;
 
-#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
-  iree_hal_vulkan_end_renderdoc_capture(device->renderdoc_api,
-                                        device->instance);
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
-
-  // AMD-specific.
-  auto& syms = device->logical_device->syms();
-  if (syms->vkQueueInsertDebugUtilsLabelEXT) {
-    VkDebugUtilsLabelEXT end_label = {};
-    end_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-    end_label.pNext = NULL;
-    end_label.pLabelName = "AmdFrameEnd";
-    device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
-        device->dispatch_queues[0]->handle(), &end_label);
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING)
+  if (iree_all_bits_set(device->logical_device->enabled_features(),
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_RENDERDOC_PROFILING)) {
+    iree_hal_vulkan_end_renderdoc_capture(device->renderdoc_api,
+                                          device->instance);
   }
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING
+#if defined(IREE_HAL_VULKAN_HAVE_RGP_TOOLING)
+  if (iree_all_bits_set(device->logical_device->enabled_features(),
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_RGP_PROFILING)) {
+    iree_hal_vulkan_end_rgp_capture(
+        device->profiling_context, device->logical_device,
+        device->dispatch_queues[0]->handle(), device->dispatch_command_pool);
+  }
+#endif  // IREE_HAL_VULKAN_HAVE_RGP_TOOLING
 
   return iree_ok_status();
 }

@@ -29,6 +29,9 @@ IREE_FLAG(int32_t, vulkan_debug_verbosity, 2,
 
 IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
+IREE_FLAG(
+    string, vulkan_profiling_tool, "",
+    "Chooses the tool to use for programmatic profiling (`renderdoc`, `rgp`).");
 
 IREE_FLAG(bool, vulkan_robust_buffer_access, false,
           "Enables the Vulkan 'robustBufferAccess' feature.");
@@ -77,6 +80,13 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   }
   if (FLAG_vulkan_tracing) {
     driver_options.requested_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
+  }
+  if (strcmp(FLAG_vulkan_profiling_tool, "rgp") == 0) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_RGP_PROFILING;
+  } else if (strcmp(FLAG_vulkan_profiling_tool, "renderdoc") == 0) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_RENDERDOC_PROFILING;
   }
   if (FLAG_vulkan_robust_buffer_access) {
     driver_options.requested_features |=

@@ -1,0 +1,7 @@
+Snapshot of the v1.7 header available here:
+https://github.com/GPUOpen-Tools/dev_driver_tools/releases/tag/V1.7
+The source code available in the repository is out of date.
+
+Users will need to download the v1.7 release and place the
+`DevDriverAPI-x64.dll` (Windows) or `libDevDriverAPI.so` (Linux) library on
+their path so that the runtime can find it.

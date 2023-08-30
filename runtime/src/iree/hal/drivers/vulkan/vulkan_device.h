@@ -27,6 +27,7 @@ iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t requested_features,
     const iree_hal_vulkan_device_options_t* options,
+    const iree_hal_vulkan_profiling_context_t* profiling_context,
     iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device);

@@ -92,6 +92,9 @@ typedef struct iree_hal_vulkan_device_extensions_t {
   bool shader_float16_int8 : 1;
   // VK_KHR_cooperative_matrix is enabled.
   bool cooperative_matrix : 1;
+  // VK_EXT_debug_marker is enabled.
+  // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_EXT_debug_marker.html
+  bool debug_marker : 1;
 } iree_hal_vulkan_device_extensions_t;
 
 // Returns a bitfield with all of the provided extension names.

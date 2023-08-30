@@ -20,15 +20,16 @@ like Tracy, vendor-specific tools can be used.
 ## RenderDoc
 
 Support for [RenderDoc](https://github.com/baldurk/renderdoc) can be enabled by
-configuring cmake with `-DIREE_ENABLE_RENDERDOC_PROFILING=ON`. When built in to
+configuring cmake with `-DIREE_ENABLE_HAL_PROFILING=ON`. When built in to
 IREE the profiling functionality is available for programmatic use via the
 `iree_hal_device_profiling_begin` and `iree_hal_device_profiling_end` APIs.
 
 When using one of the standard IREE tools (`iree-run-module`,
-`iree-benchmark-module`, etc) the `--device_profiling_mode=queue` flag can be
-passed to enable capture around the entire invocation (be careful when
-benchmarking as the recordings can be quite large!). The default capture file
-name can be specified with `--device_profiling_file=foo.rdc`.
+`iree-benchmark-module`, etc) the `--vulkan_profiling_tool=renderdoc` and
+`--device_profiling_mode=queue` flags can be passed to enable capture around
+the entire invocation (be careful when benchmarking as the recordings can be
+quite large!). The default capture file name can be specified with
+`--device_profiling_file=foo.rdc`.
 
 Capturing in the RenderDoc UI can be done by specifying the IREE tool or
 embedding application (`iree-run-module`, etc) as the launch executable and
@@ -38,11 +39,29 @@ Capturing from the command line can be done using `renderdoccmd` with the
 specified file appearing (by default) in the executable directory:
 
 ```shell
-renderdoccmd capture tools/iree-run-module --device_profiling_mode=queue --device_profiling_file=foo.rdc ...
-stat tools/foo.rdc
-renderdoccmd capture tools/iree-run-module --device_profiling_mode=queue --device_profiling_file=/some/path/foo.rdc ...
-stat /some/path/foo.rdc
+$ renderdoccmd capture tools/iree-run-module --vulkan_profiling_tool=renderdoc --device_profiling_mode=queue --device_profiling_file=foo.rdc ...
+$ stat tools/foo.rdc
+$ renderdoccmd capture tools/iree-run-module --vulkan_profiling_tool=renderdoc --device_profiling_mode=queue --device_profiling_file=/some/path/foo.rdc ...
+$ stat /some/path/foo.rdc
 ```
+
+## Radeon Graphics Profiler (RGP)
+
+On AMD GPUs the Radeon Graphics Profiler API can be used to programmatically
+capture `.rgp` files with the `iree_hal_device_profiling_begin` and
+ `iree_hal_device_profiling_end` API.
+
+When using one of the standard IREE tools (`iree-run-module`,
+`iree-benchmark-module`, etc) the `--vulkan_profiling_tool=rgp` and
+`--device_profiling_mode=queue` flags can be passed to enable capture around the
+entire invocation (be careful when benchmarking as the recordings can be quite
+large!). The default capture file name can be specified with
+`--device_profiling_file=foo.rgp`.
+
+Users will need to have the `DevDriverAPI-x64.dll` (Windows) or
+`libDevDriverAPI.so` (Linux) library on their path so that the runtime can find
+it. The latest release can be downloaded from https://github.com/GPUOpen-Tools/dev_driver_tools/releases and the library can be copied alongside the IREE
+tool or placed on `PATH`.
 
 ## Android GPUs
 

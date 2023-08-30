@@ -225,6 +225,9 @@ iree_hal_vulkan_populate_enabled_device_extensions(
     } else if (strcmp(extension_name,
                       VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME) == 0) {
       extensions.cooperative_matrix = true;
+    } else if (strcmp(extension_name, VK_EXT_DEBUG_MARKER_EXTENSION_NAME) ==
+               0) {
+      extensions.debug_marker = true;
     }
   }
   return extensions;

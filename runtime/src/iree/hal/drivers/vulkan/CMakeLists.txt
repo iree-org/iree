@@ -115,11 +115,12 @@ iree_cc_test(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-# If renderdoc support is enabled we can make use of it in the device.
+# If HAL profiling support is enabled we can make use of it in the device.
 # Note that we disable this by default as it introduces a backdoor.
-if(IREE_ENABLE_RENDERDOC_PROFILING)
+if(IREE_ENABLE_HAL_PROFILING)
   target_compile_definitions(iree_hal_drivers_vulkan_vulkan
     PUBLIC
-      "IREE_HAL_VULKAN_HAVE_RENDERDOC=1"
+      "IREE_HAL_VULKAN_HAVE_RENDERDOC_TOOLING=1"
+      "IREE_HAL_VULKAN_HAVE_RGP_TOOLING=1"
   )
 endif()
