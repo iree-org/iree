@@ -1518,13 +1518,16 @@ void populateStreamToHALPatterns(MLIRContext *context,
   patterns.insert<GlobalTimepointConversionPattern>(typeConverter, context);
 
   auto mapping = std::make_shared<StreamConversionMapping>();
+
   patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
                   ResourceDeallocaOpPattern, ResourceSizeOpPattern,
                   ResourceTryMapOpPattern, ResourceLoadOpPattern,
                   ResourceStoreOpPattern, ResourceSubviewOpPattern>(
       mapping, typeConverter, context);
+
   patterns.insert<FileConstantOpPattern, FileReadOpPattern, FileWriteOpPattern>(
       mapping, typeConverter, context);
+
   patterns.insert<TensorImportBufferOpPattern, TensorImportBufferViewOpPattern,
                   TensorExportBufferOpPattern, TensorExportBufferViewOpPattern,
                   TensorTraceOpPattern>(mapping, typeConverter, context);

@@ -217,6 +217,52 @@ struct ResourceSubviewOpPattern
   }
 };
 
+struct FileConstantOpPattern
+    : public OpConversionPattern<IREE::Stream::FileConstantOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileConstantOp constantOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Files don't currently exist on the inline HAL backend so we just assign
+    // it to null and let DCE remove the rest of the uses.
+    auto dummyFile =
+        rewriter.create<arith::ConstantIntOp>(constantOp.getLoc(), 0, 32)
+            .getResult();
+    rewriter.replaceOp(constantOp, dummyFile);
+    return success();
+  }
+};
+
+struct FileReadOpPattern
+    : public OpConversionPattern<IREE::Stream::FileReadOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileReadOp readOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Immediately resolve the timepoint as this is a no-op today.
+    auto resolvedTimepoint =
+        rewriter.create<arith::ConstantIntOp>(readOp.getLoc(), 0, 64)
+            .getResult();
+    rewriter.replaceOp(readOp, resolvedTimepoint);
+    return success();
+  }
+};
+
+struct FileWriteOpPattern
+    : public OpConversionPattern<IREE::Stream::FileWriteOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileWriteOp writeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Immediately resolve the timepoint as this is a no-op today.
+    auto resolvedTimepoint =
+        rewriter.create<arith::ConstantIntOp>(writeOp.getLoc(), 0, 64)
+            .getResult();
+    rewriter.replaceOp(writeOp, resolvedTimepoint);
+    return success();
+  }
+};
+
 struct TensorImportBufferOpPattern
     : public OpConversionPattern<IREE::Stream::TensorImportOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -674,12 +720,14 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
         return success();
       });
 
+  // Timepoints and files are both no-oped in the inline HAL.
+  typeConverter.addConversion(
+      [=](IREE::Stream::FileType type, SmallVectorImpl<Type> &results) {
+        results.push_back(IntegerType::get(context, 32));
+        return success();
+      });
   typeConverter.addConversion(
       [=](IREE::Stream::TimepointType type, SmallVectorImpl<Type> &results) {
-        // TODO(benvanik): model timepoints as semaphores.
-        // This may become a !hal.semaphore + index, or some !hal.timepoint that
-        // we then do more analysis on once we know what devices are in use
-        // where.
         results.push_back(IntegerType::get(context, 64));
         return success();
       });
@@ -688,6 +736,9 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
                   ResourceDeallocaOpPattern, ResourceSizeOpPattern,
                   ResourceTryMapOpPattern, ResourceLoadOpPattern,
                   ResourceStoreOpPattern, ResourceSubviewOpPattern>(
+      typeConverter, context);
+
+  patterns.insert<FileConstantOpPattern, FileReadOpPattern, FileWriteOpPattern>(
       typeConverter, context);
 
   patterns.insert<TensorImportBufferOpPattern, TensorImportBufferViewOpPattern,
