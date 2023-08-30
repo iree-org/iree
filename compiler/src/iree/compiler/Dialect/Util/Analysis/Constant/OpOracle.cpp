@@ -102,6 +102,7 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   }
 
   // Target-dependent ops are not const-expr.
+  // TODO(#14887): Use trait/interface instead.
   if (isa<IREE::LinalgExt::UpperBoundTileSizeOp,
           IREE::LinalgExt::SetEncodingOp>(op)) {
     return {};
