@@ -9,8 +9,8 @@
 
 void iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params) {
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
   const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
@@ -32,7 +32,7 @@ void iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni(
   __m512i acc_3_89AB_7_CDEF_B_0123_F_4567;
   __m512i acc_3_CDEF_7_89AB_B_4567_F_0123;
 
-  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     acc_0_0123_4_4567_8_89AB_C_CDEF = iree_uk_avx512_loadu_4x128_from_16x16xi32(
         out_ptr, 0, 0, 4, 4, 8, 8, 12, 12);
     acc_0_4567_4_0123_8_CDEF_C_89AB = iree_uk_avx512_loadu_4x128_from_16x16xi32(
@@ -91,7 +91,7 @@ void iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni(
   __m512i idx_CDEF89AB45670123 =
       _mm512_setr_epi32(12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3);
 
-  for (iree_uk_int32_t k = 0; k < K; ++k) {
+  for (iree_uk_int32_t k = 0; k < params->K; ++k) {
     __m512i rhs_i16_0123456789ABCDEF =
         _mm512_cvtepi8_epi16(_mm256_loadu_si256((const __m256i*)rhs_ptr));
     rhs_ptr += 32;
