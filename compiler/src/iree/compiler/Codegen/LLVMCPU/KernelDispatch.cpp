@@ -2178,6 +2178,21 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   auto rootLoweringConfig = getLoweringConfig(rootOperation);
   auto distTileSizes = rootLoweringConfig.getTileSizeVals(0);
   auto tileAndFuseSizes = rootLoweringConfig.getTileSizeVals(1);
+
+  // multi-lowering config works only if all the operations can share the same
+  // distribution and TileAndFuse tile sizes.
+  for (auto op : computeOps) {
+    auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
+    for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
+      if (idx >= tileAndFuseSizes.size())
+        break;
+      if (iterType == utils::IteratorType::parallel)
+        continue;
+      if (distTileSizes[idx] || tileAndFuseSizes[idx])
+        return;
+    }
+  }
+
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto targetMLTransInfo =
       TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
