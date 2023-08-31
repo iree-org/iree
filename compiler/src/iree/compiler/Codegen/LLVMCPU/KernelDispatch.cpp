@@ -239,6 +239,9 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
+    if (hasAnySVEFeature(targetAttr)) {
+      return VectorPreProcStrategy::Masking;
+    }
     if ((linalg::isElementwise(linalgOp) || isFullyDynamicOp(linalgOp)) &&
         enableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
@@ -899,11 +902,12 @@ static LogicalResult setMatmulNoPadRootConfig(
       entryPointFn, op, newTileSizes, getNoPadTilingExpert(vecPreProcStrategy));
 }
 
-static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
-                                          linalg::ContractionOpInterface op,
-                                          ArrayRef<int64_t> distTileSizes,
-                                          ArrayRef<int64_t> vecTileSizes,
-                                          int vectorSize) {
+/// Configure the Mmt4d tiling expert for AArch64
+static LogicalResult
+setMmt4dAArch64RootConfig(func::FuncOp entryPointFn,
+                          linalg::ContractionOpInterface op,
+                          ArrayRef<int64_t> distTileSizes,
+                          ArrayRef<int64_t> vecTileSizes, int vectorSize) {
   assert(distTileSizes.size() == vecTileSizes.size());
   SmallVector<int64_t> parallelTileSizes;
   auto shape = cast<linalg::LinalgOp>(op.getOperation()).getStaticLoopRanges();
@@ -1078,12 +1082,12 @@ setRootConfig(func::FuncOp entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
 
-  // ARM codgen does not switch to use codegen driver based approach, so we have
-  // special logic for it. All the new pipeline is expected to use codegen
-  // driver based approach.
-  if (isAArch64(targetAttr) && !isQuantized) {
-    return setAArch64RootConfig(entryPointFn, contractionOp, distTileSizes,
-                                vecTileSizes, vectorSize);
+  // ARM SVE codgen switches to use codegen driver based approach. In non-SVE
+  // cases we use special logic instead. All the new pipeline is expected to use
+  // codegen driver based approach.
+  if (isAArch64(targetAttr) && !isQuantized && !hasAnySVEFeature(targetAttr)) {
+    return setMmt4dAArch64RootConfig(entryPointFn, contractionOp, distTileSizes,
+                                     vecTileSizes, vectorSize);
   }
 
   TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
