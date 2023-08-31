@@ -100,6 +100,9 @@ createVectorContractCustomKernelsPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyLinalgTransformLegalityPass();
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUFoldVectorContractUnitDimsPass();
+
 //------------------------------------------------------------------------------
 // LLVMCPU Codegen specific patterns.
 //------------------------------------------------------------------------------
@@ -113,6 +116,9 @@ void populateVectorContractCustomKernelsPatterns(
     IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns);
 
 void populateLLVMCPUBreakDownSubbyteExtendPatterns(RewritePatternSet &patterns);
+
+void populateFoldVectorContractUnitDimsPass(RewritePatternSet &patterns,
+                                            MLIRContext *context);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU backend Pass Pipelines.

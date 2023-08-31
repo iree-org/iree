@@ -63,6 +63,13 @@ def LLVMCPUEmitVectorizationRemarks :
       "mlir::iree_compiler::createLLVMCPUEmitVectorizationRemarksPass()";
 }
 
+def LLVMCPUFoldVectorContractUnitDims :
+    Pass<"iree-llvmcpu-fold-vector-contract-unit-dims", "func::FuncOp"> {
+  let summary = "Fold unit dims on vector.contract ops";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUFoldVectorContractUnitDimsPass()";
+}
+
 def LLVMCPULinkExecutables :
     Pass<"iree-llvmcpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMCPU HAL executables within the top-level program module.";
