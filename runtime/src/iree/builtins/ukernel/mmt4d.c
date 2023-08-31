@@ -50,7 +50,6 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
                                           iree_uk_mmt4d_tile_func_t tile_func) {
   const iree_uk_int32_t M = params->M;
   const iree_uk_int32_t N = params->N;
-  const iree_uk_int32_t K = params->K;
   const iree_uk_int16_t M0 = params->M0;
   const iree_uk_int16_t N0 = params->N0;
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
@@ -78,7 +77,7 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
     IREE_UK_PREFETCH_RO(lhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
     IREE_UK_PREFETCH_RO(rhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
     for (iree_uk_int32_t j = 0; j < N; ++j) {
-      tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
+      tile_func(out_tile, lhs_panel, rhs_panel, params);
       out_tile += out_tile_size;
       rhs_panel += rhs_panel_stride;
     }
