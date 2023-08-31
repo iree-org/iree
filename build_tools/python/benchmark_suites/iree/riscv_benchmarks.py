@@ -11,7 +11,7 @@ from benchmark_suites.iree import benchmark_presets, module_execution_configs, u
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import riscv_specs
-from e2e_test_framework.models import tflite_models
+from e2e_test_framework.models import tflite_models, tf_models, torch_models
 
 
 class Linux_RV64_Benchmarks(object):
@@ -28,13 +28,15 @@ class Linux_RV64_Benchmarks(object):
         compile_targets=[RV64_CPU_TARGET],
     )
     MODELS = [
+        tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
         tflite_models.DEEPLABV3_FP32,
-        tflite_models.MOBILEBERT_FP32,
-        tflite_models.MOBILENET_V1,
-        tflite_models.MOBILEBERT_INT8,
-        tflite_models.PERSON_DETECT_INT8,
         tflite_models.EFFICIENTNET_INT8,
+        tflite_models.MOBILEBERT_FP32,
+        tflite_models.MOBILEBERT_INT8,
+        tflite_models.MOBILENET_V1,
         tflite_models.MOBILENET_V2_INT8,
+        tflite_models.PERSON_DETECT_INT8,
+        torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     ]
 
     def generate(
