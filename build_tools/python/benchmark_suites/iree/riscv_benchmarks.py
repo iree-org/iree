@@ -52,7 +52,12 @@ class Linux_RV64_Benchmarks(object):
         ]
         run_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=gen_configs,
-            module_execution_configs=[module_execution_configs.ELF_LOCAL_SYNC_CONFIG],
+            module_execution_configs=[
+                module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
+                module_execution_configs.get_elf_system_scheduling_local_task_config(
+                    thread_num=2
+                ),
+            ],
             device_specs=[riscv_specs.EMULATOR_RISCV_64],
             presets=[benchmark_presets.RISCV],
         )
