@@ -14,9 +14,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "convert_i48_to_i64.mlir"
     "tosa_to_linalg_ext.mlir"
     "verify_compiler_tosa_input_legality.mlir"
-    "convert_i48_to_i64.mlir"
   TOOLS
     FileCheck
     iree-opt
