@@ -47,6 +47,7 @@ iree_cc_library(
     "Passes.cpp"
     "TosaToLinalgExt.cpp"
     "VerifyCompilerTOSAInputLegality.cpp"
+    "Converti48Toi64.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
