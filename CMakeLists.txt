@@ -194,6 +194,20 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
+# ROCM device-libs.
+#
+# Using the (optional) ROCUM support in the compiler and runtime requires the
+# ROCM device-libs. The toolkit can either be built ahead of time or
+# it can be automatically downloaded and built on certain host architectures.
+#-------------------------------------------------------------------------------
+
+set(IREE_ROCM_AVAILABLE OFF)
+find_package(ROCMDeviceLibs)
+if(ROCMDeviceLibs_FOUND)
+  set(IREE_ROCM_AVAILABLE ON)
+endif()
+
+#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:
@@ -773,6 +787,11 @@ if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
   add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 endif()
 
+# If any ROCM features are being built, try to locate ROCM device-libs.
+if(IREE_TARGET_BACKEND_ROCM)
+  add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
+endif()
+
 #-------------------------------------------------------------------------------
 # MLIR/LLVM Dependency
 #-------------------------------------------------------------------------------
@@ -812,6 +831,7 @@ else()
   # Add default external projects.
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
   iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
+  iree_llvm_add_external_project(rocm-device-libs ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rocm-device-libs)
   if(IREE_INPUT_TORCH)
     iree_llvm_add_external_project(torch-mlir-dialects ${CMAKE_CURRENT_SOURCE_DIR}/third_party/torch-mlir-dialects)
   endif()

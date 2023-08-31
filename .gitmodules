@@ -44,3 +44,6 @@
 [submodule "third_party/stablehlo"]
 	path = third_party/stablehlo
 	url = https://github.com/iree-org/stablehlo.git
+[submodule "third_party/rocm-device-libs"]
+	path = third_party/rocm-device-libs
+	url = https://github.com/RadeonOpenCompute/ROCm-Device-Libs.git
