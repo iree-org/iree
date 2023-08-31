@@ -226,11 +226,11 @@ static iree_status_t iree_hal_cuda2_semaphore_acquire_timepoint_host_wait(
 }
 
 // Acquires an iree_hal_cuda2_event_t object to wait on the host for the
-// timeline to reach at least the given |min_value| on the device. Returns
-// Returns IREE_STATUS_OK and writes to |out_event| if we can find such an
-// event; returns IREE_STATUS_NOT_FOUND otherwise. The caller should release
-// the |out_event| once done.
-static iree_status_t iree_hal_cuda2_semaphore_acquire_event_host_wait(
+// timeline to reach at least the given |min_value| on the device.
+// Returns true and writes to |out_event| if we can find such an event;
+// returns false otherwise.
+// The caller should release the |out_event| once done.
+static bool iree_hal_cuda2_semaphore_acquire_event_host_wait(
     iree_hal_cuda2_semaphore_t* semaphore, uint64_t min_value,
     iree_hal_cuda2_event_t** out_event) {
   *out_event = NULL;
@@ -253,7 +253,7 @@ static iree_status_t iree_hal_cuda2_semaphore_acquire_event_host_wait(
   iree_slim_mutex_unlock(&semaphore->base.timepoint_mutex);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_make_status(*out_event ? IREE_STATUS_OK : IREE_STATUS_NOT_FOUND);
+  return *out_event != NULL;
 }
 
 static iree_status_t iree_hal_cuda2_semaphore_wait(
@@ -290,22 +290,21 @@ static iree_status_t iree_hal_cuda2_semaphore_wait(
   // should happen outside of the lock given that acquiring has its own internal
   // locks. This is faster than waiting on a host timepoint.
   iree_hal_cuda2_event_t* wait_event = NULL;
-  iree_status_t status = iree_hal_cuda2_semaphore_acquire_event_host_wait(
-      semaphore, value, &wait_event);
-  if (iree_status_is_ok(status)) {
+  if (iree_hal_cuda2_semaphore_acquire_event_host_wait(semaphore, value,
+                                                       &wait_event)) {
     IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
         z0, semaphore->symbols,
         cuEventSynchronize(iree_hal_cuda2_event_handle(wait_event)),
         "cuEventSynchronize");
     iree_hal_cuda2_event_release(wait_event);
     IREE_TRACE_ZONE_END(z0);
-    return status;
+    return iree_ok_status();
   }
 
   // Slow path: acquire a timepoint. This should happen outside of the lock to
   // given that acquiring has its own internal locks.
   iree_hal_cuda2_timepoint_t* timepoint = NULL;
-  status = iree_hal_cuda2_semaphore_acquire_timepoint_host_wait(
+  iree_status_t status = iree_hal_cuda2_semaphore_acquire_timepoint_host_wait(
       semaphore, value, timeout, &timepoint);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     IREE_TRACE_ZONE_END(z0);
@@ -428,9 +427,8 @@ iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
       &wait_timepoint->base);
 
   iree_hal_cuda2_event_t* wait_event = NULL;
-  iree_status_t status = iree_hal_cuda2_semaphore_acquire_event_host_wait(
-      semaphore, min_value, &wait_event);
-  if (iree_status_is_ok(status)) {
+  if (iree_hal_cuda2_semaphore_acquire_event_host_wait(semaphore, min_value,
+                                                       &wait_event)) {
     // We've found an existing signal timepoint to wait on; we don't need a
     // standalone wait timepoint anymore. Decrease its refcount before
     // overwriting it to return it back to the pool and retain the existing one.
