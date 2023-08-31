@@ -49,10 +49,10 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "TOSA",
     srcs = [
+        "Converti48Toi64.cpp",
         "Passes.cpp",
         "TosaToLinalgExt.cpp",
         "VerifyCompilerTOSAInputLegality.cpp",
-        "Converti48Toi64.cpp",
     ],
     hdrs = [
         "Passes.h",
