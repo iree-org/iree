@@ -950,6 +950,12 @@ static void getDefaultMatmulVectorSizes(linalg::LinalgOp op,
     return;
   }
 
+  // Specialisation for SVE
+  if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr)) {
+    sizes.append({8, 32, 16});
+    return;
+  }
+
   if (isRISCV(targetAttr)) {
     // RISC-V natively supports scalar x vector operations so we don't have to
     // vectorize dimension k. Vectorizing dimension k results in a vector load
@@ -976,7 +982,8 @@ static SmallVector<int64_t> getMatmulVectorSizes(func::FuncOp entryPointFn,
   // Compute vector tile sizes using heuristics.
   // TODO: if (isX86(targetAttr) || isRISCV(targetAttr)) {
 
-  if (isAArch64(targetAttr)) {
+  // FIXME: Introduce a more structured way to specialise for SVE
+  if (isAArch64(targetAttr) && !hasAnySVEFeature(targetAttr)) {
     if (isQuantized) {
       matmulTileSizes = {vectorSize, vectorSize * 4, vectorSize};
     } else {
@@ -1041,7 +1048,8 @@ setRootConfig(func::FuncOp entryPointFn,
 
   // Use the default distribution for the matmul loops.
   int64_t defaultMaxSize = defaultDistTileSize;
-  if (isX86(targetAttr) || isRISCV(targetAttr)) {
+  if (isX86(targetAttr) || isRISCV(targetAttr) ||
+      (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr))) {
     defaultMaxSize = 128;
   }
 
