@@ -81,7 +81,6 @@ static inline iree_status_t iree_hal_cuda2_event_create(
       "cuEventCreate");
   if (iree_status_is_ok(status)) {
     *out_event = event;
-    iree_hal_cuda2_event_pool_retain(pool);  // +1
   } else {
     iree_atomic_ref_count_dec(&event->ref_count);  // -> 0
     iree_hal_cuda2_event_destroy(event);
@@ -104,7 +103,7 @@ void iree_hal_cuda2_event_release(iree_hal_cuda2_event_t* event) {
     iree_hal_cuda2_event_pool_t* pool = event->pool;
     // Release back to the pool if the reference count becomes 0.
     iree_hal_cuda2_event_pool_release_event(pool, 1, &event);
-    // Drop our reference to the pool itself.
+    // Drop our reference to the pool itself when we return event to it.
     iree_hal_cuda2_event_pool_release(pool);  // -1
   }
 }
@@ -265,6 +264,12 @@ iree_status_t iree_hal_cuda2_event_pool_acquire(
       }
     }
     IREE_TRACE_ZONE_END(z1);
+  }
+
+  // Retain a reference to a pool when we pass event to the caller. When the
+  // caller returns event back to the pool they'll release the reference.
+  for (iree_host_size_t i = 0; i < event_count; ++i) {
+    iree_hal_cuda2_event_pool_retain(out_events[i]->pool);  // +1
   }
 
   IREE_TRACE_ZONE_END(z0);
