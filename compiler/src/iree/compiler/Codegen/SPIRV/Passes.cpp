@@ -304,7 +304,7 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
   }
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -390,7 +390,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
       createSPIRVVectorToGPUSubgroupMMAOpsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
 
   if (pipelineDepth > 0) {
     PipeliningSchedulingStrategy schedule =
@@ -452,7 +452,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
   nestedPM.addNestedPass<func::FuncOp>(createGPUReduceSharedMemoryBankConflicts(
       detail::bankConflictReductionPaddingBits));
 
-  nestedPM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedPM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
   nestedPM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedPM.addPass(createCanonicalizerPass());
   nestedPM.addPass(createCSEPass());
@@ -580,7 +580,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
       createConvertVectorReductionToGPUPass(getWarpSize));
   // Perform normal vector unrolling and lowering transformations. This breaks
   // vectors down to native machine size.
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
@@ -611,7 +611,7 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
   }
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -635,7 +635,7 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
   // for SPIR-V.
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
 }
 
 //===----------------------------------------------------------------------===//

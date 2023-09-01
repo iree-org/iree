@@ -4,7 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- SPIRVVectorize.cpp -------------------------------------------------===//
+//===- SPIRVVectorLoweringPass.cpp
+//-------------------------------------------------===//
 //
 // This pass vectorizes Linalg ops with buffer semantics.
 //
@@ -41,10 +42,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
-using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
-
-#define DEBUG_TYPE "iree-spirv-vectorize"
+#define DEBUG_TYPE "iree-spirv-vector-lowering"
 
 namespace mlir {
 namespace iree_compiler {
@@ -289,10 +287,11 @@ bool supportsIntegerDotProductOps(func::FuncOp fn) {
 }
 
 /// Vectorizes Linalg ops on buffer semantics.
-class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
+class SPIRVVectorLoweringPass
+    : public SPIRVVectorLoweringPassBase<SPIRVVectorLoweringPass> {
 public:
-  SPIRVVectorizePass() = default;
-  SPIRVVectorizePass(const SPIRVVectorizePass &pass) = default;
+  SPIRVVectorLoweringPass() = default;
+  SPIRVVectorLoweringPass(const SPIRVVectorLoweringPass &pass) = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // vector.gather lowering patterns target scf ops.
@@ -627,8 +626,8 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass() {
-  return std::make_unique<SPIRVVectorizePass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorLoweringPass() {
+  return std::make_unique<SPIRVVectorLoweringPass>();
 }
 
 } // namespace iree_compiler
