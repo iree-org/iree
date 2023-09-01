@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-gather-accesses},iree-spirv-vectorize))' \
+// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization{vectorize-gather-accesses},iree-spirv-vector-lowering))' \
 // RUN:   %s | FileCheck %s
 
 func.func @tensor_extract(%arg0: tensor<6x4xf32>, %arg1: tensor<6xi32>, %data: tensor<1x2x512xf32>, %init: tensor<6x4xf32>, %i : index, %j: index) -> tensor<6x4xf32> {
