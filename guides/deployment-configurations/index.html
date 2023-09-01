@@ -907,6 +907,8 @@
       
         
       
+        
+      
     
     
       
@@ -1026,6 +1028,28 @@
   
   <span class="md-ellipsis">
     GPU - CUDA/ROCm
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="gpu-metal/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - Metal
   </span>
   
 
@@ -2232,10 +2256,16 @@ advantage of multi-threaded hardware, while embedded systems can bypass IREE's
 runtime entirely or interface with custom accelerators.</p>
 <h2 id="stable-configurations">Stable configurations<a class="headerlink" href="#stable-configurations" title="Permanent link">link</a></h2>
 <ul>
-<li><a href="cpu/">CPU</a> for general purpose CPU deployment</li>
-<li><a href="bare-metal/">CPU - Bare-Metal</a> with minimal platform dependencies</li>
-<li><a href="gpu-vulkan/">GPU - Vulkan</a></li>
-<li><a href="gpu-cuda-rocm/">GPU - CUDA/ROCm</a></li>
+<li><a href="./deployment-configurations/cpu.md"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg></span> CPU</a> for general
+  purpose CPU deployment</li>
+<li><a href="./deployment-configurations/bare-metal.md"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg></span> CPU - Bare-Metal</a>
+  with minimal platform dependencies</li>
+<li><a href="./deployment-configurations/gpu-vulkan.md"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg></span> GPU - Vulkan</a>
+  for cross-platform usage and interop with graphics applications</li>
+<li><a href="./deployment-configurations/gpu-cuda-rocm.md"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg></span> GPU - CUDA/ROCm</a>
+  for NVIDIA/AMD-specific solutions</li>
+<li><a href="./deployment-configurations/gpu-metal.md"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg></span> GPU - Metal</a>
+  for running on Apple hardware</li>
 </ul>
 <p>These are just the most stable configurations IREE supports. Feel free to reach
 out on any of IREE's
@@ -2281,6 +2311,11 @@ or generate distinct code for certain device/architecture/performance profiles.<
 <td><code>cuda</code></td>
 </tr>
 <tr>
+<td><code>metal</code> or<br><code>metal-spirv</code></td>
+<td>GPU support on Apple platforms via MSL for Metal</td>
+<td><code>metal</code></td>
+</tr>
+<tr>
 <td><code>rocm</code></td>
 <td><strong>Experimental</strong> <br> AMD GPU support via HSACO for ROCm</td>
 <td><code>rocm</code></td>
@@ -2289,11 +2324,6 @@ or generate distinct code for certain device/architecture/performance profiles.<
 <td><code>webgpu-wgsl</code></td>
 <td><strong>Experimental</strong> <br> GPU support on the Web via WGSL for WebGPU</td>
 <td><code>webgpu</code></td>
-</tr>
-<tr>
-<td><code>metal</code> or<br><code>metal-spirv</code></td>
-<td><strong>Experimental</strong> <br> GPU support on Apple platforms via MSL for Metal</td>
-<td><code>metal</code></td>
 </tr>
 </tbody>
 </table>
@@ -2361,16 +2391,16 @@ focus and the build configuration.</p>
 <td>NVIDIA GPU execution using CUDA</td>
 </tr>
 <tr>
+<td><code>metal</code></td>
+<td>GPU execution on Apple platforms using Metal</td>
+</tr>
+<tr>
 <td><code>rocm</code></td>
 <td><strong>Experimental</strong> <br> AMD GPU execution using ROCm</td>
 </tr>
 <tr>
 <td><code>webgpu</code></td>
 <td><strong>Experimental</strong> <br> GPU execution on the web using WebGPU</td>
-</tr>
-<tr>
-<td><code>metal</code></td>
-<td><strong>Experimental</strong> <br> GPU execution on Apple platforms using Metal</td>
 </tr>
 </tbody>
 </table>

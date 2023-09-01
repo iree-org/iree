@@ -91,6 +91,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-metal/</loc>
+         <lastmod>2023-09-01</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-vulkan/</loc>
          <lastmod>2023-09-01</lastmod>
          <changefreq>daily</changefreq>
