@@ -409,7 +409,7 @@ dense math into HAL command buffers that are dispatched to hardware backends.
 * VM _instances_ can serve multiple isolated execution _contexts_.
 * VM _contexts_ are effectively sandboxes for loading modules and running
   programs.
-* VM _modules_ provide extra functionality to execution _contexts_, such as
+* VM _modules_ provide all functionality to execution _contexts_, including
   access to hardware accelerators through the HAL. Compiled user programs are
   also modules.
 
