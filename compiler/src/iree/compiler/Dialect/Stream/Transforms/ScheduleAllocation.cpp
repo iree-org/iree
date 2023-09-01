@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <iterator>
+
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -42,7 +43,7 @@ namespace {
 class ValueAliasingSet {
 public:
   // A mutable builder to construct value aliasing set. Once builder is freezed
-  // value aliasing set provices efficient access to discovered value alises.
+  // value aliasing set provides efficient access to discovered value alises.
   class Builder {
   public:
     void addAlias(Value streamValue, Value aliasedValue) {
