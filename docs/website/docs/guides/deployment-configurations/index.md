@@ -14,7 +14,7 @@ runtime entirely or interface with custom accelerators.
 * [:octicons-server-16: GPU - Vulkan](./deployment-configurations/gpu-vulkan.md)
   for cross-platform usage and interop with graphics applications
 * [:octicons-server-16: GPU - CUDA/ROCm](./deployment-configurations/gpu-cuda-rocm.md)
-  for NVIDIA/AMD-specific optimizations
+  for NVIDIA/AMD-specific solutions
 * [:simple-apple: GPU - Metal](./deployment-configurations/gpu-metal.md)
   for running on Apple hardware
 
