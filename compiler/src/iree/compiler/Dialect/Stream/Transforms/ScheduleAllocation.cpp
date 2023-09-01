@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
+#include <iterator>
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -22,9 +22,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-schedule-allocation"
@@ -39,22 +37,99 @@ namespace {
 // Alias analysis
 //===----------------------------------------------------------------------===//
 
-using ValueAliasingMap = llvm::MapVector<Value, SmallPtrSet<Value, 16>>;
+// Disjoint-set data structure holding non-overlapping sets of aliasing values.
+// We use union-find algorithm to construct it from pairs of aliasing values.
+class ValueAliasingSet {
+public:
+  // A mutable builder to construct value aliasing set. Once builder is freezed
+  // value aliasing set provices efficient access to discovered value alises.
+  class Builder {
+  public:
+    void addAlias(Value streamValue, Value aliasedValue) {
+      int64_t streamValueRoot = getRoot(streamValue);
+      int64_t aliasedValueRoot = getRoot(aliasedValue);
+      root[aliasedValueRoot] = streamValueRoot;
+    }
+
+    ValueAliasingSet build();
+
+  private:
+    int64_t getId(Value value) {
+      auto [iterator, inserted] = id.try_emplace(value, id.size());
+      if (inserted)
+        root.push_back(iterator->second);
+      return iterator->second;
+    }
+
+    int64_t getRoot(Value value) {
+      int64_t id = getId(value);
+      while (root[id] != id) {
+        id = root[id] = root[root[id]];
+      }
+      return id;
+    }
+
+    llvm::DenseMap<Value, int64_t> id;
+    SmallVector<int64_t> root;
+  };
+
+  ArrayRef<SmallVector<Value>> getValueAliasSets() const {
+    return valueAliasSets;
+  }
+
+  auto getValueAliases(Value value) const {
+    ArrayRef<Value> aliasers;
+    if (auto it = valueAliasSet.find(value); it != valueAliasSet.end()) {
+      aliasers = valueAliasSets[it->second];
+    }
+    return llvm::make_filter_range(
+        aliasers, [&](Value aliaser) { return aliaser != value; });
+  }
+
+private:
+  ValueAliasingSet(SmallVector<SmallVector<Value>> valueAliasSets,
+                   llvm::DenseMap<Value, int64_t> valueAliasSet)
+      : valueAliasSets(std::move(valueAliasSets)),
+        valueAliasSet(std::move(valueAliasSet)) {}
+
+  SmallVector<SmallVector<Value>> valueAliasSets;
+  llvm::DenseMap<Value, int64_t> valueAliasSet;
+};
+
+ValueAliasingSet ValueAliasingSet::Builder::build() {
+  SmallVector<SmallVector<Value>> valueAliasSets;
+  llvm::DenseMap<Value, int64_t> valueAliasSet;
+
+  // Sort all values to guarantee that we return them in determenistic order.
+  SmallVector<std::pair<Value, int64_t>> values(id.begin(), id.end());
+  llvm::sort(values, [](auto a, auto b) { return a.second < b.second; });
+
+  // Run path compression to propage roots to all values and guarantee that in
+  // the next step we'll get only "real" roots.
+  for (auto &[value, index] : values)
+    (void)getRoot(value);
+
+  // Collect unique roots, and sort them to guarantee determenistic order.
+  auto roots = llvm::SetVector<int64_t>(root.begin(), root.end()).takeVector();
+  llvm::sort(roots);
+
+  valueAliasSets.resize(roots.size());
+  for (auto &[value, index] : values) {
+    int64_t aliasSetIndex =
+        std::distance(roots.begin(), llvm::find(roots, getRoot(value)));
+    assert(aliasSetIndex < valueAliasSets.size() && "root was not found");
+    valueAliasSets[valueAliasSet[value] = aliasSetIndex].push_back(value);
+  }
+
+  return ValueAliasingSet(std::move(valueAliasSets), std::move(valueAliasSet));
+}
 
 // Builds a map of value aliases from aliasee to a set of aliasers.
 // Only values that alias will be present in the map. The map may contain
 // values nested within the |regionOp|.
 static void computeRegionValueAliases(Operation *regionOp,
-                                      ValueAliasingMap &valueAliases) {
+                                      ValueAliasingSet::Builder &valueAliases) {
   auto *block = &regionOp->getRegion(0).front();
-
-  auto propagateAlias = [&](Value streamValue, Value aliasedValue) {
-    auto &baseSet = valueAliases[streamValue];
-    baseSet.insert(aliasedValue);
-    auto &aliasedSet = valueAliases[aliasedValue];
-    baseSet.insert(aliasedSet.begin(), aliasedSet.end());
-    aliasedSet.insert(streamValue);
-  };
 
   // Filter out to only resource results - some regions may return additional
   // things like stream.async.execute returning a timepoint.
@@ -73,7 +148,7 @@ static void computeRegionValueAliases(Operation *regionOp,
         tiedStreamOp.getTiedResultOperandIndex(outerResult.getResultNumber());
     if (tiedOperandIndex.has_value()) {
       auto arg = block->getArgument(tiedOperandIndex.value());
-      propagateAlias(innerResult, arg);
+      valueAliases.addAlias(innerResult, arg);
     }
   }
 
@@ -95,33 +170,20 @@ static void computeRegionValueAliases(Operation *regionOp,
       if (tiedOp) {
         auto tiedOperand = tiedOp.getTiedResultOperand(result);
         if (tiedOperand) {
-          propagateAlias(result, tiedOperand);
-        }
-      }
-    }
-  }
-
-  // Invert the value aliaser->aliasee map so that we have for any particular
-  // value the list of all other values that alias it.
-  for (auto it : valueAliases) {
-    for (auto aliasee : it.second) {
-      for (auto aliaser : it.second) {
-        if (aliaser != aliasee) {
-          valueAliases[aliasee].insert(aliaser);
+          valueAliases.addAlias(result, tiedOperand);
         }
       }
     }
   }
 }
 
-// Builds a map of value aliases from aliasee to a set of aliasers.
-// Only values that alias will be present in the map. The map may contain
-// values nested within the |executeOp|.
-static ValueAliasingMap
+// Builds a set of aliasing sets. Only values that alias will be present in the
+// set. The set may contain values nested within the |executeOp|.
+static ValueAliasingSet
 computeExecutionRegionValueAliases(IREE::Stream::AsyncExecuteOp executeOp) {
-  ValueAliasingMap valueAliases;
+  ValueAliasingSet::Builder valueAliases;
   computeRegionValueAliases(executeOp, valueAliases);
-  return valueAliases;
+  return valueAliases.build();
 }
 
 //===----------------------------------------------------------------------===//
@@ -154,7 +216,7 @@ using LivenessIntervalList = SmallVector<LivenessInterval>;
 // lifetime.
 static LivenessIntervalList
 computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
-                                        const ValueAliasingMap &valueAliases) {
+                                        const ValueAliasingSet &valueAliases) {
   // Perform a liveness analysis on the execution region.
   // Fragments have a single block and as such the live-in/live-out block
   // information derived here applies to the entire stream region.
@@ -243,29 +305,39 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
     }
   }
 
-  // Walk the alias map and union intervals and propagate back.
-  for (auto it : valueAliases) {
-    auto &aliasee = it.first;
-    auto &aliasers = it.second;
-    auto &aliaseeInterval = valueIntervals[aliasee];
-    if (aliaseeInterval.ordinal == -1) {
-      // Aliasee is nested somewhere within the current scope.
-      // We'd need to update this analysis to handle the nesting in order to
-      // compute the ranges here but that's not (currently) required as all
-      // allocated values roll up to the parent scope by way of the yields.
+  // Walk the alias set and union intervals and propagate back.
+  for (auto &aliasSet : valueAliases.getValueAliasSets()) {
+
+    // Return true if value is nested  somewhere within the current scope.
+    auto isNested = [&](Value value) -> bool {
+      return valueIntervals[value].ordinal == -1;
+    };
+
+    // We'd need to update this analysis to handle the nesting in order to
+    // compute the ranges here but that's not (currently) required as all
+    // allocated values roll up to the parent scope by way of the yields.
+    if (llvm::all_of(aliasSet, isNested))
       continue;
-    }
+
+    assert((llvm::all_of(aliasSet, isNested) ||
+            llvm::none_of(aliasSet, isNested)) &&
+           "nested values can't alias values in the current scope");
+
+    auto &aliaseeInterval = valueIntervals[aliasSet.front()];
     int start = aliaseeInterval.start;
     int end = aliaseeInterval.end;
-    for (auto aliaser : aliasers) {
+
+    auto aliasers = ArrayRef(aliasSet).drop_front(1);
+    for (Value aliaser : aliasers) {
       auto &aliaserInterval = valueIntervals[aliaser];
-      assert(aliaserInterval.ordinal != -1);
       start = std::min(start, aliaserInterval.start);
       end = std::max(end, aliaserInterval.end);
     }
+
+    // Propage interval back to all values in the aliasing set.
     aliaseeInterval.start = start;
     aliaseeInterval.end = end;
-    for (auto aliaser : aliasers) {
+    for (Value aliaser : aliasers) {
       auto &aliaserInterval = valueIntervals[aliaser];
       aliaserInterval.start = start;
       aliaserInterval.end = end;
@@ -336,8 +408,8 @@ struct AllocationScope {
   // Execution region being allocated.
   Operation *getRootOp() const { return rootOp; }
 
-  // Aliasing map for the entire root op, indicating which values are tied.
-  const ValueAliasingMap &getValueAliases() const { return valueAliases; }
+  // Aliasing set for the entire root op, indicating which values are tied.
+  const ValueAliasingSet &getValueAliases() const { return valueAliases; }
 
   // TODO(benvanik): rework this so that we don't do a switcheroo right in the
   // middle of processing.
@@ -391,7 +463,7 @@ struct AllocationScope {
     });
 
     // Propagate alias subranges when present.
-    for (auto alias : valueAliases[resource]) {
+    for (auto alias : valueAliases.getValueAliases(resource)) {
       ResourceRange aliasRange = resourceRange;
       if (auto subviewOp =
               IREE::Stream::ResourceSubviewOp::findSubviewOp(alias)) {
@@ -445,21 +517,18 @@ struct AllocationScope {
   void forEachResourceAlias(Value resource,
                             std::function<void(Value)> callback) const {
     callback(resource);
-    auto it = valueAliases.find(resource);
-    if (it != valueAliases.end()) {
-      for (auto alias : it->second) {
-        callback(alias);
-      }
+    for (Value alias : valueAliases.getValueAliases(resource)) {
+      callback(alias);
     }
   }
 
 private:
   Operation *rootOp;
 
-  // All values that have aliases mapped to a set of all of the values they
-  // alias with. That two things alias does not imply the values can be treated
-  // as equivalent: some values may be subranges of others.
-  ValueAliasingMap valueAliases;
+  // Disjoint-set of values that alias each other. That two things alias does
+  // not imply the values can be treated as equivalent: some values may be
+  // subranges of others.
+  ValueAliasingSet valueAliases;
 
   // Index value -> std.constant index value.
   DenseMap<int64_t, Value> indexConstantMap;
