@@ -83,7 +83,7 @@ openxla-workspace init
 openxla-workspace checkout --sync openxla-pjrt-plugin
 
 cd jax
-pip install numpy wheel
+pip install build numpy wheel
 python build/build.py \
     --bazel_options=--override_repository=xla=$PWD/../xla \
      && pip3 install dist/*.whl --force-reinstall
