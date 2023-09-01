@@ -3061,8 +3061,6 @@ their state.</p>
 <p class="admonition-title">Under construction, more coming soon</p>
 </div>
 <h4 id="vm">VM<a class="headerlink" href="#vm" title="Permanent link">link</a></h4>
-<!-- TODO(scotttodd): VM module diagram (bytecode, HAL, custom) -->
-
 <p>IREE uses its own Virtual Machine (VM) at runtime to interpret program
 instructions on the host system.</p>
 <details class="tip">
@@ -3080,9 +3078,31 @@ dense math into HAL command buffers that are dispatched to hardware backends.</p
 <li>VM <em>instances</em> can serve multiple isolated execution <em>contexts</em>.</li>
 <li>VM <em>contexts</em> are effectively sandboxes for loading modules and running
   programs.</li>
-<li>VM <em>modules</em> provide extra functionality to execution <em>contexts</em>, such as
+<li>
+<p>VM <em>modules</em> provide all functionality to execution <em>contexts</em>, including
   access to hardware accelerators through the HAL. Compiled user programs are
-  also modules.</li>
+  also modules.</p>
+<pre class="mermaid"><code>stateDiagram-v2
+  accTitle: Sample VM Modules
+  accDescr {
+    Bytecode modules contain program state, program functions, and debug
+    information.
+    HAL modules contain devices, executables, HAL functions, and HAL types.
+    Custom modules may contain external functions and custom types.
+  }
+
+  state "Bytecode module" as bytecode {
+    bytecode_contents: Module state&lt;br&gt;Program functions&lt;br&gt;Debug information
+  }
+
+  state "HAL module" as HAL {
+    hal_contents: Devices&lt;br&gt;Executables&lt;br&gt;HAL functions&lt;br&gt;HAL types
+  }
+
+  state "Custom module" as custom {
+    custom_contents: External functions&lt;br&gt;Custom types
+  }</code></pre>
+</li>
 </ul>
 <h4 id="hal">HAL<a class="headerlink" href="#hal" title="Permanent link">link</a></h4>
 <!-- TODO(scotttodd): command buffer construction -> dispatch diagram -->
