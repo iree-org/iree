@@ -288,7 +288,7 @@ bool supportsIntegerDotProductOps(func::FuncOp fn) {
 
 /// Vectorizes Linalg ops on buffer semantics.
 class SPIRVVectorLoweringPass
-    : public SPIRVVectorLoweringPassBase<SPIRVVectorLoweringPass> {
+    : public SPIRVVectorLoweringBase<SPIRVVectorLoweringPass> {
 public:
   SPIRVVectorLoweringPass() = default;
   SPIRVVectorLoweringPass(const SPIRVVectorLoweringPass &pass) = default;
