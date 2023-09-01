@@ -1,0 +1,36 @@
+# Copyright 2020 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_cc_library(
+    name = "Codegen",
+    srcs = [
+        "Passes.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Common/CPU:CommonCPUPasses",
+        "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",
+        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/LLVMCPU",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU",
+        "//compiler/src/iree/compiler/Codegen/SPIRV",
+        "//compiler/src/iree/compiler/Codegen/VMVX",
+        "//compiler/src/iree/compiler/Codegen/WGSL",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
+        "@llvm-project//mlir:Pass",
+    ],
+)

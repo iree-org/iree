@@ -4,8 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# 18.04
-FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3
+# 20.04
+FROM ubuntu@sha256:b795f8e0caaaacad9859a9a38fe1c78154f8301fdaf0872eaf1520d66d9c0b98
 
 SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
 
@@ -16,18 +16,8 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
 WORKDIR /install-basics
-# Useful utilities for building child images. Best practices would tell us to
-# use multi-stage builds
-# (https://docs.docker.com/develop/develop-images/multistage-build/) but it
-# turns out that Dockerfile is a thoroughly non-composable awful format and that
-# doesn't actually work that well. These deps are pretty small.
-RUN apt-get update \
-  && apt-get install -y \
-    git \
-    unzip \
-    wget \
-    curl \
-    gnupg2
+COPY build_tools/docker/context/install_basics.sh ./
+RUN ./install_basics.sh && rm -rf /install-basics
 
 # Install the oldest supported compiler tools
 ARG LLVM_VERSION=9
@@ -35,7 +25,8 @@ ENV CC /usr/bin/clang-${LLVM_VERSION}
 ENV CXX /usr/bin/clang++-${LLVM_VERSION}
 
 COPY build_tools/docker/context/install_iree_deps.sh ./
-RUN ./install_iree_deps.sh "${LLVM_VERSION}" \
+# We need DEBIAN_FRONTEND and TZ for the tzdata package needed by some IREE dependencies.
+RUN  DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC ./install_iree_deps.sh "${LLVM_VERSION}" \
   && rm -rf /install-basics
 
 ######## ccache ########
@@ -68,7 +59,7 @@ RUN ./install_bazel.sh && rm -rf /install-bazel
 WORKDIR /install-python
 
 # Minimum supported Python version
-ARG PYTHON_VERSION=3.7
+ARG PYTHON_VERSION=3.9
 
 # Versions for things required to build IREE should match the minimum
 # supported versions in the requirements file. There doesn't appear to be a
@@ -87,18 +78,8 @@ ENV PYTHON_BIN /usr/bin/python3
 WORKDIR /install-rocm
 ARG ROCM_VERSION=5.2.1
 ARG AMDGPU_VERSION=22.20.1
-
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl libnuma-dev gnupg \
-  && curl -sL https://repo.radeon.com/rocm/rocm.gpg.key | apt-key add - \
-  && printf "deb [arch=amd64] https://repo.radeon.com/rocm/apt/$ROCM_VERSION/ ubuntu main" | tee /etc/apt/sources.list.d/rocm.list \
-  && printf "deb [arch=amd64] https://repo.radeon.com/amdgpu/$AMDGPU_VERSION/ubuntu bionic main" | tee /etc/apt/sources.list.d/amdgpu.list \
-  && apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  libelf1 \
-  kmod \
-  file \
-  rocm-dev \
-  build-essential
+COPY build_tools/docker/context/install_rocm.sh ./
+RUN ./install_rocm.sh "${ROCM_VERSION}" "${AMDGPU_VERSION}" && rm -rf /install-rocm
 WORKDIR /
 ##############
 
@@ -110,45 +91,10 @@ RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR}"
 
 ######## Vulkan ########
 WORKDIR /install-vulkan
-ARG VULKAN_SDK_VERSION=1.2.154.0
-
-RUN curl --silent --fail --show-error --location \
-  # This file disappeared from the canonical source:
-  # "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/vulkansdk-linux-${VULKAN_SDK_VERSION}.tar.gz"
-  "https://storage.googleapis.com/iree-shared-files/vulkansdk-linux-${VULKAN_SDK_VERSION}.tar.gz" \
-  --output vulkansdk.tar.gz \
-  && mkdir -p /opt/vulkan-sdk \
-  && tar -xzf vulkansdk.tar.gz -C /opt/vulkan-sdk \
-  && rm -rf /install-vulkan
+ARG VULKAN_SDK_VERSION=1.3.250
+COPY build_tools/docker/context/install_vulkan.sh ./
+RUN ./install_vulkan.sh "${VULKAN_SDK_VERSION}" && rm -rf /install-vulkan
 WORKDIR /
-
-ENV VULKAN_SDK="/opt/vulkan-sdk/${VULKAN_SDK_VERSION}/x86_64"
-
-ENV PATH="${VULKAN_SDK}/bin:$PATH"
-
-# Symlink the Vulkan loader to a system library directory. This is needed to
-# allow Vulkan applications to find the Vulkan loader. It also avoids using
-# LD_LIBRARY_PATH, which is not supported well by Docker.
-RUN ln -s "${VULKAN_SDK}/lib/libvulkan.so" /usr/lib/x86_64-linux-gnu/ \
-  && ln -s "${VULKAN_SDK}/lib/libvulkan.so.1" /usr/lib/x86_64-linux-gnu/
-
-##############
-
-
-######## GCC ########
-WORKDIR /
-
-# Avoid apt-add-repository, which requires software-properties-common, which is
-# a rabbit hole of python version compatibility issues. See
-# https://mondwan.blogspot.com/2018/05/alternative-for-add-apt-repository-for.html
-# We use gcc-9 because it's what manylinux had (at time of authorship) and
-# we don't aim to support older versions. We need a more modern lld to handle
-# --push-state flags
-RUN echo "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu bionic main" >> /etc/apt/sources.list  \
-  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1E9377A2BA9EF27F \
-  && apt-get update \
-  && apt-get install -y gcc-9 g++-9
-
 ##############
 
 ### Clean up

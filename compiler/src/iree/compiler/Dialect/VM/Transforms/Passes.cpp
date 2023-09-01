@@ -69,14 +69,15 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   FunctionLikeNest(passManager)
       .addPass(mlir::createSCFForLoopCanonicalizationPass);
 
-  // This pass is sketchy as it can pessimizes tight loops due to affine
+  // This pass is sketchy as it can pessimize tight loops due to affine
   // treating all indices as signed and the unsigned conversion pass not being
   // able to handle that. The scf.for canonicalization does a decent job of
   // removing trivial loops above and this catches the rest. It inserts nasty
   // rem/div ops that we can never safely remove inside of the hot inner loop
   // and that sucks. We still have this here for now as the cost of the rem/div
   // are less than the cost of an additional loop that this could remove.
-  passManager.addNestedPass<mlir::func::FuncOp>(createLoopCoalescingPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      affine::createLoopCoalescingPass());
 
   FunctionLikeNest(passManager)
       .addPass(mlir::createLoopInvariantCodeMotionPass)
@@ -137,7 +138,7 @@ void registerVMTransformPassPipeline() {
       });
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

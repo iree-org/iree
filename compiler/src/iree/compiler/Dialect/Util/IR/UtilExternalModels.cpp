@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace mlir {
@@ -50,13 +51,13 @@ struct InsertSliceOpTiedOpInterface
         insertSliceOp.getDest());
   }
 
-  ::llvm::Optional<unsigned> getTiedResultOperandIndex(
-      Operation *op, unsigned resultIndex) const {
-    return {1};  // dest
+  ::std::optional<unsigned>
+  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
+    return {1}; // dest
   }
 
-  SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op) const {
-    return {1};  // dest
+  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
+    return {1}; // dest
   }
 };
 
@@ -70,14 +71,14 @@ struct LinalgOpTiedOpInterface
         linalgOp.getDpsInitOperands()[resultIndex]->get());
   }
 
-  ::llvm::Optional<unsigned> getTiedResultOperandIndex(
-      Operation *op, unsigned resultIndex) const {
+  ::std::optional<unsigned>
+  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return {linalgOp.getDpsInitOperands()[resultIndex]->getOperandNumber()};
   }
 
-  SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op) const {
-    SmallVector<int64_t, 4> result;
+  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
+    SmallVector<int64_t> result;
     for (unsigned i = 0; i < op->getNumResults(); ++i)
       result.push_back(*getTiedResultOperandIndex(op, i));
     return result;
@@ -95,12 +96,36 @@ struct LinalgOpTiedOpInterfaceHelper {
   }
 };
 
-}  // namespace
+struct GlobalOpInterfaceExternalModel
+    : public GlobalOpInterface::ExternalModel<GlobalOpInterfaceExternalModel,
+                                              ml_program::GlobalOp> {
+  static void add(MLIRContext *ctx) {
+    ml_program::GlobalOp::attachInterface<GlobalOpInterfaceExternalModel>(*ctx);
+  }
+
+  Attribute getGlobalInitialValue(::mlir::Operation *op) const {
+    return cast<ml_program::GlobalOp>(op).getValueAttr();
+  }
+  void setGlobalInitialValue(::mlir::Operation *op, Attribute value) const {
+    if (value) {
+      cast<ml_program::GlobalOp>(op).setValueAttr(value);
+    } else {
+      cast<ml_program::GlobalOp>(op).removeValueAttr();
+    }
+  }
+};
+
+} // namespace
 
 void registerUtilExternalModels(DialectRegistry &registry) {
   // Must ensure that any dependent dialects are registered.
   registry.insert<arith::ArithDialect, linalg::LinalgDialect,
-                  tensor::TensorDialect>();
+                  ml_program::MLProgramDialect, tensor::TensorDialect>();
+
+  registry.addExtension(+[](MLIRContext *ctx,
+                            ml_program::MLProgramDialect *dialect) {
+    ml_program::GlobalOp::attachInterface<GlobalOpInterfaceExternalModel>(*ctx);
+  });
 
   registry.addExtension(+[](MLIRContext *ctx, arith::ArithDialect *dialect) {
     GenericNumericCastExternalModel::add<
@@ -125,33 +150,32 @@ void registerUtilExternalModels(DialectRegistry &registry) {
 
   // TODO(matthias-springer): Use a helper instead of listing all ops. This is
   // tricky because LinalgExtOps.td includes YieldOp.
-  registry.addExtension(
-      +[](MLIRContext *ctx, LinalgExt::IREELinalgExtDialect *dialect) {
-        LinalgExt::ScatterOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::ScatterOp>>(*ctx);
-        LinalgExt::SortOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::SortOp>>(*ctx);
-        LinalgExt::FftOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::FftOp>>(*ctx);
-        LinalgExt::ScanOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::ScanOp>>(*ctx);
-        LinalgExt::ReverseOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::ReverseOp>>(*ctx);
-        LinalgExt::TopkOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::TopkOp>>(*ctx);
-        LinalgExt::WinogradInputTransformOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::WinogradInputTransformOp>>(*ctx);
-        LinalgExt::WinogradOutputTransformOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::WinogradOutputTransformOp>>(
-            *ctx);
-        LinalgExt::SoftmaxOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::SoftmaxOp>>(*ctx);
-        LinalgExt::AttentionOp::attachInterface<
-            LinalgOpTiedOpInterface<LinalgExt::AttentionOp>>(*ctx);
-      });
+  registry.addExtension(+[](MLIRContext *ctx,
+                            LinalgExt::IREELinalgExtDialect *dialect) {
+    LinalgExt::ScatterOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::ScatterOp>>(*ctx);
+    LinalgExt::SortOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::SortOp>>(*ctx);
+    LinalgExt::FftOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::FftOp>>(*ctx);
+    LinalgExt::ScanOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::ScanOp>>(*ctx);
+    LinalgExt::ReverseOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::ReverseOp>>(*ctx);
+    LinalgExt::TopkOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::TopkOp>>(*ctx);
+    LinalgExt::WinogradInputTransformOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::WinogradInputTransformOp>>(*ctx);
+    LinalgExt::WinogradOutputTransformOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::WinogradOutputTransformOp>>(*ctx);
+    LinalgExt::SoftmaxOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::SoftmaxOp>>(*ctx);
+    LinalgExt::AttentionOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::AttentionOp>>(*ctx);
+  });
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

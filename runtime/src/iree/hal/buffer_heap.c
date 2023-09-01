@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_heap_impl.h"
@@ -115,8 +114,8 @@ iree_status_t iree_hal_heap_buffer_create(
     iree_hal_allocator_t* allocator,
     iree_hal_heap_allocator_statistics_t* statistics,
     const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
-    iree_const_byte_span_t initial_data, iree_allocator_t data_allocator,
-    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+    iree_allocator_t data_allocator, iree_allocator_t host_allocator,
+    iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(out_buffer);
@@ -162,12 +161,6 @@ iree_status_t iree_hal_heap_buffer_create(
       }
     });
 
-    if (!iree_const_byte_span_is_empty(initial_data)) {
-      const iree_device_size_t initial_length =
-          iree_min(initial_data.data_length, allocation_size);
-      memcpy(buffer->data.data, initial_data.data, initial_length);
-    }
-
     *out_buffer = &buffer->base;
   }
 
@@ -185,7 +178,8 @@ iree_status_t iree_hal_heap_buffer_wrap(
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (!iree_host_size_has_alignment((uintptr_t)data.data,
+  if (!iree_any_bit_set(allowed_access, IREE_HAL_MEMORY_ACCESS_UNALIGNED) &&
+      !iree_host_size_has_alignment((uintptr_t)data.data,
                                     IREE_HAL_HEAP_BUFFER_ALIGNMENT)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(

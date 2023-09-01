@@ -28,15 +28,19 @@ passthrough_env_vars = [
     # WindowsLinkerTool uses these from vcvarsall
     "VCTOOLSINSTALLDIR",
     "UNIVERSALCRTSDKDIR",
-    "UCRTVERSION"
+    "UCRTVERSION",
 ]
-config.environment.update({
-    k: v
-    for k, v in os.environ.items()
-    if k.startswith("IREE_") or k in passthrough_env_vars
-})
+config.environment.update(
+    {
+        k: v
+        for k, v in os.environ.items()
+        if k.startswith("IREE_") or k in passthrough_env_vars
+    }
+)
 
 # Use the most preferred temp directory.
-config.test_exec_root = (os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR") or
-                         os.environ.get("TEST_TMPDIR") or
-                         os.path.join(tempfile.gettempdir(), "lit"))
+config.test_exec_root = (
+    os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+    or os.environ.get("TEST_TMPDIR")
+    or os.path.join(tempfile.gettempdir(), "lit")
+)

@@ -6,8 +6,9 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -34,8 +35,9 @@ static llvm::cl::opt<bool> clEnableMicrokernels(
     llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
     llvm::cl::init(false));
 
-static IREE::HAL::ExecutableTargetAttr getVMVXExecutableTarget(
-    MLIRContext *context, StringRef backend, StringRef format) {
+static IREE::HAL::ExecutableTargetAttr
+getVMVXExecutableTarget(MLIRContext *context, StringRef backend,
+                        StringRef format) {
   SmallVector<NamedAttribute> config;
   config.emplace_back(StringAttr::get(context, "ukernels"),
                       BoolAttr::get(context, clEnableMicrokernels));
@@ -45,18 +47,19 @@ static IREE::HAL::ExecutableTargetAttr getVMVXExecutableTarget(
 }
 
 class VMVXTargetBackend final : public TargetBackend {
- public:
+public:
   VMVXTargetBackend() = default;
 
   std::string name() const override { return "vmvx"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::VM::VMDialect,
-                    IREE::VMVX::VMVXDialect>();
+                    IREE::VMVX::VMVXDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -68,16 +71,27 @@ class VMVXTargetBackend final : public TargetBackend {
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
+  std::optional<IREE::HAL::DeviceTargetAttr>
+  getHostDeviceTarget(MLIRContext *context) const override {
+    return getDefaultDeviceTarget(context);
+  }
+
+  IREE::VM::TargetOptions
+  getTargetOptions(IREE::HAL::ExecutableTargetAttr targetAttr) {
+    // TODO(benvanik): derive these from a vm target triple.
+    auto vmOptions = IREE::VM::TargetOptions::FromFlags::get();
+    vmOptions.f32Extension = true;
+    vmOptions.optimizeForStackSize = false;
+    return vmOptions;
+  }
+
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
 
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
-    // TODO(benvanik): derive these from a vm target triple.
-    auto vmOptions = IREE::VM::TargetOptions::FromFlags::get();
-    vmOptions.f32Extension = true;
-    vmOptions.optimizeForStackSize = false;
+    auto vmOptions = getTargetOptions(variantOp.getTargetAttr());
     IREE::VM::buildVMTransformPassPipeline(nestedModulePM, vmOptions);
   }
 
@@ -105,10 +119,15 @@ class VMVXTargetBackend final : public TargetBackend {
     // Serialize the VM module to bytes and embed it directly.
     SmallVector<char> moduleData;
     {
-      IREE::VM::BytecodeTargetOptions bytecodeOptions;
+      auto vmOptions = getTargetOptions(variantOp.getTargetAttr());
+      // TODO(benvanik): plumb this through somewhere? these options are mostly
+      // about output format stuff such as debug information so it's probably
+      // fine to share.
+      auto bytecodeOptions = IREE::VM::BytecodeTargetOptions::FromFlags::get();
       llvm::raw_svector_ostream stream(moduleData);
       if (failed(translateModuleToBytecode(variantOp.getInnerModule(),
-                                           bytecodeOptions, stream))) {
+                                           vmOptions, bytecodeOptions,
+                                           stream))) {
         return variantOp.emitOpError()
                << "failed to serialize VM bytecode module";
       }
@@ -135,7 +154,7 @@ class VMVXTargetBackend final : public TargetBackend {
     return success();
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
@@ -146,7 +165,7 @@ class VMVXTargetBackend final : public TargetBackend {
 };
 
 class VMVXInlineTargetBackend final : public TargetBackend {
- public:
+public:
   VMVXInlineTargetBackend() = default;
 
   std::string name() const override { return "vmvx-inline"; }
@@ -156,8 +175,8 @@ class VMVXInlineTargetBackend final : public TargetBackend {
         .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const override {
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -174,7 +193,7 @@ class VMVXInlineTargetBackend final : public TargetBackend {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
   }
 
- private:
+private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
@@ -194,7 +213,7 @@ void registerVMVXTargetBackends() {
   });
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

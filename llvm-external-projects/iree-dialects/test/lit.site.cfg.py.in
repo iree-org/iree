@@ -4,10 +4,7 @@ import sys
 
 config.enable_bindings_python = @MLIR_ENABLE_BINDINGS_PYTHON@
 config.iree_dialects_obj_root = "@IREE_DIALECTS_BINARY_DIR@"
-config.llvm_src_root = "@LLVM_SOURCE_DIR@"
-config.llvm_obj_root = "@LLVM_BINARY_DIR@"
-config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
-config.llvm_lib_dir = "@LLVM_LIBS_DIR@"
+config.llvm_tools_binary_dir = "@LLVM_TOOLS_BINARY_DIR@"
 config.llvm_shlib_dir = "@SHLIBDIR@"
 config.llvm_shlib_ext = "@SHLIBEXT@"
 config.llvm_exe_ext = "@EXEEXT@"

@@ -386,7 +386,7 @@ def Util_GlobalStoreOpInterface : Util_GlobalAccessorOpInterface<"GlobalStoreOpI
       /*desc=*/[{
         Returns the value stored by the operation.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getStoredGlobalValue",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -411,7 +411,7 @@ def Util_GlobalLoadIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface<
       /*desc=*/[{
         Returns the global symbol accessed by the op.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getGlobal",
       /*args=*/(ins)
     >,
@@ -440,7 +440,7 @@ def Util_GlobalStoreIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface
       /*desc=*/[{
         Returns the global symbol accessed by the op.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getGlobal",
       /*args=*/(ins)
     >,
@@ -448,7 +448,7 @@ def Util_GlobalStoreIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface
       /*desc=*/[{
         Returns the value stored by the operation.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getStoredGlobalValue",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -486,7 +486,7 @@ def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
       /*desc=*/[{
         Gets the input value.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getInput",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -512,7 +512,7 @@ def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
       /*desc=*/[{
         Gets the result casted value.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getCasted",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -640,7 +640,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         defining op, and the search will not continue past branches.
         If the result is untied then the result itself is returned.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getTiedResult",
       /*args=*/(ins "unsigned":$resultIndex),
       /*methodBody=*/[{}],
@@ -653,7 +653,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         Returns the operand tied to the given result of the op or nullptr if
         none.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getTiedResultOperand",
       /*args=*/(ins "Value":$result),
       /*methodBody=*/[{}],
@@ -673,7 +673,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         Note that the index returned is into the full range of all operands of
         the current op.
       }],
-      /*retTy=*/"::llvm::Optional<unsigned>",
+      /*retTy=*/"::std::optional<unsigned>",
       /*methodName=*/"getTiedResultOperandIndex",
       /*args=*/(ins "unsigned":$resultIndex),
       /*methodBody=*/[{}],
@@ -691,7 +691,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*retTy=*/"void",
       /*methodName=*/"setTiedResultOperandIndex",
       /*args=*/(ins "unsigned":$resultIndex,
-                    "::llvm::Optional<unsigned>":$operandIndex),
+                    "::std::optional<unsigned>":$operandIndex),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         return IREE::Util::detail::setTiedResultOperandIndex($_op, resultIndex, operandIndex);
@@ -705,7 +705,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         Note that the index returned is into the full range of all operands of
         the current op.
       }],
-      /*retTy=*/"SmallVector<int64_t, 4>",
+      /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getTiedResultOperandIndices",
       /*args=*/(ins),
       /*methodBody=*/[{}],
@@ -756,7 +756,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   }];
 
   let verify = [{
-    return IREE::Util::detail::verifyTiedOp($_op);
+    return IREE::Util::detail::verifyTiedOp(cast<TiedOpInterface>($_op));
   }];
 }
 
@@ -792,15 +792,15 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
   let methods = [
     InterfaceMethod<
       [{Returns dynamic dimensions for the given shaped operand index.}],
-      "ValueRange", "getOperandDynamicDims", (ins "unsigned":$idx)
+      "mlir::ValueRange", "getOperandDynamicDims", (ins "unsigned":$idx)
     >,
     InterfaceMethod<
       [{Returns dynamic dimensions for the given shaped result index.}],
-      "ValueRange", "getResultDynamicDims", (ins "unsigned":$idx)
+      "mlir::ValueRange", "getResultDynamicDims", (ins "unsigned":$idx)
     >,
     InterfaceMethod<
       [{Returns dynamic dimensions for the given shaped result value.}],
-      "ValueRange", "getResultDynamicDimsFromValue", (ins "Value":$value),
+      "mlir::ValueRange", "getResultDynamicDimsFromValue", (ins "Value":$value),
       /*defaultImplementation=*/[{
         for (unsigned i = 0; i < $_self->getNumResults(); ++i) {
           if ($_self->getResult(i) == value) {
@@ -981,7 +981,7 @@ def Util_SubrangeType : TypeInterface<"SubrangeTypeInterface"> {
       /*desc=*/[{
         Creates an op returning an (offset, length) subrange of a resource.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"createSubrangeOp",
       /*args=*/(ins
         "Location":$loc,
@@ -1008,7 +1008,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*desc=*/[{
         Returns the size-aware source resource the subrange is taken from.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeResource",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1017,7 +1017,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*desc=*/[{
         Returns the total size of the source resource.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeResourceSize",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1026,7 +1026,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*desc=*/[{
         Returns the offset of the taken subrange into the resource.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeOffset",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1035,7 +1035,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
       /*desc=*/[{
         Returns the length of the taken subrange.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeLength",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1045,7 +1045,7 @@ def Util_SubrangeOp : OpInterface<"SubrangeOpInterface"> {
         Returns the resulting subrange value if the op produces one.
         Will be nullptr if the op is only consuming a subrange.
       }],
-      /*retTy=*/"Value",
+      /*retTy=*/"mlir::Value",
       /*methodName=*/"getSubrangeResult",
       /*args=*/(ins),
       /*methodBody=*/[{}]
@@ -1066,7 +1066,7 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
       /*desc=*/[{
         Returns the subrange operand values for the given flat operand index.
       }],
-      /*retTy=*/"SubrangeOperand",
+      /*retTy=*/"IREE::Util::SubrangeOperand",
       /*methodName=*/"getSubrangeOperand",
       /*args=*/(ins "unsigned":$operandIndex)
     >,
@@ -1076,7 +1076,10 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
       }],
       /*retTy=*/"void",
       /*methodName=*/"setSubrangeOperand",
-      /*args=*/(ins "unsigned":$operandIndex, "SubrangeOperand":$operand)
+      /*args=*/(ins
+        "unsigned":$operandIndex,
+        "IREE::Util::SubrangeOperand":$operand
+      )
     >,
   ];
 }
@@ -1099,9 +1102,10 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the total storage size required by the serialized value.
+        Returns the storage size in bytes required by the serialized value.
         Any of the serialization methods will write precisely this number of
-        bytes.
+        bytes. If the value is sub-byte aligned the storage size will be rounded
+        up to the next whole byte.
       }],
       /*retTy=*/"int64_t",
       /*methodName=*/"getStorageSize",
@@ -1115,13 +1119,14 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToVector",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "SmallVectorImpl<char> &":$buffer
       ),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         buffer.resize($_attr.getStorageSize());
-        return $_attr.serializeToBuffer(endian, buffer);
+        return $_attr.serializeToBuffer(loc, endian, buffer);
       }]
     >,
     InterfaceMethod<
@@ -1132,6 +1137,7 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToBuffer",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "ArrayRef<char>":$buffer
       )
@@ -1144,13 +1150,14 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToStream",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "llvm::raw_ostream &":$os
       ),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         SmallVector<char> buffer;
-        if (failed($_attr.serializeToVector(endian, buffer))) {
+        if (failed($_attr.serializeToVector(loc, endian, buffer))) {
           return failure();
         }
         os.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());

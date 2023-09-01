@@ -20,7 +20,9 @@
 extern "C" {
 #endif  // __cplusplus
 
-#define IREE_STRING_VIEW_NPOS SIZE_MAX
+typedef struct iree_status_handle_t* iree_status_t;
+
+#define IREE_STRING_VIEW_NPOS IREE_HOST_SIZE_MAX
 
 // A string view (ala std::string_view) into a non-NUL-terminated string.
 typedef struct iree_string_view_t {
@@ -46,7 +48,7 @@ static inline iree_string_view_t iree_make_string_view(
 // Returns a string view initialized with a reference to the given
 // NUL-terminated string literal.
 static inline iree_string_view_t iree_make_cstring_view(const char* str) {
-  iree_string_view_t v = {str, strlen(str)};
+  iree_string_view_t v = {str, str ? strlen(str) : 0};
   return v;
 }
 
@@ -162,8 +164,8 @@ IREE_API_EXPORT iree_string_view_t
 iree_string_view_trim(iree_string_view_t value);
 
 // Returns a substring of the string view at offset |pos| and length |n|.
-// Use |n| == INTPTR_MAX to take the remainder of the string after |pos|.
-// Returns empty string on failure.
+// Use |n| == IREE_HOST_SIZE_MAX to take the remainder of the string after
+// |pos|. Returns empty string on failure.
 IREE_API_EXPORT iree_string_view_t iree_string_view_substr(
     iree_string_view_t value, iree_host_size_t pos, iree_host_size_t n);
 
@@ -190,6 +192,11 @@ IREE_API_EXPORT void iree_string_view_replace_char(iree_string_view_t value,
 // 'foo-10?' matches: 'foo-101', 'foo-102'
 IREE_API_EXPORT bool iree_string_view_match_pattern(iree_string_view_t value,
                                                     iree_string_view_t pattern);
+
+// Copies the string view |value| to |buffer| with |buffer_length| available
+// bytes and adds a NUL terminator. Truncates if capacity would be exceeded.
+IREE_API_EXPORT void iree_string_view_to_cstring(
+    iree_string_view_t value, char* buffer, iree_host_size_t buffer_length);
 
 // Copies the string bytes into the target buffer and returns the number of
 // characters copied. Does not include a NUL terminator.
@@ -221,6 +228,15 @@ IREE_API_EXPORT bool iree_string_view_atod(iree_string_view_t value,
 IREE_API_EXPORT bool iree_string_view_parse_hex_bytes(
     iree_string_view_t value, iree_host_size_t buffer_length,
     uint8_t* out_buffer);
+
+// Parses a byte size in |value| and returns the value in |out_size|.
+//
+// Examples:
+//   1073741824 => 1073741824
+//          1gb => 1000000000
+//         1gib => 1073741824
+IREE_API_EXPORT iree_status_t iree_string_view_parse_device_size(
+    iree_string_view_t value, iree_device_size_t* out_size);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -1,0 +1,41 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: PkgCI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      # Experimental branches can also get packages and tests automatically.
+      - exppkg-*
+
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit). The workflow name is prepended to avoid conflicts between
+  # different workflows.
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build_packages:
+    name: Build Packages
+    uses: ./.github/workflows/pkgci_build_packages.yml
+    with:
+      package_version: 0.dev1
+
+  regression_test_cpu:
+    name: Regression Test CPU
+    uses: ./.github/workflows/pkgci_regression_test_cpu.yml
+    needs: [build_packages]
+
+  regression_test_amdgpu:
+    name: Regression Test AMDGPU
+    uses: ./.github/workflows/pkgci_regression_test_amdgpu.yml
+    needs: [build_packages]

@@ -13,7 +13,7 @@ func.func @table() {
       linalg.yield %0 : i16
     } -> tensor<513xi16>
 
-  %result = "tosa.table"(%input, %cst)  : (tensor<6xi16>, tensor<513xi16>)  -> (tensor<6xi32>)
+  %result = tosa.table %input, %cst : (tensor<6xi16>, tensor<513xi16>) -> tensor<6xi32>
   check.expect_eq_const(%result, dense<[27363, 47982, 17872, 54776, 45297, 19267]> : tensor<6xi32>) : tensor<6xi32>
   return
 }

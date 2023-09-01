@@ -1,0 +1,152 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_register_plugin", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "defs",
+    includes = ["src"],
+)
+
+cc_library(
+    name = "registration",
+    srcs = [
+        "src/PluginRegistration.cpp",
+    ],
+    deps = [
+        ":IR",
+        ":Transforms",
+        ":defs",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+    ],
+)
+
+iree_compiler_register_plugin(
+    plugin_id = "simple_io_sample",
+    target = ":registration",
+)
+
+iree_td_library(
+    name = "td_files",
+    srcs = [
+        "src/simple_io_sample/IR/SimpleIOOps.td",
+        "src/simple_io_sample/Transforms/Passes.td",
+    ],
+    deps = [
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:FuncTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
+    ],
+)
+
+cc_library(
+    name = "IR",
+    srcs = [
+        "src/simple_io_sample/IR/SimpleIODialect.cpp",
+        "src/simple_io_sample/IR/SimpleIOOps.cpp",
+        "src/simple_io_sample/IR/SimpleIOOps.cpp.inc",
+    ],
+    hdrs = [
+        "src/simple_io_sample/IR/SimpleIODialect.h",
+        "src/simple_io_sample/IR/SimpleIOOps.h",
+        "src/simple_io_sample/IR/SimpleIOOps.h.inc",
+    ],
+    deps = [
+        ":SimpleIOOpsGen",
+        ":defs",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "SimpleIOOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-dialect-decls"],
+            "src/simple_io_sample/IR/SimpleIODialect.h.inc",
+        ),
+        (
+            ["--gen-dialect-defs"],
+            "src/simple_io_sample/IR/SimpleIODialect.cpp.inc",
+        ),
+        (
+            ["--gen-op-decls"],
+            "src/simple_io_sample/IR/SimpleIOOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "src/simple_io_sample/IR/SimpleIOOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "src/simple_io_sample/IR/SimpleIOOps.td",
+    deps = [":td_files"],
+)
+
+cc_library(
+    name = "Transforms",
+    srcs = [
+        "src/simple_io_sample/Transforms/LegalizeSimpleIO.cpp",
+    ],
+    hdrs = [
+        "src/simple_io_sample/Transforms/Passes.h",
+        "src/simple_io_sample/Transforms/Passes.h.inc",
+    ],
+    deps = [
+        ":IR",
+        ":PassesIncGen",
+        ":defs",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "src/simple_io_sample/Transforms/Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "src/simple_io_sample/Transforms/Passes.td",
+    deps = [
+        ":td_files",
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "SimpleIODialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "-dialect=simple_io",
+            ],
+            "src/simple_io_sample/IR/SimpleIODialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "src/simple_io_sample/IR/SimpleIOOps.td",
+    deps = [":td_files"],
+)

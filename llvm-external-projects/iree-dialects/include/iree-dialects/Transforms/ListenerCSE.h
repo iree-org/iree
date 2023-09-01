@@ -7,7 +7,7 @@
 #ifndef LLVM_IREE_SANDBOX_TRANSFORMS_LISTENERCSE_H
 #define LLVM_IREE_SANDBOX_TRANSFORMS_LISTENERCSE_H
 
-#include "iree-dialects/Transforms/Listener.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
 class DominanceInfo;
@@ -15,7 +15,7 @@ class Operation;
 
 LogicalResult eliminateCommonSubexpressions(Operation *op,
                                             DominanceInfo *domInfo,
-                                            RewriteListener *listener);
+                                            RewriterBase::Listener *listener);
 } // namespace mlir
 
 #endif // LLVM_IREE_SANDBOX_TRANSFORMS_LISTENERCSE_H

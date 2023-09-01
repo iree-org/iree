@@ -9,9 +9,11 @@
 // Wrapper pass to use MLIR's One-Shot Bufferize pass.
 //
 //===----------------------------------------------------------------------===//
+
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -23,6 +25,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -45,7 +48,7 @@ namespace iree_compiler {
 namespace {
 class EliminateEmptyTensorsPass
     : public EliminateEmptyTensorsBase<EliminateEmptyTensorsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
   }
@@ -56,24 +59,25 @@ class EliminateEmptyTensorsPass
 /// Pass to convert from tensor based ops to memref based ops.
 class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
- public:
+public:
   explicit IREEComprehensiveBufferizePass(
-      Optional<BufferizationOptions::AllocationFn> allocationFn = std::nullopt,
-      Optional<BufferizationOptions::DeallocationFn> deallocationFn =
+      std::optional<BufferizationOptions::AllocationFn> allocationFn =
           std::nullopt,
-      Optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
-      : allocationFn(allocationFn),
-        deallocationFn(deallocationFn),
+      std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
+          std::nullopt,
+      std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
+      : allocationFn(allocationFn), deallocationFn(deallocationFn),
         memCpyFn(memCpyFn) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
-        .insert<AffineDialect,
+        .insert<affine::AffineDialect,
                 arith::ArithDialect,
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
                 IREE::Flow::FlowDialect,
+                IREE::LinalgExt::IREELinalgExtDialect,
                 IREE::Util::UtilDialect,
                 linalg::LinalgDialect,
                 memref::MemRefDialect,
@@ -85,14 +89,14 @@ class IREEComprehensiveBufferizePass
 
   void runOnOperation() override;
 
- private:
-  const Optional<BufferizationOptions::AllocationFn> allocationFn;
-  const Optional<BufferizationOptions::DeallocationFn> deallocationFn;
-  const Optional<BufferizationOptions::MemCpyFn> memCpyFn;
+private:
+  const std::optional<BufferizationOptions::AllocationFn> allocationFn;
+  const std::optional<BufferizationOptions::DeallocationFn> deallocationFn;
+  const std::optional<BufferizationOptions::MemCpyFn> memCpyFn;
 };
-}  // namespace
+} // namespace
 
-static bool isaTensor(Type t) { return t.isa<TensorType>(); };
+static bool isaTensor(Type t) { return llvm::isa<TensorType>(t); };
 
 // Default allocation functions.
 static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
@@ -105,7 +109,7 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
     // type memory space; that's runtime allocations. So erase and fallback to
     // the default 0 memory space. It is fine given this is just the default
     // allocator; backends are expected to control by themselves.
-    if (storage.isa<IREE::HAL::DescriptorTypeAttr>())
+    if (llvm::isa<IREE::HAL::DescriptorTypeAttr>(storage))
       type = MemRefType::get(type.getShape(), type.getElementType(),
                              type.getLayout());
   }
@@ -122,8 +126,8 @@ static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
   return success(static_cast<bool>(copyOp));
 }
 
-static OneShotBufferizationOptions getBufferizationOptions() {
-  OneShotBufferizationOptions options;
+static IREEOneShotBufferizationOptions getBufferizationOptions() {
+  IREEOneShotBufferizationOptions options;
 
   // bufferization.to_memref is used to bufferize constants in IREE. IREE has
   // it's own logic to handle constants. We'd like to leave the arith.constant
@@ -135,7 +139,7 @@ static OneShotBufferizationOptions getBufferizationOptions() {
   // memref type can be inferred from the context.
   options.unknownTypeConverterFn = [](Value value, Attribute memorySpace,
                                       const BufferizationOptions &options) {
-    auto tensorType = value.getType().cast<TensorType>();
+    auto tensorType = llvm::cast<TensorType>(value.getType());
 
     // Special rule for ConstantOps: These always lower to some memref with a
     // static identity layout.
@@ -151,14 +155,15 @@ static OneShotBufferizationOptions getBufferizationOptions() {
   return options;
 }
 
-LogicalResult eliminateEmptyTensors(
-    Operation *op, const OneShotBufferizationOptions &options) {
+LogicalResult
+eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
+                      const OneShotBufferizationOptions &options) {
   // Analyze IR.
   OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
+  if (failed(analyzeOp(op, state)))
+    return failure();
 
   // Rewrite tensor.empty ops that are anchored on specific ops.
-  IRRewriter rewriter(op->getContext());
   if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
           rewriter, op, state)))
     return failure();
@@ -171,25 +176,43 @@ LogicalResult eliminateEmptyTensors(
 
 void EliminateEmptyTensorsPass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
+  MLIRContext *context = &getContext();
+
+  // Run the convert to destination style patterns.
+  {
+    RewritePatternSet patterns(context);
+    linalg::populateConvertToDestinationStylePatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
+      moduleOp->emitOpError(
+          "Failed in conversion to destination style patterns");
+      return signalPassFailure();
+    }
+  }
+
   OneShotBufferizationOptions options = getBufferizationOptions();
-  if (failed(eliminateEmptyTensors(moduleOp, options)))
+
+  IRRewriter rewriter(moduleOp->getContext());
+  if (failed(eliminateEmptyTensors(rewriter, moduleOp, options)))
     return signalPassFailure();
 }
 
 // The following is copied from bufferization::runOneShotBufferize with
 // modifications.
-LogicalResult runIREEOneShotBufferize(
-    Operation *op, const OneShotBufferizationOptions &options) {
+LogicalResult
+runIREEOneShotBufferize(Operation *op,
+                        const IREEOneShotBufferizationOptions &options) {
   OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-  if (options.testAnalysisOnly) return success();
+  if (failed(analyzeOp(op, state)))
+    return failure();
+  if (options.testAnalysisOnly)
+    return success();
   return bufferization::runOneShotBufferize(op, options);
 }
 
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-  OneShotBufferizationOptions options = getBufferizationOptions();
+  IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
   options.allocationFn = allocationFn;
@@ -215,12 +238,15 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    Optional<BufferizationOptions::AllocationFn> allocationFn,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
-  if (!allocationFn) allocationFn = defaultAllocationFn;
-  if (!deallocationFn) deallocationFn = defaultDeallocationFn;
-  if (!memCpyFn) memCpyFn = defaultMemCpyFn;
+    std::optional<BufferizationOptions::AllocationFn> allocationFn,
+    std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+  if (!allocationFn)
+    allocationFn = defaultAllocationFn;
+  if (!deallocationFn)
+    deallocationFn = defaultDeallocationFn;
+  if (!memCpyFn)
+    memCpyFn = defaultMemCpyFn;
   return std::make_unique<IREEComprehensiveBufferizePass>(
       allocationFn, deallocationFn, memCpyFn);
 }
@@ -238,9 +264,9 @@ void addIREEPostBufferizationPasses(OpPassManager &passManager) {
 
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    Optional<BufferizationOptions::AllocationFn> allocationFn,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+    std::optional<BufferizationOptions::AllocationFn> allocationFn,
+    std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   passManager.addPass(createEliminateEmptyTensorsPass());
   passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   passManager.addPass(createIREEComprehensiveBufferizePass(
@@ -248,5 +274,5 @@ void addIREEComprehensiveBufferizePasses(
   addIREEPostBufferizationPasses(passManager);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

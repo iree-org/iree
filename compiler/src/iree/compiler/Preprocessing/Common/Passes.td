@@ -15,6 +15,12 @@ def ConvertConv2DToImg2Col :
   let constructor = "mlir::iree_compiler::IREE::createConvertConv2DToImg2ColPass()";
 }
 
+def MakeSingleDispatchForFunction :
+    Pass<"iree-preprocessing-make-single-dispatch-for-function", "func::FuncOp"> {
+  let summary = "Convert entire function into a single dispatch";
+  let constructor = "mlir::iree_compiler::IREE::createMakeSingleDispatchForFunctionPass()";
+}
+
 def PadLinalgOps :
     Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";

@@ -26,7 +26,8 @@ static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
                                           spirv::ResourceLimitsAttr limits) {
   const std::array<int64_t, 2> workgroupXY = {256, 1};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType =
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {4, 8, 8};
   } else {
@@ -49,21 +50,21 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAppleMatmulConfig(linalgOp, limits);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [limits](auto op) { return setAppleMatmulConfig(op, limits); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            return setConvOpConfig(op, subgroupSize,
-                                   /*bestTilingFactor=*/16);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        return setConvOpConfig(op, subgroupSize,
-                               /*bestTilingFactor=*/16);
-      })
-      .Default([](Operation *) { return success(); });
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    // Use the result type in case of larger bitwidth for accumulators.
+    auto type = cast<ShapedType>(convOp->getResult(0).getType());
+    const int bitwidth = type.getElementTypeBitWidth();
+    if (bitwidth > 32)
+      return failure();
+    const int multipler = 32 / bitwidth;
+    const int bestTilingFactor = 16 * multipler;
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
+  }
+
+  return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

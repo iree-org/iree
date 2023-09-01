@@ -14,7 +14,8 @@
 
 #include "iree/base/api.h"
 
-static inline size_t iree_min_host_size(size_t a, size_t b) {
+static inline size_t iree_min_host_size(iree_host_size_t a,
+                                        iree_host_size_t b) {
   return a < b ? a : b;
 }
 
@@ -209,14 +210,14 @@ IREE_API_EXPORT intptr_t iree_string_view_split(iree_string_view_t value,
                                                 char split_char,
                                                 iree_string_view_t* out_lhs,
                                                 iree_string_view_t* out_rhs) {
-  *out_lhs = iree_string_view_empty();
-  *out_rhs = iree_string_view_empty();
+  if (out_lhs) *out_lhs = iree_string_view_empty();
+  if (out_rhs) *out_rhs = iree_string_view_empty();
   if (!value.data || !value.size) {
     return -1;
   }
   const void* first_ptr = memchr(value.data, split_char, value.size);
   if (!first_ptr) {
-    *out_lhs = value;
+    if (out_lhs) *out_lhs = value;
     return -1;
   }
   intptr_t offset = (intptr_t)((const char*)(first_ptr)-value.data);
@@ -286,6 +287,17 @@ static bool iree_string_view_match_pattern_impl(iree_string_view_t value,
 IREE_API_EXPORT bool iree_string_view_match_pattern(
     iree_string_view_t value, iree_string_view_t pattern) {
   return iree_string_view_match_pattern_impl(value, pattern);
+}
+
+IREE_API_EXPORT void iree_string_view_to_cstring(
+    iree_string_view_t value, char* buffer, iree_host_size_t buffer_length) {
+  if (!buffer_length) return;
+  // Truncate and ensure there's space for the NUL terminator.
+  iree_host_size_t length = iree_min(value.size, buffer_length - 1);
+  // Copy string contents up to the truncated length.
+  memcpy(buffer, value.data, length);
+  // Add NUL terminator.
+  buffer[length] = 0;
 }
 
 IREE_API_EXPORT iree_host_size_t iree_string_view_append_to_buffer(
@@ -457,4 +469,44 @@ IREE_API_EXPORT bool iree_string_view_parse_hex_bytes(
 
   // Should have consumed all characters.
   return iree_string_view_is_empty(value);
+}
+
+IREE_API_EXPORT iree_status_t iree_string_view_parse_device_size(
+    iree_string_view_t value, iree_device_size_t* out_size) {
+  // TODO(benvanik): probably worth to-lowering here on the size. Having copies
+  // of all the string view utils for just this case is code size overkill. For
+  // now only accept lazy lowercase.
+  iree_device_size_t scale = 1;
+  if (iree_string_view_consume_suffix(&value, IREE_SV("kb"))) {
+    scale = 1000;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("kib"))) {
+    scale = 1024;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("mb"))) {
+    scale = 1000 * 1000;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("mib"))) {
+    scale = 1024 * 1024;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("gb"))) {
+    scale = 1000 * 1000 * 1000;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("gib"))) {
+    scale = 1024 * 1024 * 1024;
+  } else if (iree_string_view_consume_suffix(&value, IREE_SV("b"))) {
+    scale = 1;
+  }
+  uint64_t size = 0;
+  if (!iree_string_view_atoi_uint64(value, &size)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "size must be an integer, got '%.*s'",
+                            (int)value.size, value.data);
+  }
+  size *= scale;
+  if (size > IREE_DEVICE_SIZE_MAX) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "size parsed (%" PRIu64
+        ") is out of the representable range of iree_device_size_t (%" PRIu64
+        ")",
+        size, (uint64_t)IREE_DEVICE_SIZE_MAX);
+  }
+  *out_size = size;
+  return iree_ok_status();
 }

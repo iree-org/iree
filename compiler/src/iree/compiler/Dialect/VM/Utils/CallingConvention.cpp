@@ -26,32 +26,32 @@ namespace VM {
 //  tuple<i32, i64>  -> iI
 LogicalResult encodeCallingConventionType(Operation *op, Type type,
                                           SmallVectorImpl<char> &s) {
-  if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
+  if (auto refPtrType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
     s.push_back('r');
     return success();
-  } else if (auto integerType = type.dyn_cast<IntegerType>()) {
+  } else if (auto integerType = llvm::dyn_cast<IntegerType>(type)) {
     switch (integerType.getIntOrFloatBitWidth()) {
-      default:
-      case 32:
-        s.push_back('i');
-        return success();
-      case 64:
-        s.push_back('I');
-        return success();
+    default:
+    case 32:
+      s.push_back('i');
+      return success();
+    case 64:
+      s.push_back('I');
+      return success();
     }
-  } else if (auto floatType = type.dyn_cast<FloatType>()) {
+  } else if (auto floatType = llvm::dyn_cast<FloatType>(type)) {
     switch (floatType.getIntOrFloatBitWidth()) {
-      default:
-      case 32:
-        s.push_back('f');
-        return success();
-      case 64:
-        s.push_back('F');
-        return success();
+    default:
+    case 32:
+      s.push_back('f');
+      return success();
+    case 64:
+      s.push_back('F');
+      return success();
     }
-  } else if (auto tupleType = type.dyn_cast<TupleType>()) {
+  } else if (auto tupleType = llvm::dyn_cast<TupleType>(type)) {
     // Flatten tuple (so tuple<i32, i64> -> `...iI...`).
-    SmallVector<Type, 4> flattenedTypes;
+    SmallVector<Type> flattenedTypes;
     tupleType.getFlattenedTypes(flattenedTypes);
     for (auto elementType : flattenedTypes) {
       if (failed(encodeCallingConventionType(op, elementType, s))) {
@@ -74,11 +74,11 @@ LogicalResult encodeVariadicCallingConventionType(Operation *op, Type type,
   return result;
 }
 
-Optional<std::string> makeImportCallingConventionString(
-    IREE::VM::ImportOp importOp) {
+std::optional<std::string>
+makeImportCallingConventionString(IREE::VM::ImportOp importOp) {
   auto functionType = importOp.getFunctionType();
   if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
-    return std::string("0v_v");  // Valid but empty.
+    return std::string("0v_v"); // Valid but empty.
   }
 
   SmallVector<char, 8> s = {'0'};
@@ -113,10 +113,11 @@ Optional<std::string> makeImportCallingConventionString(
   return std::string(s.data(), s.size());
 }
 
-Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp) {
+std::optional<std::string>
+makeCallingConventionString(IREE::VM::FuncOp funcOp) {
   auto functionType = funcOp.getFunctionType();
   if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
-    return std::string("0v_v");  // Valid but empty.
+    return std::string("0v_v"); // Valid but empty.
   }
 
   SmallVector<char, 8> s = {'0'};
@@ -144,7 +145,7 @@ Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp) {
   return std::string(s.data(), s.size());
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

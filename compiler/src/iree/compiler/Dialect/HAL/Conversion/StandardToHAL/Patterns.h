@@ -19,7 +19,7 @@ void populateStandardToHALPatterns(MLIRContext *context,
                                    TypeConverter &typeConverter,
                                    RewritePatternSet &patterns);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_STANDARDTOHAL_PATTERNS_H_
+#endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_STANDARDTOHAL_PATTERNS_H_

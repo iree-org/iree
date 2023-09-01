@@ -15,7 +15,6 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/path.h"
-#include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
@@ -26,6 +25,132 @@
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
 static const char* emoji(bool good) { return good ? "🦄" : "🐞"; }
+
+// Defines the type of a primitive value.
+typedef enum iree_e2e_test_value_type_e {
+  // Not a value type.
+  IREE_E2E_TEST_VALUE_TYPE_NONE = 0,
+  // int8_t.
+  IREE_E2E_TEST_VALUE_TYPE_I8 = 1,
+  // int16_t.
+  IREE_E2E_TEST_VALUE_TYPE_I16 = 2,
+  // int32_t.
+  IREE_E2E_TEST_VALUE_TYPE_I32 = 3,
+  // int64_t.
+  IREE_E2E_TEST_VALUE_TYPE_I64 = 4,
+  // halft_t.
+  IREE_E2E_TEST_VALUE_TYPE_F16 = 5,
+  // float.
+  IREE_E2E_TEST_VALUE_TYPE_F32 = 6,
+  // double.
+  IREE_E2E_TEST_VALUE_TYPE_F64 = 7,
+} iree_e2e_test_value_type_t;
+
+// Maximum size, in bytes, of any value type we can represent.
+#define IREE_E2E_TEST_VALUE_STORAGE_SIZE 8
+
+// A variant value type.
+typedef struct iree_e2e_test_value_t {
+  iree_e2e_test_value_type_t type;
+  union {
+    int8_t i8;
+    int16_t i16;
+    int32_t i32;
+    int64_t i64;
+    float f32;
+    uint16_t f16_u16;
+    double f64;
+    uint8_t value_storage[IREE_E2E_TEST_VALUE_STORAGE_SIZE];  // max size of all
+                                                              // value types
+  };
+} iree_e2e_test_value_t;
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_none() {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_NONE;
+  return result;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_i8(int8_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_I8;
+  result.i8 = value;
+  return result;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_i16(
+    int16_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_I16;
+  result.i16 = value;
+  return result;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_i32(
+    int32_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_I32;
+  result.i32 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline int32_t iree_e2e_test_value_get_i32(
+    iree_e2e_test_value_t* value) {
+  return value->i32;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_i64(
+    int64_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_I64;
+  result.i64 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline int64_t iree_e2e_test_value_get_i64(
+    iree_e2e_test_value_t* value) {
+  return value->i64;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_f16(
+    uint16_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_F16;
+  result.f16_u16 = value;
+  return result;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_f32(float value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_F32;
+  result.f32 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline float iree_e2e_test_value_get_f32(iree_e2e_test_value_t* value) {
+  return value->f32;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline uint16_t iree_e2e_test_value_get_f16(
+    iree_e2e_test_value_t* value) {
+  return value->f16_u16;
+}
+
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_f64(double value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_F64;
+  result.f64 = value;
+  return result;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline double iree_e2e_test_value_get_f64(iree_e2e_test_value_t* value) {
+  return value->f64;
+}
 
 /*****************************************************************************
  *
@@ -40,10 +165,10 @@ static iree_status_t get_item_as_buffer_view(
     iree_vm_list_t* list, iree_host_size_t i,
     iree_hal_buffer_view_t** out_value) {
   iree_vm_variant_t variant = iree_vm_variant_empty();
-  IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(list, i, &variant));
+  IREE_RETURN_IF_ERROR(iree_vm_list_get_variant_assign(list, i, &variant));
   if (!iree_vm_variant_is_ref(variant)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "expected list item %zu to be a ref", i);
+                            "expected list item %" PRIhsz " to be a ref", i);
   }
   return iree_hal_buffer_view_check_deref(variant.ref, out_value);
 }
@@ -71,18 +196,18 @@ static iree_status_t map_host_local_row_major_data(
                             "buffer_view is not dense row major");
   }
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(buffer_view),
-      IREE_HAL_MAPPING_MODE_PERSISTENT, access, 0, IREE_WHOLE_BUFFER, mapping));
+      iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
+      access, 0, IREE_WHOLE_BUFFER, mapping));
   return iree_ok_status();
 }
 
 // Allocates host-local |dst| to have the same shape as |src|.
 // Implicitly zero-filled.
 static iree_status_t allocate_host_buffer_view_like(
-    iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
-    iree_hal_buffer_view_t** dst) {
-  return iree_hal_buffer_view_allocate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
+    iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
+  return iree_hal_buffer_view_allocate_buffer_copy(
+      device, hal_allocator, iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
@@ -97,10 +222,11 @@ static iree_status_t allocate_host_buffer_view_like(
 // Allocates device-local |dst| to have the same shape as |src|.
 // Implicitly zero-filled.
 static iree_status_t allocate_device_buffer_view_like(
-    iree_hal_allocator_t* hal_allocator, iree_hal_buffer_view_t* src,
-    iree_const_byte_span_t initial_data, iree_hal_buffer_view_t** dst) {
-  return iree_hal_buffer_view_allocate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_rank(src),
+    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
+    iree_hal_buffer_view_t* src, iree_const_byte_span_t initial_data,
+    iree_hal_buffer_view_t** dst) {
+  return iree_hal_buffer_view_allocate_buffer_copy(
+      device, hal_allocator, iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
@@ -118,7 +244,8 @@ static iree_status_t copy_device_buffer_view_to_host(
     iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
   IREE_RETURN_IF_ERROR(
       validate_memory_type(src, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL));
-  IREE_RETURN_IF_ERROR(allocate_host_buffer_view_like(hal_allocator, src, dst));
+  IREE_RETURN_IF_ERROR(
+      allocate_host_buffer_view_like(device, hal_allocator, src, dst));
   iree_hal_buffer_mapping_t dst_mapping;
   iree_status_t status = map_host_local_row_major_data(
       *dst, IREE_HAL_MEMORY_ACCESS_WRITE, &dst_mapping);
@@ -142,8 +269,8 @@ static iree_status_t copy_host_buffer_view_to_device(
       src, IREE_HAL_MEMORY_ACCESS_READ, &src_mapping));
   iree_const_byte_span_t const_src_bytes = iree_make_const_byte_span(
       src_mapping.contents.data, src_mapping.contents.data_length);
-  IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(hal_allocator, src,
-                                                        const_src_bytes, dst));
+  IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
+      device, hal_allocator, src, const_src_bytes, dst));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&src_mapping));
   return iree_ok_status();
 }
@@ -156,7 +283,7 @@ static iree_status_t copy_device_buffer_view_to_device(
   IREE_RETURN_IF_ERROR(
       validate_memory_type(src, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL));
   IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
-      hal_allocator, src, iree_const_byte_span_empty(), dst));
+      device, hal_allocator, src, iree_const_byte_span_empty(), dst));
   iree_status_t status = iree_hal_device_transfer_d2d(
       device, iree_hal_buffer_view_buffer(src), 0,
       iree_hal_buffer_view_buffer(*dst), 0,
@@ -176,7 +303,7 @@ static iree_status_t copy_device_buffer_views_to_host(
   iree_vm_type_def_t elem_type = iree_vm_list_element_type(src);
   iree_host_size_t size = iree_vm_list_size(src);
   iree_allocator_t allocator = iree_hal_allocator_host_allocator(hal_allocator);
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(&elem_type, size, allocator, dst));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(elem_type, size, allocator, dst));
   IREE_RETURN_IF_ERROR(iree_vm_list_resize(*dst, size));
   for (iree_host_size_t i = 0; i < size; ++i) {
     iree_hal_buffer_view_t* src_elem = NULL;
@@ -186,7 +313,7 @@ static iree_status_t copy_device_buffer_views_to_host(
                                                          src_elem, &dst_elem));
     iree_vm_ref_t dst_elem_ref = {0};
     IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-        dst_elem, iree_hal_buffer_view_type_id(), &dst_elem_ref));
+        dst_elem, iree_hal_buffer_view_type(), &dst_elem_ref));
     IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_move(*dst, i, &dst_elem_ref));
   }
   return iree_ok_status();
@@ -280,7 +407,8 @@ static iree_status_t get_matrix_shape(iree_hal_buffer_view_t* buffer_view,
   if (shape_rank != 2) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "expected a matrix (2D tensor) shape, got a %zu-dimensional shape",
+        "expected a matrix (2D tensor) shape, got a %" PRIhsz
+        "-dimensional shape",
         shape_rank);
   }
   dims[0] = iree_hal_buffer_view_shape_dim(buffer_view, 0);
@@ -305,21 +433,35 @@ static iree_status_t get_matmul_sizes(
   iree_hal_dim_t result_dims[2] = {0};
   IREE_RETURN_IF_ERROR(get_matrix_shape(lhs, lhs_dims));
   IREE_RETURN_IF_ERROR(get_matrix_shape(rhs, rhs_dims));
-  IREE_RETURN_IF_ERROR(get_matrix_shape(acc, acc_dims));
   IREE_RETURN_IF_ERROR(get_matrix_shape(result, result_dims));
   *m_size = lhs_dims[0];
   *k_size = lhs_dims[1];
   *n_size = rhs_dims[1];
-  if (!(lhs_dims[0] == *m_size && lhs_dims[1] == *k_size &&
-        rhs_dims[0] == *k_size && rhs_dims[1] == *n_size &&
-        acc_dims[0] == *m_size && acc_dims[1] == *n_size &&
-        result_dims[0] == *m_size && result_dims[1] == *n_size)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "mismatched matrix shapes in matmul: %" PRIdim "x%" PRIdim " * %" PRIdim
-        "x%" PRIdim " + %" PRIdim "x%" PRIdim " -> %" PRIdim "x%" PRIdim,
-        lhs_dims[0], lhs_dims[1], rhs_dims[0], rhs_dims[1], acc_dims[0],
-        acc_dims[1], result_dims[0], result_dims[1]);
+  if (acc) {
+    IREE_RETURN_IF_ERROR(get_matrix_shape(acc, acc_dims));
+    if (!(lhs_dims[0] == *m_size && lhs_dims[1] == *k_size &&
+          rhs_dims[0] == *k_size && rhs_dims[1] == *n_size &&
+          acc_dims[0] == *m_size && acc_dims[1] == *n_size &&
+          result_dims[0] == *m_size && result_dims[1] == *n_size)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "mismatched matrix shapes in matmul: %" PRIdim "x%" PRIdim
+          " * %" PRIdim "x%" PRIdim " + %" PRIdim "x%" PRIdim " -> %" PRIdim
+          "x%" PRIdim,
+          lhs_dims[0], lhs_dims[1], rhs_dims[0], rhs_dims[1], acc_dims[0],
+          acc_dims[1], result_dims[0], result_dims[1]);
+    }
+  } else {
+    if (!(lhs_dims[0] == *m_size && lhs_dims[1] == *k_size &&
+          rhs_dims[0] == *k_size && rhs_dims[1] == *n_size &&
+          result_dims[0] == *m_size && result_dims[1] == *n_size)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "mismatched matrix shapes in matmul: %" PRIdim
+                              "x%" PRIdim " * %" PRIdim "x%" PRIdim
+                              " -> %" PRIdim "x%" PRIdim,
+                              lhs_dims[0], lhs_dims[1], rhs_dims[0],
+                              rhs_dims[1], result_dims[0], result_dims[1]);
+    }
   }
   return iree_ok_status();
 }
@@ -331,7 +473,7 @@ static iree_status_t get_matmul_sizes(
       iree_hal_element_type_t acc_type, LHSTYPE* lhs_data, RHSTYPE* rhs_data,  \
       ACCTYPE* acc_data, RESTYPE* result_data, iree_hal_dim_t m,               \
       iree_hal_dim_t n) {                                                      \
-    ACCTYPE acc = acc_data[n + m * n_size];                                    \
+    ACCTYPE acc = acc_data ? acc_data[n + m * n_size] : 0;                     \
     for (iree_hal_dim_t k = 0; k < k_size; ++k) {                              \
       LHSTYPE lhs_value = lhs_data[k + m * k_size];                            \
       RHSTYPE rhs_value = rhs_data[n + k * n_size];                            \
@@ -358,7 +500,7 @@ static void reference_matmul_f16_f16_f16_f16(
     iree_hal_element_type_t acc_type, uint16_t* lhs_data, uint16_t* rhs_data,
     uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
     iree_hal_dim_t n) {
-  float acc = iree_math_f16_to_f32(acc_data[n + m * n_size]);
+  float acc = acc_data ? iree_math_f16_to_f32(acc_data[n + m * n_size]) : 0;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
     acc = iree_math_round_to_nearest_f16(
         iree_math_round_to_nearest_f16(
@@ -410,8 +552,9 @@ static iree_status_t reference_matmul(iree_vm_list_t* input_list,
   iree_hal_buffer_view_t* acc = NULL;
   IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 0, &lhs));
   IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 1, &rhs));
-  IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 2, &acc));
-
+  if (iree_vm_list_size(input_list) == 3) {
+    IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 2, &acc));
+  }
   iree_hal_dim_t m_size, k_size, n_size;
   IREE_RETURN_IF_ERROR(
       get_matmul_sizes(lhs, rhs, acc, result, &m_size, &k_size, &n_size));
@@ -423,24 +566,29 @@ static iree_status_t reference_matmul(iree_vm_list_t* input_list,
       lhs, IREE_HAL_MEMORY_ACCESS_READ, &lhs_mapping));
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
       rhs, IREE_HAL_MEMORY_ACCESS_READ, &rhs_mapping));
-  IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      acc, IREE_HAL_MEMORY_ACCESS_READ, &acc_mapping));
+  if (acc) {
+    IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
+        acc, IREE_HAL_MEMORY_ACCESS_READ, &acc_mapping));
+  }
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
       result, IREE_HAL_MEMORY_ACCESS_WRITE, &result_mapping));
   iree_hal_element_type_t lhs_type = iree_hal_buffer_view_element_type(lhs);
   iree_hal_element_type_t rhs_type = iree_hal_buffer_view_element_type(rhs);
-  iree_hal_element_type_t acc_type = iree_hal_buffer_view_element_type(acc);
+  iree_hal_element_type_t acc_type = iree_hal_buffer_view_element_type(result);
   for (iree_hal_dim_t m = 0; m < m_size; ++m) {
     for (iree_hal_dim_t n = 0; n < n_size; ++n) {
-      reference_matmul_element(
-          m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
-          lhs_mapping.contents.data, rhs_mapping.contents.data,
-          acc_mapping.contents.data, result_mapping.contents.data, m, n);
+      reference_matmul_element(m_size, k_size, n_size, lhs_type, rhs_type,
+                               acc_type, lhs_mapping.contents.data,
+                               rhs_mapping.contents.data,
+                               acc ? acc_mapping.contents.data : NULL,
+                               result_mapping.contents.data, m, n);
     }
   }
   IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&lhs_mapping));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&rhs_mapping));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&acc_mapping));
+  if (acc) {
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&acc_mapping));
+  }
   IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&result_mapping));
   return iree_ok_status();
 }
@@ -687,9 +835,11 @@ static iree_status_t check_matmul_failure(
   print_matrix(file, "right-hand side", PRECISION_LOW, k_start, k_end, n_start,
                n_end, rhs, NULL, NULL);
   fprintf(file, "\n");
-  print_matrix(file, "input accumulator", PRECISION_LOW, m_start, m_end,
-               n_start, n_end, acc, NULL, NULL);
-  fprintf(file, "\n");
+  if (acc) {
+    print_matrix(file, "input accumulator", PRECISION_LOW, m_start, m_end,
+                 n_start, n_end, acc, NULL, NULL);
+    fprintf(file, "\n");
+  }
   print_matrix(file, "expected result", PRECISION_LOW, m_start, m_end, n_start,
                n_end, expected_result, actual_result, emoji(true));
   fprintf(file, "\n");
@@ -748,7 +898,9 @@ static iree_status_t check_matmul_results(
   iree_hal_buffer_view_t* acc = NULL;
   IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 0, &lhs));
   IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 1, &rhs));
-  IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 2, &acc));
+  if (iree_vm_list_size(input_list) == 3) {
+    IREE_RETURN_IF_ERROR(get_item_as_buffer_view(input_list, 2, &acc));
+  }
 
   iree_hal_dim_t m_size, k_size, n_size;
   IREE_RETURN_IF_ERROR(get_matmul_sizes(lhs, rhs, acc, actual_result, &m_size,
@@ -769,23 +921,9 @@ static iree_status_t check_matmul_results(
  * helpers for it.
  *
  * |replay_event_call_matmul| calls |do_matmul_and_check_results| to actually
- * perform a matmul. In normal cases, each |replay_event_call_matmul| performs
- * one call to |do_matmul_and_check_results|, but when that generates an error,
- * it will make additional calls to |do_matmul_and_check_results| to evaluate
- * variants of the failed testcase to generate a more helpful log.
- *
- * The |matrix_mask_t| stuff is only used to generate these variants of failed
- * testcases.
+ * perform a matmul.
  *
  *****************************************************************************/
-
-// Enumerates ways that we may mask matrices in list of matrix inputs to matmul
-// testcases.
-typedef enum {
-  MATRIX_MASK_NONE,      // no-op: leave the existing matrix unchanged.
-  MATRIX_MASK_ZERO,      // overwrite the matrix with zeros.
-  MATRIX_MASK_IDENTITY,  // overwrite with (general rectangular) identity matrix
-} matrix_mask_t;
 
 static iree_status_t make_identity_matrix_callback(
     iree_hal_buffer_mapping_t* mapping, void* user_data) {
@@ -810,84 +948,38 @@ static iree_status_t make_identity_matrix_callback(
   return iree_ok_status();
 }
 
-// Allocates device-local |dst| and initializes it as an identity-matrix shaped
-// like |src|.
-static iree_status_t make_device_identity_matrix_like(
+// Deep-copies device-local list of buffer_views |src| into |dst|.
+static iree_status_t copy_device_buffer_views_to_device(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
-    iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
-  return iree_hal_buffer_view_generate_buffer(
-      hal_allocator, iree_hal_buffer_view_shape_rank(src),
-      iree_hal_buffer_view_shape_dims(src),
-      iree_hal_buffer_view_element_type(src),
-      iree_hal_buffer_view_encoding_type(src),
-      (iree_hal_buffer_params_t){
-          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
-      },
-      make_identity_matrix_callback, src, dst);
-}
-
-// Allocates device-local |dst| shaped like |src|, and:
-// - If |mask| is MATRIX_MASK_NONE, copies device-local |src| into |dst|.
-// - If |mask| is MATRIX_MASK_ZERO, leaves |dst| zero-filled.
-// - If |mask| is MATRIX_MASK_IDENTITY, makes |dst| an identity-matrix
-static iree_status_t mask_and_copy_device_buffer_view_to_device(
-    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
-    iree_hal_buffer_view_t* src, matrix_mask_t mask,
-    iree_hal_buffer_view_t** dst) {
-  if (mask == MATRIX_MASK_NONE) {
-    IREE_RETURN_IF_ERROR(
-        copy_device_buffer_view_to_device(device, hal_allocator, src, dst));
-  } else if (mask == MATRIX_MASK_ZERO) {
-    IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
-        hal_allocator, src, iree_const_byte_span_empty(), dst));
-  } else if (mask == MATRIX_MASK_IDENTITY) {
-    IREE_RETURN_IF_ERROR(
-        make_device_identity_matrix_like(device, hal_allocator, src, dst));
-  } else {
-    iree_status_abort(iree_make_status(IREE_STATUS_INTERNAL, "bad mask enum"));
-  }
-  return iree_ok_status();
-}
-
-// Deep-copies device-local list of buffer_views |src| into |dst|, applying
-// mask[i] to the i-th list element as in
-// |mask_and_copy_device_buffer_view_to_device|.
-// Requirement: |mask| must point to an array of the same length as |src|.
-static iree_status_t mask_and_copy_device_buffer_views_to_device(
-    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
-    iree_vm_list_t* src_list, matrix_mask_t* mask, iree_vm_list_t** dst_list) {
+    iree_vm_list_t* src_list, iree_vm_list_t** dst_list) {
   iree_vm_type_def_t elem_type = iree_vm_list_element_type(src_list);
   iree_host_size_t size = iree_vm_list_size(src_list);
   iree_allocator_t allocator = iree_hal_allocator_host_allocator(hal_allocator);
   IREE_RETURN_IF_ERROR(
-      iree_vm_list_create(&elem_type, size, allocator, dst_list));
+      iree_vm_list_create(elem_type, size, allocator, dst_list));
   IREE_RETURN_IF_ERROR(iree_vm_list_resize(*dst_list, size));
   for (iree_host_size_t i = 0; i < size; ++i) {
     iree_hal_buffer_view_t* src = NULL;
     IREE_RETURN_IF_ERROR(get_item_as_buffer_view(src_list, i, &src));
     iree_hal_buffer_view_t* dst = NULL;
-    IREE_RETURN_IF_ERROR(mask_and_copy_device_buffer_view_to_device(
-        device, hal_allocator, src, mask[i], &dst));
+    IREE_RETURN_IF_ERROR(
+        copy_device_buffer_view_to_device(device, hal_allocator, src, &dst));
     iree_vm_ref_t dst_ref = {0};
     IREE_RETURN_IF_ERROR(
-        iree_vm_ref_wrap_assign(dst, iree_hal_buffer_view_type_id(), &dst_ref));
+        iree_vm_ref_wrap_assign(dst, iree_hal_buffer_view_type(), &dst_ref));
     IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_move(*dst_list, i, &dst_ref));
   }
   return iree_ok_status();
 }
 
 // Performs one matmul test, on the device-local input matrices given in
-// |original_device_inputs|, applying the masks given in |mask| as in
-// |mask_and_copy_device_buffer_view_to_device|.
-// Both |input_list| and |mask| should have length 3. The 3 input matrices are
-// LHS, RHS, Accumulator, in that order.
+// |original_device_inputs|.
 //
 // The contents of |original_device_inputs| are preserved, even if the
 // |function| would overwrite input-output arguments (e.g. the accumulator).
 static iree_status_t do_matmul_and_check_results(
     FILE* file, iree_trace_replay_t* replay, iree_vm_function_t function,
-    matrix_mask_t* mask, iree_vm_list_t* original_device_inputs) {
+    iree_vm_list_t* original_device_inputs) {
   iree_hal_allocator_t* device_allocator =
       iree_hal_device_allocator(replay->device);
 
@@ -897,85 +989,56 @@ static iree_status_t do_matmul_and_check_results(
   // linalg.matmul. We need to preserve the original test inputs to perform
   // reruns on variants in the failure case (see |replay_event_call_matmul|).
   iree_vm_list_t* device_inputs = NULL;
-  iree_status_t status = mask_and_copy_device_buffer_views_to_device(
-      replay->device, device_allocator, original_device_inputs, mask,
-      &device_inputs);
+  IREE_CHECK_OK(copy_device_buffer_views_to_device(
+      replay->device, device_allocator, original_device_inputs,
+      &device_inputs));
 
   // Perform a deep copy of the device-local inputs into host-local buffers.
   // Needed to pass to the reference matmul implementation and to logging
   // in the failure case.
   iree_vm_list_t* host_inputs = NULL;
-  if (iree_status_is_ok(status)) {
-    status = copy_device_buffer_views_to_host(replay->device, device_allocator,
-                                              device_inputs, &host_inputs);
-  }
+  IREE_CHECK_OK(copy_device_buffer_views_to_host(
+      replay->device, device_allocator, device_inputs, &host_inputs));
 
   // Invoke the function to produce the actual result.
   iree_vm_list_t* device_outputs = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_list_create(/*element_type=*/NULL,
-                                 /*initial_capacity=*/8, replay->host_allocator,
-                                 &device_outputs);
-  }
-
-  if (iree_status_is_ok(status)) {
-    status = iree_vm_invoke(
-        replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
-        /*policy=*/NULL, device_inputs, device_outputs, replay->host_allocator);
-  }
-
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                    /*initial_capacity=*/8,
+                                    replay->host_allocator, &device_outputs));
+  IREE_CHECK_OK(iree_vm_invoke(
+      replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
+      /*policy=*/NULL, device_inputs, device_outputs, replay->host_allocator));
   iree_vm_list_release(device_inputs);
 
   // Get the device_actual_result from the device_outputs.
   iree_hal_buffer_view_t* device_actual_result;
-  if (iree_status_is_ok(status)) {
-    status = get_item_as_buffer_view(device_outputs, 0, &device_actual_result);
-  }
+  IREE_CHECK_OK(
+      get_item_as_buffer_view(device_outputs, 0, &device_actual_result));
 
   // Copy the results to a host local buffer to be able to map it.
   iree_hal_buffer_view_t* host_actual_result = NULL;
-  if (iree_status_is_ok(status)) {
-    status = copy_device_buffer_view_to_host(replay->device, device_allocator,
-                                             device_actual_result,
-                                             &host_actual_result);
-  }
+  IREE_CHECK_OK(copy_device_buffer_view_to_host(
+      replay->device, device_allocator, device_actual_result,
+      &host_actual_result));
 
   // Allocate host_expected_result with same shape as host_actual_result.
   iree_hal_buffer_view_t* host_expected_result = NULL;
-  if (iree_status_is_ok(status)) {
-    status = allocate_host_buffer_view_like(
-        device_allocator, host_actual_result, &host_expected_result);
-  }
+  IREE_CHECK_OK(allocate_host_buffer_view_like(replay->device, device_allocator,
+                                               host_actual_result,
+                                               &host_expected_result));
 
   // Use the reference matmul implementation to fill host_expected_result
-  if (iree_status_is_ok(status)) {
-    status = reference_matmul(host_inputs, host_expected_result);
-  }
+  IREE_CHECK_OK(reference_matmul(host_inputs, host_expected_result));
 
   // Check that host_actual_result and host_expected_result agree.
-  if (iree_status_is_ok(status)) {
-    status = check_matmul_results(file, host_inputs, host_actual_result,
-                                  host_expected_result);
-  }
+  iree_status_t status = check_matmul_results(
+      file, host_inputs, host_actual_result, host_expected_result);
 
   iree_vm_list_release(device_outputs);  // releases device_actual_result
   iree_vm_list_release(host_inputs);
   iree_hal_buffer_view_release(host_actual_result);
   iree_hal_buffer_view_release(host_expected_result);
   return status;
-}
-
-const char* matrix_form(matrix_mask_t mask) {
-  switch (mask) {
-    case MATRIX_MASK_NONE:
-      return "GENERAL";
-    case MATRIX_MASK_ZERO:
-      return "ZERO";
-    case MATRIX_MASK_IDENTITY:
-      return "IDENTITY";
-  }
-  assert(false);
-  return NULL;
 }
 
 // Prints to |file| a message about the matmul shape. Useful as testcases
@@ -997,8 +1060,6 @@ static iree_status_t print_matmul_shape(FILE* file,
 }
 
 // Special handler for function calls in a e2e matmul test trace.
-// Assumes that all calls are to functions that take 3 inputs (lhs, rhs, acc)
-// and return the result of a matmul (lhs*rhs+acc).
 static iree_status_t replay_event_call_matmul(iree_trace_replay_t* replay,
                                               yaml_document_t* document,
                                               yaml_node_t* event_node) {
@@ -1017,69 +1078,8 @@ static iree_status_t replay_event_call_matmul(iree_trace_replay_t* replay,
 
   IREE_CHECK_OK(print_matmul_shape(stderr, device_inputs));
 
-  // Perform the matmul test. So far we are using pseudorandom matrices (as
-  // specified in the YAML trace and interpreted above in
-  // |iree_trace_replay_event_call_prepare|). So this is a test on general
-  // random matrices: great for test coverage (if this succeeds, any variant on
-  // more special matrices would also succeed) but bad for debugging (if this
-  // fails, having to debug that would involve staring at arrays of random
-  // numbers). So for now we pass NULL as the |file| param, keeping errors
-  // silent for now.
-  matrix_mask_t none_masks[3] = {MATRIX_MASK_NONE, MATRIX_MASK_NONE,
-                                 MATRIX_MASK_NONE};
-  iree_status_t status = do_matmul_and_check_results(NULL, replay, function,
-                                                     none_masks, device_inputs);
-  if (!iree_status_is_ok(status)) {
-    // The matmul test failed. So whatever we do now is only for the sake of
-    // generating the most undertandable possible error log. We are going to
-    // retry the matmul but on more special, easy-to-understand matrices,
-    // gradually increasing generality, and we will abort and log details on
-    // the first error that we encounter.
-    iree_string_builder_t sb;
-    iree_string_builder_initialize(replay->host_allocator, &sb);
-    matrix_mask_t all_debug_masks[6][3] = {
-        // Try Zero * Zero + Zero. Expected result: Zero.
-        {MATRIX_MASK_ZERO, MATRIX_MASK_ZERO, MATRIX_MASK_ZERO},
-        // Try Identity * Identity + Zero. Expected result: Identity.
-        {MATRIX_MASK_IDENTITY, MATRIX_MASK_IDENTITY, MATRIX_MASK_ZERO},
-        // Try RandomLHS * Identity + Zero. Expected result: RandomLHS.
-        {MATRIX_MASK_NONE, MATRIX_MASK_IDENTITY, MATRIX_MASK_ZERO},
-        // Try Identity * RandomRHS + Zero. Expected result: RandomRHS.
-        {MATRIX_MASK_IDENTITY, MATRIX_MASK_NONE, MATRIX_MASK_ZERO},
-        // Try Identity * Identity + RandomAccum.
-        // Expected result: Identity + RandomAccum.
-        {MATRIX_MASK_IDENTITY, MATRIX_MASK_IDENTITY, MATRIX_MASK_NONE},
-        // Finally run the general case again. If none of the above special
-        // cases
-        // failed, then that at least must fail, since we already ran that and
-        // it
-        // had failed.
-        {MATRIX_MASK_NONE, MATRIX_MASK_NONE, MATRIX_MASK_NONE}};
-    bool reproduced_failure = false;
-    for (int i = 0; i < IREE_ARRAYSIZE(all_debug_masks); ++i) {
-      matrix_mask_t* masks = all_debug_masks[i];
-      iree_status_code_t rerun_status =
-          iree_status_consume_code(do_matmul_and_check_results(
-              stderr, replay, function, masks, device_inputs));
-      bool good = iree_status_is_ok(rerun_status);
-      reproduced_failure |= !good;
-      iree_string_builder_append_format(
-          &sb, "%s LHS:%-10s * RHS:%-10s + ACCUMULATOR:%-10s\n", emoji(good),
-          matrix_form(masks[0]), matrix_form(masks[1]), matrix_form(masks[2]));
-      if (!good) break;
-    }
-    if (!reproduced_failure) {
-      iree_status_abort(iree_make_status(
-          IREE_STATUS_INTERNAL,
-          "Internal error: a matmul test failed, but subsequent reruns for "
-          "logging purposes were not able to reproduce the failure."));
-    }
-    fprintf(stderr,
-            "Summary of reruns, pinpointing how general matrices need to be to "
-            "reproduce this failure:\n%s\n",
-            iree_string_builder_buffer(&sb));
-    iree_string_builder_deinitialize(&sb);
-  }
+  iree_status_t status =
+      do_matmul_and_check_results(stderr, replay, function, device_inputs);
 
   // Clean up.
   iree_vm_list_release(device_inputs);
@@ -1156,7 +1156,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
                                     iree_vm_instance_t* instance) {
   iree_trace_replay_t replay;
   IREE_RETURN_IF_ERROR(iree_trace_replay_initialize(
-      root_path, instance,
+      root_path, instance, IREE_TRACE_REPLAY_FLAG_NONE,
       FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
                            : IREE_VM_CONTEXT_FLAG_NONE,
       iree_hal_available_driver_registry(), iree_allocator_system(), &replay));
@@ -1172,7 +1172,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
-    iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+    iree_trace_replay_deinitialize(&replay);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "yaml_parser_initialize failed");
   }
@@ -1197,7 +1197,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
   }
 
   yaml_parser_delete(&parser);
-  iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
+  iree_trace_replay_deinitialize(&replay);
   return status;
 }
 
@@ -1222,25 +1222,30 @@ static iree_status_t run_trace_files(int file_count, char** file_paths,
 }
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   if (argc <= 1) {
     fprintf(stderr,
             "no trace files provided; pass one or more yaml file paths\n");
-    return 1;
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   iree_vm_instance_t* instance = NULL;
-  iree_status_t status =
-      iree_vm_instance_create(iree_allocator_system(), &instance);
+  iree_status_t status = iree_vm_instance_create(
+      IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &instance);
   if (iree_status_is_ok(status)) {
     status = run_trace_files(argc - 1, argv + 1, instance);
   }
   iree_vm_instance_release(instance);
+  int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     bool is_unavailable = iree_status_is_unavailable(status);
     iree_status_free(status);
-    return is_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
+    exit_code = is_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
   }
-  return EXIT_SUCCESS;
+  IREE_TRACE_APP_EXIT(exit_code);
+  return exit_code;
 }

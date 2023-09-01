@@ -19,7 +19,7 @@ namespace iree_compiler {
 // nested module conversion.
 // Conversions targeting the VM dialect should always use this.
 class VMConversionTarget : public ConversionTarget {
- public:
+public:
   // Ensures that a module has double-nesting to allow for module conversion.
   // If the module is already nested then this is a no-op.
   // Returns a pair of (outer module, inner module).
@@ -28,8 +28,8 @@ class VMConversionTarget : public ConversionTarget {
   //  module { func.func @foo() { ... } }
   // ->
   //  module attributes {vm.toplevel} { module { func.func @foo() { ... } } }
-  static std::pair<mlir::ModuleOp, mlir::ModuleOp> nestModuleForConversion(
-      mlir::ModuleOp outerModuleOp);
+  static std::pair<mlir::ModuleOp, mlir::ModuleOp>
+  nestModuleForConversion(mlir::ModuleOp outerModuleOp);
 
   // Returns whether this is the outer module as setup via
   // nestModuleForConversion. Use for patterns which need to distinguish.
@@ -38,7 +38,7 @@ class VMConversionTarget : public ConversionTarget {
   VMConversionTarget(MLIRContext *context);
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONTARGET_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONTARGET_H_

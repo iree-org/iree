@@ -43,19 +43,22 @@ namespace {
 static bool isSafeToElideCOW(Value operand, IREE::Stream::ResourceType type) {
   // Can't do anything with block args without analysis - we don't know if the
   // value they carry is the last user (move semantics).
-  if (operand.isa<BlockArgument>()) return false;
+  if (llvm::isa<BlockArgument>(operand))
+    return false;
 
   // If our value is a constant then we need to ensure that we aren't
   // tied to a constant operand. If we are we need to clone to a
   // non-constant value. We could make this work in cases where constants are
   // being initialized, however those are best modeled as transfer operations
   // where no mutations will occur on the constant transfer target.
-  if (type.getLifetime() == IREE::Stream::Lifetime::Constant) return false;
+  if (type.getLifetime() == IREE::Stream::Lifetime::Constant)
+    return false;
 
   // If there's more than one user we can't make a local decision. It's
   // expensive to query relative operation order within a block and within a
   // region the lifetime of values may vary - all things we can't tell here.
-  if (!operand.hasOneUse()) return false;
+  if (!operand.hasOneUse())
+    return false;
 
   // We are the only user and the value is contained entirely within the
   // current region. We by construction know we do not need to worry.
@@ -72,12 +75,15 @@ static bool materializeOperandCOW(Location loc, OpOperand &operand,
   // much IR. Anything that requires wider analysis (CFG, across functions, etc)
   // has to wait until a subsequent pass.
   auto resourceType =
-      operand.get().getType().dyn_cast<IREE::Stream::ResourceType>();
-  if (!resourceType) return false;
-  if (isSafeToElideCOW(operand.get(), resourceType)) return false;
+      llvm::dyn_cast<IREE::Stream::ResourceType>(operand.get().getType());
+  if (!resourceType)
+    return false;
+  if (isSafeToElideCOW(operand.get(), resourceType))
+    return false;
 
   // Materialize a clone operation just for the operand provided.
-  auto sizeAwareType = resourceType.cast<IREE::Util::SizeAwareTypeInterface>();
+  auto sizeAwareType =
+      llvm::cast<IREE::Util::SizeAwareTypeInterface>(resourceType);
   auto size = sizeAwareType.queryValueSize(loc, operand.get(), builder);
   auto cloneOp = builder.create<IREE::Stream::AsyncCloneOp>(
       loc, resourceType, operand.get(), size, size, affinity);
@@ -103,7 +109,8 @@ static bool materializeTiedOpCOW(IREE::Util::TiedOpInterface tiedOp) {
   auto tiedOperandIndices = tiedOp.getTiedResultOperandIndices();
   for (unsigned i = 0; i < tiedOperandIndices.size(); ++i) {
     int64_t operandIdx = tiedOperandIndices[i];
-    if (operandIdx == IREE::Util::TiedOpInterface::kUntiedIndex) continue;
+    if (operandIdx == IREE::Util::TiedOpInterface::kUntiedIndex)
+      continue;
     auto &operand = tiedOp->getOpOperand(operandIdx);
     didChange =
         materializeOperandCOW(tiedOp.getLoc(), operand, affinity, builder) ||
@@ -119,7 +126,8 @@ static bool materializeRegionCOW(Region &region) {
   bool didChange = false;
   for (auto &block : region.getBlocks()) {
     for (auto &op : block) {
-      if (!op.hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) continue;
+      if (!op.hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>())
+        continue;
       didChange =
           TypeSwitch<Operation *, bool>(&op)
               .Case<IREE::Stream::TensorImportOp, IREE::Stream::TensorExportOp,
@@ -128,7 +136,8 @@ static bool materializeRegionCOW(Region &region) {
                     // TODO(#11249): special case collectives for in-place.
                     // We don't want to clone the send buffer.
                     IREE::Stream::AsyncCollectiveOp,
-                    IREE::Stream::AsyncDispatchOp, IREE::Stream::AsyncExecuteOp,
+                    IREE::Stream::AsyncDispatchOp, IREE::Stream::AsyncCallOp,
+                    IREE::Stream::AsyncExecuteOp,
                     IREE::Stream::AsyncConcurrentOp>(
                   [&](auto op) { return materializeTiedOpCOW(op); })
               .Default(false) ||
@@ -157,7 +166,7 @@ static bool materializeRegionCOW(Region &region) {
 // and also makes it easy to disable copy elision to ferret out issues.
 class MaterializeCopyOnWritePass
     : public MaterializeCopyOnWriteBase<MaterializeCopyOnWritePass> {
- public:
+public:
   MaterializeCopyOnWritePass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -177,13 +186,13 @@ class MaterializeCopyOnWritePass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<>> createMaterializeCopyOnWritePass() {
   return std::make_unique<MaterializeCopyOnWritePass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

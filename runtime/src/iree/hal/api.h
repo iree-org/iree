@@ -14,6 +14,7 @@
 #include "iree/hal/buffer_view.h"       // IWYU pragma: export
 #include "iree/hal/buffer_view_util.h"  // IWYU pragma: export
 #include "iree/hal/channel.h"           // IWYU pragma: export
+#include "iree/hal/channel_provider.h"  // IWYU pragma: export
 #include "iree/hal/command_buffer.h"    // IWYU pragma: export
 #include "iree/hal/device.h"            // IWYU pragma: export
 #include "iree/hal/driver.h"            // IWYU pragma: export
@@ -22,6 +23,7 @@
 #include "iree/hal/executable.h"        // IWYU pragma: export
 #include "iree/hal/executable_cache.h"  // IWYU pragma: export
 #include "iree/hal/fence.h"             // IWYU pragma: export
+#include "iree/hal/file.h"              // IWYU pragma: export
 #include "iree/hal/pipeline_layout.h"   // IWYU pragma: export
 #include "iree/hal/resource.h"          // IWYU pragma: export
 #include "iree/hal/semaphore.h"         // IWYU pragma: export

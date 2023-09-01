@@ -6,21 +6,19 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
@@ -37,7 +35,8 @@ namespace iree_compiler {
 
 FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variantOp) return failure();
+  if (!variantOp)
+    return failure();
 
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
     if (op.getSymName() == funcOp.getName()) {
@@ -47,8 +46,8 @@ FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   return failure();
 }
 
-FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(
-    Operation *op) {
+FailureOr<IREE::HAL::ExecutableVariantOp>
+getExecutableVariantOp(Operation *op) {
   if (auto result = dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
     return result;
   }
@@ -62,8 +61,8 @@ bool isEntryPoint(func::FuncOp func) {
   return func.isPublic() && succeeded(getEntryPoint(func));
 }
 
-llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
-    ModuleOp module) {
+llvm::StringMap<IREE::HAL::ExecutableExportOp>
+getAllEntryPoints(ModuleOp module) {
   auto variantOp = module->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
@@ -72,69 +71,76 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp> getAllEntryPoints(
   return exportOps;
 }
 
-Optional<StringAttr> getConfigStringAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef stringAttr) {
-  if (!targetAttr) return std::nullopt;
+std::optional<StringAttr>
+getConfigStringAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                    StringRef stringAttr) {
+  if (!targetAttr)
+    return std::nullopt;
   auto config = targetAttr.getConfiguration();
-  if (!config) return std::nullopt;
+  if (!config)
+    return std::nullopt;
   auto attr = config.getAs<StringAttr>(stringAttr);
-  if (!attr) return std::nullopt;
+  if (!attr)
+    return std::nullopt;
   return attr;
 }
 
-Optional<IntegerAttr> getConfigIntegerAttr(
-    IREE::HAL::ExecutableTargetAttr targetAttr, StringRef integerAttr) {
-  if (!targetAttr) return std::nullopt;
+std::optional<IntegerAttr>
+getConfigIntegerAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                     StringRef integerAttr) {
+  if (!targetAttr)
+    return std::nullopt;
   auto config = targetAttr.getConfiguration();
-  if (!config) return std::nullopt;
+  if (!config)
+    return std::nullopt;
   auto attr = config.getAs<IntegerAttr>(integerAttr);
-  if (!attr) return std::nullopt;
+  if (!attr)
+    return std::nullopt;
   return attr;
 }
 
-Optional<BoolAttr> getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
-                                     StringRef integerAttr) {
-  if (!targetAttr) return std::nullopt;
+std::optional<BoolAttr>
+getConfigBoolAttr(IREE::HAL::ExecutableTargetAttr targetAttr,
+                  StringRef integerAttr) {
+  if (!targetAttr)
+    return std::nullopt;
   auto config = targetAttr.getConfiguration();
-  if (!config) return std::nullopt;
+  if (!config)
+    return std::nullopt;
   auto attr = config.getAs<BoolAttr>(integerAttr);
-  if (!attr) return std::nullopt;
+  if (!attr)
+    return std::nullopt;
   return attr;
 }
 
-Optional<llvm::Triple> getTargetTriple(
-    IREE::HAL::ExecutableTargetAttr targetAttr) {
+std::optional<llvm::Triple>
+getTargetTriple(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto triple = getConfigStringAttr(targetAttr, "target_triple");
-  if (!triple) return std::nullopt;
+  if (!triple)
+    return std::nullopt;
   return llvm::Triple(triple.value().str());
 }
 
-/// Returns the CPU target features associated with the `hal.executable.variant`
-/// operation, if set.
-Optional<StringRef> getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
-  if (!cpuFeatures) return std::nullopt;
-  return cpuFeatures->getValue();
-}
-
-bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isX86();
-}
-
-bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().getArch() == llvm::Triple::x86_64;
-}
-
-bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isAArch64();
-}
-
-bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  Optional<llvm::Triple> triple = getTargetTriple(targetAttr);
-  return triple && triple.value().isRISCV();
+const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
+  if (triple.isX86()) {
+    return triple.isArch64Bit() ? "x86_64" : "x86_32";
+  }
+  if (triple.isWasm()) {
+    return triple.isArch64Bit() ? "wasm_64" : "wasm_32";
+  }
+  if (triple.isAArch64()) {
+    return "arm_64";
+  }
+  if (triple.isARM()) {
+    return "arm_32";
+  }
+  if (triple.isRISCV64()) {
+    return "riscv_64";
+  }
+  if (triple.isRISCV32()) {
+    return "riscv_32";
+  }
+  return "unknown";
 }
 
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
@@ -146,10 +152,12 @@ bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return enableMicrokernels && enableMicrokernels->getValue();
 }
 
-bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto intrinsicsAttr =
-      getConfigBoolAttr(targetAttr, "prefer_intrinsics_over_asm");
-  return intrinsicsAttr && intrinsicsAttr->getValue();
+std::optional<StringRef>
+getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
+  if (!cpuFeatures)
+    return std::nullopt;
+  return cpuFeatures->getValue();
 }
 
 // TODO(dcaballe): If we have to check for a significantly large number of
@@ -157,7 +165,7 @@ bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // over processed HAL information or keeping the TTI instance alive and query
 // subtarget features data structure.
 bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
-  Optional<StringRef> features = getCpuFeatures(targetAttr);
+  std::optional<StringRef> features = getCpuFeatures(targetAttr);
   if (!features) {
     return false;
   }
@@ -175,25 +183,30 @@ bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
   return false;
 }
 
-bool hasAVX2Feature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+avx2");
+bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isX86();
 }
 
-bool hasVFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+v");
+bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().getArch() == llvm::Triple::x86_64;
 }
 
-bool hasZve32xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+zve32x");
+bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isAArch64();
 }
 
-bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+zve64x");
+bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isRISCV();
 }
 
 bool isReadOnly(Value v) {
   Operation *definingOp = v.getDefiningOp();
-  if (!definingOp) return false;
+  if (!definingOp)
+    return false;
   return TypeSwitch<Operation *, bool>(definingOp)
       .Case<arith::ConstantOp>(
           [&](arith::ConstantOp constantOp) { return true; })
@@ -203,9 +216,8 @@ bool isReadOnly(Value v) {
           [&](auto op) { return isReadOnly(op.getSource()); })
       .Case<IREE::Flow::DispatchTensorLoadOp>(
           [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.getSource()
-                       .getType()
-                       .cast<IREE::Flow::DispatchTensorType>()
+            return llvm::cast<IREE::Flow::DispatchTensorType>(
+                       loadOp.getSource().getType())
                        .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
           })
       .Default([&](Operation *op) { return false; });
@@ -219,7 +231,8 @@ bool isReadOnly(Value v) {
 template <typename T>
 static AffineExpr getAffineExprOfType(ArrayRef<AffineExpr> exprs) {
   for (auto expr : exprs) {
-    if (expr.isa<T>()) return expr;
+    if (expr.isa<T>())
+      return expr;
   }
   return nullptr;
 }
@@ -239,7 +252,8 @@ static bool isaAffineExprOfType(AffineExpr expr) {
 
 /// Returns a Value that represents the value for symbol or dim expr for the map
 /// in the `applyOp`.
-static Value getValueForDimOrSymbol(AffineApplyOp applyOp, AffineExpr expr) {
+static Value getValueForDimOrSymbol(affine::AffineApplyOp applyOp,
+                                    AffineExpr expr) {
   unsigned numDims = applyOp.getAffineMap().getNumDims();
   if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
     return applyOp.getOperand(dimExpr.getPosition());
@@ -249,8 +263,9 @@ static Value getValueForDimOrSymbol(AffineApplyOp applyOp, AffineExpr expr) {
   }
   return nullptr;
 }
-static SmallVector<Value> getValuesForDimsOrSymbols(
-    AffineApplyOp applyOp, ArrayRef<AffineExpr> exprs) {
+static SmallVector<Value>
+getValuesForDimsOrSymbols(affine::AffineApplyOp applyOp,
+                          ArrayRef<AffineExpr> exprs) {
   SmallVector<Value> vals;
   for (auto expr : exprs) {
     vals.push_back(getValueForDimOrSymbol(applyOp, expr));
@@ -261,15 +276,16 @@ static SmallVector<Value> getValuesForDimsOrSymbols(
 /// Returns the dimension for any operation that implements processor op
 /// interfaces.
 template <typename T>
-static Optional<unsigned> getDimension(Operation *op) {
+static std::optional<unsigned> getDimension(Operation *op) {
   if (auto tOp = dyn_cast<T>(op)) {
     return tOp.getDimIndex();
   }
   return std::nullopt;
 }
 template <typename T1, typename T2, typename... T3>
-static Optional<unsigned> getDimension(Operation *op) {
-  if (!op) return std::nullopt;
+static std::optional<unsigned> getDimension(Operation *op) {
+  if (!op)
+    return std::nullopt;
   if (auto dimension = getDimension<T1>(op)) {
     return dimension;
   }
@@ -282,11 +298,13 @@ static Optional<unsigned> getDimension(Operation *op) {
 /// returns the dimension.  If `refDimension` is passed checks if the dimension
 /// matches the given value.
 template <typename... T>
-static Optional<unsigned> checkDimensions(
-    ArrayRef<Value> vals, Optional<unsigned> refDimension = std::nullopt) {
+static std::optional<unsigned>
+checkDimensions(ArrayRef<Value> vals,
+                std::optional<unsigned> refDimension = std::nullopt) {
   for (auto v : vals) {
     auto currDimension = getDimension<T...>(v.getDefiningOp());
-    if (!currDimension) return std::nullopt;
+    if (!currDimension)
+      return std::nullopt;
     if (refDimension) {
       if (refDimension.value() != currDimension.value()) {
         return std::nullopt;
@@ -304,8 +322,8 @@ namespace {
 /// hal.interface.workgroup.id or hal.interface.workgroup.size.
 class LowerBoundExprVisitor
     : public AffineExprVisitor<LowerBoundExprVisitor, LogicalResult> {
- public:
-  LowerBoundExprVisitor(AffineApplyOp applyOp,
+public:
+  LowerBoundExprVisitor(affine::AffineApplyOp applyOp,
                         LoopTilingAndDistributionInfo &loopInfo)
       : applyOp(applyOp), loopInfo(loopInfo) {}
 
@@ -345,7 +363,7 @@ class LowerBoundExprVisitor
 
   LogicalResult visitMulExpr(AffineBinaryOpExpr expr) {
     SmallVector<Value> vals;
-    Optional<unsigned> dimension;
+    std::optional<unsigned> dimension;
     // workgroupSizeOp may have been folded into a constant expression.
     if (auto wgSize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS()});
@@ -380,8 +398,8 @@ class LowerBoundExprVisitor
     return success();
   }
 
- private:
-  AffineApplyOp applyOp;
+private:
+  affine::AffineApplyOp applyOp;
   LoopTilingAndDistributionInfo &loopInfo;
 };
 
@@ -391,8 +409,8 @@ class LowerBoundExprVisitor
 /// operation.
 class StepExprVisitor
     : public AffineExprVisitor<StepExprVisitor, LogicalResult> {
- public:
-  StepExprVisitor(AffineApplyOp applyOp,
+public:
+  StepExprVisitor(affine::AffineApplyOp applyOp,
                   LoopTilingAndDistributionInfo &loopInfo)
       : applyOp(applyOp), loopInfo(loopInfo) {}
 
@@ -479,7 +497,7 @@ class StepExprVisitor
     return success();
   }
 
- private:
+private:
   LogicalResult processSentinel(AffineExpr e,
                                 SmallVectorImpl<AffineExpr> &sentinels) {
     if (isaAffineExprOfType<AffineDimExpr, AffineSymbolExpr>(e)) {
@@ -496,13 +514,13 @@ class StepExprVisitor
     return failure();
   }
 
-  AffineApplyOp applyOp;
+  affine::AffineApplyOp applyOp;
   LoopTilingAndDistributionInfo &loopInfo;
 };
-}  // namespace
+} // namespace
 
 template <typename OpTy>
-static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
+static std::optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
   if (auto op = value.getDefiningOp<OpTy>()) {
     return op.getDimension().getZExtValue();
   }
@@ -522,31 +540,32 @@ static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
 ///     affine_map<(d0)[s0, s1] -> (d0 * s0 * s1)>(%step)[%id, %size]
 ///   scf.for %iv = %offset to %ub step %new_step { ... }
 /// ```
-Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
-    scf::ForOp forOp) {
+std::optional<LoopTilingAndDistributionInfo>
+isTiledAndDistributedLoop(scf::ForOp forOp) {
   LoopTilingAndDistributionInfo loopInfo;
   loopInfo.loop = forOp;
   loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.getUpperBound());
 
-  auto lbApplyOp = forOp.getLowerBound().getDefiningOp<AffineApplyOp>();
-  auto stepApplyOp = forOp.getStep().getDefiningOp<AffineApplyOp>();
+  auto lbApplyOp = forOp.getLowerBound().getDefiningOp<affine::AffineApplyOp>();
+  auto stepApplyOp = forOp.getStep().getDefiningOp<affine::AffineApplyOp>();
 
   if (!lbApplyOp || !stepApplyOp) {
     // Try to see if this is a specical case where we have:
     //   scf.for %iv = %id to %ub step %count
-    Optional<unsigned> idDim;
+    std::optional<unsigned> idDim;
     if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(
             forOp.getLowerBound().getDefiningOp())) {
       idDim = ifx.getDimIndex();
     }
 
-    Optional<unsigned> countDim;
+    std::optional<unsigned> countDim;
     if (auto ifx = dyn_cast_or_null<ProcessorCountInterface>(
             forOp.getStep().getDefiningOp())) {
       countDim = ifx.getDimIndex();
     }
 
-    if (!idDim || !countDim) return std::nullopt;
+    if (!idDim || !countDim)
+      return std::nullopt;
 
     Builder b(forOp.getContext());
     loopInfo.untiledLowerBound = b.getIndexAttr(0);
@@ -572,49 +591,18 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   return loopInfo;
 }
 
-LogicalResult getFilteredOps(
-    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
-    SmallVectorImpl<Operation *> &filteredOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  Region &region = funcOp.getFunctionBody();
-  if (!llvm::hasSingleElement(region)) {
-    return funcOp.emitError("unable dispatch function with multiple blocks");
-  }
-  Block *body = &region.front();
-  auto forOps = body->getOps<scf::ForOp>();
-  while (!forOps.empty()) {
-    if (!llvm::hasSingleElement(forOps)) return failure();
-    scf::ForOp forOp = *(forOps.begin());
-    if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
-      tiledLoops.emplace_back(std::move(tiledLoopInfo.value()));
+SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
+  SmallVector<Operation *> computeOps;
+  funcOp.walk([&](Operation *op) {
+    if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op)) {
+      computeOps.push_back(op);
     }
-    body = forOp.getBody();
-    forOps = body->getOps<scf::ForOp>();
-  }
-  for (Operation &op : body->getOperations()) {
-    if (filteringFn(&op)) {
-      filteredOps.push_back(&op);
-    }
-  }
-  return success();
+  });
+  return computeOps;
 }
 
-LogicalResult getComputeOps(
-    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
-    SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  if (failed(getFilteredOps(
-          funcOp,
-          [](Operation *op) {
-            return isa<linalg::LinalgOp, TilingInterface>(op);
-          },
-          computeOps, tiledLoops))) {
-    return failure();
-  }
-  return success();
-}
-
-SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
-    func::FuncOp funcOp) {
+SmallVector<LoopTilingAndDistributionInfo>
+getTiledAndDistributedLoopInfo(func::FuncOp funcOp) {
   SmallVector<LoopTilingAndDistributionInfo> info;
   funcOp.walk([&](scf::ForOp forOp) {
     if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
@@ -629,8 +617,8 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
 /// memref::CopyOp.
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes) {
-  auto memrefTypeFrom = from.getType().dyn_cast<MemRefType>();
-  auto memrefTypeTo = to.getType().dyn_cast<MemRefType>();
+  auto memrefTypeFrom = llvm::dyn_cast<MemRefType>(from.getType());
+  auto memrefTypeTo = llvm::dyn_cast<MemRefType>(to.getType());
   if (!memrefTypeFrom || !memrefTypeTo ||
       memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
     mlir::emitError(
@@ -660,92 +648,323 @@ static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
 }
 
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
-    const SmallVector<int64_t> &tileSizes) {
-  return {
-      [&tileSizes](OpBuilder &builder, Location loc,
-                   ArrayRef<Range> parallelLoopRanges) {
-        SmallVector<int64_t> nonZeroTileSizes;
-        for (int64_t size : tileSizes) {
-          if (size != 0) nonZeroTileSizes.push_back(size);
-        }
-        auto numParallelDims = parallelLoopRanges.size();
+    const SmallVector<int64_t> &tileSizes,
+    linalg::DistributionMethod distributionMethod,
+    int32_t maxWorkgroupParallelDims) {
+  return {[&tileSizes, distributionMethod,
+           maxWorkgroupParallelDims](OpBuilder &builder, Location loc,
+                                     ArrayRef<Range> parallelLoopRanges) {
+    SmallVector<int64_t> nonZeroTileSizes;
+    for (int64_t size : tileSizes) {
+      if (size != 0)
+        nonZeroTileSizes.push_back(size);
+    }
+    auto numParallelDims = parallelLoopRanges.size();
 
-        SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-        Value splitDim;
-        for (size_t dim = 0; dim < numParallelDims; ++dim) {
-          if (numParallelDims > kNumMaxParallelDims &&
-              dim >= kNumMaxParallelDims - 1) {
-            if (!splitDim) {
-              splitDim =
-                  buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
-                      builder, 2);
-            }
-            Value size = getValueOrCreateConstantIndexOp(
-                builder, loc,
-                parallelLoopRanges[numParallelDims - dim - 1].size);
-            Value offset = getValueOrCreateConstantIndexOp(
-                builder, loc,
-                parallelLoopRanges[numParallelDims - dim - 1].offset);
-            AffineExpr d0, d1;
-            int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
-            bindSymbols(builder.getContext(), d0, d1);
-            Value numTiles = makeComposedAffineApply(
-                builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
-            Value dimValue;
-            if (dim == numParallelDims - 1)
-              dimValue = splitDim;
-            else {
-              dimValue =
-                  builder.create<arith::RemUIOp>(loc, splitDim, numTiles);
-              splitDim =
-                  builder.create<arith::DivUIOp>(loc, splitDim, numTiles);
-            }
-            procInfo[numParallelDims - dim - 1] = {
-                dimValue,
-                numTiles,
-                linalg::DistributionMethod::Cyclic,
-            };
-            continue;
-          }
-          procInfo[numParallelDims - dim - 1] = {
-              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
-                  builder, dim),
-              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(
-                  builder, dim),
-              linalg::DistributionMethod::Cyclic};
+    SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+    Value splitDim;
+    for (size_t dim = 0; dim < numParallelDims; ++dim) {
+      if (numParallelDims > maxWorkgroupParallelDims &&
+          dim >= maxWorkgroupParallelDims - 1) {
+        if (!splitDim) {
+          splitDim = buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
+              builder, maxWorkgroupParallelDims - 1);
         }
-        return procInfo;
-      }};
+        Value size = getValueOrCreateConstantIndexOp(
+            builder, loc, parallelLoopRanges[numParallelDims - dim - 1].size);
+        Value offset = getValueOrCreateConstantIndexOp(
+            builder, loc, parallelLoopRanges[numParallelDims - dim - 1].offset);
+        AffineExpr d0, d1;
+        int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
+        bindSymbols(builder.getContext(), d0, d1);
+        Value numTiles = affine::makeComposedAffineApply(
+            builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
+        Value dimValue;
+        if (dim == numParallelDims - 1)
+          dimValue = splitDim;
+        else {
+          dimValue = affine::makeComposedAffineApply(builder, loc, (d0 % d1),
+                                                     {splitDim, numTiles});
+          splitDim = affine::makeComposedAffineApply(
+              builder, loc, (d0).floorDiv(d1), {splitDim, numTiles});
+        }
+        procInfo[numParallelDims - dim - 1] = {dimValue, numTiles,
+                                               distributionMethod};
+        continue;
+      }
+      procInfo[numParallelDims - dim - 1] = {
+          buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(builder,
+                                                                     dim),
+          buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(builder,
+                                                                        dim),
+          distributionMethod};
+    }
+    return procInfo;
+  }};
 }
 
-void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
-                                       OpBuilder &builder) {
-  SmallVector<Operation *> opToDelete;
-  SmallVector<OpOperand *> operandsToReplace;
-  for (OpOperand &use : oldOp->getUses()) {
-    auto subviewUse = dyn_cast<memref::SubViewOp>(use.getOwner());
-    if (!subviewUse) {
-      // Save the operand to and replace outside the loop to not invalidate the
-      // iterator.
-      operandsToReplace.push_back(&use);
+//===---------------------------------------------------------------------===//
+// Misc. utility functions
+//===---------------------------------------------------------------------===//
+
+OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
+                                              Location loc,
+                                              OpFoldResult byteOffset,
+                                              Type elementType) {
+  if (isa<ComplexType, FloatType, IntegerType, VectorType>(elementType)) {
+    unsigned typeBitWidth = IREE::Util::getTypeBitWidth(elementType);
+    assert(llvm::isPowerOf2_32(typeBitWidth) &&
+           "unhandled non powers of 2 bit width while converting byte offset "
+           "to element offset");
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    return affine::makeComposedFoldedAffineApply(
+        rewriter, loc, (s0 * 8).floorDiv(typeBitWidth),
+        {byteOffset, rewriter.getIndexAttr(typeBitWidth)});
+  } else {
+    OpFoldResult elementByteSize =
+        rewriter.create<IREE::Util::SizeOfOp>(loc, elementType).getResult();
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
+                                                 {byteOffset, elementByteSize});
+  }
+}
+
+//===---------------------------------------------------------------------===//
+// Replace Memref users (transitively)
+//===---------------------------------------------------------------------===//
+
+/// Replaces a `use` with the `replacement` for cases where a simple
+/// substition might lead to verification errors.
+static std::optional<SmallVector<Value>>
+replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
+                     Value replacement) {
+  Operation *user = use.getOwner();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(user);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\tReplacing in user by creating new user : ";
+    user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+    llvm::dbgs() << "\n";
+  });
+
+  if (auto castOp = dyn_cast<memref::CastOp>(user)) {
+    auto replacementType = llvm::cast<MemRefType>(replacement.getType());
+    auto currentResultType =
+        llvm::cast<MemRefType>(castOp.getResult().getType());
+    if (replacementType == currentResultType) {
+      // Cast is a no op, just return the replacement.
+      return SmallVector<Value>{replacement};
+    }
+    auto newResultType = MemRefType::get(
+        currentResultType.getShape(), currentResultType.getElementType(),
+        replacementType.getLayout(), replacementType.getMemorySpace());
+    auto newCastOp =
+        rewriter.create<memref::CastOp>(loc, newResultType, replacement);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newCastOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return SmallVector<Value>(newCastOp->result_begin(),
+                              newCastOp->result_end());
+  }
+  if (auto subviewOp = dyn_cast<memref::SubViewOp>(user)) {
+    auto currResultType =
+        llvm::cast<MemRefType>(subviewOp.getResult().getType());
+    auto newSourceType = llvm::cast<MemRefType>(replacement.getType());
+    SmallVector<OpFoldResult> offsets = subviewOp.getMixedOffsets();
+    SmallVector<OpFoldResult> sizes = subviewOp.getMixedSizes();
+    SmallVector<OpFoldResult> strides = subviewOp.getMixedStrides();
+    MemRefType newResultType =
+        (currResultType.getRank() != newSourceType.getRank()
+             ? llvm::cast<MemRefType>(
+                   memref::SubViewOp::inferRankReducedResultType(
+                       currResultType.getShape(), newSourceType, offsets, sizes,
+                       strides))
+             : nullptr);
+    auto newSubviewOp = rewriter.create<memref::SubViewOp>(
+        loc, newResultType, replacement, offsets, sizes, strides);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\t\tNew user : ";
+      newSubviewOp->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+    return SmallVector<Value>(newSubviewOp->result_begin(),
+                              newSubviewOp->result_end());
+  }
+  return std::nullopt;
+}
+
+void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
+                                       Value origValue,
+                                       Value replacementValue) {
+  SmallVector<std::pair<Value, Value>> worklist;
+  SmallVector<Operation *> toDeleteUsers;
+  worklist.push_back({origValue, replacementValue});
+
+  while (!worklist.empty()) {
+    auto [original, replacement] = worklist.pop_back_val();
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "//===------------------------------------------===//\n";
+      llvm::dbgs() << "Replacing : ";
+      original.print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+      llvm::dbgs() << "\n";
+    });
+
+    llvm::SmallDenseSet<OpOperand *> preservedUses;
+
+    if (original.getType() != replacement.getType()) {
+      for (OpOperand &use : original.getUses()) {
+        Operation *user = use.getOwner();
+        // Some uses cannot be replaced.
+        if (isa<func::ReturnOp, scf::YieldOp>(user)) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "\tUnhandled user : ";
+            user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
+            llvm::dbgs() << "\n";
+          });
+          preservedUses.insert(&use);
+          continue;
+        }
+
+        // Some uses might be replace-able but require creating new versions
+        // of the users to pass verification.
+        std::optional<SmallVector<Value>> nonTrivialUse =
+            replaceNonTrivialUse(rewriter, loc, use, replacement);
+        if (nonTrivialUse) {
+          // Add the results of the new users created as replacements
+          // for the old users. Push this back on the to worklist.
+          preservedUses.insert(&use);
+          for (auto [v1, v2] :
+               llvm::zip_equal(user->getResults(), nonTrivialUse.value())) {
+            worklist.push_back({v1, v2});
+          }
+          toDeleteUsers.push_back(user);
+          continue;
+        }
+      }
+    }
+
+    // Replace all non-preserved uses.
+    rewriter.replaceUsesWithIf(original, replacement, [&](OpOperand &use) {
+      if (!preservedUses.count(&use)) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "\t\tReplacing use in :";
+          use.getOwner()->print(llvm::dbgs(),
+                                OpPrintingFlags().assumeVerified());
+          llvm::dbgs() << "\n";
+        });
+        return true;
+      }
+      return false;
+    });
+  }
+
+  // Iterate over delete-able operations in reverse and delete if
+  // there are no users.
+  for (auto deleteOp : llvm::reverse(toDeleteUsers)) {
+    if (deleteOp->use_empty()) {
+      rewriter.eraseOp(deleteOp);
+    }
+  }
+}
+
+void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
+                  DominanceInfo &dominators) {
+  for (Operation *sinkOp : allocs) {
+    Block *dom = nullptr;
+    for (Operation *user : sinkOp->getUsers()) {
+      if (!dom) {
+        dom = user->getBlock();
+        // Find the block in the same region.
+        while (dom->getParent() != sinkOp->getParentRegion()) {
+          dom = dom->getParentOp()->getBlock();
+        }
+        continue;
+      }
+      dom = dominators.findNearestCommonDominator(dom, user->getBlock());
+    }
+    llvm::SmallDenseSet<Operation *> users;
+    for (Operation *user : sinkOp->getUsers()) {
+      while (user->getParentRegion() != sinkOp->getParentRegion()) {
+        user = user->getParentOp();
+      }
+      users.insert(user);
+    }
+    Operation *firstUse = dom->getTerminator();
+    for (Operation &op : dom->getOperations()) {
+      if (users.count(&op)) {
+        firstUse = &op;
+        break;
+      }
+    }
+    sinkOp->moveBefore(firstUse);
+  }
+}
+
+/// Infer the number of workgroups from exportOp.
+SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp) {
+  SmallVector<int64_t> result;
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (failed(exportOp))
+    return result;
+
+  Block *body = exportOp->getWorkgroupCountBody();
+  if (!body)
+    return result;
+
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  assert(returnOp.getNumOperands() == 3);
+
+  for (unsigned i = 0; i < 3; ++i) {
+    Operation *defOp = returnOp.getOperand(i).getDefiningOp();
+    if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
+      result.push_back(indexOp.value());
+    } else {
+      return SmallVector<int64_t>();
+    }
+  }
+
+  return result;
+}
+
+// Return true if all the uses of op are either Store/transfer_write.
+// There can be SubviewOp users as long as all its users are also
+// StoreOp/transfer_write. If return true it also fills out the uses, if it
+// returns false uses is unchanged.
+static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
+  std::vector<Operation *> opUses;
+  for (OpOperand &use : op->getUses()) {
+    Operation *useOp = use.getOwner();
+    if (isa<memref::DeallocOp, vector::TransferWriteOp, memref::StoreOp>(
+            useOp) ||
+        (isa<memref::SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
+      opUses.push_back(useOp);
       continue;
     }
-    builder.setInsertionPoint(subviewUse);
-    Type newType = memref::SubViewOp::inferRankReducedResultType(
-        subviewUse.getType().getShape(), val.getType().cast<MemRefType>(),
-        subviewUse.getStaticOffsets(), subviewUse.getStaticSizes(),
-        subviewUse.getStaticStrides());
-    Value newSubview = builder.create<memref::SubViewOp>(
-        subviewUse->getLoc(), newType.cast<MemRefType>(), val,
-        subviewUse.getMixedOffsets(), subviewUse.getMixedSizes(),
-        subviewUse.getMixedStrides());
-    replaceMemrefUsesAndPropagateType(subviewUse, newSubview, builder);
-    opToDelete.push_back(use.getOwner());
+    return false;
   }
-  for (OpOperand *operand : operandsToReplace) operand->set(val);
-  // Clean up old subview ops.
-  for (Operation *op : opToDelete) op->erase();
+  uses.insert(uses.end(), opUses.begin(), opUses.end());
+  return true;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+void eraseDeadAllocAndStores(Operation *parentOp) {
+  std::vector<Operation *> opToErase;
+  parentOp->walk([&](memref::AllocOp op) {
+    if (allUsesAreStores(op, opToErase)) {
+      opToErase.push_back(op.getOperation());
+    }
+  });
+  for (Operation *op : opToErase) {
+    op->erase();
+  }
+}
+
+} // namespace iree_compiler
+} // namespace mlir

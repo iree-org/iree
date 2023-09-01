@@ -10,9 +10,10 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 
@@ -67,9 +68,25 @@ struct ConvertTensorExtractPattern
     if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
-
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
         op, op.getResult().getType(), op.getTensor(), op.getIndices());
+    return success();
+  }
+};
+
+struct ConvertTensorBitcastPattern
+    : public OpRewritePattern<tensor::BitcastOp> {
+  using OpRewritePattern<tensor::BitcastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::BitcastOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
+        op.getLoc(), op.getOperand(), rewriter);
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, op.getResult().getType(), op.getOperand(), dynamicDims,
+        dynamicDims);
     return success();
   }
 };
@@ -84,9 +101,9 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
 
     auto loc = op.getLoc();
     Value input = op.getOperand();
-    ShapedType inputType = input.getType().dyn_cast<ShapedType>();
+    ShapedType inputType = llvm::dyn_cast<ShapedType>(input.getType());
     ShapedType resultType =
-        op.getResult().getType().dyn_cast_or_null<ShapedType>();
+        llvm::dyn_cast_if_present<ShapedType>(op.getResult().getType());
     if (!inputType || !resultType || !inputType.hasRank() ||
         !resultType.hasRank()) {
       return rewriter.notifyMatchFailure(op, "not ranked shaped types");
@@ -144,7 +161,7 @@ struct ConvertTensorFromElementsPattern
   LogicalResult matchAndRewrite(tensor::FromElementsOp op,
                                 PatternRewriter &rewriter) const override {
     // TODO: This pattern was mainly added to iron out some kinks specific to
-    // detensoring (see: https://github.com/iree-org/iree/issues/1159). Do we
+    // detensoring (see: https://github.com/openxla/iree/issues/1159). Do we
     // need to expand this check for other uses?
     if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
@@ -177,7 +194,7 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
     if (reshapeOp->template getParentOfType<Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
-    SmallVector<SmallVector<Value>> outputShape;
+    SmallVector<SmallVector<OpFoldResult>> outputShape;
     ReifyRankedShapedTypeOpInterface reifyShapedTypeInterface =
         cast<ReifyRankedShapedTypeOpInterface>(reshapeOp.getOperation());
     if (failed(reifyShapedTypeInterface.reifyResultShapes(rewriter,
@@ -185,10 +202,12 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;
-    for (auto [resultShape, outputShape] : llvm::zip_equal(
+    for (auto [resultShape, outputShp] : llvm::zip_equal(
              reshapeOp.getResultType().getShape(), outputShape[0])) {
-      if (resultShape != ShapedType::kDynamic) continue;
-      outputDynamicShapes.push_back(outputShape);
+      if (resultShape != ShapedType::kDynamic)
+        continue;
+      outputDynamicShapes.push_back(getValueOrCreateConstantIndexOp(
+          rewriter, reshapeOp.getLoc(), outputShp));
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         reshapeOp, reshapeOp.getResultType(), reshapeOp.getSrc(),
@@ -212,7 +231,7 @@ struct ConvertLinalgFillPattern final
       return failure();
     }
 
-    SmallVector<Value, 4> dynamicDims = tensor::createDynamicDimValues(
+    SmallVector<Value> dynamicDims = tensor::createDynamicDimValues(
         rewriter, fillOp.getLoc(), fillOp.output());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(
         fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);
@@ -220,19 +239,20 @@ struct ConvertLinalgFillPattern final
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateTensorToFlowConversionPatterns(MLIRContext *context,
                                             RewritePatternSet &patterns) {
-  patterns.insert<ConvertLinalgFillPattern, ConvertTensorCastPattern,
-                  ConvertTensorExtractPattern, ConvertTensorExtractSlicePattern,
-                  ConvertTensorInsertSlicePattern, ConvertTensorInsertPattern,
-                  ConvertTensorFromElementsPattern,
-                  ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
-                  ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
+  patterns
+      .insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
+              ConvertTensorCastPattern, ConvertTensorExtractPattern,
+              ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
+              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern,
+              ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
+              ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

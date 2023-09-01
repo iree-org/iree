@@ -15,6 +15,9 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/FileUtilities.h"
 
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::IREE::HAL::TargetOptions);
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -39,7 +42,25 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::init(2), llvm::cl::cat(halTargetOptionsCategory));
 
   binder.opt<std::string>(
-      "iree-hal-dump-executable-sources-to", sourceListingPath,
+      "iree-hal-dump-executable-files-to", executableFilesPath,
+      llvm::cl::desc(
+          "Meta flag for all iree-hal-dump-executable-* options. Path to write "
+          "executable files (sources, benchmarks, intermediates, binaries) "
+          "to."),
+      llvm::cl::callback([&](const std::string &path) {
+        if (executableSourcesPath.empty())
+          executableSourcesPath = path;
+        if (executableBenchmarksPath.empty())
+          executableBenchmarksPath = path;
+        if (executableIntermediatesPath.empty())
+          executableIntermediatesPath = path;
+        if (executableBinariesPath.empty())
+          executableBinariesPath = path;
+      }),
+      llvm::cl::cat(halTargetOptionsCategory));
+
+  binder.opt<std::string>(
+      "iree-hal-dump-executable-sources-to", executableSourcesPath,
       llvm::cl::desc("Path to write individual hal.executable input "
                      "source listings into (- for stdout)."),
       llvm::cl::cat(halTargetOptionsCategory));
@@ -79,7 +100,7 @@ void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,
   file->keep();
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

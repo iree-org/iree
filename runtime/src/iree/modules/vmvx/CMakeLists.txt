@@ -17,12 +17,12 @@ iree_cc_library(
   TEXTUAL_HDRS
     "exports.inl"
   SRCS
-    "module.c"
+  "elementwise.c"
+  "module.c"
   DEFINES
     "IREE_HAVE_VMVX_MODULE"
   DEPS
     iree::base
-    iree::base::tracing
     iree::builtins::ukernel
     iree::base::internal::cpu
     iree::vm

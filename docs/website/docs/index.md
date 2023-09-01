@@ -1,3 +1,8 @@
+---
+hide:
+  - navigation
+---
+
 # IREE
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment[^1]) is
@@ -48,7 +53,7 @@ Support for hardware accelerators and APIs is also included:
 
 - [x] Vulkan
 - [x] CUDA
-- [ ] Metal (planned)
+- [x] Metal (for Apple silicon devices)
 - [ ] WebGPU (planned)
 
 ## Project architecture
@@ -60,42 +65,41 @@ to low-level parallel pipelined hardware/API like
 dense computation on the hardware in the form of hardware/API-specific binaries
 like [SPIR-V](https://www.khronos.org/spir/).
 
-![IREE Architecture](assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
-![IREE Architecture](assets/images/iree_architecture.svg#gh-light-mode-only)
+![IREE Architecture](./assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
+![IREE Architecture](./assets/images/iree_architecture.svg#gh-light-mode-only)
 
 ## Workflow overview
 
-Specific examples outlining IREE's workflow can be found in the
-[User Getting Started Guide](./getting-started/index.md). Using IREE involves the following
-general steps:
+Using IREE involves the following general steps:
 
 1. **Import your model**
 
-    Develop your program using one of the [supported frameworks](./getting-started/#supported-frameworks), then run your model
-    using one of IREE's import tools.
+    Develop your program using one of the
+    [supported frameworks](./guides/ml-frameworks/index.md), then import into
+    IREE
 
-2. **Select your [deployment configuration](./deployment-configurations/)**
+2. **Select your [deployment configuration](./guides/deployment-configurations/index.md)**
 
-    Identify your target platform, accelerator(s), and other constraints.
+    Identify your target platform, accelerator(s), and other constraints
 
 3. **Compile your model**
 
-    Compile through IREE, picking compilation targets based on your
-    deployment configuration.
+    Compile through IREE, picking settings based on your deployment
+    configuration
 
 4. **Run your model**
 
-    Use IREE's runtime components to execute your compiled model.
+    Use IREE's runtime components to execute your compiled model
 
 ### Importing models from ML frameworks
 
 IREE supports importing models from a growing list of ML frameworks and model
 formats:
 
-* [TensorFlow](getting-started/tensorflow.md)
-* [TensorFlow Lite](getting-started/tflite.md)
-* [JAX](getting-started/jax.md)
-* [PyTorch](getting-started/pytorch.md)
+* [TensorFlow](./guides/ml-frameworks/tensorflow.md) and
+  [TensorFlow Lite](./guides/ml-frameworks/tflite.md)
+* [JAX](./guides/ml-frameworks/jax.md)
+* [PyTorch](./guides/ml-frameworks/pytorch.md)
 
 ### Selecting deployment configurations
 
@@ -120,47 +124,35 @@ operators used by high level frameworks down into optimized native code and
 associated scheduling logic.
 
 For example, compiling for
-[GPU execution](deployment-configurations/gpu-vulkan.md) using Vulkan generates
+[GPU execution](./guides/deployment-configurations/gpu-vulkan.md) using Vulkan generates
 SPIR-V kernels and Vulkan API calls. For
-[CPU execution](deployment-configurations/cpu.md), native code with
+[CPU execution](./guides/deployment-configurations/cpu.md), native code with
 static or dynamic linkage and the associated function calls are generated.
 
 ### Running models
 
-IREE offers a low level C API, as well as several specialized sets of
-[bindings](./bindings) for running IREE models using other languages:
-
-* [C API](bindings/c-api.md)
-* [Python](bindings/python.md)
-* [TensorFlow Lite](bindings/tensorflow-lite.md)
+IREE offers a low level C API, as well as several sets of
+[API bindings](./reference/bindings/index.md) for compiling and running programs
+using various languages.
 
 ## Communication channels
 
-*   :fontawesome-brands-github:
-    [GitHub issues](https://github.com/iree-org/iree/issues): Feature requests,
-    bugs, and other work tracking
-*   :fontawesome-brands-discord:
-    [IREE Discord server](https://discord.gg/26P4xW4): Daily development
-    discussions with the core team and collaborators
-*   :fontawesome-solid-users: [iree-discuss email list](https://groups.google.com/forum/#!forum/iree-discuss):
-    Announcements, general and low-priority discussion
+* :fontawesome-brands-github:
+  [GitHub issues](https://github.com/openxla/iree/issues): Feature requests,
+  bugs, and other work tracking
+* :fontawesome-brands-discord:
+  [IREE Discord server](https://discord.gg/26P4xW4): Daily development
+  discussions with the core team and collaborators
+* :fontawesome-solid-users: [iree-discuss email list](https://groups.google.com/forum/#!forum/iree-discuss):
+  Announcements, general and low-priority discussion
 
 ## Roadmap
 
 IREE is in the early stages of development and is not yet ready for broad
-adoption. Check out the
-[long-term design roadmap](https://github.com/iree-org/iree/blob/main/docs/developers/design_roadmap.md)
-to get a sense of where we're headed.
-
-We plan on a quarterly basis using [OKRs](https://en.wikipedia.org/wiki/OKR).
-Review our latest
-[objectives](https://github.com/iree-org/iree/blob/main/docs/developers/objectives.md) to
-see what we're up to.
-
-We use [GitHub Projects](https://github.com/iree-org/iree/projects) to track
-progress on IREE components and specific efforts and
-[GitHub Milestones](https://github.com/iree-org/iree/milestones) to track the
-work associated with plans for each quarter.
+adoption. We use both
+[GitHub Projects](https://github.com/openxla/iree/projects) and
+[GitHub Milestones](https://github.com/openxla/iree/milestones) to track
+progress.
 
 [^1]:
   Pronounced "eerie" and often styled with the :iree-ghost: emoji

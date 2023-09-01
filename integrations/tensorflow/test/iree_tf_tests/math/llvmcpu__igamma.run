@@ -1,3 +1,0 @@
-# XFAIL: *
-# REQUIRES: llvmcpu
-# RUN: %PYTHON -m iree_tf_tests.math.math_test --target_backends=iree_llvmcpu --dynamic_dims=false --functions=igamma --artifacts_dir=%t

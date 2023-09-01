@@ -10,7 +10,6 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
-#include "iree/schemas/cpu_data.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,7 +39,7 @@ const uint64_t* iree_cpu_data_fields(void);
 //
 // Common usage:
 // if (iree_all_bits_set(iree_cpu_data_field(0),
-//                       IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD)) {
+//                       IREE_CPU_DATA0_ARM_64_DOTPROD)) {
 //   // Bit is set and known true.
 // } else {
 //   // Bit is unset but _may_ be true (CPU data not available, etc).

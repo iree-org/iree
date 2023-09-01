@@ -31,7 +31,7 @@ static bool isDivisible(Value v, int64_t dividend);
 /// scf.for %iv = %lb to %ub step %step
 ///   %affine.min affine_map<(d0, d1) -> (N, d0 - d1)>(%ub, %iv)
 /// ```
-static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
+static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
   if (!minOp.getSymbolOperands().empty() ||
       minOp.getAffineMap().getNumResults() != 2) {
     return {};
@@ -42,8 +42,9 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   Value step;
   // Check if any of the dimensions is a ForOp or ParallelOp induction variable.
   for (auto dim : minOp.getDimOperands()) {
-    auto ivArg = dim.dyn_cast<BlockArgument>();
-    if (!ivArg) continue;
+    auto ivArg = llvm::dyn_cast<BlockArgument>(dim);
+    if (!ivArg)
+      continue;
     Operation *containingOp = ivArg.getOwner()->getParentOp();
     auto forOp = dyn_cast_or_null<scf::ForOp>(containingOp);
     if (forOp && forOp.getInductionVar() == dim) {
@@ -54,7 +55,8 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
       break;
     }
     auto parallelOp = dyn_cast_or_null<scf::ParallelOp>(containingOp);
-    if (!parallelOp) continue;
+    if (!parallelOp)
+      continue;
     for (auto [index, inductionVar] :
          llvm::enumerate(parallelOp.getInductionVars())) {
       if (inductionVar == dim) {
@@ -65,9 +67,11 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
         break;
       }
     }
-    if (iv) break;
+    if (iv)
+      break;
   }
-  if (!iv) return false;
+  if (!iv)
+    return false;
   // Calculate the affine map representing `%ub - %iv`.
   AffineExpr ivDim;
   AffineExpr ubDim;
@@ -93,9 +97,11 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   // `dividend` or equal to `%ub - %iv`.
   for (AffineExpr result : minOp.getAffineMap().getResults()) {
     if (auto cst = result.dyn_cast<AffineConstantExpr>()) {
-      if (cst.getValue() <= 0 || cst.getValue() % dividend != 0) return false;
+      if (cst.getValue() <= 0 || cst.getValue() % dividend != 0)
+        return false;
     } else {
-      if (diffExp != result) return false;
+      if (diffExp != result)
+        return false;
     }
   }
   // Now check that for every value of the induction variable `%ub - %iv` is
@@ -114,17 +120,19 @@ static bool isDivisible(Value v, int64_t dividend) {
   AffineExpr mod = getAffineDimExpr(0, ctx) % dividend;
   AffineMap modMap = AffineMap::get(1, 0, {mod}, ctx);
   SmallVector<Value> ops(1, v);
-  fullyComposeAffineMapAndOperands(&modMap, &ops);
-  canonicalizeMapAndOperands(&modMap, &ops);
+  affine::fullyComposeAffineMapAndOperands(&modMap, &ops);
+  affine::canonicalizeMapAndOperands(&modMap, &ops);
   modMap = simplifyAffineMap(modMap);
   auto cst = modMap.getResult(0).dyn_cast<AffineConstantExpr>();
-  if (cst) return (cst.getValue() == 0);
+  if (cst)
+    return (cst.getValue() == 0);
   // If the map doesn't fold to 0 but simplifies to (d0 %n) with d0 an
   // affine.min, check if all the results of the affine.min's map are divisible
   // by `dividend`.
-  if (modMap.getResult(0) != mod) return false;
+  if (modMap.getResult(0) != mod)
+    return false;
   assert(ops.size() == 1);
-  auto minOp = ops[0].getDefiningOp<AffineMinOp>();
+  auto minOp = ops[0].getDefiningOp<affine::AffineMinOp>();
   return (minOp && affineMinOpDivisible(minOp, dividend));
 }
 
@@ -136,7 +144,7 @@ static bool isDivisible(Value v, int64_t dividend) {
 /// With N a compile time constant. This operations can be replace by
 /// `%cN = arith.constant N : index` if we can prove that %lb, %step and %ub are
 /// divisible by N.
-static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
+static std::optional<int64_t> foldAffineMin(affine::AffineMinOp minOp) {
   AffineMap map = minOp.getAffineMap();
   int64_t constantResult = 0;
   for (AffineExpr result : map.getResults()) {
@@ -144,25 +152,29 @@ static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
       constantResult = cst.getValue();
     }
   }
-  if (constantResult == 0) return {};
+  if (constantResult == 0)
+    return {};
   // If afine.min map's results are all positive and divisible by
   // `constantResult` then it can be replaced by `constantResult`.
-  if (affineMinOpDivisible(minOp, constantResult)) return constantResult;
+  if (affineMinOpDivisible(minOp, constantResult))
+    return constantResult;
   return {};
 }
 
 namespace {
 struct AffineMinDistributedSCFCanonicalizationPattern
-    : public mlir::OpRewritePattern<mlir::AffineMinOp> {
-  using OpRewritePattern<mlir::AffineMinOp>::OpRewritePattern;
+    : public mlir::OpRewritePattern<mlir::affine::AffineMinOp> {
+  using OpRewritePattern<mlir::affine::AffineMinOp>::OpRewritePattern;
 
-  mlir::LogicalResult matchAndRewrite(
-      mlir::AffineMinOp minOp, mlir::PatternRewriter &rewriter) const override {
-    Optional<int64_t> cst = foldAffineMin(minOp);
-    if (!cst) return failure();
+  mlir::LogicalResult
+  matchAndRewrite(mlir::affine::AffineMinOp minOp,
+                  mlir::PatternRewriter &rewriter) const override {
+    std::optional<int64_t> cst = foldAffineMin(minOp);
+    if (!cst)
+      return failure();
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(minOp,
                                                    rewriter.getIndexAttr(*cst));
-    return failure();
+    return success();
   }
 };
 
@@ -192,13 +204,13 @@ struct AffineMinDistributedSCFCanonicalizationPass
     // Explicitly walk and apply the pattern locally to avoid more general
     // folding on the rest of the IR.
     SmallVector<Operation *> minOps;
-    funcOp.walk([&minOps](AffineMinOp minOp) {
+    funcOp.walk([&minOps](affine::AffineMinOp minOp) {
       minOps.push_back(minOp.getOperation());
     });
     (void)applyOpPatternsAndFold(minOps, frozenPatterns);
   }
 };
-}  // namespace
+} // namespace
 
 void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns) {
   patterns.add<AffineMinDistributedSCFCanonicalizationPattern>(
@@ -209,5 +221,5 @@ static PassRegistration<AffineMinDistributedSCFCanonicalizationPass> pass([] {
   return std::make_unique<AffineMinDistributedSCFCanonicalizationPass>();
 });
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

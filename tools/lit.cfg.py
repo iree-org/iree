@@ -11,6 +11,7 @@
 # pylint: disable=undefined-variable
 
 import os
+import sys
 import tempfile
 
 import lit.formats
@@ -20,13 +21,23 @@ config.suffixes = [".mlir", ".txt"]
 config.test_format = lit.formats.ShTest(execute_external=True)
 # Forward all IREE environment variables
 passthrough_env_vars = ["VK_ICD_FILENAMES"]
-config.environment.update({
-    k: v
-    for k, v in os.environ.items()
-    if k.startswith("IREE_") or k in passthrough_env_vars
-})
+config.environment.update(
+    {
+        k: v
+        for k, v in os.environ.items()
+        if k.startswith("IREE_") or k in passthrough_env_vars
+    }
+)
 
 # Use the most preferred temp directory.
-config.test_exec_root = (os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR") or
-                         os.environ.get("TEST_TMPDIR") or
-                         os.path.join(tempfile.gettempdir(), "lit"))
+config.test_exec_root = (
+    os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
+    or os.environ.get("TEST_TMPDIR")
+    or os.path.join(tempfile.gettempdir(), "lit")
+)
+
+config.substitutions.extend(
+    [
+        ("%PYTHON", os.getenv("PYTHON", sys.executable)),
+    ]
+)

@@ -10,8 +10,10 @@
 include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -24,12 +26,20 @@ class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
 // Generic resource ops
 //===----------------------------------------------------------------------===//
 
-def Stream_ResourceAllocOp : Stream_PureOp<"resource.alloc", [
+def OpGroupResourceOps : OpDocGroup {
+  let summary = "Resource ops";
+  let description = "Generic resource ops.";
+}
+
+let opDocGroup = OpGroupResourceOps in {
+
+def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
   ]>,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a persistent value with undefined contents}];
@@ -77,13 +87,14 @@ def Stream_ResourceAllocOp : Stream_PureOp<"resource.alloc", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
+def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
   ]>,
   Stream_TimelineOp,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a transient value with undefined contents}];
@@ -216,48 +227,6 @@ def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
   let hasFolder = 1;
 }
 
-def Stream_ResourceMapOp : Stream_Op<"resource.map", [
-  Stream_AffinityOp,
-  Util_SizeAwareOp,
-  MemoryEffects<[MemAlloc]>,
-]> {
-  let summary = [{maps read-only memory into a staging resource}];
-  let description = [{
-    Synchronously maps a host heap buffer into a stream-accessible staging
-    resource. Will never fail but may induce a copy if required and as such the
-    mapped resource is not coherent with the original source buffer: changing
-    the source buffer after mapping has undefined behavior.
-  }];
-
-  let arguments = (ins
-    Util_BufferType:$source,
-    Stream_Offset:$source_offset,
-    Stream_Size:$result_size,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_StagingResource:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    $source `[` $source_offset `]` `:`
-    type($source)
-    `->`
-    type($result) `` `{` $result_size `}`
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getResultSize(); }
-  }];
-
-  let hasVerifier = 1;
-
-  let hasCanonicalizer = 1;
-}
-
 def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
   Stream_AffinityOp,
   Util_SizeAwareOp,
@@ -266,10 +235,10 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
   let summary = [{maps read-only memory into a resource}];
   let description = [{
     Synchronously maps a host heap buffer into a stream-accessible resource
-    with constant lifetime. If the given source cannot be mapped into a constant
-    a failure is returned and the resulting resource value is null. As with
-    `stream.resource.map` the resulting resource is not coherent with the source
-    and changes will not be reflected.
+    with the requested lifetime. If the given source cannot be mapped the
+    `did_map` result will be 0 and users must find another route into memory
+    (such as file I/O). The resulting resource is not coherent with the source
+    and behavior is undefined if the underlying contents change.
   }];
 
   let arguments = (ins
@@ -280,7 +249,7 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
   );
   let results = (outs
     I1:$did_map,
-    Stream_ConstantResource:$result
+    Stream_AnyStreamResource:$result
   );
 
   let assemblyFormat = [{
@@ -511,7 +480,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
   }];
 
   let arguments = (ins
-    TypedArrayAttrBase<ElementsAttr, "constant value array attribute">:$values,
+    TypedArrayAttrBase<AnyAttr, "constant value array attribute">:$values,
     Variadic<Stream_Size>:$result_sizes,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -588,6 +557,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     Value getSubrangeResult() { return getResult(); }
 
     // Walks up the use-def chain to find a subview op that feeds into |value|.
+    // Stops at any timeline op that may indicate a change in resource contents.
     static IREE::Stream::ResourceSubviewOp findSubviewOp(Value value);
   }];
 
@@ -597,9 +567,188 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
   let hasFolder = 1;
 }
 
+} // OpGroupResourceOps
+
+//===----------------------------------------------------------------------===//
+// File ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupFileOps : OpDocGroup {
+  let summary = "File ops";
+  let description = "File ops.";
+}
+
+let opDocGroup = OpGroupFileOps in {
+
+def Stream_FileConstantOp : Stream_PureOp<"file.constant", [
+  Stream_AffinityOp,
+  Util_SizeAwareOp,
+  MemoryEffects<[MemAlloc]>,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
+]> {
+  let summary = [{creates a file backed by the provided constant host memory}];
+  let description = [{
+    Synchronously wraps a host heap buffer into a stream-accessible file handle.
+    Changing the source buffer after definition has undefined behavior.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$source,
+    Util_Size:$source_size,
+    Stream_Offset:$source_offset,
+    Stream_Size:$source_length,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_File:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $source `[` $source_offset `for` $source_length `]` `:`
+    type($source) `` `{` $source_size `}`
+    `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
+def Stream_FileReadOp : Stream_Op<"file.read", [
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{reads a segment of a file into a resource}];
+  let description = [{
+    Asynchronously reads a segment of a file into a resource.
+
+    Some implementations this can stream directly from the file into
+    device-local memory and should be preferred to manually staging memory
+    through host buffers.
+  }];
+
+  let arguments = (ins
+    Stream_File:$source,
+    I64:$source_offset,
+    Stream_AnyStreamResource:$target,
+    Stream_Size:$target_size,
+    Stream_Offset:$target_offset,
+    Stream_Size:$length,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`):(`:`)?
+    $source `[` $source_offset `]` `,`
+    $target `[` $target_offset `]` `,`
+    $length `:`
+    type($source) `->`
+    type($target) `` `{` $target_size `}`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_FileWriteOp : Stream_Op<"file.write", [
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{writes a segment of a file from a resource}];
+  let description = [{
+    Asynchronously writes a segment of a resource into a file.
+    The file range must be valid within the file as this operation cannot
+    grow the underlying file storage.
+
+    Some implementations this can stream directly from device-local memory into
+    the file and should be preferred to manually staging memory
+    through host buffers.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$source,
+    Stream_Size:$source_size,
+    Stream_Offset:$source_offset,
+    Stream_File:$target,
+    I64:$target_offset,
+    Stream_Size:$length,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`):(`:`)?
+    $source `[` $source_offset `]` `,`
+    $target `[` $target_offset `]` `,`
+    $length `:`
+    type($source) `` `{` $source_size `}` `->`
+    type($target)
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+} // OpGroupFileOps
+
 //===----------------------------------------------------------------------===//
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
+
+def OpGroupPseudoOps : OpDocGroup {
+  let summary = "Pseudo Ops";
+  let description = "Pseudo ops for conversion support.";
+}
+
+let opDocGroup = OpGroupPseudoOps in {
 
 def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
   Stream_AffinityOp,
@@ -707,9 +856,18 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
   let hasFolder = 1;
 }
 
+} // OpGroupPseudoOps
+
 //===----------------------------------------------------------------------===//
 // High-level tensor ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupTensorOps : OpDocGroup {
+  let summary = "Tensor ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupTensorOps in {
 
 def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
   Stream_AffinityOp,
@@ -744,7 +902,10 @@ def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
 
 def Stream_TensorEmptyOp : Stream_PureOp<"tensor.empty", [
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "isMetadata",
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -801,7 +962,7 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
   }];
 
   let arguments = (ins
-    ElementsAttr:$value,
+    AnyAttr:$value,
     TypeAttr:$result_encoding,
     Stream_ShapeDynamicDims:$result_encoding_dims,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -833,7 +994,9 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
 
 def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
   Stream_AffinityOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "preferCloneToConsumers",
+  ]>,
   Stream_TensorPhaseOp,
   Util_ShapeAwareOp,
   Util_SizeAwareOp,
@@ -1226,109 +1389,20 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", []> {
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
-//===----------------------------------------------------------------------===//
-// Builtins
-//===----------------------------------------------------------------------===//
-// Builtins are added by frontends or during tensor encoding to handle ops or
-// data types not supported by the lower-level stream ops (stream.async.* and
-// stream.cmd.*).
-
-def Stream_BuiltinSplatI64Op : Stream_Op<"builtin.splat.i64", [
-  Stream_AffinityOp,
-  Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_BuiltinOp, [
-    "mergeBuiltinModule",
-    "convertBuiltinOp",
-  ]>,
-  Util_SizeAwareOp,
-]> {
-  let summary = [{splats a value into a resource}];
-  let description = [{
-    Generated builtin for emulating 64-bit splats.
-    As with stream.async.splat it returns a new resource with the given
-    value splatted out to fill the entire contents.
-  }];
-
-  let arguments = (ins
-    I64:$value,
-    Stream_Size:$result_size,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_AnyStreamResource:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    $value `:` type($value) `->` type($result) `` `{` $result_size `}`
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getResultSize(); }
-  }];
-
-  let hasVerifier = 1;
-}
-
-def Stream_BuiltinFillI64Op : Stream_Op<"builtin.fill.i64", [
-  AllTypesMatch<["target", "result"]>,
-  Stream_AffinityOp,
-  Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_BuiltinOp, [
-    "mergeBuiltinModule",
-    "convertBuiltinOp",
-  ]>,
-  Util_SizeAwareOp,
-  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-    "getTiedResult",
-    "getTiedResultOperandIndex",
-    "getTiedResultOperandIndices",
-  ]>,
-]> {
-  let summary = [{fills a subview of a stream resource with a value}];
-  let description = [{
-    Generated builtin for emulating 64-bit fills.
-    As with stream.async.fill it splats a value into a subview of the given
-    stream resource and returns the resource with the update applied.
-  }];
-
-  let arguments = (ins
-    Stream_AnyStreamResource:$target,
-    Stream_Size:$target_size,
-    Stream_Offset:$target_offset,
-    Stream_Offset:$target_end,
-    Stream_Size:$target_length,
-    I64:$value,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_AnyStreamResource:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    $value `,`
-    $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
-    type($value) `->`
-    custom<ShapedTiedResult>(type($target), $target_size)
-    attr-dict-with-keyword
-  }];
-
-  let extraClassDeclaration = [{
-    Value getOperandSize(unsigned idx) { return getTargetSize(); }
-    Value getResultSize(unsigned idx) { return getTargetSize(); }
-  }];
-
-  let hasVerifier = 1;
-}
+} // OpGroupTensorOps
 
 //===----------------------------------------------------------------------===//
 // Resource transfer ops
 //===----------------------------------------------------------------------===//
 
-def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
+def OpGroupResourceTransferOps : OpDocGroup {
+  let summary = "Resource transfer ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupResourceTransferOps in {
+
+def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
@@ -1339,6 +1413,7 @@ def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
     "preferCloneToConsumers",
   ]>,
   Util_SizeAwareOp,
+  AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
   let summary = [{allocates a transient value with undefined contents}];
@@ -1387,7 +1462,7 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   }];
 
   let arguments = (ins
-    ElementsAttr:$value,
+    AnyAttr:$value,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -1774,7 +1849,7 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
     `` $op `` `[` $element_count `]`
     (`on` `(` $affinity^ `)`)?
     `channel` `(` $channel `)`
-    custom<CollectiveParam>(ref($op), $param)
+    custom<CollectiveParam>(ref($op), $param) ``
     $source `[` $source_offset `to` $source_end `for` $source_length `]` `,`
     $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
     type($source) `` `{` $source_size `}` `->`
@@ -1973,10 +2048,10 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     (`on` `(` $affinity^ `)`)?
     $entry_point
     (`[` $workload^ `]`)? ``
-    `(` custom<DispatchOperands>($resource_operands,
-                                 $resource_operand_offsets,
-                                 $resource_operand_ends,
-                                 $resource_operand_lengths) `)` attr-dict `:`
+    custom<DispatchOperands>($resource_operands,
+                             $resource_operand_offsets,
+                             $resource_operand_ends,
+                             $resource_operand_lengths) attr-dict `:`
     custom<ShapedFunctionType>(ref($resource_operands),
                                type($resource_operands), $resource_operand_sizes,
                                type($results), $result_sizes,
@@ -1997,19 +2072,200 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupResourceTransferOps
+
 //===----------------------------------------------------------------------===//
 // Async control flow ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupAsyncControlFlowOps : OpDocGroup {
+  let summary = "Async control flow ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupAsyncControlFlowOps in {
 
 // TODO(benvanik): stream.async.if
 // TODO(benvanik): stream.async.select
 // TODO(benvanik): stream.async.for
 
+def Stream_AsyncFuncOp : Stream_Op<"async.func", [
+  CallableOpInterface,
+  FunctionOpInterface,
+  IsolatedFromAbove,
+  Stream_AsyncPhaseOp,
+]> {
+  let summary = [{streamable function declaration}];
+  let description = [{
+    Declares a function that can be called as an asynchronous streaming
+    operation via `stream.async.call`. Today only external functions are
+    allowed.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    ``
+    custom<ShapedFunctionSignature>($function_type,
+                                    $tied_operands,
+                                    $arg_attrs,
+                                    $res_attrs)
+    attr-dict-with-keyword
+    ($body^)?
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "FunctionType":$type,
+      CArg<"ArrayAttr", "{}">:$tied_operands,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$resAttrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    static AsyncFuncOp create(Location location, StringRef name,
+                              FunctionType type,
+                              ArrayRef<int64_t> tiedOperands = {},
+                              ArrayRef<DictionaryAttr> argAttrs = {},
+                              ArrayRef<DictionaryAttr> resAttrs = {});
+
+    bool isDeclaration() { return true; }
+
+    ::mlir::Region *getCallableRegion() { return nullptr; }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
+    ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    // Returns true if the given result is tied to an argument.
+    bool isResultTied(int resultIndex);
+  }];
+}
+
+def Stream_AsyncCallOp : Stream_Op<"async.call", [
+  AttrSizedOperandSegments,
+  CallOpInterface,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{calls a streamable external host function}];
+  let description = [{
+    Calls a function taking/returning resource values with stream semantics.
+    Asynchronous calls must have no side-effects.
+
+    Note that returned resources must have their sizes declared prior to the
+    call as this is what allows the call to be made on the stream. If external
+    host logic is required to compute the size (avoid at all costs!) a separate
+    func.call can be used outside of the stream to do so. If sizes are
+    unknownable until the operation is performed it should be made as a normal
+    asynchronous host call with 'coarse-fences' instead.
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    Variadic<AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_PrimitiveType,
+      AnyType,
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
+    Variadic<Stream_Offset>:$resource_operand_offsets,
+    Variadic<Stream_Offset>:$resource_operand_ends,
+    Variadic<Stream_Size>:$resource_operand_lengths,
+    Variadic<Stream_Size>:$result_sizes,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_PrimitiveType,
+    ]>>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $callee ``
+    custom<DispatchOperands>($resource_operands,
+                             $resource_operand_offsets,
+                             $resource_operand_ends,
+                             $resource_operand_lengths) attr-dict `:`
+    custom<ShapedFunctionType>(ref($resource_operands),
+                               type($resource_operands), $resource_operand_sizes,
+                               type($results), $result_sizes,
+                               $tied_operands)
+  }];
+
+  let extraClassDeclaration = [{
+    FunctionType getCalleeType();
+
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    operand_iterator arg_operand_begin() { return getResourceOperands().begin(); }
+    operand_iterator arg_operand_end() { return getResourceOperands().end(); }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
+    Value getOperandSize(unsigned idx) {
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+    }
+    Value getResultSize(unsigned idx) {
+      return findValueSizeInList(idx, getResults(), getResultSizes());
+    }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getResourceOperandsMutable();
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
 def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   AttrSizedOperandSegments,
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
-    "getSuccessorEntryOperands",
+    "getEntrySuccessorOperands",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -2104,7 +2360,7 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   AttrSizedOperandSegments,
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
-    "getSuccessorEntryOperands",
+    "getEntrySuccessorOperands",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -2208,9 +2464,18 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupAsyncControlFlowOps
+
 //===----------------------------------------------------------------------===//
 // Explicit command ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupExplicitCommandOps : OpDocGroup {
+  let summary = "Explicit command ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupExplicitCommandOps in {
 
 def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
   Stream_CmdPhaseOp,
@@ -2344,7 +2609,7 @@ def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
     Stream_Size:$target_size,
     Stream_Offset:$target_offset,
     Stream_Size:$target_length,
-    Stream_FillPatternType:$value
+    Stream_NativeFillPatternType:$value
   );
   let results = (outs);
 
@@ -2480,7 +2745,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
 
   let arguments = (ins
     Variadic<Index>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<Stream_PrimitiveType>:$uniform_operands,
     Variadic<Stream_AnyStreamResource>:$resources,
     Variadic<Stream_Size>:$resource_sizes,
@@ -2491,7 +2756,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   let results = (outs);
 
   let assemblyFormat = [{
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     (`(` $uniform_operands^ `:` type($uniform_operands) `)`)? `{`
     custom<DispatchResources>($resources, type($resources), $resource_sizes,
@@ -2502,6 +2767,13 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   }];
 
   let extraClassDeclaration = [{
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(
           idx - getODSOperandIndexAndLength(2).first,
@@ -2520,11 +2792,158 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
   let hasCanonicalizer = 1;
 }
 
+def Stream_CmdFuncOp : Stream_Op<"cmd.func", [
+  CallableOpInterface,
+  FunctionOpInterface,
+  IsolatedFromAbove,
+  Stream_CmdPhaseOp,
+]> {
+  let summary = [{streamable function declaration}];
+  let description = [{
+    Declares a function that can be called as an asynchronous streaming
+    operation via `stream.cmd.call`. Today only external functions are
+    allowed.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name ``
+    custom<DispatchFunctionSignature>($function_type,
+                                      $arg_attrs,
+                                      $res_attrs)
+    attr-dict-with-keyword
+    ($body^)?
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "FunctionType":$type,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$resAttrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    static CmdFuncOp create(Location location, StringRef name,
+                            FunctionType type,
+                            ArrayRef<DictionaryAttr> argAttrs = {},
+                            ArrayRef<DictionaryAttr> resAttrs = {});
+
+    bool isDeclaration() { return true; }
+
+    ::mlir::Region *getCallableRegion() { return nullptr; }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
+    ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+  }];
+}
+
+def Stream_CmdCallOp : Stream_Op<"cmd.call", [
+  AttrSizedOperandSegments,
+  CallOpInterface,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  Stream_CmdPhaseOp,
+  Stream_StreamableOp,
+  Stream_SubviewEffectOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{calls a streamable external host function}];
+  let description = [{
+    Calls a function operating on resource values with stream semantics.
+    Asynchronous calls must have no side-effects.
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    // TODO(benvanik): rework this to make more sense - it's mostly a copy of
+    // stream.cmd.dispatch mashed together with stream.async.call and it's kind
+    // of confusing.
+    Variadic<AnyTypeOf<[
+      Stream_PrimitiveType,
+      Stream_AnyStreamResource,
+      AnyType,  // for custom types
+    ]>>:$resource_operands,
+    Variadic<Stream_Size>:$resource_operand_sizes,
+    Variadic<Stream_Offset>:$resource_operand_offsets,
+    Variadic<Stream_Size>:$resource_operand_lengths,
+    Variadic<Stream_Size>:$result_sizes,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    Stream_ResourceAccessArrayAttr:$resource_operand_accesses
+  );
+  let results = (outs
+    Variadic<Stream_PrimitiveType>:$results
+  );
+
+  let assemblyFormat = [{
+    $callee ``
+    custom<CmdCallOperands>($resource_operands,
+                            $resource_operand_offsets,
+                            $resource_operand_lengths,
+                            $resource_operand_accesses) attr-dict `:`
+    custom<ShapedFunctionType>(ref($resource_operands),
+                               type($resource_operands),
+                               $resource_operand_sizes,
+                               type($results),
+                               $result_sizes,
+                               $tied_operands)
+  }];
+
+  let extraClassDeclaration = [{
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+
+    operand_iterator arg_operand_begin() { return getOperands().begin(); }
+    operand_iterator arg_operand_end() { return getOperands().end(); }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
+    Value getOperandSize(unsigned idx) {
+      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+    }
+    Value getResultSize(unsigned idx) { return {}; }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getResourceOperandsMutable();
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
 def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   AttrSizedOperandSegments,
   RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
-    "getSuccessorEntryOperands",
+    "getEntrySuccessorOperands",
   ]>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
@@ -2724,9 +3143,18 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupExplicitCommandOps
+
 //===----------------------------------------------------------------------===//
 // Synchronization ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupSynchronizationOps : OpDocGroup {
+  let summary = "Synchronization ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupSynchronizationOps in {
 
 def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
   ConstantLike,
@@ -2840,6 +3268,8 @@ def Stream_TimepointChainExternalOp :
     `(` $external_values `:` type($external_values) `)`
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
@@ -2998,36 +3428,20 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   let hasFolder = 1;
 }
 
+} // OpGroupSynchronizationOps
+
 //===----------------------------------------------------------------------===//
 // Channels
 //===----------------------------------------------------------------------===//
 
-def Stream_ChannelDefaultOp : Stream_PureOp<"channel.default", [
-  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  Stream_AffinityOp,
-]> {
-  let summary = [{returns a default collective communication channel}];
-  let description = [{
-    Returns a channel initialized using the runtime environment for the
-    particular affinity.
-  }];
-
-  let arguments = (ins
-    // TODO(benvanik): optional discriminator for groupings.
-    OptionalAttr<Stream_AffinityAttr>:$affinity
-  );
-  let results = (outs
-    Stream_Channel:$result
-  );
-
-  let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
+def OpGroupChannelOps : OpDocGroup {
+  let summary = "Channel ops";
+  let description = "";
 }
 
-def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
+let opDocGroup = OpGroupChannelOps in {
+
+def Stream_ChannelCreateOp : Stream_PureOp<"channel.create", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   Stream_AffinityOp,
@@ -3038,12 +3452,14 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
     affinity. Collective operations using this channel must only be submitted on
     compatible affinities.
 
-    The rank can be omitted to indicate a default inherited from the environment
-    or device configuration at runtime.
+    The group and ID are optional and may be null. The rank and count can be
+    omitted to indicate a default inherited from the environment or device
+    configuration at runtime.
   }];
 
   let arguments = (ins
-    // TODO(benvanik): optional discriminator for groupings.
+    Optional<Util_BufferType>:$id,
+    OptionalAttr<StrAttr>:$group,
     Optional<Index>:$rank,
     Optional<Index>:$count,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -3054,11 +3470,47 @@ def Stream_ChannelCreateOp : Stream_Op<"channel.create", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
+    (`id` `(` $id^ `)`)?
+    (`group` `(` $group^ `)`)?
     (`rank` `(` $rank^ `)`)?
     (`count` `(` $count^ `)`)?
     `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_ChannelSplitOp : Stream_PureOp<"channel.split", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+]> {
+  let summary = [{splits a collective communication channel}];
+  let description = [{
+    Partitions the group associated with the given channel into disjoint
+    subgroups for each unique value of color. Each new subgroup contains all
+    participants of the same color and within each subgroup the key argument
+    is used to define the rank order. When multiple participants in a group
+    use the same key the tie will be broken using their rank in the parent
+    group. A color of -1 indicates that the rank does not participate in any
+    subgroup and will return a null channel.
+  }];
+
+  let arguments = (ins
+    Stream_Channel:$channel,
+    Index:$color,
+    Index:$key
+  );
+  let results = (outs
+    Stream_Channel:$result
+  );
+
+  let assemblyFormat = [{
+    $channel `,` $color `,` $key
+    `:` type($channel) `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
@@ -3081,6 +3533,8 @@ def Stream_ChannelRankOp : Stream_PureOp<"channel.rank", [
      $channel `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasFolder = 1;
 }
 
 def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
@@ -3102,11 +3556,22 @@ def Stream_ChannelCountOp : Stream_PureOp<"channel.count", [
     $channel `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let hasFolder = 1;
 }
+
+} // OpGroupChannelOps
 
 //===----------------------------------------------------------------------===//
 // Executables
 //===----------------------------------------------------------------------===//
+
+def OpGroupExecutableOps : OpDocGroup {
+  let summary = "Executable ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupExecutableOps in {
 
 def Stream_ExecutableOp : Stream_Op<"executable", [
   IsolatedFromAbove,
@@ -3233,18 +3698,24 @@ def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
   }];
 }
 
+} // OpGroupExecutableOps
+
 //===----------------------------------------------------------------------===//
 // Misc
 //===----------------------------------------------------------------------===//
+
+def OpGroupMiscellaneousOps : OpDocGroup {
+  let summary = "Miscellaneous ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupMiscellaneousOps in {
 
 def Stream_ReturnOp : Stream_Op<"return", [
   ParentOneOf<[
     "IREE::Stream::ExecutableExportOp",
   ]>,
   Pure,
-  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
-    "getMutableSuccessorOperands",
-  ]>,
   ReturnLike,
   Terminator,
 ]> {
@@ -3272,10 +3743,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
     "IREE::Stream::CmdConcurrentOp",
   ]>,
   Pure,
-  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
-    "getMutableSuccessorOperands",
-  ]>,
-  ReturnLike,
+  DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface>,
   Terminator,
   SameVariadicOperandSize,
   Util_SizeAwareOp,
@@ -3315,5 +3783,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 }
+
+} // OpGroupMiscellaneousOps
 
 #endif  // IREE_DIALECT_STREAM_OPS

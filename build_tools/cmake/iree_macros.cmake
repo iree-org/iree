@@ -19,6 +19,146 @@ else()
   set(IREE_HOST_EXECUTABLE_SUFFIX "")
 endif()
 
+
+#-------------------------------------------------------------------------------
+# IREE_ARCH: identifies the target CPU architecture. May be empty when this is
+# ill-defined, such as multi-architecture builds.
+# This should be kept consistent with the C preprocessor token IREE_ARCH defined
+# in target_platform.h.
+#-------------------------------------------------------------------------------
+
+# First, get the raw CMake architecture name, not yet normalized. Even that is
+# non-trivial: it usually is CMAKE_SYSTEM_PROCESSOR, but on some platforms, we
+# have to read other variables instead.
+if(CMAKE_OSX_ARCHITECTURES)
+  # Borrowing from:
+  # https://boringssl.googlesource.com/boringssl/+/c5f0e58e653d2d9afa8facc090ce09f8aaa3fa0d/CMakeLists.txt#43
+  # https://github.com/google/XNNPACK/blob/2eb43787bfad4a99bdb613111cea8bc5a82f390d/CMakeLists.txt#L40
+  list(LENGTH CMAKE_OSX_ARCHITECTURES NUM_ARCHES)
+  if(${NUM_ARCHES} EQUAL 1)
+    # Only one arch in CMAKE_OSX_ARCHITECTURES, use that.
+    set(_IREE_UNNORMALIZED_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+  endif()
+  # Leaving _IREE_UNNORMALIZED_ARCH empty disables arch code paths. We will
+  # issue a performance warning about that below.
+elseif(CMAKE_GENERATOR MATCHES "^Visual Studio " AND CMAKE_GENERATOR_PLATFORM)
+  # Borrowing from:
+  # https://github.com/google/XNNPACK/blob/2eb43787bfad4a99bdb613111cea8bc5a82f390d/CMakeLists.txt#L50
+  set(_IREE_UNNORMALIZED_ARCH "${CMAKE_GENERATOR_PLATFORM}")
+else()
+  set(_IREE_UNNORMALIZED_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
+string(TOLOWER "${_IREE_UNNORMALIZED_ARCH}" _IREE_UNNORMALIZED_ARCH_LOWERCASE)
+
+# Normalize _IREE_UNNORMALIZED_ARCH into IREE_ARCH.
+if(EMSCRIPTEN)
+  # TODO: figure what to do about the wasm target, which masquerades as x86.
+  # This is the one case where the IREE_ARCH CMake variable is currently
+  # inconsistent with the IREE_ARCH C preprocessor token.
+  set(IREE_ARCH "")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "aarch64") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64e") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm64ec"))
+  set(IREE_ARCH "arm_64")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "arm") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^armv[5-8]"))
+  set(IREE_ARCH "arm_32")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86_64") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "amd64") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x64"))
+  set(IREE_ARCH "x86_64")
+elseif((_IREE_UNNORMALIZED_ARCH_LOWERCASE MATCHES "^i[3-7]86$") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "x86") OR
+        (_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "win32"))
+  set(IREE_ARCH "x86_32")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv64")
+  set(IREE_ARCH "riscv_64")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "riscv32")
+  set(IREE_ARCH "riscv_32")
+elseif(_IREE_UNNORMALIZED_ARCH_LOWERCASE STREQUAL "")
+  set(IREE_ARCH "")
+  message(WARNING "Performance advisory: architecture-specific code paths "
+    "disabled because no target architecture was specified or we didn't know "
+    "which CMake variable to read. Some relevant CMake variables:\n"
+    "CMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}\n"
+    "CMAKE_GENERATOR=${CMAKE_GENERATOR}\n"
+    "CMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}\n"
+    "CMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}\n"
+    )
+else()
+  set(IREE_ARCH "")
+  message(SEND_ERROR "Unrecognized target architecture ${_IREE_UNNORMALIZED_ARCH_LOWERCASE}")
+endif()
+
+# iree_arch_to_llvm_arch()
+#
+# Helper mapping an architecture in IREE's naming scheme (as in IREE_ARCH)
+# to an architecture in LLVM's naming scheme (as in LLVM target triples).
+function(iree_arch_to_llvm_arch DST_LLVM_ARCH_VARIABLE SRC_ARCH)
+  if("${SRC_ARCH}" STREQUAL "arm_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "aarch64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "arm_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "arm" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "x86_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "x86_64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "x86_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "i386" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "riscv_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "riscv64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "riscv_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "riscv32" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "wasm_64")
+    set(${DST_LLVM_ARCH_VARIABLE} "wasm64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "wasm_32")
+    set(${DST_LLVM_ARCH_VARIABLE} "wasm32" PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "What is the LLVM name of the architecture that we call ${SRC_ARCH} ?")
+    set(${DST_LLVM_ARCH_VARIABLE} "unknown" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# iree_arch_to_llvm_target()
+#
+# Helper mapping an architecture in IREE's naming scheme (as in IREE_ARCH)
+# to a LLVM CPU target (as in LLVM_TARGETS_TO_BUILD, the CMake variable).
+function(iree_arch_to_llvm_target DST_LLVM_TARGET_VARIABLE SRC_ARCH)
+  if("${SRC_ARCH}" STREQUAL "arm_64")
+    set(${DST_LLVM_TARGET_VARIABLE} "AArch64" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" STREQUAL "arm_32")
+    set(${DST_LLVM_TARGET_VARIABLE} "ARM" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^x86_")
+    set(${DST_LLVM_TARGET_VARIABLE} "X86" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^riscv_")
+    set(${DST_LLVM_TARGET_VARIABLE} "RISCV" PARENT_SCOPE)
+  elseif("${SRC_ARCH}" MATCHES "^wasm_")
+    set(${DST_LLVM_TARGET_VARIABLE} "WebAssembly" PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "What is the LLVM target handling of the architecture that we call ${SRC_ARCH} ?")
+    set(${DST_LLVM_TARGET_VARIABLE} "" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# iree_compiler_targeting_iree_arch
+#
+# Helper returning true if we are building the IREE compiler with the llvm-cpu
+# backend enabled and with the LLVM target supporting the CPU architecture
+# give in IREE's naming scheme (as in IREE_ARCH).
+function(iree_compiler_targeting_iree_arch DST_VAR SRC_ARCH)
+  if (NOT IREE_BUILD_COMPILER OR NOT IREE_TARGET_BACKEND_LLVM_CPU)
+    set(${DST_VAR} OFF PARENT_SCOPE)
+    return()
+  endif()
+  
+  iree_arch_to_llvm_target(_LLVM_TARGET "${SRC_ARCH}")
+  if (_LLVM_TARGET IN_LIST LLVM_TARGETS_TO_BUILD)
+    set(${DST_VAR} ON PARENT_SCOPE)
+  else()
+    set(${DST_VAR} OFF PARENT_SCOPE)
+  endif()
+endfunction()
+
 #-------------------------------------------------------------------------------
 # General utilities
 #-------------------------------------------------------------------------------
@@ -58,40 +198,48 @@ endfunction()
 #   runtime/src/iree/base/CMakeLists.txt -> iree::base
 #   tests/e2e/CMakeLists.txt -> iree::tests::e2e
 function(iree_package_ns PACKAGE_NS)
-  # Get the relative path of the current dir (i.e. runtime/src/iree/vm).
-  string(REPLACE ${IREE_ROOT_DIR} "" _IREE_RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
-  string(SUBSTRING ${_IREE_RELATIVE_PATH} 1 -1 _IREE_RELATIVE_PATH)
-
-  if(NOT ${CMAKE_CURRENT_LIST_DIR} MATCHES "^${IREE_ROOT_DIR}/.*")
-    # Function is being called from outside IREE. Use the source-relative path.
-    # Please check the README.md to see the potential risk.
-    string(REPLACE ${PROJECT_SOURCE_DIR} "" _SOURCE_RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
-    string(SUBSTRING ${_SOURCE_RELATIVE_PATH} 1 -1 _SOURCE_RELATIVE_PATH)
-    set(_PACKAGE "${_SOURCE_RELATIVE_PATH}")
-
-  # If changing the directory/package mapping rules, please also implement
-  # the corresponding rule in:
-  #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
-  # Some sub-trees form their own roots for package purposes. Rewrite them.
-  elseif(_IREE_RELATIVE_PATH MATCHES "^compiler/src/(.*)")
-    # compiler/src/iree/compiler -> iree/compiler
-    set(_PACKAGE "${CMAKE_MATCH_1}")
-  elseif(_IREE_RELATIVE_PATH MATCHES "^runtime/src/(.*)")
-    # runtime/src/iree/base -> iree/base
-    set(_PACKAGE "${CMAKE_MATCH_1}")
-  elseif(_IREE_RELATIVE_PATH MATCHES "^tools$")
-    # Special case for tools/ -> "" (empty string)
-    # For example, tools/iree-compile -> iree-compile (no namespace)
-    set(_PACKAGE "")
+  if(DEFINED IREE_PACKAGE_ROOT_DIR)
+    # If an enclosing package root dir is set, then the package is just the
+    # relative part after that.
+    cmake_path(RELATIVE_PATH CMAKE_CURRENT_LIST_DIR
+      BASE_DIRECTORY "${IREE_PACKAGE_ROOT_DIR}"
+      OUTPUT_VARIABLE _PACKAGE)
+    if(_PACKAGE STREQUAL ".")
+      set(_PACKAGE "")
+    endif()
+    if(IREE_PACKAGE_ROOT_PREFIX)
+      if("${_PACKAGE}" STREQUAL "")
+        set(_PACKAGE "${IREE_PACKAGE_ROOT_PREFIX}")
+      else()
+        set(_PACKAGE "${IREE_PACKAGE_ROOT_PREFIX}/${_PACKAGE}")
+      endif()
+    endif()
   else()
-    # Default to prefixing with iree/
-    set(_PACKAGE "iree/${_IREE_RELATIVE_PATH}")
+    # Get the relative path of the current dir (i.e. runtime/src/iree/vm).
+    string(REPLACE ${IREE_ROOT_DIR} "" _IREE_RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+    string(SUBSTRING ${_IREE_RELATIVE_PATH} 1 -1 _IREE_RELATIVE_PATH)
+
+    if(NOT ${CMAKE_CURRENT_LIST_DIR} MATCHES "^${IREE_ROOT_DIR}/.*")
+      # Function is being called from outside IREE. Use the source-relative path.
+      # Please check the README.md to see the potential risk.
+      string(REPLACE ${PROJECT_SOURCE_DIR} "" _SOURCE_RELATIVE_PATH ${CMAKE_CURRENT_LIST_DIR})
+      string(SUBSTRING ${_SOURCE_RELATIVE_PATH} 1 -1 _SOURCE_RELATIVE_PATH)
+      set(_PACKAGE "${_SOURCE_RELATIVE_PATH}")
+
+    # If changing the directory/package mapping rules, please also implement
+    # the corresponding rule in:
+    #   build_tools/bazel_to_cmake/bazel_to_cmake_targets.py
+    # Some sub-trees form their own roots for package purposes. Rewrite them.
+    else()
+      message(SEND_ERROR "iree_package_ns(): Could not determine package for ${CMAKE_CURRENT_LIST_DIR}")
+      set(_PACKAGE "iree/unknown")
+    endif()
   endif()
 
   string(REPLACE "/" "::" _PACKAGE_NS "${_PACKAGE}")
 
   if(_DEBUG_IREE_PACKAGE_NAME)
-    message(STATUS "iree_package_ns(): map ${_IREE_RELATIVE_PATH} -> ${_PACKAGE_NS}")
+    message(STATUS "iree_package_ns(): map ${CMAKE_CURRENT_LIST_DIR} -> ${_PACKAGE_NS}")
   endif()
 
   set(${PACKAGE_NS} ${_PACKAGE_NS} PARENT_SCOPE)
@@ -156,7 +304,7 @@ function(iree_select_compiler_opts OPTS)
     _IREE_SELECTS
     ""
     ""
-    "ALL;CLANG;CLANG_GTE_10;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
+    "ALL;CLANG;CLANG_GTE_10;CLANG_GTE_12;CLANG_CL;MSVC;GCC;CLANG_OR_GCC;MSVC_OR_CLANG_CL"
   )
   # OPTS is a variable containing the *name* of the variable being populated, so
   # we need to dereference it twice.
@@ -173,6 +321,9 @@ function(iree_select_compiler_opts OPTS)
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG})
       if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
         list(APPEND _OPTS ${_IREE_SELECTS_CLANG_GTE_10})
+      endif()
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 12)
+        list(APPEND _OPTS ${_IREE_SELECTS_CLANG_GTE_12})
       endif()
       list(APPEND _OPTS ${_IREE_SELECTS_CLANG_OR_GCC})
     endif()
@@ -231,6 +382,17 @@ function(iree_add_data_dependencies)
       add_dependencies(${_RULE_NAME} ${_DATA_TARGET})
     endif()
   endforeach()
+endfunction()
+
+#-------------------------------------------------------------------------------
+# iree_make_empty_file
+#-------------------------------------------------------------------------------
+
+# Creates an empty file by copying an in-tree empty file. Unlike `file(WRITE)`
+# or `file(TOUCH)`, this does not update the timestamp every time CMake is run,
+# avoiding unnecessary rebuilds when the empty file is used as a rule input.
+function(iree_make_empty_file _FILENAME)
+  configure_file("${PROJECT_SOURCE_DIR}/build_tools/cmake/empty_file" "${_FILENAME}" COPYONLY)
 endfunction()
 
 #-------------------------------------------------------------------------------
@@ -413,7 +575,7 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
     return()
   endif()
 
-  if(ANDROID AND NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+  if(ANDROID AND NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # Android's CMake toolchain defines some variables that we can use to infer
     # the appropriate target triple from the configured settings:
     # https://developer.android.com/ndk/guides/cmake#android_platform
@@ -424,28 +586,28 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
     # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
     # should pretty consistently be just a number we can use for target triple.
     set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
-    list(APPEND _FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
+    list(APPEND _FLAGS "--iree-llvmcpu-target-triple=${_TARGET_TRIPLE}")
   endif()
 
-  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+  if(IREE_ARCH STREQUAL "riscv_64" AND
      CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
-     NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+     NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV64 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
     # llvm-target-triple is not specified.
     list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
-  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+  elseif(IREE_ARCH STREQUAL "riscv_32" AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
-         NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+         NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV32 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
     # llvm-target-triple is not specified.
     list(APPEND _FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
   endif()
 
-  if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+  if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     set(_EMSCRIPTEN_TEST_DEFAULT_FLAGS
-      "--iree-llvm-target-triple=wasm32-unknown-emscripten"
+      "--iree-llvmcpu-target-triple=wasm32-unknown-emscripten"
     )
     list(APPEND _FLAGS ${_EMSCRIPTEN_TEST_DEFAULT_FLAGS})
   endif()

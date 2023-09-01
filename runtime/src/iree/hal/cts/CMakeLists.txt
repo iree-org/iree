@@ -14,6 +14,7 @@ set(IREE_ALL_CTS_TESTS
   "driver"
   "event"
   "executable_cache"
+  "file"
   "pipeline_layout"
   "semaphore"
   "semaphore_submission"
@@ -152,6 +153,18 @@ iree_cc_library(
     executable_cache_test_library
   HDRS
     "executable_cache_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+)
+
+iree_cc_library(
+  NAME
+    file_test_library
+  HDRS
+    "file_test.h"
   DEPS
     ::cts_test_base
     iree::base

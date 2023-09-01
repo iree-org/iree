@@ -11,10 +11,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/string_builder.h"
 #include "iree/vm/ref.h"
 
 #ifdef __cplusplus
@@ -377,8 +375,12 @@ typedef struct iree_vm_module_t {
 
   // Looks up a function with the given name and linkage in the module.
   // This may perform a linear scan and results should be cached.
+  // An optional |expected_signature| can be specified in cases where the
+  // module may be able to provide additional validation or versioning based on
+  // it. Implementations should not assume all lookups will include a signature.
   iree_status_t(IREE_API_PTR* lookup_function)(
       void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
+      const iree_vm_function_signature_t* expected_signature,
       iree_vm_function_t* out_function);
 
   // Gets one or more pieces of function information:
@@ -400,10 +402,10 @@ typedef struct iree_vm_module_t {
       void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
       iree_host_size_t index, iree_string_pair_t* out_attr);
 
-  // Resolves a stack |frame| from the module to a |out_source_location|, if
-  // debug information is available.
+  // Resolves a |function| at |pc| from the module to a |out_source_location|,
+  // if debug information is available.
   iree_status_t(IREE_API_PTR* resolve_source_location)(
-      void* self, iree_vm_stack_frame_t* frame,
+      void* self, iree_vm_function_t function, iree_vm_source_offset_t pc,
       iree_vm_source_location_t* out_source_location);
 
   // Allocates module state data.
@@ -508,11 +510,11 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
     const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
     iree_host_size_t ordinal, iree_vm_function_t* out_function);
 
-// Resolves a stack |frame| from the module to a |out_source_location|, if
+// Resolves a |function| at |pc| from the module to a |out_source_location|, if
 // debug information is available.
 IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
-    const iree_vm_module_t* module, iree_vm_stack_frame_t* frame,
-    iree_vm_source_location_t* out_source_location);
+    const iree_vm_module_t* module, iree_vm_function_t function,
+    iree_vm_source_offset_t pc, iree_vm_source_location_t* out_source_location);
 
 //===----------------------------------------------------------------------===//
 // iree_vm_function_t

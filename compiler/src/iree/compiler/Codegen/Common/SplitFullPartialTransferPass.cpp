@@ -6,8 +6,9 @@
 
 #include <string>
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
@@ -36,7 +37,7 @@ struct SplitFullPartialTransferPass
             .Case("vector-transfers",
                   vector::VectorTransferSplit::VectorTransfer)
             .Default(vector::VectorTransferSplit::None));
-    patterns.add<vector::VectorTransferFullPartialRewriter>(ctx, options);
+    populateVectorTransferFullPartialPatterns(patterns, options);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -44,16 +45,16 @@ struct SplitFullPartialTransferPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSplitFullPartialTransferPass() {
   return std::make_unique<SplitFullPartialTransferPass>();
 }
-std::unique_ptr<OperationPass<func::FuncOp>> createSplitFullPartialTransferPass(
-    StringRef option) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSplitFullPartialTransferPass(StringRef option) {
   return std::make_unique<SplitFullPartialTransferPass>(option);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

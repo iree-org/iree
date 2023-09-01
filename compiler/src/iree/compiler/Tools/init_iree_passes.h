@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
@@ -33,7 +34,7 @@
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
 // TODO: Remove these once rolled up into explicit registration.
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
 
 namespace mlir {
 namespace iree_compiler {
@@ -47,6 +48,7 @@ inline void registerAllIreePasses() {
   IREE::TFLite::registerTransformPassPipeline();
 
   ConstEval::registerConstEvalPasses();
+  GlobalOptimization::registerGlobalOptimizationPipeline();
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
   IREE::HAL::Inline::registerHALInlinePasses();
@@ -67,10 +69,10 @@ inline void registerAllIreePasses() {
   // TODO: Eliminate these.
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
   IREE::VM::createConvertVMToEmitCPass();
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_IREE_PASSES_H_
+#endif // IREE_COMPILER_TOOLS_INIT_IREE_PASSES_H_

@@ -4,17 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_cc_library(
-  NAME
-    defs
-  INCLUDES
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_BINARY_DIR}
-  PUBLIC
-)
-
-# Configures all iree_cc_* targets to take this implicit dep,
-# which provides common includes and copts for the tree.
-set(IREE_IMPLICIT_DEFS_CC_DEPS iree::runtime::src::defs)
+set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
+set(IREE_PACKAGE_ROOT_PREFIX "")
 
 add_subdirectory(iree)

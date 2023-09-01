@@ -6,6 +6,35 @@
 
 include(CMakeParseArguments)
 
+# iree_redirect_llvm_dylib_deps(DEPS_VAR)
+#
+# Filters a list of CC dependencies, making alterations as needed to
+# to redirect LLVM libraries to the libLLVM.so dynamic library, when LLVM
+# has been configured to link against it.
+# This is necessary to preserve the one-definition rule in the build graph
+# in a consistent way as to how AddLLVM.cmake does it.
+# Note that this only really works if libLLVM.so was configured to contain
+# "all" components. If this ever becomes unworkable, we may need to port the
+# component naming logic and selectively choose when to divert.
+function(iree_redirect_llvm_dylib_deps DEPS_VAR)
+  set(_deps ${${DEPS_VAR}})
+  set(_new_deps)
+  set(_modified FALSE)
+  foreach(_dep ${_deps})
+    # If linking against the LLVM dylib, then divert any LLVM prefixed
+    # targets there.
+    if(LLVM_LINK_LLVM_DYLIB AND _dep MATCHES "^LLVM")
+      list(APPEND _new_deps "LLVM")
+      set(_modified TRUE)
+    else()
+      list(APPEND _new_deps "${_dep}")
+    endif()
+  endforeach()
+  if(_modified)
+    set(${DEPS_VAR} "${_new_deps}" PARENT_SCOPE)
+  endif()
+endfunction()
+
 # iree_cc_library()
 #
 # CMake function to imitate Bazel's cc_library rule.
@@ -18,6 +47,11 @@ include(CMakeParseArguments)
 # SRCS: List of source files for the library
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
+# DISABLE_LLVM_LINK_LLVM_DYLIB: Disables linking against the libLLVM.so dynamic
+#   library, even if the build is configured to do so. This must be used with
+#   care as it can only contain dependencies and be used by binaries that also
+#   so disable it (either in upstream LLVM or locally). In practice, it is used
+#   for LLVM dependency chains that must always result in static-linked tools.
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
@@ -61,7 +95,7 @@ include(CMakeParseArguments)
 function(iree_cc_library)
   cmake_parse_arguments(
     _RULE
-    "PUBLIC;TESTONLY;SHARED"
+    "PUBLIC;TESTONLY;SHARED;DISABLE_LLVM_LINK_LLVM_DYLIB"
     "PACKAGE;NAME;WINDOWS_DEF_FILE"
     "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
@@ -82,8 +116,15 @@ function(iree_cc_library)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   set(_OBJECTS_NAME ${_NAME}.objects)
 
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "  : iree_cc_library(${_NAME})")
+  endif()
+
   # Replace dependencies passed by ::name with iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  if(NOT _RULE_DISABLE_LLVM_LINK_LLVM_DYLIB)
+    iree_redirect_llvm_dylib_deps(_RULE_DEPS)
+  endif()
 
   # Check if this is a header-only library.
   # Note that as of February 2019, many popular OS's (for example, Ubuntu
@@ -113,7 +154,7 @@ function(iree_cc_library)
 
   if(NOT _RULE_IS_INTERFACE)
     add_library(${_OBJECTS_NAME} OBJECT)
-    if(_RULE_SHARED)
+    if(_RULE_SHARED OR BUILD_SHARED_LIBS)
       add_library(${_NAME} SHARED "$<TARGET_OBJECTS:${_OBJECTS_NAME}>")
       if(_RULE_WINDOWS_DEF_FILE AND WIN32)
         target_sources(${_NAME} PRIVATE "${_RULE_WINDOWS_DEF_FILE}")
@@ -189,6 +230,7 @@ function(iree_cc_library)
     target_link_libraries(${_NAME}
       PUBLIC
         ${_RULE_DEPS}
+        ${IREE_THREADS_DEPS}
     )
 
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
@@ -196,6 +238,17 @@ function(iree_cc_library)
       PUBLIC
         ${_RULE_DEFINES}
     )
+
+    # If in BUILD_SHARED_LIBS mode, then we need to make sure that visibility
+    # is not hidden. We default to hidden visibility in the main copts so
+    # need to undo it here.
+    # TODO: Switch to the CXX_VISIBILITY_PRESET property and fix the global
+    # hidden setting to follow suit.
+    if(BUILD_SHARED_LIBS AND IREE_SUPPORTS_VISIBILITY_DEFAULT)
+      target_compile_options(${_OBJECTS_NAME} PRIVATE
+        "-fvisibility=default"
+      )
+    endif()
 
     # Add all IREE targets to a folder in the IDE for organization.
     if(_RULE_PUBLIC)
@@ -242,6 +295,9 @@ function(iree_cc_library)
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
+  endif()
   add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
 
   if(NOT "${_PACKAGE_NS}" STREQUAL "")
@@ -249,7 +305,7 @@ function(iree_cc_library)
     # it as a default. For example, foo/bar/ library 'bar' would end up as
     # 'foo::bar'.
     iree_package_dir(_PACKAGE_DIR)
-    if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
+    if("${_RULE_NAME}" STREQUAL "${_PACKAGE_DIR}")
       add_library(${_PACKAGE_NS} ALIAS ${_NAME})
     endif()
   endif()
@@ -384,4 +440,22 @@ function(iree_cc_unified_library)
   if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
   endif()
+endfunction()
+
+# iree_cc_library_exclude_from_all(target exclude)
+#
+# For a target previously defined in the same package, set the
+# EXCLUDE_FROM_ALL property.
+#
+# This is necessary because cc_library targets consist of multiple sub-targets
+# and they all must have the property set.
+function(iree_cc_library_exclude_from_all target exclude_from_all)
+  iree_package_ns(_PACKAGE_NS)
+  iree_package_name(_PACKAGE_NAME)
+
+  set(_NAME "${_PACKAGE_NAME}_${target}")
+  set(_OBJECTS_NAME ${_NAME}.objects)
+
+  set_target_properties(${_NAME} ${_OBJECTS_NAME}
+    PROPERTIES EXCLUDE_FROM_ALL ${exclude_from_all})
 endfunction()

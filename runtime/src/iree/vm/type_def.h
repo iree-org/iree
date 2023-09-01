@@ -23,66 +23,63 @@ extern "C" {
 // * i8: primitive value (value_type != 0)
 // * !vm.ref<?>: any ref value (ref_type == IREE_VM_REF_TYPE_ANY)
 // * !vm.ref<!foo>: ref value of type !foo (ref_type > 0)
+//
+// Implementation note: since type defs are used frequently and live in tables
+// and on the stack we pack the value and ref types together into a single
+// native machine word. This exploits the fact that iree_vm_ref_type_t is a
+// pointer to a struct that should always be aligned to some multiple of the
+// native machine word and we'll have low bits to spare.
 typedef struct iree_vm_type_def_t {
-  iree_vm_value_type_t value_type : 8;
-  iree_vm_ref_type_t ref_type : 24;
+  uintptr_t value_type_bits : IREE_VM_REF_TYPE_TAG_BITS;
+  uintptr_t ref_type_bits : IREE_VM_REF_TYPE_PTR_BITS;
 } iree_vm_type_def_t;
+static_assert(sizeof(iree_vm_type_def_t) == sizeof(uintptr_t),
+              "iree_vm_type_def_t should be a single native machine word");
+static_assert(
+    IREE_VM_VALUE_TYPE_MAX <= IREE_VM_REF_TYPE_TAG_BIT_MASK,
+    "iree_vm_value_type_t must fit within the iree_vm_ref_type_t tag bits");
 
-static inline iree_vm_type_def_t iree_vm_type_def_make_variant_type(void) {
-  iree_vm_type_def_t result;
-  result.value_type = IREE_VM_VALUE_TYPE_NONE;
-  result.ref_type = IREE_VM_REF_TYPE_NULL;
-  return result;
-}
-
-static inline iree_vm_type_def_t iree_vm_type_def_make_value_type(
-    iree_vm_value_type_t value_type) {
-  iree_vm_type_def_t result;
-  result.value_type = value_type;
-  result.ref_type = IREE_VM_REF_TYPE_NULL;
-  return result;
-}
-
-static inline iree_vm_type_def_t iree_vm_type_def_make_ref_type(
-    iree_vm_ref_type_t ref_type) {
-  iree_vm_type_def_t result;
-  result.value_type = IREE_VM_VALUE_TYPE_NONE;
-  result.ref_type = ref_type;
-  return result;
-}
+#define iree_vm_type_def_as_value(v) (iree_vm_value_type_t)((v).value_type_bits)
+#define iree_vm_type_def_as_ref(v) \
+  (((iree_vm_ref_type_t)(v).ref_type_bits) << IREE_VM_REF_TYPE_TAG_BITS)
 
 #define iree_vm_type_def_is_value(v) \
-  ((v)->value_type != IREE_VM_VALUE_TYPE_NONE)
-#define iree_vm_type_def_is_ref(v) ((v)->ref_type != IREE_VM_REF_TYPE_NULL)
-#define iree_vm_type_def_is_variant(v)           \
-  ((v)->value_type == IREE_VM_VALUE_TYPE_NONE && \
-   (v)->ref_type == IREE_VM_REF_TYPE_NULL)
+  (iree_vm_type_def_as_value(v) != IREE_VM_VALUE_TYPE_NONE)
+#define iree_vm_type_def_is_ref(v) \
+  (iree_vm_type_def_as_ref(v) != IREE_VM_REF_TYPE_NULL)
+#define iree_vm_type_def_is_variant(v)                        \
+  (iree_vm_type_def_as_value(v) == IREE_VM_VALUE_TYPE_NONE && \
+   iree_vm_type_def_as_ref(v) == IREE_VM_REF_TYPE_NULL)
+#define iree_vm_type_def_is_undefined(v) iree_vm_type_def_is_variant(v)
 
-// An variant value that can be either a primitive value type or a ref type.
-// Each variant value stores its type but users are required to check the type
-// prior to accessing any of the data.
-typedef struct iree_vm_variant_t {
-  iree_vm_type_def_t type;
-  union {
-    // TODO(benvanik): replace with iree_vm_value_t.
-    int8_t i8;
-    int16_t i16;
-    int32_t i32;
-    int64_t i64;
-    float f32;
-    double f64;
-    iree_vm_ref_t ref;
+static inline bool iree_vm_type_def_equal(iree_vm_type_def_t a,
+                                          iree_vm_type_def_t b) {
+  return a.value_type_bits == b.value_type_bits &&
+         a.ref_type_bits == b.ref_type_bits;
+}
 
-    uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value
-                                                        // types
-  };
-} iree_vm_variant_t;
+static inline iree_vm_type_def_t iree_vm_make_undefined_type_def(void) {
+  iree_vm_type_def_t result;
+  result.value_type_bits = IREE_VM_VALUE_TYPE_NONE;
+  result.ref_type_bits = IREE_VM_REF_TYPE_NULL;
+  return result;
+}
 
-#define iree_vm_variant_empty() \
-  { {IREE_VM_VALUE_TYPE_NONE, IREE_VM_REF_TYPE_NULL}, {0}, }
-#define iree_vm_variant_is_value(v) iree_vm_type_def_is_value(&(v).type)
-#define iree_vm_variant_is_ref(v) iree_vm_type_def_is_ref(&(v).type)
-#define iree_vm_variant_is_empty(v) iree_vm_type_def_is_variant(&(v).type)
+static inline iree_vm_type_def_t iree_vm_make_value_type_def(
+    iree_vm_value_type_t value_type) {
+  iree_vm_type_def_t result;
+  result.value_type_bits = value_type;
+  result.ref_type_bits = IREE_VM_REF_TYPE_NULL;
+  return result;
+}
+
+static inline iree_vm_type_def_t iree_vm_make_ref_type_def(
+    iree_vm_ref_type_t ref_type) {
+  iree_vm_type_def_t result;
+  result.value_type_bits = IREE_VM_VALUE_TYPE_NONE;
+  result.ref_type_bits = ref_type >> IREE_VM_REF_TYPE_TAG_BITS;
+  return result;
+}
 
 #ifdef __cplusplus
 }  // extern "C"

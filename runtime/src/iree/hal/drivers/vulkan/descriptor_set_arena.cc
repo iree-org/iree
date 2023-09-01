@@ -11,11 +11,10 @@
 #include <utility>
 
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
+#include "iree/hal/drivers/vulkan/base_buffer.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
-#include "iree/hal/drivers/vulkan/vma_buffer.h"
 
 namespace iree {
 namespace hal {
@@ -37,10 +36,9 @@ static void PopulateDescriptorSetWriteInfos(
     const auto& binding = bindings[i];
 
     auto& buffer_info = buffer_infos[i];
-    buffer_info.buffer =
-        binding.buffer ? iree_hal_vulkan_vma_buffer_handle(
-                             iree_hal_buffer_allocated_buffer(binding.buffer))
-                       : VK_NULL_HANDLE;
+    buffer_info.buffer = binding.buffer
+                             ? iree_hal_vulkan_buffer_handle(binding.buffer)
+                             : VK_NULL_HANDLE;
     buffer_info.offset =
         iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
     if (binding.length == IREE_WHOLE_BUFFER) {
@@ -62,7 +60,7 @@ static void PopulateDescriptorSetWriteInfos(
       // to match the ABI and provide the buffer as 32-bit aligned, otherwise
       // the whole read by the shader is considered as out of bounds per the
       // Vulkan spec. See
-      // https://github.com/iree-org/iree/issues/2022#issuecomment-640617234 for
+      // https://github.com/openxla/iree/issues/2022#issuecomment-640617234 for
       // more details.
       buffer_info.range = iree_device_align(
           std::min(binding.length, iree_hal_buffer_byte_length(binding.buffer) -
@@ -130,7 +128,7 @@ iree_status_t DescriptorSetArena::BindDescriptorSet(
     return iree_ok_status();
   }
 
-  IREE_TRACE_SCOPE0("DescriptorSetArena::BindDescriptorSet");
+  IREE_TRACE_SCOPE_NAMED("DescriptorSetArena::BindDescriptorSet");
 
   auto* set_layout =
       iree_hal_vulkan_native_pipeline_layout_set(pipeline_layout, set);
@@ -220,7 +218,7 @@ void DescriptorSetArena::PushDescriptorSet(
     VkCommandBuffer command_buffer, iree_hal_pipeline_layout_t* pipeline_layout,
     uint32_t set, iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
-  IREE_TRACE_SCOPE0("DescriptorSetArena::PushDescriptorSet");
+  IREE_TRACE_SCOPE_NAMED("DescriptorSetArena::PushDescriptorSet");
   VkPipelineLayout device_pipeline_layout =
       iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout);
 
@@ -239,7 +237,7 @@ void DescriptorSetArena::PushDescriptorSet(
 }
 
 DescriptorSetGroup DescriptorSetArena::Flush() {
-  IREE_TRACE_SCOPE0("DescriptorSetArena::Flush");
+  IREE_TRACE_SCOPE_NAMED("DescriptorSetArena::Flush");
 
   if (used_descriptor_pools_.empty()) {
     // No resources to free.

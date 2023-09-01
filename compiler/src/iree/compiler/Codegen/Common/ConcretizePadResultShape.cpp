@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
@@ -30,10 +31,11 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
                              Location loc) {
   IntegerAttr attr;
   if (Value val = attrOrValue.dyn_cast<Value>()) {
-    if (val.getType().isIndex()) return val;
+    if (val.getType().isIndex())
+      return val;
     matchPattern(val, m_Constant(&attr));
   } else {
-    attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
+    attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
   }
   return builder.createOrFold<arith::ConstantIndexOp>(
       loc, attr.getValue().getSExtValue());
@@ -49,7 +51,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
   LogicalResult matchAndRewrite(tensor::PadOp padOp,
                                 PatternRewriter &rewriter) const override {
     // If the result shape is already static, then nothing to do.
-    if (padOp.getResultType().hasStaticShape()) return failure();
+    if (padOp.getResultType().hasStaticShape())
+      return failure();
 
     int rank = padOp.getResultType().getRank();
     SmallVector<int64_t> staticShape;
@@ -57,7 +60,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
 
     auto sourceIfxOp = dyn_cast_or_null<OffsetSizeAndStrideOpInterface>(
         padOp.getSource().getDefiningOp());
-    if (!sourceIfxOp) return failure();
+    if (!sourceIfxOp)
+      return failure();
 
     SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> source = sourceIfxOp.getMixedSizes();
@@ -84,8 +88,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
       // SSA values that would need invoking other patterns to simplify. We
       // cannot invoke patterns in patterns.
       AffineMap map = addMap;
-      fullyComposeAffineMapAndOperands(&map, &valueSizes);
-      canonicalizeMapAndOperands(&map, &valueSizes);
+      affine::fullyComposeAffineMapAndOperands(&map, &valueSizes);
+      affine::canonicalizeMapAndOperands(&map, &valueSizes);
 
       auto cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
       // Specially handle the case where we have both dimensions and symbols and
@@ -104,10 +108,11 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
         map = map.replace(dimToSymMap, /*numResultDims=*/0,
                           /*numResultSyms=*/numDims + numSyms);
 
-        canonicalizeMapAndOperands(&map, &valueSizes);
+        affine::canonicalizeMapAndOperands(&map, &valueSizes);
         cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
       }
-      if (!cstExpr) return failure();
+      if (!cstExpr)
+        return failure();
 
       staticShape.push_back(cstExpr.getValue());
     }
@@ -124,7 +129,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
 
 class ConcretizePadResultShapePass final
     : public ConcretizePadResultShapeBase<ConcretizePadResultShapePass> {
- public:
+public:
   ConcretizePadResultShapePass() = default;
   ConcretizePadResultShapePass(const ConcretizePadResultShapePass &pass) =
       default;
@@ -135,7 +140,7 @@ class ConcretizePadResultShapePass final
 
     {
       RewritePatternSet patterns(context);
-      populateConcretizePadResultShapePatterns(context, patterns);
+      populateConcretizePadResultShapePatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -150,22 +155,20 @@ class ConcretizePadResultShapePass final
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConcretizePadResultShapePass() {
   return std::make_unique<ConcretizePadResultShapePass>();
 }
 
-void populateConcretizePadResultShapePatterns(MLIRContext *context,
-                                              RewritePatternSet &patterns) {
+void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
+                                              ArrayRef<int64_t> numWorkgroups) {
+  MLIRContext *context = patterns.getContext();
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   // Pulling in upstream scf.for and affine.min canonicalization patterns.
   // They work on tiled (but not distributed) loops.
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  // Pulling in IREE scf.for and affine.min canonicalization patterns.
-  // They work on tiled and distributed loops.
-  populateFoldAffineMinInDistributedLoopsPatterns(patterns);
   // Pulling in flow.dispatch.tensor.load op canonicalization patterns.
   // Tiling can generate dim ops taking them as operands.
   IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,
@@ -177,5 +180,5 @@ void populateConcretizePadResultShapePatterns(MLIRContext *context,
   patterns.add<ConcretizePadResultShape>(context);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -30,15 +30,13 @@ iree_cc_library(
     "tensor.h"
   DEPS
     iree::base
-    iree::base::core_headers
     iree::base::internal
     iree::base::internal::synchronization
-    iree::base::tracing
     iree::hal
     iree::hal::drivers
     iree::modules::hal
     iree::vm
-    iree::vm::bytecode_module
+    iree::vm::bytecode::module
   PUBLIC
 )
 

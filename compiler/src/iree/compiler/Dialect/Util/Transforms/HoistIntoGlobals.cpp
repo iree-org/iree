@@ -15,7 +15,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
-#define DEBUG_TYPE "iree-util-hoist-into-globals"
+#define DEBUG_TYPE "iree-constexpr"
 
 using llvm::dbgs;
 
@@ -28,14 +28,14 @@ namespace {
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
-// expressions into globals. It is not expected that such a greedy algorithm
-// is great, but it is simple. Naive use of this algorithm very likely
+// Hoist expressions into globals. It is not expected that such a greedy
+// algorithm is great, but it is simple. Naive use of this algorithm very likely
 // favors programs that consume more memory at runtime than is strictly
 // necessary. Either this algorithm can be made smarter or a follow-on pass
 // can sink globals into the program where it is profitable to reduce
 // working set size.
 class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registerConstExprDependentDialects(registry);
   }
@@ -102,6 +102,9 @@ class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
       Location loc = originalValue.getLoc();
       OpBuilder builder = getModuleEndBuilder();
       auto initializerOp = builder.create<InitializerOp>(loc);
+      // Signals that this initializer is eligible for constant evaluation
+      // at compile time.
+      initializerOp->setAttr("iree.compiler.consteval", builder.getUnitAttr());
       Block *entryBlock = initializerOp.addEntryBlock();
       OpBuilder initBuilder = OpBuilder::atBlockEnd(entryBlock);
       IRMapping valueMapping;
@@ -116,11 +119,13 @@ class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
     return existingGlobal;
   }
 
-  void cloneProducerTreeInto(
-      OpBuilder &builder, const ConstExprAnalysis::ConstValueInfo *producerInfo,
-      HoistedValueMap &hoistedMap, IRMapping &cloneMapping,
-      const ConstExprAnalysis &constExprs) {
-    if (cloneMapping.contains(producerInfo->constValue)) return;
+  void
+  cloneProducerTreeInto(OpBuilder &builder,
+                        const ConstExprAnalysis::ConstValueInfo *producerInfo,
+                        HoistedValueMap &hoistedMap, IRMapping &cloneMapping,
+                        const ConstExprAnalysis &constExprs) {
+    if (cloneMapping.contains(producerInfo->constValue))
+      return;
 
     // We either have a global associated already or we need to traverse
     // down and materialize producers.
@@ -225,13 +230,13 @@ class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass() {
   return std::make_unique<HoistIntoGlobalsPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

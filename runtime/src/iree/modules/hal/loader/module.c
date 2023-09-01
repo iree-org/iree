@@ -7,7 +7,6 @@
 #include "iree/modules/hal/loader/module.h"
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/vm/api.h"

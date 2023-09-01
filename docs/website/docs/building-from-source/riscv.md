@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - CPU
+icon: octicons/cpu-16
+---
+
 # RISC-V cross-compilation
 
 Running on a platform like RISC-V involves cross-compiling from a _host_
@@ -68,7 +76,7 @@ cmake --build ../iree-build/ --target install
 
 The following instruction shows how to build for a RISC-V 64-bit Linux machine.
 For other RISC-V targets, please refer to
-[riscv.toolchain.cmake](https://github.com/iree-org/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
+[riscv.toolchain.cmake](https://github.com/openxla/iree/blob/main/build_tools/cmake/riscv.toolchain.cmake)
 as a reference of how to set up the cmake configuration.
 
 #### RISC-V 64-bit Linux target
@@ -90,7 +98,7 @@ cmake --build ../iree-build-riscv/
 !!! note
     The following instructions are meant for the RISC-V 64-bit Linux
     target. For the bare-metal target, please refer to
-    [simple_embedding](https://github.com/iree-org/iree/blob/main/samples/simple_embedding)
+    [simple_embedding](https://github.com/openxla/iree/blob/main/samples/simple_embedding)
     to see how to build a ML workload for a bare-metal machine.
 
 Set the path to qemu-riscv64 Linux emulator binary in the `QEMU_BIN` environment
@@ -141,16 +149,16 @@ ${QEMU_BIN} \
 [https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
 
 The SIMD code can be generated following the
-[IREE CPU flow](../deployment-configurations/cpu.md)
+[IREE CPU flow](../guides/deployment-configurations/cpu.md)
 with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
 tools/iree-compile \
   --iree-hal-target-backends=llvm-cpu \
-  --iree-llvm-target-triple=riscv64 \
-  --iree-llvm-target-cpu=generic-rv64 \
-  --iree-llvm-target-abi=lp64d \
-  --iree-llvm-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
+  --iree-llvmcpu-target-triple=riscv64 \
+  --iree-llvmcpu-target-cpu=generic-rv64 \
+  --iree-llvmcpu-target-abi=lp64d \
+  --iree-llvmcpu-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
   --riscv-v-fixed-length-vector-lmul-max=8 \
   iree_input.mlir -o mobilenet_cpu.vmfb
 ```

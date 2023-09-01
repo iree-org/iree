@@ -20,19 +20,23 @@ add_mlir_library(IREELinalgTransformDialect
   MLIRPDLDialect
   MLIRRewrite
   MLIRTransformDialect
+  MLIRTransformPDLExtension
 
   # Transforms
+  MLIRAffineToStandard
   MLIRAsyncTransforms
   MLIRLinalgTransforms
-  MLIRAffineToStandard
-  MLIRTransforms
+  MLIRMemRefTransforms
   MLIRReconcileUnrealizedCasts
-  
+  MLIRTensorTransformOps
+  MLIRTransforms
+  MLIRVectorToSCF
+
   # Conversions
   MLIRAsyncToLLVM
+  MLIRIndexToLLVM
   MLIRMemRefToLLVM
   MLIRMathToLLVM
   MLIRVectorToLLVM
-  MLIRLinalgToLLVM
   MLIRSCFToControlFlow
 )

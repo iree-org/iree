@@ -34,7 +34,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
@@ -62,7 +62,8 @@ class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
     // are mutually exclusive.
     parentOp.walk([&](IREE::Stream::ResourceAllocOp allocOp) {
       // If just one result then ignore (nothing to pack).
-      if (allocOp.getResults().size() == 1) return;
+      if (allocOp.getResults().size() == 1)
+        return;
       auto resourceType = allocOp.getResults().front().getType();
 
       // NOTE: this is risky: we are assuming right now that all of the
@@ -105,14 +106,14 @@ class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<InterfacePass<CallableOpInterface>>
 createPackAllocationsPass() {
   return std::make_unique<PackAllocationsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

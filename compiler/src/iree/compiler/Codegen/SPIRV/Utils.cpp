@@ -12,7 +12,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
@@ -29,44 +29,36 @@ const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   auto variant = op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variant) return nullptr;
+  if (!variant)
+    return nullptr;
   IREE::HAL::ExecutableTargetAttr targetAttr = variant.getTarget();
-  if (!targetAttr) return nullptr;
+  if (!targetAttr)
+    return nullptr;
   auto config = targetAttr.getConfiguration();
-  if (!config) return nullptr;
+  if (!config)
+    return nullptr;
   return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
 }
 
-/// Returns true if the given MemRef is in workgroup memory.
-bool isInWorkgroupMemory(MemRefType memrefType) {
-  auto attribute =
-      memrefType.getMemorySpace().dyn_cast_or_null<gpu::AddressSpaceAttr>();
-  if (attribute &&
-      attribute.getValue() == gpu::GPUDialect::getWorkgroupAddressSpace())
-    return true;
-  return false;
-}
-
-llvm::Optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
+std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
   auto moduleOp = funcOp->getParentOfType<ModuleOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   auto exportOp = exportOps.lookup(funcOp.getName());
-  if (!exportOp) return std::nullopt;
-  if (auto size = exportOp.getSubgroupSize()) return size->getSExtValue();
+  if (!exportOp)
+    return std::nullopt;
+  if (auto size = exportOp.getSubgroupSize())
+    return size->getSExtValue();
 
   spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(funcOp);
-  if (!target) return std::nullopt;
+  if (!target)
+    return std::nullopt;
   return target.getResourceLimits().getSubgroupSize();
 }
 
 FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
                                                  int tilingLevel) {
-  SmallVector<Operation *> computeOps;
-  if (failed(getComputeOps(funcOp, computeOps))) {
-    return funcOp.emitOpError("failed to get compute ops");
-  }
-
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   auto config = getLoweringConfig(computeOps);
   if (failed(config)) {
     return funcOp.emitOpError("failed to get lowering configuration");
@@ -75,24 +67,24 @@ FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
   return config->getTileSizeVals(tilingLevel);
 }
 
-FailureOr<linalg::TileSizeComputationFunction> getSPIRVTileSizeComputeFn(
-    func::FuncOp funcOp, int tilingLevel) {
+FailureOr<linalg::TileSizeComputationFunction>
+getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
   auto tileSizes = getSPIRVTileSize(funcOp, tilingLevel);
-  if (failed(tileSizes)) return failure();
+  if (failed(tileSizes))
+    return failure();
   linalg::TileSizeComputationFunction computeFn =
       [tileSizes](OpBuilder &builder, Operation *op) {
         auto range = llvm::map_range(*tileSizes, [&](int64_t size) -> Value {
           return builder.create<arith::ConstantIndexOp>(op->getLoc(), size);
         });
-        return llvm::to_vector<4>(range);
+        return llvm::to_vector(range);
       };
   return computeFn;
 }
 
 template <typename GPUIdOp, typename GPUCountOp>
-static linalg::ProcInfo getGPUProcessorIdAndCountImpl(OpBuilder &builder,
-                                                      Location loc,
-                                                      unsigned dim) {
+static linalg::ProcInfo
+getGPUProcessorIdAndCountImpl(OpBuilder &builder, Location loc, unsigned dim) {
   assert(dim < kNumGPUDims && "processor index out of range!");
 
   std::array<gpu::Dimension, kNumGPUDims> dimAttr{
@@ -104,8 +96,9 @@ static linalg::ProcInfo getGPUProcessorIdAndCountImpl(OpBuilder &builder,
 }
 
 template <typename GPUIdOp, typename GPUCountOp>
-static SmallVector<linalg::ProcInfo, 2> getGPUProcessorIdsAndCountsImpl(
-    OpBuilder &builder, Location loc, unsigned numDims) {
+static SmallVector<linalg::ProcInfo, 2>
+getGPUProcessorIdsAndCountsImpl(OpBuilder &builder, Location loc,
+                                unsigned numDims) {
   SmallVector<linalg::ProcInfo, 2> procInfo(numDims);
   for (unsigned i = 0; i < numDims; ++i) {
     procInfo[numDims - 1 - i] =
@@ -127,5 +120,5 @@ template SmallVector<linalg::ProcInfo, 2>
 getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
     OpBuilder &builder, Location loc, unsigned numDims);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

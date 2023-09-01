@@ -7,7 +7,6 @@
 #ifndef STRUCTURED_TRANSFORM_OPS_EXT
 #define STRUCTURED_TRANSFORM_OPS_EXT
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformAttrs.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
@@ -16,86 +15,41 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
-def CanonicalizedSequenceOp
-    : TransformDialectOp<"structured.canonicalized_sequence",
-      [OpAsmOpInterface,
-       PossibleTopLevelTransformOpTrait,
-       DeclareOpInterfaceMethods<RegionBranchOpInterface,
-          ["getSuccessorEntryOperands", "getSuccessorRegions",
-           "getRegionInvocationBounds"]>,
-       DeclareOpInterfaceMethods<TransformOpInterface>,
-       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-       SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">]> {
-
-  let summary = "A transformation sequence interspersed with canonicalizations";
-  let description = [{
-    This op is a copy of `transform.sequence`, but applies canonicalizations
-    after each step in the sequence.
-  }];
-
-  let arguments = (ins FailurePropagationMode:$failure_propagation_mode,
-                       Optional<PDL_Operation>:$root);
-  let results = (outs Variadic<AnyType>:$results);
-  let regions = (region SizedRegion<1>:$body);
-
-  let assemblyFormat =
-    "($root^)? `failures` `(` $failure_propagation_mode `)` attr-dict-with-keyword regions (`:` type($results)^)?";
-
-  let builders = [
-    OpBuilder<(ins "::mlir::transform::FailurePropagationMode":$failure_propagation_mode,
-                   CArg<"::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location, ::mlir::Value)>",
-                        "nullptr">)>
-  ];
-
-  let extraClassDeclaration = [{
-    using BodyBuilderFn =
-        ::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location, ::mlir::Value)>;
-
-    /// Allow the dialect prefix to be omitted.
-    static ::llvm::StringRef getDefaultDialect() { return "transform"; }
-  }];
-
-  let cppNamespace = "mlir::transform_ext";
-  let hasVerifier = 1;
-}
-
-//===----------------------------------------------------------------------===//
-
-def BufferizeOp : Op<Transform_Dialect, "bufferize",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Indicates that the entire module should be bufferized.}];
-  let assemblyFormat = "attr-dict";
-  let cppNamespace = "mlir::transform_ext";
-}
-
 def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let description = [{Indicates that the entire module should be converted
-  to the LLVM dialect. This is expected to be the last transformation in
-  a sequence.}];
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Indicates that the entire targeted module should be converted
+    to the LLVM dialect. This is expected to be the last transformation in
+    a sequence.
+
+    #### Return modes
+
+    This operation consumes the `target` handle and produces the `transformed`
+    handle.
+  }];
 
   let arguments =
-    (ins DefaultValuedAttr<BoolAttr, "false">:$reassociate_fp_reductions,
+    (ins TransformHandleTypeInterface:$target,
+     DefaultValuedAttr<BoolAttr, "false">:$reassociate_fp_reductions,
      DefaultValuedAttr<BoolAttr, "false">:$enable_index_optimizations,
      DefaultValuedAttr<BoolAttr, "false">:$enable_arm_neon,
      DefaultValuedAttr<BoolAttr, "false">:$enable_arm_sve,
      DefaultValuedAttr<BoolAttr, "false">:$enable_amx,
      DefaultValuedAttr<BoolAttr, "false">:$enable_x86vector,
      DefaultValuedAttr<BoolAttr, "false">:$enable_async);
-
-  let assemblyFormat = "attr-dict";
+  let results = (outs TransformHandleTypeInterface:$transformed);
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::transform_ext";
 }
-
 
 def RegisterMatchCallbacksOp :
     Op<Transform_Dialect, "iree.register_match_callbacks",
       [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-       DeclareOpInterfaceMethods<TransformOpInterface>]> {
+       DeclareOpInterfaceMethods<TransformOpInterface>,
+       ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Registers named structured op matcher callbacks specific for IREE to use
     with `transform.iree.match_callback`. This should be called before first
@@ -128,7 +82,8 @@ def RegisterMatchCallbacksOp :
 def MatchCallbackOp :
     Op<Transform_Dialect, "iree.match_callback",
        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-        DeclareOpInterfaceMethods<TransformOpInterface>]> {
+        DeclareOpInterfaceMethods<TransformOpInterface>,
+        ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Performs payload IR matching using a C++ callback registered beforehand.
     The callback is identified by name and is passed the current transform
@@ -155,7 +110,8 @@ def MatchCallbackOp :
 def TakeFirstOp :
     Op<Transform_Dialect, "iree.take_first",
        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-        DeclareOpInterfaceMethods<TransformOpInterface>]> {
+        DeclareOpInterfaceMethods<TransformOpInterface>,
+        ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Given an arbitrary list of handles associated with potentially empty lists
     of payload operations, produces two new handles:
@@ -182,7 +138,8 @@ def TakeFirstOp :
 def EmitRemarkOp :
     Op<Transform_Dialect, "iree.emit_remark",
        [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-        TransformOpInterface, TransformEachOpTrait]> {
+        TransformOpInterface, TransformEachOpTrait,
+        ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Emits a diagnostic remark with the given message located at payload ops
     associated with the given handle. This can be used, e.g., for debugging.
@@ -195,6 +152,7 @@ def EmitRemarkOp :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::transform::TransformRewriter &rewriter,
       ::mlir::Operation *target,
       ::mlir::transform::ApplyToEachResultList &results,
       ::mlir::transform::TransformState &state);

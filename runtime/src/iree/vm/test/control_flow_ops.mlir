@@ -45,7 +45,7 @@ vm.module @control_flow_ops {
   // vm.import.resolved
   //===--------------------------------------------------------------------===//
 
-  vm.import optional @reserved.optional(%arg0: i32) -> i32
+  vm.import private optional @reserved.optional(%arg0: i32) -> i32
 
   // The optional import should not be found.
   vm.export @test_optional_import_resolved

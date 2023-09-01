@@ -38,6 +38,9 @@ function(iree_tablegen_library)
     "${IREE_SOURCE_DIR}/compiler/src"
     "${IREE_BINARY_DIR}/compiler/src"
   )
+  if(DEFINED IREE_COMPILER_TABLEGEN_INCLUDE_DIRS)
+    list(APPEND _INCLUDE_DIRS ${IREE_COMPILER_TABLEGEN_INCLUDE_DIRS})
+  endif()
   list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
   list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
   set(_OUTPUTS)

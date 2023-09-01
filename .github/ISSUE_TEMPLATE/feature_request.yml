@@ -1,6 +1,6 @@
 name: ➕ Feature Request
 description: Ask for a new feature to be added
-labels: ["awaiting-triage", "enhancement ➕"]
+labels: ["enhancement ➕"]
 body:
   - type: markdown
     attributes:

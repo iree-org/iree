@@ -11,7 +11,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -25,12 +25,13 @@ namespace iree_compiler {
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                                Type accETy, ArrayRef<bool> is_reduction) {
   auto context = val.getContext();
-  RankedTensorType ty = val.getType().cast<RankedTensorType>();
+  RankedTensorType ty = llvm::cast<RankedTensorType>(val.getType());
 
   llvm::SmallVector<int64_t> staticSizes;
   SmallVector<Value> dynSizes;
   for (int i = 0, s = is_reduction.size(); i < s; i++) {
-    if (is_reduction[i]) continue;
+    if (is_reduction[i])
+      continue;
 
     staticSizes.push_back(ty.getDimSize(i));
     if (ty.isDynamicDim(i)) {
@@ -83,5 +84,5 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
       .getResult(0);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

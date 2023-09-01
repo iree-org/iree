@@ -15,8 +15,8 @@ namespace mlir {
 namespace iree_compiler {
 
 // Returns a uniqued set of all targets in |executableOps|.
-SetVector<IREE::HAL::ExecutableTargetAttr> gatherExecutableTargets(
-    ArrayRef<IREE::HAL::ExecutableOp> executableOps);
+SetVector<IREE::HAL::ExecutableTargetAttr>
+gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps);
 
 // Links all executables for the current target found in |moduleOp| into
 // |linkedExecutableOp|. Functions will be cloned into |linkedModuleOp|.
@@ -28,7 +28,7 @@ LogicalResult linkExecutablesInto(
     std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
     OpBuilder &builder);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_UTILS_LINKINGUTILS_H_
+#endif // IREE_COMPILER_CODEGEN_UTILS_LINKINGUTILS_H_

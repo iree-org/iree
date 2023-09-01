@@ -18,12 +18,14 @@ include "mlir/IR/EnumAttr.td"
 def IREELinalgExt_Dialect : Dialect {
   let name = "iree_linalg_ext";
   let cppNamespace = "::mlir::iree_compiler::IREE::LinalgExt";
+  let summary = [{
+    IREE Linalg Extensions.
+  }];
   let description = [{
-    The `iree_linalg_ext` dialect is intended to experiment more support for
-    non-structured operations, ie, can not be represented in Linalg operations.
+    A dialect designed for experimenting with non-structured operations that
+    cannot be represented efficiently/directly by the Linalg dialect.
   }];
   let useDefaultAttributePrinterParser = 1;
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 //===----------------------------------------------------------------------===//
@@ -44,43 +46,66 @@ def AnyRankedTensorOrMemRefType : RankedTensorOrMemRefOf<[AnyType]>;
 class IREELinalgExt_Attr<string name, list<Trait> traits = []>
   : AttrDef<IREELinalgExt_Dialect, name, traits>;
 
-// List of pre-defined data layout encoding attributes.
-def MATMUL_F32F32F32_LHS
-    : I32EnumAttrCase<"MATMUL_F32F32F32_LHS", 0>;
-def MATMUL_F32F32F32_RHS
-    : I32EnumAttrCase<"MATMUL_F32F32F32_RHS", 1>;
-def MATMUL_F32F32F32_RHS_TRANSPOSE
-    : I32EnumAttrCase<"MATMUL_F32F32F32_RHS_TRANSPOSE", 2>;
-def MATMUL_F32F32F32_RESULT
-    : I32EnumAttrCase<"MATMUL_F32F32F32_RESULT", 3>;
-def MATMUL_I8I8I32_LHS
-    : I32EnumAttrCase<"MATMUL_I8I8I32_LHS", 4>;
-def MATMUL_I8I8I32_RHS
-    : I32EnumAttrCase<"MATMUL_I8I8I32_RHS", 5>;
-def MATMUL_I8I8I32_RHS_TRANSPOSE
-    : I32EnumAttrCase<"MATMUL_I8I8I32_RHS_TRANSPOSE", 6>;
-def MATMUL_I8I8I32_RESULT
-    : I32EnumAttrCase<"MATMUL_I8I8I32_RESULT", 7>;
-
-def TensorEncodingEnum
-    : I32EnumAttr<"TensorEncoding",
-                  "identifier for encoding used for the tensor",[
-                    MATMUL_F32F32F32_LHS, MATMUL_F32F32F32_RHS, MATMUL_F32F32F32_RHS_TRANSPOSE, MATMUL_F32F32F32_RESULT,
-                    MATMUL_I8I8I32_LHS, MATMUL_I8I8I32_RHS, MATMUL_I8I8I32_RHS_TRANSPOSE, MATMUL_I8I8I32_RESULT,
-                  ]> {
+class IREELinalgExt_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
+    : I32EnumAttr<name, summary, cases> {
   let cppNamespace = "::mlir::iree_compiler::IREE::LinalgExt";
   let genSpecializedAttr = 0;
 }
 
-def TensorEncodingAttr :
-  EnumAttr<IREELinalgExt_Dialect, TensorEncodingEnum, ""> {
-  let assemblyFormat = "``$value";
-}
+class IREELinalgExt_EnumAttr<EnumAttrInfo enumInfo, string name = "">
+  : EnumAttr<IREELinalgExt_Dialect, enumInfo, name>;
 
-def IREELinalgExt_EncodingAttr : IREELinalgExt_Attr<"Encoding"> {
+def MATMUL_F32F32F32 : I32EnumAttrCase<"MATMUL_F32F32F32", 0>;
+def MATMUL_I8I8I32 : I32EnumAttrCase<"MATMUL_I8I8I32", 1>;
+def MATMUL_F16F16F32 : I32EnumAttrCase<"MATMUL_F16F16F32", 2>;
+def MATMUL_F16F16F16 : I32EnumAttrCase<"MATMUL_F16F16F16", 3>;
+def MATMUL_BF16BF16F32 : I32EnumAttrCase<"MATMUL_BF16BF16F32", 4>;
+def MATMUL_BF16BF16BF16 : I32EnumAttrCase<"MATMUL_BF16BF16BF16", 5>;
+def BATCH_MATMUL_F32F32F32 : I32EnumAttrCase<"BATCH_MATMUL_F32F32F32", 6>;
+def BATCH_MATMUL_I8I8I32 : I32EnumAttrCase<"BATCH_MATMUL_I8I8I32", 7>;
+def BATCH_MATMUL_F16F16F32 : I32EnumAttrCase<"BATCH_MATMUL_F16F16F32", 8>;
+def BATCH_MATMUL_F16F16F16 : I32EnumAttrCase<"BATCH_MATMUL_F16F16F16", 9>;
+def BATCH_MATMUL_BF16BF16F32 : I32EnumAttrCase<"BATCH_MATMUL_BF16BF16F32", 10>;
+def BATCH_MATMUL_BF16BF16BF16 : I32EnumAttrCase<"BATCH_MATMUL_BF16BF16BF16", 11>;
+
+def EncodingUser : IREELinalgExt_I32EnumAttr<"EncodingUser",
+    "Describes the operation that a tensor is an operand or a result of.", [
+      MATMUL_F32F32F32,
+      MATMUL_I8I8I32,
+      MATMUL_F16F16F32,
+      MATMUL_F16F16F16,
+      MATMUL_BF16BF16F32,
+      MATMUL_BF16BF16BF16,
+      BATCH_MATMUL_F32F32F32,
+      BATCH_MATMUL_I8I8I32,
+      BATCH_MATMUL_F16F16F32,
+      BATCH_MATMUL_F16F16F16,
+      BATCH_MATMUL_BF16BF16F32,
+      BATCH_MATMUL_BF16BF16BF16,
+    ]>;
+
+def EncodingUserAttr :
+  IREELinalgExt_EnumAttr<EncodingUser, "user">;
+
+def LHS : I32EnumAttrCase<"LHS", 0>;
+def RHS : I32EnumAttrCase<"RHS", 1>;
+def RESULT : I32EnumAttrCase<"RESULT", 2>;
+
+def EncodingRole : IREELinalgExt_I32EnumAttr<"EncodingRole",
+    "Describes the role of the tensor as an operand or a result of an operation.", [
+      LHS,
+      RHS,
+      RESULT,
+    ]>;
+
+def EncodingRoleAttr :
+  IREELinalgExt_EnumAttr<EncodingRole, "role">;
+
+def EncodingAttr :
+    IREELinalgExt_Attr<"Encoding"> {
   let mnemonic = "encoding";
-  let summary = [{tensor layout encoding}];
-  let description = [{
+  let summary = [{information to decide how to data-tile a tensor}];
+   let description = [{
     This attribute describes the change in the layout for
     a given tensor to execute subsequent operations on
     the tiled layout. The encoding serves as a way to
@@ -89,26 +114,21 @@ def IREELinalgExt_EncodingAttr : IREELinalgExt_Attr<"Encoding"> {
     the tensor itself. When required, the encoding
     can be used to explicitly manifest the layout change
     through operations like pack/unpack.
+  }];
 
-    Currently the encoding is just an enum that describes
-    in an ad-hoc fashions the data layouts we initially care
-    about. In fullness of time the encoding attribute can be
-    made richer.
+  let assemblyFormat = [{
+    `<` `user` `=` `` $user
+    `,` `role` `=` `` $role
+    (`,` `original_type` `=` $originalType^)? `>`
   }];
 
   let parameters = (ins
-    AttrParameter<"IREE::LinalgExt::TensorEncodingAttr",
-        "Tensor encoding to use for a tensor">:$encoding
+    AttrParameter<"EncodingUserAttr", "kind of operation using this tensor">:$user,
+    AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role,
+    OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$originalType
   );
 
-  let assemblyFormat = [{
-    `<` `` $encoding `>`
-  }];
-
-  let builders = [
-    AttrBuilder<(ins "TensorEncoding":$encoding)>
-  ];
+  let genVerifyDecl = 0;
 }
-
 
 #endif // IREE_DIALECT_LINALGEXT_BASE

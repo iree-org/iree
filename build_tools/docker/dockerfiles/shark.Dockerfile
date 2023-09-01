@@ -34,7 +34,7 @@ WORKDIR /
 ######## Python ########
 WORKDIR /install-python
 
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.11
 
 COPY runtime/bindings/python/iree/runtime/build_requirements.txt build_tools/docker/context/install_python_deps.sh ./
 RUN ./install_python_deps.sh "${PYTHON_VERSION}" \

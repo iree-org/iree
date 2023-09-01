@@ -210,6 +210,18 @@ iree_hal_vulkan_populate_enabled_device_extensions(
     } else if (strcmp(extension_name,
                       VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME) == 0) {
       extensions.subgroup_size_control = true;
+    } else if (strcmp(extension_name,
+                      VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME) == 0) {
+      extensions.external_memory_host = true;
+    } else if (strcmp(extension_name,
+                      VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) == 0) {
+      extensions.buffer_device_address = true;
+    } else if (strcmp(extension_name, VK_KHR_8BIT_STORAGE_EXTENSION_NAME) ==
+               0) {
+      extensions.shader_8bit_storage = true;
+    } else if (strcmp(extension_name,
+                      VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME) == 0) {
+      extensions.shader_float16_int8 = true;
     }
   }
   return extensions;
@@ -231,6 +243,13 @@ iree_hal_vulkan_infer_enabled_device_extensions(
   }
   if (device_syms->vkGetCalibratedTimestampsEXT) {
     extensions.calibrated_timestamps = true;
+  }
+  if (device_syms->vkGetMemoryHostPointerPropertiesEXT) {
+    extensions.external_memory_host = true;
+  }
+  if (device_syms->vkGetBufferDeviceAddress ||
+      device_syms->vkGetBufferDeviceAddressKHR) {
+    extensions.buffer_device_address = true;
   }
   return extensions;
 }

@@ -12,43 +12,76 @@
 # the script to learn about the required setup.
 #
 # IREE_NORMAL_BENCHMARK_TOOLS_DIR needs to point to a directory contains IREE
-# benchmark tools. See benchmarks/README.md for more information. The first
-# argument is the path of e2e test artifacts directory. The second argument is
-# the path of IREE benchmark run config. The third argument is the path to write
-# benchmark results.
+# benchmark tools. See benchmarks/README.md for more information.
+#
+# Command line arguments:
+# 1. The path of e2e test artifacts directory
+# 2. The path of IREE benchmark run config
+# 3. The target device name
+# 4. The shard index
+# 5. The path to write benchmark results
+# 6. The path to write benchmark traces
 
 set -euo pipefail
 
 DOCKER_WRAPPER="${IREE_DOCKER_WRAPPER:-./build_tools/docker/docker_run.sh}"
-DEVICE_NAME="${IREE_DEVICE_NAME}"
 NORMAL_BENCHMARK_TOOLS_DIR="${IREE_NORMAL_BENCHMARK_TOOLS_DIR}"
+TRACED_BENCHMARK_TOOLS_DIR="${IREE_TRACED_BENCHMARK_TOOLS_DIR}"
+TRACY_CAPTURE_TOOL="${IREE_TRACY_CAPTURE_TOOL}"
 E2E_TEST_ARTIFACTS_DIR="${1:-${IREE_E2E_TEST_ARTIFACTS_DIR}}"
-RUN_CONFIG="${2:-${IREE_RUN_CONFIG}}"
-BENCHMARK_RESULTS="${3:-${IREE_BENCHMARK_RESULTS}}"
+EXECUTION_BENCHMARK_CONFIG="${2:-${IREE_EXECUTION_BENCHMARK_CONFIG}}"
+TARGET_DEVICE_NAME="${3:-${IREE_TARGET_DEVICE_NAME}}"
+SHARD_INDEX="${4:-${IREE_SHARD_INDEX}}"
+BENCHMARK_RESULTS="${5:-${IREE_BENCHMARK_RESULTS}}"
+BENCHMARK_TRACES="${6:-${IREE_BENCHMARK_TRACES}}"
 
-if [[ "${DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
+if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
     --gpus all \
     --env NVIDIA_DRIVER_CAPABILITIES=all \
-    gcr.io/iree-oss/nvidia@sha256:1294591d06d2b5eb03a7214fac040a1ccab890ea62e466843553f7fb7aacdc1d \
+    gcr.io/iree-oss/nvidia-bleeding-edge@sha256:522491c028ec3b4070f23910c70c8162fd9612e11d9cf062a13444df7e88ab70 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
+        --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
+        --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
+        --capture_tarball="${BENCHMARK_TRACES}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
-        --run_config="${RUN_CONFIG}" \
+        --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
+        --target_device_name="${TARGET_DEVICE_NAME}" \
+        --shard_index="${SHARD_INDEX}" \
         --output="${BENCHMARK_RESULTS}" \
         --verbose
-elif [[ "${DEVICE_NAME}" == "c2-standard-16" ]]; then
+elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-16" ]]; then
   ${DOCKER_WRAPPER} \
-    gcr.io/iree-oss/base-bleeding-edge@sha256:479eefb76447c865cf58c5be7ca9fe33f48584b474a1da3dfaa125aad2510463 \
+    gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
+        --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
+        --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
+        --capture_tarball="${BENCHMARK_TRACES}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
-        --run_config="${RUN_CONFIG}" \
+        --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
+        --target_device_name="${TARGET_DEVICE_NAME}" \
+        --shard_index="${SHARD_INDEX}" \
         --output="${BENCHMARK_RESULTS}" \
         --device_model=GCP-c2-standard-16 \
         --cpu_uarch=CascadeLake \
         --verbose
+elif [[ "${TARGET_DEVICE_NAME}" =~ ^(pixel-4|pixel-6-pro|moto-edge-x30)$ ]]; then
+  ./build_tools/benchmarks/run_benchmarks_on_android.py \
+    --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
+    --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
+    --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
+    --capture_tarball="${BENCHMARK_TRACES}" \
+    --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
+    --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
+    --target_device_name="${TARGET_DEVICE_NAME}" \
+    --shard_index="${SHARD_INDEX}" \
+    --output="${BENCHMARK_RESULTS}" \
+    --pin-cpu-freq \
+    --pin-gpu-freq \
+    --verbose
 else
-  echo "${DEVICE_NAME} is not supported yet."
+  echo "${TARGET_DEVICE_NAME} is not supported yet."
   exit 1
 fi

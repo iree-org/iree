@@ -1,5 +1,5 @@
-// RUN: iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --device=local-task | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-compile --iree-hal-target-backends=vulkan-spirv %s | iree-benchmark-module --device=vulkan | FileCheck %s)
+// RUN: iree-compile --iree-hal-target-backends=vmvx %s | iree-benchmark-module --device=local-task --module=- | FileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-compile --iree-hal-target-backends=vulkan-spirv %s | iree-benchmark-module --device=vulkan --module=- | FileCheck %s)
 
 module {
   func.func @foo1() -> tensor<4xf32> {

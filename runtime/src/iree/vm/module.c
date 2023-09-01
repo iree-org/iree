@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
-#include "iree/base/tracing.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
 
@@ -30,7 +29,8 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_get_cconv_fragments(
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "unsupported cconv version %c", cconv.data[0]);
   }
-  iree_string_view_t cconv_body = iree_string_view_substr(cconv, 1, INTPTR_MAX);
+  iree_string_view_t cconv_body =
+      iree_string_view_substr(cconv, 1, IREE_HOST_SIZE_MAX);
   if (iree_string_view_split(cconv_body, '_', out_arguments, out_results) ==
       -1) {
     *out_arguments = cconv_body;
@@ -70,14 +70,14 @@ static iree_status_t iree_vm_function_call_count_fragment_values(
               break;
             default:
               return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "unsupported cconv span type %c",
+                                      "unsupported cconv span type '%c'",
                                       cconv_fragment.data[i]);
           }
         }
       } break;
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "unsupported cconv type %c",
+                                "unsupported cconv type '%c'",
                                 cconv_fragment.data[i]);
     }
   }
@@ -159,7 +159,7 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
               break;
             default:
               return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                      "unsupported cconv span type %c",
+                                      "unsupported cconv span type '%c'",
                                       cconv_fragment.data[i]);
           }
         }
@@ -167,7 +167,7 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
       } break;
       default:
         return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                                "unsupported cconv type %c",
+                                "unsupported cconv type '%c'",
                                 cconv_fragment.data[i]);
     }
   }
@@ -284,7 +284,8 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_name(
     const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
     iree_string_view_t name, iree_vm_function_t* out_function) {
   IREE_ASSERT_ARGUMENT(module);
-  return module->lookup_function(module->self, linkage, name, out_function);
+  return module->lookup_function(module->self, linkage, name,
+                                 /*expected_signature=*/NULL, out_function);
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
@@ -297,14 +298,14 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
-    const iree_vm_module_t* module, iree_vm_stack_frame_t* frame,
+    const iree_vm_module_t* module, iree_vm_function_t function,
+    iree_vm_source_offset_t pc,
     iree_vm_source_location_t* out_source_location) {
   IREE_ASSERT_ARGUMENT(module);
-  IREE_ASSERT_ARGUMENT(frame);
   IREE_ASSERT_ARGUMENT(out_source_location);
   memset(out_source_location, 0, sizeof(*out_source_location));
   if (module->resolve_source_location) {
-    return module->resolve_source_location(module->self, frame,
+    return module->resolve_source_location(module->self, function, pc,
                                            out_source_location);
   }
   return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
@@ -317,6 +318,7 @@ IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
 IREE_API_EXPORT iree_string_view_t
 iree_vm_function_name(const iree_vm_function_t* function) {
   IREE_ASSERT_ARGUMENT(function);
+  if (!function->module) return iree_string_view_empty();
   iree_string_view_t name;
   iree_status_t status = function->module->get_function(
       function->module->self, function->linkage, function->ordinal,

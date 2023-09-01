@@ -10,11 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "iree/base/alignment.h"
 #include "iree/base/api.h"
-#include "iree/base/attributes.h"
-#include "iree/base/string_builder.h"
-#include "iree/base/tracing.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 
@@ -307,7 +303,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
     iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
     iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn,
-    iree_vm_stack_frame_t** out_callee_frame);
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame);
 
 // Leaves the current stack frame.
 IREE_API_EXPORT iree_status_t

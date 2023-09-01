@@ -30,7 +30,7 @@ namespace HAL {
 class MaterializeResourceCachesPass
     : public PassWrapper<MaterializeResourceCachesPass,
                          OperationPass<ModuleOp>> {
- public:
+public:
   explicit MaterializeResourceCachesPass(TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 
@@ -50,10 +50,38 @@ class MaterializeResourceCachesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty()) return;
+    if (moduleOp.getBody()->empty())
+      return;
     moduleBuilder = OpBuilder(&moduleOp.getBody()->front());
 
+    // Find all relevant ops. If we don't find any we skip the pass as it's
+    // likely it's already been run. We could fix the pass to better support
+    // partial materialization but there's no use cases for that today.
     auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());
+    SmallVector<IREE::HAL::DescriptorSetLayoutLookupOp>
+        descriptorSetLayoutLookupOps;
+    SmallVector<IREE::HAL::PipelineLayoutLookupOp> pipelineLayoutLookupOps;
+    SmallVector<IREE::HAL::ExecutableLookupOp> executableLookupOps;
+    for (Operation &funcLikeOp : moduleOp.getOps()) {
+      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
+      if (!funcOp)
+        continue;
+      for (auto &block : funcOp.getFunctionBody()) {
+        block.walk([&](Operation *op) {
+          if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
+            descriptorSetLayoutLookupOps.push_back(lookupOp);
+          } else if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
+            pipelineLayoutLookupOps.push_back(lookupOp);
+          } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
+            executableLookupOps.push_back(lookupOp);
+          }
+        });
+      }
+    }
+    if (descriptorSetLayoutLookupOps.empty() &&
+        pipelineLayoutLookupOps.empty() && executableLookupOps.empty()) {
+      return;
+    }
 
     // Declare all layouts used by the executables. This will ensure that the
     // initialization order is correct as any pipeline layout needed (and its
@@ -73,32 +101,23 @@ class MaterializeResourceCachesPass
     // Declare executable variables so that we can reference them during lookup
     // replacement.
     for (auto executableOp : executableOps) {
-      if (!defineExecutableOp(executableOp)) {
-        signalPassFailure();
-        return;
-      }
+      defineExecutableOp(executableOp);
     }
 
     // Generate cached resource singletons and replace lookup ops with direct
     // loads from variables.
-    for (Operation &funcLikeOp : moduleOp.getOps()) {
-      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
-      if (!funcOp) continue;
-      for (auto &block : funcOp.getFunctionBody()) {
-        block.walk([&](Operation *op) {
-          if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
-            replaceDescriptorSetLayoutLookupOp(lookupOp);
-          } else if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
-            replacePipelineLayoutLookupOp(lookupOp);
-          } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
-            replaceExecutableLookupOp(lookupOp);
-          }
-        });
-      }
+    for (auto lookupOp : descriptorSetLayoutLookupOps) {
+      replaceDescriptorSetLayoutLookupOp(lookupOp);
+    }
+    for (auto lookupOp : pipelineLayoutLookupOps) {
+      replacePipelineLayoutLookupOp(lookupOp);
+    }
+    for (auto lookupOp : executableLookupOps) {
+      replaceExecutableLookupOp(lookupOp);
     }
   }
 
- private:
+private:
   IREE::Util::GlobalOp defineDescriptorSetLayoutOp(Location loc,
                                                    ArrayAttr bindingAttrs) {
     auto existingIt = descriptorSetLayoutCache_.find(bindingAttrs);
@@ -131,8 +150,9 @@ class MaterializeResourceCachesPass
     return globalOp;
   }
 
-  IREE::Util::GlobalOp definePipelineLayoutOp(
-      Location loc, IREE::HAL::PipelineLayoutAttr layoutAttr) {
+  IREE::Util::GlobalOp
+  definePipelineLayoutOp(Location loc,
+                         IREE::HAL::PipelineLayoutAttr layoutAttr) {
     auto existingIt = pipelineLayoutCache_.find(layoutAttr);
     if (existingIt != pipelineLayoutCache_.end()) {
       return existingIt->second;
@@ -140,7 +160,7 @@ class MaterializeResourceCachesPass
 
     // First lookup (or create) all the required descriptor sets. This ensures
     // they end up in the proper initialization order.
-    SmallVector<IREE::Util::GlobalOp, 4> setLayoutGlobalOps;
+    SmallVector<IREE::Util::GlobalOp> setLayoutGlobalOps;
     for (auto setLayoutAttr : layoutAttr.getSetLayouts()) {
       SmallVector<Attribute> bindingAttrs;
       for (auto bindingAttr : setLayoutAttr.getBindings()) {
@@ -163,7 +183,7 @@ class MaterializeResourceCachesPass
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
-    SmallVector<Value, 4> setLayoutValues;
+    SmallVector<Value> setLayoutValues;
     for (auto setLayoutGlobalOp : setLayoutGlobalOps) {
       auto setLayoutValue = blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
           loc, DescriptorSetLayoutType::get(loc.getContext()),
@@ -182,7 +202,7 @@ class MaterializeResourceCachesPass
     return globalOp;
   }
 
-  IREE::Util::GlobalOp defineExecutableOp(ExecutableOp executableOp) {
+  void defineExecutableOp(ExecutableOp executableOp) {
     auto loc = executableOp.getLoc();
     auto symbolName =
         (StringRef("_executable_") + executableOp.getSymName()).str();
@@ -259,8 +279,6 @@ class MaterializeResourceCachesPass
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableValue,
                                                    globalOp.getName());
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
-
-    return globalOp;
   }
 
   // Inlines a constant block as a function in |moduleBuilder| and then inserts
@@ -294,12 +312,12 @@ class MaterializeResourceCachesPass
     auto callOp = callerBuilder.create<func::CallOp>(blockOp.getLoc(), funcOp,
                                                      callOperands);
 
-    return llvm::to_vector(llvm::map_range(
-        callOp.getResults(), [](OpResult result) -> Value { return result; }));
+    return llvm::map_to_vector(callOp.getResults(),
+                               [](OpResult result) -> Value { return result; });
   }
 
-  void replaceDescriptorSetLayoutLookupOp(
-      DescriptorSetLayoutLookupOp &lookupOp) {
+  void
+  replaceDescriptorSetLayoutLookupOp(DescriptorSetLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
     auto globalOp =
         defineDescriptorSetLayoutOp(lookupOp.getLoc(), lookupOp.getBindings());
@@ -346,8 +364,8 @@ class MaterializeResourceCachesPass
   int nextUniqueDescriptorSetLayoutId = 0;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
-    TargetOptions targetOptions) {
+std::unique_ptr<OperationPass<ModuleOp>>
+createMaterializeResourceCachesPass(TargetOptions targetOptions) {
   return std::make_unique<MaterializeResourceCachesPass>(targetOptions);
 }
 
@@ -356,7 +374,7 @@ static PassRegistration<MaterializeResourceCachesPass> pass([] {
   return std::make_unique<MaterializeResourceCachesPass>(options);
 });
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

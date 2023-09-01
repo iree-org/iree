@@ -20,6 +20,8 @@ declare -a excluded_files_patterns=(
   "*Makefile*"
   # Symlinks make grep upset
   "^integrations/tensorflow/iree-dialects$"
+  # Generated / Binary files
+  ".svg"
 )
 
 # Join on |

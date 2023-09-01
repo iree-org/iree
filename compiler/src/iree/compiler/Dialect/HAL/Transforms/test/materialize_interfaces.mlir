@@ -54,7 +54,7 @@ module attributes {hal.device.targets = [
     %c2 = arith.constant 2 : index
     %0 = stream.resource.alloc uninitialized : !stream.resource<transient>{%arg2}
     %1 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<constant>{%arg2}, %arg1 as %arg5: !stream.resource<transient>{%arg2}, %0 as %arg6: !stream.resource<transient>{%arg2}) {
-      // CHECK: stream.cmd.dispatch @ex_workgroups::@entry
+      // CHECK: stream.cmd.dispatch {@ex_workgroups::@embedded_elf_arm_64::@entry, @ex_workgroups::@embedded_elf_x86_64::@entry}
       // CHECK: attributes {
       // CHECK-SAME: hal.interface.bindings = [
       // CHECK-SAME:   #hal.interface.binding<0, 0>,

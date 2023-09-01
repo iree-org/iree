@@ -16,7 +16,6 @@
 #include "experimental/rocm/rocm_buffer.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 
 // Command buffer implementation that directly maps to rocm direct.
 // This records the commands on the calling thread without additional threading
@@ -26,6 +25,7 @@ typedef struct {
   iree_hal_command_buffer_t base;
   iree_hal_rocm_context_wrapper_t* context;
   iree_arena_block_pool_t* block_pool;
+  iree_hal_rocm_tracing_context_t* tracing_context;
 
   // Keep track of the current set of kernel arguments.
   int32_t push_constant[IREE_HAL_ROCM_MAX_PUSH_CONSTANT_COUNT];
@@ -48,6 +48,7 @@ iree_hal_rocm_direct_command_buffer_cast(
 
 iree_status_t iree_hal_rocm_direct_command_buffer_create(
     iree_hal_device_t* device, iree_hal_rocm_context_wrapper_t* context,
+    iree_hal_rocm_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
@@ -76,6 +77,7 @@ iree_status_t iree_hal_rocm_direct_command_buffer_create(
         device, mode, command_categories, queue_affinity, binding_capacity,
         &iree_hal_rocm_direct_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
+    command_buffer->tracing_context = tracing_context;
     command_buffer->block_pool = block_pool;
     hipDeviceptr_t* device_ptrs =
         (hipDeviceptr_t*)(command_buffer->current_descriptor +
@@ -104,17 +106,8 @@ static void iree_hal_rocm_direct_command_buffer_destroy(
 
 bool iree_hal_rocm_direct_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(
-      command_buffer, &iree_hal_rocm_direct_command_buffer_vtable);
-}
-
-static void* iree_hal_rocm_direct_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_rocm_direct_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_rocm_direct_command_buffer_vtable);
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_begin(
@@ -196,7 +189,8 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_fill_buffer(
   hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
-  hipDeviceptr_t dst = target_device_buffer + target_offset;
+  hipDeviceptr_t dst =
+      (hipDeviceptr_t)((uintptr_t)target_device_buffer + target_offset);
   size_t num_elements = length / pattern_length;
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
@@ -251,8 +245,10 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
   hipDeviceptr_t source_device_buffer = iree_hal_rocm_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
-  hipDeviceptr_t dst = target_device_buffer + target_offset;
-  hipDeviceptr_t src = source_device_buffer + source_offset;
+  hipDeviceptr_t dst =
+      (hipDeviceptr_t)((uintptr_t)target_device_buffer + target_offset);
+  hipDeviceptr_t src =
+      (hipDeviceptr_t)((uintptr_t)source_device_buffer + source_offset);
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
   ROCM_RETURN_IF_ERROR(
@@ -327,9 +323,11 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
     iree_hal_descriptor_set_binding_t binding = bindings[binding_used[i].index];
     hipDeviceptr_t device_ptr =
         binding.buffer
-            ? (iree_hal_rocm_buffer_device_pointer(
-                   iree_hal_buffer_allocated_buffer(binding.buffer)) +
-               iree_hal_buffer_byte_offset(binding.buffer) + binding.offset)
+            ? (hipDeviceptr_t)((uintptr_t)iree_hal_rocm_buffer_device_pointer(
+                                   iree_hal_buffer_allocated_buffer(
+                                       binding.buffer)) +
+                               iree_hal_buffer_byte_offset(binding.buffer) +
+                               binding.offset)
             : 0;
     *((hipDeviceptr_t*)command_buffer->current_descriptor[i + base_binding]) =
         device_ptr;
@@ -343,32 +341,42 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch(
     uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
-  iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
-  iree_hal_pipeline_layout_t* layout =
-      iree_hal_rocm_executable_get_layout(executable, entry_point);
+  // Lookup kernel parameters used for side-channeling additional launch
+  // information from the compiler.
+  iree_hal_rocm_kernel_params_t kernel_params;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_rocm_native_executable_entry_point_kernel_params(
+          executable, entry_point, &kernel_params));
+
+  IREE_ROCM_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, 0, kernel_params.function_name.data,
+      kernel_params.function_name.size,
+      /*line=*/0, /*func_name=*/NULL, 0, kernel_params.function_name.data,
+      kernel_params.function_name.size);
+
+  // Patch the push constants in the kernel arguments.
   iree_host_size_t num_constants =
-      iree_hal_rocm_pipeline_layout_num_constants(layout);
+      iree_hal_rocm_pipeline_layout_num_constants(kernel_params.layout);
   iree_host_size_t constant_base_index =
-      iree_hal_rocm_push_constant_index(layout);
+      iree_hal_rocm_push_constant_index(kernel_params.layout);
   // Patch the push constants in the kernel arguments.
   for (iree_host_size_t i = 0; i < num_constants; i++) {
     *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
         command_buffer->push_constant[i];
   }
 
-  int32_t block_size_x, block_size_y, block_size_z;
-  IREE_RETURN_IF_ERROR(iree_hal_rocm_native_executable_block_size(
-      executable, entry_point, &block_size_x, &block_size_y, &block_size_z));
-  hipFunction_t func =
-      iree_hal_rocm_native_executable_for_entry_point(executable, entry_point);
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
   ROCM_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      hipModuleLaunchKernel(func, workgroup_x, workgroup_y, workgroup_z,
-                            block_size_x, block_size_y, block_size_z, 0, 0,
+      hipModuleLaunchKernel(kernel_params.function, workgroup_x, workgroup_y,
+                            workgroup_z, kernel_params.block_size[0],
+                            kernel_params.block_size[1],
+                            kernel_params.block_size[2], 0, 0,
                             command_buffer->current_descriptor, NULL),
       "hipModuleLaunchKernel");
+
+  IREE_ROCM_TRACE_ZONE_END(command_buffer->tracing_context, 0);
   return iree_ok_status();
 }
 
@@ -392,7 +400,6 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_execute_commands(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_rocm_direct_command_buffer_vtable = {
         .destroy = iree_hal_rocm_direct_command_buffer_destroy,
-        .dyn_cast = iree_hal_rocm_direct_command_buffer_dyn_cast,
         .begin = iree_hal_rocm_direct_command_buffer_begin,
         .end = iree_hal_rocm_direct_command_buffer_end,
         .begin_debug_group =

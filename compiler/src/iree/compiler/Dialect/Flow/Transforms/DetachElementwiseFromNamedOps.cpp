@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/PatternMatch.h"
@@ -41,7 +42,8 @@ struct DetachElementwisePattern
         !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
       return failure();
     }
-    if (!linalgOp.hasTensorSemantics()) return failure();
+    if (!linalgOp.hasTensorSemantics())
+      return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
     OpOperandVector outputOperands;
@@ -50,7 +52,8 @@ struct DetachElementwisePattern
     }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.
-    if (outputOperands.size() != 1) return failure();
+    if (outputOperands.size() != 1)
+      return failure();
     Value outputOperand = outputOperands.front()->get();
 
     auto outsDefiningOp = outputOperand.getDefiningOp<linalg::LinalgOp>();
@@ -58,22 +61,19 @@ struct DetachElementwisePattern
       // If not linalg op, or is a fill op, do nothing.
       return failure();
     }
-    auto outputType = outputOperand.getType().cast<RankedTensorType>();
-    if (!outputType.getElementType().isIntOrFloat()) return failure();
+    auto outputType = llvm::cast<RankedTensorType>(outputOperand.getType());
+    if (!outputType.getElementType().isIntOrFloat())
+      return failure();
     auto elementType = outputType.getElementType();
 
     Location loc = linalgOp.getLoc();
 
     // Create a zero tensor as the new output tensor operand to the Linalg
     // contraction op.
-    SmallVector<Value> dynamicDims;
-    for (unsigned i = 0; i < outputType.getRank(); i++) {
-      if (outputType.isDynamicDim(i))
-        dynamicDims.push_back(
-            rewriter.create<tensor::DimOp>(loc, outputOperand, i));
-    }
-    auto initOp = rewriter.create<tensor::EmptyOp>(loc, outputType.getShape(),
-                                                   elementType, dynamicDims);
+    SmallVector<OpFoldResult> mixedSizes =
+        tensor::getMixedSizes(rewriter, loc, outputOperand);
+    auto initOp =
+        rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value fill =
@@ -87,7 +87,8 @@ struct DetachElementwisePattern
         linalgOp.getMatchingIndexingMap(outputOperands.front()));
     // Only support identity map for output access for now; this is the case for
     // all existing contraction/convolution ops.
-    if (!outputMap.isIdentity()) return failure();
+    if (!outputMap.isIdentity())
+      return failure();
     SmallVector<AffineMap> maps(3, outputMap);
 
     SmallVector<utils::IteratorType> iterators;
@@ -95,7 +96,8 @@ struct DetachElementwisePattern
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
       int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
       auto attr = linalgOp.getIteratorTypesArray()[pos];
-      if (!linalg::isParallelIterator(attr)) return failure();
+      if (!linalg::isParallelIterator(attr))
+        return failure();
       iterators.push_back(attr);
     }
 
@@ -106,7 +108,7 @@ struct DetachElementwisePattern
         fill, maps, iterators,
         [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
           Value result;
-          if (elementType.isa<FloatType>()) {
+          if (llvm::isa<FloatType>(elementType)) {
             result = b.create<arith::AddFOp>(nestedLoc, args[0], args[1]);
           } else {
             result = b.create<arith::AddIOp>(nestedLoc, args[0], args[1]);
@@ -120,7 +122,7 @@ struct DetachElementwisePattern
 };
 
 /// Replace uses of splat constants as `outs` operands of `LinalgExt`
-/// operations. More canonical representation is to use a `init_tensor -> fill
+/// operations. More canonical representation is to use a `empty -> fill
 /// -> outs` operand sequence. Splat constants pulled in this way causes issues
 /// with allocations. Using `fill` will allow for fusing with the op just like
 /// fill -> linalg ops are fused. If not as a fallback they would be converted
@@ -144,21 +146,24 @@ struct DetachSplatConstantOutsOperands
          llvm::enumerate(dpsInterfaceOp.getDpsInitOperands())) {
       auto constOp =
           outOperand.value()->get().template getDefiningOp<arith::ConstantOp>();
-      if (!constOp) continue;
+      if (!constOp)
+        continue;
 
       auto resultType =
-          constOp.getResult().getType().template dyn_cast<RankedTensorType>();
-      if (!resultType || !resultType.getElementType().isIntOrFloat()) continue;
+          llvm::dyn_cast<RankedTensorType>(constOp.getResult().getType());
+      if (!resultType || !resultType.getElementType().isIntOrFloat())
+        continue;
 
-      auto attr = constOp.getValue().template dyn_cast<DenseElementsAttr>();
-      if (!attr || !attr.isSplat()) continue;
+      auto attr = llvm::dyn_cast<DenseElementsAttr>(constOp.getValue());
+      if (!attr || !attr.isSplat())
+        continue;
 
       Location loc = constOp.getLoc();
       Type elementType = resultType.getElementType();
       Value emptyTensorOp = rewriter.create<tensor::EmptyOp>(
           loc, resultType.getShape(), elementType);
-      Attribute constValue;
-      if (elementType.isa<IntegerType>()) {
+      TypedAttr constValue;
+      if (llvm::isa<IntegerType>(elementType)) {
         constValue = rewriter.getIntegerAttr(
             elementType, attr.template getSplatValue<APInt>());
       } else {
@@ -202,13 +207,13 @@ struct DetachElementwiseFromNamedOpsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass() {
   return std::make_unique<DetachElementwiseFromNamedOpsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

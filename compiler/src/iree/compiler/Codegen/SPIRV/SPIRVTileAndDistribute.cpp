@@ -14,9 +14,10 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -32,6 +33,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -96,9 +98,13 @@ static void populateTilingReductionPatterns(
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(computeFn);
 
-  TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNchwFchwOp,
-                 linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
-                 linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
+  TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp>::insert(
+      patterns, tilingOptions, filter);
+  filter.addFilter([](Operation *op) {
+    return success(isa<linalg::ConvolutionOpInterface>(op));
+  });
+  patterns.add<IREE::LinalgExt::LinalgTilingPattern>(patterns.getContext(),
+                                                     tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -110,19 +116,19 @@ namespace {
 /// buffer semantics.
 class SPIRVTileAndDistributePass
     : public SPIRVTileAndDistributeBase<SPIRVTileAndDistributePass> {
- public:
+public:
   SPIRVTileAndDistributePass() = default;
   SPIRVTileAndDistributePass(const SPIRVTileAndDistributePass &pass) = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect, linalg::LinalgDialect,
-                    memref::MemRefDialect, scf::SCFDialect,
-                    vector::VectorDialect>();
+    registry.insert<affine::AffineDialect, gpu::GPUDialect,
+                    linalg::LinalgDialect, memref::MemRefDialect,
+                    scf::SCFDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 //====---------------------------------------------------------------------===//
 // Main pass implementation
@@ -131,14 +137,17 @@ class SPIRVTileAndDistributePass
 void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
-  if (!isEntryPoint(funcOp)) return;
+  if (!isEntryPoint(funcOp))
+    return;
 
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
-  if (failed(threadTileComputeFn)) return signalPassFailure();
+  if (failed(threadTileComputeFn))
+    return signalPassFailure();
   auto reductionTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 2);
-  if (failed(reductionTileComputeFn)) return signalPassFailure();
+  if (failed(reductionTileComputeFn))
+    return signalPassFailure();
 
-  {  // Tile and distribute to invocations.
+  { // Tile and distribute to invocations.
     RewritePatternSet invocationTilingPatterns(context);
     populateTilingToInvocationPatterns(invocationTilingPatterns,
                                        *threadTileComputeFn);
@@ -159,7 +168,9 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     RewritePatternSet canonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
 
-    populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
+    SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
+    populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns,
+                                                    numWorkgroups);
 
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
@@ -177,7 +188,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     });
   }
 
-  {  // Tile reduction dimensions.
+  { // Tile reduction dimensions.
     RewritePatternSet reductionTilingPatterns(context);
     populateTilingReductionPatterns(reductionTilingPatterns,
                                     *reductionTileComputeFn);
@@ -213,5 +224,5 @@ createSPIRVTileAndDistributePass() {
   return std::make_unique<SPIRVTileAndDistributePass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -15,18 +15,18 @@ vm.module @main_module attributes { version = 100 : i32 } {
   // CHECK: "imported_functions":
 
   // CHECK: "full_name": "required.method0"
-  vm.import @required.method0() attributes { minimum_version = 4 : i32 }
+  vm.import private @required.method0() attributes { minimum_version = 4 : i32 }
   // CHECK: "full_name": "required.method1"
-  vm.import @required.method1() attributes { minimum_version = 5 : i32 }
+  vm.import private @required.method1() attributes { minimum_version = 5 : i32 }
   // CHECK: "full_name": "required.method2"
   // CHECK: "flags": "OPTIONAL"
-  vm.import optional @required.method2() attributes { minimum_version = 6 : i32 }
+  vm.import private optional @required.method2() attributes { minimum_version = 6 : i32 }
 
   // CHECK: "full_name": "optional.method0"
   // CHECK: "flags": "OPTIONAL"
-  vm.import optional @optional.method0() attributes { minimum_version = 10 : i32 }
+  vm.import private optional @optional.method0() attributes { minimum_version = 10 : i32 }
   // CHECK: "full_name": "optional.method1"
   // CHECK: "flags": "OPTIONAL"
-  vm.import optional @optional.method1() attributes { minimum_version = 11 : i32 }
+  vm.import private optional @optional.method1() attributes { minimum_version = 11 : i32 }
 
 }

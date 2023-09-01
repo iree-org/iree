@@ -159,17 +159,42 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #endif  // !IREE_STATISTICS_ENABLE
 
 //===----------------------------------------------------------------------===//
+// Tracing
+//===----------------------------------------------------------------------===//
+// A user include file is included in the main iree/base/tracing.h to allow
+// users to override the default provider include. Note that additional deps
+// may need to be linked in to binaries when using an out-of-tree provider.
+//
+// Specify a custom header with `-DIREE_TRACING_PROVIDER_H="my_provider.h"`.
+// Specify a dependency with `-DIREE_TRACING_PROVIDER=my_provider_target`.
+
+// Set IREE_TRACING_FEATURES based on IREE_TRACING_MODE if the user hasn't
+// overridden it with more specific settings.
+//
+// IREE_TRACING_MODE = 0: tracing disabled
+// IREE_TRACING_MODE = 1: instrumentation, log messages, and basic statistics
+// IREE_TRACING_MODE = 2: same as 1 with added allocation tracking
+// IREE_TRACING_MODE = 3: same as 2 with callstacks for allocations
+// IREE_TRACING_MODE = 4: same as 3 with callstacks for all instrumentation
+#if !defined(IREE_TRACING_MODE)
+#define IREE_TRACING_MODE 0
+#endif  // !IREE_TRACING_MODE
+
+//===----------------------------------------------------------------------===//
 // IREE HAL configuration
 //===----------------------------------------------------------------------===//
 // Enables optional HAL features. Each of these may add several KB to the final
 // binary when linked dynamically.
 
-// To use an import provider in the built-in CPU drivers define a function like:
-//   iree_hal_executable_import_provider_t my_provider(void) { ... }
+// To register local executable import plugins define a function like:
+// iree_status_t register_my_plugins(
+//    iree_hal_executable_plugin_manager_t* manager,
+//    iree_allocator_t host_allocator);
 // And define it:
-//   -DIREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN=my_provider
-// This will only work for default drivers and otherwise users can explicitly
-// specify the provider when creating the executable loaders themselves.
+//   -DIREE_HAL_EXECUTABLE_PLUGIN_REGISTRATION_FN=register_my_plugins
+// Alternatively when creating drivers explicitly (vs using the driver modules
+// and automatic registry) the plugin manager can be used to register both
+// stateful plugins and lightweight import providers.
 
 #if !defined(IREE_HAL_VERBOSE_TRACING_ENABLE)
 // Whether to enable additional HAL tracing that is known to have non-trivial
@@ -225,10 +250,10 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Enables disassembly of vm bytecode functions and stderr dumping of execution.
 // Increases code size quite, lowers VM performance, and is generally unsafe;
 // include only when debugging or running on trusted inputs.
-#ifdef NDEBUG
-#define IREE_VM_EXECUTION_TRACING_ENABLE 0
-#else
+#ifndef NDEBUG
 #define IREE_VM_EXECUTION_TRACING_ENABLE 1
+#else
+#define IREE_VM_EXECUTION_TRACING_ENABLE 0
 #endif  // NDEBUG
 #endif  // !IREE_VM_EXECUTION_TRACING_ENABLE
 
@@ -256,7 +281,14 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // moderate performance improvement (~10-20%) on very heavy VMVX workloads but
 // adds 20-30KB to the binary size.
 #define IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE 0
-#endif  // IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
+#endif  // !IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
+
+#if !defined(IREE_VM_BYTECODE_VERIFICATION_ENABLE)
+// Enables verification ensuring input bytecode is well-formed.
+// This increases binary size but should be left on in all cases where untrusted
+// inputs can be provided. Module metadata is always verified.
+#define IREE_VM_BYTECODE_VERIFICATION_ENABLE 1
+#endif  // !IREE_VM_BYTECODE_VERIFICATION_ENABLE
 
 #if !defined(IREE_VM_EXT_F32_ENABLE)
 // Enables the 32-bit floating-point instruction extension.
@@ -273,6 +305,6 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #if !defined(IREE_VM_UBSAN_CHECKABLE_ENABLE)
 // Exposes VMVX kernels to UBSAN checking, else disable UBSAN checking.
 #define IREE_VM_UBSAN_CHECKABLE_ENABLE 0
-#endif  // IREE_VM_UBSAN_CHECKABLE_ENABLE
+#endif  // !IREE_VM_UBSAN_CHECKABLE_ENABLE
 
 #endif  // IREE_BASE_CONFIG_H_

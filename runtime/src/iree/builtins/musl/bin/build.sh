@@ -15,9 +15,9 @@ set -e
 
 CLANG="${CLANG:-clang}"
 CLANGXX="${CLANGXX:-$(which clang++)}"
-LLVM_AS="${LLVM_AS:-${IREE_BUILD_DIR}/third_party/llvm-project/llvm/bin/llvm-as}"
-LLVM_LINK="${LLVM_LINK:-${IREE_BUILD_DIR}/third_party/llvm-project/llvm/bin/llvm-link}"
-LLVM_OPT="${LLVM_OPT:-${IREE_BUILD_DIR}/third_party/llvm-project/llvm/bin/opt}"
+LLVM_AS="${LLVM_AS:-${IREE_BUILD_DIR}/llvm-project/bin/llvm-as}"
+LLVM_LINK="${LLVM_LINK:-${IREE_BUILD_DIR}/llvm-project/bin/llvm-link}"
+LLVM_OPT="${LLVM_OPT:-${IREE_BUILD_DIR}/llvm-project/bin/opt}"
 
 IREE_SRC_DIR="$(git rev-parse --show-toplevel)"
 IREE_BUILD_DIR="${IREE_BUILD_DIR:-${IREE_SRC_DIR?}/../build}"

@@ -43,12 +43,13 @@ IREE_API_EXPORT iree_status_t iree_runtime_call_initialize(
   // this interface a few small pooled malloc calls should be fine.
   iree_allocator_t host_allocator =
       iree_runtime_session_host_allocator(session);
-  iree_status_t status = iree_vm_list_create(
-      /*element_type=*/NULL, arguments.size, host_allocator, &out_call->inputs);
+  iree_status_t status =
+      iree_vm_list_create(iree_vm_make_undefined_type_def(), arguments.size,
+                          host_allocator, &out_call->inputs);
   if (iree_status_is_ok(status)) {
-    status = iree_vm_list_create(
-        /*element_type=*/NULL, results.size, host_allocator,
-        &out_call->outputs);
+    status =
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), results.size,
+                            host_allocator, &out_call->outputs);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -107,7 +108,7 @@ IREE_API_EXPORT iree_status_t iree_runtime_call_inputs_push_back_buffer_view(
   IREE_ASSERT_ARGUMENT(buffer_view);
   iree_vm_ref_t value = {0};
   IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-      buffer_view, iree_hal_buffer_view_type_id(), &value));
+      buffer_view, iree_hal_buffer_view_type(), &value));
   return iree_vm_list_push_ref_retain(call->inputs, &value);
 }
 

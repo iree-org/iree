@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_
 
-#include "mlir/Dialect/PDL/IR/PDLTypes.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 
@@ -19,14 +19,15 @@ class FuncOp;
 }
 
 namespace scf {
-class ForeachThreadOp;
+class ForallOp;
 class IfOp;
-}  // namespace scf
+class ForOp;
+} // namespace scf
 
 namespace vector {
 class VectorDialect;
 class WarpExecuteOnLane0Op;
-}  // namespace vector
+} // namespace vector
 
 namespace iree_compiler {
 
@@ -39,22 +40,22 @@ namespace transform_dialect {
 // Hook to register LLVMGPU transformations to the transform dialect.
 class LLVMGPUExtensions
     : public transform::TransformDialectExtension<LLVMGPUExtensions> {
- public:
+public:
   LLVMGPUExtensions();
 };
-}  // namespace transform_dialect
-}  // namespace IREE
+} // namespace transform_dialect
+} // namespace IREE
 
-/// Transformation to convert scf.foreach_thread to gpu distribution.
-FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
-    scf::ForeachThreadOp foreachThreadOp,
-    const SmallVector<int64_t> &globalWorkgroupSizes, RewriterBase &rewriter,
-    bool syncAfterDistribute = true);
+/// Transformation to convert scf.forall to gpu distribution.
+FailureOr<SmallVector<OpFoldResult>>
+rewriteForallToGpu(scf::ForallOp forallOp,
+                   const SmallVector<int64_t> &globalWorkgroupSizes,
+                   RewriterBase &rewriter, bool syncAfterDistribute = true);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensionsOps.h.inc"
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS_H_

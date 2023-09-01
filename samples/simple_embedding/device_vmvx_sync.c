@@ -24,7 +24,8 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
   iree_hal_sync_device_params_initialize(&params);
 
   iree_vm_instance_t* instance = NULL;
-  IREE_RETURN_IF_ERROR(iree_vm_instance_create(host_allocator, &instance));
+  IREE_RETURN_IF_ERROR(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                               host_allocator, &instance));
 
   iree_hal_executable_loader_t* loader = NULL;
   iree_status_t status = iree_hal_vmvx_module_loader_create(

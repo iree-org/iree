@@ -16,6 +16,10 @@
 extern "C" {
 #endif  // __cplusplus
 
+//===----------------------------------------------------------------------===//
+// iree_hal_cuda_device_t
+//===----------------------------------------------------------------------===//
+
 // Defines how command buffers are recorded and executed.
 typedef enum iree_hal_cuda_command_buffer_mode_e {
   // Command buffers are recorded into CUDA graphs.
@@ -28,6 +32,26 @@ typedef enum iree_hal_cuda_command_buffer_mode_e {
 typedef struct {
   char data[128];
 } iree_hal_cuda_nccl_id_t;
+
+// Parameters defining a CUmemoryPool.
+typedef struct iree_hal_cuda_memory_pool_params_t {
+  // Minimum number of bytes to keep in the pool when trimming with
+  // iree_hal_device_trim.
+  uint64_t minimum_capacity;
+  // Soft maximum number of bytes to keep in the pool.
+  // When more than this is allocated the extra will be freed at the next
+  // device synchronization in order to remain under the threshold.
+  uint64_t release_threshold;
+  // TODO: per-device access permissions array.
+} iree_hal_cuda_memory_pool_params_t;
+
+// Parameters for each CUmemoryPool used for queue-ordered allocations.
+typedef struct iree_hal_cuda_memory_pooling_params_t {
+  // Used exclusively for DEVICE_LOCAL allocations.
+  iree_hal_cuda_memory_pool_params_t device_local;
+  // Used for any host-visible/host-local memory types.
+  iree_hal_cuda_memory_pool_params_t other;
+} iree_hal_cuda_memory_pooling_params_t;
 
 // Parameters configuring an iree_hal_cuda_device_t.
 // Must be initialized with iree_hal_cuda_device_params_initialize prior to use.
@@ -60,22 +84,16 @@ typedef struct iree_hal_cuda_device_params_t {
   // tracing with this enabled.
   bool stream_tracing;
 
-  // Opaque NCCL ID used during channel creation when empty IDs are provided.
-  // Today this is used for all communicators created but in the future this may
-  // just be used as a default when not otherwise specified on channel creation.
-  iree_hal_cuda_nccl_id_t nccl_default_id;
-  // Default base rank to use when creating collective channels.
-  // This will be added to the local rank assigned to communicators when
-  // IREE_HAL_CHANNEL_RANK_DEFAULT is specified on creation calls.
-  int nccl_default_rank;
-  // Default total number of participants to use when creating collective
-  // channels. This will be used IREE_HAL_CHANNEL_COUNT_DEFAULT is specified on
-  // creation calls.
-  int nccl_default_count;
+  // Whether to use async allocations even if reported as available by the
+  // device. Defaults to true when the device supports it.
+  bool async_allocations;
+
+  // Parameters for each CUmemoryPool used for queue-ordered allocations.
+  iree_hal_cuda_memory_pooling_params_t memory_pools;
 } iree_hal_cuda_device_params_t;
 
 // Initializes |out_params| to default values.
-void iree_hal_cuda_device_params_initialize(
+IREE_API_EXPORT void iree_hal_cuda_device_params_initialize(
     iree_hal_cuda_device_params_t* out_params);
 
 //===----------------------------------------------------------------------===//

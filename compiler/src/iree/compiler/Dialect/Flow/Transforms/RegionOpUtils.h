@@ -7,7 +7,6 @@
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_
 
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
-#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -23,6 +22,11 @@ namespace IREE {
 namespace Flow {
 class DispatchRegionOp;
 
+/// Check if an operation is not null and is not nested within
+/// `flow.dispatch.region` or `flow.dispatch.workgroups` op.
+bool isNonNullAndOutsideDispatch(Operation *op);
+bool isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations);
+
 /// For a given operation returns the loop ranges needed to compute the op.
 SmallVector<Range> getLoopRanges(Operation *op, Location loc,
                                  OpBuilder &builder);
@@ -33,14 +37,13 @@ LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
 
 /// Append a result to the given DispatchRegionOp. The newly created
 /// DispatchRegionOp is returned.
-FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
-    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result,
-    const SmallVector<Value> &dynamicDims);
+FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResults(
+    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp,
+    ArrayRef<Value> results, ArrayRef<SmallVector<Value>> dynamicDims);
 
-/// Create an DispatchRegionOp with workload
-Flow::DispatchRegionOp makeDispatchRegionWithWorkload(
-    OpBuilder &builder, Location loc,
-    Optional<ValueRange> workload = std::nullopt);
+/// Create an empty DispatchRegionOp.
+Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder, Location loc,
+                                               ValueRange workload);
 
 /// Clone a `target` op that is preceding the given dispatch region op into the
 /// dispatch region.
@@ -58,8 +61,9 @@ Flow::DispatchRegionOp makeDispatchRegionWithWorkload(
 /// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
 ///
 /// Returns the cloned target op.
-FailureOr<Operation *> clonePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp);
+FailureOr<Operation *>
+clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
+                                   Flow::DispatchRegionOp regionOp);
 
 /// Move a `target` op that is preceding the given dispatch region op into the
 /// dispatch region.
@@ -76,17 +80,30 @@ FailureOr<Operation *> clonePrecedingOpIntoDispatchRegion(
 ///   flow.return %1 : tensor<?xf32>
 /// }
 /// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp);
+FailureOr<Flow::DispatchRegionOp>
+movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
+                                   ArrayRef<Operation *> targets,
+                                   Flow::DispatchRegionOp regionOp);
 
 /// Wrap the given op in a new dispatch region op.
-FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(
-    RewriterBase &rewriter, Operation *op,
-    Optional<Flow::WorkloadBuilder> workloadBuilder = std::nullopt);
+FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
+                                                         Operation *op);
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+/// Decide whether the given op should be cloned and fused into a dispatch
+/// region using heuristics.
+///
+/// Note: This function returns `false` for ops that should be tiled and fused
+/// into a dispatch region.
+bool isClonableIntoDispatchOp(Operation *op);
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_
+/// Clone into the region producers of those value used in the region but
+/// defined above, to prepare the dispatch region isolated from above.
+LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
+                                     Flow::DispatchRegionOp regionOp);
+
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
+
+#endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_

@@ -1,13 +1,17 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=false})' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-fuse-dispatch-bindings)' %s | FileCheck %s
 
 // TODO(benvanik): remove this file when aliasing mutable bindings is fixed.
 
 // Tests that bindings that are duplicated at all dispatch sites are folded
 // so long as they are not mutable.
 
+#noaliasConfig = #stream.resource_config<{
+  alias_mutable_bindings = false
+}>
+
 // CHECK-LABEL: @deduplicateBindingsEx
 stream.executable private @deduplicateBindingsEx {
-  stream.executable.export public @dispatch
+  stream.executable.export public @dispatch attributes {stream.resources = #noaliasConfig}
   builtin.module  {
     // CHECK: func.func @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_C:.+]]: !stream.binding,
     // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OPERAND:.+]]: index)
@@ -21,13 +25,13 @@ stream.executable private @deduplicateBindingsEx {
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_A]]
       util.optimization_barrier %subspan_a : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
 
-      // CHECK: %[[SUM_OFFSET_B:.+]] = arith.addi %c20, %[[OFFSET_B]]
+      // CHECK: %[[SUM_OFFSET_B:.+]] = arith.addi %[[OFFSET_B]], %c20
       // CHECK-NEXT: %[[SUBSPAN_B:.+]] = stream.binding.subspan %[[BINDING_A]][%[[SUM_OFFSET_B]]]
       %subspan_b = stream.binding.subspan %binding_b[%c20] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_B]]
       util.optimization_barrier %subspan_b : !flow.dispatch.tensor<readwrite:tensor<20xi8>>
 
-      // CHECK: %[[SUM_OFFSET_C:.+]] = arith.addi %c40, %[[OFFSET_C]]
+      // CHECK: %[[SUM_OFFSET_C:.+]] = arith.addi %[[OFFSET_C]], %c40
       // CHECK-NEXT: %[[SUBSPAN_C:.+]] = stream.binding.subspan %[[BINDING_C]][%[[SUM_OFFSET_C]]]
       %subspan_c = stream.binding.subspan %binding_c[%c40] : !stream.binding -> !flow.dispatch.tensor<readwrite:tensor<20xi8>>{%c20}
       // CHECK-NEXT: util.optimization_barrier %[[SUBSPAN_C]]

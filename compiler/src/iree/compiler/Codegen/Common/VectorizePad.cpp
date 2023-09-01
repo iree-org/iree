@@ -4,13 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -31,10 +33,11 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
                              Location loc) {
   IntegerAttr attr;
   if (Value val = attrOrValue.dyn_cast<Value>()) {
-    if (val.getType().isIndex()) return val;
+    if (val.getType().isIndex())
+      return val;
     matchPattern(val, m_Constant(&attr));
   } else {
-    attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
+    attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
   }
   return builder.createOrFold<arith::ConstantIndexOp>(loc, attr.getInt());
 }
@@ -80,13 +83,17 @@ struct VectorizePadWithConditions final
                                 PatternRewriter &rewriter) const override {
     // Static result shape is needed to reading padded dimensions in an
     // unrolled manner.
-    if (!padOp.getType().hasStaticShape()) return failure();
+    if (!padOp.getType().hasStaticShape())
+      return failure();
 
     // Only support constant padding value cases.
     Value paddingValue = padOp.getConstantPaddingValue();
-    if (!paddingValue) return failure();
+    if (!paddingValue)
+      return failure();
     Attribute paddingAttr;
-    matchPattern(paddingValue, m_Constant(&paddingAttr));
+    if (!matchPattern(paddingValue, m_Constant(&paddingAttr))) {
+      return failure();
+    }
 
     SmallVector<OpFoldResult> lowPads = padOp.getMixedLowPad();
     SmallVector<OpFoldResult> highPads = padOp.getMixedHighPad();
@@ -94,7 +101,7 @@ struct VectorizePadWithConditions final
     /// Return true if the given `attrOrValue` is a constant zero.
     auto isConstantZero = [](OpFoldResult attrOrValue) {
       if (attrOrValue.is<Attribute>()) {
-        auto attr = attrOrValue.get<Attribute>().dyn_cast<IntegerAttr>();
+        auto attr = llvm::dyn_cast<IntegerAttr>(attrOrValue.get<Attribute>());
         return attr && attr.getValue().getZExtValue() == 0;
       }
       IntegerAttr attr;
@@ -119,14 +126,15 @@ struct VectorizePadWithConditions final
     SmallVector<Value> paddedDimLBs(tensorRank);
     SmallVector<Value> paddedDimUBs(tensorRank);
     for (int i = 0; i < tensorRank; ++i) {
-      if (isConstantZero(lowPads[i]) && isConstantZero(highPads[i])) continue;
+      if (isConstantZero(lowPads[i]) && isConstantZero(highPads[i]))
+        continue;
 
       paddedDimIndices.push_back(i);
       auto srcDimSize =
           rewriter.createOrFold<tensor::DimOp>(loc, padOp.getSource(), i);
       auto lb = getAsIndexValue(lowPads[i], rewriter, loc);
-      auto ub = rewriter.create<AffineApplyOp>(loc, addMap,
-                                               ValueRange{lb, srcDimSize});
+      auto ub = rewriter.create<affine::AffineApplyOp>(
+          loc, addMap, ValueRange{lb, srcDimSize});
       paddedDimLBs[i] = lb;
       paddedDimUBs[i] = ub;
     }
@@ -137,8 +145,9 @@ struct VectorizePadWithConditions final
     Value fullVector = rewriter.createOrFold<arith::ConstantOp>(
         loc, SplatElementsAttr::get(fullVectorType, {paddingAttr}));
 
-    auto sliceVectorShape = llvm::to_vector<4>(paddedTensorShape);
-    for (int dim : paddedDimIndices) sliceVectorShape[dim] = 1;
+    auto sliceVectorShape = llvm::to_vector(paddedTensorShape);
+    for (int dim : paddedDimIndices)
+      sliceVectorShape[dim] = 1;
     auto sliceVectorType =
         VectorType::get(dropLeadingOne(sliceVectorShape), elementType);
     Value cstSliceVector = rewriter.createOrFold<arith::ConstantOp>(
@@ -147,7 +156,8 @@ struct VectorizePadWithConditions final
     // Calculate the total count of all padded dimensions. We need to generate
     // vector read ops with scf.if guards for each of them.
     int totalCount = 1;
-    for (int dim : paddedDimIndices) totalCount *= paddedTensorShape[dim];
+    for (int dim : paddedDimIndices)
+      totalCount *= paddedTensorShape[dim];
 
     auto zeroIndex = rewriter.createOrFold<arith::ConstantIndexOp>(loc, 0);
     auto trueAttr = rewriter.getBoolAttr(true);
@@ -187,7 +197,7 @@ struct VectorizePadWithConditions final
 
       // Need to subtract the low padding to get the index into the source.
       for (int dim : paddedDimIndices) {
-        readIndices[dim] = rewriter.create<AffineApplyOp>(
+        readIndices[dim] = rewriter.create<affine::AffineApplyOp>(
             loc, subMap, ValueRange{valueIndices[dim], paddedDimLBs[dim]});
       }
 
@@ -223,8 +233,9 @@ struct VectorizePadWithConditions final
 struct TensorToVectorVectorizePadPass
     : public TensorToVectorVectorizePadBase<TensorToVectorVectorizePadPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, arith::ArithDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, vector::VectorDialect>();
+    registry.insert<affine::AffineDialect, arith::ArithDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override {
@@ -238,7 +249,7 @@ struct TensorToVectorVectorizePadPass
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit) {
@@ -249,5 +260,5 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass() {
   return std::make_unique<TensorToVectorVectorizePadPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

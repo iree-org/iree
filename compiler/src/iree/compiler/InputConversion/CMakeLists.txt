@@ -6,8 +6,8 @@
 
 add_subdirectory(Common)
 
-if(IREE_INPUT_MHLO)
-  add_subdirectory(MHLO)
+if(IREE_INPUT_STABLEHLO)
+  add_subdirectory(StableHLO)
 endif()
 if(IREE_INPUT_TORCH)
   add_subdirectory(TMTensor)

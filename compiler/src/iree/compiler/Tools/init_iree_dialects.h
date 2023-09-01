@@ -55,9 +55,10 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // External models.
   IREE::Util::registerUtilExternalModels(registry);
   registerCodegenInterfaces(registry);
+  registerUKernelBufferizationInterface(registry);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_
+#endif // IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_

@@ -11,9 +11,8 @@
 #include <string>
 #include <type_traits>
 
-#include "iree/compiler/API2/Embed.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
-#include "iree/compiler/Tools/init_iree.h"
+#include "iree/compiler/embedding_api.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/raw_ostream.h"
@@ -44,15 +43,27 @@ enum class CompileMode {
   hal_executable,
 };
 
-}  // namespace
+struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
+  BytecodeVersionParser(llvm::cl::Option &O)
+      : llvm::cl::parser<std::optional<int64_t>>(O) {}
+  bool parse(llvm::cl::Option &O, StringRef /*argName*/, StringRef arg,
+             std::optional<int64_t> &v) {
+    long long w;
+    if (llvm::getAsSignedInteger(arg, 10, w))
+      return O.error("Invalid argument '" + arg +
+                     "', only integer is supported.");
+    v = w;
+    return false;
+  }
+};
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace
+
+} // namespace iree_compiler
+} // namespace mlir
 
 int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
-  InitIree y(argc, argv);
   static llvm::cl::OptionCategory mainOptions("IREE Main Options");
-  ireeCompilerGlobalInitialize(/*initializeCommandLine=*/true);
 
   // General command line flags.
   llvm::cl::opt<std::string> inputFilename(
@@ -72,7 +83,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
                      "IREE VM Bytecode (default)"),
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
           clEnumValN(OutputFormat::vm_c, "vm-c", "C source module"),
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
           clEnumValN(OutputFormat::vm_asm, "vm-asm", "IREE VM MLIR Assembly")),
       llvm::cl::init(OutputFormat::vm_bytecode), llvm::cl::cat(mainOptions));
 
@@ -94,6 +105,18 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::desc("Verifies the IR for correctness throughout compilation."),
       llvm::cl::init(true));
 
+  llvm::cl::opt<IREEVMPipelinePhase> compileFrom(
+      "compile-from",
+      llvm::cl::desc("Compilation phase to resume from, starting with the "
+                     "following phase."),
+      llvm::cl::init(IREEVMPipelinePhase::Start));
+  SmallVector<std::string> compileFromPhases;
+  enumerateIREEVMPipelinePhases(
+      [&](IREEVMPipelinePhase phase, StringRef name, StringRef desc) {
+        compileFrom.getParser().addLiteralOption(name, phase, desc);
+        compileFromPhases.push_back(name.str());
+      });
+
   llvm::cl::opt<IREEVMPipelinePhase> compileTo(
       "compile-to",
       llvm::cl::desc(
@@ -105,6 +128,19 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         compileTo.getParser().addLiteralOption(name, phase, desc);
         compileToPhases.push_back(name.str());
       });
+
+  llvm::cl::opt<bool> emitMLIRBytecode(
+      "emit-mlir-bytecode",
+      llvm::cl::desc(
+          "Emit bytecode when generating compile-to or VM MLIR output."),
+      llvm::cl::init(false));
+  llvm::cl::opt<std::optional<int64_t>, /*ExternalStorage=*/false,
+                mlir::iree_compiler::BytecodeVersionParser>
+      emitMLIRBytecodeVersion(
+          "emit-mlir-bytecode-version",
+          llvm::cl::desc("Use specified bytecode version when "
+                         "generating compile-to or VM MLIR output."),
+          llvm::cl::init(std::nullopt));
 
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
@@ -126,14 +162,24 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
             nullptr);
         exit(0);
       }));
+  llvm::cl::opt<bool> listPlugins(
+      "iree-list-plugins", llvm::cl::desc("Lists all loaded plugins."),
+      llvm::cl::init(false), llvm::cl::ValueDisallowed,
+      llvm::cl::callback([&](const bool &) {
+        llvm::outs() << "Loaded plugins:\n";
+        ireeCompilerEnumeratePlugins(
+            [](const char *pluginName, void *userData) {
+              llvm::outs() << "  " << pluginName << "\n";
+            },
+            nullptr);
+        exit(0);
+      }));
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, "IREE compilation driver\n");
-
-  // If a HAL executable is being compiled, it is only valid to output in that
-  // form.
-  if (compileMode == CompileMode::hal_executable) {
-    outputFormat = OutputFormat::hal_executable;
-  }
+  ireeCompilerGlobalInitialize();
+  ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
+  ireeCompilerSetupGlobalCL(argc, const_cast<const char **>(argv),
+                            "IREE compilation driver\n",
+                            /*installSignalHandlers=*/true);
 
   // Stash our globals in an RAII instance.
   struct MainState {
@@ -181,33 +227,49 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     InvState r(s);
 
     ireeCompilerInvocationEnableConsoleDiagnostics(r.inv);
+    ireeCompilerInvocationSetCompileFromPhase(
+        r.inv,
+        compileFromPhases[static_cast<int>(compileFrom.getValue())].c_str());
     ireeCompilerInvocationSetCompileToPhase(
         r.inv, compileToPhases[static_cast<int>(compileTo.getValue())].c_str());
     ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
-    if (!ireeCompilerInvocationParseSource(r.inv, source)) return false;
+    if (!ireeCompilerInvocationParseSource(r.inv, source))
+      return false;
 
     // Switch on compileMode to choose a pipeline to run.
     switch (compileMode) {
-      case CompileMode::std:
-        if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD))
-          return false;
-        break;
-      case CompileMode::vm:
-        break;
-      case CompileMode::hal_executable: {
-        if (!ireeCompilerInvocationPipeline(
-                r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
-          return false;
-        break;
-      }
-      default:
-        llvm::errs() << "INTERNAL ERROR: unknown compile mode\n";
+    case CompileMode::std:
+      if (!ireeCompilerInvocationPipeline(r.inv, IREE_COMPILER_PIPELINE_STD))
         return false;
+      break;
+    case CompileMode::vm:
+      break;
+    case CompileMode::hal_executable: {
+      // Compiling a HAL executable, it is only valid to output in that form.
+      outputFormat = OutputFormat::hal_executable;
+      if (!ireeCompilerInvocationPipeline(
+              r.inv, IREE_COMPILER_PIPELINE_HAL_EXECUTABLE))
+        return false;
+      break;
     }
+    default:
+      llvm::errs() << "INTERNAL ERROR: unknown compile mode\n";
+      return false;
+    }
+
+    auto outputMLIR = [&](iree_compiler_invocation_t *inv,
+                          iree_compiler_output_t *output) {
+      if (emitMLIRBytecode) {
+        return ireeCompilerInvocationOutputIRBytecode(
+            inv, output, emitMLIRBytecodeVersion.value_or(-1));
+      } else {
+        return ireeCompilerInvocationOutputIR(inv, output);
+      }
+    };
 
     // Ending early and just emitting IR.
     if (compileTo != IREEVMPipelinePhase::End) {
-      if (auto error = ireeCompilerInvocationOutputIR(r.inv, s.output)) {
+      if (auto error = outputMLIR(r.inv, s.output)) {
         s.handleError(error);
         return false;
       }
@@ -217,25 +279,24 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     // Switch based on output format.
     iree_compiler_error_t *outputError = nullptr;
     switch (outputFormat) {
-      case OutputFormat::vm_asm:
-        outputError = ireeCompilerInvocationOutputIR(r.inv, s.output);
-        break;
-      case OutputFormat::vm_bytecode:
-        outputError = ireeCompilerInvocationOutputVMBytecode(r.inv, s.output);
-        break;
+    case OutputFormat::vm_asm:
+      outputError = outputMLIR(r.inv, s.output);
+      break;
+    case OutputFormat::vm_bytecode:
+      outputError = ireeCompilerInvocationOutputVMBytecode(r.inv, s.output);
+      break;
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
-      case OutputFormat::vm_c:
-        outputError = ireeCompilerInvocationOutputVMCSource(r.inv, s.output);
-        break;
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
-      case OutputFormat::hal_executable: {
-        outputError =
-            ireeCompilerInvocationOutputHALExecutable(r.inv, s.output);
-        break;
-      }
-      default:
-        llvm::errs() << "INTERNAL ERROR: Unknown output format\n";
-        return false;
+    case OutputFormat::vm_c:
+      outputError = ireeCompilerInvocationOutputVMCSource(r.inv, s.output);
+      break;
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
+    case OutputFormat::hal_executable: {
+      outputError = ireeCompilerInvocationOutputHALExecutable(r.inv, s.output);
+      break;
+    }
+    default:
+      llvm::errs() << "INTERNAL ERROR: Unknown output format\n";
+      return false;
     }
 
     if (outputError) {
@@ -268,7 +329,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       return 1;
     }
   } else {
-    if (!processBuffer(s.source)) return 1;
+    if (!processBuffer(s.source))
+      return 1;
   }
 
   ireeCompilerOutputKeep(s.output);

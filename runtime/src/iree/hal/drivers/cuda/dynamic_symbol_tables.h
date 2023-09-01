@@ -4,6 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// cuGetErrorName, cuGetErrorString should be loaded first in case there are
+// errors loading the other symbols.
+CU_PFN_DECL(cuGetErrorName, CUresult, const char**)
+CU_PFN_DECL(cuGetErrorString, CUresult, const char**)
 CU_PFN_DECL(cuCtxCreate, CUcontext*, unsigned int, CUdevice)
 CU_PFN_DECL(cuCtxDestroy, CUcontext)
 CU_PFN_DECL(cuDevicePrimaryCtxRetain, CUcontext*, CUdevice)
@@ -22,8 +26,7 @@ CU_PFN_DECL(cuEventElapsedTime, float*, CUevent, CUevent)
 CU_PFN_DECL(cuEventQuery, CUevent)
 CU_PFN_DECL(cuEventRecord, CUevent, CUstream)
 CU_PFN_DECL(cuEventSynchronize, CUevent)
-CU_PFN_DECL(cuGetErrorName, CUresult, const char**)
-CU_PFN_DECL(cuGetErrorString, CUresult, const char**)
+CU_PFN_DECL(cuGetProcAddress, const char*, void**, int, cuuint64_t)
 CU_PFN_DECL(cuGraphAddMemcpyNode, CUgraphNode*, CUgraph, const CUgraphNode*,
             size_t, const CUDA_MEMCPY3D*, CUcontext)
 CU_PFN_DECL(cuGraphAddMemsetNode, CUgraphNode*, CUgraph, const CUgraphNode*,
@@ -47,6 +50,15 @@ CU_PFN_DECL(cuMemHostAlloc, void**, size_t, unsigned int)
 CU_PFN_DECL(cuMemHostRegister, void*, size_t, unsigned int)
 CU_PFN_DECL(cuMemHostUnregister, void*)
 CU_PFN_DECL(cuMemHostGetDevicePointer, CUdeviceptr*, void*, unsigned int)
+CU_PFN_DECL(cuMemPoolCreate, CUmemoryPool*, const CUmemPoolProps*)
+CU_PFN_DECL(cuMemPoolDestroy, CUmemoryPool)
+CU_PFN_DECL(cuMemPoolSetAccess, CUmemoryPool, const CUmemAccessDesc*, size_t)
+CU_PFN_DECL(cuMemPoolGetAttribute, CUmemoryPool, CUmemPool_attribute, void*)
+CU_PFN_DECL(cuMemPoolSetAttribute, CUmemoryPool, CUmemPool_attribute, void*)
+CU_PFN_DECL(cuMemPoolTrimTo, CUmemoryPool, size_t)
+CU_PFN_DECL(cuMemAllocFromPoolAsync, CUdeviceptr*, size_t, CUmemoryPool,
+            CUstream)
+CU_PFN_DECL(cuMemFreeAsync, CUdeviceptr dptr, CUstream hStream)
 CU_PFN_DECL(cuModuleGetFunction, CUfunction*, CUmodule, const char*)
 CU_PFN_DECL(cuModuleLoadDataEx, CUmodule*, const void*, unsigned int,
             CUjit_option*, void**)
@@ -62,7 +74,7 @@ CU_PFN_DECL(cuMemsetD16Async, unsigned long long, unsigned short, size_t,
 CU_PFN_DECL(cuMemsetD8Async, unsigned long long, unsigned char, size_t,
             CUstream)
 CU_PFN_DECL(cuMemcpyAsync, CUdeviceptr, CUdeviceptr, size_t, CUstream)
-CU_PFN_DECL(cuMemcpyHtoDAsync_v2, CUdeviceptr, const void*, size_t, CUstream)
+CU_PFN_DECL(cuMemcpyHtoDAsync, CUdeviceptr, const void*, size_t, CUstream)
 CU_PFN_DECL(cuFuncSetAttribute, CUfunction, CUfunction_attribute, int)
 CU_PFN_DECL(cuLaunchKernel, CUfunction, unsigned int, unsigned int,
             unsigned int, unsigned int, unsigned int, unsigned int,
@@ -76,6 +88,7 @@ NCCL_PFN_DECL(ncclCommInitRankConfig, ncclComm_t*, int, ncclUniqueId, int,
               ncclConfig_t*)
 NCCL_PFN_DECL(ncclCommInitRank, ncclComm_t*, int, ncclUniqueId, int)
 NCCL_PFN_DECL(ncclCommInitAll, ncclComm_t*, int, const int*)
+NCCL_PFN_DECL(ncclCommSplit, ncclComm_t, int, int, ncclComm_t*, ncclConfig_t*)
 NCCL_PFN_DECL(ncclCommFinalize, ncclComm_t)
 NCCL_PFN_DECL(ncclCommDestroy, ncclComm_t)
 NCCL_PFN_DECL(ncclCommAbort, ncclComm_t)

@@ -248,10 +248,11 @@ func.func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !strea
 // -----
 
 // Tests that cloning across partition boundaries inserts the cloned op into the
-// correct partitions.
+// correct partitions. If the resource is used outside of any partition one of
+// the cloned values will be exported to provide the value.
 
 // CHECK-LABEL: @cloneAcrossPartitions
-func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
+func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>, !stream.resource<transient>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c123_i8 = arith.constant 123 : i8
@@ -263,7 +264,7 @@ func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
   %dispatch0 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%splat[%c0 to %c1 for %c1]) : (!stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.transfer
   %download = stream.async.transfer %dispatch0 : !stream.resource<transient>{%c1} -> !stream.resource<staging>{%c1}
-  // CHECK: stream.timepoint.await
+  // CHECK: %[[PARTITION0:.+]]:2 = stream.timepoint.await
 
   // CHECK: stream.async.load
   %load = stream.async.load %download[%c0] : !stream.resource<staging>{%c1} -> i8
@@ -271,16 +272,17 @@ func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
   %updated = stream.async.store %load, %download[%c0] : i8 -> !stream.resource<staging>{%c1}
 
   // CHECK: stream.async.execute
-  // CHECK-NEXT: stream.async.splat
   // CHECK-NEXT: stream.async.transfer
+  // CHECK-NEXT: stream.async.splat
   %upload = stream.async.transfer %updated : !stream.resource<staging>{%c1} -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.dispatch
   %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%upload[%c0 to %c1 for %c1], %splat[%c0 to %c1 for %c1]) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.async.transfer
   %result = stream.async.transfer %dispatch1 : !stream.resource<transient>{%c1} -> !stream.resource<external>{%c1}
+  // CHECK: %[[PARTITION1:.+]] = stream.timepoint.await
 
-  // CHECK: return
-  return %result : !stream.resource<external>
+  // CHECK: return %[[PARTITION1]], %[[PARTITION0]]#1
+  return %result, %splat : !stream.resource<external>, !stream.resource<transient>
 }
 
 // -----
@@ -314,4 +316,20 @@ func.func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
 
   // CHECK: return
   return %4 : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that async calls that return only resource types are handled correctly.
+
+stream.async.func private @inplaceExtern(%arg0: !stream.resource<*>, %arg1: index) -> %arg0
+
+// CHECK-LABEL: @inplaceCall
+func.func @inplaceCall(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> (!stream.resource<*>, index) {
+  %c0 = arith.constant 0 : index
+  // CHECK: stream.async.execute
+  // CHECK-NEXT: stream.async.call
+  %0 = stream.async.call @inplaceExtern(%arg0[%c0 to %arg1 for %arg1], %arg2) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  // CHECK: stream.timepoint.await
+  return %0, %arg1 : !stream.resource<*>, index
 }

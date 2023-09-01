@@ -12,7 +12,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
-#define DEBUG_TYPE "iree-const-expr-analysis"
+#define DEBUG_TYPE "iree-constexpr"
 
 using llvm::dbgs;
 
@@ -28,12 +28,13 @@ namespace Util {
 namespace {
 OpOperand *findOperandFor(Operation *op, Value input) {
   for (OpOperand &operand : op->getOpOperands()) {
-    if (operand.get() == input) return &operand;
+    if (operand.get() == input)
+      return &operand;
   }
   return nullptr;
 }
 
-}  // namespace
+} // namespace
 
 bool ConstExprAnalysis::ConstValueInfo::hasNonAnalyzedConsumer() const {
   // The analysis cannot represent zero-result operations, so detect that
@@ -53,18 +54,24 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
   // Populate the constant roots for globals.
   explorer.forEachGlobal([&](const Explorer::GlobalInfo *info) {
     // Rely on globals having been canonicalized to immutable correctly.
-    if (info->op.isGlobalMutable()) return;
-    if (info->isIndirect) return;
+    if (info->op.isGlobalMutable())
+      return;
+    if (info->isIndirect)
+      return;
+    if (!isLegalConstExprRootType(info->op.getGlobalType()))
+      return;
     for (auto *use : info->uses) {
       auto loadOp = llvm::dyn_cast<GlobalLoadOp>(use);
-      if (!loadOp) continue;
+      if (!loadOp)
+        continue;
       constantRoots[loadOp.getResult()] = loadOp;
     }
   });
 
   // Populate the constant roots for all inline constants in the program.
   rootOp->walk([&](arith::ConstantOp constOp) {
-    constantRoots[constOp.getResult()] = constOp;
+    if (isLegalConstExprRootType(constOp.getResult().getType()))
+      constantRoots[constOp.getResult()] = constOp;
   });
 
   // Prime the const value map with known roots. This must be done first
@@ -87,6 +94,10 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
     Operation *constOp = it.second;
     for (auto &use : constOp->getUses()) {
       Operation *useOp = use.getOwner();
+      // For now ignore operations that are not in the same scope.
+      if (constOp->getParentOp() != useOp->getParentOp()) {
+        continue;
+      }
       expandToOp(useOp);
     }
   }
@@ -98,7 +109,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
     iterWorklist.clear();
     iterWorklist.swap(worklist);
     for (ConstValueInfo *info : iterWorklist) {
-      if (info->state != ConstValueInfo::UNKNOWN) continue;
+      if (info->state != ConstValueInfo::UNKNOWN)
+        continue;
       bool allConstants = true;
       for (ConstValueInfo *producerInfo : info->producers) {
         if (producerInfo->state == ConstValueInfo::UNKNOWN) {
@@ -151,8 +163,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
   }
 }
 
-ConstExprAnalysis::ConstValueInfo *ConstExprAnalysis::addInfo(
-    Value constValue) {
+ConstExprAnalysis::ConstValueInfo *
+ConstExprAnalysis::addInfo(Value constValue) {
   auto info = std::make_unique<ConstValueInfo>(constValue);
   constInfoMap[constValue] = info.get();
   allocedConstInfos.push_back(std::move(info));
@@ -163,7 +175,8 @@ void ConstExprAnalysis::expandToOp(Operation *op) {
   ConstExprOpInfo opInfo = ConstExprOpInfo::getForOp(op);
   for (auto result : op->getResults()) {
     auto foundIt = constInfoMap.find(result);
-    if (foundIt != constInfoMap.end()) continue;
+    if (foundIt != constInfoMap.end())
+      continue;
 
     // Generate new info record.
     auto *valueInfo = addInfo(result);
@@ -198,7 +211,8 @@ void ConstExprAnalysis::expandToOp(Operation *op) {
 void ConstExprAnalysis::print(raw_ostream &os) const {
   os << "\nFOUND CONSTANTS:\n----------------\n";
   for (auto &info : allocedConstInfos) {
-    if (info->state != ConstValueInfo::CONSTANT || info->isRoot) continue;
+    if (info->state != ConstValueInfo::CONSTANT || info->isRoot)
+      continue;
     if (!info->roots.empty()) {
       os << "\n::" << info->constValue << "\n";
       os << "    WITH ROOTS:\n";
@@ -260,7 +274,8 @@ void ConstExprHoistingPolicy::initialize() {
     bool madeChange = false;
     for (auto *info : worklist) {
       Decision *decision = getDecision(info);
-      if (decision->getOutcome() != UNDECIDED) continue;
+      if (decision->getOutcome() != UNDECIDED)
+        continue;
       makeDecision(info, decision);
 
       if (decision->getOutcome() != UNDECIDED) {
@@ -321,7 +336,8 @@ void ConstExprHoistingPolicy::makeDecision(
   if (!hasLegalEscape) {
     for (auto *consumerInfo : info->consumers) {
       Decision *consumerDecision = getDecision(consumerInfo);
-      if (consumerDecision->getOutcome() != DISABLE_HOIST) continue;
+      if (consumerDecision->getOutcome() != DISABLE_HOIST)
+        continue;
 
       Operation *consumerOp = consumerInfo->getOperation();
       OpOperand *consumerOperand = findOperandFor(consumerOp, info->constValue);
@@ -346,7 +362,7 @@ void ConstExprHoistingPolicy::makeDecision(
   decision->enableHoist();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

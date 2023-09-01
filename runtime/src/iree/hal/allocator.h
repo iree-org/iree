@@ -204,6 +204,17 @@ enum iree_hal_buffer_compatibility_bits_t {
 };
 typedef uint32_t iree_hal_buffer_compatibility_t;
 
+// Parses a buffer compatibility bitfield from a string.
+// See iree_bitfield_parse for usage.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_compatibility_parse(
+    iree_string_view_t value, iree_hal_buffer_compatibility_t* out_value);
+
+// Formats a buffer compatibility bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t
+iree_hal_buffer_compatibility_format(iree_hal_buffer_compatibility_t value,
+                                     iree_bitfield_string_temp_t* out_temp);
+
 // Defines the type of an external buffer handle.
 // Each type may only be usable in a subset of implementations and platforms and
 // may even vary based on the runtime device properties or buffer instance.
@@ -223,6 +234,9 @@ typedef enum iree_hal_external_buffer_type_e {
   // caller is responsible for ensuring the memory remains live for as long as
   // the iree_hal_buffer_t referencing it.
   //
+  // CPU:
+  //  When using the default heap allocator this is just a host pointer.
+  //
   // CUDA:
   //  Requires device support.
   //  Uses cuMemHostRegister / cuMemHostUnregister.
@@ -231,9 +245,24 @@ typedef enum iree_hal_external_buffer_type_e {
   //
   // Vulkan:
   //  Requires VK_EXT_external_memory_host.
-  //  Requires device support.
   //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT.
-  IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION = 1,
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
+
+  // A device pointer allocated from an external allocator.
+  // An imported/exported buffer does not own a reference to the memory and the
+  // caller is responsible for ensuring the memory remains live for as long as
+  // the iree_hal_buffer_t referencing it.
+  //
+  // CPU:
+  //  When using the default heap allocator this is just a host pointer.
+  //
+  // CUDA:
+  //  Buffer usage is declared on import.
+  //
+  // Vulkan:
+  //  Requires VK_KHR_buffer_device_address.
+  //  Treats the pointer as VkDeviceAddress.
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION,
 
   // A driver/device-specific POSIX file descriptor handle.
   // The handle supports dup, dup2, close, and transport using the SCM_RIGHTS
@@ -248,7 +277,7 @@ typedef enum iree_hal_external_buffer_type_e {
   // Vulkan:
   //  Requires device support.
   //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT.
-  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD = 2,
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD,
 
   // A driver/device-specific Win32 HANDLE.
   // The handle supports DuplicateHandle, CompareObjectHandles, CloseHandle, and
@@ -263,10 +292,11 @@ typedef enum iree_hal_external_buffer_type_e {
   // Vulkan:
   //  Requires device support.
   //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT.
-  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32 = 3,
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32,
 
   // TODO(benvanik): additional memory types:
   //  shared memory fd (shmem)/mapped file
+  //  VkBuffer?
   //  VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT
   //  VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID
 } iree_hal_external_buffer_type_t;
@@ -293,8 +323,24 @@ typedef struct iree_hal_external_buffer_t {
     // IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION
     struct {
       // Host memory pointer.
+      //
+      // On Metal this must be a base pointer to a virtual memory region
+      // allocated with vm_allocate or mmap. Pointers returned from malloc (or
+      // iree_allocator_malloc/etc) are not supported.
       void* ptr;
     } host_allocation;
+    // IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION
+    struct {
+      // Device memory pointer. Pointer width may vary across devices so it is
+      // always treated as a 64-bit integer here.
+      //
+      // Common implementations:
+      //    CPU: host memory pointer
+      //   CUDA: CUdeviceptr
+      //  Metal: MTLBuffer
+      // Vulkan: VkDeviceMemory
+      uint64_t ptr;
+    } device_allocation;
     // IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD
     struct {
       int fd;
@@ -305,25 +351,6 @@ typedef struct iree_hal_external_buffer_t {
     } opaque_win32;
   } handle;
 } iree_hal_external_buffer_t;
-
-typedef void(IREE_API_PTR* iree_hal_buffer_release_fn_t)(
-    void* user_data, iree_hal_buffer_t* buffer);
-
-// A callback issued when a buffer is released.
-typedef struct {
-  // Callback function pointer.
-  iree_hal_buffer_release_fn_t fn;
-  // User data passed to the callback function. Unowned.
-  void* user_data;
-} iree_hal_buffer_release_callback_t;
-
-// Returns a no-op buffer release callback that implies that no cleanup is
-// required.
-static inline iree_hal_buffer_release_callback_t
-iree_hal_buffer_release_callback_null(void) {
-  iree_hal_buffer_release_callback_t callback = {NULL, NULL};
-  return callback;
-}
 
 //===----------------------------------------------------------------------===//
 // Statistics/reporting
@@ -425,9 +452,6 @@ iree_hal_allocator_query_buffer_compatibility(
     iree_device_size_t* out_allocation_size);
 
 // Allocates a buffer from the allocator.
-// If |initial_data| is provided then the bytes will be copied into the device
-// buffer. To avoid the copy when device-accessible constant data is used prefer
-// iree_hal_allocator_import_buffer when available.
 //
 // The memory type of the buffer returned may differ from the requested value
 // if the device can provide more functionality; for example, if requesting
@@ -443,7 +467,7 @@ iree_hal_allocator_query_buffer_compatibility(
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
-    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
+    iree_hal_buffer_t** out_buffer);
 
 // TODO(benvanik): iree_hal_allocator_query_external_buffer_compatibility to
 // check for support without needing an external buffer already. There's a few
@@ -543,7 +567,7 @@ typedef struct iree_hal_allocator_vtable_t {
   iree_status_t(IREE_API_PTR* allocate_buffer)(
       iree_hal_allocator_t* IREE_RESTRICT allocator,
       const iree_hal_buffer_params_t* IREE_RESTRICT params,
-      iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+      iree_device_size_t allocation_size,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
   void(IREE_API_PTR* deallocate_buffer)(
@@ -604,8 +628,8 @@ static inline void iree_hal_allocator_statistics_record_free(
 }
 
 #else
-#define iree_hal_allocator_statistics_record_alloc(...)
-#define iree_hal_allocator_statistics_record_free(...)
+#define iree_hal_allocator_statistics_record_alloc(statistics, ...)
+#define iree_hal_allocator_statistics_record_free(statistics, ...)
 #endif  // IREE_STATISTICS_ENABLE
 
 #ifdef __cplusplus

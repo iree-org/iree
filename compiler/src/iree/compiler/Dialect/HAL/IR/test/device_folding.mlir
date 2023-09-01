@@ -1,5 +1,69 @@
 // RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
 
+// CHECK-LABEL: @ImmediatelyResolveDeviceQueueBarrier
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[SIGNAL_FENCE:.+]]: !hal.fence)
+func.func @ImmediatelyResolveDeviceQueueBarrier(%device: !hal.device, %signal_fence: !hal.fence) {
+  %c-1_i64 = arith.constant -1 : i64
+  // CHECK-NOT: util.null
+  %wait_fence = util.null : !hal.fence
+  // CHECK-NOT: hal.device.queue.execute
+  // CHECK: hal.fence.signal<%[[SIGNAL_FENCE]] : !hal.fence>
+  hal.device.queue.execute<%device : !hal.device>
+      affinity(%c-1_i64)
+      wait(%wait_fence)
+      signal(%signal_fence)
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @HoistDeviceQueueBarrierChain
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[SIGNAL_FENCE:.+]]: !hal.fence)
+func.func @HoistDeviceQueueBarrierChain(%device: !hal.device, %signal_fence: !hal.fence) {
+  %c-1_i64 = arith.constant -1 : i64
+  // CHECK-NOT: hal.fence.create
+  %temp_fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
+  // CHECK: call @external_async_fn(%[[SIGNAL_FENCE]])
+  call @external_async_fn(%temp_fence) : (!hal.fence) -> ()
+  // CHECK-NOT: hal.device.queue.execute
+  hal.device.queue.execute<%device : !hal.device>
+      affinity(%c-1_i64)
+      wait(%temp_fence)
+      signal(%signal_fence)
+  return
+}
+func.func private @external_async_fn(!hal.fence)
+
+// -----
+
+// Tests that chains of locally defined fences are handled by hoisting the fence
+// create op (when possible).
+
+// CHECK-LABEL: @HoistDeviceQueueBarrierChainOutOfOrder
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[CMD:.+]]: !hal.command_buffer, %[[WAIT_FENCE:.+]]: !hal.fence)
+func.func @HoistDeviceQueueBarrierChainOutOfOrder(%device: !hal.device, %cmd: !hal.command_buffer, %wait_fence: !hal.fence) -> !hal.fence {
+  %c-1_i64 = arith.constant -1 : i64
+  // CHECK: %[[FENCE1:.+]] = hal.fence.create {{.+}} {test.fence1}
+  %fence0 = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence attributes {test.fence0}
+  // CHECK: hal.device.queue.execute{{.+}} wait(%[[WAIT_FENCE]]) signal(%[[FENCE1]]) commands([%[[CMD]]])
+  hal.device.queue.execute<%device : !hal.device>
+      affinity(%c-1_i64)
+      wait(%wait_fence)
+      signal(%fence0)
+      commands([%cmd])
+  // CHECK-NOT: hal.fence.create
+  %fence1 = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence attributes {test.fence1}
+  // CHECK-NOT: hal.device.queue.execute
+  hal.device.queue.execute<%device : !hal.device>
+      affinity(%c-1_i64)
+      wait(%fence0)
+      signal(%fence1)
+  // CHECK: return %[[FENCE1]]
+  return %fence1 : !hal.fence
+}
+
+// -----
+
 // CHECK-LABEL: @ElideDeviceQueueBarrierOp
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:  %[[CMD:.+]]: !hal.command_buffer,

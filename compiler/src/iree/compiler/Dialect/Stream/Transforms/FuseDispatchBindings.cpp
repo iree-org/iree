@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
-#include "iree/compiler/Utils/ADTExtras.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
@@ -40,10 +39,9 @@ namespace {
 struct BindingRange {
   BindingRange() = default;
   BindingRange(IREE::Stream::CmdDispatchOp dispatchOp, unsigned idx)
-      : idx(idx),
-        access(dispatchOp.getResourceAccesses()[idx]
-                   .cast<IREE::Stream::ResourceAccessBitfieldAttr>()
-                   .getValue()),
+      : idx(idx), access(llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+                             dispatchOp.getResourceAccesses()[idx])
+                             .getValue()),
         resource(dispatchOp.getResources()[idx]),
         resourceSize(dispatchOp.getResourceSizes()[idx]),
         offset(dispatchOp.getResourceOffsets()[idx]),
@@ -77,9 +75,10 @@ struct Binding {
 // those we can prove are the same. We could in the future introduce new entry
 // points if we had minor divergence in order to gain more fusion in the common
 // cases.
-static SmallVector<Binding> findCorrelatedBindings(
-    unsigned bindingCount, ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
-    bool aliasMutableBindings) {
+static SmallVector<Binding>
+findCorrelatedBindings(unsigned bindingCount,
+                       ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
+                       bool aliasMutableBindings) {
   // For each dispatch build equivalence classes indicating which bindings are
   // from the same base resource. Note that not all dispatches will have the
   // same duplicate bindings (though we hope they do!).
@@ -88,12 +87,13 @@ static SmallVector<Binding> findCorrelatedBindings(
   for (auto dispatchOp : dispatchOps) {
     llvm::EquivalenceClasses<unsigned> ec;
     DenseMap<Value, unsigned> leaders;
-    for (auto [idx, resource, resourceAccessAttr] : enumerate_zip_equal(
+    for (auto [idx, resource, resourceAccessAttr] : llvm::enumerate(
              dispatchOp.getResources(), dispatchOp.getResourceAccesses())) {
       // If the resource is mutable and we were told not to alias mutable
       // bindings we always put the resource into its own class.
       auto resourceAccess =
-          resourceAccessAttr.cast<IREE::Stream::ResourceAccessBitfieldAttr>();
+          llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+              resourceAccessAttr);
       if (!aliasMutableBindings &&
           bitEnumContainsAll(resourceAccess.getValue(),
                              IREE::Stream::ResourceAccessBitfield::Write)) {
@@ -149,7 +149,8 @@ static SmallVector<Binding> findCorrelatedBindings(
   llvm::BitVector handledBindings(bindingCount, /*t=*/false);
   for (unsigned i = 0; i < bindingCount; ++i) {
     // Ignore bindings we've already covered earlier during iteration.
-    if (handledBindings.test(i)) continue;
+    if (handledBindings.test(i))
+      continue;
 
     // Build new binding.
     Binding binding;
@@ -179,7 +180,7 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
   // Gather old bindings (in order).
   SmallVector<BlockArgument> oldBindingArgs;
   for (auto arg : entryBlock.getArguments()) {
-    if (arg.getType().isa<IREE::Stream::BindingType>()) {
+    if (llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
       oldBindingArgs.push_back(arg);
     }
   }
@@ -299,7 +300,7 @@ static void updateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
   OpBuilder builder(dispatchOp);
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
       dispatchOp.getLoc(), dispatchOp.getWorkload(),
-      dispatchOp.getEntryPointAttr(), newOperands, newResources,
+      dispatchOp.getEntryPointsAttr(), newOperands, newResources,
       newResourceSizes, newOffsets, newLengths,
       builder.getArrayAttr(newAccesses));
   (void)newOp;
@@ -311,14 +312,18 @@ static void updateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
 }
 
 // Fuses bindings on an |exportOp| based on all |dispatchOps| invoking it.
-static void fuseDispatchBindings(
-    IREE::Stream::ExecutableOp executableOp,
-    IREE::Stream::ExecutableExportOp exportOp,
-    ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
-    bool aliasMutableBindings, MemoizedCmdZeros &memoizedZeros) {
-  if (dispatchOps.empty()) return;  // no-op if no dispatches
+static void
+fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
+                     IREE::Stream::ExecutableExportOp exportOp,
+                     ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
+                     MemoizedCmdZeros &memoizedZeros) {
+  if (dispatchOps.empty())
+    return; // no-op if no dispatches
   auto anyDispatchOp = dispatchOps.front();
   unsigned bindingCount = anyDispatchOp.getResources().size();
+
+  auto configAttr = IREE::Stream::ResourceConfigAttr::lookup(exportOp);
+  bool aliasMutableBindings = configAttr.getAliasMutableBindings();
 
   LLVM_DEBUG({
     AsmState asmState(executableOp->getParentOp());
@@ -400,7 +405,7 @@ static void fuseDispatchBindings(
   for (auto dispatchOp : dispatchOps) {
     updateDispatchSite(dispatchOp, bindings, memoizedZeros);
   }
-  bindings.clear();  // invalidated above
+  bindings.clear(); // invalidated above
 }
 
 //===----------------------------------------------------------------------===//
@@ -409,7 +414,7 @@ static void fuseDispatchBindings(
 
 class FuseDispatchBindingsPass
     : public FuseDispatchBindingsBase<FuseDispatchBindingsPass> {
- public:
+public:
   FuseDispatchBindingsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -433,9 +438,11 @@ class FuseDispatchBindingsPass
     DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>
         entryDispatchMap;
     getOperation()->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto exportOp = symbolTable.lookupNearestSymbolFrom(
-          dispatchOp, dispatchOp.getEntryPoint());
-      entryDispatchMap[exportOp].push_back(dispatchOp);
+      dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp =
+            symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+        entryDispatchMap[exportOp].push_back(dispatchOp);
+      });
     });
 
     // Perform fusion for each executable entry point using all known dispatches
@@ -446,20 +453,20 @@ class FuseDispatchBindingsPass
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         fuseDispatchBindings(executableOp, exportOp, entryDispatchMap[exportOp],
-                             aliasMutableBindings, memoizedZeros);
+                             memoizedZeros);
       }
     }
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createFuseDispatchBindingsPass() {
   return std::make_unique<FuseDispatchBindingsPass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

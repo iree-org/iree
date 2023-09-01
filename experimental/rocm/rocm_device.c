@@ -19,9 +19,11 @@
 #include "experimental/rocm/rocm_allocator.h"
 #include "experimental/rocm/rocm_event.h"
 #include "experimental/rocm/status_util.h"
+#include "experimental/rocm/tracing.h"
 #include "iree/base/internal/arena.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
+#include "iree/hal/utils/file_transfer.h"
+#include "iree/hal/utils/memory_file.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_rocm_device_t
@@ -43,9 +45,12 @@ typedef struct iree_hal_rocm_device_t {
 
   // TODO: support multiple streams.
   hipStream_t stream;
+  iree_hal_rocm_tracing_context_t* tracing_context;
   iree_hal_rocm_context_wrapper_t context_wrapper;
   iree_hal_allocator_t* device_allocator;
 
+  // Optional provider used for creating/configuring collective channels.
+  iree_hal_channel_provider_t* channel_provider;
 } iree_hal_rocm_device_t;
 
 static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable;
@@ -63,6 +68,11 @@ static void iree_hal_rocm_device_destroy(iree_hal_device_t* base_device) {
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
+
+  // Buffers may have been retaining collective resources.
+  iree_hal_channel_provider_release(device->channel_provider);
+
+  iree_hal_rocm_tracing_context_free(device->tracing_context);
   ROCM_IGNORE_ERROR(device->context_wrapper.syms,
                     hipStreamDestroy(device->stream));
 
@@ -95,9 +105,14 @@ static iree_status_t iree_hal_rocm_device_create_internal(
   device->context_wrapper.rocm_context = context;
   device->context_wrapper.host_allocator = host_allocator;
   device->context_wrapper.syms = syms;
-  iree_status_t status = iree_hal_rocm_allocator_create(
-      (iree_hal_device_t*)device, &device->context_wrapper,
-      &device->device_allocator);
+  // Enable tracing for the (currently only) stream - no-op if disabled.
+  iree_status_t status = iree_hal_rocm_tracing_context_allocate(
+      &device->context_wrapper, device->identifier, stream, &device->block_pool,
+      host_allocator, &device->tracing_context);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_rocm_allocator_create(&device->context_wrapper,
+                                            &device->device_allocator);
+  }
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -161,6 +176,14 @@ static void iree_hal_rocm_replace_device_allocator(
   device->device_allocator = new_allocator;
 }
 
+static void iree_hal_rocm_replace_channel_provider(
+    iree_hal_device_t* base_device, iree_hal_channel_provider_t* new_provider) {
+  iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
+  iree_hal_channel_provider_retain(new_provider);
+  iree_hal_channel_provider_release(device->channel_provider);
+  device->channel_provider = new_provider;
+}
+
 static iree_status_t iree_hal_rocm_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value) {
@@ -202,8 +225,8 @@ static iree_status_t iree_hal_rocm_device_create_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   return iree_hal_rocm_direct_command_buffer_create(
-      base_device, &device->context_wrapper, mode, command_categories,
-      queue_affinity, binding_capacity, &device->block_pool,
+      base_device, &device->context_wrapper, device->tracing_context, mode,
+      command_categories, queue_affinity, binding_capacity, &device->block_pool,
       out_command_buffer);
 }
 
@@ -231,6 +254,23 @@ static iree_status_t iree_hal_rocm_device_create_executable_cache(
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   return iree_hal_rocm_nop_executable_cache_create(
       &device->context_wrapper, identifier, out_executable_cache);
+}
+
+static iree_status_t iree_hal_rocm_device_import_file(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_memory_access_t access,
+    iree_hal_external_file_t* IREE_RESTRICT external_file,
+    iree_hal_file_release_callback_t release_callback,
+    iree_hal_file_t** out_file) {
+  if (external_file->type != IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "implementation does not support the external file type");
+  }
+  return iree_hal_memory_file_wrap(
+      queue_affinity, access, external_file->handle.host_allocation,
+      release_callback, iree_hal_device_allocator(base_device),
+      iree_hal_device_host_allocator(base_device), out_file);
 }
 
 static iree_status_t iree_hal_rocm_device_create_pipeline_layout(
@@ -269,9 +309,9 @@ static iree_status_t iree_hal_rocm_device_queue_alloca(
   // TODO: queue-ordered allocations.
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
                                                     iree_infinite_timeout()));
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(base_device), params, allocation_size,
-      iree_const_byte_span_empty(), out_buffer));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
+                                         params, allocation_size, out_buffer));
   IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
   return iree_ok_status();
 }
@@ -287,6 +327,48 @@ static iree_status_t iree_hal_rocm_device_queue_dealloca(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_rocm_device_queue_read(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_file_t* source_file, uint64_t source_offset,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, uint32_t flags) {
+  // TODO: expose streaming chunk count/size options.
+  iree_status_t loop_status = iree_ok_status();
+  iree_hal_file_transfer_options_t options = {
+      .loop = iree_loop_inline(&loop_status),
+      .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
+      .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_read_streaming(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_file, source_offset, target_buffer, target_offset, length, flags,
+      options));
+  return loop_status;
+}
+
+static iree_status_t iree_hal_rocm_device_queue_write(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
+    iree_hal_file_t* target_file, uint64_t target_offset,
+    iree_device_size_t length, uint32_t flags) {
+  // TODO: expose streaming chunk count/size options.
+  iree_status_t loop_status = iree_ok_status();
+  iree_hal_file_transfer_options_t options = {
+      .loop = iree_loop_inline(&loop_status),
+      .chunk_count = IREE_HAL_FILE_TRANSFER_CHUNK_COUNT_DEFAULT,
+      .chunk_size = IREE_HAL_FILE_TRANSFER_CHUNK_SIZE_DEFAULT,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_write_streaming(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      source_buffer, source_offset, target_file, target_offset, length, flags,
+      options));
+  return loop_status;
+}
+
 static iree_status_t iree_hal_rocm_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -299,8 +381,11 @@ static iree_status_t iree_hal_rocm_device_queue_execute(
   // synchronizes after every submit.
   // TODO(raikonenfnu): currently run on default/null stream, when cmd buffer
   // stream work with device->stream, we'll change
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "hipStreamSynchronize");
   ROCM_RETURN_IF_ERROR(device->context_wrapper.syms, hipStreamSynchronize(0),
                        "hipStreamSynchronize");
+  iree_hal_rocm_tracing_context_collect(device->tracing_context);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -324,6 +409,12 @@ static iree_status_t iree_hal_rocm_device_profiling_begin(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_rocm_device_profiling_flush(
+    iree_hal_device_t* base_device) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_rocm_device_profiling_end(
     iree_hal_device_t* base_device) {
   // Unimplemented (and that's ok).
@@ -336,6 +427,7 @@ static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
     .host_allocator = iree_hal_rocm_device_host_allocator,
     .device_allocator = iree_hal_rocm_device_allocator,
     .replace_device_allocator = iree_hal_rocm_replace_device_allocator,
+    .replace_channel_provider = iree_hal_rocm_replace_channel_provider,
     .trim = iree_hal_rocm_device_trim,
     .query_i64 = iree_hal_rocm_device_query_i64,
     .create_channel = iree_hal_rocm_device_create_channel,
@@ -344,6 +436,7 @@ static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
         iree_hal_rocm_device_create_descriptor_set_layout,
     .create_event = iree_hal_rocm_device_create_event,
     .create_executable_cache = iree_hal_rocm_device_create_executable_cache,
+    .import_file = iree_hal_rocm_device_import_file,
     .create_pipeline_layout = iree_hal_rocm_device_create_pipeline_layout,
     .create_semaphore = iree_hal_rocm_device_create_semaphore,
     .query_semaphore_compatibility =
@@ -351,9 +444,12 @@ static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
     .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_alloca = iree_hal_rocm_device_queue_alloca,
     .queue_dealloca = iree_hal_rocm_device_queue_dealloca,
+    .queue_read = iree_hal_rocm_device_queue_read,
+    .queue_write = iree_hal_rocm_device_queue_write,
     .queue_execute = iree_hal_rocm_device_queue_execute,
     .queue_flush = iree_hal_rocm_device_queue_flush,
     .wait_semaphores = iree_hal_rocm_device_wait_semaphores,
     .profiling_begin = iree_hal_rocm_device_profiling_begin,
+    .profiling_flush = iree_hal_rocm_device_profiling_flush,
     .profiling_end = iree_hal_rocm_device_profiling_end,
 };

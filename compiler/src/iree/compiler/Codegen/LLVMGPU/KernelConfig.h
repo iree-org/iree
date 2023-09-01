@@ -14,6 +14,6 @@ namespace iree_compiler {
 
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp);
 
-}  // namespace iree_compiler
-}  // namespace mlir
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_
+} // namespace iree_compiler
+} // namespace mlir
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_

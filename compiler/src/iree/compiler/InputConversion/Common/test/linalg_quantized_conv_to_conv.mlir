@@ -388,7 +388,7 @@ func.func @dconv2d_izp(%arg0 : tensor<1x64x64x16xi8>, %arg1 : tensor<4x4x16xi8>,
   // CHECK:    linalg.yield %[[ADD]]
 
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x61x61x16xi32>
-  // CHECK: %[[UPDATE:.+]] = linalg.generic 
+  // CHECK: %[[UPDATE:.+]] = linalg.generic
   // CHECK-SAME: indexing_maps = [#map2, #map3, #map2]
   // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
   // CHECK-SAME: ins(%[[CONV]], %[[SUM]] : tensor<1x61x61x16xi32>, tensor<16xi32>)
@@ -422,14 +422,14 @@ func.func @dconv2d_fzp(%arg0 : tensor<1x64x64x16xi8>, %arg1 : tensor<4x4x16xi8>,
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x61x61x16xi32>
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<1x61x61x16xi32>)
   // CHECK: %[[WINDOW:.+]] = tensor.empty() : tensor<4x4xi32>
-  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum 
+  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum
   // CHECK-SAME:      dilations = dense<1> : tensor<2xi64>
   // CHECK-SAME:      strides = dense<1> : tensor<2xi64>
   // CHECK-SAME:      ins(%arg0, %[[WINDOW]] : tensor<1x64x64x16xi8>, tensor<4x4xi32>)
   // CHECK-SAME:      outs(%[[FILL]] : tensor<1x61x61x16xi32>)
 
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x61x61x16xi32>
-  // CHECK:  %[[UPDATE:.+]] = linalg.generic 
+  // CHECK:  %[[UPDATE:.+]] = linalg.generic
   // CHECK-SAME:      indexing_maps = [#map, #map, #map]
   // CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
   // CHECK-SAME:      ins(%[[CONV]], %[[POOL]] : tensor<1x61x61x16xi32>, tensor<1x61x61x16xi32>)
@@ -464,7 +464,7 @@ func.func @dconv2d_ifzp(%arg0 : tensor<1x64x64x16xi8>, %arg1 : tensor<4x4x16xi8>
 
   // CHECK: %[[SUMF:.+]] = linalg.generic
   // CHECK-SAME: ins(%arg1 : tensor<4x4x16xi8>)
-  // CHECK: %[[FIX_IZP:.+]] = linalg.generic 
+  // CHECK: %[[FIX_IZP:.+]] = linalg.generic
   // CHECK-SAME: ins(%[[DCONV]], %[[SUMF]] : tensor<1x61x61x16xi32>, tensor<16xi32>)
 
   // CHECK: %[[WINDOW:.+]] = tensor.empty() : tensor<4x4xi32>
@@ -474,7 +474,7 @@ func.func @dconv2d_ifzp(%arg0 : tensor<1x64x64x16xi8>, %arg1 : tensor<4x4x16xi8>
   // CHECK:  ins(%[[FIX_IZP]], %[[POOL]] : tensor<1x61x61x16xi32>, tensor<1x61x61x16xi32>)
 
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<1x61x61x16xi32>
-  // CHECK: %[[RET:.+]] = linalg.generic 
+  // CHECK: %[[RET:.+]] = linalg.generic
   // CHECK-SAME: indexing_maps = [#map2, #map2]
   // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
   // CHECK-SAME: ins(%[[FIX_FZP]] : tensor<1x61x61x16xi32>)
@@ -523,7 +523,7 @@ func.func @dconv2d_dyn(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tensor<?x?x?xi8>, %ar
   // CHECK: %[[DIM2:.+]] = tensor.dim %arg2, %[[I2]]
   // CHECK: %[[DIM3:.+]] = tensor.dim %arg0, %[[I3]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]]) : tensor<?x?x?x?xi32>
-  // CHECK: %[[FIX_IZP:.+]] = linalg.generic 
+  // CHECK: %[[FIX_IZP:.+]] = linalg.generic
   // CHECK-SAME: ins(%[[DCONV]], %[[SUMF]] : tensor<?x?x?x?xi32>, tensor<?xi32>)
   // CHECK-SAME: outs(%[[EMPTY]] : tensor<?x?x?x?xi32>)
 
@@ -561,7 +561,7 @@ func.func @dconv2d_dyn(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tensor<?x?x?xi8>, %ar
   // CHECK:  %[[DIM2:.+]] = tensor.dim %arg2, %[[I2]]
   // CHECK:  %[[DIM3:.+]] = tensor.dim %arg0, %[[I3]]
   // CHECK:  %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]]) : tensor<?x?x?x?xi32>
-  // CHECK: %[[RET:.+]] = linalg.generic 
+  // CHECK: %[[RET:.+]] = linalg.generic
   // CHECK-SAME: ins(%[[FIX_FZP]] : tensor<?x?x?x?xi32>)
   // CHECK-SAME: outs(%[[EMPTY]] : tensor<?x?x?x?xi32>)
   // CHECK:    ^bb0(%[[IN:.+]]: i32, %{{.+}}: i32):
@@ -576,4 +576,18 @@ func.func @dconv2d_dyn(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tensor<?x?x?xi8>, %ar
 
   // CHECK: return %[[RET]]
   return %result : tensor<?x?x?x?xi32>
+}
+
+// -----
+
+// Make sure linalg.depthwise_conv_2d_nhwd_hwcm_q is converted to
+// linalg.depthwise_conv_2d_nhwc_hwc_q and then lowered according to the
+// patterns tested above.
+
+// CHECK-LABEL: @dconv2d_hwcm
+//   CHECK-NOT:   linalg.depthwise_conv_2d_nhwc_hwcm_q
+//       CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
+func.func @dconv2d_hwcm(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x1xi8>, %arg2: tensor<?x?x?x?x1xi32>, %arg3 : i32, %arg4 : i32) -> tensor<?x?x?x?x1xi32> {
+  %0 = linalg.depthwise_conv_2d_nhwc_hwcm_q {_someattr, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%arg0, %arg1, %arg3, %arg4 : tensor<?x?x?x?xi8>, tensor<?x?x?x1xi8>, i32, i32) outs(%arg2 : tensor<?x?x?x?x1xi32>) -> tensor<?x?x?x?x1xi32>
+  return %0 : tensor<?x?x?x?x1xi32>
 }

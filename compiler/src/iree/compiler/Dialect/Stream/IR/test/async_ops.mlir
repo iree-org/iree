@@ -84,13 +84,13 @@ func.func @asyncCopy(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.re
 
 // CHECK-LABEL: @asyncCollectiveAllGather
 func.func @asyncCollectiveAllGather(
+    // CHECK-SAME: %[[CHANNEL:.+]]: !stream.channel,
+    %channel: !stream.channel,
     // CHECK-SAME: %[[SEND:[a-z0-9]+]]: !stream.resource<*>, %[[SEND_SIZE:[a-z0-9]+]]: index,
     %send: !stream.resource<*>, %send_size: index,
     // CHECK-SAME: %[[RECV_SIZE:[a-z0-9]+]]: index, %[[COUNT:[a-z0-9]+]]: index)
     %recv_size: index, %count: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK: %[[CHANNEL:.+]] = stream.channel.default
-  %channel = stream.channel.default : !stream.channel
   // CHECK: %[[RECV:.+]] = stream.async.alloca
   %recv = stream.async.alloca : !stream.resource<*>{%recv_size}
   // CHECK: = stream.async.collective<all_gather : f32>[%[[COUNT]]]
@@ -112,6 +112,8 @@ func.func @asyncCollectiveAllGather(
 
 // CHECK-LABEL: @asyncCollectiveBroadcast
 func.func @asyncCollectiveBroadcast(
+    // CHECK-SAME: %[[CHANNEL:.+]]: !stream.channel,
+    %channel: !stream.channel,
     // CHECK-SAME: %[[RANK:[a-z0-9]+]]: i32,
     %rank: i32,
     // CHECK-SAME: %[[SEND:[a-z0-9]+]]: !stream.resource<*>, %[[SEND_SIZE:[a-z0-9]+]]: index,
@@ -119,8 +121,6 @@ func.func @asyncCollectiveBroadcast(
     // CHECK-SAME: %[[RECV_SIZE:[a-z0-9]+]]: index, %[[COUNT:[a-z0-9]+]]: index)
     %recv_size: index, %count: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK: %[[CHANNEL:.+]] = stream.channel.default
-  %channel = stream.channel.default : !stream.channel
   // CHECK: %[[RECV:.+]] = stream.async.alloca
   %recv = stream.async.alloca : !stream.resource<*>{%recv_size}
   // CHECK: = stream.async.collective<broadcast : f32>[%[[COUNT]]]
@@ -181,6 +181,16 @@ func.func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.re
 
 // -----
 
+// CHECK-LABEL: @asyncDispatchNoInputs
+func.func @asyncDispatchNoInputs(%arg0: index) -> !stream.resource<*> {
+  %c1 = arith.constant 1 : index
+  // CHECK: = stream.async.dispatch @executable::@dispatch[%c1]() : () -> !stream.resource<*>{%arg0}
+  %0 = stream.async.dispatch @executable::@dispatch[%c1]() : () -> !stream.resource<*>{%arg0}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
 stream.executable private @executable {
   stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index) -> (index, index, index) {
     stream.return %arg0, %arg1, %arg0 : index, index, index
@@ -235,6 +245,19 @@ func.func @asyncDispatchNoWorkload(%arg0: !stream.resource<*>, %arg1: index) -> 
   // CHECK: = stream.async.dispatch @executable::@dispatch(%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   %0 = stream.async.dispatch @executable::@dispatch(%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   return %0 : !stream.resource<*>
+}
+
+// -----
+
+stream.async.func private @asyncExtern(%arg0: !stream.resource<*>, %arg1: index) -> %arg0
+
+// CHECK-LABEL: @asyncCall
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[SIZE0:.+]]: index)
+func.func @asyncCall(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: = stream.async.call @asyncExtern(%[[ARG0]][%c0 to %[[SIZE0]] for %[[SIZE0]]], %[[SIZE0]]) : (!stream.resource<*>{%[[SIZE0]]}, index) -> %[[ARG0]]{%[[SIZE0]]}
+  %call = stream.async.call @asyncExtern(%arg0[%c0 to %arg1 for %arg1], %arg1) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  return %call : !stream.resource<*>
 }
 
 // -----

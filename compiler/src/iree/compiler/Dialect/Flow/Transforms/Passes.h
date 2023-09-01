@@ -25,20 +25,9 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {
-  // Enables the iree-util-hoist-into-globals pass. This should eventually
-  // become the default.
-  bool constExprHoisting = false;
-
-  // Enables passes to perform numeric precision reduction.
-  bool numericPrecisionReduction = false;
-
-  // Hook to populate a constant evaluation pass pipeline. If nullptr, then
-  // no passes are added for constant evaluation. This must be injected in
-  // because constant-evaluators can depend on the whole compiler, of which
-  // this is a part, and we maintain strict optionality for this component.
-  std::function<void(OpPassManager &passManager)> buildConstEvalPassPipeline;
-};
+/// This is a placeholder for future. We should pass all the options through the
+/// struct.
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
 
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.
@@ -60,6 +49,11 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Apply patterns to erase unused linalg operands and remove dead code
+// associated.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createEraseUnusedLinalgOperands();
+
 // Expands tensor shape dimensions into SSA values across the program.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
 
@@ -79,16 +73,26 @@ std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 
 // Pass to convert a tensor.pad operation into a linalg.fill +
 // tensor.insert_slice.
-std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
-    bool skipSingleLinalgOpUses = false);
+std::unique_ptr<Pass>
+createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses = false);
 
 // Create a pass to detach elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
+
+// Create a pass that imports upstream patterns to fold unit extent dims
+// but with IREE control.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFoldUnitExtentDimsPass();
 
 // Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse = false,
                             unsigned multiUseFusionIteration = 2);
+
+// Create a pass that generalizes some named Linalg ops into `linalg.generic`
+// operations since the IREE compiler can handle that better.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGeneralizeLinalgNamedOpsPass();
 
 // Infers and inserts util.numeric.optional_narrow ops at points that may be
 // beneficial.
@@ -122,6 +126,14 @@ std::unique_ptr<Pass> createSetEncodingPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createStripSignednessPass();
 
+// Removes tensors that have 0-extents.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createRemoveZeroExtentTensorsPass();
+
+// Decomposes top-level SCF operations to CFG.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTopLevelSCFToCFGPass();
+
 // Verifies that the input to the Flow transformation pipeline is legal.
 // This includes checking for operations from dialects that are expected
 // to be legalized before this pass.
@@ -132,14 +144,38 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 //===----------------------------------------------------------------------===//
 
 // Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region
-// is created for each tiled loop nest.
+// is created for each tiled loop nest. This pass only moves the root compute op
+// into the dispatch region, allowing producers to be outside.
+/// This struct is the same struct that is auto-generated from tablegen file for
+/// the pass definition. THis is manually copied from the `Passes.h.inc` file
+/// generated below.
+// TODO(ravishankarm): Move the passes in Flow to use the auto-generated options
+// struct.
+struct FormDispatchRegionsOptions {
+  bool fuseMultiUse = false;
+  bool generateWorkloadRegion = true;
+  bool fusePadWithConsumers = false;
+  bool fusePadWithProducers = false;
+};
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchRegionsPass(bool aggressiveFusion = false,
-                              bool generateWorkloadRegion = true);
+createFormDispatchRegionsPass(FormDispatchRegionsOptions options = {});
+
+// Pass to create `flow.dispatch.region`s for scalar computations.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFormScalarDispatchesPass();
 
 // Pass to collapse dimensions of Linalg Ops on tensor ops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCollapseDimensionsPass();
+
+// Pass to clone into dispatch regions producers of values used in the dispatch
+// regions but defined in the above. This prepares the dispatch regions for
+// converting to dispatch workgroups with explicit captures.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCloneProducersIntoDispatchRegionsPass();
+
+// A pass to fuse dequantization and matmul linalg.generic ops
+std::unique_ptr<Pass> createFuseDequantizationMatmulPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
@@ -170,6 +206,16 @@ createOutlineDispatchRegionsPass();
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createInjectDispatchTracingPass();
+
+// Crops the program and inserts trace markers at the specified symbols.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createInsertDebugTargetAtSymbolPass(std::string breakDebugTarget = "",
+                                    std::string traceDebugTarget = "");
+
+// Crops the program and inserts trace markers at the specified ordinals.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createInsertDebugTargetAtOrdinalPass(std::string breakDebugTarget = "",
+                                     std::string traceDebugTarget = "");
 
 // Exports all functions and dispatch executables as `() -> ()` benchmark funcs.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
@@ -204,17 +250,9 @@ std::unique_ptr<Pass> createCollapseDimsPass();
 // Simplification and Development Tools
 //===----------------------------------------------------------------------===//
 
-// Strips constant util.globals and replaces them with splats.
-// This destructively removes data (often model weights and other parameters)
-// and is intended for use as a development tool.
-// TODO(scotttodd): pass pipeline with this and other development passes to
-//                  generate test cases / models suitable for check-in
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createStripAndSplatConstantVariablesPass();
-
 /// Creates a pass to dump a graph for dispatches
-std::unique_ptr<Pass> createDumpDispatchGraphPass(
-    raw_ostream &os = llvm::errs());
+std::unique_ptr<Pass>
+createDumpDispatchGraphPass(raw_ostream &os = llvm::errs());
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -222,9 +260,9 @@ std::unique_ptr<Pass> createDumpDispatchGraphPass(
 
 void registerFlowPasses();
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_

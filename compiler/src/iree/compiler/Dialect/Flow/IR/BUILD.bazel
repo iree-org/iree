@@ -1,0 +1,200 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "FlowBase.td",
+            "FlowInterfaces.td",
+            "FlowOps.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:FuncTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "IR",
+    srcs = [
+        "FlowAttrs.cpp.inc",
+        "FlowDialect.cpp",
+        "FlowEnums.cpp.inc",
+        "FlowOpFolders.cpp",
+        "FlowOpInterfaces.cpp.inc",
+        "FlowOps.cpp",
+        "FlowOps.cpp.inc",
+        "FlowTypeInterfaces.cpp.inc",
+        "FlowTypes.cpp",
+        "FlowTypes.cpp.inc",
+    ],
+    hdrs = [
+        "FlowAttrs.h.inc",
+        "FlowDialect.h",
+        "FlowEnums.h.inc",
+        "FlowOpInterfaces.h.inc",
+        "FlowOps.h",
+        "FlowOps.h.inc",
+        "FlowTypeInterfaces.h.inc",
+        "FlowTypes.h",
+        "FlowTypes.h.inc",
+    ],
+    deps = [
+        ":FlowEnumsGen",
+        ":FlowInterfacesGen",
+        ":FlowOpsGen",
+        ":FlowTypesGen",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ArithUtils",
+        "@llvm-project//mlir:ControlFlowInterfaces",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:InferTypeOpInterface",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SideEffectInterfaces",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:ViewLikeInterface",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "FlowEnumsGen",
+    tbl_outs = [
+        (
+            ["--gen-enum-decls"],
+            "FlowEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "FlowEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "FlowBase.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "FlowInterfacesGen",
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "FlowOpInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "FlowOpInterfaces.cpp.inc",
+        ),
+        (
+            ["--gen-type-interface-decls"],
+            "FlowTypeInterfaces.h.inc",
+        ),
+        (
+            ["--gen-type-interface-defs"],
+            "FlowTypeInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "FlowInterfaces.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "FlowOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "FlowOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "FlowOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "FlowOps.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "FlowTypesGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-attrdef-decls",
+                "--attrdefs-dialect=flow",
+            ],
+            "FlowAttrs.h.inc",
+        ),
+        (
+            [
+                "--gen-attrdef-defs",
+                "--attrdefs-dialect=flow",
+            ],
+            "FlowAttrs.cpp.inc",
+        ),
+        (
+            [
+                "--gen-typedef-decls",
+                "--typedefs-dialect=flow",
+            ],
+            "FlowTypes.h.inc",
+        ),
+        (
+            [
+                "--gen-typedef-defs",
+                "--typedefs-dialect=flow",
+            ],
+            "FlowTypes.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "FlowBase.td",
+    deps = [":td_files"],
+)
+
+iree_tablegen_doc(
+    name = "FlowDialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "-dialect=flow",
+            ],
+            "FlowDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "FlowOps.td",
+    deps = [":td_files"],
+)

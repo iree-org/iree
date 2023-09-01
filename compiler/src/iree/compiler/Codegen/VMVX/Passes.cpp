@@ -4,11 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Passes.h"
-
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
+
+#include "iree/compiler/Codegen/VMVX/PassDetail.h"
+#include "iree/compiler/Codegen/VMVX/Passes.h"
+#include "mlir/Pass/PassManager.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -29,5 +29,26 @@ void buildVMVXLinkingPassPipeline(OpPassManager &passManager) {
           createVMVXAssignConstantOrdinalsPass());
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+//===---------------------------------------------------------------------===//
+// Register VMVX Passes
+//===---------------------------------------------------------------------===//
+
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/VMVX/Passes.h.inc"
+} // namespace
+
+void registerCodegenVMVXPasses() {
+  // Generated.
+  registerPasses();
+
+  static PassPipelineRegistration<> VMVXLinkingPipeline(
+      "iree-codegen-vmvx-linking-pipeline",
+      "Runs the VMVX HAL executable linking pipeline",
+      [](OpPassManager &passManager) {
+        buildVMVXLinkingPassPipeline(passManager);
+      });
+}
+
+} // namespace iree_compiler
+} // namespace mlir

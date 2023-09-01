@@ -42,6 +42,11 @@ struct ConstExprOpInfo {
   static ConstExprOpInfo getForOp(Operation *op);
 };
 
+// Whether the type is considered legal for a constexpr root. For example,
+// this would be called with the i32 type below:
+//   %cst = arith.constant 4 : i32
+bool isLegalConstExprRootType(Type t);
+
 // Whether a const-expr op is eligible to be hoistable. This enforces
 // policies for excluding certain, otherwise eligible, const-expr ops from
 // being hoisted to a global.
@@ -54,9 +59,9 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info);
 // This is used to exclude certain operands that we never want in globals.
 bool isHoistableConstExprConsumingOperand(OpOperand *operand);
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_OP_ORACLE_H_
+#endif // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_OP_ORACLE_H_

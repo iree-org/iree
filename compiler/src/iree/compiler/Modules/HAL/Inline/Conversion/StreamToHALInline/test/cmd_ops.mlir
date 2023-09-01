@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-hal-inline-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-inline-conversion %s | FileCheck %s
 
 // NOTE: memory control ops are currently ignored as we're executing inline and
 // assume coherent memory.
@@ -86,7 +86,7 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
 // Provided by the iree-hal-inline-executables pass:
 func.func private @__dispatch_ex_dispatch(
     index, index,                 // workload[2]
-    i32, i32,                     // push_constants[2]
+    i32, i32,                     // pushConstants[2]
     !util.buffer, !util.buffer,   // bindingBuffers[2]
     index, index,                 // bindingOffsets[2]
     index, index)                 // bindingLengths[2]
@@ -128,4 +128,31 @@ func.func @cmdDispatch(%buffer0: !stream.resource<transient>, %buffer0_size: ind
   } => !stream.timepoint
   // CHECK: return %c0
   return %fence : !stream.timepoint
+}
+
+// -----
+
+// Tests conversion of streamable calls and function declarations.
+// Note that we get a buffer + offset + length for each resource but unlike the
+// full HAL path there's no command buffer passed in.
+
+// CHECK: func.func private @cmdFunc(!util.buffer, index, index, i32, !util.buffer, index, index, !custom.type, !util.buffer, index, index)
+stream.cmd.func private @cmdFunc(%arg0[%arg1 for %arg2]: !stream.resource<*>, %arg3: i32, %arg4[%arg5 for %arg6]: !stream.resource<*>, %arg7: !custom.type, %arg8[%arg9 for %arg10]: !stream.resource<*>)
+
+// CHECK-LABEL: @cmdCall
+func.func @cmdCall(%arg0: !stream.resource<external>, %arg1: i32, %arg2: !stream.resource<transient>, %arg3: !custom.type, %arg4: !stream.resource<transient>) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  // CHECK-DAG: %[[SIZE0:.+]] = arith.constant 100
+  %size0 = arith.constant 100 : index
+  // CHECK-DAG: %[[SIZE1:.+]] = arith.constant 101
+  %size1 = arith.constant 101 : index
+  // CHECK-DAG: %[[SIZE2:.+]] = arith.constant 102
+  %size2 = arith.constant 102 : index
+  // CHECK-DAG: %[[ARG0_STORAGE:.+]] = hal_inline.buffer.storage<%arg0 : !hal.buffer> : !util.buffer
+  %timepoint = stream.cmd.execute with(%arg0 as %stream0: !stream.resource<external>{%size0}, %arg2 as %stream1: !stream.resource<transient>{%size1}, %arg4 as %stream2: !stream.resource<transient>{%size2}) {
+    // CHECK: call @cmdFunc(%[[ARG0_STORAGE]], %c0, %[[SIZE0]], %arg1, %arg2, %c0, %[[SIZE1]], %arg3, %arg4, %c0, %[[SIZE2]]) :
+    // CHECK-SAME: (!util.buffer, index, index, i32, !util.buffer, index, index, !custom.type, !util.buffer, index, index) -> ()
+    stream.cmd.call @cmdFunc(ro %stream0[%c0 for %size0], %arg1, rw %stream1[%c0 for %size1], %arg3, wo %stream2[%c0 for %size2]) : (!stream.resource<external>{%size0}, i32, !stream.resource<transient>{%size1}, !custom.type, !stream.resource<transient>{%size2}) -> ()
+  } => !stream.timepoint
+  return %timepoint : !stream.timepoint
 }

@@ -38,12 +38,18 @@ FailureOr<FusionResult> LinalgExtFusionPattern::returningMatchAndRewrite(
       return failure();
 
     // Tile the producer.
-    FailureOr<Value> tiledProducer = producerOp.generateResultTileValue(
-        rewriter, /*resultNumber=*/0, sliceOp.getMixedOffsets(),
-        sliceOp.getMixedSizes());
-    if (failed(tiledProducer))
+    FailureOr<TilingResult> tileAndFuseResult =
+        producerOp.generateResultTileValue(rewriter, /*resultNumber=*/0,
+                                           sliceOp.getMixedOffsets(),
+                                           sliceOp.getMixedSizes());
+    if (failed(tileAndFuseResult))
       return failure();
-    fusedOps.push_back(cast<TilingInterface>(tiledProducer->getDefiningOp()));
+    for (auto tileAndFusedOp : tileAndFuseResult->tiledOps) {
+      auto interfaceOp = dyn_cast<TilingInterface>(tileAndFusedOp);
+      if (!interfaceOp)
+        continue;
+      fusedOps.push_back(interfaceOp);
+    }
   }
 
   // Update the consumer in-place using the tiled producer results.

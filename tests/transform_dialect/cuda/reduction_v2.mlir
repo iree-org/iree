@@ -31,11 +31,11 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_v2_codegen_spec.mlir | \
-// RUN: iree-run-module --function=reduce --device=cuda --input="33x1024xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=cuda --input="33x1024xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda | \
-// RUN: iree-run-module --function=reduce --device=cuda --input="33x1024xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=cuda --input="33x1024xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 
@@ -46,19 +46,21 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //     CHECK-DAG: %[[SHMEM_ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<1x128xf32, #gpu.address_space<workgroup>>
 
   //         CHECK: %[[TIDX:.]] = gpu.thread_id  x
-  //         CHECK: %[[IDX:.*]] = affine.apply{{.*}}%[[TIDX]]
+  //         CHECK: %[[IDX_0:.*]] = affine.apply{{.*}}()[%[[TIDX]]]
   //         CHECK: gpu.barrier
+  // TODO: Properly poduce/CSE IDX_1 vs IDX_0
+  //         CHECK: %[[IDX_1:.*]] = affine.apply{{.*}}(%[[TIDX]])
   // Local per-thread scf.for-based reduction.
   //         CHECK: scf.for
   //         CHECK:   vector.transfer_read
-  //         CHECK:   vector.transfer_read %[[SHMEM_ALLOC]][%[[C0]], %[[IDX]]]
+  //         CHECK:   vector.transfer_read %[[SHMEM_ALLOC]][%[[C0]], %[[IDX_1]]]
   //         CHECK:   arith.addf %{{.*}}, %{{.*}} : vector<4xf32>
-  //         CHECK:   vector.transfer_write %{{.*}}, %[[SHMEM_ALLOC]][%[[C0]], %[[IDX]]]
+  //         CHECK:   vector.transfer_write %{{.*}}, %[[SHMEM_ALLOC]][%[[C0]], %[[IDX_1]]]
   // TODO: remote unnecessary barrier within the loop
   //         CHECK:   gpu.barrier
 
   // Distributed reduction: everyone loads then 5 xor + addf expected
-  //         CHECK: vector.transfer_read %{{.*}}[%[[C0]], %[[IDX]]]
+  //         CHECK: vector.transfer_read %{{.*}}[%[[C0]], %[[IDX_0]]]
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}

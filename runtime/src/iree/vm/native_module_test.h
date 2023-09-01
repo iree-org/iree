@@ -77,7 +77,7 @@ static iree_status_t call_shim_i32_i32(iree_vm_stack_t* stack,
 typedef struct module_a_t module_a_t;
 typedef struct module_a_state_t module_a_state_t;
 
-// vm.import @module_a.add_1(%arg0 : i32) -> i32
+// vm.import private @module_a.add_1(%arg0 : i32) -> i32
 static iree_status_t module_a_add_1(iree_vm_stack_t* stack, module_a_t* module,
                                     module_a_state_t* module_state,
                                     int32_t arg0, int32_t* out_ret0) {
@@ -86,7 +86,7 @@ static iree_status_t module_a_add_1(iree_vm_stack_t* stack, module_a_t* module,
   return iree_ok_status();
 }
 
-// vm.import @module_a.sub_1(%arg0 : i32) -> i32
+// vm.import private @module_a.sub_1(%arg0 : i32) -> i32
 static iree_status_t module_a_sub_1(iree_vm_stack_t* stack, module_a_t* module,
                                     module_a_state_t* module_state,
                                     int32_t arg0, int32_t* out_ret0) {
@@ -152,7 +152,7 @@ typedef struct module_b_t {
   iree_allocator_t allocator;
   // Resolved types; these never change once queried and are safe to store on
   // the shared structure to avoid needing to look them up again.
-  const iree_vm_ref_type_descriptor_t* types[1];
+  iree_vm_ref_type_t types[1];
 } module_b_t;
 
 // Stores per-context state; at the minimum imports, but possibly other user
@@ -211,7 +211,7 @@ static iree_status_t IREE_API_PTR module_b_resolve_import(
 // fetching the args, calling the function as a normal C function, and stashing
 // back the results).
 //
-// vm.import @module_b.entry(%arg0 : i32) -> i32
+// vm.import private @module_b.entry(%arg0 : i32) -> i32
 static iree_status_t module_b_entry(iree_vm_stack_t* stack, module_b_t* module,
                                     module_b_state_t* module_state,
                                     int32_t arg0, int32_t* out_ret0) {
@@ -286,9 +286,12 @@ static iree_status_t module_b_create(iree_vm_instance_t* instance,
   module->allocator = allocator;
 
   // Resolve types used by the module once so that we can share it across all
-  // instances of the module.
-  module->types[0] =
-      iree_vm_ref_lookup_registered_type(iree_make_cstring_view("vm.buffer"));
+  // instances of the module. Depending on the types here can be somewhat risky
+  // as it can lead to ordering issues. If possible resolving types on module
+  // state is better as all dependent modules are guaranteed to have been
+  // loaded.
+  module->types[0] = iree_vm_instance_lookup_type(
+      instance, iree_make_cstring_view("vm.buffer"));
   if (!module->types[0]) {
     iree_allocator_free(allocator, module);
     return iree_make_status(

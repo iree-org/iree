@@ -64,56 +64,6 @@ void createMatchingParallelSubsetInsertOp(
     OpBuilder &b, Location loc, tensor::ExtractSliceOp subsetExtractOp,
     Value source, Value dest);
 
-struct AffineValueExpr {
-  explicit AffineValueExpr(AffineExpr e) : e(e) {}
-  AffineValueExpr bind(Value v) {
-    this->v = v;
-    return *this;
-  }
-  operator AffineExpr() const { return e; }
-  operator Value() const { return v; }
-  AffineExpr e;
-  Value v;
-};
-
-/// Helper struct to build simple arithmetic quantiAffineValueExprs with minimal
-/// type inference support.
-// TODO: move into ArithBuilder once ops have been moved into arith.
-struct AffineBuilder {
-  AffineBuilder(OpBuilder &b, Location loc) : b(b), loc(loc) {}
-
-  Value add(AffineValueExpr lhs, AffineValueExpr rhs) {
-    return b.createOrFold<AffineApplyOp>(
-        loc, ArrayRef<AffineExpr>{lhs.e + rhs.e}, ValueRange{lhs, rhs});
-  }
-  Value sub(AffineValueExpr lhs, AffineValueExpr rhs) {
-    return b.createOrFold<AffineApplyOp>(
-        loc, ArrayRef<AffineExpr>{lhs.e - rhs.e}, ValueRange{lhs, rhs});
-  }
-  Value mul(AffineValueExpr lhs, AffineValueExpr rhs) {
-    return b.createOrFold<AffineApplyOp>(
-        loc, ArrayRef<AffineExpr>{lhs.e * rhs.e}, ValueRange{lhs, rhs});
-  }
-  Value ceil(AffineValueExpr lhs, AffineValueExpr rhs) {
-    return b.createOrFold<AffineApplyOp>(
-        loc, ArrayRef<AffineExpr>{lhs.e.ceilDiv(rhs.e)}, ValueRange{lhs, rhs});
-  }
-  Value min(ValueRange vals) {
-    return b.createOrFold<AffineMinOp>(
-        loc, AffineMap::getMultiDimIdentityMap(vals.size(), b.getContext()),
-        vals);
-  }
-  Value max(ValueRange vals) {
-    return b.createOrFold<AffineMaxOp>(
-        loc, AffineMap::getMultiDimIdentityMap(vals.size(), b.getContext()),
-        vals);
-  }
-
-private:
-  OpBuilder &b;
-  Location loc;
-};
-
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

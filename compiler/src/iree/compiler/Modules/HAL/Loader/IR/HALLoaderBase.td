@@ -31,8 +31,6 @@ def HALLoader_Dialect : Dialect {
 
     See `hal_loader.imports.mlir` for the full list of exported functions.
   }];
-
-  let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 //===----------------------------------------------------------------------===//

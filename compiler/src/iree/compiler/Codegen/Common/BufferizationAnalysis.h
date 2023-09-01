@@ -27,7 +27,7 @@ namespace iree_compiler {
 /// light-weight wrapper around `llvm::EquivalenceClasses` to account for
 /// `Value` not directly supported as a value type by this class.
 class BufferizationPlan {
- public:
+public:
   llvm::EquivalenceClasses<void *>::iterator findValue(Value v) const {
     return mappedTensors.findValue(getPointer(v));
   }
@@ -52,21 +52,9 @@ class BufferizationPlan {
 
   void insert(Value v) { mappedTensors.insert(getPointer(v)); }
 
-  void unionSets(Value v1, Value v2) {
-    // If one the sets was part of the store set, the store set
-    // needs to be updated to drop the all leaders from the store set
-    // and add the new leader to it.
-    Value leader1 = getLeaderValue(v1);
-    Value leader2 = getLeaderValue(v2);
-    bool insertNewStoreLeader =
-        storeLeaders.count(leader1) || storeLeaders.count(leader2);
-    storeLeaders.erase(leader1);
-    storeLeaders.erase(leader2);
-    mappedTensors.unionSets(getPointer(v1), getPointer(v2));
-    if (insertNewStoreLeader) {
-      storeLeaders.insert(getLeaderValue(v1));
-    }
-  }
+  /// Union the sets containing `v1` and `v2`. Checks if the union can be
+  /// done and does nothing if union is invalid.
+  void unionSets(Value v1, Value v2);
 
   /// Sets the equivalance class that contains `v` as the set that contains the
   /// result tensor of the dispatch region (i.e. a tensor that is the `value`
@@ -79,13 +67,14 @@ class BufferizationPlan {
   /// the dispatch region.
   bool isInStoreSet(Value v) {
     Value leader = getLeaderValue(v);
-    if (!leader) return false;
+    if (!leader)
+      return false;
     return storeLeaders.count(leader);
   }
 
   void dump();
 
- private:
+private:
   Value getLeaderValue(Value v1) const {
     void *ptr = getPointer(v1);
     auto it = mappedTensors.findLeader(ptr);
@@ -113,6 +102,6 @@ class BufferizationPlan {
 LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
                                              BufferizationPlan &plan);
 
-}  // namespace iree_compiler
-}  // namespace mlir
-#endif  // IREE_COMPILER_CODEGEN_COMMON_BUFFERIZATIONANALYSIS_H
+} // namespace iree_compiler
+} // namespace mlir
+#endif // IREE_COMPILER_CODEGEN_COMMON_BUFFERIZATIONANALYSIS_H

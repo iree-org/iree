@@ -6,8 +6,8 @@
 
 # Enable input dialects based on options.
 set(IREE_INPUT_DEPS "")
-if(IREE_INPUT_MHLO)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
+if(IREE_INPUT_STABLEHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
 endif()
 if(IREE_INPUT_TORCH)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
@@ -57,7 +57,9 @@ iree_cc_library(
     iree::compiler::Modules::HAL::Inline::Transforms
     iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::InputConversion::Common
+    iree::compiler::InputConversion::Common::AutoInputConversionPipeline
     iree::compiler::Preprocessing::Passes
+    iree::compiler::GlobalOptimization
     iree::compiler::Utils
   PUBLIC
 )

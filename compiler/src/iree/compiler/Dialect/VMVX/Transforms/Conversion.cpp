@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/Patterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -33,9 +34,11 @@ namespace iree_compiler {
 namespace IREE {
 namespace VMVX {
 
+namespace {
+
 // Runs conversion with registered input dialects.
 class ConversionPass : public ConversionBase<ConversionPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::VM::VMDialect, IREE::VMVX::VMVXDialect,
@@ -66,7 +69,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     conversionTarget
         .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
                          mlir::arith::ArithDialect>();
-    conversionTarget.addLegalDialect<mlir::AffineDialect>();
+    conversionTarget.addLegalDialect<mlir::affine::AffineDialect>();
     conversionTarget.addLegalDialect<memref::MemRefDialect>();
     conversionTarget.addIllegalOp<mlir::UnrealizedConversionCastOp>();
 
@@ -77,6 +80,8 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
                                  patterns,
                                  IREE::Util::BufferType::get(&getContext()));
+    populateGenericStructuralConversionPatterns(context, conversionTarget,
+                                                typeConverter, patterns);
 
     // Use the default 64-bit lowering for TOSA's ApplyScale operator:
     //   This lowering widens integer types to 64-bit an performs the non-fused
@@ -96,11 +101,13 @@ class ConversionPass : public ConversionBase<ConversionPass> {
   }
 };
 
+} // namespace
+
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();
 }
 
-}  // namespace VMVX
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VMVX
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

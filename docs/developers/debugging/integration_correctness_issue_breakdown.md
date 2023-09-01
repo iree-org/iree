@@ -9,7 +9,7 @@ correctness issue.
 See [instructions for reproducing failures in TF/TFLite integration tests](https://github.com/hanhanW/iree/blob/main/docs/developers/debugging/tf_integrations_test_repro.md).
 
 For input data, they are not dumped within the flagfile. You can construct the
-function inputs by looking into `log.txt`. There is an [issue](https://github.com/iree-org/iree/issues/8658)
+function inputs by looking into `log.txt`. There is an [issue](https://github.com/openxla/iree/issues/8658)
 for tracking this.
 
 ## iree-samples
@@ -28,14 +28,14 @@ I0401 17:27:04.085064 140182373025024 binaries.py:218] Invoke IREE Pipeline:
     --save-temp-iree-input=/tmp/iree-samples/tflitehub/tmp/mobilenet_v2_int8_test.py/tosa.mlir
 ```
 
-Unfortunately, the artifacts are not dumped in the runs. There is an [issue](https://github.com/iree-org/iree/issues/8756)
+Unfortunately, the artifacts are not dumped in the runs. There is an [issue](https://github.com/openxla/iree/issues/8756)
 for tracking this. A workaround can be found in the issue.
 
 # Narrow down the repro
 
 The model itself is big. IREE breaks a model into dispatches and launches the
 kernels. The inputs and outputs could be diverged starting from one of
-launches. To get a smaller reproduce, you can use [-iree-flow-trace-dispatch-tensors](https://github.com/iree-org/iree/blob/main/docs/developers/developing_iree/developer_overview.md#iree-flow-trace-dispatch-tensors).
+launches. To get a smaller reproduce, you can use [-iree-flow-trace-dispatch-tensors](https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/developer_overview.md#iree-flow-trace-dispatch-tensors).
 You can compare the logs between builds/backends, and get the idea about which
 dispatch results in wrong outputs. The dumped inputs can be reused in a
 flagfile.

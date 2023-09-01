@@ -1,0 +1,206 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+exports_files([
+    "HALBase.td",
+    "HALDialect.td",
+])
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "HALBase.td",
+            "HALDialect.td",
+            "HALInterfaces.td",
+            "HALOps.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Stream/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:FuncTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "IR",
+    srcs = [
+        "HALOpFolders.cpp",
+        "HALOps.cpp",
+        "HALTypes.cpp",
+    ],
+    hdrs = [
+        "HALDialect.h",
+        "HALOps.h",
+        "HALTraits.h",
+        "HALTypes.h",
+    ],
+    textual_hdrs = [
+        "HALAttrs.cpp.inc",
+        "HALAttrs.h.inc",
+        "HALAttrInterfaces.cpp.inc",
+        "HALAttrInterfaces.h.inc",
+        "HALEnums.cpp.inc",
+        "HALEnums.h.inc",
+        "HALOpInterfaces.cpp.inc",
+        "HALOpInterfaces.h.inc",
+        "HALOps.cpp.inc",
+        "HALOps.h.inc",
+        "HALTypeInterfaces.cpp.inc",
+        "HALTypeInterfaces.h.inc",
+    ],
+    deps = [
+        ":HALInterfacesGen",
+        ":HALOpsGen",
+        ":HALTypesGen",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ControlFlowDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SideEffectInterfaces",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:ViewLikeInterface",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "HALDialect",
+    srcs = ["HALDialect.cpp"],
+    hdrs = ["HALDialect.h"],
+    deps = [
+        ":IR",
+        "//compiler/src/iree/compiler/Dialect/HAL:hal_imports",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ControlFlowDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "HALInterfacesGen",
+    tbl_outs = [
+        (
+            ["--gen-attr-interface-decls"],
+            "HALAttrInterfaces.h.inc",
+        ),
+        (
+            ["--gen-attr-interface-defs"],
+            "HALAttrInterfaces.cpp.inc",
+        ),
+        (
+            ["--gen-op-interface-decls"],
+            "HALOpInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "HALOpInterfaces.cpp.inc",
+        ),
+        (
+            ["--gen-type-interface-decls"],
+            "HALTypeInterfaces.h.inc",
+        ),
+        (
+            ["--gen-type-interface-defs"],
+            "HALTypeInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "HALInterfaces.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "HALOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "HALOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "HALOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "HALOps.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "HALTypesGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-attrdef-decls",
+                "--attrdefs-dialect=hal",
+            ],
+            "HALAttrs.h.inc",
+        ),
+        (
+            [
+                "--gen-attrdef-defs",
+                "--attrdefs-dialect=hal",
+            ],
+            "HALAttrs.cpp.inc",
+        ),
+        (
+            ["--gen-enum-decls"],
+            "HALEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "HALEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "HALBase.td",
+    deps = [":td_files"],
+)
+
+iree_tablegen_doc(
+    name = "HALDialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "--dialect=hal",
+            ],
+            "HALDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "HALOps.td",
+    deps = [":td_files"],
+)

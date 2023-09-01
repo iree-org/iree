@@ -14,31 +14,24 @@
 namespace mlir {
 class Operation;
 /// A rewriter that keeps track of all tensor::DimOps.
-class TensorDimTrackingRewriter : public IRRewriter {
- public:
+class TensorDimTrackingRewriter : public IRRewriter, IRRewriter::Listener {
+public:
   /// Create a new rewriter: Scan the given op for tensor::DimOps.
   TensorDimTrackingRewriter(Operation *op);
   /// Return all tracked tensor::DimOps.
   SmallVector<tensor::DimOp> getTensorDimOps();
 
- protected:
+protected:
   void notifyOperationRemoved(Operation *op) override;
   void notifyOperationInserted(Operation *op) override;
 
- private:
+private:
   SmallPtrSet<Operation *, 16> dimOps;
 };
 
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-
-/// A heuristic that decides which ops should be cloned and fused into a
-/// dispatch region.
-///
-/// Note: This function returns `false` for ops that should be tiled and fused
-/// into a dispatch region.
-bool isClonableIntoDispatchOp(Operation *op);
 
 /// Computes the workload and provides a workload region builder for the given
 /// root op.
@@ -53,9 +46,9 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 ///   value.
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps);
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_FORMDISPATCHREGIONS_H_
+#endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_FORMDISPATCHREGIONS_H_

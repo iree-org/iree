@@ -76,7 +76,7 @@ function ireeInitializeWorker() {
 // In order to call functions on the program it must be compiled in a supported
 // configuration, such as with these flags:
 //     --iree-hal-target-backends=llvm
-//     --iree-llvm-target-triple=wasm32-unknown-emscripten
+//     --iree-llvmcpu-target-triple=wasm32-unknown-emscripten
 //
 // Resolves with an opaque pointer to the program state on success.
 function ireeLoadProgram(vmfbPathOrBuffer) {

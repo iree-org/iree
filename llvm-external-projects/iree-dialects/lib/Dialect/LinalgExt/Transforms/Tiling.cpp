@@ -192,18 +192,3 @@ private:
   LinalgTransformationFilter filter;
 };
 } // namespace
-
-/// Second pattern to implement the switch of `TilingInterface ->
-/// tensor.extract_slice` to `tensor.extract_slice -> `TilingInterface`.
-FailureOr<Operation *> SwapTilingInterfaceOp::returningMatchAndRewrite(
-    tensor::ExtractSliceOp sliceOp, PatternRewriter &rewriter) const {
-  auto sourceOp = sliceOp.getSource().getDefiningOp<TilingInterface>();
-  if (!sourceOp)
-    return failure();
-  SmallVector<Operation *> tiledOps = sourceOp.getTiledImplementation(
-      rewriter, sliceOp.getMixedOffsets(), sliceOp.getMixedSizes());
-  assert(tiledOps.size() && "expected single tiled op");
-  Operation *tiledOp = tiledOps.front();
-  rewriter.replaceOp(sliceOp, tiledOp->getResults());
-  return tiledOp;
-}

@@ -62,7 +62,7 @@ static constexpr int64_t outputTileSize = 6;
 /// TODO: Codegen this as a kernel and run once at initialization
 static DenseElementsAttr
 foldFilterTransform(ArrayRef<int64_t> shape, int64_t inputTileSize,
-                    int64_t kernelSize, Type outputType, const float *G,
+                    int64_t kernelSize, ShapedType outputType, const float *G,
                     bool isSplat, float splatValue,
                     DenseElementsAttr::iterator_range<APFloat> &input,
                     FloatType floatType, bool isNchw) {

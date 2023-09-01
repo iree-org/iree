@@ -4,12 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -36,19 +38,21 @@ struct LLVMCPUMmt4dVectorLoweringPass
   }
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  Optional<int64_t> numLoops;
+  std::optional<int64_t> numLoops;
   funcOp.walk([&](vector::ContractionOp op) {
-    if (numLoops) return signalPassFailure();
+    if (numLoops)
+      return signalPassFailure();
     numLoops = op.getIndexingMapsArray()[0].getNumDims();
   });
   // No vector.contract op to optimize.
-  if (!numLoops) return;
+  if (!numLoops)
+    return;
 
   {
     // Fold consumer add ops into the contraction op itself.
@@ -60,7 +64,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs()
           << "\n--- After folding consumer add ops into contraction op "
              "iteself ---\n";
@@ -117,7 +121,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
                                             std::move(vectorUnrollPatterns)))) {
       return signalPassFailure();
     }
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After vector unrolling ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
@@ -134,10 +138,9 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
     RewritePatternSet vectorContractLoweringPatterns(&getContext());
-    vectorContractLoweringPatterns.insert<
-        vector::ContractionOpToOuterProductOpLowering,
-        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
-        vectorTransformsOptions, context);
+    vector::populateVectorContractLoweringPatterns(
+        vectorContractLoweringPatterns, vectorTransformsOptions, /*benefit=*/1,
+        /*disableOuterProductLowering=*/true);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
     if (failed(applyPatternsAndFoldGreedily(
@@ -145,11 +148,31 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    LLVM_DEBUG({
       llvm::dbgs() << "\n--- After vector specific operatrion lowering ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+  }
+
+  // Flatten transfer ops.
+  {
+    RewritePatternSet patterns(&getContext());
+    mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+    mlir::vector::populateFlattenVectorTransferPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  // 'vector.shape_cast' are very expensive operations that are even generated
+  // by some of the lowerings above (e.g., flatten transfer ops). There are
+  // chances to cancel them out if they are not lowered too early so we lower
+  // them at the very end of the pass.
+  {
+    RewritePatternSet patterns(&getContext());
+    vector::populateVectorShapeCastLoweringPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 }
 
@@ -158,5 +181,5 @@ createLLVMCPUMmt4dVectorLoweringPass() {
   return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

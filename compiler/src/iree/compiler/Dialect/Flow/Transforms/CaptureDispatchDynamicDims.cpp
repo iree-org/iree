@@ -30,7 +30,11 @@ namespace {
 // leave the cleanup of redundant work to further optimization passes to keep
 // this simple.
 static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
-  auto *entryBlock = dispatchOp.getBody();
+  Region &body = dispatchOp.getWorkgroupBody();
+  if (body.empty()) {
+    return;
+  }
+  auto *entryBlock = &body.front();
 
   // Map of SSA values on the outside of the op to arguments on the inside.
   // This lets us avoid capturing duplicate values - they'd be cleaned up
@@ -42,7 +46,8 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     outerToInnerMap[operand] = arg;
   }
   for (auto result : dispatchOp.getResults()) {
-    if (dispatchOp.getTiedResultOperand(result)) continue;  // ignored tied
+    if (dispatchOp.getTiedResultOperand(result))
+      continue; // ignored tied
     auto arg = entryBlock->getArgument(argIdx++);
     outerToInnerMap[result] = arg;
   }
@@ -52,14 +57,17 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
   auto captureTensorDims = [&](Value externalValue, Value internalValue) {
     auto tensorType =
-        internalValue.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
-    if (!tensorType) return;
-    if (tensorType.hasStaticShape()) return;
+        llvm::dyn_cast<IREE::Flow::DispatchTensorType>(internalValue.getType());
+    if (!tensorType)
+      return;
+    if (tensorType.hasStaticShape())
+      return;
 
     // Find the dimensions in the parent.
     auto maybeDynamicDims = IREE::Util::findDynamicDims(
         externalValue, dispatchOp->getBlock(), Block::iterator(dispatchOp));
-    if (!maybeDynamicDims.has_value()) return;
+    if (!maybeDynamicDims.has_value())
+      return;
     // Convert to a vector -- we cannot use the ValueRange directly because
     // it might point into the operand list of this op, which we might mutate
     // in-place.
@@ -69,7 +77,8 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     // "writeonly" tensors corresponding to the result.
     unsigned insertionPosition = entryBlock->getNumArguments();
     for (auto argType : llvm::reverse(entryBlock->getArgumentTypes())) {
-      auto flowTensorType = argType.dyn_cast<IREE::Flow::DispatchTensorType>();
+      auto flowTensorType =
+          llvm::dyn_cast<IREE::Flow::DispatchTensorType>(argType);
       if (!flowTensorType ||
           flowTensorType.getAccess() != IREE::Flow::TensorAccess::WriteOnly) {
         break;
@@ -101,11 +110,12 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   };
 
   // Capture all required dimensions and add tie_shape ops.
-  for (auto operand : llvm::to_vector<4>(dispatchOp.getArguments())) {
+  for (auto operand : llvm::to_vector(dispatchOp.getArguments())) {
     captureTensorDims(operand, outerToInnerMap[operand]);
   }
   for (auto result : dispatchOp.getResults()) {
-    if (dispatchOp.getTiedResultOperand(result)) continue;  // ignore tied
+    if (dispatchOp.getTiedResultOperand(result))
+      continue; // ignore tied
     captureTensorDims(result, outerToInnerMap[result]);
   }
 }
@@ -123,13 +133,13 @@ class CaptureDispatchDynamicDimsPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass() {
   return std::make_unique<CaptureDispatchDynamicDimsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

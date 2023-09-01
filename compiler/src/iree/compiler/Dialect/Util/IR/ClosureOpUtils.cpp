@@ -20,18 +20,17 @@ namespace Util {
 //------------------------------------------------------------------------------
 
 void excludeClosureOperandsAndResults(
-    SmallVector<Value, 4> &operandValues,
-    ArrayRef<unsigned> excludedOperandIndices,
-    SmallVector<Type, 4> &resultTypes,
+    SmallVector<Value> &operandValues,
+    ArrayRef<unsigned> excludedOperandIndices, SmallVector<Type> &resultTypes,
     ArrayRef<unsigned> excludedResultIndices) {
-  SmallVector<Value, 4> oldOperandValues = operandValues;
+  SmallVector<Value> oldOperandValues = operandValues;
   operandValues.clear();
   for (auto it : llvm::enumerate(oldOperandValues)) {
     if (!llvm::count(excludedOperandIndices, it.index())) {
       operandValues.push_back(it.value());
     }
   }
-  SmallVector<Type, 4> oldResultTypes = resultTypes;
+  SmallVector<Type> oldResultTypes = resultTypes;
   resultTypes.clear();
   for (auto it : llvm::enumerate(oldResultTypes)) {
     if (!llvm::count(excludedResultIndices, it.index())) {
@@ -41,21 +40,20 @@ void excludeClosureOperandsAndResults(
 }
 
 void excludeClosureOperandsAndResults(
-    SmallVector<Value, 4> &operandValues, SmallVector<Value, 4> &operandDims,
-    ArrayRef<unsigned> excludedOperandIndices,
-    SmallVector<Type, 4> &resultTypes, SmallVector<Value, 4> &resultDims,
-    ArrayRef<unsigned> excludedResultIndices) {
-  SmallVector<Value, 4> oldOperandValues = operandValues;
-  SmallVector<Value, 4> oldOperandDims = operandDims;
+    SmallVector<Value> &operandValues, SmallVector<Value> &operandDims,
+    ArrayRef<unsigned> excludedOperandIndices, SmallVector<Type> &resultTypes,
+    SmallVector<Value> &resultDims, ArrayRef<unsigned> excludedResultIndices) {
+  SmallVector<Value> oldOperandValues = operandValues;
+  SmallVector<Value> oldOperandDims = operandDims;
   operandValues.clear();
   operandDims.clear();
   auto remainingOperandDims = llvm::ArrayRef(oldOperandDims);
   for (auto it : llvm::enumerate(oldOperandValues)) {
     unsigned numDynamicDims = 0;
     auto type = it.value().getType();
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
       numDynamicDims = shapedType.getNumDynamicDims();
-    } else if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
+    } else if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       numDynamicDims = 1;
     }
     if (!llvm::count(excludedOperandIndices, it.index())) {
@@ -67,17 +65,17 @@ void excludeClosureOperandsAndResults(
     remainingOperandDims = remainingOperandDims.drop_front(numDynamicDims);
   }
 
-  SmallVector<Type, 4> oldResultTypes = resultTypes;
-  SmallVector<Value, 4> oldResultDims = resultDims;
+  SmallVector<Type> oldResultTypes = resultTypes;
+  SmallVector<Value> oldResultDims = resultDims;
   resultTypes.clear();
   resultDims.clear();
   auto remainingResultDims = llvm::ArrayRef(oldResultDims);
   for (auto it : llvm::enumerate(oldResultTypes)) {
     unsigned numDynamicDims = 0;
     auto type = it.value();
-    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
       numDynamicDims = shapedType.getNumDynamicDims();
-    } else if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
+    } else if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       numDynamicDims = 1;
     }
     if (!llvm::count(excludedResultIndices, it.index())) {
@@ -96,7 +94,7 @@ void eraseRegionResults(Region &region,
   for (auto &block : region.getBlocks()) {
     auto *terminatorOp = block.getTerminator();
     if (terminatorOp && terminatorOp->hasTrait<OpTrait::ReturnLike>()) {
-      llvm::SmallVector<Value, 4> newReturns;
+      llvm::SmallVector<Value> newReturns;
       for (auto it : llvm::enumerate(terminatorOp->getOperands())) {
         if (!llvm::count(excludedResultIndices, it.index())) {
           newReturns.push_back(it.value());
@@ -107,7 +105,8 @@ void eraseRegionResults(Region &region,
   }
 }
 
-// Returns true if |constantOp| represents a (logically) small constant value.
+// Returns true if |constantOp| represents a (logically) small constant value
+// that can be inlined into a closure.
 //
 // "Small" is relative and there's a risk that we'll bloat the closures by
 // duplicating a bunch of constants however what we are able to save by not
@@ -119,29 +118,30 @@ void eraseRegionResults(Region &region,
 // This is also still at a fairly high level (flow dialect): once the closures
 // are expanded out in lower dialects things like CSE have a chance to once
 // again get at the constants and dedupe them if they survive.
-static bool isConstantSmall(arith::ConstantOp constantOp) {
-  // We could tune this/take it as a configuration setting.
-  // The current value is chosen based on what is known to be reasonable to
-  // inline into command buffers way down in the HAL, which is not great but at
-  // least better than either allocating independent buffers for 4 byte
-  // constants or inlining megabytes.
-  static constexpr int kMaxInlinedConstantBytes = 256;
+static bool isConstantInlinable(const ClosureOptimizationOptions &options,
+                                arith::ConstantOp constantOp) {
+  int64_t maxInlinedConstantBytes =
+      options.maxInlinedConstantBytes.value_or(INT64_MAX);
+  if (maxInlinedConstantBytes == 0) {
+    // Inlining of constants disabled.
+    return false;
+  }
 
   auto constantValueAttr = constantOp.getValue();
   auto constantType = constantOp.getType();
-  if (constantValueAttr.isa<SplatElementsAttr>()) {
+  if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
     // Splats are always small and can often have special handling when we
     // know they are a splat - which is why it's so important we inline them
     // here so we know when they are used that's the case.
     return true;
-  } else if (auto denseAttr = constantValueAttr.dyn_cast<DenseElementsAttr>()) {
+  } else if (auto denseAttr =
+                 llvm::dyn_cast<DenseElementsAttr>(constantValueAttr)) {
     // Smallish constants are worth moving inside.
-    auto shapedType = constantType.cast<ShapedType>();
+    auto shapedType = llvm::cast<ShapedType>(constantType);
     uint64_t estimatedByteLength =
-        shapedType.getNumElements() *
-        getRoundedElementByteWidth(shapedType.getElementType());
+        IREE::Util::getRoundedPhysicalStorageSize(shapedType);
     return denseAttr.isSplat() ||
-           estimatedByteLength <= kMaxInlinedConstantBytes;
+           estimatedByteLength <= maxInlinedConstantBytes;
   } else if (constantType.isIntOrIndexOrFloat()) {
     // Primitives can always go in.
     return true;
@@ -155,11 +155,12 @@ static bool isConstantSmall(arith::ConstantOp constantOp) {
 // trees is hard and it'd be better to model that differently such as by having
 // a wrapper region for immutable blobs that can be inlined that this then
 // returns true for.
-static bool shouldInlineIntoClosure(Value value) {
+static bool shouldInlineIntoClosure(const ClosureOptimizationOptions &options,
+                                    Value value) {
   auto definingOp = value.getDefiningOp();
   if (auto constantOp = dyn_cast<arith::ConstantOp>(definingOp)) {
     // Constants are perfect!
-    return isConstantSmall(constantOp);
+    return isConstantInlinable(options, constantOp);
   }
   return false;
 }
@@ -171,7 +172,8 @@ static bool shouldInlineIntoClosure(Value value) {
 // Note that if multiple operands reference the same value it will get cloned
 // multiple times. That's fine, as anything we can inline here is something we
 // should also be able to CSE and that happens later on anyway.
-static void inlineClosureOperands(ClosureOpInterface &closureOp,
+static void inlineClosureOperands(const ClosureOptimizationOptions &options,
+                                  ClosureOpInterface &closureOp,
                                   Block &entryBlock,
                                   PatternRewriter &rewriter) {
   OpBuilder::InsertionGuard g(rewriter);
@@ -179,16 +181,18 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto outerValue = opArg.value();
     auto *sourceOp = outerValue.getDefiningOp();
-    if (!sourceOp) continue;  // can't clone block arguments into closures
+    if (!sourceOp)
+      continue; // can't clone block arguments into closures
 
     // We cannot just simply inline and replace all users if this is an
     // argument that can be written; for example, the region might perform
     // work after loading a initial constant from the argument and then
     // write back.
-    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly()) continue;
+    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly())
+      continue;
 
     if (closureOp.canClosureContainOp(sourceOp) &&
-        shouldInlineIntoClosure(outerValue)) {
+        shouldInlineIntoClosure(options, outerValue)) {
       // Clone the op (with regions).
       auto *clonedOp = rewriter.clone(*sourceOp);
 
@@ -203,12 +207,13 @@ static void inlineClosureOperands(ClosureOpInterface &closureOp,
 
       // Replace all of the uses inside of the closure.
       BlockArgument blockArg = entryBlock.getArgument(opArg.index());
-      blockArg.replaceAllUsesWith(newValue);
+      rewriter.replaceAllUsesWith(blockArg, newValue);
     }
   }
 }
 
-LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
+LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
+                                    ClosureOpInterface closureOp,
                                     PatternRewriter &rewriter) {
   // NOTE: the block is transferred to the new op; we can update it in place.
   Block &entryBlock = closureOp.getClosureBodyRegion().front();
@@ -218,12 +223,12 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   // then elide below. When we do inline things the operands will be changed
   // such that the following work is guaranteed to happen and thus our op will
   // be rebuilt.
-  inlineClosureOperands(closureOp, entryBlock, rewriter);
+  inlineClosureOperands(options, closureOp, entryBlock, rewriter);
 
   // Build data structure for unused operand elision.
-  SmallVector<unsigned, 4> elidedOperands;
+  SmallVector<unsigned> elidedOperands;
   llvm::SmallMapVector<Value, BlockArgument, 8> argToBlockMap;
-  SmallVector<llvm::Optional<BlockArgument>, 8> blockArgReplacements(
+  SmallVector<std::optional<BlockArgument>, 8> blockArgReplacements(
       entryBlock.getNumArguments());
   for (auto opArg : llvm::enumerate(closureOp.getClosureOperands())) {
     auto blockArg = entryBlock.getArgument(opArg.index());
@@ -245,8 +250,8 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   }
 
   // Check for unused results.
-  SmallVector<Value, 4> preservedResults;
-  SmallVector<unsigned, 4> elidedResults;
+  SmallVector<Value> preservedResults;
+  SmallVector<unsigned> elidedResults;
   for (auto result : llvm::enumerate(closureOp.getClosureResults())) {
     // You can drop a result if the use is empty and not read via a tie.
     auto access = closureOp.getResultAccess(result.index());
@@ -277,8 +282,8 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
       // Dropped.
     } else {
       // Replaced.
-      entryBlock.getArgument(replacement.index())
-          .replaceAllUsesWith(*replacement.value());
+      rewriter.replaceAllUsesWith(entryBlock.getArgument(replacement.index()),
+                                  *replacement.value());
     }
   }
 
@@ -300,13 +305,13 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   assert(oldResults.size() == newResults.size() &&
          "expected non-closure results to match");
   for (auto [oldResult, newResult] : llvm::zip_equal(oldResults, newResults)) {
-    oldResult.replaceAllUsesWith(newResult);
+    rewriter.replaceAllUsesWith(oldResult, newResult);
   }
 
   // Replace original uses of the closure results.
   for (auto [oldResult, newResult] :
        llvm::zip_equal(preservedResults, newOp.getClosureResults())) {
-    oldResult.replaceAllUsesWith(newResult);
+    rewriter.replaceAllUsesWith(oldResult, newResult);
   }
 
   // Erase the original op.
@@ -315,7 +320,7 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   return success();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

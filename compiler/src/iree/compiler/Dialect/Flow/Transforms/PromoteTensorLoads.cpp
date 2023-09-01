@@ -28,9 +28,9 @@ namespace {
 struct ExtractElementOpLowering
     : public OpConversionPattern<tensor::ExtractOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      tensor::ExtractOp op, ArrayRef<Value> args,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(tensor::ExtractOp op, ArrayRef<Value> args,
+                  ConversionPatternRewriter &rewriter) const override {
     // tensor<i1> is not valid to load, it needs to be converted to i8 or
     // something else instead.
     auto tensorType = op.tensor().getType().cast<TensorType>();
@@ -61,11 +61,11 @@ void populateStandardToFlowTensorLoadPatterns(MLIRContext *context,
   patterns.insert<ExtractElementOpLowering>(context);
 }
 
-}  // namespace
+} // namespace
 
 class PromoteTensorLoadsPass
     : public PromoteTensorLoadsBase<PromoteTensorLoadsPass> {
- public:
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<FlowDialect, func::FuncDialect, mlir::arith::ArithDialect,
                     mlir::math::MathDialect, tensor::TensorDialect>();
@@ -95,7 +95,7 @@ createPromoteTensorLoadsPass() {
   return std::make_unique<PromoteTensorLoadsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

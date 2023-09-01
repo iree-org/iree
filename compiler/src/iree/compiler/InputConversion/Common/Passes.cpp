@@ -16,10 +16,11 @@ namespace iree_compiler {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/InputConversion/Common/Passes.h.inc"  // IWYU pragma: export
-}  // namespace
+#include "iree/compiler/InputConversion/Common/Passes.h.inc" // IWYU pragma: export
+} // namespace
 
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
+  // Currently we don't handle SCF ops well and have to convert them all to CFG.
   passManager.addPass(createIREEImportPublicPass());
   passManager.addPass(createImportMLProgramPass());
   passManager.addPass(createSanitizeModuleNamesPass());
@@ -37,5 +38,5 @@ void registerCommonInputConversionPasses() {
       });
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

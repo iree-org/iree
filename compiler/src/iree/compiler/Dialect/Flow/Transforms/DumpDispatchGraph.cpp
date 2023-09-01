@@ -45,7 +45,8 @@ static const StringRef kShapeNone = "plain";
 static const StringRef kShapeEllipse = "ellipse";
 
 static StringRef getShape(Operation *op) {
-  if (isa<DispatchOp>(op)) return kShapeBox;
+  if (isa<DispatchOp>(op))
+    return kShapeBox;
 
   return kShapeEllipse;
 }
@@ -53,7 +54,8 @@ static StringRef getShape(Operation *op) {
 /// Return the size limits for eliding large attributes.
 static int64_t getLargeAttributeSizeLimit() {
   // Use the default from the printer flags if possible.
-  if (Optional<int64_t> limit = OpPrintingFlags().getLargeElementsAttrLimit())
+  if (std::optional<int64_t> limit =
+          OpPrintingFlags().getLargeElementsAttrLimit())
     return *limit;
   return 16;
 }
@@ -71,32 +73,32 @@ static std::string escapeString(std::string str) {
   return strFromOs([&](raw_ostream &os) {
     for (unsigned char c : str) {
       switch (c) {
-        case '\\':
-          os << '\\' << '\\';
+      case '\\':
+        os << '\\' << '\\';
+        break;
+      case '\t':
+        os << '\\' << 't';
+        break;
+      case '\n':
+        os << '\\' << 'n';
+        break;
+      case '"':
+        os << '\\' << '"';
+        break;
+      case '\r': // translate "carriage return" as "\l"
+        os << '\\' << 'l';
+        break;
+      default:
+        if (llvm::isPrint(c)) {
+          os << c;
           break;
-        case '\t':
-          os << '\\' << 't';
-          break;
-        case '\n':
-          os << '\\' << 'n';
-          break;
-        case '"':
-          os << '\\' << '"';
-          break;
-        case '\r':  // translate "carriage return" as "\l"
-          os << '\\' << 'l';
-          break;
-        default:
-          if (llvm::isPrint(c)) {
-            os << c;
-            break;
-          }
+        }
 
-          // Always use a full 3-character octal escape.
-          os << '\\';
-          os << char('0' + ((c >> 6) & 7));
-          os << char('0' + ((c >> 3) & 7));
-          os << char('0' + ((c >> 0) & 7));
+        // Always use a full 3-character octal escape.
+        os << '\\';
+        os << char('0' + ((c >> 6) & 7));
+        os << char('0' + ((c >> 3) & 7));
+        os << char('0' + ((c >> 0) & 7));
       }
     }
   });
@@ -117,12 +119,12 @@ using AttributeMap = llvm::StringMap<std::string>;
 /// cluster with `lhead` and `ltail` attributes. Therefore, when creating a new
 /// cluster, an invisible "anchor" node is created.
 struct Node {
- public:
-  Node(int id = 0, Optional<int> clusterId = std::nullopt)
+public:
+  Node(int id = 0, std::optional<int> clusterId = std::nullopt)
       : id(id), clusterId(clusterId) {}
 
   int id;
-  Optional<int> clusterId;
+  std::optional<int> clusterId;
 };
 
 /// This pass generates a Graphviz dataflow visualization of an MLIR operation.
@@ -130,21 +132,24 @@ struct Node {
 /// about the Graphviz DOT language.
 class DumpDispatchGraphPass
     : public DumpDispatchGraphBase<DumpDispatchGraphPass> {
- public:
+public:
   DumpDispatchGraphPass(raw_ostream &os) : os(os) {}
   DumpDispatchGraphPass(const DumpDispatchGraphPass &o)
       : DumpDispatchGraphPass(o.os.getOStream()) {}
 
   void runOnOperation() override {
     auto modOp = dyn_cast<ModuleOp>(getOperation());
-    if (!modOp) return;
+    if (!modOp)
+      return;
 
     auto funcOps = modOp.getOps<func::FuncOp>();
 
-    if (funcOps.empty()) return;
+    if (funcOps.empty())
+      return;
 
     emitGraph([&]() {
-      for (auto funcOp : funcOps) processOperation(funcOp);
+      for (auto funcOp : funcOps)
+        processOperation(funcOp);
       emitAllEdgeStmts();
     });
   }
@@ -156,11 +161,12 @@ class DumpDispatchGraphPass
     emitGraph([&]() { processRegion(region); });
   }
 
- private:
+private:
   /// Emit all edges. This function should be called after all nodes have been
   /// emitted.
   void emitAllEdgeStmts() {
-    for (const std::string &edge : edges) os << edge << ";\n";
+    for (const std::string &edge : edges)
+      os << edge << ";\n";
     edges.clear();
   }
 
@@ -200,21 +206,21 @@ class DumpDispatchGraphPass
     int64_t largeAttrLimit = getLargeAttributeSizeLimit();
 
     // Always emit splat attributes.
-    if (attr.isa<SplatElementsAttr>()) {
+    if (llvm::isa<SplatElementsAttr>(attr)) {
       attr.print(os);
       return;
     }
 
     // Elide "big" elements attributes.
-    auto elements = attr.dyn_cast<ElementsAttr>();
+    auto elements = llvm::dyn_cast<ElementsAttr>(attr);
     if (elements && elements.getNumElements() > largeAttrLimit) {
-      os << std::string(elements.getType().getRank(), '[') << "..."
-         << std::string(elements.getType().getRank(), ']') << " : "
-         << elements.getType();
+      auto type = cast<ShapedType>(elements.getType());
+      os << std::string(type.getRank(), '[') << "..."
+         << std::string(type.getRank(), ']') << " : " << type;
       return;
     }
 
-    auto array = attr.dyn_cast<ArrayAttr>();
+    auto array = llvm::dyn_cast<ArrayAttr>(attr);
     if (array && static_cast<int64_t>(array.size()) > largeAttrLimit) {
       os << "[...]";
       return;
@@ -334,9 +340,11 @@ class DumpDispatchGraphPass
   }
 
   void annotateOperation(raw_ostream &os, Operation *op, AsmState &state) {
-    if (isa<arith::ConstantOp>(op)) return;
+    if (isa<arith::ConstantOp>(op))
+      return;
 
-    if (isa<func::ReturnOp>(op)) return;
+    if (isa<func::ReturnOp>(op))
+      return;
 
     if (auto load = dyn_cast<DispatchTensorLoadOp>(op)) {
       printDispatchTensorLoad(os, load, state);
@@ -372,7 +380,8 @@ class DumpDispatchGraphPass
     auto entryPoint = dispatchOp.getEntryPoint();
     auto executableOp = cast<ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
         dispatchOp, entryPoint.getRootReference()));
-    if (!executableOp) return;
+    if (!executableOp)
+      return;
 
     auto calleeNameAttr = entryPoint.getLeafReference();
     auto innerModule = executableOp.getInnerModule();
@@ -380,7 +389,8 @@ class DumpDispatchGraphPass
     auto funcIt = llvm::find_if(funcOps, [&](func::FuncOp op) {
       return op.getNameAttr() == calleeNameAttr;
     });
-    if (funcIt == funcOps.end()) return;
+    if (funcIt == funcOps.end())
+      return;
 
     auto callee = *funcIt;
 
@@ -405,9 +415,9 @@ class DumpDispatchGraphPass
 
       if (op && isScalarConstantOp(op)) {
         auto ty = operand.getType();
-        if (ty.isa<IntegerType>()) {
+        if (llvm::isa<IntegerType>(ty)) {
           os << cast<arith::ConstantIntOp>(op).value();
-        } else if (ty.isa<FloatType>()) {
+        } else if (llvm::isa<FloatType>(ty)) {
           cast<arith::ConstantFloatOp>(op).value().print(os);
         } else {
           os << cast<arith::ConstantIndexOp>(op).value();
@@ -446,7 +456,7 @@ class DumpDispatchGraphPass
           if (rootName == leafName) {
             os << leafName;
           } else {
-            os << entryPoint;  // print the full name
+            os << entryPoint; // print the full name
           }
 
           // print entry function args
@@ -485,7 +495,7 @@ class DumpDispatchGraphPass
         valueToNode[blockArg] = emitNodeStmt(getLabel(blockArg));
 
       // Emit a node for each operation.
-      Optional<Node> prevNode;
+      std::optional<Node> prevNode;
       for (Operation &op : block) {
         Node nextNode = processOperation(&op);
         if (printControlFlowEdges && prevNode)
@@ -498,7 +508,8 @@ class DumpDispatchGraphPass
 
   bool isScalarConstantOp(Operation *op) {
     if (auto constOp = dyn_cast<mlir::arith::ConstantOp>(op))
-      if (constOp.getResult().getType().isIntOrIndexOrFloat()) return true;
+      if (constOp.getResult().getType().isIntOrIndexOrFloat())
+        return true;
 
     return false;
   }
@@ -520,7 +531,8 @@ class DumpDispatchGraphPass
       // Emit cluster for op with regions.
       node = emitClusterStmt(
           [&]() {
-            for (Region &region : op->getRegions()) processRegion(region);
+            for (Region &region : op->getRegions())
+              processRegion(region);
           },
           getLabel(op));
     } else {
@@ -542,19 +554,22 @@ class DumpDispatchGraphPass
       }
     }
 
-    for (Value result : op->getResults()) valueToNode[result] = node;
+    for (Value result : op->getResults())
+      valueToNode[result] = node;
 
     return node;
   }
 
   /// Process a region.
   void processRegion(Region &region) {
-    for (Block &block : region.getBlocks()) processBlock(block);
+    for (Block &block : region.getBlocks())
+      processBlock(block);
   }
 
   /// Truncate long strings.
   std::string truncateString(std::string str) {
-    if (str.length() <= maxLabelLen) return str;
+    if (str.length() <= maxLabelLen)
+      return str;
     return str.substr(0, maxLabelLen) + "...";
   }
 
@@ -569,13 +584,13 @@ class DumpDispatchGraphPass
   int counter = 0;
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createDumpDispatchGraphPass(raw_ostream &os) {
   return std::make_unique<DumpDispatchGraphPass>(os);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

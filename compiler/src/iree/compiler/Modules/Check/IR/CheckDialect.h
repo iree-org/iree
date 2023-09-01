@@ -15,14 +15,14 @@ namespace IREE {
 namespace Check {
 
 class CheckDialect : public Dialect {
- public:
+public:
   explicit CheckDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "check"; }
 };
 
-}  // namespace Check
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Check
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_MODULES_CHECK_IR_CHECK_DIALECT_H_
+#endif // IREE_COMPILER_MODULES_CHECK_IR_CHECK_DIALECT_H_

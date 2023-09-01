@@ -42,8 +42,9 @@ static std::unique_ptr<AsmState> getRootAsmState(Block *block) {
 // a real implementation would do. We want cost modeling for tie breakers when
 // an op could be in multiple partitions, cloning for ops that are not worth
 // spanning partitions (like splats), etc.
-PartitionSet partitionStreamableOpsReference(
-    IREE::Stream::PartitioningConfigAttr config, Block *block) {
+PartitionSet
+partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
+                                Block *block) {
   PartitionSet partitionSet;
 
   struct PartitionBuilder {
@@ -126,7 +127,8 @@ PartitionSet partitionStreamableOpsReference(
     llvm::BitVector consumers(builders.size(), /*t=*/false);
     for (auto user : op.getUsers()) {
       auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end()) continue;
+      if (userInfoIt == opInfos.end())
+        continue;
       auto &userInfo = userInfoIt->second;
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
@@ -228,6 +230,11 @@ PartitionSet partitionStreamableOpsReference(
     usableBuilders.resize(builders.size(), /*t=*/true);
   }
 
+  // Ops cloned into multiple partitions may still escape if there are
+  // non-streamable consumers. We need to make sure we only let one result
+  // escape.
+  DenseSet<Operation *> clonedEscapingOps;
+
   // Emit partitions in forward order (as they are topologically sorted in
   // reverse order from our bottom-up walk).
   for (auto &builder : llvm::reverse(builders)) {
@@ -237,13 +244,28 @@ PartitionSet partitionStreamableOpsReference(
     SetVector<Value> producedValues;
     SetVector<Value> escapingValues;
     for (auto *op : llvm::reverse(builder->ops)) {
+      bool didCloneEscape = false;
       for (auto operand : op->getOperands()) {
         consumedValues.insert(operand);
       }
       for (auto result : op->getResults()) {
         producedValues.insert(result);
-        // Cloned ops never escape even if the originals did.
-        if (!builder->clonedOps.contains(op)) {
+
+        // Cloned ops default to local usage but may still have users outside
+        // of any partition and need to escape.
+        if (builder->clonedOps.contains(op)) {
+          // We only want to have one partition produce the value and track ones
+          // we've already produced via clonedEscapingOps.
+          if (!clonedEscapingOps.contains(op)) {
+            for (auto user : result.getUsers()) {
+              if (!isa<IREE::Stream::StreamableOpInterface>(user)) {
+                escapingValues.insert(result);
+                didCloneEscape = true;
+                break;
+              }
+            }
+          }
+        } else {
           // TODO(benvanik): optimize this - creates n^2/nlogn behavior.
           for (auto user : result.getUsers()) {
             if (!builder->ops.contains(user)) {
@@ -251,6 +273,9 @@ PartitionSet partitionStreamableOpsReference(
             }
           }
         }
+      }
+      if (didCloneEscape) {
+        clonedEscapingOps.insert(op);
       }
     }
     consumedValues.set_subtract(producedValues);
@@ -269,8 +294,9 @@ PartitionSet partitionStreamableOpsReference(
 
 // This looks to extract a single level of concurrency; we should be recursively
 // dividing the block to identify both serial and concurrent regions.
-PartitionSet partitionRegionConcurrencyReference(
-    IREE::Stream::PartitioningConfigAttr config, Block *block) {
+PartitionSet
+partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
+                                    Block *block) {
   PartitionSet waveSet;
 
   auto favor = config.getFavor().getValue();
@@ -335,7 +361,8 @@ PartitionSet partitionRegionConcurrencyReference(
     // dependency chain down the use-def chain to a wave.
     for (auto user : op.getUsers()) {
       auto userInfoIt = opInfos.find(user);
-      if (userInfoIt == opInfos.end()) continue;
+      if (userInfoIt == opInfos.end())
+        continue;
       auto &userInfo = userInfoIt->second;
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
@@ -359,6 +386,49 @@ PartitionSet partitionRegionConcurrencyReference(
       // Always inherit hazards whether merging or not.
       opInfo.hazards |= userInfo.hazards;
     }
+
+    // Additional exhaustive testing for users of tied operands.
+    // For each resource operand of this op we scan back through previously
+    // created waves to see if there are any partitioned ops that have a hazard.
+    for (auto operand : op.getOperands()) {
+      if (!operand.getType().isa<IREE::Stream::ResourceType>())
+        continue;
+      for (auto user : operand.getUsers()) {
+        if (user == &op || user->getBlock() != block ||
+            user->isBeforeInBlock(&op))
+          continue;
+        auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user);
+        if (!tiedOp || !tiedOp.hasAnyTiedUses(operand))
+          continue;
+        auto userInfoIt = opInfos.find(user);
+        if (userInfoIt == opInfos.end())
+          continue;
+        auto &userInfo = userInfoIt->second;
+        LLVM_DEBUG({
+          llvm::dbgs() << "Testing tied user:\n";
+          user->print(llvm::dbgs(), *asmState);
+          llvm::dbgs() << "\n";
+          for (auto membershipOrdinal : userInfo.membership.set_bits()) {
+            llvm::dbgs() << "  member of wave " << membershipOrdinal << "\n";
+          }
+          int lastHazardOrdinal = userInfo.hazards.find_last();
+          if (lastHazardOrdinal != -1) {
+            llvm::dbgs() << "  hazard w/ waves 0-" << lastHazardOrdinal << "\n";
+          }
+        });
+        bool hazardPresent = hazardAnalysis.hasHazard(streamableOp, user);
+        if (hazardPresent) {
+          // Hazard with existing op usage - prevent concurrent scheduling.
+          opInfo.hazards |= userInfo.membership;
+        } else {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "  $ hazard analysis says ok to schedule with tied\n");
+        }
+        // Always inherit hazards whether merging or not.
+        opInfo.hazards |= userInfo.hazards;
+      }
+    }
+
     llvm::BitVector candidates(builders.size(), /*t=*/true);
     candidates ^= opInfo.hazards;
 
@@ -433,7 +503,7 @@ PartitionSet partitionRegionConcurrencyReference(
   return waveSet;
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

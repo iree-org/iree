@@ -16,6 +16,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Finds the first file location in |baseLoc|, if one exists.
+// This will traverse FusedLoc, CallSiteLoc, and NameLoc locations as needed.
+std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc);
+
 // Guesses the name of the module from the source locations attached unless a
 // name is already specified. If no source locations are found then
 // |defaultName| is returned.
@@ -37,7 +41,7 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
                                     Operation *targetOp,
                                     OpBuilder &targetBuilder);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_MODULEUTILS_H_
+#endif // IREE_COMPILER_UTILS_MODULEUTILS_H_

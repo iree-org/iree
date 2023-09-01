@@ -82,8 +82,9 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Updates the |arg| type to the lifetime derived by analysis, if needed.
   // Returns true if a change was made.
   bool applyArgTransition(BlockArgument arg, PatternRewriter &rewriter) const {
-    auto oldType = arg.getType().dyn_cast<IREE::Stream::ResourceType>();
-    if (!oldType) return false;
+    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(arg.getType());
+    if (!oldType)
+      return false;
     auto newUsage = analysis.lookupResourceUsage(arg);
     auto newLifetime = convertUsageToLifetime(newUsage);
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
@@ -104,8 +105,9 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Returns true if a change was made.
   bool applyResultTransition(Operation *op, Value result,
                              PatternRewriter &rewriter) const {
-    auto oldType = result.getType().dyn_cast<IREE::Stream::ResourceType>();
-    if (!oldType) return false;
+    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(result.getType());
+    if (!oldType)
+      return false;
     auto newUsage = analysis.lookupResourceUsage(result);
     auto newLifetime = convertUsageToLifetime(newUsage);
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
@@ -141,8 +143,9 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   bool applyResultTransition(Value result, Value resultSize,
                              IREE::Stream::AffinityAttr affinityAttr,
                              PatternRewriter &rewriter) const {
-    auto oldType = result.getType().dyn_cast<IREE::Stream::ResourceType>();
-    if (!oldType) return false;
+    auto oldType = llvm::dyn_cast<IREE::Stream::ResourceType>(result.getType());
+    if (!oldType)
+      return false;
     auto newUsage = analysis.lookupResourceUsage(result);
     auto newLifetime = convertUsageToLifetime(newUsage);
     auto newType = rewriter.getType<IREE::Stream::ResourceType>(newLifetime);
@@ -152,7 +155,20 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
     } else if (oldType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
       // Transitioning from one lifetime to another; insert a transfer
       // placeholder (as we may later decide it's ok to transition on a
-      // particular device).
+      // particular device). Note that the consumer may be a transfer in which
+      // case we don't need to insert the op.
+      if (result.hasOneUse()) {
+        auto consumerOp =
+            dyn_cast<IREE::Stream::AsyncTransferOp>(*result.getUsers().begin());
+        if (consumerOp) {
+          auto finalType = llvm::cast<IREE::Stream::ResourceType>(
+              consumerOp.getResult().getType());
+          if (finalType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+            // Already have a transfer to the new lifetime.
+            return false;
+          }
+        }
+      }
       auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
           result.getLoc(), newType, result, resultSize, resultSize,
           /*source_affinity=*/affinityAttr,
@@ -220,7 +236,8 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::func::FuncOp> {
     // Arguments:
     SmallVector<Type> newInputs;
     for (auto inputType : llvm::enumerate(op.getFunctionType().getInputs())) {
-      auto oldType = inputType.value().dyn_cast<IREE::Stream::ResourceType>();
+      auto oldType =
+          llvm::dyn_cast<IREE::Stream::ResourceType>(inputType.value());
       if (!oldType) {
         newInputs.push_back(inputType.value());
       } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
@@ -239,7 +256,8 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::func::FuncOp> {
     SmallVector<Type> newOutputs;
     auto anyReturnOp = *op.getOps<mlir::func::ReturnOp>().begin();
     for (auto outputType : llvm::enumerate(op.getFunctionType().getResults())) {
-      auto oldType = outputType.value().dyn_cast<IREE::Stream::ResourceType>();
+      auto oldType =
+          llvm::dyn_cast<IREE::Stream::ResourceType>(outputType.value());
       if (!oldType) {
         newOutputs.push_back(outputType.value());
       } else if (oldType.getLifetime() == IREE::Stream::Lifetime::Unknown) {
@@ -260,7 +278,8 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::func::FuncOp> {
     }
 
     // Blocks and nested operations:
-    if (this->applyRegionTransitions(op, rewriter)) didChange = true;
+    if (this->applyRegionTransitions(op, rewriter))
+      didChange = true;
 
     return success(didChange);
   }
@@ -279,8 +298,9 @@ struct ApplyGenericOp : public UsageRefinementPattern<Op> {
     rewriter.setInsertionPointAfter(op);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (result.getType().template isa<IREE::Stream::ResourceType>()) {
-        if (this->applyResultTransition(op, result, rewriter)) didChange = true;
+      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+        if (this->applyResultTransition(op, result, rewriter))
+          didChange = true;
       }
     }
     if (didChange) {
@@ -312,7 +332,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
         cast<IREE::Util::SizeAwareOpInterface>(op.getOperation());
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
-      if (!result.getType().template isa<IREE::Stream::ResourceType>()) {
+      if (!llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
         continue;
       }
       auto resultSize = sizeAwareOp.getResultSize(i);
@@ -358,6 +378,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                   ApplyStreamableOp<IREE::Stream::AsyncLoadOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncStoreOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncDispatchOp>,
+                  ApplyStreamableOp<IREE::Stream::AsyncCallOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncExecuteOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncConcurrentOp>,
                   ApplyStreamableOp<IREE::Stream::YieldOp>>(context, analysis);
@@ -369,7 +390,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
 //===----------------------------------------------------------------------===//
 
 class RefineUsagePass : public RefineUsageBase<RefineUsagePass> {
- public:
+public:
   RefineUsagePass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -380,7 +401,8 @@ class RefineUsagePass : public RefineUsageBase<RefineUsagePass> {
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty()) return;
+    if (moduleOp.getBody()->empty())
+      return;
 
     // Run analysis on the entire module.
     ResourceUsageAnalysis analysis(moduleOp);
@@ -402,13 +424,13 @@ class RefineUsagePass : public RefineUsageBase<RefineUsagePass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createRefineUsagePass() {
   return std::make_unique<RefineUsagePass>();
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

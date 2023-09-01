@@ -7,7 +7,6 @@
 #include "runtime/bindings/tflite/interpreter.h"
 
 #include "iree/base/internal/call_once.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
 #include "runtime/bindings/tflite/model.h"
@@ -91,7 +90,7 @@ static iree_status_t _TfLiteInterpreterShapeFrameInitialize(
     _TfLiteInterpreterShapeFrame* frame) {
   // [int32...] storage for the shape dimension inputs/outputs.
   iree_vm_type_def_t dim_type =
-      iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
+      iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
   IREE_RETURN_IF_ERROR(iree_vm_list_initialize(
       iree_make_byte_span(frame->shape_list_storage,
                           IREE_ARRAYSIZE(frame->shape_list_storage)),
@@ -107,7 +106,7 @@ static iree_status_t _TfLiteInterpreterShapeFrameInitialize(
   // Arg 1 is always the shape list for all I/O, so do that once here.
   iree_vm_ref_t shape_list_ref = {0};
   IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(
-      frame->shape_list, iree_vm_list_type_id(), &shape_list_ref));
+      frame->shape_list, iree_vm_list_type(), &shape_list_ref));
   IREE_RETURN_IF_ERROR(
       iree_vm_list_set_ref_retain(frame->arg_list, 1, &shape_list_ref));
 
@@ -233,7 +232,7 @@ static iree_host_size_t _TfLiteInterpreterCalculateSize(
       iree_host_align(sizeof(TfLiteInterpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
-      iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());
+      iree_vm_make_ref_type_def(iree_hal_buffer_type());
   total_size +=
       iree_vm_list_storage_size(&buffer_view_type_def, model->input_count);
   total_size +=
@@ -264,7 +263,7 @@ static iree_status_t _TfLiteInterpreterAllocate(
                iree_host_align(sizeof(*interpreter), iree_max_align_t);
 
   iree_vm_type_def_t buffer_view_type_def =
-      iree_vm_type_def_make_ref_type(iree_hal_buffer_type_id());
+      iree_vm_make_ref_type_def(iree_hal_buffer_type());
 
   iree_byte_span_t input_list_storage = iree_make_byte_span(
       p, iree_vm_list_storage_size(&buffer_view_type_def, model->input_count));
@@ -394,7 +393,7 @@ TFL_CAPI_EXPORT extern TfLiteInterpreter* TfLiteInterpreterCreate(
       _TfLiteInterpreterCreate(model, optional_options, &interpreter);
   if (iree_status_is_ok(iree_status_consume_code(status))) {
     IREE_TRACE_ZONE_APPEND_TEXT(z0, "num_threads=", strlen("num_threads="));
-    IREE_TRACE_ZONE_APPEND_VALUE(z0, interpreter->options.num_threads);
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, interpreter->options.num_threads);
   } else {
     IREE_TRACE_MESSAGE(ERROR, "failed interpreter creation");
     TfLiteInterpreterDelete(interpreter);
@@ -564,7 +563,7 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteInterpreterAllocateTensors(
     total_input_size +=
         iree_hal_buffer_byte_length(interpreter->input_tensors[i].buffer);
   }
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, total_input_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, total_input_size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   IREE_TRACE_ZONE_END(z0);
@@ -588,8 +587,8 @@ static iree_status_t _TfLiteInterpreterInvoke(TfLiteInterpreter* interpreter) {
   // NOTE: we could defer the mapping unless requested and ensure state buffers
   // remain where they currently are for the next invocation.
   for (iree_host_size_t i = 0; i < interpreter->model->output_count; ++i) {
-    iree_hal_buffer_t* buffer = (iree_hal_buffer_t*)iree_vm_list_get_ref_deref(
-        interpreter->output_list, i, iree_hal_buffer_get_descriptor());
+    iree_hal_buffer_t* buffer =
+        iree_vm_list_get_buffer_assign(interpreter->output_list, i);
     TfLiteTensor* tensor = &interpreter->output_tensors[i];
     IREE_RETURN_IF_ERROR(_TfLiteTensorBind(tensor, buffer));
   }
@@ -609,7 +608,7 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteInterpreterInvoke(
     total_output_size +=
         iree_hal_buffer_byte_length(interpreter->output_tensors[i].buffer);
   }
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, total_output_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, total_output_size);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   IREE_TRACE_ZONE_END(z0);

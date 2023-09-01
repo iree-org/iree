@@ -22,6 +22,7 @@
 set -xeuo pipefail
 
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-riscv}}"
+BUILD_TYPE="${IREE_BUILD_TYPE:-RelWithDebInfo}"
 RISCV_PLATFORM="${IREE_TARGET_PLATFORM:-linux}"
 RISCV_ARCH="${IREE_TARGET_ARCH:-riscv_64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
@@ -38,6 +39,7 @@ declare -a args
 args=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
+  "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}"
@@ -52,12 +54,14 @@ args=(
 if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
+    -DRISCV_TOOLCHAIN_PREFIX="riscv64-unknown-linux-gnu-"
   )
 elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT}"
+    -DRISCV_TOOLCHAIN_PREFIX="riscv32-unknown-elf-"
   )
 else
   echo "riscv config for ${RISCV_PLATFORM_ARCH} not supported yet"

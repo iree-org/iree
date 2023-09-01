@@ -6,10 +6,17 @@
 
 
 class ModuleInfo:
-
-    def __init__(self, *, name: str, path: str, branch_pin_file: str,
-                 default_repository_url: str, fork_repository_push: str,
-                 fork_repository_pull: str, branch_prefix: str):
+    def __init__(
+        self,
+        *,
+        name: str,
+        path: str,
+        branch_pin_file: str,
+        default_repository_url: str,
+        fork_repository_push: str,
+        fork_repository_pull: str,
+        branch_prefix: str
+    ):
         self.name = name
         self.path = path
         self.branch_pin_file = branch_pin_file
@@ -20,8 +27,7 @@ class ModuleInfo:
 
 
 MODULE_INFOS = {
-    "llvm-project":
-    ModuleInfo(
+    "llvm-project": ModuleInfo(
         name="llvm-project",
         path="third_party/llvm-project",
         branch_pin_file="third_party/llvm-project.branch-pin",
@@ -30,14 +36,13 @@ MODULE_INFOS = {
         fork_repository_pull="https://github.com/iree-org/iree-llvm-fork.git",
         branch_prefix="patched-llvm-project-",
     ),
-    "mlir-hlo":
-    ModuleInfo(
-        name="mlir-hlo",
-        path="third_party/mlir-hlo",
-        branch_pin_file="third_party/mlir-hlo.branch-pin",
-        default_repository_url="https://github.com/iree-org/iree-mhlo-fork.git",
-        fork_repository_push="git@github.com:iree-org/iree-mhlo-fork.git",
-        fork_repository_pull="https://github.com/iree-org/iree-mhlo-fork.git",
-        branch_prefix="patched-mlir-hlo-",
-    )
+    "stablehlo": ModuleInfo(
+        name="stablehlo",
+        path="third_party/stablehlo",
+        branch_pin_file="third_party/stablehlo.branch-pin",
+        default_repository_url="https://github.com/iree-org/stablehlo.git",
+        fork_repository_push="git@github.com:iree-org/stablehlo.git",
+        fork_repository_pull="https://github.com/iree-org/stablehlo.git",
+        branch_prefix="patched-stablehlo-",
+    ),
 }

@@ -12,6 +12,7 @@
 #include <functional>
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -25,7 +26,8 @@ namespace transform_ext {
 //===---------------------------------------------------------------------===//
 
 class StructuredOpMatcher;
-StructuredOpMatcher m_StructuredOp();
+class MatcherContext;
+StructuredOpMatcher &m_StructuredOp(MatcherContext &);
 
 /// A tag indicating the shape being static or dynamic, for use with the
 /// structured op matcher.
@@ -70,6 +72,23 @@ struct CaptureDims : public CaptureStaticValue<SmallVector<int64_t>> {
   using Base::Base;
 };
 
+/// Captures the contraction dimensions of the target operation.
+struct CaptureIndexingMaps : public CaptureStaticValue<SmallVector<AffineMap>> {
+  using Base::Base;
+};
+
+/// Captures the contraction dimensions of the target operation.
+struct CaptureContractionDims
+    : public CaptureStaticValue<mlir::linalg::ContractionDimensions> {
+  using Base::Base;
+};
+
+/// Captures the convolution dimensions of the target operation.
+struct CaptureConvDims
+    : public CaptureStaticValue<mlir::linalg::ConvolutionDimensions> {
+  using Base::Base;
+};
+
 /// Captures the rank of the operation.
 struct CaptureRank : public CaptureStaticValue<int64_t> {
   using Base::Base;
@@ -78,6 +97,18 @@ struct CaptureRank : public CaptureStaticValue<int64_t> {
 /// Captures the bitwidth of an element type.
 struct CaptureElementTypeBitWidth : public CaptureStaticValue<int64_t> {
   using Base::Base;
+};
+
+/// Captures element element type.
+struct CaptureElementType : public CaptureStaticValue<Type> {
+  using Base::Base;
+};
+
+template <typename T = Attribute>
+struct CaptureAttribute : public CaptureStaticValue<T> {
+  static_assert(std::is_base_of_v<Attribute, T>,
+                "can only capture a subclass of Attribute");
+  using CaptureStaticValue<T>::CaptureStaticValue;
 };
 
 /// A tag indicating to look for any user of the operation's result that would
@@ -135,15 +166,9 @@ struct IsProjected : public SingleValuePredicateParam<int64_t> {
 struct IsIdentity {};
 
 /// Predicate tag indicating that the operand is a special float constant.
-struct ConstantFloatMin {};
+struct ConstantFloatMinOrMinusInf {};
 struct ConstantFloatZero {};
-
-/// Predicate indicating that the operand is the same value as its producer's
-/// operand.
-struct SameOperandAsProducer
-    : public SingleValuePredicateParam<std::pair<int64_t, int64_t>> {
-  using Base::Base;
-};
+struct ConstantFloatOne {};
 
 /// Indicates that the match optional. The matcher is still expected to run and
 /// capture if successful. The parameter can be set to false
@@ -156,32 +181,16 @@ struct OptionalMatch : public SingleValuePredicateParam<bool> {
 /// operation.
 struct SingleCombinerReduction {};
 
-namespace detail {
-template <typename T>
-using has_reset_capture_t = decltype(std::declval<T>().resetCapture());
-template <typename T>
-using has_get_capture_t = decltype(std::declval<T>().getCaptured());
-} // namespace detail
+class CapturingOpMatcher;
+class CapturingValueMatcher;
 
-/// Base class for op matchers that capture the matched operation.
-class CapturingOpMatcher {
+/// Base class for capturing matchers that can be owned by the context.
+class CapturingMatcherBase {
 public:
-  virtual ~CapturingOpMatcher() = default;
-
-  /// Resets the captured value to null. This should be called if the same
-  /// pattern needs to be applied more than once as it may keep captured values
-  /// for optional nested predicates from the previous application.
-  void resetCapture() {
-    captured = nullptr;
-    SmallVector<CapturingOpMatcher *> nested;
-    getAllNested(nested);
-    for (CapturingOpMatcher *matcher : nested) {
-      matcher->captured = nullptr;
-    }
-  }
-
-  /// Returns the matched operation if the match was successful.
-  Operation *getCaptured() const { return captured; }
+  // Virtual destructor so unique pointers are deallocated correctly.
+  // TODO: if efficiency is a problem, consider disallowing non-trivial
+  // destructors for subclasses.
+  virtual ~CapturingMatcherBase() = default;
 
 protected:
   /// Informs the matcher that it has another, nested matcher. Derived classes
@@ -191,63 +200,445 @@ protected:
   void recordNestedMatcher(T &nested) {
     if constexpr (std::is_base_of_v<CapturingOpMatcher, T>)
       nestedCapturingMatchers.push_back(&nested);
+    if constexpr (std::is_base_of_v<CapturingValueMatcher, T>)
+      nestedCapturingValueMatchers.push_back(&nested);
   }
 
-  /// Appends all nested capturing matchers, excluding this one, to `nested`.
+  /// Appends all nested capturing matchers of a certain kind, excluding this
+  /// one, to `nested`.
   void getAllNested(SmallVectorImpl<CapturingOpMatcher *> &nested);
+  void
+  getAllNestedValueMatchers(SmallVectorImpl<CapturingValueMatcher *> &nested);
+
+  /// Resets nested capturing matchers but does NOT reset the current one.
+  void resetCapture();
 
 private:
   /// A list of (recursively) nested capturing matchers that should be reset
   /// when the current matcher is.
-  SmallVector<CapturingOpMatcher *> nestedCapturingMatchers;
-
-protected:
-  /// Matched value.
-  linalg::LinalgOp captured = nullptr;
+  SmallVector<CapturingOpMatcher *, 2> nestedCapturingMatchers;
+  SmallVector<CapturingValueMatcher *, 2> nestedCapturingValueMatchers;
 };
 
-/// Structured op matcher with additional predicates attachable through the
+/// A context object holding capturing matchers, must outlive any individual
+/// matcher. When matching complex subgraphs, the caller often doesn't care
+/// about all intermediate nodes (operations) in the graph and shouldn't need to
+/// hold matcher objects for those. These matchers can be created in this
+/// context.
+class MatcherContext {
+public:
+  /// Create a new matcher of the specified type owned by this context.
+  template <typename T, typename... Args>
+  std::enable_if_t<std::is_base_of_v<CapturingMatcherBase, T>, T> &
+  allocate(Args &&...args) {
+    // Need to call "new" explicitly as make_unique wouldn't have access to the
+    // private constructor when this class would.
+    ownedMatchers.emplace_back(
+        std::unique_ptr<T>(new T(std::forward<Args>(args)...)));
+    return *static_cast<T *>(ownedMatchers.back().get());
+  }
+
+private:
+  /// Owning list of matchers.
+  // TODO: If this becomes inefficient, consider something like BumpPtrAllocator
+  // that derived classes can use to store their members as well.
+  SmallVector<std::unique_ptr<CapturingMatcherBase>> ownedMatchers;
+};
+
+/// Base class for value matchers that capture the matched value. Stores a list
+/// of predicates and requires all of them to match for the value to match. Once
+/// a value matched, any repeated use just verifies that equality of the value.
+class CapturingValueMatcher : public CapturingMatcherBase {
+  friend class CapturingMatcherBase;
+  friend class MatcherContext;
+
+  using PredicateFn = std::function<bool(Value)>;
+
+public:
+  /// Resets the captured value to null. This should be called if the same
+  /// pattern needs to be applied more than once as it may keep captured values
+  /// for optional nested predicates from the previous application.
+  void resetCapture() {
+    captured = nullptr;
+    CapturingMatcherBase::resetCapture();
+  }
+
+  /// Returns the matched value if the match was successful.
+  Value getCaptured() const { return captured; }
+
+  /// Matches the given value, hook for `matchPattern`.
+  bool match(Value value);
+
+protected:
+  CapturingValueMatcher() = default;
+
+  /// Adds a predicate to the end of the predicate list for this value matcher.
+  template <typename Fn>
+  void addPredicate(Fn &&predicate) {
+    predicates.emplace_back(std::forward<Fn>(predicate));
+  }
+
+  /// The captured value.
+  Value captured = nullptr;
+
+private:
+  /// Additional predicates to be checked on the value.
+  SmallVector<PredicateFn> predicates;
+};
+
+/// Creates a matcher of an arbitrary value.
+inline CapturingValueMatcher &m_Value(MatcherContext &context) {
+  return context.allocate<CapturingValueMatcher>();
+}
+
+/// Matcher for typed values whose type implements the `ShapedType` interface.
+/// Allows for matching the components of the shaped type such as rank and
+/// dimensions.
+class ShapedValueMatcher : public CapturingValueMatcher {
+  friend class MatcherContext;
+
+  ShapedValueMatcher();
+
+public:
+  /// Add an always-succeeding matcher predicate capturing the rank.
+  ShapedValueMatcher &rank(CaptureRank capture);
+
+  /// Add an always-succeeding matcher predicate capturing the size of the
+  /// dimension identified by the first argument.
+  ShapedValueMatcher &dim(int64_t dimension, CaptureDim capture);
+
+  /// Add an always-succeeding matcher predicate capturing the sizes of all
+  /// dimensions in order of appearance.
+  ShapedValueMatcher &dim(AllDims tag, CaptureDims captures);
+
+  /// Add an always-succeeding matcher predicate capturing the element type of
+  /// the value.
+  ShapedValueMatcher &elementType(CaptureElementType captures);
+};
+
+/// Construct a new matcher of a value whose type is a `ShapedType`, owned by
+/// the given context.
+inline ShapedValueMatcher &m_ShapedValue(MatcherContext &context) {
+  return context.allocate<ShapedValueMatcher>();
+}
+
+/// Matcher for operations with additional predicates attachable through the
 /// fluent, a.k.a. chainable, API. Note that public API must *not* accept
 /// additional callbacks even; new predicates should be added instead when
 /// necessary. Not only this decreases the depth of the callback stack and
 /// increases readability, it also allows us to port the matcher to a
 /// declarative format using PDL and/or Transform dialect in the future. The
 /// latter will become impossible with arbitrary C++ callbacks.
-class StructuredOpMatcher : public CapturingOpMatcher {
-  friend StructuredOpMatcher m_StructuredOp();
-  using PredicateFn = std::function<bool(linalg::LinalgOp)>;
-  using CaptureResetFn = std::function<void()>;
-  using GetCapturedFn = std::function<Operation *()>;
+class CapturingOpMatcher : public CapturingMatcherBase {
+  friend class CapturingMatcherBase;
+  friend class MatcherContext;
 
-  /// Matches a structured operation if the given predicate is satisfied.
-  StructuredOpMatcher(PredicateFn &&firstPredicate) {
-    predicates.push_back(std::move(firstPredicate));
+  template <typename... OpTy>
+  friend CapturingOpMatcher &m_Operation(MatcherContext &matcherContext);
+
+public:
+  using PredicateFn = std::function<bool(Operation *)>;
+
+  /// Matches the given operation, hook for `matchPattern`.
+  bool match(Operation *op);
+
+  /// Resets the captured value to null. This should be called if the same
+  /// pattern needs to be applied more than once as it may keep captured values
+  /// for optional nested predicates from the previous application.
+  void resetCapture() {
+    captured = nullptr;
+    CapturingMatcherBase::resetCapture();
+  }
+
+  /// Returns the matched operation if the match was successful.
+  Operation *getCaptured() const { return captured; }
+
+  /// Adds alternative paths for predicates. In practice, this is just a
+  /// predicate that is satisfied when either the first or the second matcher is
+  /// satisfied. The alternative satisfaction is eager and short-cutting, i.e.,
+  /// the second alternative will not be processed, and therefore will not
+  /// capture values, if the first alternative succeeded.
+  CapturingOpMatcher &alternatives(CapturingOpMatcher &first,
+                                   CapturingOpMatcher &second);
+
+  //===-------------------------------------------------------------------===//
+  // Constraints on adjacent ops.
+  //===-------------------------------------------------------------------===//
+
+  /// Adds a predicate checking that all ops implementing TilingInterface in the
+  /// parent of the given type (e.g., a function or a module) were matched by
+  /// this or nested matchers. This is useful to ensure that the matcher covered
+  /// the entire parent region, not just a parent of it. This predicate **must**
+  /// be added *after* all the other predicates that capture.
+  template <typename OpTy>
+  CapturingOpMatcher &allTilableOpsCaptured() {
+    SmallVector<CapturingOpMatcher *> copy;
+    copy.push_back(this);
+    getAllNested(copy);
+    addPredicate([copy = std::move(copy)](Operation *op) {
+      Operation *parent = op->getParentOfType<OpTy>();
+      return checkAllTilableMatched(parent, op, copy);
+    });
+    return *this;
+  }
+
+  //-------------------------------------------------------------------------//
+  // Predicates for operands and results.
+  //-------------------------------------------------------------------------//
+
+  /// Adds a predicate checking that the operation has exactly the given number
+  /// of operands.
+  CapturingOpMatcher &operand(NumEqualsTo num);
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation is
+  /// defined by an operation that satisfies the given matcher.
+  CapturingOpMatcher &operand(int64_t pos, CapturingOpMatcher &nested);
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation
+  /// satisfies the given value matcher.
+  CapturingOpMatcher &operand(int64_t pos, CapturingValueMatcher &nested);
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation is
+  /// defined by `arith.constant` with the value 1.0.
+  // TODO: better matching for attributes.
+  CapturingOpMatcher &operand(int64_t pos, ConstantFloatOne);
+
+  /// Adds a predicate checking that the operation has exactly the given number
+  /// of results.
+  CapturingOpMatcher &result(NumEqualsTo num);
+
+  /// Adds a predicate checking that the `pos`-th result of the operation
+  /// satisfies the given value matcher.
+  CapturingOpMatcher &result(int64_t pos, CapturingValueMatcher &nested);
+
+protected:
+  /// Constructs a default operation matcher accepting any operation.
+  CapturingOpMatcher() = default;
+
+  /// Adds a predicate for the matched operation to satisfy.
+  template <typename Fn>
+  void addPredicate(Fn &&predicate) {
+    predicates.emplace_back(std::forward<Fn>(predicate));
+  }
+
+  /// Produce the debug output for `create` method in a non-templated way.
+  static void debugOutputForCreate(ArrayRef<StringRef> opNames);
+
+private:
+  /// A list of additional conditions for the operation to match.
+  SmallVector<PredicateFn> predicates;
+
+  /// Checks that `matchers` captured all tilable ops nested in `parent` except
+  /// for `linalgOp`. This is an implementation detail of allTilableOpsCaptured.
+  static bool checkAllTilableMatched(Operation *parent, Operation *op,
+                                     ArrayRef<CapturingOpMatcher *> matchers);
+
+  /// Creates a matcher for an operation with one of the given types.
+  template <typename... OpType>
+  static CapturingOpMatcher create() {
+    CapturingOpMatcher matcher;
+    matcher.addPredicate([](Operation *op) {
+      debugOutputForCreate(ArrayRef<StringRef>{OpType::getOperationName()...});
+      return isa<OpType...>(op);
+    });
+    return matcher;
+  }
+
+  /// Common util for constant matcher.
+  CapturingOpMatcher &operand(int64_t position,
+                              std::function<bool(llvm::APFloat)> floatValueFn);
+
+protected:
+  /// Matched value.
+  Operation *captured = nullptr;
+};
+
+namespace detail {
+/// Prints the debug output from the ConcreteOpMatcher constructor. The
+/// implementation must reside in the C++ file so we don't pollute the header
+/// with debug includes, and ConcreteOpMatcher is a class template that can only
+/// reside in the header.
+void debugOutputForConcreteOpMatcherConstructor(StringRef name);
+} // namespace detail
+
+/// Base class for matchers that match a specific op. Adds an initial predicate
+/// checking if the op is indeed of the specified kind.
+/// Derived classes specializing this for op interfaces MUST also define a
+/// specialization of DebugOpKindDescription.
+template <typename Derived, typename OpTy>
+class ConcreteOpMatcher : public CapturingOpMatcher {
+protected:
+  using Base = ConcreteOpMatcher;
+
+  static StringRef getConcreteOpDescription() {
+    return OpTy::getOperationName();
+  }
+
+  /// Adds a predicate checking if the op is of the OpTy kind.
+  ConcreteOpMatcher() {
+    CapturingOpMatcher::addPredicate([](Operation *op) {
+      detail::debugOutputForConcreteOpMatcherConstructor(
+          Derived::getConcreteOpDescription());
+      return isa<OpTy>(op);
+    });
+  }
+
+  /// Adds a predicate for the matched operation to satisfy.
+  template <typename FnTy>
+  Derived &addPredicate(FnTy &&predicate) {
+    // Dispatch to the callback.
+    CapturingOpMatcher::addPredicate(
+        [inner = std::move(predicate)](Operation *op) {
+          return inner(cast<OpTy>(op));
+        });
+    return static_cast<Derived &>(*this);
   }
 
 public:
-  /// Matches any structured operation, i.e., operation with LinalgOp interface.
-  StructuredOpMatcher() {}
+  /// Adds alternative paths for predicates. In practice, this is just a
+  /// predicate that is satisfied when either the first or the second matcher is
+  /// satisfied. The alternative satisfaction is eager and short-cutting, i.e.,
+  /// the second alternative will not be processed, and therefore will not
+  /// capture values, if the first alternative succeeded.
+  Derived &alternatives(CapturingOpMatcher &first, CapturingOpMatcher &second) {
+    return static_cast<Derived &>(
+        CapturingOpMatcher::alternatives(first, second));
+  }
+
+  /// Adds a predicate checking that all ops implementing TilingInterface in the
+  /// parent of the given type (e.g., a function or a module) were matched by
+  /// this or nested matchers. This is useful to ensure that the matcher covered
+  /// the entire parent region, not just a parent of it. This predicate **must**
+  /// be added *after* all the other predicates that capture.
+  template <typename ParentTy>
+  Derived &allTilableOpsCaptured() {
+    return static_cast<Derived &>(
+        CapturingOpMatcher::allTilableOpsCaptured<ParentTy>());
+  }
+
+  //-------------------------------------------------------------------------//
+  // Predicates for operands and results.
+  //-------------------------------------------------------------------------//
+
+  /// Adds a predicate checking that the operation has exactly the given number
+  /// of operands.
+  Derived &operand(NumEqualsTo num) {
+    return static_cast<Derived &>(CapturingOpMatcher::operand(num));
+  }
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation is
+  /// defined by an operation that satisfies the given matcher.
+  Derived &operand(int64_t pos, CapturingOpMatcher &nested) {
+    return static_cast<Derived &>(CapturingOpMatcher::operand(pos, nested));
+  }
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation
+  /// satisfies the given value matcher.
+  Derived &operand(int64_t pos, CapturingValueMatcher &nested) {
+    return static_cast<Derived &>(CapturingOpMatcher::operand(pos, nested));
+  }
+
+  /// Adds a predicate checking that the `pos`-th operand of the operation is
+  /// defined by `arith.constant` with the value 1.0.
+  // TODO: better matching for attributes.
+  Derived &operand(int64_t pos, ConstantFloatOne c) {
+    return static_cast<Derived &>(CapturingOpMatcher::operand(pos, c));
+  }
+
+  /// Adds a predicate checking that the operation has exactly the given number
+  /// of results.
+  Derived &result(NumEqualsTo num) {
+    return static_cast<Derived &>(CapturingOpMatcher::result(num));
+  }
+
+  /// Adds a predicate checking that the `pos`-th result of the operation
+  /// satisfies the given value matcher.
+  Derived &result(int64_t pos, CapturingValueMatcher &nested) {
+    return static_cast<Derived &>(CapturingOpMatcher::result(pos, nested));
+  }
+};
+
+/// Matcher for the `tensor.pad` operation.
+class TensorPadOpMatcher
+    : public ConcreteOpMatcher<TensorPadOpMatcher, tensor::PadOp> {
+  friend class MatcherContext;
+
+  TensorPadOpMatcher() = default;
+
+public:
+  /// Adds a predicate checking that the low padding sizes are exactly the given
+  /// values.
+  TensorPadOpMatcher &low(ArrayRef<int64_t> sizes);
+
+  /// Adds a predicate checking that the low padding sizes for all dimensions
+  /// are exactly the same given value.
+  TensorPadOpMatcher &low(AllDims tag, int64_t size);
+
+  /// Adds a predicate checking that the high padding sizes for all dimensions
+  /// are exactly the same given value.
+  TensorPadOpMatcher &high(ArrayRef<int64_t> sizes);
+
+  /// Adds a predicate checking that the high padding sizes for all dimensions
+  /// are exactly the same given value.
+  TensorPadOpMatcher &high(AllDims tag, int64_t size);
+
+  /// Adds a predicate checking that the body of the pad only yields values
+  /// defined outside the pad region.
+  TensorPadOpMatcher &yieldsExternalValue();
+};
+
+inline TensorPadOpMatcher &m_tensorPad(MatcherContext &matcherContext) {
+  return matcherContext.allocate<TensorPadOpMatcher>();
+}
+
+/// Creates a default operation matcher in the given context that accepts any
+/// operation.
+inline CapturingOpMatcher &m_Operation(MatcherContext &matcherContext) {
+  return matcherContext.allocate<CapturingOpMatcher>();
+}
+
+/// Creates an operation matcher in the given context that accepts only
+/// operations of the kinds provided as template arguments.
+template <typename... OpTy>
+inline CapturingOpMatcher &m_Operation(MatcherContext &matcherContext) {
+  return matcherContext.allocate<CapturingOpMatcher>(
+      CapturingOpMatcher::create<OpTy...>());
+}
+
+/// Matcher for structured aka Linalg operations.
+class StructuredOpMatcher
+    : public ConcreteOpMatcher<StructuredOpMatcher, linalg::LinalgOp> {
+  friend class MatcherContext;
+
+  StructuredOpMatcher() = default;
+
+public:
+  static StringRef getConcreteOpDescription() {
+    return "linalg interface implementation";
+  }
 
   /// Creates a matcher for a structured operation with one of the given types.
   template <typename... OpType>
   static StructuredOpMatcher create() {
-    return StructuredOpMatcher([](linalg::LinalgOp op) {
+    StructuredOpMatcher matcher;
+    matcher.addPredicate([](Operation *op) {
       debugOutputForCreate(ArrayRef<StringRef>{OpType::getOperationName()...});
-      return isa<OpType...>(op.getOperation());
+      return isa<linalg::LinalgOp>(op) && isa<OpType...>(op);
     });
+    return matcher;
   }
 
-  /// Matches the given operation, hook for `matchPattern`.
-  bool match(Operation *op);
+  /// Matches a structured operation if either patterns A or B match.
+  StructuredOpMatcher(StructuredOpMatcher &A, StructuredOpMatcher &B);
 
   //===-------------------------------------------------------------------===//
   // Constraints on op rank and dims.
   //===-------------------------------------------------------------------===//
   /// Adds a predicate checking that the given rank must be greater than some
   /// constant value.
-  // TODO: Base class, derived class and proper API.
   StructuredOpMatcher &rank(NumGreaterEqualTo minRank);
   StructuredOpMatcher &rank(NumLowerEqualTo maxRank);
+  StructuredOpMatcher &rank(NumEqualsTo exactRank);
 
   /// Adds a predicate checking that the given iteration space dimension is
   /// static/dynamic. The dimension index may be negative, in which case
@@ -288,6 +679,9 @@ public:
   StructuredOpMatcher &rank(CaptureRank capture);
   StructuredOpMatcher &dim(int64_t dimension, CaptureDim capture);
   StructuredOpMatcher &dim(AllDims tag, CaptureDims captures);
+  StructuredOpMatcher &indexingMaps(CaptureIndexingMaps indexingMaps);
+  StructuredOpMatcher &contractionDims(CaptureContractionDims contractionDims);
+  StructuredOpMatcher &convolutionDims(CaptureConvDims convDims);
 
   //===-------------------------------------------------------------------===//
   // Constraints on input operands.
@@ -316,9 +710,20 @@ public:
     recordNestedMatcher(operandMatcher);
     return *this;
   }
-
-  StructuredOpMatcher &input(int64_t position,
-                             SameOperandAsProducer parentPosition);
+  template <typename T>
+  std::enable_if_t<
+      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
+                        Value>::value,
+      StructuredOpMatcher &>
+  input(int64_t position, T &operandMatcher,
+        OptionalMatch optional = OptionalMatch(false)) {
+    addInputMatcher(
+        position,
+        [&operandMatcher](Value v) { return operandMatcher.match(v); },
+        optional);
+    recordNestedMatcher(operandMatcher);
+    return *this;
+  }
 
   /// Adds a predicate checking that all input operands of the structured op
   /// have a permutation indexing map.
@@ -351,31 +756,13 @@ public:
   StructuredOpMatcher &input(int64_t position,
                              CaptureElementTypeBitWidth width);
 
+  /// Capture the elemental type of input operand `position`.
+  StructuredOpMatcher &input(int64_t position, CaptureElementType elem);
+
   /// Check if input is equal to a known constant.
   // TODO: Support matching for constant ops.
-  StructuredOpMatcher &input(int64_t position, ConstantFloatMin);
+  StructuredOpMatcher &input(int64_t position, ConstantFloatMinOrMinusInf);
   StructuredOpMatcher &input(int64_t position, ConstantFloatZero);
-
-  //===-------------------------------------------------------------------===//
-  // Constraints on adjacent ops.
-  //===-------------------------------------------------------------------===//
-
-  /// Adds a predicate checking that all ops implementing TilingInterface in the
-  /// parent of the given type (e.g., a function or a module) were matched by
-  /// this or nested matchers. This is useful to ensure that the matcher covered
-  /// the entire parent region, not just a parent of it. This predicate **must**
-  /// be added *after* all the other predicates that capture.
-  template <typename OpTy>
-  StructuredOpMatcher &allTilableOpsCaptured() {
-    SmallVector<CapturingOpMatcher *> copy;
-    copy.push_back(this);
-    getAllNested(copy);
-    predicates.push_back([copy = std::move(copy)](linalg::LinalgOp linalgOp) {
-      Operation *parent = linalgOp->getParentOfType<OpTy>();
-      return checkAllTilableMatched(parent, linalgOp, copy);
-    });
-    return *this;
-  }
 
   //===-------------------------------------------------------------------===//
   // Constraints on output operands.
@@ -408,6 +795,9 @@ public:
   /// Capture the elemental type bitwidth of output operand `position`.
   StructuredOpMatcher &output(int64_t position,
                               CaptureElementTypeBitWidth width);
+
+  /// Capture the elemental type of output operand `position`.
+  StructuredOpMatcher &output(int64_t position, CaptureElementType elem);
 
   /// Adds a predicate checking that the output of the structured op is produced
   /// by a reduction with a single-operation combinator (such as addf or mulf,
@@ -474,28 +864,36 @@ public:
   ///     %3 = arith.maxf %arg0, %arg1 : f32
   ///     linalg.yield %3 : f32
   ///   } -> tensor<?x?xf32>
+  /// If commutative is set binary operations can have their operands swapped.
   template <typename OpType>
-  StructuredOpMatcher &singleOpWithCanonicaleArgs() {
-    return singleOpWithCanonicaleArgs(OpType::getOperationName());
+  StructuredOpMatcher &singleOpWithCanonicaleArgs(bool commutative = false) {
+    return singleOpWithCanonicaleArgs(OpType::getOperationName(), commutative);
   }
-  StructuredOpMatcher &singleOpWithCanonicaleArgs(StringRef opname);
+  StructuredOpMatcher &singleOpWithCanonicaleArgs(StringRef opname,
+                                                  bool commutative);
   /// Check if the op is a linalg of with a single float reciprocal op.
   StructuredOpMatcher &isFloatReciprocal();
+  /// Check if the op is a linalg of with a region containing only a yield op
+  /// using block arguments in order.
+  StructuredOpMatcher &passThroughOp();
+
+  /// Check if the body of the linalg op implements a contraction of the kind
+  ///   result <ReductionOpTy>= input1 <ElemOpTy> input2
+  template <typename ElemOpTy, typename ReductionOpTy>
+  StructuredOpMatcher &hasContractionBody() {
+    return hasContractionBody(
+        [](Operation *op) { return isa<ElemOpTy>(op); },
+        [](Operation *op) { return isa<ReductionOpTy>(op); },
+        ElemOpTy::getOperationName(), ReductionOpTy::getOperationName());
+  }
 
 private:
-  /// Checks that `matchers` captured all tilable ops nested in `parent` except
-  /// for `linalgOp`. This is an implementation detail of allTilableOpsCaptured.
-  static bool checkAllTilableMatched(Operation *parent,
-                                     linalg::LinalgOp linalgOp,
-                                     ArrayRef<CapturingOpMatcher *> matchers);
-
-  /// Produce the debug output for `create` method in a non-templated way.
-  static void debugOutputForCreate(ArrayRef<StringRef> opNames);
-
   /// Non-template implementations of nested predicate builders for inputs,
   /// outputs and results. Should not be called directly.
   void addInputMatcher(int64_t position,
                        std::function<bool(Operation *)> matcher,
+                       OptionalMatch optional);
+  void addInputMatcher(int64_t position, std::function<bool(Value)> matcher,
                        OptionalMatch optional);
   void addOutputMatcher(int64_t position,
                         std::function<bool(Operation *)> matcher,
@@ -508,18 +906,38 @@ private:
   StructuredOpMatcher &input(int64_t position,
                              std::function<bool(llvm::APFloat)> floatValueFn);
 
-  /// Additional predicates to be checked on the structured op.
-  SmallVector<PredicateFn> predicates;
+  /// Non-template implementation of hasContractionBody. Takes callbacks for
+  /// checking operation kinds and names for error reporting.
+  StructuredOpMatcher &
+  hasContractionBody(function_ref<bool(Operation *)> isaElemOpTy,
+                     function_ref<bool(Operation *)> isaReductionOpTy,
+                     StringRef elemOpName, StringRef reductionOpName);
 };
 
 /// Creates a matcher of an arbitrary structured op.
-inline StructuredOpMatcher m_StructuredOp() { return StructuredOpMatcher(); }
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext) {
+  return matcherContext.allocate<StructuredOpMatcher>();
+}
+
+/// Creates a matcher that is a copy of the given matcher.
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext,
+                                           const StructuredOpMatcher &other) {
+  return matcherContext.allocate<StructuredOpMatcher>(other);
+}
+
+/// Creates a matcher that accepts as disjunction of the two given matchers.
+inline StructuredOpMatcher &m_StructuredOp_Or(MatcherContext &matcherContext,
+                                              StructuredOpMatcher &A,
+                                              StructuredOpMatcher &B) {
+  return matcherContext.allocate<StructuredOpMatcher>(A, B);
+}
 
 /// Creates a matcher of a structured op with kinds provided as template
 /// arguments.
 template <typename... OpType>
-inline StructuredOpMatcher m_StructuredOp() {
-  return StructuredOpMatcher::create<OpType...>();
+inline StructuredOpMatcher &m_StructuredOp(MatcherContext &matcherContext) {
+  return matcherContext.allocate<StructuredOpMatcher>(
+      StructuredOpMatcher::create<OpType...>());
 }
 
 //===---------------------------------------------------------------------===//
@@ -621,35 +1039,161 @@ struct MatchedReductionCaptures {
   int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
 };
 
+struct MatchedMatmulCaptures {
+  linalg::ContractionDimensions contractionDims = {};
+  Type lhsElementType, rhsElementType, outputElementType;
+  SmallVector<int64_t> matmulOpSizes = {};
+  SmallVector<AffineMap> indexingMaps;
+
+  /// Helper functions.
+  int64_t rank() const { return matmulOpSizes.size(); }
+  /// Return all batches.
+  ArrayRef<unsigned> batches() const { return contractionDims.batch; }
+  /// Return the most minor candidate dimension for `m`.
+  int64_t m() const { return contractionDims.m.back(); }
+  /// Return the most minor candidate dimension for `n`.
+  int64_t n() const { return contractionDims.n.back(); }
+  /// Return the most minor candidate dimension for `k`.
+  int64_t k() const { return contractionDims.k.back(); }
+  /// AffineMap for indexing into the LHS.
+  AffineMap lhsIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[0];
+  }
+  /// AffineMap for indexing into the RHS.
+  AffineMap rhsIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[1];
+  }
+  /// AffineMap for indexing into the RES.
+  AffineMap resIndexing() const {
+    assert(indexingMaps.size() == 3 && "expected 3 indexing maps");
+    return indexingMaps[2];
+  }
+};
+
 /// Creates a group of matchers for:
 ///
 ///     trailing(reduction(leading(), fill()))
 ///
 /// where trailing and leading are elementwise operations whose presence is
-/// optional. Each matcher will capture the corresponding operation.
-void makeReductionMatcher(StructuredOpMatcher &reduction,
-                          StructuredOpMatcher &fill,
-                          StructuredOpMatcher &leading,
-                          StructuredOpMatcher &trailing,
-                          MatchedReductionCaptures &captures);
+/// optional. Each matcher will capture the corresponding operation. If
+/// `mustMatchEntireFunc` is set, the matcher additionally checks if all
+/// tileable operations in the functions are captured.
+void makeReductionMatcher(MatcherContext &context,
+                          StructuredOpMatcher *&reductionCapture,
+                          StructuredOpMatcher *&fillCapture,
+                          StructuredOpMatcher *&leadingCapture,
+                          StructuredOpMatcher *&trailingCapture,
+                          MatchedReductionCaptures &captures,
+                          bool mustMatchEntireFunc);
+void makeReductionMatcher(MatcherContext &context,
+                          StructuredOpMatcher *&reductionCapture,
+                          MatchedReductionCaptures &captures,
+                          bool mustMatchEntireFunc);
+///
+///     trailing(matmul(*, *, fill()))
+///
+/// where trailing and leading are elementwise operations whose presence is
+/// optional. Each matcher will capture the corresponding operation. If
+/// `mustMatchEntireFunc` is set, the matcher additionally checks if all
+/// tileable operations in the functions are captured.
+void makeMatmulMatcher(MatcherContext &matcherContext,
+                       StructuredOpMatcher *&matmulCapture,
+                       StructuredOpMatcher *&fillCapture,
+                       StructuredOpMatcher *&trailingCapture,
+                       MatchedMatmulCaptures &captures,
+                       bool mustMatchEntireFunc);
 
-/// Create a group of matchers for a sequence of operations matching exactly a
-/// softmax operation.
+/// Create a group of matchers of batch mamtul with a fill:
+///
+///  batch_matmul(*, *, fill())
+///
+/// and capture various useful quantities. If `mustMatchEntireFunc` is set, the
+/// matcher additionally checks if all tileable operations in the functions are
+/// captured.
+void makeBatchMatmulMatcher(transform_ext::MatcherContext &matcherContext,
+                            transform_ext::StructuredOpMatcher *&bmmCapture,
+                            transform_ext::StructuredOpMatcher *&fillCapture,
+                            transform_ext::MatchedMatmulCaptures &captures,
+                            bool mustMatchEntireFunc);
+
+/// Create a group of matchers for a different code sequence of operations
+/// matching exactly a softmax operation.
 ///
 ///  %red = reduce_max(%0)
 ///  %sub = sub(%0, %red)
 ///  %exp = exp(%sub)
 ///  %sum = reduce_sum(%exp)
-///  %rec = reciprocal(%sum)
-///  %mul = mul(%exp, %rec)
-void makeSoftmaxMatcher(transform_ext::StructuredOpMatcher &fillMinusInf,
-                        transform_ext::StructuredOpMatcher &maxReduction,
-                        transform_ext::StructuredOpMatcher &sub,
-                        transform_ext::StructuredOpMatcher &expOperand,
-                        transform_ext::StructuredOpMatcher &fillzero,
-                        transform_ext::StructuredOpMatcher &sum,
-                        transform_ext::StructuredOpMatcher &divOperand,
-                        transform_ext::StructuredOpMatcher &softmaxroot);
+///  %mul = div(%exp, %%sum)
+void makeSoftmaxMatcher(MatcherContext &context,
+                        StructuredOpMatcher *&maxReductionCapture,
+                        StructuredOpMatcher *&softmaxRootCapture);
+
+struct MatchedConvolutionCaptures {
+  Type inputElementType, filterElementType, outputElementType;
+  mlir::linalg::ConvolutionDimensions convolutionDims = {};
+  SmallVector<int64_t> convolutionOpSizes = {};
+  SmallVector<int64_t> trailingOpSizes = {};
+  int64_t maybeTrailingOutputElementalTypeBitWidth = 0;
+  int64_t maybeFillElementalTypeBitWidth = 0;
+};
+
+/// Creates a group of matchers for:
+///
+///     trailing(convolution(input, filter, fill()))
+///
+/// where fill is a FillOp and trailing is an elementwise operation, both of
+/// which is optional. Each matcher will capture the corresponding operation. If
+/// `mustMatchEntireFunc` is set, the matcher additionally checks if all
+/// tileable operations in the functions are captured.
+void makeConvolutionMatcher(MatcherContext &context,
+                            StructuredOpMatcher *&convolutionCapture,
+                            StructuredOpMatcher *&fillCapture,
+                            StructuredOpMatcher *&trailingCapture,
+                            MatchedConvolutionCaptures &captures,
+                            bool mustMatchEntireFunc);
+void makeConvolutionMatcher(MatcherContext &context,
+                            StructuredOpMatcher *&convolutionCapture,
+                            MatchedConvolutionCaptures &captures,
+                            bool mustMatchEntireFunc);
+
+struct MatchedPadCaptures {
+  int64_t rank = 0;
+  Type elementType;
+  SmallVector<int64_t> dims = {};
+};
+
+/// Create a matcher for tensor.pad(*) without leading or trailing ops atm.
+/// If `mustMatchEntireFunc` is set, the matcher additionally checks if all
+/// tileable operations in the functions are captured.
+void makePadMatcher(MatcherContext &context, CapturingOpMatcher *&padCapture,
+                    MatchedPadCaptures &captures, bool mustMatchEntireFunc);
+
+/// Wraps the given matcher callback to indicate that it must capture all
+/// tilable ops in the parent function. Expects the callback to accept the same
+/// arguments as what is expected by MatchCallbacksRegistry::register, followed
+/// by a bool.
+template <typename Fn>
+auto wrapAsEntireFuncMatch(Fn &&fn) {
+  return [fn = std::move(fn)](MatchCallbackResult &res, Location loc,
+                              const mlir::transform::TransformState &state,
+                              ValueRange handles) {
+    return fn(res, loc, state, handles, true);
+  };
+}
+
+/// Wraps the given matcher callback to indicate that it can match subgraphs.
+/// Expects the callback to accept the same arguments as what is expected by
+/// MatchCallbacksRegistry::register, followed by a bool.
+template <typename Fn>
+auto wrapAsPartialMatch(Fn &&fn) {
+  return [fn = std::move(fn)](MatchCallbackResult &res, Location loc,
+                              const mlir::transform::TransformState &state,
+                              ValueRange handles) {
+    return fn(res, loc, state, handles, false);
+  };
+}
 
 } // namespace transform_ext
 } // namespace mlir

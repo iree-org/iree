@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_HAL_TARGET_TARGETBACKEND_H_
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -40,8 +41,11 @@ struct TargetOptions {
   //   3: maximal debug information
   int debugLevel;
 
+  // Default path to write executable files into.
+  std::string executableFilesPath;
+
   // A path to write individual executable source listings into.
-  std::string sourceListingPath;
+  std::string executableSourcesPath;
 
   // A path to write standalone executable benchmarks into.
   std::string executableBenchmarksPath;
@@ -115,7 +119,7 @@ struct TargetOptions {
 //      + hal.executable.binary attributes { ... }
 //          data blob...
 class TargetBackend {
- public:
+public:
   virtual ~TargetBackend() = default;
 
   // Returns a name for the backend used to differentiate between other targets.
@@ -131,9 +135,20 @@ class TargetBackend {
   // Types, Attributes).
   virtual void getDependentDialects(DialectRegistry &registry) const {}
 
-  // Returns the default device this backend targets.
-  virtual IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
-      MLIRContext *context) const = 0;
+  // Returns the default device this backend targets. This may involve setting
+  // defaults from flags and other environmental sources, and it may be
+  // cross-targeting in a way that is not compatible with the host.
+  virtual IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context) const = 0;
+
+  // Similar to getDefaultDeviceTarget, but always returns a DeviceTargetAttr
+  // that is configured for the host, regardless of if flags/environment were
+  // configured to cross-target in some way.
+  //
+  virtual std::optional<IREE::HAL::DeviceTargetAttr>
+  getHostDeviceTarget(MLIRContext *context) const {
+    return {};
+  }
 
   // Inserts passes used to translate the `hal.executable.variant` op contents.
   // The pass manager will be nested on `hal.executable` such that the pipeline
@@ -166,8 +181,9 @@ class TargetBackend {
   //       module { spirv.module { ... } }
   //     }
   //   }
-  virtual void buildTranslationPassPipeline(
-      IREE::HAL::ExecutableVariantOp variantOp, OpPassManager &passManager) = 0;
+  virtual void
+  buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                               OpPassManager &passManager) = 0;
 
   // Inserts passes used to link `hal.executable.variant` ops together.
   // The pass manager will be nested on the parent module of `hal.executable`
@@ -239,9 +255,10 @@ class TargetBackend {
   //
   // If no serialization is provided then lowering the parent module into a
   // binary format (such as to the IREE VM) will fail.
-  virtual LogicalResult serializeExecutable(
-      const SerializationOptions &options,
-      IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder) {
+  virtual LogicalResult
+  serializeExecutable(const SerializationOptions &options,
+                      IREE::HAL::ExecutableVariantOp variantOp,
+                      OpBuilder &executableBuilder) {
     assert(false && "unimplemented serializeExecutable");
     return failure();
   }
@@ -259,9 +276,9 @@ void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,
                            data.size() * sizeof(T)));
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_TARGETBACKEND_H_
+#endif // IREE_COMPILER_DIALECT_HAL_TARGET_TARGETBACKEND_H_

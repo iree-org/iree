@@ -12,7 +12,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
@@ -182,17 +181,8 @@ static void iree_hal_task_command_buffer_destroy(
 
 bool iree_hal_task_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(command_buffer,
-                                          &iree_hal_task_command_buffer_vtable);
-}
-
-static void* iree_hal_task_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_task_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_task_command_buffer_vtable);
 }
 
 //===----------------------------------------------------------------------===//
@@ -229,6 +219,8 @@ static iree_status_t iree_hal_task_command_buffer_end(
     iree_task_list_move(&command_buffer->leaf_tasks,
                         &command_buffer->root_tasks);
   }
+
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
 
   return iree_ok_status();
 }
@@ -357,8 +349,7 @@ iree_status_t iree_hal_task_command_buffer_issue(
     iree_hal_task_queue_state_t* queue_state, iree_task_t* retire_task,
     iree_arena_allocator_t* arena, iree_task_submission_t* pending_submission) {
   iree_hal_task_command_buffer_t* command_buffer =
-      iree_hal_command_buffer_dyn_cast(base_command_buffer,
-                                       &iree_hal_task_command_buffer_vtable);
+      iree_hal_task_command_buffer_cast(base_command_buffer);
   IREE_ASSERT_TRUE(command_buffer);
 
   // If the command buffer is empty (valid!) then we are a no-op.
@@ -515,7 +506,7 @@ static iree_status_t iree_hal_cmd_fill_tile(
   iree_device_size_t remaining_length = cmd->length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_map_fill(
       cmd->target_buffer, cmd->target_offset + slice_offset, slice_length,
@@ -654,7 +645,7 @@ static iree_status_t iree_hal_cmd_copy_tile(
   iree_device_size_t remaining_length = cmd->length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_map_copy(
       cmd->source_buffer, cmd->source_offset + slice_offset, cmd->target_buffer,
@@ -750,7 +741,8 @@ static iree_status_t iree_hal_task_command_buffer_push_constants(
   if (IREE_UNLIKELY(offset + values_length >=
                     sizeof(command_buffer->state.push_constants))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "push constant range %zu (length=%zu) out of range",
+                            "push constant range %" PRIhsz " (length=%" PRIhsz
+                            ") out of range",
                             offset, values_length);
   }
 
@@ -1053,7 +1045,6 @@ static iree_status_t iree_hal_task_command_buffer_execute_commands(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_task_command_buffer_vtable = {
         .destroy = iree_hal_task_command_buffer_destroy,
-        .dyn_cast = iree_hal_task_command_buffer_dyn_cast,
         .begin = iree_hal_task_command_buffer_begin,
         .end = iree_hal_task_command_buffer_end,
         .begin_debug_group = iree_hal_task_command_buffer_begin_debug_group,

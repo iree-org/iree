@@ -14,14 +14,21 @@
 namespace mlir {
 namespace iree_compiler {
 
+struct IREEOneShotBufferizationOptions
+    : public mlir::bufferization::OneShotBufferizationOptions {
+  // For now this has no extra fields. Keeping this anyway in case this is
+  // needed in future.
+};
+
 // Register all interfaces needed for bufferization.
 void registerBufferizationInterfaces(DialectRegistry &registry);
 
 // Eliminate tensor.empty ops that are anchored on flow store ops.
 LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
-    RewriterBase &rewriter, Operation *op, bufferization::AnalysisState &state);
+    RewriterBase &rewriter, Operation *op,
+    bufferization::OneShotAnalysisState &state);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_INTERFACES_BUFFERIZATIONINTERFACES_H_
+#endif // IREE_COMPILER_CODEGEN_INTERFACES_BUFFERIZATIONINTERFACES_H_

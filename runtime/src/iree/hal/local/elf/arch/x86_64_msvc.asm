@@ -185,6 +185,23 @@ iree_elf_call_i_ppp PROC FRAME
   ret
 iree_elf_call_i_ppp ENDP
 
+; void* iree_elf_call_p_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2)
+iree_elf_call_p_ppp PROC FRAME
+  _sysv_interop_prolog
+
+  ; RCX = symbol_ptr
+  ; RDX = a0         <- RDI
+  ; R8  = a1         <- RSI
+  ; R9  = a2         <- RDX
+  mov rdi, rdx
+  mov rsi, r8
+  mov rdx, r9
+  call rcx
+
+  _sysv_interop_epilog
+  ret
+iree_elf_call_p_ppp ENDP
+
 ; int iree_elf_thunk_i_ppp(const void* symbol_ptr, void* a0, void* a1, void* a2)
 iree_elf_thunk_i_ppp PROC FRAME
   _sysv_interop_prolog

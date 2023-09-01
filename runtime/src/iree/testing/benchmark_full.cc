@@ -13,7 +13,6 @@
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/testing/benchmark.h"
 
 //===----------------------------------------------------------------------===//
@@ -94,7 +93,8 @@ static std::string StatusToString(iree_status_t status) {
 static void iree_benchmark_run(const char* benchmark_name,
                                const iree_benchmark_def_t* benchmark_def,
                                benchmark::State& benchmark_state) {
-  IREE_TRACE_SCOPE_DYNAMIC(benchmark_name);
+  IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name,
+                                      strlen(benchmark_name));
   IREE_TRACE_FRAME_MARK();
 
   iree_benchmark_state_t state;
@@ -108,6 +108,8 @@ static void iree_benchmark_run(const char* benchmark_name,
     iree_status_ignore(status);
     benchmark_state.SkipWithError(status_str.c_str());
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 void iree_benchmark_register(iree_string_view_t name,

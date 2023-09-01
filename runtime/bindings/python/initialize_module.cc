@@ -7,6 +7,7 @@
 #include "./binding.h"
 #include "./hal.h"
 #include "./invoke.h"
+#include "./numpy_interop.h"
 #include "./py_module.h"
 #include "./status_utils.h"
 #include "./vm.h"
@@ -16,7 +17,9 @@
 namespace iree {
 namespace python {
 
-PYBIND11_MODULE(_runtime, m) {
+NB_MODULE(_runtime, m) {
+  numpy::InitializeNumPyInterop();
+
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
 
@@ -29,7 +32,7 @@ PYBIND11_MODULE(_runtime, m) {
   m.def("parse_flags", [](py::args py_flags) {
     std::vector<std::string> alloced_flags;
     alloced_flags.push_back("python");
-    for (auto &py_flag : py_flags) {
+    for (py::handle py_flag : py_flags) {
       alloced_flags.push_back(py::cast<std::string>(py_flag));
     }
 

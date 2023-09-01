@@ -25,7 +25,7 @@ REGION="$3"
 # the number of runners removed at a time.
 COUNT="${4:--0}"
 
-MIG="github-runner-${GROUP}-${TYPE}-${REGION}"
+MIG="gh-runner-${GROUP}-${TYPE}-${REGION}"
 
 
 # Give VMs 5 minutes to startup and register with GitHub. This is pretty generous
@@ -34,7 +34,7 @@ CREATION_CUTOFF="$(( "$(date +%s)" - STARTUP_DURATION ))"
 
 function get_online_runners() {
   gh api --paginate -H "Accept: application/vnd.github+json" \
-      /orgs/iree-org/actions/runners?per_page=100 \
+      /orgs/openxla/actions/runners?per_page=100 \
     | jq --raw-output \
       ".runners | .[]
       | select(

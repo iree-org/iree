@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -20,7 +21,8 @@ namespace {
 /// Check whether the given dimensions are contiguous in the result map.
 /// If non of the dimension are present in the map return true as well.
 static bool hasContiguousDims(AffineMap map, ArrayRef<unsigned> dims) {
-  if (!map.isProjectedPermutation()) return false;
+  if (!map.isProjectedPermutation())
+    return false;
   llvm::SmallDenseSet<unsigned> existingDims(dims.begin(), dims.end());
   for (unsigned i = 0, e = map.getNumResults(); i < e; i++) {
     if (map.getDimPosition(i) != dims[0]) {
@@ -31,7 +33,8 @@ static bool hasContiguousDims(AffineMap map, ArrayRef<unsigned> dims) {
     }
     // Check that the following dimensions are match the order of `dims`
     for (unsigned j = 1, numDims = dims.size(); j < numDims; j++) {
-      if (map.getDimPosition(i + j) != dims[j]) {
+      unsigned pos = i + j;
+      if (pos >= map.getNumResults() || map.getDimPosition(pos) != dims[j]) {
         return false;
       }
     }
@@ -40,15 +43,22 @@ static bool hasContiguousDims(AffineMap map, ArrayRef<unsigned> dims) {
   return true;
 }
 
-static SmallVector<ReassociationIndices> collapseDimensions(
-    linalg::GenericOp genericOp) {
+static SmallVector<ReassociationIndices>
+collapseDimensions(linalg::GenericOp genericOp) {
   SmallVector<ReassociationIndices> collapseIndices;
+
+  if (!isNonNullAndOutsideDispatch(genericOp)) {
+    return collapseIndices;
+  }
+
   SmallVector<unsigned> reductionDims;
   genericOp.getReductionDims(reductionDims);
-  if (reductionDims.size() < 2) return collapseIndices;
+  if (reductionDims.size() < 2)
+    return collapseIndices;
 
   for (AffineMap map : genericOp.getIndexingMapsArray()) {
-    if (!hasContiguousDims(map, reductionDims)) return collapseIndices;
+    if (!hasContiguousDims(map, reductionDims))
+      return collapseIndices;
   }
   ReassociationIndices indices;
   for (unsigned dim : reductionDims) {
@@ -73,13 +83,13 @@ struct CollapseDimsPass : public CollapseDimsBase<CollapseDimsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createCollapseDimsPass() {
   return std::make_unique<CollapseDimsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -26,7 +26,7 @@ class VM_TrivialOp<string mnemonic, list<Trait> traits = []> :
 // Pure ops do not have any memory effects, do not invoke Undefined Behavior,
 // and are always safe to speculate/hoist.
 //
-// TODO(https://github.com/iree-org/iree/issues/11179): More VM ops should be
+// TODO(https://github.com/openxla/iree/issues/11179): More VM ops should be
 // made pure.
 class VM_PureOp<string mnemonic, list<Trait> traits = []> :
       VM_TrivialOp<mnemonic, !listconcat(traits, [AlwaysSpeculatable])>;
@@ -34,6 +34,13 @@ class VM_PureOp<string mnemonic, list<Trait> traits = []> :
 //===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupStructuralOps : OpDocGroup {
+  let summary = "Structural ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupStructuralOps in {
 
 def VM_ModuleOp : VM_Op<"module", [
     IsolatedFromAbove,
@@ -155,6 +162,18 @@ def VM_FuncOp : VM_Op<"func", [
       return getFunctionType().getResults();
     }
 
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
+
     /// Adds or overrides a reflection attribute.
     void setReflectionAttr(StringRef name, Attribute value);
   }];
@@ -261,6 +280,18 @@ def VM_ImportOp : VM_Op<"import", [
     ArrayRef<Type> getCallableResults() {
       return getFunctionType().getResults();
     }
+
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
   }];
 }
 
@@ -310,6 +341,18 @@ def VM_InitializerOp : VM_Op<"initializer", [
     Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return {}; }
 
+    /// Returns the argument attributes for all callable region arguments or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableArgAttrs() {
+      return getArgAttrs().value_or(nullptr);
+    }
+
+    /// Returns the result attributes for all callable region results or
+    /// null if there are none.
+    ::mlir::ArrayAttr getCallableResAttrs() {
+      return getResAttrs().value_or(nullptr);
+    }
+
     /// Make symbol optional as this op has no symbol.
     bool isOptionalSymbol() { return true; }
   }];
@@ -317,9 +360,18 @@ def VM_InitializerOp : VM_Op<"initializer", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupStructuralOps
+
 //===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
+
+def OpGroupGlobalOps : OpDocGroup {
+  let summary = "Global ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupGlobalOps in {
 
 class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
@@ -349,7 +401,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
   let builders = [
     OpBuilder<(ins
       "StringRef":$name, "bool":$isMutable, "Type":$type,
-      "Optional<TypedAttr>":$initialValue,
+      "std::optional<TypedAttr>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{
@@ -827,9 +879,18 @@ def VM_GlobalStoreIndirectRefOp :
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupGlobalOps
+
 //===----------------------------------------------------------------------===//
 // Constants
 //===----------------------------------------------------------------------===//
+
+def OpGroupConstantOps : OpDocGroup {
+  let summary = "Constant ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupConstantOps in {
 
 class VM_ConstOp<string mnemonic, string ctype, list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
@@ -1135,9 +1196,18 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   ];
 }
 
+} // OpGroupConstantOps
+
 //===----------------------------------------------------------------------===//
 // Buffers
 //===----------------------------------------------------------------------===//
+
+def OpGroupBufferOps : OpDocGroup {
+  let summary = "Buffer ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupBufferOps in {
 
 def VM_BufferAllocOp :
     VM_Op<"buffer.alloc", [
@@ -1151,7 +1221,8 @@ def VM_BufferAllocOp :
   }];
 
   let arguments = (ins
-    VM_BufferIndex:$length
+    VM_BufferIndex:$length,
+    I32:$alignment
   );
   let results = (outs
     VM_RefOf<VM_BufferType>:$result
@@ -1164,6 +1235,7 @@ def VM_BufferAllocOp :
   let encoding = [
     VM_EncOpcode<VM_OPC_BufferAlloc>,
     VM_EncOperand<"length", 0>,
+    VM_EncOperand<"alignment", 1>,
     VM_EncResult<"result">,
   ];
 }
@@ -1183,7 +1255,8 @@ def VM_BufferCloneOp :
   let arguments = (ins
     VM_RefOf<VM_BufferType>:$source_buffer,
     VM_BufferIndex:$source_offset,
-    VM_BufferIndex:$length
+    VM_BufferIndex:$length,
+    I32:$alignment
   );
   let results = (outs
     VM_RefOf<VM_BufferType>:$result
@@ -1198,6 +1271,7 @@ def VM_BufferCloneOp :
     VM_EncOperand<"source_buffer", 0>,
     VM_EncOperand<"source_offset", 1>,
     VM_EncOperand<"length", 2>,
+    VM_EncOperand<"alignment", 3>,
     VM_EncResult<"result">,
   ];
 }
@@ -1306,7 +1380,7 @@ class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
       MemoryEffects<[MemWrite]>,
     ])> {
   let description = [{
-    Fills a range of the buffer with the given value, like memset.
+    Fills an element range of the buffer with the given value, like memset.
   }];
 
   let arguments = (ins
@@ -1364,9 +1438,7 @@ class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
       MemoryEffects<[MemRead]>,
     ])> {
   let description = [{
-    Loads a value from the buffer at the given offset. Offsets must match the
-    natural alignment of the loaded type and will be coerced to the alignment
-    at runtime automatically.
+    Loads a value from the buffer at the given element offset.
   }];
 
   let arguments = (ins
@@ -1397,9 +1469,7 @@ class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
       MemoryEffects<[MemWrite]>,
     ])> {
   let description = [{
-    Stores a value to the buffer at the given offset. Offsets must match the
-    natural alignment of the loaded type and will be coerced to the alignment
-    at runtime automatically.
+    Stores a value to the buffer at the given element offset.
   }];
 
   let arguments = (ins
@@ -1485,9 +1555,18 @@ def VM_BufferStoreF64Op :
   let summary = [{64-bit floating-point store}];
 }
 
+} // OpGroupBufferOps
+
 //===----------------------------------------------------------------------===//
 // Lists
 //===----------------------------------------------------------------------===//
+
+def OpGroupListOps : OpDocGroup {
+  let summary = "List ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupListOps in {
 
 // TODO(benvanik): vm.list.push.i32 / vm.list.pop.i32 (variadic)
 // TODO(benvanik): vm.list.copy(src_list, src_index, dst_list, dst_index, length)
@@ -1754,9 +1833,18 @@ def VM_ListSetRefOp :
   let hasVerifier = 1;
 }
 
+} // OpGroupListOps
+
 //===----------------------------------------------------------------------===//
 // Conditional assignment
 //===----------------------------------------------------------------------===//
+
+def OpGroupConditionalAssignmentOps : OpDocGroup {
+  let summary = "Conditional assignment ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupConditionalAssignmentOps in {
 
 class VM_SelectPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
                            list<Trait> traits = []> :
@@ -1890,7 +1978,7 @@ class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncPrimitiveAttr<"default_value", type.bitwidth>,
+    VM_EncOperand<"default_value", 1>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
@@ -1929,7 +2017,7 @@ class VM_SwitchFloatOp<F type, string mnemonic, VM_OPC opcode,
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"index", 0>,
-    VM_EncPrimitiveAttr<"default_value", type.bitwidth>,
+    VM_EncOperand<"default_value", 1>,
     VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
@@ -1999,9 +2087,18 @@ def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
   let hasFolder = 1;
 }
 
+} // OpGroupConditionalAssignmentOps
+
 //===----------------------------------------------------------------------===//
 // Arithmetic helpers
 //===----------------------------------------------------------------------===//
+
+def OpGroupArithmeticHelperOps : OpDocGroup {
+  let summary = "Arithmetic helper ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupArithmeticHelperOps in {
 
 class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
                            list<Trait> traits = []> :
@@ -2097,20 +2194,31 @@ class VM_TotalTernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
     VM_TernaryArithmeticOp<type, mnemonic, opcode,
                            !listconcat(traits, [AlwaysSpeculatable])> {}
 
+} // OpGroupArithmeticHelperOps
+
 //===----------------------------------------------------------------------===//
 // Integer arithmetic
 //===----------------------------------------------------------------------===//
+
+def OpGroupIntegerArithmeticOps : OpDocGroup {
+  let summary = "Integer arithmetic ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupIntegerArithmeticOps in {
 
 def VM_AddI32Op :
     VM_BinaryArithmeticOp<I32, "add.i32", VM_OPC_AddI32, [Commutative]> {
   let summary = [{integer add operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_AddI64Op :
     VM_BinaryArithmeticOp<I64, "add.i64", VM_OPC_AddI64, [Commutative]> {
   let summary = [{integer add operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_SubI32Op :
@@ -2213,15 +2321,73 @@ def VM_AbsI64Op :
   let hasFolder = 1;
 }
 
+def VM_MinI32SOp :
+    VM_BinaryArithmeticOp<I32, "min.i32.s", VM_OPC_MinI32S, [Commutative]> {
+  let summary = [{signed integer minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MinI32UOp :
+    VM_BinaryArithmeticOp<I32, "min.i32.u", VM_OPC_MinI32U, [Commutative]> {
+  let summary = [{unsigned integer minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MinI64SOp :
+    VM_BinaryArithmeticOp<I64, "min.i64.s", VM_OPC_MinI64S, [Commutative]> {
+  let summary = [{signed integer minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MinI64UOp :
+    VM_BinaryArithmeticOp<I64, "min.i64.u", VM_OPC_MinI64U, [Commutative]> {
+  let summary = [{unsigned integer minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxI32SOp :
+    VM_BinaryArithmeticOp<I32, "max.i32.s", VM_OPC_MaxI32S, [Commutative]> {
+  let summary = [{signed integer maximum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxI32UOp :
+    VM_BinaryArithmeticOp<I32, "max.i32.u", VM_OPC_MaxI32U, [Commutative]> {
+  let summary = [{unsigned integer maximum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxI64SOp :
+    VM_BinaryArithmeticOp<I64, "max.i64.s", VM_OPC_MaxI64S, [Commutative]> {
+  let summary = [{signed integer maximum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxI64UOp :
+    VM_BinaryArithmeticOp<I64, "max.i64.u", VM_OPC_MaxI64U, [Commutative]> {
+  let summary = [{unsigned integer maximum operation}];
+  let hasFolder = 1;
+}
+
+} // OpGroupIntegerArithmeticOps
+
 //===----------------------------------------------------------------------===//
 // Floating-point arithmetic
 //===----------------------------------------------------------------------===//
+
+def OpGroupFloatingPointArithmeticOps : OpDocGroup {
+  let summary = "Floating-point arithmetic ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupFloatingPointArithmeticOps in {
 
 def VM_AddF32Op :
     VM_TotalBinaryArithmeticOp<F32, "add.f32", VM_OPC_AddF32,
                                [VM_ExtF32, Commutative]> {
   let summary = [{floating-point add operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_AddF64Op :
@@ -2229,6 +2395,7 @@ def VM_AddF64Op :
                                [VM_ExtF64, Commutative]> {
   let summary = [{floating-point add operation}];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def VM_SubF32Op :
@@ -2371,10 +2538,59 @@ def VM_RoundF64Op :
   let summary = [{rounds the value to the nearest integer away from zero}];
 }
 
+def VM_RoundF32EvenOp :
+    VM_TotalUnaryArithmeticOp<F32, "round.f32.even", VM_OPC_RoundF32Even,
+                              [VM_ExtF32]> {
+  let summary = [{rounds the value to the nearest even integer}];
+}
+
+def VM_RoundF64EvenOp :
+    VM_TotalUnaryArithmeticOp<F64, "round.f64.even", VM_OPC_RoundF64Even,
+                              [VM_ExtF64]> {
+  let summary = [{rounds the value to the nearest even integer}];
+}
+
+def VM_MinF32Op :
+    VM_TotalBinaryArithmeticOp<F32, "min.f32", VM_OPC_MinF32,
+                               [VM_ExtF32, Commutative]> {
+  let summary = [{floating point minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MinF64Op :
+    VM_TotalBinaryArithmeticOp<F64, "min.f64", VM_OPC_MinF64,
+                               [VM_ExtF64, Commutative]> {
+  let summary = [{floating point minimum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxF32Op :
+    VM_TotalBinaryArithmeticOp<F32, "max.f32", VM_OPC_MaxF32,
+                               [VM_ExtF32, Commutative]> {
+  let summary = [{floating point maximum operation}];
+  let hasFolder = 1;
+}
+
+def VM_MaxF64Op :
+    VM_TotalBinaryArithmeticOp<F64, "max.f64", VM_OPC_MaxF64,
+                               [VM_ExtF32, Commutative]> {
+  let summary = [{floating point maximum operation}];
+  let hasFolder = 1;
+}
+
+} // OpGroupFloatingPointArithmeticOps
+
 //===----------------------------------------------------------------------===//
 // Floating-point math
 //===----------------------------------------------------------------------===//
 // These map directly to the `math` dialect.
+
+def OpGroupFloatingPointMathOps : OpDocGroup {
+  let summary = "Floating-point math ops";
+  let description = "These map directly to the `math` dialect.";
+}
+
+let opDocGroup = OpGroupFloatingPointMathOps in {
 
 def VM_AtanF32Op :
     VM_TotalUnaryArithmeticOp<F32, "atan.f32", VM_OPC_AtanF32, [VM_ExtF32]> {
@@ -2536,9 +2752,18 @@ def VM_ErfF64Op :
   let summary = [{computes the error function of the specified value}];
 }
 
+} // OpGroupFloatingPointMathOps
+
 //===----------------------------------------------------------------------===//
 // Integer bit manipulation
 //===----------------------------------------------------------------------===//
+
+def OpGroupIntegerBitManipulationOps : OpDocGroup {
+  let summary = "Integer bit manipulation ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupIntegerBitManipulationOps in {
 
 def VM_NotI32Op :
     VM_TotalUnaryArithmeticOp<I32, "not.i32", VM_OPC_NotI32> {
@@ -2600,9 +2825,18 @@ def VM_CtlzI64Op :
   let hasFolder = 1;
 }
 
+} // OpGroupIntegerBitManipulationOps
+
 //===----------------------------------------------------------------------===//
 // Bitwise shifts and rotates
 //===----------------------------------------------------------------------===//
+
+def OpGroupBitwiseShiftAndRotateOps : OpDocGroup {
+  let summary = "Bitwise shift and rotate ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupBitwiseShiftAndRotateOps in {
 
 class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
                            list<Trait> traits = []> :
@@ -2664,9 +2898,18 @@ def VM_ShrI64UOp : VM_ShiftArithmeticOp<I64, "shr.i64.u", VM_OPC_ShrI64U> {
   let hasFolder = 1;
 }
 
+} // OpGroupBitwiseShiftAndRotateOps
+
 //===----------------------------------------------------------------------===//
 // Casting and type conversion/emulation
 //===----------------------------------------------------------------------===//
+
+def OpGroupCastingAndConversionOps : OpDocGroup {
+  let summary = "Casting and conversion ops";
+  let description = "Casting and type conversion/emulation.";
+}
+
+let opDocGroup = OpGroupCastingAndConversionOps in {
 
 class VM_ConversionOp<Type src_type, Type dst_type, string mnemonic,
                       VM_OPC opcode, list<Trait> traits = []> :
@@ -2706,6 +2949,12 @@ class VM_ConversionPseudoOp<Type src_type, Type dst_type, string mnemonic,
   }];
 
   let hasCanonicalizer = 1;
+}
+
+def VM_TruncI16I8Op :
+    VM_ConversionPseudoOp<I32, I32, "trunc.i16.i8"> {
+  let summary = [{integer truncate to 8 bits}];
+  let hasFolder = 1;
 }
 
 def VM_TruncI32I8Op :
@@ -2864,6 +3113,64 @@ def VM_BitcastF64I64Op :
   let summary = [{bitcast from a 64-bit float-point value to a 64-bit integer}];
 }
 
+def VM_CastAnyRefOp :
+    VM_PureOp<"cast.any.ref", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ]> {
+  let summary = [{casts from any ref to a specific ref type}];
+  let description = [{
+    Performs a runtime cast of an opaque `!vm.ref<?>` to a specific `!vm.ref<T>`
+    and raises an error if the operand does not match the expected type.
+    Null refs can always be cast between types.
+  }];
+
+  let arguments = (ins
+    VM_AnyRef:$operand
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CastAnyRef>,
+    VM_EncOperand<"operand", 0>,
+    VM_EncTypeOf<"result">,
+    VM_EncResult<"result">,
+  ];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def VM_CastRefAnyOp :
+    VM_PureOp<"cast.ref.any", [VM_AssignmentOp]> {
+  let summary = [{casts from a specific ref to any ref type}];
+  let description = [{
+    Performs a compile-time widening cast of a specific `!vm.ref<T>` to an
+    opaque `!vm.ref<?>`.
+  }];
+
+  let arguments = (ins
+    VM_AnyRef:$operand
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($result)
+  }];
+
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+} // OpGroupCastingAndConversionOps
+
 //===----------------------------------------------------------------------===//
 // Native reduction (horizontal) arithmetic
 //===----------------------------------------------------------------------===//
@@ -2873,6 +3180,13 @@ def VM_BitcastF64I64Op :
 //===----------------------------------------------------------------------===//
 // Comparison ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupComparisonOps : OpDocGroup {
+  let summary = "Comparison ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupComparisonOps in {
 
 class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
                            list<Trait> traits = []> :
@@ -3181,9 +3495,18 @@ def VM_CmpNZI64Op :
   let hasFolder = 1;
 }
 
+} // OpGroupComparisonOps
+
 //===----------------------------------------------------------------------===//
 // Floating-point comparison
 //===----------------------------------------------------------------------===//
+
+def OpGroupFloatingPointComparisonOps : OpDocGroup {
+  let summary = "Floating-point comparison ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupFloatingPointComparisonOps in {
 
 def VM_CmpEQF32OOp :
     VM_BinaryComparisonOp<F32, "cmp.eq.f32.o", VM_OPC_CmpEQF32O,
@@ -3453,9 +3776,18 @@ def VM_CmpNaNF64Op :
   let hasFolder = 1;
 }
 
+} // OpGroupFloatingPointComparisonOps
+
 //===----------------------------------------------------------------------===//
 // vm.ref comparison
 //===----------------------------------------------------------------------===//
+
+def OpGroupRefComparisonOps : OpDocGroup {
+  let summary = "Ref comparison ops";
+  let description = "Comparison ops for `vm.ref`.";
+}
+
+let opDocGroup = OpGroupRefComparisonOps in {
 
 def VM_CmpEQRefOp :
     VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef, [
@@ -3489,9 +3821,18 @@ def VM_CmpNZRefOp :
   let hasFolder = 1;
 }
 
+} // OpGroupRefComparisonOps
+
 //===----------------------------------------------------------------------===//
 // Control flow
 //===----------------------------------------------------------------------===//
+
+def OpGroupControlFlowOps : OpDocGroup {
+  let summary = "Control flow ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupControlFlowOps in {
 
 def VM_BranchOp : VM_Op<"br", [
     DeclareOpInterfaceMethods<BranchOpInterface>,
@@ -3682,6 +4023,17 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     CallInterfaceCallable getCallableForCallee() {
       return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
     }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getOperandsMutable();
+    }
   }];
 }
 
@@ -3781,9 +4133,9 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
                               $_builder.getIntegerType(16)),
               segmentSizes));
       $_state.addAttribute("segment_types", $_builder.getArrayAttr(
-          llvm::to_vector<4>(llvm::map_range(segmentTypes, [&](Type type) {
+          llvm::map_to_vector(segmentTypes, [&](Type type) {
               return TypeAttr::get(type).cast<Attribute>();
-          }))));
+          })));
       $_state.addOperands(operands);
       $_state.addTypes(resultTypes);
     }]>,
@@ -4054,9 +4406,18 @@ def VM_ImportResolvedOp : VM_TrivialOp<"import.resolved", [
   let hasCanonicalizer = 1;
 }
 
+} // OpGroupControlFlowOps
+
 //===----------------------------------------------------------------------===//
 // Async/fiber ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupAsyncFiberOps : OpDocGroup {
+  let summary = "Async/fiber ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupAsyncFiberOps in {
 
 // TODO(benvanik): WaitHandle and wait functions with YieldPoint traits:
 //   signaling ops
@@ -4116,9 +4477,18 @@ def VM_YieldOp : VM_Op<"yield", [
   }];
 }
 
+} // OpGroupAsyncFiberOps
+
 //===----------------------------------------------------------------------===//
 // Debugging
 //===----------------------------------------------------------------------===//
+
+def OpGroupDebuggingOps : OpDocGroup {
+  let summary = "Debugging ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupDebuggingOps in {
 
 def VM_TraceOp : VM_Op<"trace", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -4281,5 +4651,7 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
 
   let hasCanonicalizer = 1;
 }
+
+} // OpGroupDebuggingOps
 
 #endif  // IREE_DIALECT_VM_OPS

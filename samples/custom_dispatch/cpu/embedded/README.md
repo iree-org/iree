@@ -101,7 +101,7 @@ func.call @simple_mul_workgroup(%memref0, %memref1, %memref2, %dim, %tid) : (mem
 ## Instructions
 
 This presumes that `iree-compile` and `iree-run-module` have been installed or
-built. [See here](https://iree-org.github.io/iree/building-from-source/getting-started/)
+built. [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
 for instructions for CMake setup and building from source.
 
 0. Ensure that `clang` is on your PATH:
@@ -124,7 +124,7 @@ for instructions for CMake setup and building from source.
     files.
 
 2. Compile the [example module](./example_stream.mlir) to a .vmfb file and pass
-   the path to the build directory so the .spv files can be found:
+   the path to the build directory so the .o files can be found:
 
     ```
     iree-compile \
@@ -142,9 +142,9 @@ for instructions for CMake setup and building from source.
 
     ```
     iree-run-module \
-        --device=llvm-sync \
+        --device=local-sync \
         --function=mixed_invocation \
         --input=8xf32=2 \
         --input=8xf32=4 \
-        /tmp/example.vmfb
+        --module=/tmp/example.vmfb
     ```

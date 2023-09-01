@@ -18,7 +18,6 @@
 #if IREE_FLAGS_ENABLE_CLI == 1
 
 #include "iree/base/internal/debugging.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // Flag manipulation utilities
@@ -440,7 +439,7 @@ void iree_flags_parse_checked(iree_flags_parse_mode_t mode, int* argc,
                               char*** argv) {
   IREE_TRACE_ZONE_BEGIN(z0);
   for (int i = 0; i < *argc; ++i) {
-    IREE_TRACE_ZONE_APPEND_TEXT_CSTRING(z0, (*argv)[i]);
+    IREE_TRACE_ZONE_APPEND_TEXT(z0, (*argv)[i]);
   }
   iree_status_t status = iree_flags_parse(mode, argc, argv);
   IREE_TRACE_ZONE_END(z0);
@@ -506,7 +505,8 @@ static iree_status_t iree_flags_parse_file(iree_string_view_t file_path) {
   iree_allocator_t allocator = iree_flags_leaky_allocator();
   iree_file_contents_t* file_contents = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_file_read_contents(file_path.data, allocator, &file_contents),
+      iree_file_read_contents(file_path.data, IREE_FILE_READ_FLAG_DEFAULT,
+                              allocator, &file_contents),
       "while trying to parse flagfile");
 
   // Run through the file line-by-line.

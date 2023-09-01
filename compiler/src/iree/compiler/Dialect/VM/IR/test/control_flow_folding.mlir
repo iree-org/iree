@@ -63,8 +63,8 @@ vm.module @cond_br_folds {
     // CHECK-NEXT: vm.return
     vm.return
   }
-  vm.import @nonvariadic_pure_func(%arg0 : i32) -> i32 attributes {nosideeffects}
-  vm.import @variadic_pure_func(%arg0 : i32 ...) -> i32 attributes {nosideeffects}
+  vm.import private @nonvariadic_pure_func(%arg0 : i32) -> i32 attributes {nosideeffects}
+  vm.import private @variadic_pure_func(%arg0 : i32 ...) -> i32 attributes {nosideeffects}
 
   // CHECK-LABEL: @convert_nonvariadic_to_call
   vm.func @convert_nonvariadic_to_call(%arg0 : i32) -> (i32, i32) {
@@ -75,8 +75,8 @@ vm.module @cond_br_folds {
     // CHECK-NEXT: vm.return
     vm.return %0, %1 : i32, i32
   }
-  vm.import @nonvariadic_func(%arg0 : i32) -> i32
-  vm.import @variadic_func(%arg0 : i32, %arg1 : i32 ...) -> i32
+  vm.import private @nonvariadic_func(%arg0 : i32) -> i32
+  vm.import private @variadic_func(%arg0 : i32, %arg1 : i32 ...) -> i32
 }
 
 // -----
@@ -178,8 +178,8 @@ vm.module @check_folds {
 
 // CHECK-LABEL: @check_imports
 vm.module @check_imports {
-  vm.import @required_import_fn(%arg0 : i32) -> i32
-  vm.import optional @optional_import_fn(%arg0 : i32) -> i32
+  vm.import private @required_import_fn(%arg0 : i32) -> i32
+  vm.import private optional @optional_import_fn(%arg0 : i32) -> i32
   vm.func @call_fn() -> (i32, i32) {
     // CHECK-NOT: vm.import.resolved @required_import_fn
     // CHECK-DAG: %[[HAS_STRONG:.+]] = vm.const.i32 1

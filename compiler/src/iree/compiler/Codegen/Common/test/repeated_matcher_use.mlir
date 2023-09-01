@@ -1,16 +1,16 @@
 // RUN: iree-opt %s --iree-transform-dialect-interpreter --verify-diagnostics --split-input-file
 
 module {
-  transform.structured.canonicalized_sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
+  transform.sequence failures(propagate) {
+  ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
 
     %first, %second =
       transform.iree.match_callback failures(propagate) "_test_repeated_matcher_use_callback"(%arg0)
-      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    transform.iree.emit_remark "first" at %first : !pdl.operation
-    transform.iree.emit_remark "second" at %second : !pdl.operation
+    transform.iree.emit_remark "first" at %first : !transform.any_op
+    transform.iree.emit_remark "second" at %second : !transform.any_op
   }
 
   module {
@@ -52,19 +52,18 @@ module {
 
 // -----
 
-// expected-error @below {{transform dialect interpreter failed}}
 module {
-  transform.structured.canonicalized_sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
+  transform.sequence failures(propagate) {
+  ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
 
     // expected-error @+2 {{failed to match}}
     %first, %second =
       transform.iree.match_callback failures(propagate) "_test_repeated_matcher_use_callback"(%arg0)
-      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    transform.iree.emit_remark "first" at %first : !pdl.operation
-    transform.iree.emit_remark "second" at %second : !pdl.operation
+    transform.iree.emit_remark "first" at %first : !transform.any_op
+    transform.iree.emit_remark "second" at %second : !transform.any_op
   }
 
   module {
@@ -107,19 +106,18 @@ module {
 
 // -----
 
-// expected-error @below {{transform dialect interpreter failed}}
 module {
-  transform.structured.canonicalized_sequence failures(propagate) {
-  ^bb0(%arg0: !pdl.operation):
+  transform.sequence failures(propagate) {
+  ^bb0(%arg0: !transform.any_op):
     transform.iree.register_match_callbacks
 
     // expected-error @+2 {{failed to match}}
     %first, %second =
       transform.iree.match_callback failures(propagate) "_test_repeated_matcher_use_callback"(%arg0)
-      : (!pdl.operation) -> (!pdl.operation, !pdl.operation)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    transform.iree.emit_remark "first" at %first : !pdl.operation
-    transform.iree.emit_remark "second" at %second : !pdl.operation
+    transform.iree.emit_remark "first" at %first : !transform.any_op
+    transform.iree.emit_remark "second" at %second : !transform.any_op
   }
 
   module {
@@ -154,6 +152,88 @@ module {
         linalg.yield %0 : f32
       } -> tensor<10xf32>
       return %second : tensor<10xf32>
+    }
+  }
+}
+
+// -----
+
+module {
+  transform.sequence failures(propagate) {
+  ^bb0(%arg0: !transform.any_op):
+    transform.iree.register_match_callbacks
+
+    %first, %second =
+      transform.iree.match_callback failures(propagate) "_test_value_matcher_callback"(%arg0)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+
+    transform.iree.emit_remark "first" at %first : !transform.any_op
+    transform.iree.emit_remark "second" at %second : !transform.any_op
+  }
+
+  module {
+    func.func private @f1(f32) -> f32
+    func.func private @f2(f32, f32) -> f32
+
+    func.func @foo() -> tensor<10xf32> {
+      %dummy1 = tensor.empty() : tensor<10xf32>
+      %dummy2 = tensor.empty() : tensor<10xf32>
+      %dummy3 = tensor.empty() : tensor<10xf32>
+      %operand = tensor.empty() : tensor<10xf32>
+
+      // expected-remark @below {{first}}
+      %first = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]
+      } ins(%operand : tensor<10xf32>)
+        outs(%dummy2 : tensor<10xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32):
+        %0 = func.call @f1(%arg0) : (f32) -> f32
+        linalg.yield %0 : f32
+      } -> tensor<10xf32>
+
+      // expected-remark @below {{second}}
+      %second = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]
+      } ins(%operand, %first : tensor<10xf32>, tensor<10xf32>)
+        outs(%dummy3 : tensor<10xf32>) {
+      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+        %0 = func.call @f2(%arg0, %arg1) : (f32, f32) -> f32
+        linalg.yield %0 : f32
+      } -> tensor<10xf32>
+      return %second : tensor<10xf32>
+    }
+  }
+}
+
+// -----
+
+module {
+  transform.sequence failures(propagate) {
+  ^bb0(%arg0: !transform.any_op):
+    transform.iree.register_match_callbacks
+
+    %0 = transform.iree.match_callback failures(propagate) "_test_shaped_value_matcher_callback"(%arg0)
+      : (!transform.any_op) -> !transform.any_op
+    transform.iree.emit_remark "matched" at %0 : !transform.any_op
+  }
+
+  module {
+    func.func @foo(%arg0: tensor<42x10xf32>) -> tensor<10x42xf32> {
+      %init = tensor.empty() : tensor<10x42xf32>
+      // expected-remark @below {{rank: 2}}
+      // expected-remark @below {{dimensions: 10, 42}}
+      // expected-remark @below {{matched}}
+      %0 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel"]
+      } ins(%arg0: tensor<42x10xf32>) 
+       outs(%init: tensor<10x42xf32>) {
+      ^bb0(%arg1: f32, %arg2: f32):
+        linalg.yield %arg1 : f32
+      } -> tensor<10x42xf32>
+      return %0 : tensor<10x42xf32>
     }
   }
 }

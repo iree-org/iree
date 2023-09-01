@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "iree/compiler/Pipelines/Options.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {
@@ -20,15 +21,16 @@ namespace IREE {
 /// passes specified in textual pass-pipeline format using
 /// `iree-preprocessing-pass-pipeline`. This allows some user control
 /// on the sequence of preprocessing passes to run after conversion from input
-/// dialects like `mhlo`/`tosa` before running the core IREE compilation
+/// dialects like `stablehlo`/`tosa` before running the core IREE compilation
 /// pipelines (starting with the flow pipeline).
-void buildPreprocessingPassPipeline(OpPassManager &passManager,
-                                    const PreprocessingOptions &options);
+void buildPreprocessingPassPipeline(
+    OpPassManager &passManager, const PreprocessingOptions &options,
+    PipelineExtensions *pipelineExtensions = nullptr);
 
 void registerPreprocessingPasses();
 
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_PREPROCESSING_PASSES_H_
+#endif // IREE_COMPILER_PREPROCESSING_PASSES_H_

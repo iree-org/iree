@@ -9,9 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 static iree_status_t _TfLiteModelCalculateFunctionIOCounts(
     const iree_vm_function_signature_t* signature, int32_t* out_input_count,
@@ -34,7 +33,8 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_instance_create(allocator, &model->instance));
+      z0, iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT, allocator,
+                                  &model->instance));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_module_register_all_types(model->instance));
 

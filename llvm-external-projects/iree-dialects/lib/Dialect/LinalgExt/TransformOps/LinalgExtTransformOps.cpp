@@ -8,6 +8,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
+#include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -20,6 +21,10 @@ LinalgExt::LinalgExtTransformOpsExtension::LinalgExtTransformOpsExtension() {
 #define GET_OP_LIST
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.cpp.inc"
       >();
+}
+
+void LinalgExt::LinalgExtTransformOpsExtension::init() {
+  declareGeneratedDialect<async::AsyncDialect>();
 }
 
 //===---------------------------------------------------------------------===//
@@ -41,7 +46,8 @@ static SmallVector<int64_t> extractI64Array(ArrayAttr attr) {
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
+LinalgExt::FuseProducersOp::apply(transform::TransformRewriter &rewriter,
+                                  transform::TransformResults &transformResults,
                                   transform::TransformState &state) {
   SmallVector<int64_t> operandsToFuse = extractI64Array(getOperandsToFuse());
   LinalgExt::LinalgExtFusionPattern pattern(getContext(), operandsToFuse);
@@ -51,9 +57,10 @@ LinalgExt::FuseProducersOp::apply(transform::TransformResults &transformResults,
   SmallVector<SmallVector<Operation *>> fusedOps(numProducers);
   for (Operation *target : state.getPayloadOps(getTarget())) {
     // Apply the pattern.
-    SimplePatternRewriter rewriter(target);
+    SimplePatternRewriter patternRewriter(target);
     FailureOr<LinalgExt::FusionResult> result =
-        pattern.returningMatchAndRewrite(target, rewriter);
+        pattern.returningMatchAndRewrite(cast<TilingInterface>(target),
+                                         patternRewriter);
     if (failed(result))
       return emitDefaultDefiniteFailure(target);
 
@@ -108,10 +115,10 @@ ParseResult LinalgExt::FuseProducersOp::parse(OpAsmParser &parser,
                             llvm::formatv("`{0}` attribute must be an array",
                                           operandsToFuseAttrName));
   }
-  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
+  Type anyOpType = transform::AnyOpType::get(parser.getBuilder().getContext());
   size_t numProducers = operandsToFuseArrayAttr.size();
-  result.addTypes(SmallVector<Type>(numProducers + 1, pdlOpType));
-  if (parser.resolveOperand(targetOperand, pdlOpType, result.operands))
+  result.addTypes(SmallVector<Type>(numProducers + 1, anyOpType));
+  if (parser.resolveOperand(targetOperand, anyOpType, result.operands))
     return failure();
   return success();
 }
@@ -122,31 +129,46 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
   p.printOptionalAttrDict((*this)->getAttrs());
 }
 
-DiagnosedSilenceableFailure
-LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
-    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
+DiagnosedSilenceableFailure LinalgExt::RewriteForallToAsyncOp::applyToOne(
+    transform::TransformRewriter &rewriter, scf::ForallOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  LinalgExt::ForeachThreadOpToAsyncRewriter pattern(this->getContext());
-  SimplePatternRewriter rewriter(target);
+  LinalgExt::ForallOpToAsyncRewriter pattern(this->getContext());
+  SimplePatternRewriter patternRewriter(target);
   FailureOr<Operation *> result =
-      pattern.returningMatchAndRewrite(target, rewriter);
+      pattern.returningMatchAndRewrite(target, patternRewriter);
   if (failed(result))
     return emitDefaultDefiniteFailure(target);
   results.push_back(*result);
   return DiagnosedSilenceableFailure::success();
 }
 
-DiagnosedSilenceableFailure
-LinalgExt::RewriteForeachThreadToScfForOp::applyToOne(
-    scf::ForeachThreadOp target, transform::ApplyToEachResultList &results,
+DiagnosedSilenceableFailure LinalgExt::RewriteForallToScfForOp::applyToOne(
+    transform::TransformRewriter &rewriter, scf::ForallOp target,
+    transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  LinalgExt::ForeachThreadOpToScfForRewriter pattern(this->getContext());
-  SimplePatternRewriter rewriter(target);
+  LinalgExt::ForallOpToScfForRewriter pattern(this->getContext());
+  SimplePatternRewriter patternRewriter(target);
   FailureOr<Operation *> result =
-      pattern.returningMatchAndRewrite(target, rewriter);
+      pattern.returningMatchAndRewrite(target, patternRewriter);
   if (failed(result))
     return emitDefaultDefiniteFailure(target);
   results.push_back(*result);
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// TileAndDecomposeAttention
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure LinalgExt::TileAndDecomposeAttentionOp::applyToOne(
+    transform::TransformRewriter &rewriter, LinalgExt::AttentionOp attentionOp,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  SmallVector<Operation *> ops =
+      LinalgExt::tileAndDecomposeAttention(attentionOp, rewriter);
+  for (auto op : ops)
+    results.push_back(op);
   return DiagnosedSilenceableFailure::success();
 }
 

@@ -15,7 +15,7 @@ namespace iree_compiler {
 
 class BufferLoadOpConversion
     : public OpConversionPattern<IREE::HAL::BufferLoadOp> {
- public:
+public:
   BufferLoadOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                          TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(typeConverter, context) {
@@ -23,13 +23,14 @@ class BufferLoadOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::BufferLoadOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::BufferLoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
     auto originalType = op.getResult().getType();
     auto targetType = typeConverter->convertType(originalType);
+    auto targetBitwidth = IREE::Util::getTypeBitWidth(targetType);
     int32_t validByteWidth =
         IREE::Util::getRoundedElementByteWidth(originalType);
 
@@ -65,8 +66,7 @@ class BufferLoadOpConversion
       auto hi = rewriter.create<arith::ShLIOp>(
           op.getLoc(),
           rewriter.create<arith::ExtUIOp>(
-              op.getLoc(),
-              rewriter.getIntegerType(targetType.getIntOrFloatBitWidth()),
+              op.getLoc(), rewriter.getIntegerType(targetBitwidth),
               hiCallOp.getResult(0)),
           rewriter.create<arith::ConstantIntOp>(op.getLoc(), 32, 32));
 
@@ -75,15 +75,14 @@ class BufferLoadOpConversion
           ArrayRef<Value>{adaptor.getSourceBuffer(), sourceOffset,
                           halfByteWidth});
       auto lo = rewriter.create<arith::ExtUIOp>(
-          op.getLoc(),
-          rewriter.getIntegerType(targetType.getIntOrFloatBitWidth()),
+          op.getLoc(), rewriter.getIntegerType(targetBitwidth),
           loCallOp.getResult(0));
 
       value = rewriter.create<arith::OrIOp>(op.getLoc(), lo, hi);
     }
 
     // i32 -> f32, etc
-    if (targetType.isa<FloatType>()) {
+    if (llvm::isa<FloatType>(targetType)) {
       value = rewriter.create<arith::BitcastOp>(op.getLoc(), targetType, value);
     }
 
@@ -91,13 +90,13 @@ class BufferLoadOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
 class BufferStoreOpConversion
     : public OpConversionPattern<IREE::HAL::BufferStoreOp> {
- public:
+public:
   BufferStoreOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                           TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(context) {
@@ -105,9 +104,9 @@ class BufferStoreOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::BufferStoreOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::BufferStoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getFunctionType();
 
     auto elementType = op.getValue().getType();
@@ -124,7 +123,7 @@ class BufferStoreOpConversion
 
     // f32 -> i32, etc
     auto value = adaptor.getValue();
-    if (elementType.isa<FloatType>()) {
+    if (llvm::isa<FloatType>(elementType)) {
       value = rewriter.createOrFold<arith::BitcastOp>(
           op.getLoc(),
           rewriter.getIntegerType(value.getType().getIntOrFloatBitWidth()),
@@ -171,7 +170,7 @@ class BufferStoreOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
@@ -191,5 +190,5 @@ void populateHALBufferToVMPatterns(MLIRContext *context,
                                            typeConverter, "hal.buffer.store");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

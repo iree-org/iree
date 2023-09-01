@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -40,12 +41,13 @@ namespace {
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
 class ConvertToHALPass
     : public PassWrapper<ConvertToHALPass, OperationPass<ModuleOp>> {
- public:
+public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertToHALPass)
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<mlir::func::FuncDialect>();
+    registry.insert<mlir::scf::SCFDialect>();
     registry.insert<IREE::HAL::HALDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
@@ -62,7 +64,7 @@ class ConvertToHALPass
 
     // Gather all interfaces from registered dialects.
     // These will perform the tensor->buffer mapping for their ops.
-    SmallVector<const HALConversionDialectInterface *, 4> conversionInterfaces;
+    SmallVector<const HALConversionDialectInterface *> conversionInterfaces;
     for (auto *dialect : context->getLoadedDialects()) {
       if (auto *conversionInterface =
               dialect
@@ -101,7 +103,7 @@ class ConvertToHALPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
   return std::make_unique<ConvertToHALPass>();
@@ -109,7 +111,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
 
 static PassRegistration<ConvertToHALPass> pass;
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

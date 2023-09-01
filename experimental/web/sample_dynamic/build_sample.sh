@@ -33,8 +33,8 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 HOST_BUILD_DIR="${IREE_HOST_BUILD_DIR:-${ROOT_DIR}/build-host}"
 BUILD_DIR="${IREE_EMPSCRIPTEN_BUILD_DIR:-build-emscripten}"
 INSTALL_ROOT="$(realpath ${1:-${HOST_BUILD_DIR}/install})"
-SOURCE_DIR=${ROOT_DIR}/experimental/web/sample_dynamic
-BINARY_DIR=${BUILD_DIR}/experimental/web/sample_dynamic
+SOURCE_DIR="${ROOT_DIR}/experimental/web/sample_dynamic"
+BINARY_DIR="${BUILD_DIR}/experimental/web/sample_dynamic"
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 
 
@@ -61,10 +61,10 @@ COMPILE_TOOL="${INSTALL_ROOT}/bin/iree-compile"
 compile_sample() {
   echo "  Compiling '$1' sample..."
   "${COMPILE_TOOL}" "$2" \
-    --iree-input-type=mhlo \
+    --iree-input-type=stablehlo \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=wasm32-unknown-emscripten \
-    --iree-llvm-target-cpu-features=+atomics,+bulk-memory,+simd128 \
+    --iree-llvmcpu-target-triple=wasm32-unknown-emscripten \
+    --iree-llvmcpu-target-cpu-features=+atomics,+bulk-memory,+simd128 \
     --o "${BINARY_DIR}/$1.vmfb"
 }
 
@@ -91,6 +91,7 @@ emcmake "${CMAKE_BIN}" \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
+  -UIREE_EXTERNAL_HAL_DRIVERS \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
   .
@@ -102,6 +103,6 @@ echo "=== Copying static files (.html, .js) to the build directory ==="
 
 cp "${SOURCE_DIR}/index.html" "${BINARY_DIR}"
 cp "${SOURCE_DIR}/benchmarks.html" "${BINARY_DIR}"
-cp "${ROOT_DIR}/docs/website/overrides/ghost.svg" "${BINARY_DIR}"
+cp "${ROOT_DIR}/docs/website/overrides/.icons/iree/ghost.svg" "${BINARY_DIR}"
 cp "${SOURCE_DIR}/iree_api.js" "${BINARY_DIR}"
 cp "${SOURCE_DIR}/iree_worker.js" "${BINARY_DIR}"

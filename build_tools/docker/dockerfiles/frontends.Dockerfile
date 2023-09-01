@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/android@sha256:b0b607d95af8da6a6ce430f22d9d7c621702df13ce2b5d264b79d0ac7e60d670
+FROM gcr.io/iree-oss/android@sha256:40b81bb45a771a8f30b1bd88e6153437544ec57b69be1a35aaf70e9f038f7404
 
 WORKDIR /pip-install
 
@@ -15,6 +15,7 @@ COPY integrations/tensorflow/test/requirements.txt ./
 # doesn't appear to be a pip-native way to get the minimum versions, but this
 # hack works for simple files, at least.
 RUN sed -i 's/>=/==/' requirements.txt \
+  && python3 -m pip install --upgrade pip \
   && python3 -m pip install --upgrade -r requirements.txt \
   && rm -rf /pip-install
 

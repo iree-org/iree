@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-stream-schedule-allocation))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-schedule-allocation %s | FileCheck %s
 
 // Tests that async constant ops get extracted into a dedicated constant op
 // outside of the execution region. This allows us to handle them in various
@@ -118,6 +118,58 @@ func.func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[OPERAND]]
   util.optimization_barrier %result : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// Tests that subviews of tied operands are propagated to consumers.
+
+// CHECK-LABEL: @tiedOperandSubviews
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[SIZE:.+]]: index, %[[OFFSET0:.+]]: index, %[[OFFSET1:.+]]: index, %[[OFFSET2:.+]]: index, %[[LENGTH0:.+]]: index, %[[LENGTH1:.+]]: index, %[[LENGTH2:.+]]: index)
+func.func @tiedOperandSubviews(%operand: !stream.resource<external>, %size: index, %offset0: index, %offset1: index, %offset2: index, %length0: index, %length1: index, %length2: index) {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[SUBVIEW_OFFSET:.+]] = arith.addi %[[OFFSET0]], %[[OFFSET1]]
+  // CHECK: %[[SUBVIEW:.+]] = stream.resource.subview %[[OPERAND]][%[[SUBVIEW_OFFSET]]] {{.*}} -> !stream.resource<external>{%[[LENGTH1]]}
+  // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]})
+  // CHECK-NEXT: } => !stream.timepoint
+  %result0, %result0_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<external>{%size}) -> (%operand as !stream.resource<external>{%length1}) {
+    %subview0 = stream.resource.subview %capture[%offset0] : !stream.resource<external>{%size} -> !stream.resource<external>{%length0}
+    %subview1 = stream.resource.subview %subview0[%offset1] : !stream.resource<external>{%length0} -> !stream.resource<external>{%length1}
+    stream.yield %subview1 : !stream.resource<external>{%length1}
+  } => !stream.timepoint
+  // CHECK: stream.cmd.execute with(%[[SUBVIEW]] as %[[SUBVIEW_CAPTURE:.+]]: !stream.resource<external>{%[[LENGTH1]]})
+  // CHECK: stream.cmd.copy %[[SUBVIEW_CAPTURE]][%[[OFFSET2]]], %[[SUBVIEW_CAPTURE]][%c0], %[[LENGTH2]] : !stream.resource<external>{%[[LENGTH1]]} -> !stream.resource<external>{%[[LENGTH1]]}
+  %result1, %result1_timepoint = stream.async.execute with(%result0 as %capture: !stream.resource<external>{%length1}) -> (%result0 as !stream.resource<external>{%length1}) {
+    %subview2 = stream.resource.subview %capture[%offset2] : !stream.resource<external>{%length1} -> !stream.resource<external>{%length2}
+    %update = stream.async.update %subview2, %capture[%c0 to %length2] : !stream.resource<external>{%length2} -> %capture as !stream.resource<external>{%length1}
+    stream.yield %update : !stream.resource<external>{%length1}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[SUBVIEW]]
+  util.optimization_barrier %result1 : !stream.resource<external>
+  return
+}
+
+// -----
+
+// Tests that value aliases with subranges are propagated.
+
+// CHECK-LABEL: @aliasPropagation
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
+func.func @aliasPropagation(%operand: !stream.resource<external>, %size: index, %offset: index, %length: index) {
+  %c0 = arith.constant 0 : index
+  // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<external>{%size}) -> (%operand as !stream.resource<external>{%size}) {
+    // CHECK-NOT: stream.resource.subview
+    %subview = stream.resource.subview %capture[%offset] : !stream.resource<external>{%size} -> !stream.resource<external>{%length}
+    // CHECK: stream.cmd.copy %[[CAPTURE]][%[[OFFSET]]], %[[CAPTURE]][%c0], %[[LENGTH]] : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+    %update = stream.async.update %subview, %capture[%c0 to %length] : !stream.resource<external>{%length} -> %capture as !stream.resource<external>{%size}
+    stream.yield %update : !stream.resource<external>{%size}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<external>
   return
 }
 
@@ -394,12 +446,12 @@ func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %targ
 // TODO(#11249): add a test for in-place collectives (send == recv).
 
 // CHECK-LABEL: @applyAsyncCollectiveOpOutOfPlace
-// CHECK-SAME: (%[[SEND:.+]]: !stream.resource<external>, %[[SEND_SIZE:[a-z0-9]+]]: index,
+// CHECK-SAME: (%[[CHANNEL:.+]]: !stream.channel,
+// CHECK-SAME:  %[[SEND:.+]]: !stream.resource<external>, %[[SEND_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[RECV:.+]]: !stream.resource<transient>, %[[RECV_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[COUNT:[a-z0-9]+]]: index)
-func.func @applyAsyncCollectiveOpOutOfPlace(%send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
+func.func @applyAsyncCollectiveOpOutOfPlace(%channel: !stream.channel, %send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
   %c0 = arith.constant 0 : index
-  %channel = stream.channel.default : !stream.channel
   // CHECK: stream.cmd.execute
   // CHECK-SAME: with(%[[SEND]] as %[[SEND_CAPTURE:.+]]: !stream.resource<external>{%[[SEND_SIZE]]},
   // CHECK-SAME:      %[[RECV]] as %[[RECV_CAPTURE:.+]]: !stream.resource<transient>{%[[RECV_SIZE]]})
@@ -458,6 +510,75 @@ func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: in
     // CHECK-NEXT:   wo %[[ALLOC_CAPTURE]][%c0{{[_0-9]*}} for %[[SIZE]]] : !stream.resource<transient>{%[[SIZE]]}
     // CHECK-NEXT: }
     %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%capture[%offset to %end for %length], %c4) : (!stream.resource<transient>{%size}, index) -> (%capture{%size}, !stream.resource<transient>{%size})
+    stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[TIMEPOINT]]
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %results#0 : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %results#1 : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// Tests that unused dispatch results nested in concurrent regions are still
+// allocated memory.
+
+// CHECK-LABEL: @applyAsyncDispatchUnusedOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
+func.func @applyAsyncDispatchUnusedOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[PACK:.+]]:2 = stream.resource.pack
+  // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized : !stream.resource<transient>{%[[PACK]]#0}
+  // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
+  // CHECK-SAME: await(%[[ALLOCA_TIMEPOINT]])
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOCA]] as %[[ALLOCA_CAPTURE:.+]]: !stream.resource<transient>{%[[PACK]]#0})
+  %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.concurrent
+    %concurrent = stream.async.concurrent with(%capture as %concurrent_capture: !stream.resource<transient>{%size}) -> (%capture as !stream.resource<transient>{%size}) {
+      // CHECK-NEXT: stream.cmd.dispatch @executable::@dispatch[%c1, %c1, %c1](%c4 : index) {
+      // CHECK-NEXT:   rw %[[OPERAND_CAPTURE]][%[[OFFSET]] for %[[LENGTH]]] : !stream.resource<transient>{%[[SIZE]]},
+      // CHECK-NEXT:   wo %[[ALLOCA_CAPTURE]][%[[PACK]]#1 for %[[SIZE]]] : !stream.resource<transient>{%[[PACK]]#0}
+      // CHECK-NEXT: }
+      %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%concurrent_capture[%offset to %end for %length], %c4) : (!stream.resource<transient>{%size}, index) -> (%concurrent_capture{%size}, !stream.resource<transient>{%size})
+      // NOTE: %0#1 is unused.
+      stream.yield %0#0 : !stream.resource<transient>{%size}
+    }
+    stream.yield %concurrent : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: %[[DEALLOCA:.+]] = stream.resource.dealloca await(%[[TIMEPOINT]]) => %[[ALLOCA]]
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[DEALLOCA]], %[[TIMEPOINT]])
+  // CHECK: util.optimization_barrier %[[JOIN]]
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<transient>
+  return
+}
+
+// -----
+
+// CHECK: stream.cmd.func private @asyncExtern(%arg0[%arg1 for %arg2]: !stream.resource<transient>, %arg3: index, %arg4[%arg5 for %arg6]: !stream.resource<transient>)
+stream.async.func private @asyncExtern(%arg0: !stream.resource<transient>, %arg1: index) -> (%arg0, !stream.resource<transient>)
+
+// CHECK-LABEL: @applyAsyncCallOp
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
+func.func @applyAsyncCallOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
+  // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
+  // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
+  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %results:2, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
+    // CHECK-NEXT: stream.cmd.call @asyncExtern(rw %[[OPERAND_CAPTURE]][%[[OFFSET]] for %[[LENGTH]]], %c4, wo %[[ALLOC_CAPTURE]][%c0{{[_0-9]*}} for %[[SIZE]]]) :
+    // CHECK-SAME:     (!stream.resource<transient>{%[[SIZE]]}, index, !stream.resource<transient>{%[[SIZE]]}) -> ()
+    %0:2 = stream.async.call @asyncExtern(%capture[%offset to %end for %length], %c4) : (!stream.resource<transient>{%size}, index) -> (%capture{%size}, !stream.resource<transient>{%size})
     stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[TIMEPOINT]]

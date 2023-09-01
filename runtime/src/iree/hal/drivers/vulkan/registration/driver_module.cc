@@ -11,7 +11,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/api.h"
 
 #ifndef NDEBUG
@@ -31,12 +30,27 @@ IREE_FLAG(int32_t, vulkan_debug_verbosity, 2,
 IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
 
+IREE_FLAG(bool, vulkan_robust_buffer_access, false,
+          "Enables the Vulkan 'robustBufferAccess' feature.");
+IREE_FLAG(
+    bool, vulkan_sparse_binding, true,
+    "Enables the Vulkan 'sparseBinding' feature (and others) when available.");
+IREE_FLAG(bool, vulkan_sparse_residency, true,
+          "Enables the Vulkan 'sparseResidencyBuffer' feature (and others) "
+          "when available.");
+IREE_FLAG(bool, vulkan_buffer_device_addresses, true,
+          "Enables the Vulkan 'bufferDeviceAddress` feature and support for "
+          "SPIR-V executables compiled to use it.");
+
 IREE_FLAG(
     bool, vulkan_dedicated_compute_queue, false,
     "Use a dedicated queue with VK_QUEUE_COMPUTE_BIT for dispatch workloads.");
+IREE_FLAG(bool, vulkan_vma_allocator, false,
+          "Whether to use the VMA allocator instead of native Vulkan API "
+          "memory allocations.");
 IREE_FLAG(
     int64_t, vulkan_large_heap_block_size, 0,
-    "Preferred allocator block size for large allocations in bytes. Sets the "
+    "Preferred allocator block size for large allocations in bytes. Sets the\n"
     "minimum bound on memory consumption.");
 
 static iree_status_t iree_hal_vulkan_create_driver_with_flags(
@@ -71,10 +85,33 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   if (FLAG_vulkan_tracing) {
     driver_options.requested_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
   }
+  if (FLAG_vulkan_robust_buffer_access) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS;
+  }
+  if (FLAG_vulkan_sparse_binding) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING;
+  }
+  if (FLAG_vulkan_sparse_residency) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED;
+  }
+  if (FLAG_vulkan_buffer_device_addresses) {
+    driver_options.requested_features |=
+        IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES;
+  }
 
   if (FLAG_vulkan_dedicated_compute_queue) {
     driver_options.device_options.flags |=
         IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE;
+  }
+  if (FLAG_vulkan_vma_allocator) {
+    driver_options.device_options.flags |=
+        IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR;
+  } else {
+    driver_options.device_options.flags &=
+        ~IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR;
   }
   if (FLAG_vulkan_large_heap_block_size) {
     driver_options.device_options.large_heap_block_size =

@@ -10,7 +10,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/OpDefinition.h"
@@ -18,8 +17,15 @@
 namespace mlir {
 namespace scf {
 class ForOp;
-class ForeachThreadOp;
+class ForallOp;
 } // namespace scf
+namespace iree_compiler {
+namespace IREE {
+namespace LinalgExt {
+class AttentionOp;
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
 } // namespace mlir
 
 #define GET_OP_CLASSES
@@ -31,9 +37,10 @@ namespace IREE {
 namespace LinalgExt {
 class LinalgExtTransformOpsExtension
     : public transform::TransformDialectExtension<
-          LinalgExtTransformOpsExtension, IREELinalgExtDialect> {
+          LinalgExtTransformOpsExtension> {
 public:
   LinalgExtTransformOpsExtension();
+  void init();
 };
 } // namespace LinalgExt
 } // namespace IREE

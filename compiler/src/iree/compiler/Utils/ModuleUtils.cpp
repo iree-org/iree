@@ -17,21 +17,44 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
-  if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
-    for (auto &childLoc : loc.getLocations()) {
-      auto childResult = findFirstFileLoc(childLoc);
-      if (childResult) return childResult;
-    }
-  } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
+std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
+  if (auto loc = llvm::dyn_cast<FileLineColLoc>(baseLoc)) {
     return loc;
   }
+
+  if (auto loc = llvm::dyn_cast<FusedLoc>(baseLoc)) {
+    // Recurse through fused locations.
+    for (auto &childLoc : loc.getLocations()) {
+      auto childResult = findFirstFileLoc(childLoc);
+      if (childResult)
+        return childResult;
+    }
+  } else if (auto loc = llvm::dyn_cast<CallSiteLoc>(baseLoc)) {
+    // First check caller...
+    auto callerResult = findFirstFileLoc(loc.getCaller());
+    if (callerResult)
+      return callerResult;
+    // Then check callee...
+    auto calleeResult = findFirstFileLoc(loc.getCallee());
+    if (calleeResult)
+      return calleeResult;
+  } else if (auto loc = llvm::dyn_cast<NameLoc>(baseLoc)) {
+    auto childResult = findFirstFileLoc(loc.getChildLoc());
+    if (childResult)
+      return childResult;
+  } else if (auto loc = llvm::dyn_cast<OpaqueLoc>(baseLoc)) {
+    // TODO(scotttodd): Use loc.fallbackLocation()?
+  } else if (auto loc = llvm::dyn_cast<UnknownLoc>(baseLoc)) {
+    // ¯\_(ツ)_/¯
+  }
+
   return std::nullopt;
 }
 
 std::string guessModuleName(mlir::ModuleOp moduleOp, StringRef defaultName) {
   std::string moduleName = moduleOp.getName().value_or("").str();
-  if (!moduleName.empty()) return moduleName;
+  if (!moduleName.empty())
+    return moduleName;
   auto loc = findFirstFileLoc(moduleOp.getLoc());
   if (loc.has_value()) {
     return sanitizeSymbolName(
@@ -77,31 +100,31 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
   SymbolTable sourceSymbolTable(sourceModuleOp);
   SymbolTable targetSymbolTable(targetModuleOp);
   auto &sourceBlock = sourceModuleOp->getRegion(0).front();
-  auto sourceOps = llvm::to_vector<8>(
-      llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
+  auto sourceOps =
+      llvm::map_to_vector<8>(sourceBlock, [&](Operation &op) { return &op; });
 
   // Resolve conflicts and move the op.
   for (auto &sourceOp : sourceOps) {
-    if (sourceOp->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (sourceOp->hasTrait<OpTrait::IsTerminator>())
+      continue;
     if (auto symbolOp = dyn_cast<SymbolOpInterface>(sourceOp)) {
       auto symbolName = symbolOp.getName();
 
       // Resolve symbol name conflicts.
       if (auto targetOp = targetSymbolTable.lookup(symbolName)) {
+        if (OperationEquivalence::isEquivalentTo(
+                targetOp, sourceOp, OperationEquivalence::exactValueMatch,
+                /*markEquivalent=*/nullptr,
+                OperationEquivalence::Flags::IgnoreLocations)) {
+          // If the two ops are identical then we can ignore the source op and
+          // use the existing target op.
+          continue;
+        }
         if (symbolOp.getVisibility() == SymbolTable::Visibility::Private) {
-          // Private symbols can be safely folded into duplicates or renamed.
-          if (OperationEquivalence::isEquivalentTo(
-                  targetOp, sourceOp, OperationEquivalence::exactValueMatch,
-                  /*markEquivalent=*/nullptr,
-                  OperationEquivalence::Flags::IgnoreLocations)) {
-            // Optimization: skip over duplicate private symbols.
-            // We could let CSE do this later, but we may as well check here.
-            continue;
-          } else {
-            // Preserve the op but give it a unique name.
-            renameWithDisambiguatedName(sourceOp, sourceModuleOp,
-                                        sourceSymbolTable, targetSymbolTable);
-          }
+          // Since the source symbol is private we can rename it as all uses
+          // are known to be local to the source module.
+          renameWithDisambiguatedName(sourceOp, sourceModuleOp,
+                                      sourceSymbolTable, targetSymbolTable);
         } else {
           // The source symbol has 'nested' or 'public' visibility.
           if (SymbolTable::getSymbolVisibility(targetOp) !=
@@ -148,5 +171,5 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
   return mergeModuleInto(*sourceModuleRef, targetOp, targetBuilder);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

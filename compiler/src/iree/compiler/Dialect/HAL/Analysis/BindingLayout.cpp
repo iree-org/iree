@@ -40,22 +40,24 @@ void PipelineLayout::print(llvm::raw_ostream &os) const {
 }
 
 // Finds all dispatches within |rootOp| and groups them by executable export.
-static BindingLayoutAnalysis::ExportDispatchMap findAllDispatchSites(
-    Operation *rootOp) {
+static BindingLayoutAnalysis::ExportDispatchMap
+findAllDispatchSites(Operation *rootOp) {
   SymbolTable symbolTable(rootOp);
   BindingLayoutAnalysis::ExportDispatchMap dispatchMap;
   rootOp->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-    auto exportOp = symbolTable.lookupNearestSymbolFrom(
-        dispatchOp, dispatchOp.getEntryPointAttr());
-    dispatchMap[exportOp].push_back(dispatchOp);
+    dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+      auto exportOp =
+          symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+      dispatchMap[exportOp].push_back(dispatchOp);
+    });
   });
   return dispatchMap;
 }
 
 // Derives an pipeline layout from all of the dispatches to |exportOp|.
-static PipelineLayout deriveExportLayout(
-    IREE::Stream::ExecutableExportOp exportOp,
-    SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
+static PipelineLayout
+deriveExportLayout(IREE::Stream::ExecutableExportOp exportOp,
+                   SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto funcOp = exportOp.lookupFunctionRef();
   assert(funcOp && "export target not found");
 
@@ -79,7 +81,7 @@ static PipelineLayout deriveExportLayout(
   unsigned operandCount = 0;
   unsigned bindingCount = 0;
   for (auto arg : funcOp.getArgumentTypes()) {
-    if (arg.isa<IREE::Stream::BindingType>()) {
+    if (llvm::isa<IREE::Stream::BindingType>(arg)) {
       ++bindingCount;
     } else {
       ++operandCount;
@@ -92,8 +94,8 @@ static PipelineLayout deriveExportLayout(
     auto resourceAccessesAttrs = dispatchOp.getResourceAccesses().getValue();
     for (unsigned i = 0; i < bindingCount; ++i) {
       auto resourceAccessAttr =
-          resourceAccessesAttrs[i]
-              .cast<IREE::Stream::ResourceAccessBitfieldAttr>();
+          llvm::cast<IREE::Stream::ResourceAccessBitfieldAttr>(
+              resourceAccessesAttrs[i]);
       auto resourceAccess = static_cast<IREE::Stream::ResourceAccessBitfield>(
           resourceAccessAttr.getInt());
       if (!bitEnumContainsAll(resourceAccess,
@@ -136,8 +138,9 @@ static PipelineLayout deriveExportLayout(
   return pipelineLayout;
 }
 
-static BindingLayoutAnalysis::ExportLayoutMap deriveExportLayouts(
-    Operation *rootOp, BindingLayoutAnalysis::ExportDispatchMap dispatchMap) {
+static BindingLayoutAnalysis::ExportLayoutMap
+deriveExportLayouts(Operation *rootOp,
+                    BindingLayoutAnalysis::ExportDispatchMap dispatchMap) {
   BindingLayoutAnalysis::ExportLayoutMap layoutMap;
   rootOp->walk([&](IREE::Stream::ExecutableExportOp exportOp) {
     auto &dispatchOps = dispatchMap[exportOp];
@@ -155,7 +158,8 @@ SmallVector<IREE::Stream::CmdDispatchOp>
 BindingLayoutAnalysis::getExportDispatches(
     IREE::Stream::ExecutableExportOp exportOp) const {
   auto it = exportDispatches.find(exportOp);
-  if (it == exportDispatches.end()) return {};  // no dispatches
+  if (it == exportDispatches.end())
+    return {}; // no dispatches
   return it->second;
 }
 
@@ -166,7 +170,7 @@ const PipelineLayout &BindingLayoutAnalysis::getPipelineLayout(
   return it->second;
 }
 
-}  // namespace HAL
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace HAL
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

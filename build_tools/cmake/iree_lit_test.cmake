@@ -69,7 +69,7 @@ function(iree_lit_test)
       ${_NAME_PATH}
     COMMAND
       "${Python3_EXECUTABLE}"
-      "${LLVM_SOURCE_DIR}/utils/lit/lit.py"
+      "${LLVM_EXTERNAL_LIT}"
       ${_LIT_PATH_ARGS}
       ${_TEST_FILE_PATH}
   )

@@ -79,13 +79,14 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
   iree_hal_buffer_view_t* arg0 = NULL;
   static const iree_hal_dim_t arg0_shape[1] = {4};
   static const float arg0_data[4] = {1.0f, 1.1f, 1.2f, 1.3f};
-  IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
+  IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer_copy(
+      iree_runtime_session_device(session),
       iree_runtime_session_device_allocator(session),
       IREE_ARRAYSIZE(arg0_shape), arg0_shape, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          .access = IREE_HAL_MEMORY_ACCESS_READ,
+          .access = IREE_HAL_MEMORY_ACCESS_ALL,
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
       iree_make_const_byte_span(arg0_data, sizeof(arg0_data)), &arg0));
@@ -101,13 +102,14 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
   iree_hal_buffer_view_t* arg1 = NULL;
   static const iree_hal_dim_t arg1_shape[1] = {4};
   static const float arg1_data[4] = {10.0f, 100.0f, 1000.0f, 10000.0f};
-  IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
+  IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer_copy(
+      iree_runtime_session_device(session),
       iree_runtime_session_device_allocator(session),
       IREE_ARRAYSIZE(arg1_shape), arg1_shape, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          .access = IREE_HAL_MEMORY_ACCESS_READ,
+          .access = IREE_HAL_MEMORY_ACCESS_ALL,
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
       iree_make_const_byte_span(arg1_data, sizeof(arg1_data)), &arg1));

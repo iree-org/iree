@@ -28,7 +28,9 @@ if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)
     DEPS
       iree::hal::drivers::local_sync::registration
     EXCLUDED_TESTS
-      "semaphore_submission"  # SubmitWithWait hangs?
+      "semaphore_submission"  # SubmitWithWait hangs (requires async)
+    LABELS
+      driver=local-sync
     )
 endif()
 
@@ -49,6 +51,8 @@ if(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE)
     DEPS
       iree::hal::drivers::local_sync::registration
     EXCLUDED_TESTS
-      "semaphore_submission"  # SubmitWithWait hangs?
+      "semaphore_submission"  # SubmitWithWait hangs (requires async)
+    LABELS
+      driver=local-sync
   )
 endif()

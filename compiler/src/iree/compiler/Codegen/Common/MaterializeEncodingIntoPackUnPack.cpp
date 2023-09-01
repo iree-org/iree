@@ -9,17 +9,20 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingInfo.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "runtime/src/iree/builtins/ukernel/exported_bits.h"
 
 namespace mlir {
@@ -28,20 +31,40 @@ namespace iree_compiler {
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
 
+static EncodingAttr getEncodingAttr(RankedTensorType type) {
+  return type.getEncoding().dyn_cast_or_null<EncodingAttr>();
+}
+
+static RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
+  auto encoding = getEncodingAttr(type);
+  if (!encoding) {
+    return type;
+  }
+  RankedTensorType originalType = type;
+  if (auto originalTypeAttr = encoding.getOriginalType()) {
+    originalType = originalTypeAttr.getValue().cast<RankedTensorType>();
+  }
+  return RankedTensorType::get(originalType.getShape(),
+                               originalType.getElementType(), encoding);
+}
+
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
 /// returns the materialized shape of the `dispatchTensorType`. The
 /// dynamic dimensions of the `dispatchTensorType` are provided in
 /// `dynamicDims`.
 static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     OpBuilder &builder, Location loc,
-    MaterializeEncodingTypeConverter &typeConverter,
+    const MaterializeEncodingTypeConverter &typeConverter,
     IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   auto boundTensorType =
-      dispatchTensorType.getBoundType().dyn_cast<RankedTensorType>();
+      llvm::dyn_cast<RankedTensorType>(dispatchTensorType.getBoundType());
   if (!boundTensorType) {
     return failure();
   }
+
+  RankedTensorType originalTensorType =
+      getOriginalTypeWithEncoding(boundTensorType);
 
   MaterializeEncodingFn materializeEncodingFn =
       typeConverter.getMaterializeEncodingFn();
@@ -51,14 +74,17 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
-  SmallVector<OpFoldResult, 4> targetShape =
-      getMixedValues(dispatchTensorType.getShape(), dynamicDims, builder);
-  auto innerTileSizes = getInnerTileSizesOfr(
-      builder, loc, boundTensorType, *encodingInfo, materializeEncodingValueFn);
-  if (failed(innerTileSizes)) return failure();
-  SmallVector<OpFoldResult> convertedTargetShape = PackOp::getResultShape(
-      builder, loc, targetShape, *innerTileSizes, encodingInfo->innerDimsPos,
-      encodingInfo->outerDimsPerm);
+  SmallVector<OpFoldResult> targetShape =
+      getMixedValues(originalTensorType.getShape(), dynamicDims, builder);
+  auto innerTileSizes =
+      getInnerTileSizesOfr(builder, loc, originalTensorType, *encodingInfo,
+                           materializeEncodingValueFn);
+  if (failed(innerTileSizes))
+    return failure();
+  SmallVector<OpFoldResult> convertedTargetShape =
+      tensor::PackOp::getResultShape(builder, loc, targetShape, *innerTileSizes,
+                                     encodingInfo->innerDimsPos,
+                                     encodingInfo->outerDimsPerm);
   return convertedTargetShape;
 }
 
@@ -68,7 +94,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
 /// provided in `dynamicDims`.
 static FailureOr<SmallVector<Value>> getPackedDynamicDimsForDispatchTensor(
     OpBuilder &builder, Location loc,
-    MaterializeEncodingTypeConverter &typeConverter,
+    const MaterializeEncodingTypeConverter &typeConverter,
     IREE::Flow::DispatchTensorType dispatchTensorType, ValueRange dynamicDims,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   FailureOr<SmallVector<OpFoldResult>> convertedTargetShape =
@@ -95,18 +121,18 @@ struct MaterializeInterfaceBindingEncoding
   using OpMaterializeEncodingPattern<
       IREE::HAL::InterfaceBindingSubspanOp>::OpMaterializeEncodingPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    auto resultType = subspanOp.getResult()
-                          .getType()
-                          .dyn_cast<IREE::Flow::DispatchTensorType>();
+  LogicalResult
+  matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+        subspanOp.getResult().getType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(
           subspanOp, "expected result type to be !flow.dispatch.tensor");
     }
     auto boundTensorType =
-        resultType.getBoundType().dyn_cast<RankedTensorType>();
+        llvm::dyn_cast<RankedTensorType>(resultType.getBoundType());
     if (!boundTensorType) {
       return rewriter.notifyMatchFailure(
           subspanOp, "bound type is not a RankedTensorType");
@@ -117,8 +143,8 @@ struct MaterializeInterfaceBindingEncoding
       return rewriter.notifyMatchFailure(subspanOp, "bound type already valid");
     }
 
-    auto *typeConverter =
-        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter());
+    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
     // Get the dynamic dims of the target.
     Location loc = subspanOp.getLoc();
     FailureOr<SmallVector<Value>> convertedDynamicDims =
@@ -148,9 +174,9 @@ struct MaterializeFlowDispatchTensorLoadOp
   using OpMaterializeEncodingPattern<
       IREE::Flow::DispatchTensorLoadOp>::OpMaterializeEncodingPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchTensorLoadOp loadOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::DispatchTensorLoadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the load covers the entire
     // `!flow.dispatch.tensor` type.
     // TODO(ravishankarm): Relax this for partial loads.
@@ -160,8 +186,8 @@ struct MaterializeFlowDispatchTensorLoadOp
 
     auto sourceType = loadOp.getSourceType();
     auto boundTensorType = sourceType.getBoundType();
-    auto *typeConverter =
-        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter());
+    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
     if (typeConverter->convertType(boundTensorType) == boundTensorType) {
       return rewriter.notifyMatchFailure(loadOp, "bound type already valid");
     }
@@ -198,9 +224,9 @@ struct MaterializeFlowDispatchTensorStoreOp
   using OpMaterializeEncodingPattern<
       IREE::Flow::DispatchTensorStoreOp>::OpMaterializeEncodingPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::Flow::DispatchTensorStoreOp storeOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Flow::DispatchTensorStoreOp storeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Only handle operations where the store covers the entire
     // `!flow.dispatch.tensor` type.
     // TODO(ravishankarm): Relax this for partial stores.
@@ -210,8 +236,9 @@ struct MaterializeFlowDispatchTensorStoreOp
 
     auto targetType = storeOp.getTargetType();
     auto boundTensorType = targetType.getBoundType();
-    auto *typeConverter =
-        static_cast<MaterializeEncodingTypeConverter *>(getTypeConverter());
+    auto *typeConverter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
+
     if (typeConverter->convertType(boundTensorType) == boundTensorType) {
       return rewriter.notifyMatchFailure(storeOp, "bound type already valid");
     }
@@ -240,147 +267,68 @@ struct MaterializeFlowDispatchTensorStoreOp
   }
 };
 
-}  // namespace
-
-IREE::LinalgExt::MaterializeEncodingInfo chooseEncodingInfoForMatmul(
-    MatmulType type, MatmulOperandRole operandRole,
-    MatmulTileParams tileParams) {
-  MaterializeEncodingInfo encodingInfo;
-  encodingInfo.innerDimsPos = {0, 1};
-  switch (operandRole) {
-    case (MatmulOperandRole::LHS): {
-      encodingInfo.innerTileSizes = {tileParams.M, tileParams.K};
-      break;
-    }
-    case (MatmulOperandRole::RHS): {
-      encodingInfo.innerTileSizes = {tileParams.K, tileParams.N};
-      break;
-    }
-    case (MatmulOperandRole::RHS_TRANSPOSE): {
-      encodingInfo.innerTileSizes = {tileParams.N, tileParams.K};
-      encodingInfo.innerDimsPos = {1, 0};
-      encodingInfo.outerDimsPerm = {1, 0};
-      break;
-    }
-    case (MatmulOperandRole::RESULT): {
-      encodingInfo.innerTileSizes = {tileParams.M, tileParams.N};
-      break;
-    }
-    default: {
-      assert(false);
-      return {};
-    }
-  }
-  return encodingInfo;
-}
-
-Optional<TensorEncoding> getEncoding(RankedTensorType tensorType) {
-  auto encodingAttr = tensorType.getEncoding().dyn_cast_or_null<EncodingAttr>();
-  if (!encodingAttr) return std::nullopt;
-  return encodingAttr.getEncoding().getValue();
-}
-
-Optional<MatmulType> getMatmulType(TensorEncoding encoding) {
-  switch (encoding) {
-    case TensorEncoding::MATMUL_F32F32F32_LHS:
-    case TensorEncoding::MATMUL_F32F32F32_RHS:
-    case TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE:
-    case TensorEncoding::MATMUL_F32F32F32_RESULT:
-      return MatmulType::F32F32F32;
-    case TensorEncoding::MATMUL_I8I8I32_LHS:
-    case TensorEncoding::MATMUL_I8I8I32_RHS:
-    case TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE:
-    case TensorEncoding::MATMUL_I8I8I32_RESULT:
-      return MatmulType::I8I8I32;
-    default:
-      return std::nullopt;
-  }
-}
-
-Optional<MatmulOperandRole> getMatmulOperandRole(TensorEncoding encoding) {
-  switch (encoding) {
-    case TensorEncoding::MATMUL_F32F32F32_LHS:
-    case TensorEncoding::MATMUL_I8I8I32_LHS:
-      return MatmulOperandRole::LHS;
-    case TensorEncoding::MATMUL_F32F32F32_RHS:
-    case TensorEncoding::MATMUL_I8I8I32_RHS:
-      return MatmulOperandRole::RHS;
-    case TensorEncoding::MATMUL_F32F32F32_RHS_TRANSPOSE:
-    case TensorEncoding::MATMUL_I8I8I32_RHS_TRANSPOSE:
-      return MatmulOperandRole::RHS_TRANSPOSE;
-    case TensorEncoding::MATMUL_F32F32F32_RESULT:
-    case TensorEncoding::MATMUL_I8I8I32_RESULT:
-      return MatmulOperandRole::RESULT;
-    default:
-      return std::nullopt;
-  }
-}
+} // namespace
 
 void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
                                         ArrayRef<int64_t> shape) {
-  for (size_t i = 0; i < shape.size(); i++) {
+  for (size_t i = 0; i < encodingInfo.innerDimsPos.size(); i++) {
     int64_t size = shape[encodingInfo.innerDimsPos[i]];
     // Dynamic sizes are assumed to be large enough, not to be candidates for
     // narrow kernels.
-    if (ShapedType::isDynamic(size)) continue;
+    if (ShapedType::isDynamic(size))
+      continue;
     int64_t &tileSize = encodingInfo.innerTileSizes[i];
     // Let's not try to handle any dynamic tile sizes here. We could handle the
     // case where size==1 (as whatever is the runtime value of tileSize, it
     // can't be less than that, so it should be OK to replace it with 1) but
     // in general, adjusting dynamic tile sizes has to be done by the
     // materializeEncodingValueFn which we obtain those tileSizes from.
-    if (ShapedType::isDynamic(tileSize)) continue;
-    auto generateNarrowTileSize = [&](int64_t n) {
-      if (size <= n && tileSize >= n) tileSize = n;
-    };
-    generateNarrowTileSize(1);
-    generateNarrowTileSize(2);
-    generateNarrowTileSize(4);
+    if (ShapedType::isDynamic(tileSize))
+      continue;
+    // Adjust tile sizes for narrow cases: ensure that narrow sizes (those that
+    // are less than the normal tileSize) don't get padded to more than the
+    // next power of two, or tileSize, whichever is smaller.
+    //
+    // For example, if size==1, always adjust tileSize to be 1, so that
+    // matrix-times-vector problems remain that, instead of becoming more
+    // general matrix-times-matrix.
+    //
+    // Another example, if tileSize==6, then:
+    //
+    //   Original tensor size | adjusted tileSize
+    //   -------------------- | -----------------
+    //                      1 |                 1
+    //                      2 |                 2
+    //                      3 |                 4
+    //                      4 |                 4
+    //                      5 |                 6
+    //                   >= 6 |                 6
+    //
+    // Note: this implies that microkernels that implement a code path for
+    // a given `tileSize` value should also implement alternative code paths
+    // for all powers of two smaller than `tileSize`, as those could end up
+    // being selected here, and would fall back on slow generic code if no
+    // optimized code path is provided.
+    for (int po2 = 1; po2 < tileSize; po2 *= 2) {
+      if (size <= po2 && tileSize >= po2)
+        tileSize = po2;
+    }
   }
 }
 
-FailureOr<MaterializeEncodingValueInfo>
+static FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {
-  Optional<TensorEncoding> encoding = getEncoding(tensorType);
-  if (!encoding) return failure();
-  auto matmulType = getMatmulType(*encoding);
-  auto matmulOperandRole = getMatmulOperandRole(*encoding);
-  if (!matmulType || !matmulOperandRole) return failure();
-  uint32_t flags = 0;
-  if (*matmulType == MatmulType::F32F32F32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
-  } else if (*matmulType == MatmulType::I8I8I32) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
-  } else {
-    return failure();
-  }
-  if (*matmulOperandRole == MatmulOperandRole::LHS) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
-  } else if (*matmulOperandRole == MatmulOperandRole::RHS) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
-  } else if (*matmulOperandRole == MatmulOperandRole::RHS_TRANSPOSE) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS_TRANSPOSE;
-  } else if (*matmulOperandRole == MatmulOperandRole::RESULT) {
-    flags |= IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
-  } else {
-    return failure();
-  }
-  SmallVector<Type> tileSizesTypes(tensorType.getRank(),
-                                   builder.getIndexType());
-  SmallVector<Value> shapeValues;
-  for (int64_t i : tensorType.getShape()) {
-    shapeValues.push_back(builder.create<arith::ConstantIndexOp>(loc, i));
-  }
-  auto op = builder.create<IREE::VMVX::QueryTileSizesOp>(
-      loc, tileSizesTypes, shapeValues, builder.getI32IntegerAttr(flags));
+  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
+  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
+      loc, resultTypes, TypeAttr::get(tensorType));
   MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getTileSizes();
+  result.innerTileSizes = op.getResults();
   return result;
 }
 
-MaterializeEncodingValueFn getMaterializeEncodingValueFn(
-    IREE::HAL::ExecutableTargetAttr targetAttr) {
+MaterializeEncodingValueFn
+getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (isVMVXBackend(targetAttr) && hasMicrokernels(targetAttr)) {
     return chooseDynamicEncodingInfoVMVXMicrokernels;
   }
@@ -406,12 +354,11 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
 
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&typeConverter](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-        auto resultType =
-            subspanOp.getResult()
-                .getType()
-                .template dyn_cast<IREE::Flow::DispatchTensorType>();
+        auto resultType = llvm::dyn_cast<IREE::Flow::DispatchTensorType>(
+            subspanOp.getResult().getType());
         // For types that are not `Flow::DispatchTensorType` mark as legal.
-        if (!resultType) return true;
+        if (!resultType)
+          return true;
         return resultType == typeConverter.convertType(resultType);
       });
 
@@ -423,5 +370,5 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
       context, typeConverter, materializeEncodingValueFn);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

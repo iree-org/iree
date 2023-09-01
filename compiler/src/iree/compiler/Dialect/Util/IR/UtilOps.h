@@ -17,6 +17,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/CastInterfaces.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -24,7 +25,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h.inc" // IWYU pragma: export
 
 namespace mlir {
 namespace iree_compiler {
@@ -102,15 +103,15 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size);
 //===----------------------------------------------------------------------===//
 // (type{%size0}, type, type{%size1})
 
-ParseResult parseSizeAwareTypeList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes);
+ParseResult
+parseSizeAwareTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
+                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes);
 void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
                             OperandRange sizes);
-ParseResult parseSizeAwareTypeList(
-    OpAsmParser &parser, SmallVectorImpl<Type> &types0,
-    SmallVectorImpl<Type> &types1,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes);
+ParseResult
+parseSizeAwareTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types0,
+                       SmallVectorImpl<Type> &types1,
+                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes);
 void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
                             TypeRange types1, OperandRange sizes);
 
@@ -123,9 +124,9 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims);
-inline ParseResult parseShapedTiedResult(
-    OpAsmParser &parser, Type &resultType,
-    OpAsmParser::UnresolvedOperand &resultDim) {
+inline ParseResult
+parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
+                      OpAsmParser::UnresolvedOperand &resultDim) {
   SmallVector<OpAsmParser::UnresolvedOperand, 1> resultDims;
   if (failed(parseShapedTiedResult(parser, resultType, resultDims))) {
     return failure();
@@ -144,9 +145,10 @@ ParseResult parseShapedTiedResult(
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
                            ValueRange resultDims, ArrayAttr tiedOperands);
 
-inline ParseResult parseShapedTiedResult(
-    OpAsmParser &parser, Type &resultType,
-    OpAsmParser::UnresolvedOperand &resultDim, ArrayAttr &tiedOperands) {
+inline ParseResult
+parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
+                      OpAsmParser::UnresolvedOperand &resultDim,
+                      ArrayAttr &tiedOperands) {
   SmallVector<OpAsmParser::UnresolvedOperand> resultDims;
   if (failed(parseShapedTiedResult(parser, resultType, resultDims,
                                    tiedOperands))) {
@@ -191,7 +193,22 @@ void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
                              OperandRange operandDims, TypeRange resultTypes,
                              OperandRange resultDims, ArrayAttr tiedOperands);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+//===----------------------------------------------------------------------===//
+// custom<ShapedFunctionSignature>
+//===----------------------------------------------------------------------===//
+// (%arg0: type {some.attr = 54 : index}, %arg1: type) -> (type, %arg1 as type)
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
+ParseResult parseShapedFunctionSignature(OpAsmParser &parser,
+                                         TypeAttr &functionTypeAttr,
+                                         ArrayAttr &tiedOperands,
+                                         ArrayAttr &argAttrs,
+                                         ArrayAttr &resultAttrs);
+void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
+                                  TypeAttr functionTypeAttr,
+                                  ArrayAttr tiedOperands, ArrayAttr argAttrs,
+                                  ArrayAttr resultAttrs);
+
+} // namespace iree_compiler
+} // namespace mlir
+
+#endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_

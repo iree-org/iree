@@ -7,7 +7,9 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -48,29 +50,41 @@ ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
   return info;
 }
 
-}  // namespace
+// Enforce a limited allow-list of types that are legal to consider
+// constexpr operand or result types. Given MLIR's open type system,
+// it is best to be conservative here, and we limit to known value
+// types.
+bool isLegalConstExprType(Type t) {
+  if (llvm::isa<IntegerType, FloatType>(t)) {
+    // TODO: We shouldn't need to be this conservative about the bit widths we
+    // support, but for now the consteval JIT has interop limitations. Lift
+    // this restriction when the JIT interops for all types.
+    auto bitWidth = t.getIntOrFloatBitWidth();
+    return bitWidth == 1 || bitWidth == 8 || bitWidth == 16 || bitWidth == 32 ||
+           bitWidth == 64;
+  }
+
+  if (llvm::isa<IndexType>(t)) {
+    return true;
+  }
+
+  if (auto tensorType = llvm::dyn_cast<TensorType>(t)) {
+    return isLegalConstExprType(tensorType.getElementType());
+  }
+
+  return false;
+}
+
+} // namespace
 
 void registerConstExprDependentDialects(DialectRegistry &registry) {
   registry.insert<IREE::Util::UtilDialect>();
   registry.insert<linalg::LinalgDialect>();
 }
 
-ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
-  // Special carve-out for unregistered testing ops.
-  if (!op->isRegistered()) {
-    // Reject.
-    if (op->getName().getStringRef() == "iree_unregistered.var_expr") {
-      return {};
-    }
-    // Accept.
-    if (op->getName().getStringRef() ==
-            "iree_unregistered.non_leaf_const_expr" ||
-        op->getName().getStringRef() == "iree_unregistered.const_expr") {
-      return getInfoForDefaultConstExprOp(op);
-    }
-    return {};
-  }
+bool isLegalConstExprRootType(Type t) { return isLegalConstExprType(t); }
 
+ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   // We have a specific allow-list for Linalg ops because we want to consider
   // new additions carefully.
   if (op->getDialect() ==
@@ -86,18 +100,48 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
     return {};
   }
 
-  // By default any effects make it non const-expr.
-  if (!isMemoryEffectFree(op)) {
-    return {};
-  }
-
   // By default, ops without results are not const-expr.
   if (op->getNumResults() == 0) {
     return {};
   }
 
+  // Forbid if illegal result types. It is sufficient to verify result
+  // types since all constexpr values must come from a result somewhere
+  // in the analyzed tree.
+  if (!llvm::all_of(op->getResultTypes(), isLegalConstExprType)) {
+    return {};
+  }
+
   // Forbid if part of a parent that should be treated atomically.
   if (op->getParentOfType<linalg::LinalgOp>()) {
+    return {};
+  }
+
+  // Optimization barriers cannot be folded.
+  if (isa<IREE::Util::OptimizationBarrierOp>(op)) {
+    return {};
+  }
+
+  // Special carve-out for unregistered testing ops.
+  // Since these are unregistered, we have to make this carve-out
+  // after any verification on structure but before any verification
+  // of traits (like effects). These specific unregistered ops
+  // override default traits.
+  if (!op->isRegistered()) {
+    // Reject.
+    if (op->getName().getStringRef() == "iree_unregistered.var_expr") {
+      return {};
+    }
+    // Accept.
+    if (op->getName().getStringRef() ==
+            "iree_unregistered.non_leaf_const_expr" ||
+        op->getName().getStringRef() == "iree_unregistered.const_expr") {
+      return getInfoForDefaultConstExprOp(op);
+    }
+  }
+
+  // By default any effects make it non const-expr.
+  if (!isMemoryEffectFree(op)) {
     return {};
   }
 
@@ -115,8 +159,8 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
 
   // Never hoist sub-byte aligned values: in legal programs, these will be
   // cast or packed in some successor.
-  if (auto integerType = getElementTypeOrSelf(info->constValue.getType())
-                             .dyn_cast<IntegerType>()) {
+  if (auto integerType = llvm::dyn_cast<IntegerType>(
+          getElementTypeOrSelf(info->constValue.getType()))) {
     if (integerType.getWidth() % 8 != 0) {
       return false;
     }
@@ -138,9 +182,10 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     }
   }
 
-  // Never hoist init_tensor. These are sometimes used for pure shape metadata
+  // Never hoist empty. These are sometimes used for pure shape metadata
   // and must not be separated from their consumers.
-  if (isa<tensor::EmptyOp>(op)) {
+  if (isa<tensor::EmptyOp, tensor::ExpandShapeOp, tensor::CollapseShapeOp>(
+          op)) {
     return false;
   }
 
@@ -158,7 +203,7 @@ bool isHoistableConstExprConsumingOperand(OpOperand *operand) {
   return true;
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

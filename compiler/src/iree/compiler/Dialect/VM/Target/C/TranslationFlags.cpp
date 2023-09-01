@@ -44,7 +44,7 @@ CTargetOptions getCTargetOptionsFromFlags() {
   return targetOptions;
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

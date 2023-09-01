@@ -140,15 +140,14 @@ TEST(ThreadTest, PriorityOverride) {
   EXPECT_NE(0, iree_thread_id(thread));
 
   // Push a few overrides.
+  // NOTE: some platforms (Apple) may ignore the request and return NULL. Code
+  // using overrides needs to be tolerant of this.
   iree_thread_override_t* override0 = iree_thread_priority_class_override_begin(
       thread, IREE_THREAD_PRIORITY_CLASS_HIGH);
-  EXPECT_NE(nullptr, override0);
   iree_thread_override_t* override1 = iree_thread_priority_class_override_begin(
       thread, IREE_THREAD_PRIORITY_CLASS_HIGHEST);
-  EXPECT_NE(nullptr, override1);
   iree_thread_override_t* override2 = iree_thread_priority_class_override_begin(
       thread, IREE_THREAD_PRIORITY_CLASS_LOWEST);
-  EXPECT_NE(nullptr, override2);
 
   // Wait for the thread to finish.
   while (iree_atomic_load_int32(&entry_data.value, iree_memory_order_acquire) !=

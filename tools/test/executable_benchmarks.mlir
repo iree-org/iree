@@ -2,7 +2,7 @@
 // RUN:     --iree-hal-target-backends=vmvx \
 // RUN:     --iree-hal-dump-executable-benchmarks-to=- | \
 // RUN: iree-compile - | \
-// RUN: iree-benchmark-module | \
+// RUN: iree-benchmark-module --module=- | \
 // RUN: FileCheck %s
 
 // This test relies on us piping stdout and that there's only a single
@@ -18,7 +18,7 @@
 //  iree-compile some_input.mlir -o ignored.mlir \
 //      --iree-hal-target-backends=vmvx \
 //      --iree-hal-dump-executable-benchmarks-to=benchmarks/ | \
-//  ls -1 benchmarks/ | xargs -i sh -c "iree-compile benchmarks/{} | iree-benchmark-module"
+//  ls -1 benchmarks/ | xargs -i sh -c "iree-compile benchmarks/{} | iree-benchmark-module --module=-"
 //
 // NOTE: only dispatches that are able to be benchmarked automatically will be
 // written; if you don't end up with a .mlir file for the dispatch you're

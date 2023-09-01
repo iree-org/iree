@@ -58,7 +58,7 @@ typedef struct iree_task_topology_group_t {
   uint8_t group_index;
 
   // A name assigned to executor workers used for logging/tracing.
-  char name[15];
+  char name[32 - /*group_index*/ 1];
 
   // Processor index in the cpuinfo set.
   uint32_t processor_index;
@@ -155,7 +155,7 @@ void iree_task_topology_initialize_from_group_count(
 // Initializes a topology with one group for each physical core with the given
 // NUMA node ID (usually package or cluster). Up to |max_core_count| physical
 // cores will be selected from the node.
-void iree_task_topology_initialize_from_physical_cores(
+iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
     iree_task_topology_t* out_topology);
 

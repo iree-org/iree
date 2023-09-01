@@ -164,7 +164,7 @@ func.func @command_buffer_collective_send(
     %send_buffer: !hal.buffer,
     %count: index) {
   // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
-  // CHECK-DAG: %[[OP_BITS:.+]] = vm.const.i32 262149
+  // CHECK-DAG: %[[OP_BITS:.+]] = vm.const.i32 262150
   %c10 = arith.constant 10 : index
   %c128 = arith.constant 128 : index
   // CHECK-DAG: %[[COUNT_I64:.+]] = vm.ext.i32.i64.s %[[COUNT]]

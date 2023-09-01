@@ -10,7 +10,7 @@
 set(IREE_COMPILER_TARGETS "")
 set(IREE_COMPILER_TARGET_COPTS "")
 if(IREE_TARGET_BACKEND_LLVM_CPU)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM)
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVMCPU)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVM_CPU_TARGET")
 endif()
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
@@ -29,10 +29,6 @@ if(IREE_TARGET_BACKEND_WEBGPU)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::WebGPU)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_WEBGPU_TARGET")
 endif()
-if(IREE_TARGET_BACKEND_CUDA)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::CUDA)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_CUDA_TARGET")
-endif()
 if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::ROCM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
@@ -46,11 +42,10 @@ endif()
 
 # Enable input dialects based on options.
 set(IREE_INPUT_DEPS "")
-if(IREE_INPUT_MHLO)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::MHLO)
-  list(APPEND IREE_INPUT_DEPS tensorflow::external_mhlo_includes)
+if(IREE_INPUT_STABLEHLO)
+  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
   list(APPEND IREE_INPUT_DEPS ChloOps)
-  list(APPEND IREE_INPUT_DEPS MhloDialect)
+  list(APPEND IREE_INPUT_DEPS StablehloOps)
 endif()
 if(IREE_INPUT_TORCH)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
@@ -74,19 +69,6 @@ iree_cc_library(
   DEPS
     ${IREE_INPUT_DEPS}
     iree::compiler::InputConversion::Common
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    init_iree
-  HDRS
-    "init_iree.h"
-  SRCS
-    "init_iree.cc"
-  DEPS
-    ::version
-    LLVMSupport
   PUBLIC
 )
 
@@ -148,12 +130,12 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
-    MLIRGPUOps
+    MLIRFuncInlinerExtension
+    MLIRGPUDialect
     MLIRGPUToSPIRV
     MLIRIR
     MLIRLLVMDialect
     MLIRLinalgDialect
-    MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRMLProgramDialect
     MLIRQuantDialect
@@ -230,11 +212,10 @@ iree_cc_library(
   SRCS
     "iree_compile_lib.cc"
   DEPS
-    ::init_iree
     LLVMSupport
-    iree::compiler::API2::Headers
-    iree::compiler::API2::Internal::Embed
+    iree::compiler::API::Internal::CompilerDriver
     iree::compiler::Pipelines
+    iree::compiler::bindings::c::headers
   PUBLIC
 )
 

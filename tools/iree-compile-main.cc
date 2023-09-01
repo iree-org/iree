@@ -4,6 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/API2/ToolEntryPoints.h"
+#include "iree/compiler/tool_entry_points_api.h"
 
 int main(int argc, char **argv) { return ireeCompilerRunMain(argc, argv); }

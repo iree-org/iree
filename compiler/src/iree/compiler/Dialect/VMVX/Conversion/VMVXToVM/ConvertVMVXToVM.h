@@ -21,7 +21,7 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns);
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VMVX_CONVERSION_VMVXTOVM_CONVERTVMVXTOVM_H_
+#endif // IREE_COMPILER_DIALECT_VMVX_CONVERSION_VMVXTOVM_CONVERTVMVXTOVM_H_

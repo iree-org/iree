@@ -40,17 +40,6 @@ func.func @resourceSize(%arg0: !stream.resource<*>) -> index {
 
 // -----
 
-// CHECK-LABEL: @resourceMap
-func.func @resourceMap(%arg0: !util.buffer) -> !stream.resource<staging> {
-  %c0 = arith.constant 0 : index
-  %c128 = arith.constant 128 : index
-  // CHECK: = stream.resource.map %arg0[%c0] : !util.buffer -> !stream.resource<staging>{%c128}
-  %0 = stream.resource.map %arg0[%c0] : !util.buffer -> !stream.resource<staging>{%c128}
-  return %0 : !stream.resource<staging>
-}
-
-// -----
-
 // CHECK-LABEL: @resourceTryMap
 func.func @resourceTryMap(%arg0: !util.buffer) -> (i1, !stream.resource<constant>) {
   %c0 = arith.constant 0 : index

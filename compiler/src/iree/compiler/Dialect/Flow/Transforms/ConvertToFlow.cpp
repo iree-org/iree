@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -22,9 +22,9 @@ namespace {
 // Pass to test conversion to flow patterns.
 struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
@@ -32,7 +32,7 @@ struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
     RewritePatternSet convertToFlowPatterns(context);
     Flow::populateTensorToFlowConversionPatterns(context,
                                                  convertToFlowPatterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(
+    memref::populateResolveRankedShapedTypeResultDimsPatterns(
         convertToFlowPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             getOperation(), std::move(convertToFlowPatterns)))) {
@@ -40,7 +40,7 @@ struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
     }
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> Flow::createConvertToFlowPass() {
   return std::make_unique<ConvertToFlowPass>();

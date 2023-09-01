@@ -17,7 +17,7 @@
 
 module attributes {hal.device.targets = [#device_target_cpu]}  {
 
-  // CHECK: hal.executable private @ex0
+  // CHECK: hal.executable public @ex0
   hal.executable private @ex0 {
     // We expect local outputs with attributes inlined:
     // CHECK-NEXT: hal.executable.variant {{.+}}, target = <"llvm-cpu"

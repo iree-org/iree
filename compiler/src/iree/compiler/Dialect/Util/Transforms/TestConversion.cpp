@@ -25,13 +25,13 @@ namespace Util {
 namespace {
 
 class TestConversionPass : public TestConversionBase<TestConversionPass> {
- public:
+public:
   TestConversionPass() = default;
   TestConversionPass(const TestConversionPass &) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, func::FuncDialect,
                     mlir::arith::ArithDialect, math::MathDialect,
-                    mlir::AffineDialect, memref::MemRefDialect>();
+                    mlir::affine::AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {
@@ -74,13 +74,13 @@ class TestConversionPass : public TestConversionBase<TestConversionPass> {
       llvm::cl::desc("Tests type conversion by widening integers to i32")};
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestConversionPass() {
   return std::make_unique<TestConversionPass>();
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

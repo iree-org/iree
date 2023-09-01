@@ -17,13 +17,14 @@ namespace iree_compiler {
 // Simple cache for generated index values.
 // Always inserts at the location specified by the builder when constructed.
 class IndexSet {
- public:
+public:
   explicit IndexSet(Location loc, OpBuilder builder)
       : loc(loc), builder(builder) {}
 
   Value get(int64_t value) {
     auto it = memoizedIndices.find(value);
-    if (it != memoizedIndices.end()) return it->second;
+    if (it != memoizedIndices.end())
+      return it->second;
     auto memoizedValue =
         builder.create<arith::ConstantIndexOp>(loc, value).getResult();
     memoizedIndices[value] = memoizedValue;
@@ -39,13 +40,13 @@ class IndexSet {
     }
   }
 
- private:
+private:
   Location loc;
   OpBuilder builder;
   DenseMap<int64_t, Value> memoizedIndices;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_INDEXSET_H_
+#endif // IREE_COMPILER_UTILS_INDEXSET_H_

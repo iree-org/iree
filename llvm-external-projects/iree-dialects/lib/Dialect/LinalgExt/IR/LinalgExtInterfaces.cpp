@@ -37,12 +37,12 @@ IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
 
 template <typename Ty, typename DimOpTy>
 static void getDimValues(OpBuilder &b, Location loc, Value v, Ty t,
-                         SmallVector<Value> &dimVals) {
+                         SmallVector<OpFoldResult> &dimVals) {
   for (auto dim : llvm::enumerate(t.getShape())) {
     if (ShapedType::isDynamic(dim.value())) {
-      dimVals.push_back(b.create<DimOpTy>(loc, v, dim.index()));
+      dimVals.push_back(b.create<DimOpTy>(loc, v, dim.index()).getResult());
     } else {
-      dimVals.push_back(b.create<arith::ConstantIndexOp>(loc, dim.value()));
+      dimVals.push_back(b.getIndexAttr(dim.value()));
     }
   }
 }
@@ -51,7 +51,7 @@ LogicalResult LinalgExtOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   Operation *op = getOperation();
   for (auto output : getOutputs()) {
-    SmallVector<Value> dims;
+    SmallVector<OpFoldResult> dims;
     Type outputType = output.getType();
     if (auto rankedTensorType = outputType.dyn_cast<RankedTensorType>()) {
       getDimValues<RankedTensorType, tensor::DimOp>(b, op->getLoc(), output,

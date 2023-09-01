@@ -10,7 +10,10 @@ module @simple_module {
 // CHECK: "function_descriptors":
 // CHECK-NEXT: {
 // CHECK-NEXT:   "bytecode_offset": 0
-// CHECK-NEXT:   "bytecode_length": 8
+// CHECK-NEXT:   "bytecode_length": 6
+// CHECK-NEXT:   "requirements": 0
+// CHECK-NEXT:   "reserved": 0
+// CHECK-NEXT:   "block_count": 1
 // CHECK-NEXT:   "i32_register_count": 1
 // CHECK-NEXT:   "ref_register_count": 0
 // CHECK-NEXT: }
@@ -19,9 +22,10 @@ func.func @func(%arg0 : i32) -> i32 {
 }
 
 // CHECK: "bytecode_data": [
+// CHECK-NEXT:   121,
 // CHECK-NEXT:   90,
-// CHECK-NEXT:   0,
 // CHECK-NEXT:   1,
+// CHECK-NEXT:   0,
 // CHECK-NEXT:   0,
 // CHECK-NEXT:   0,
 }

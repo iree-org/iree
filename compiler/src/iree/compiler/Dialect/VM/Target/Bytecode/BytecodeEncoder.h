@@ -18,8 +18,13 @@ namespace IREE {
 namespace VM {
 
 struct EncodedBytecodeFunction {
-  // Encoded bytecode data for the function body.
+  // Encoded bytecode data for the function body including padding.
   std::vector<uint8_t> bytecodeData;
+  // Precise size of the bytecode.
+  size_t bytecodeLength = 0;
+
+  // Total number of blocks including the entry block.
+  uint16_t blockCount = 0;
 
   // Total i32 register slots required for execution.
   // Note that larger types also use these slots (i64=2xi32).
@@ -30,26 +35,26 @@ struct EncodedBytecodeFunction {
 
 // Abstract encoder used for function bytecode encoding.
 class BytecodeEncoder : public VMFuncEncoder {
- public:
+public:
   // Matches IREE_VM_BYTECODE_VERSION_MAJOR.
-  static constexpr uint32_t kVersionMajor = 13;
+  static constexpr uint32_t kVersionMajor = 15;
   // Matches IREE_VM_BYTECODE_VERSION_MINOR.
   static constexpr uint32_t kVersionMinor = 0;
   static constexpr uint32_t kVersion = (kVersionMajor << 16) | kVersionMinor;
 
   // Encodes a vm.func to bytecode and returns the result.
   // Returns None on failure.
-  static Optional<EncodedBytecodeFunction> encodeFunction(
-      IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
-      SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase);
+  static std::optional<EncodedBytecodeFunction>
+  encodeFunction(IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
+                 SymbolTable &symbolTable, DebugDatabaseBuilder &debugDatabase);
 
   BytecodeEncoder() = default;
   ~BytecodeEncoder() = default;
 };
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEENCODER_H_
+#endif // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEENCODER_H_

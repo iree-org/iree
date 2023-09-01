@@ -39,7 +39,7 @@ function compile_and_extract_library() {
       -o="${TESTDATA}/${so_name}"
 
       --iree-hal-target-backends=llvm-cpu
-      --iree-llvm-debug-symbols=false
+      --iree-llvmcpu-debug-symbols=false
 
       "${compile_args[@]}"
   )
@@ -47,38 +47,38 @@ function compile_and_extract_library() {
 }
 
 ARM_32=(
-  --iree-llvm-target-triple=armv7a-pc-linux-elf
-  --iree-llvm-target-float-abi=hard
+  --iree-llvmcpu-target-triple=armv7a-pc-linux-elf
+  --iree-llvmcpu-target-float-abi=hard
 )
 compile_and_extract_library "elementwise_mul_arm_32.so" ${ARM_32[@]}
 
 ARM_64=(
-  --iree-llvm-target-triple=aarch64-pc-linux-elf
+  --iree-llvmcpu-target-triple=aarch64-pc-linux-elf
 )
 compile_and_extract_library "elementwise_mul_arm_64.so" ${ARM_64[@]}
 
 RISCV_32=(
-  --iree-llvm-target-triple=riscv32-pc-linux-elf
-  --iree-llvm-target-cpu=generic-rv32
-  --iree-llvm-target-cpu-features=+m,+f
-  --iree-llvm-target-abi=ilp32
+  --iree-llvmcpu-target-triple=riscv32-pc-linux-elf
+  --iree-llvmcpu-target-cpu=generic-rv32
+  --iree-llvmcpu-target-cpu-features=+m,+f
+  --iree-llvmcpu-target-abi=ilp32
 )
 compile_and_extract_library "elementwise_mul_riscv_32.so" ${RISCV_32[@]}
 
 RISCV_64=(
-  --iree-llvm-target-triple=riscv64-pc-linux-elf
-  --iree-llvm-target-cpu=generic-rv64
-  --iree-llvm-target-cpu-features=+m,+a,+f,+d,+c
-  --iree-llvm-target-abi=lp64d
+  --iree-llvmcpu-target-triple=riscv64-pc-linux-elf
+  --iree-llvmcpu-target-cpu=generic-rv64
+  --iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+c
+  --iree-llvmcpu-target-abi=lp64d
 )
 compile_and_extract_library "elementwise_mul_riscv_64.so" ${RISCV_64[@]}
 
 X86_32=(
-  --iree-llvm-target-triple=i686-pc-linux-elf
+  --iree-llvmcpu-target-triple=i686-pc-linux-elf
 )
 compile_and_extract_library "elementwise_mul_x86_32.so" ${X86_32[@]}
 
 X86_64=(
-  --iree-llvm-target-triple=x86_64-pc-linux-elf
+  --iree-llvmcpu-target-triple=x86_64-pc-linux-elf
 )
 compile_and_extract_library "elementwise_mul_x86_64.so" ${X86_64[@]}

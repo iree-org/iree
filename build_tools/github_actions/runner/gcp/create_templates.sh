@@ -17,17 +17,17 @@ TESTING="${TEMPLATE_TESTING:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 TESTING_SELF_DELETER="${TESTING_SELF_DELETER:-0}"
 
-GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-01-30-1675109292}"
-GPU_DISK_SIZE_GB="${GPU_DISK_SIZE_GB:-100}"
-CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-01-30-1675109033}"
-CPU_DISK_SIZE_GB="${CPU_DISK_SIZE_GB:-100}"
+GPU_IMAGE="${GPU_IMAGE:-github-runner-gpu-2023-08-28-1693244870}"
+CPU_IMAGE="${CPU_IMAGE:-github-runner-cpu-2023-06-02-1685725199}"
+ARM64_IMAGE="${ARM64_IMAGE:-github-runner-arm64-2023-08-21-1692581800}"
+DISK_SIZE_GB="${DISK_SIZE_GB:-1000}"
 
-PROD_TEMPLATE_CONFIG_REPO="${PROD_TEMPLATE_CONFIG_REPO:-iree-org/iree}"
-GITHUB_RUNNER_SCOPE="${GITHUB_RUNNER_SCOPE:-iree-org}"
+PROD_TEMPLATE_CONFIG_REPO="${PROD_TEMPLATE_CONFIG_REPO:-openxla/iree}"
+GITHUB_RUNNER_SCOPE="${GITHUB_RUNNER_SCOPE:-openxla}"
 
 TEMPLATE_CONFIG_REPO="${TEMPLATE_CONFIG_REPO:-${PROD_TEMPLATE_CONFIG_REPO}}"
 TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
-TEMPLATE_NAME_PREFIX="${TEMPLATE_NAME_PREFIX:-github-runner}"
+TEMPLATE_NAME_PREFIX="${TEMPLATE_NAME_PREFIX:-gh-runner}"
 
 if (( TESTING==0 )) && ! git merge-base --is-ancestor "${TEMPLATE_CONFIG_REF}" main; then
   echo "Creating testing template because TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}' is not on the main branch" >&2
@@ -51,9 +51,10 @@ VERSION="${SHORT_REF}-${SUFFIX}"
 if (( TESTING!=0 )); then
   VERSION="${VERSION}-testing"
 fi
-GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.300.2}"
-GITHUB_RUNNER_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARCHIVE_DIGEST:-ed5bf2799c1ef7b2dd607df66e6b676dff8c44fb359c6fedc9ebf7db53339f0c}"
-GITHUB_TOKEN_PROXY_URL="${GITHUB_TOKEN_PROXY_URL:-https://ght-proxy-zbhz5clunq-ue.a.run.app}"
+GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-2.308.0}"
+GITHUB_RUNNER_X64_ARCHIVE_DIGEST="${GITHUB_RUNNER_X64_ARCHIVE_DIGEST:-9f994158d49c5af39f57a65bf1438cbae4968aec1e4fec132dd7992ad57c74fa}"
+GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST="${GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST:-e39b3137fcaad3262e1def26d3e42cdd810c831a3c836deeb560a2266338b503}"
+GITHUB_TOKEN_PROXY_URL="${GITHUB_TOKEN_PROXY_URL:-https://ght-proxy-openxla-zbhz5clunq-ue.a.run.app}"
 
 if (( TESTING_SELF_DELETER==1 )); then
   INSTANCE_SELF_DELETER_URL="https://instance-self-deleter-testing-zbhz5clunq-uc.a.run.app"
@@ -63,7 +64,6 @@ fi
 
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
-  "github-runner-archive-digest=${GITHUB_RUNNER_ARCHIVE_DIGEST}"
   "github-runner-config-ref=${TEMPLATE_CONFIG_REF}"
   "github-runner-config-repo=${TEMPLATE_CONFIG_REPO}"
   "github-runner-scope=${GITHUB_RUNNER_SCOPE}"
@@ -81,9 +81,7 @@ declare -a common_args=(
   # Matches firewall rule for health check traffic
   --tags="allow-health-checks"
   --provisioning-model=STANDARD
-  # The instance group manager handles this for us and this is necessary to
-  # achieve better local SSD performance:
-  # https://cloud.google.com/compute/docs/disks/optimizing-local-ssd-performance#disable-automatic-restart
+  # The instance group manager handles this for us
   --no-restart-on-failure
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
@@ -113,6 +111,18 @@ function create_template() {
     "github-runner-type=${type}"
   )
 
+  if [[ "${type}" == "arm64" ]]; then
+    local runner_arch="arm64"
+    local runner_archive_digest="${GITHUB_RUNNER_ARM64_ARCHIVE_DIGEST}"
+  else
+    local runner_arch="x64"
+    local runner_archive_digest="${GITHUB_RUNNER_X64_ARCHIVE_DIGEST}"
+  fi
+  metadata+=(
+    "github-runner-archive-url=https://github.com/actions/runner/releases/download/v${GITHUB_RUNNER_VERSION}/actions-runner-linux-${runner_arch}-${GITHUB_RUNNER_VERSION}.tar.gz"
+    "github-runner-archive-digest=${runner_archive_digest}"
+  )
+
   # Join on commas
   local metadata_string="$(IFS="," ; echo "${metadata[*]}")"
 
@@ -128,31 +138,58 @@ function create_template() {
     --metadata="${metadata_string}"
   )
 
-  if [[ "${type}" == gpu ]]; then
-    cmd+=(
-      --machine-type=a2-highgpu-1g
-      --maintenance-policy=TERMINATE
-      --accelerator=count=1,type=nvidia-tesla-a100
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
-      # See comment in build_tools/github_actions/runner/config/setup.sh
-      --local-ssd=interface=NVME
-    )
-  elif [[ "${type}" == cpu ]]; then
-    cmd+=(
-      --machine-type=n1-standard-96
-      --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
-    )
-  elif [[ "${type}" == c2s16 ]]; then
-    cmd+=(
-      --machine-type=c2-standard-16
-      --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
-    )
-  else
-    echo "Got unrecognized type '${type}'" >2
-    exit 1
-  fi
+  case "${type}" in
+    gpu)
+      cmd+=(
+        --machine-type=n1-standard-16
+        --maintenance-policy=TERMINATE
+        --accelerator=count=1,type=nvidia-tesla-t4
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    a100)
+      cmd+=(
+        --machine-type=a2-highgpu-1g
+        --maintenance-policy=TERMINATE
+        --accelerator=count=1,type=nvidia-tesla-a100
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    cpu)
+      cmd+=(
+        --machine-type=n1-standard-96
+        --maintenance-policy=MIGRATE
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    c2s16)
+      cmd+=(
+        --machine-type=c2-standard-16
+        --maintenance-policy=MIGRATE
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    c2s601t)
+      cmd+=(
+        --machine-type=c2-standard-60
+        --threads-per-core=1
+        --maintenance-policy=MIGRATE
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    arm64)
+      cmd+=(
+        --machine-type=t2a-standard-8
+        --maintenance-policy=MIGRATE
+        --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${ARM64_IMAGE},mode=rw,size=${DISK_SIZE_GB},type=pd-ssd"
+      )
+      ;;
+    *)
+      echo "Got unrecognized type '${type}'" >2
+      exit 1
+      ;;
+  esac
+
   if (( DRY_RUN==1 )); then
     # Prefix the command with a noop. It will still be printed by set -x
     cmd=(":" "${cmd[@]}")
@@ -163,7 +200,8 @@ function create_template() {
 }
 
 for group in presubmit postsubmit; do
-  for type in gpu cpu c2s16; do
+  # TODO(#14661): Remove c2s601t if we decide not to migrate benchmarks to it.
+  for type in gpu a100 cpu c2s16 c2s601t arm64; do
     create_template "${group}" "${type}"
   done
 done

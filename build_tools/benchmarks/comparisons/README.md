@@ -30,7 +30,7 @@ When running benchmarks on an Android device, some initial setup is involved.
 ### Install Android NDK and ADB
 
 Detailed steps
-[here](https://iree-org.github.io/iree/building-from-source/android/#install-android-ndk-and-adb).
+[here](https://openxla.github.io/iree/building-from-source/android/#install-android-ndk-and-adb).
 
 ### Install the Termux App and the Python Interpreter
 

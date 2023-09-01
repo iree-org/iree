@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 
@@ -17,9 +18,9 @@ namespace IREE {
 namespace Flow {
 
 /// Gets the list of non-static values from a list of `OpFoldResult`.
-static SmallVector<Value, 4> getDynamicValues(
-    ArrayRef<OpFoldResult> valueOrAttrList) {
-  SmallVector<Value, 4> dynamicDims;
+static SmallVector<Value>
+getDynamicValues(ArrayRef<OpFoldResult> valueOrAttrList) {
+  SmallVector<Value> dynamicDims;
   for (auto valueOrAttr : valueOrAttrList) {
     if (auto value = valueOrAttr.dyn_cast<Value>()) {
       dynamicDims.push_back(value);
@@ -29,15 +30,15 @@ static SmallVector<Value, 4> getDynamicValues(
 }
 
 /// Get shape of the tensor given the sizes as a list of `OpFoldResult`.
-static SmallVector<int64_t, 4> getShapeFromSizes(
-    ArrayRef<OpFoldResult> valueOrAttrList) {
-  return llvm::to_vector<4>(llvm::map_range(
+static SmallVector<int64_t>
+getShapeFromSizes(ArrayRef<OpFoldResult> valueOrAttrList) {
+  return llvm::map_to_vector(
       valueOrAttrList, [&](OpFoldResult valueOrAttr) -> int64_t {
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-          return attr.cast<IntegerAttr>().getInt();
+          return llvm::cast<IntegerAttr>(attr).getInt();
         }
         return ShapedType::kDynamic;
-      }));
+      });
 }
 
 /// An operation that uses `offsets`, `sizes` and `strides` (i.e. implements the
@@ -54,9 +55,9 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
   }
   auto getVal = [](OpFoldResult valueOrAttr, int64_t dynamicVal) -> int64_t {
     auto attr = valueOrAttr.dyn_cast<Attribute>();
-    return attr ? attr.cast<IntegerAttr>().getInt() : dynamicVal;
+    return attr ? llvm::cast<IntegerAttr>(attr).getInt() : dynamicVal;
   };
-  /// To ensure contiguity, start from the least signficant dimension. As long
+  /// To ensure contiguity, start from the least significant dimension. As long
   /// as the inner slices are "full slices", the current slice can be any offset
   /// and size. If the inner slices are not "full slices", the current slice
   /// must be of size 1. All strides must be one.
@@ -67,17 +68,21 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     int64_t staticSize = getVal(sizes[dim - 1], ShapedType::kDynamic);
     int64_t staticStride = getVal(strides[dim - 1], ShapedType::kDynamic);
 
-    if (staticStride != 1) return false;
+    if (staticStride != 1)
+      return false;
     // The offsets and sizes dont have to be static for all dimensions. When
     // `fullSlices` is true, the offset and sizes can be dynamic. But many
     // cases, the dynamic offset/size value is obtained by computing from
     // another tensor which lives on the device. To avoid host-round tripping
     // enforce that offset/size is also static.
-    if (staticSize == ShapedType::kDynamic) return false;
-    if (staticOffset == ShapedType::kDynamic) return false;
+    if (staticSize == ShapedType::kDynamic)
+      return false;
+    if (staticOffset == ShapedType::kDynamic)
+      return false;
 
     if (fullSlices == false) {
-      if (staticSize != 1) return false;
+      if (staticSize != 1)
+        return false;
     } else {
       if (!(staticOffset == 0 && staticSize != ShapedType::kDynamic &&
             baseShape[dim - 1] != ShapedType::kDynamic &&
@@ -89,8 +94,9 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
   return true;
 }
 
-LogicalResult convertInsertSliceOpToFlowUpdateOp(
-    RewriterBase &rewriter, tensor::InsertSliceOp insertOp) {
+LogicalResult
+convertInsertSliceOpToFlowUpdateOp(RewriterBase &rewriter,
+                                   tensor::InsertSliceOp insertOp) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(insertOp);
 
@@ -98,9 +104,9 @@ LogicalResult convertInsertSliceOpToFlowUpdateOp(
     return failure();
   }
 
-  SmallVector<OpFoldResult, 4> offsets = insertOp.getMixedOffsets();
-  SmallVector<OpFoldResult, 4> sizes = insertOp.getMixedSizes();
-  SmallVector<OpFoldResult, 4> strides = insertOp.getMixedStrides();
+  SmallVector<OpFoldResult> offsets = insertOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sizes = insertOp.getMixedSizes();
+  SmallVector<OpFoldResult> strides = insertOp.getMixedStrides();
   ArrayRef<int64_t> dstShape = insertOp.getType().getShape();
   if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides, dstShape)) {
     return failure();
@@ -122,17 +128,19 @@ LogicalResult convertInsertSliceOpToFlowUpdateOp(
         loc, sourceType, source, sourceDynamicDims, sourceDynamicDims);
   }
 
-  auto offsetVals = getAsValues(rewriter, loc, insertOp.getMixedOffsets());
+  auto offsetVals = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                    insertOp.getMixedOffsets());
   Value dest = insertOp.getDest();
   auto destDynamicDims = tensor::createDynamicDimValues(rewriter, loc, dest);
-  rewriter.replaceOpWithNewOp<TensorUpdateOp>(
-      insertOp, insertOp.getType(), dest, destDynamicDims, offsetVals, source,
-      sourceDynamicDims, rewriter.getIndexArrayAttr({0}));
+  rewriter.replaceOpWithNewOp<TensorUpdateOp>(insertOp, insertOp.getType(),
+                                              dest, destDynamicDims, offsetVals,
+                                              source, sourceDynamicDims);
   return success();
 }
 
-LogicalResult convertExtractSliceOpToFlowSliceOp(
-    RewriterBase &rewriter, tensor::ExtractSliceOp sliceOp) {
+LogicalResult
+convertExtractSliceOpToFlowSliceOp(RewriterBase &rewriter,
+                                   tensor::ExtractSliceOp sliceOp) {
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(sliceOp);
 
@@ -140,9 +148,9 @@ LogicalResult convertExtractSliceOpToFlowSliceOp(
     return failure();
   }
 
-  SmallVector<OpFoldResult, 4> offsets = sliceOp.getMixedOffsets();
-  SmallVector<OpFoldResult, 4> sizes = sliceOp.getMixedSizes();
-  SmallVector<OpFoldResult, 4> strides = sliceOp.getMixedStrides();
+  SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+  SmallVector<OpFoldResult> strides = sliceOp.getMixedStrides();
   ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
   if (!isOffsetSizeAndStrideMappableToFlow(offsets, sizes, strides, srcShape)) {
     return failure();
@@ -161,8 +169,8 @@ LogicalResult convertExtractSliceOpToFlowSliceOp(
         RankedTensorType::get(unreducedShape, sourceType.getElementType());
   }
 
-  auto offsetVals = getAsValues(rewriter, loc, offsets);
-  auto sizeVals = getAsValues(rewriter, loc, sizes);
+  auto offsetVals = getValueOrCreateConstantIndexOp(rewriter, loc, offsets);
+  auto sizeVals = getValueOrCreateConstantIndexOp(rewriter, loc, sizes);
   auto sourceDynamicDims =
       tensor::createDynamicDimValues(rewriter, loc, sliceOp.getSource());
   auto resultDynamicDims = getDynamicValues(sizes);
@@ -178,7 +186,7 @@ LogicalResult convertExtractSliceOpToFlowSliceOp(
   return success();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -29,7 +29,7 @@ def PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"> {
       }],
       /*retTy=*/"::llvm::SmallVector<unsigned>",
       /*methodName=*/"getPartitionableLoops",
-      /*args=*/(ins "llvm::Optional<unsigned>":$maxNumPartitionedLoops),
+      /*args=*/(ins "std::optional<unsigned>":$maxNumPartitionedLoops),
       /*methodBody=*/"",
       /*defaultImplementation*/"return {};"
     >,

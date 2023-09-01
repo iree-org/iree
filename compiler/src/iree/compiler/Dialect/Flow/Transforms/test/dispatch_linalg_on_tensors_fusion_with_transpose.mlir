@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(func.func(iree-flow-interchange-transpose-generic-ops,iree-flow-form-dispatch-regions{aggressive-fusion=true}, iree-flow-form-dispatch-workgroups, canonicalize, cse))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(func.func(iree-flow-interchange-transpose-generic-ops,iree-flow-form-dispatch-regions{fuse-multi-use=true}, iree-flow-form-dispatch-workgroups, canonicalize, cse))" %s | FileCheck %s
 
 func.func @fuse_batch_matmul_transpose(%a: tensor<4x384x384xf32>, %b: tensor<4x384x32xf32>) -> tensor<384x4x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32

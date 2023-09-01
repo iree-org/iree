@@ -28,7 +28,7 @@ include(CMakeParseArguments)
 #       generated IREE module (.vmfb). Mandatory, unlike in iree_check_test,
 #       because trace files (.yaml) reference a specific module file path.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvm-target-cpu-features.
+#       --iree-llvmcpu-target-cpu-features.
 function(iree_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -47,24 +47,34 @@ function(iree_trace_runner_test)
     ${ARGN}
   )
 
+  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
+  if(_EXCLUDED_BY_LABELS)
+    return()
+  endif()
+
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   set(_MODULE_NAME "${_RULE_NAME}_module")
 
-  iree_bytecode_module_for_iree_check_test_and_friends(
-    MODULE_NAME
+  set(_BASE_COMPILER_FLAGS
+    "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
+  )
+
+  if (_RULE_TARGET_CPU_FEATURES)
+    list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
+  endif()
+
+  iree_bytecode_module(
+    NAME
       "${_MODULE_NAME}"
     MODULE_FILE_NAME
       "${_RULE_MODULE_FILE_NAME}"
     SRC
       "${_RULE_SRC}"
-    TARGET_BACKEND
-      "${_RULE_TARGET_BACKEND}"
     FLAGS
-      ${_RULE_COMPILER_FLAGS}
-    TARGET_CPU_FEATURES
-      ${_RULE_TARGET_CPU_FEATURES}
+      "${_BASE_COMPILER_FLAGS}"
+      "${_RULE_COMPILER_FLAGS}"
   )
 
   # A target specifically for the test. We could combine this with the above,
@@ -92,7 +102,6 @@ function(iree_trace_runner_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
-      ${_RULE_TARGET_CPU_FEATURES}
   )
 endfunction()
 
@@ -123,7 +132,7 @@ endfunction()
 #       "driver=${DRIVER}" are added automatically.
 #   TRACE_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
-#       --iree-llvm-target-cpu-features.
+#       --iree-llvmcpu-target-cpu-features.
 function(iree_single_backend_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -148,6 +157,11 @@ function(iree_single_backend_generated_trace_runner_test)
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
+
+  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
+  if(_EXCLUDED_BY_LABELS)
+    return()
+  endif()
 
   # Omit tests for which the specified driver or target backend is not enabled.
   # This overlaps with directory exclusions and other filtering mechanisms.
@@ -274,12 +288,14 @@ endfunction()
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   TRACE_RUNNER: trace-runner program to run.
-#   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Only used
-#       for drivers that vary based on the target CPU features. For each list
-#       element, a separate test is created, with the list element passed as
-#       argument to --iree-llvm-target-cpu-features. The special value "default"
-#       is interpreted as no --iree-llvm-target-cpu-features flag to work around
-#       corner cases with empty entries in CMake lists.
+#   TARGET_CPU_FEATURES_VARIANTS:list of target cpu features variants. Each
+#       entry is either "default" for the architecture defaults, or a colon-
+#       separated triple "arch:name:cpu_features" where "arch" filters
+#       for a target CPU architecture (in IREE_ARCH format), "name" is a
+#       short name for the CPU features set (used to generate target names)
+#       and cpu_features is a comma-separated list of LLVM target attributes
+#       to enable. Example:
+#         x86_64:avx2_fma:+avx,+avx2,+fma
 function(iree_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -292,6 +308,17 @@ function(iree_generated_trace_runner_test)
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
+
+  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
+  if(_EXCLUDED_BY_LABELS)
+    return()
+  endif()
+
+  if(_RULE_TARGET_CPU_FEATURES_VARIANTS)
+    set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
+  else()
+    set(_TARGET_CPU_FEATURES_VARIANTS "default")
+  endif()
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
     set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "llvm-cpu")
@@ -310,16 +337,18 @@ function(iree_generated_trace_runner_test)
   foreach(_INDEX RANGE "${_MAX_INDEX}")
     list(GET _RULE_TARGET_BACKENDS ${_INDEX} _TARGET_BACKEND)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
-    if((_TARGET_BACKEND IN_LIST IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES) AND _RULE_TARGET_CPU_FEATURES_VARIANTS)
-      set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
-    else()
-      set(_TARGET_CPU_FEATURES_VARIANTS "default")
-    endif()
-    foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
-      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
+    foreach(_VARIANT_STRING IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
+      parse_target_cpu_features_variant("${_VARIANT_STRING}"
+        _ENABLED _TARGET_CPU_FEATURES_NAME _TARGET_CPU_FEATURES)
       if(NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()
+      endif()
+      set(_TARGET_CPU_FEATURES_SUFFIX "")
+      set(_LABELS "${_RULE_LABELS}")
+      if (_TARGET_CPU_FEATURES_NAME)
+        set(_TARGET_CPU_FEATURES_SUFFIX "_${_TARGET_CPU_FEATURES_NAME}")
+        list(APPEND _LABELS "cpu_features=${_TARGET_CPU_FEATURES_NAME}")
       endif()
       iree_single_backend_generated_trace_runner_test(
         NAME
@@ -339,7 +368,7 @@ function(iree_generated_trace_runner_test)
         RUNNER_ARGS
           ${_RULE_RUNNER_ARGS}
         LABELS
-          ${_RULE_LABELS}
+          ${_LABELS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
       )

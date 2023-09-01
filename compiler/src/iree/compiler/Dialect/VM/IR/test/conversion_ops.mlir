@@ -7,7 +7,9 @@ vm.module @my_module {
     %0 = vm.trunc.i32.i8 %arg0 : i32 -> i32
     // CHECK-NEXT: %1 = vm.trunc.i32.i16 %0 : i32 -> i32
     %1 = vm.trunc.i32.i16 %0 : i32 -> i32
-    vm.return %1 : i32
+    // CHECK: %2 = vm.trunc.i16.i8 %1 : i32 -> i32
+    %2 = vm.trunc.i16.i8 %1 : i32 -> i32
+    vm.return %2 : i32
   }
 }
 
@@ -61,5 +63,27 @@ vm.module @my_module {
     // CHECK-NEXT: %5 = vm.ext.i32.i64.u %arg0 : i32 -> i64
     %5 = vm.ext.i32.i64.u %arg0 : i32 -> i64
     vm.return %5 : i64
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_any_ref
+vm.module @my_module {
+  vm.func @cast_any_ref(%arg0: !vm.ref<?>) -> !vm.buffer {
+    // CHECK-NEXT: = vm.cast.any.ref %arg0 : !vm.ref<?> -> !vm.buffer
+    %0 = vm.cast.any.ref %arg0 : !vm.ref<?> -> !vm.buffer
+    vm.return %0 : !vm.buffer
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @cast_ref_any
+vm.module @my_module {
+  vm.func @cast_ref_any(%arg0: !vm.buffer) -> !vm.ref<?> {
+    // CHECK-NEXT: = vm.cast.ref.any %arg0 : !vm.buffer -> !vm.ref<?>
+    %0 = vm.cast.ref.any %arg0 : !vm.buffer -> !vm.ref<?>
+    vm.return %0 : !vm.ref<?>
   }
 }

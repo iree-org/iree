@@ -41,5 +41,5 @@ python -m pip install compiler/
 In order to sanity check once the package is installed:
 
 ```
-python compiler/src/iree/compiler/API/python/test/transforms/ireec/compile_sample_module.py
+python compiler/src/iree/compiler/bindings/python/test/transforms/ireec/compile_sample_module.py
 ```

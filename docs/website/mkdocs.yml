@@ -1,62 +1,66 @@
 site_name: IREE
-site_url: https://iree-org.github.io/iree/
+site_url: https://openxla.github.io/iree/
+repo_url: https://github.com/openxla/iree
+repo_name: openxla/iree
 
 theme:
   name: material
+  logo: assets/images/openxla-logo-lockup-white.svg
+  logo_alt: IREE
   icon:
     repo: fontawesome/brands/github
-    logo: iree/ghost
-  favicon: ghost.svg
+  font:
+    text: Noto
+    code: Noto Sans Mono
+  favicon: assets/images/favicon.png
+
+  # Note: this includes symlinks to forked files in third_party/mkdocs-material/
   custom_dir: overrides
 
   features:
-    - navigation.instant # Faster loading
-
-    # TODO(scotttodd): join mkdocs-material insiders for this
-    - navigation.tracking # Update URL in address bar with the active anchor
-
-    # TODO(scotttodd): decide if we want this
-    #     these move sections from the left nav to tabs below the header
-    # - navigation.tabs
-    # - navigation.tabs.sticky  # insiders only
-
-    # TODO(scotttodd): remove this if the number of pages grows too much
-    - navigation.sections # Group sections without collapsible buttons
-
-    - navigation.top # Back to top button
-
-    - navigation.indexes # section names can link to index.md pages
-
     - content.code.annotate # Allow inline annotations
     - content.code.copy # Enable copy button
     - content.tabs.link # Link content tabs across site (e.g. Windows/Linux)
 
+    - navigation.instant # Ajax-style dynamic loading (faster)
+    - navigation.tracking # Update URL in address bar with the active anchor
+    - navigation.sections # Group sections without collapsible buttons
+    - navigation.expand # Start sections expanded
+    - navigation.tabs # Show primary sections in tabs below the header
+    - navigation.tabs.sticky # Keep tabs visible at the top when scrolled
+    - navigation.top # "Back to top" button
+    - navigation.indexes  # Section names can link to index.md pages
+
+    - toc.follow # Scroll the TOC panel to follow the reader
+
   palette:
-    # Light mode
+    # Light mode (scheme overrides in openxla.css)
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    # Dark mode
+    # Dark mode (scheme overrides in openxla.css)
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue
-      accent: blue
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
 
-repo_url: https://github.com/iree-org/iree
-repo_name: iree-org/iree
-edit_uri: "" # Omit edit button (linking to GitHub) from each document
-
 extra:
+  # TODO(scotttodd): https://openxla.github.io/community (when hosted)
+  community_homepage: https://github.com/openxla/community
+  community_site_name: OpenXLA
+
+  homepage: https://openxla.github.io/iree/
+
+  # TODO(scotttodd): join mkdocs-material insiders and remove notice?
+  #   (we *can* remove the notice without joining)
+  # generator: false
+
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/iree-org/iree
+      link: https://github.com/openxla/iree
       name: IREE on GitHub
     - icon: fontawesome/brands/discord
       link: https://discord.gg/26P4xW4
@@ -64,10 +68,13 @@ extra:
     - icon: fontawesome/solid/users
       link: https://groups.google.com/forum/#!forum/iree-discuss
       name: IREE Discuss Google Group
-  generator: false # TODO(scotttodd): join mkdocs-material insiders for this
+
+  status:
+    new: Recently added
 
 extra_css:
   - assets/stylesheets/extra.css
+  - assets/stylesheets/openxla.css
 
 copyright: Copyright &copy; 2023 The IREE Authors
 
@@ -84,53 +91,127 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
-  - pymdownx.superfences
+  # Diagram support, see
+  #   https://squidfunk.github.io/mkdocs-material/reference/diagrams/
+  #   Docs  : https://mermaid.js.org/
+  #   Editor: https://mermaid.live/edit
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - tables
-  - toc:
-      permalink: true # TODO(scotttodd): icon: https://fonts.google.com/icons?selected=Material+Icons+Outlined:link
+  - toc:  # Table of Contents
+      permalink: 'link'  # Use Material font's "link" icon; see openxla.css
+      toc_depth: 4
 
 # Navigation with explicit ordering and nesting.
 # https://www.mkdocs.org/user-guide/configuration/#nav
 # Note: may include external links and titles are optional for internal links
 nav:
   - Home: "index.md"
-  - "Getting Started":
-      - "getting-started/index.md"
-      - TensorFlow: "getting-started/tensorflow.md"
-      - TensorFlow Lite: "getting-started/tflite.md"
-      - JAX: "getting-started/jax.md"
-      - PyTorch: "getting-started/pytorch.md"
-  - "Deployment configurations":
-      - "deployment-configurations/index.md"
-      - CPU: "deployment-configurations/cpu.md"
-      - CPU - Bare-Metal: "deployment-configurations/bare-metal.md"
-      - GPU - Vulkan: "deployment-configurations/gpu-vulkan.md"
-      - GPU - CUDA/ROCm: "deployment-configurations/gpu-cuda-rocm.md"
   - "Building from source":
       - "building-from-source/index.md"
       - "building-from-source/getting-started.md"
-      - "building-from-source/python-bindings-and-importers.md"
       - "building-from-source/android.md"
       - "building-from-source/ios.md"
       - "building-from-source/riscv.md"
-  - "Bindings":
-      - "bindings/index.md"
-      - C API: "bindings/c-api.md"
-      - Python: "bindings/python.md"
-      - TensorFlow Lite: "bindings/tensorflow-lite.md"
-  - "Extensions":
-      - "extensions/index.md"
-  - "Blog":
-      - "blog/index.md"
-      - CUDA backend: "blog/2021-10-15-cuda-backend.md"
-      - Work in progress on Matrix Multiplication on CPU: "blog/2021-10-13-mmt4d.md"
-      - TFLite Support via TOSA: "blog/2021-07-19-tflite-tosa.md"
+  - "Guides":
+      - "guides/index.md"
+      - "ML frameworks":
+          - "guides/ml-frameworks/index.md"
+          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
+          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
+          - JAX: "guides/ml-frameworks/jax.md"
+          - PyTorch: "guides/ml-frameworks/pytorch.md"
+      - "Deployment configurations":
+          - "guides/deployment-configurations/index.md"
+          - CPU: "guides/deployment-configurations/cpu.md"
+          - CPU - Bare-Metal: "guides/deployment-configurations/bare-metal.md"
+          - GPU - Vulkan: "guides/deployment-configurations/gpu-vulkan.md"
+          - GPU - CUDA/ROCm: "guides/deployment-configurations/gpu-cuda-rocm.md"
+      - "Other topics":
+          - Developer tips and tricks: "guides/developer-tips.md"
   - "Reference":
-      - Glossary: "reference/glossary.md"
-      - Optimization Options: "reference/optimization-options.md"
+      - "reference/index.md"
+      - "API bindings":
+          - "reference/bindings/index.md"
+          - C API: "reference/bindings/c-api.md"
+          - Python: "reference/bindings/python.md"
+      - "MLIR dialects":
+          - "reference/mlir-dialects/index.md"
+          # Note: these files are generated by generate_extra_files.sh.
+          - "Internal dialects":
+              - Check: "reference/mlir-dialects/Check.md"
+              - Flow: "reference/mlir-dialects/Flow.md"
+              - HAL: "reference/mlir-dialects/HAL.md"
+              - HALInline: "reference/mlir-dialects/HALInline.md"
+              - HALLoader: "reference/mlir-dialects/HALLoader.md"
+              - Stream: "reference/mlir-dialects/Stream.md"
+              - Util: "reference/mlir-dialects/Util.md"
+              - VM: "reference/mlir-dialects/VM.md"
+              - VMVX: "reference/mlir-dialects/VMVX.md"
+          # Dialects from llvm-external-projects/iree-dialects/
+          - "Public dialects":
+              - IREEInput: "reference/mlir-dialects/IREEInput.md"
+              - IREELinalgExt: "reference/mlir-dialects/IREELinalgExt.md"
+      - "Other topics":
+          - Glossary: "reference/glossary.md"
+          - Optimization options: "reference/optimization-options.md"
+          - Extensions: "reference/extensions.md"
   - "Community":
       - "community/index.md"
+      - "Blog":
+          - "community/blog/index.md"
+      - "community/tags.md"
+plugins:
+  # https://squidfunk.github.io/mkdocs-material/setup/setting-up-a-blog/
+  - blog:
+      blog_dir: "community/blog"
+      blog_toc: true
+      post_url_date_format: yyyy-MM-dd
+      post_url_format: "{date}-{slug}"
+
+  # https://squidfunk.github.io/mkdocs-material/setup/setting-up-site-search/
+  - search
+
+  # https://squidfunk.github.io/mkdocs-material/setup/setting-up-tags/
+  - tags:
+      tags_file: community/tags.md
+
+  # https://github.com/mkdocs/mkdocs-redirects
+  - redirects:
+      redirect_maps:  # old -> new
+        "extensions/index.md": "reference/extensions.md"
+
+        # "getting-started/" moved under "guides/ml-frameworks/"
+        "getting-started/index.md": "guides/ml-frameworks/index.md"
+        "getting-started/tensorflow.md": "guides/ml-frameworks/tensorflow.md"
+        "getting-started/tflite.md": "guides/ml-frameworks/tflite.md"
+        "getting-started/jax.md": "guides/ml-frameworks/jax.md"
+        "getting-started/pytorch.md": "guides/ml-frameworks/pytorch.md"
+
+        # "deployment-configurations/" moved under "guides/"
+        "deployment-configurations/index.md": "guides/deployment-configurations/index.md"
+        "deployment-configurations/cpu.md": "guides/deployment-configurations/cpu.md"
+        "deployment-configurations/bare-metal.md": "guides/deployment-configurations/bare-metal.md"
+        "deployment-configurations/gpu-vulkan.md": "guides/deployment-configurations/gpu-vulkan.md"
+        "deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda-rocm.md"
+
+        # "bindings/" moved under "reference/"
+        "bindings/index.md": "reference/bindings/index.md"
+        "bindings/c-api.md": "reference/bindings/c-api.md"
+        "bindings/python.md": "reference/bindings/python.md"
+
+        # "blog/" moved under "community/"
+        "blog/index.md": "community/blog/index.md"
+        "blog/2021-07-19-tflite-tosa.md": "community/blog/posts/tflite-tosa.md"
+        "blog/2021-10-13-mmt4d.md": "community/blog/posts/mmt4d.md"
+        "blog/2021-10-15-cuda-backend.md": "community/blog/posts/cuda-backend.md"
+        # Some blog post names/paths changed when setting up the blog plugin
+        "community/blog/2021-07-19-tflite-tosa.md": "community/blog/posts/tflite-tosa.md"
+        "community/blog/2021-10-13-mmt4d.md": "community/blog/posts/mmt4d.md"

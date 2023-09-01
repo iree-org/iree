@@ -25,28 +25,26 @@ namespace {
 struct ConvertTensorImportOp
     : public OpConversionPattern<IREE::HAL::TensorImportOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::TensorImportOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::TensorImportOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSource().getType();
     auto targetType = op.getTargetEncoding();
-    if (!sourceType.isa<IREE::HAL::BufferType>() &&
-        !sourceType.isa<IREE::HAL::BufferViewType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(sourceType) &&
+        !llvm::isa<IREE::HAL::BufferViewType>(sourceType)) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
     // Assert the shape of the buffer view matches the expected encoding
     // shape. We can only do this when we are importing a buffer view as that's
     // what carries the information we need to validate.
-    if (sourceType.isa<IREE::HAL::BufferViewType>()) {
+    if (llvm::isa<IREE::HAL::BufferViewType>(sourceType)) {
       // NOTE: we do this before the other checks as it's the most likely
       // mistake and it's better to know of a shape mismatch than just buffer
       // byte length difference.
-      if (auto tensorType = targetType.dyn_cast<RankedTensorType>()) {
-        // TODO(benvanik): get a name for the tensor (argument name/etc).
-        auto message = rewriter.getStringAttr("tensor");
+      if (auto tensorType = llvm::dyn_cast<RankedTensorType>(targetType)) {
         if (failed(buildEncodingAssertions(op.getLoc(), adaptor.getSource(),
-                                           message, tensorType,
+                                           op.getNameAttr(), tensorType,
                                            op.getTargetDims(), rewriter))) {
           return rewriter.notifyMatchFailure(op, "unsupported tensor type");
         }
@@ -129,8 +127,8 @@ struct ConvertTensorImportOp
     }
 
     builder.create<IREE::HAL::BufferViewAssertOp>(
-        loc, bufferView, message, expectedElementType, expectedEncodingType,
-        shapeDims);
+        loc, bufferView, message ? message : builder.getStringAttr("tensor"),
+        expectedElementType, expectedEncodingType, shapeDims);
     return success();
   }
 };
@@ -142,13 +140,13 @@ struct ConvertTensorImportOp
 struct ConvertTensorExportOp
     : public OpConversionPattern<IREE::HAL::TensorExportOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSourceEncoding();
     auto targetType = op.getTarget().getType();
-    if (!targetType.isa<IREE::HAL::BufferType>() &&
-        !targetType.isa<IREE::HAL::BufferViewType>()) {
+    if (!llvm::isa<IREE::HAL::BufferType>(targetType) &&
+        !llvm::isa<IREE::HAL::BufferViewType>(targetType)) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
@@ -161,11 +159,10 @@ struct ConvertTensorExportOp
     if (adaptor.getTargetStorage()) {
       // Query the target storage buffer length; we will only populate up to
       // what is required for the output.
-      auto storageSize =
-          rewriter
-              .create<IREE::HAL::BufferLengthOp>(
-                  op.getLoc(), rewriter.getIndexType(), op.getTargetStorage())
-              .getResult();
+      auto storageSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+          op.getLoc(), rewriter.getIndexType(),
+          TypeAttr::get(op.getSource().getType()), adaptor.getSourceDims(),
+          /*affinity=*/nullptr);
 
       // Import the target storage as a resource that we can use as an update
       // target. We overwrite the contents and just cast the storage to the
@@ -222,9 +219,9 @@ struct ConvertTensorExportOp
 struct ConvertTensorBarrierOp
     : public OpConversionPattern<IREE::HAL::TensorBarrierOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      IREE::HAL::TensorBarrierOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::TensorBarrierOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto timepointType = rewriter.getType<IREE::Stream::TimepointType>();
     SmallVector<Value> signaledResources;
     SmallVector<Value> signaledTimepoints;
@@ -247,7 +244,7 @@ struct ConvertTensorBarrierOp
   }
 };
 
-}  // namespace
+} // namespace
 
 void populateHALToStreamConversionPatterns(MLIRContext *context,
                                            TypeConverter &typeConverter,
@@ -281,5 +278,5 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
   populateHALToStreamConversionPatterns(context, typeConverter, patterns);
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

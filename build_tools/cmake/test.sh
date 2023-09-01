@@ -20,6 +20,8 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 # Respect the user setting, but default to turning on Vulkan.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
+# Respect the user setting, but default to turning off Metal.
+export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
 # Respect the user setting, but default to turning off CUDA.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
@@ -47,13 +49,13 @@ declare -a label_exclude_args=(
   #   ^bindings/
 )
 
-if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
+if (( IREE_VULKAN_DISABLE == 1 )); then
   label_exclude_args+=("^driver=vulkan$")
 fi
-if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
+if (( IREE_CUDA_DISABLE == 1 )); then
   label_exclude_args+=("^driver=cuda$")
 fi
-if [[ "${IREE_VULKAN_F16_DISABLE?}" == 1 ]]; then
+if (( IREE_VULKAN_F16_DISABLE == 1 )); then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
 fi
 

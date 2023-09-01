@@ -9,7 +9,7 @@
 # Runs yamllint on files modified vs the specified reference commit
 # (default "main")
 
-set -uo pipefail
+set -euo pipefail
 
 BASE_REF="${1:-main}"
 
@@ -21,6 +21,8 @@ declare -a included_files_patterns=(
 declare -a excluded_files_patterns=(
   "/third_party/"
   "^third_party/"
+  "/tools/test/"
+  "^tools/test/"
 )
 
 # Join on |

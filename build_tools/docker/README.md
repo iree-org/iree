@@ -32,7 +32,7 @@ files to copy.
 ## Dependencies Between Images
 
 IREE images follow a consistent structure. The image defined by
-`build_tools/docker/foo-bar/Dockerfile` is uploaded to GCR as
+`build_tools/docker/dockerfiles/foo-bar.Dockerfile` is uploaded to GCR as
 `gcr.io/iree-oss/foo-bar`. It may be tagged as `latest` or `prod`, e.g.
 `gcr.io/iree-oss/foo-bar:latest`. Dockerfile image definitions should list their
 dependencies based on these image names.
@@ -42,21 +42,27 @@ all images and their dependencies and manages their canonical registry location.
 This script pushes images to GCR which requires the `Storage Admin` role in the
 `iree-oss` GCP project.
 
-When creating a new image, add it to the mapping in this script. To build an
-image and all images it depends on as well as pushing them to GCR and updating
-all references to the image digest.
+When creating a new image, add it to the mapping in this script.
+
+Run the script to
+
+* Build an image and all images that transitively depend on it
+* Push all built images to GCR
+* Update all references to the image digest
+
+For example, after changing the `base` image:
 
 ```shell
 python3 build_tools/docker/manage_images.py --image base
 ```
 
-For multiple images
+For multiple images:
 
 ```shell
-python3 build_tools/docker/manage_images.py --image base --image nvidia
+python3 build_tools/docker/manage_images.py --image base --image base-bleeding-edge
 ```
 
-There is also the special option `--image all` for all registered images.
+There is also the special option `--image all` for all registered images:
 
 ```shell
 python3 build_tools/docker/manage_images.py --image all

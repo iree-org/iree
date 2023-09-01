@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -59,7 +59,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
 //         CHECK:    %[[TID4:.+]] = affine.apply #[[$MAP]]()[%[[TID]]]
 //         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[TID4]] to %[[C10240]] step %[[C1024]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<1xf32>) {
-//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<512x10240xf32>, vector<4xf32>
+//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      %[[E:.+]] = vector.extract %[[A0]][0] : vector<1xf32>
 //         CHECK:      %[[RL:.+]] = vector.reduction <add>, %[[V]], %[[E]] : vector<4xf32> into f32
 //         CHECK:      %[[B:.+]] = vector.broadcast %[[RL:.*]] : f32 to vector<1xf32>
@@ -97,7 +97,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    %[[R13:.+]] = vector.broadcast %[[R12]] : f32 to vector<1xf32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {
-//         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32>
+//         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
 //         CHECK:    }
 
 // -----
@@ -154,7 +154,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL:  func.func @warp_reduction_broadcast_dispatch
 //         CHECK:    scf.for {{.*}} -> (vector<1xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32>, vector<4xf32>
+//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      vector.reduction <add>, {{.*}} : vector<4xf32> into f32
 //         CHECK:      scf.yield
 //         CHECK:    gpu.shuffle  xor
@@ -187,7 +187,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.divf {{.*}} : vector<4x1xf32>
-//         CHECK:      vector.transfer_write {{.*}} : vector<4xf32>, memref<512x10240xf32>
+//         CHECK:      vector.transfer_write {{.*}} : vector<4xf32>, memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>
 //         CHECK:    }
 //         CHECK:    return
 
@@ -215,33 +215,9 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
-      %3 = tensor.empty() : tensor<12x128xf32>
-      %4 = tensor.empty() : tensor<12x128x40960xf32>
-      %5 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [0, 0, 4096]]>} ins(%cst : f32) outs(%3 : tensor<12x128xf32>) -> tensor<12x128xf32>
-      %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [0, 0, 4096]]>} ins(%cst_0 : f32) outs(%3 : tensor<12x128xf32>) -> tensor<12x128xf32>
-      %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<12x128x40960xf32>) outs(%5 : tensor<12x128xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [0, 0, 4096]]>} {
-      ^bb0(%in: f32, %out: f32):
-        %11 = arith.maxf %in, %out : f32
-        linalg.yield %11 : f32
-      } -> tensor<12x128xf32>
-      %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%2, %7 : tensor<12x128x40960xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x40960xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [0, 0, 4096]]>} {
-      ^bb0(%in: f32, %in_2: f32, %out: f32):
-        %11 = arith.subf %in, %in_2 : f32
-        %12 = math.exp %11 : f32
-        linalg.yield %12 : f32
-      } -> tensor<12x128x40960xf32>
-      %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%8 : tensor<12x128x40960xf32>) outs(%6 : tensor<12x128xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [0, 0, 4096]]>} {
-      ^bb0(%in: f32, %out: f32):
-        %11 = arith.addf %in, %out : f32
-        linalg.yield %11 : f32
-      } -> tensor<12x128xf32>
-      %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%8, %9 : tensor<12x128x40960xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x40960xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1], [0, 0, 4096]]>} {
-      ^bb0(%in: f32, %in_2: f32, %out: f32):
-        %11 = arith.divf %cst_1, %in_2 : f32
-        %12 = arith.mulf %in, %11 : f32
-        linalg.yield %12 : f32
-      } -> tensor<12x128x40960xf32>
-      flow.dispatch.tensor.store %10, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+      %3 = tensor.empty() : tensor<12x128x40960xf32>
+      %4 = iree_linalg_ext.softmax dimension(2) ins(%2 : tensor<12x128x40960xf32>) outs(%3 : tensor<12x128x40960xf32>) -> tensor<12x128x40960xf32>
+      flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       return
     }
   }
@@ -250,7 +226,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL:  func.func @softmax
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32>, vector<4xf32>
+//         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      arith.maxf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
 //         CHECK:    vector.reduction <maxf>, %{{.*}} : vector<4xf32> into f32
@@ -317,13 +293,11 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    arith.addf
 //         CHECK:    arith.addf
 //         CHECK:    vector.broadcast
-//         CHECK:    vector.broadcast
-//         CHECK:    arith.divf
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
 //         CHECK:      math.exp
-//         CHECK:      arith.mulf
+//         CHECK:      arith.divf
 //         CHECK:      vector.transfer_write
 //         CHECK:    }
 //         CHECK:    return

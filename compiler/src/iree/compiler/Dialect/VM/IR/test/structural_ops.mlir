@@ -63,17 +63,20 @@ vm.module @export_funcs_invalid {
 
 // CHECK-LABEL: @import_funcs
 vm.module @import_funcs {
-  // CHECK-NEXT: vm.import @my.fn_empty()
-  vm.import @my.fn_empty()
+  // CHECK-NEXT: vm.import private @my.fn_empty()
+  vm.import private @my.fn_empty()
 
-  // CHECK-NEXT: vm.import @my.fn(%foo : i32, %bar : i32) -> i32
-  vm.import @my.fn(%foo : i32, %bar : i32) -> i32
+  // CHECK-NEXT: vm.import public @my.fn(i32, i32) -> i32
+  vm.import public @my.fn(i32, i32) -> i32
 
-  // CHECK-NEXT: vm.import @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
-  vm.import @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
+  // CHECK-NEXT: vm.import private @my.fn_names(%foo : i32, %bar : i32) -> i32
+  vm.import private @my.fn_names(%foo : i32, %bar : i32) -> i32
 
-  // CHECK-NEXT: vm.import @my.fn_varargs(%foo : vector<3xi32> ..., %bar : tuple<i32, i32> ...) -> i32
-  vm.import @my.fn_varargs(%foo : vector<3xi32> ..., %bar : tuple<i32, i32> ...) -> i32
+  // CHECK-NEXT: vm.import private @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
+  vm.import private @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
+
+  // CHECK-NEXT: vm.import private @my.fn_varargs(%foo : vector<3xi32> ..., %bar : tuple<i32, i32> ...) -> i32
+  vm.import private @my.fn_varargs(%foo : vector<3xi32> ..., %bar : tuple<i32, i32> ...) -> i32
 }
 
 // -----

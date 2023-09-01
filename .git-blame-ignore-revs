@@ -1,0 +1,14 @@
+# This file contains the list of commits to exclude from 'git blame'.
+# Such commits do not meaningfully contribute to git history, and include
+# large-scale mechanical changes like code formatting style changes.
+#
+# To set this file as the default ignore file for 'git blame', run:
+# ```shell
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# ```
+
+# Use Black to format Python files (#14161)
+be24f0258a520a48555c9baec9d2f737ba1c2ca0
+
+# Switch compiler to LLVM/MLIR formatting style (#14181)
+3b652d46e86cd82cc81922a964327b12dc914428

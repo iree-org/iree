@@ -12,7 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/tracing.h"
+#include "iree/hal/drivers/vulkan/base_buffer.h"
 #include "iree/hal/drivers/vulkan/descriptor_set_arena.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
@@ -20,7 +20,6 @@
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
-#include "iree/hal/drivers/vulkan/vma_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
 using namespace iree::hal::vulkan;
@@ -148,17 +147,8 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
 
 bool iree_hal_vulkan_direct_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
-  return iree_hal_command_buffer_dyn_cast(
-      command_buffer, &iree_hal_vulkan_direct_command_buffer_vtable);
-}
-
-static void* iree_hal_vulkan_direct_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_vulkan_direct_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
+  return iree_hal_resource_is(&command_buffer->resource,
+                              &iree_hal_vulkan_direct_command_buffer_vtable);
 }
 
 static void iree_hal_vulkan_direct_command_buffer_destroy(
@@ -183,11 +173,11 @@ static void iree_hal_vulkan_direct_command_buffer_destroy(
 
 VkCommandBuffer iree_hal_vulkan_direct_command_buffer_handle(
     iree_hal_command_buffer_t* base_command_buffer) {
+  if (!iree_hal_vulkan_direct_command_buffer_isa(base_command_buffer)) {
+    return VK_NULL_HANDLE;
+  }
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
-      (iree_hal_vulkan_direct_command_buffer_t*)
-          iree_hal_command_buffer_dyn_cast(
-              base_command_buffer,
-              &iree_hal_vulkan_direct_command_buffer_vtable);
+      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
   return command_buffer->handle;
 }
 
@@ -233,6 +223,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_end(
   // Flush all pending descriptor set writes (if any).
   command_buffer->descriptor_set_group =
       command_buffer->descriptor_set_arena.Flush();
+
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
 
   return iree_ok_status();
 }
@@ -382,8 +374,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_execution_barrier(
         iree_hal_vulkan_convert_access_mask(buffer_barrier.target_scope);
     info->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     info->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    info->buffer = iree_hal_vulkan_vma_buffer_handle(
-        iree_hal_buffer_allocated_buffer(buffer_barrier.buffer));
+    info->buffer = iree_hal_vulkan_buffer_handle(buffer_barrier.buffer);
     info->offset = buffer_barrier.offset;
     info->size = buffer_barrier.length;
   }
@@ -484,8 +475,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_wait_events(
         iree_hal_vulkan_convert_access_mask(buffer_barrier.target_scope);
     info->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     info->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    info->buffer = iree_hal_vulkan_vma_buffer_handle(
-        iree_hal_buffer_allocated_buffer(buffer_barrier.buffer));
+    info->buffer = iree_hal_vulkan_buffer_handle(buffer_barrier.buffer);
     info->offset = buffer_barrier.offset;
     info->size = buffer_barrier.length;
   }
@@ -542,8 +532,10 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
     iree_host_size_t pattern_length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(target_buffer));
+  VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
+
+  IREE_VULKAN_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
+                               command_buffer->handle);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_buffer));
@@ -590,6 +582,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
                                           length, dword_pattern);
   }
 
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
+
   return iree_ok_status();
 }
 
@@ -599,8 +594,10 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
     iree_device_size_t target_offset, iree_device_size_t length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(target_buffer));
+  VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
+
+  IREE_VULKAN_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
+                               command_buffer->handle);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &target_buffer));
@@ -624,6 +621,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
     length -= chunk_length;
   }
 
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
+
   return iree_ok_status();
 }
 
@@ -634,10 +634,11 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
     iree_device_size_t length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  VkBuffer source_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(source_buffer));
-  VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(target_buffer));
+  VkBuffer source_device_buffer = iree_hal_vulkan_buffer_handle(source_buffer);
+  VkBuffer target_device_buffer = iree_hal_vulkan_buffer_handle(target_buffer);
+
+  IREE_VULKAN_TRACE_ZONE_BEGIN(command_buffer->tracing_context,
+                               command_buffer->handle);
 
   const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
   IREE_RETURN_IF_ERROR(
@@ -650,6 +651,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
   command_buffer->syms->vkCmdCopyBuffer(command_buffer->handle,
                                         source_device_buffer,
                                         target_device_buffer, 1, &region);
+
+  IREE_VULKAN_TRACE_ZONE_END(command_buffer->tracing_context,
+                             command_buffer->handle);
 
   return iree_ok_status();
 }
@@ -777,8 +781,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   command_buffer->syms->vkCmdBindPipeline(
       command_buffer->handle, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_handle);
 
-  VkBuffer workgroups_device_buffer = iree_hal_vulkan_vma_buffer_handle(
-      iree_hal_buffer_allocated_buffer(workgroups_buffer));
+  VkBuffer workgroups_device_buffer =
+      iree_hal_vulkan_buffer_handle(workgroups_buffer);
   workgroups_offset += iree_hal_buffer_byte_offset(workgroups_buffer);
   command_buffer->syms->vkCmdDispatchIndirect(
       command_buffer->handle, workgroups_device_buffer, workgroups_offset);
@@ -825,7 +829,6 @@ namespace {
 const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_direct_command_buffer_vtable = {
         /*.destroy=*/iree_hal_vulkan_direct_command_buffer_destroy,
-        /*.dyn_cast=*/iree_hal_vulkan_direct_command_buffer_dyn_cast,
         /*.begin=*/iree_hal_vulkan_direct_command_buffer_begin,
         /*.end=*/iree_hal_vulkan_direct_command_buffer_end,
         /*.begin_debug_group=*/

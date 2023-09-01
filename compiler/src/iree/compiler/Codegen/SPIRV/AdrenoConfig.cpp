@@ -26,7 +26,8 @@ static LogicalResult setAdrenoMatmulConfig(linalg::LinalgOp op,
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType =
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {16, 8, 8};
   } else {
@@ -44,26 +45,33 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   int subgroupSize = limits.getSubgroupSize();
 
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
-    if (isMatmulOrBatchMatmul(linalgOp))
-      return setAdrenoMatmulConfig(linalgOp, limits);
+  if (!isa<linalg::LinalgOp>(rootOp))
+    return failure();
+
+  auto linalgOp = cast<linalg::LinalgOp>(rootOp);
+  if (isMatmulOrBatchMatmul(linalgOp))
+    return setAdrenoMatmulConfig(linalgOp, limits);
+
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    // Use the result type in case of larger bitwidth for accumulators.
+    auto type = cast<ShapedType>(convOp->getResult(0).getType());
+    const int bitwidth = type.getElementTypeBitWidth();
+    if (bitwidth > 32)
+      return failure();
+    const int multipler = 32 / bitwidth;
+
+    auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
+    if (failed(convDimsOrFailure))
+      return failure();
+    const int bestTilingFactor =
+        (convDimsOrFailure->depth.empty() ? 32 : 16) * multipler;
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [limits](auto op) { return setAdrenoMatmulConfig(op, limits); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            return setConvOpConfig(op, subgroupSize,
-                                   /*bestTilingFactor=*/32);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        return setConvOpConfig(op, subgroupSize,
-                               /*bestTilingFactor=*/16);
-      })
-      .Default([](Operation *) { return success(); });
+  return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

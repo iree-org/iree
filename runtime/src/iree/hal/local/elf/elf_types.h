@@ -10,7 +10,6 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/target_platform.h"
 
 // This file contains the ELF data structures we use in our runtime linker and
 // the definitions to support them. The structure definitions are taken from
@@ -74,6 +73,12 @@ enum {
   IREE_ELF_ELFDATANONE = 0,  // Invalid data encoding
   IREE_ELF_ELFDATA2LSB = 1,  // Little-endian
   IREE_ELF_ELFDATA2MSB = 2,  // Big-endian
+};
+
+enum {
+  IREE_ELF_ELFOSABI_NONE = 0,          // No extensions or unspecified
+  IREE_ELF_ELFOSABI_LINUX = 3,         // Linux
+  IREE_ELF_ELFOSABI_STANDALONE = 255,  // Standalone
 };
 
 enum {

@@ -1,0 +1,163 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library")
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "static_assert",
+    hdrs = ["static_assert.h"],
+)
+
+iree_runtime_cc_library(
+    name = "exported_bits",
+    hdrs = ["exported_bits.h"],
+    deps = [":static_assert"],
+)
+
+internal_headers = [
+    "common.h",
+    "exported_bits.h",
+    "mmt4d.h",
+    "mmt4d_internal.h",
+    "pack.h",
+    "pack_internal.h",
+    "query_tile_sizes.h",
+    "query_tile_sizes_internal.h",
+    "static_assert.h",
+    "unpack.h",
+    "unpack_internal.h",
+]
+
+# Filegroup used in Bazel only (only Bazel enforces header dependencies).
+filegroup(
+    name = "internal_headers_filegroup",
+    srcs = internal_headers,
+)
+
+iree_runtime_cc_library(
+    name = "internal_headers",
+    hdrs = internal_headers,
+    visibility = [":__subpackages__"],
+    deps = [
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+# Entry points.
+iree_runtime_cc_library(
+    name = "ukernel_noweak",
+    srcs = [
+        "mmt4d.c",
+        "mmt4d_tile.c",
+        "pack.c",
+        "pack_tile.c",
+        "query_tile_sizes.c",
+        "unpack.c",
+        "unpack_tile.c",
+    ] + internal_headers,
+    hdrs = ["api.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":exported_bits",
+        ":static_assert",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "zzz_weak_linklast",
+    srcs = ["weak.c"],
+    visibility = ["//visibility:private"],
+    deps = [":internal_headers"],
+)
+
+iree_runtime_cc_library(
+    name = "ukernel",
+    hdrs = ["api.h"],
+    deps = [
+        ":ukernel_noweak",
+        ":zzz_weak_linklast",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# UKernel bitcode files
+#===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
+""",
+    inline = True,
+)
+
+[iree_bitcode_library(
+    name = "ukernel_bitcode_%sbit_base" % bitness,
+    srcs = [
+        # Note: only some of these ukernels are actually used in LLVMCPU, which
+        # is the backend that consumes this bitcode, while other ukernels are
+        # only used in VMVX, which links to the native build, not bitcode.
+        # We still keep all ukernels here to ensure that they all build as
+        # bitcode, so we could easily let LLVMCPU use them at any time. This
+        # unused bitcode should be only a small inflation of the IREE compiler
+        # (where it is embedded as data). It should have no effect on generated
+        # modules.
+        "mmt4d.c",
+        "mmt4d_tile.c",
+        "pack.c",
+        "pack_tile.c",
+        "query_tile_sizes.c",
+        "unpack_tile.c",
+        "weak.c",
+    ],
+    # wasm_X here is a proxy for "some reasonable X-bit architecture". The
+    # exact architecture should not matter (other than bitness) as the code here
+    # is not architecture-specialized, and ukernel source code is carefully
+    # written to be completely stand-alone.
+    arch = "wasm_%s" % bitness,
+    internal_hdrs = [
+        ":internal_headers_filegroup",
+        "//runtime/src/iree/schemas:cpu_data_headers_filegroup",
+    ],
+) for bitness in [
+    "32",
+    "64",
+]]
+
+c_embed_data(
+    name = "embed_ukernel_bitcode",
+    srcs = [
+        ":ukernel_bitcode_32bit_base.bc",
+        ":ukernel_bitcode_64bit_base.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/arm_64:ukernel_bitcode_arm_64.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/arm_64:ukernel_bitcode_arm_64_entry_points.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/x86_64:ukernel_bitcode_x86_64.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/x86_64:ukernel_bitcode_x86_64_entry_points.bc",
+    ],
+    c_file_output = "ukernel_bitcode.c",
+    flatten = True,
+    h_file_output = "ukernel_bitcode.h",
+    identifier = "iree_ukernel_bitcode",
+    deps = [
+        "//runtime/src:runtime_defines",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()  # IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU
+""",
+    inline = True,
+)

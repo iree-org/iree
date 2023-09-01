@@ -718,7 +718,7 @@ hal.executable @matmul_f16_f512x4096x64 {
 
 // -----
 
-// Transposed+broadcasted elementwise ops need promote C.
+// Transposed+broadcasted elementwise ops does not need promoting C matrix.
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -798,6 +798,123 @@ hal.executable @matmul_f16_f512x4096x64 {
 
 // PROMOTEC-LABEL: func.func @matmul_f16_f512x4096x64()
 
+//  PROMOTEC-NOT: memref.alloc()
+//  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
+//  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, #gpu.address_space<workgroup>>
+//  PROMOTEC-NOT: memref.alloc()
+
+//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//      PROMOTEC: %[[SPAN3:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+//      PROMOTEC: %[[OUT_VIEW:.+]] = memref.subview %[[SPAN3]]
+
+//      PROMOTEC: linalg.fill
+// PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
+// PROMOTEC-SAME:   outs(%[[OUT_VIEW]]
+
+//      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32 {
+//      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0] [%c64, %c32]
+//      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0] [%c32, %c128]
+//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
+// PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
+//      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
+// PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
+//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   linalg.matmul
+// PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
+// PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
+// PROMOTEC-SAME:    outs(%[[OUT_VIEW]]
+//      PROMOTEC: }
+
+//  PROMOTEC-NOT: gpu.barrier
+//  PROMOTEC-NOT: memref.copy
+//      PROMOTEC: %[[BCAST_VIEW:.+]] = memref.subview %[[SPAN2]][%{{.+}}] [64] [1]
+//      PROMOTEC: linalg.generic
+// PROMOTEC-SAME:    ins(%[[BCAST_VIEW]]
+// PROMOTEC-SAME:    outs(%[[OUT_VIEW]]
+// PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
+
+// -----
+
+// Inlined large constant array needs promoting C matrix.
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
+
+hal.executable @matmul_f16_128x262144x2304 {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+    spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 65536,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
+        subgroup_size = 64>
+       >}> {
+    hal.executable.export public @matmul_f16_128x262144x2304 ordinal(0) layout(#pipeline_layout) attributes {
+      translation_info = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>,
+      workgroup_size = [128 : index, 2 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @matmul_f16_128x262144x2304() {
+        %c128 = arith.constant 128 : index
+        %c262144 = arith.constant 262144 : index
+        %c96565312 = arith.constant 96565312 : index
+        %c806357120 = arith.constant 806357120 : index
+        %c134217728 = arith.constant 134217728 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %cst_0 = arith.constant dense<"0x69222B2E40A3002A45AC1AAB2E2E202DA21C212680264C2A102314A041A7D029CB28352E5BAAD3B02F299D9A142B8AA1D1285C28412B25AF9A24EE2BA22C242D53AD9E2948A9289FCF301D28012F08AD68A6DD20ECAC912465290B2E9420C5AA50A222A912AB9526B62ADA2039AD4D912C9FDD287B20B224D329BA2A4D2C41A76DAB7E30B027F62ED1A0F1273A2BAE9D0FA48029812992A65AA92A2C9C2EE9A744A4632C5FA8A9A4CF2D70A482A0F5A2DBA7B6304B9D22A52B1B9DA8E424722AB5ACD0248A2B8B29C82D782E402D1A99F0A60CA4DE2DD32815266F2A6B247FA6FE214E2853AA402390AB6925F1A339307F2664A23CACBE28BA2B3D286DB0BA2E"> : tensor<128xf16>
+        %0 = bufferization.to_memref %cst_0 : memref<128xf16>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c96565312)  : memref<128x2304xf16>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c806357120) : memref<2304x262144xf16>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c134217728) : memref<128x262144xf16>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
+        %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
+        scf.for %arg0 = %4 to %c128 step %5 {
+          %6 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
+          %7 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_count_x]
+          scf.for %arg1 = %6 to %c262144 step %7 {
+            %subview = memref.subview %3[%arg0, %arg1] [64, 128] [1, 1] : memref<128x262144xf16> to memref<64x128xf16, strided<[262144, 1], offset: ?>>
+            %subview_1 = memref.subview %1[%arg0, 0] [64, 2304] [1, 1] : memref<128x2304xf16> to memref<64x2304xf16, strided<[2304, 1], offset: ?>>
+            %subview_2 = memref.subview %2[0, %arg1] [2304, 128] [1, 1] : memref<2304x262144xf16> to memref<2304x128xf16, strided<[262144, 1], offset: ?>>
+            linalg.fill ins(%cst : f16) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>)
+            linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>}
+              ins(%subview_1, %subview_2 : memref<64x2304xf16, strided<[2304, 1], offset: ?>>, memref<2304x128xf16, strided<[262144, 1], offset: ?>>)
+              outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>)
+            %subview_3 = memref.subview %0[%arg0] [64] [1] : memref<128xf16> to memref<64xf16, strided<[1], offset: ?>>
+            linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+              ins(%subview_3 : memref<64xf16, strided<[1], offset: ?>>) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>) {
+            ^bb0(%in: f16, %out: f16):
+              %8 = arith.addf %out, %in : f16
+              linalg.yield %8 : f16
+            }
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+// PROMOTEC-LABEL: func.func @matmul_f16_128x262144x2304()
+
 //  PROMOTEC-DAG: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<64x32xf16, #gpu.address_space<workgroup>>
 //  PROMOTEC-DAG: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x128xf16, #gpu.address_space<workgroup>>
 //  PROMOTEC-DAG: %[[C_ALLOC:.+]] = memref.alloc() : memref<64x128xf16, #gpu.address_space<workgroup>>
@@ -806,7 +923,7 @@ hal.executable @matmul_f16_f512x4096x64 {
 // PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
 // PROMOTEC-SAME:   outs(%[[C_ALLOC]]
 
-//      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32 {
+//      PROMOTEC: scf.for %{{.+}} = %c0 to %c2304 step %c32 {
 //      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0] [%c64, %c32]
 //      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0] [%c32, %c128]
 //      PROMOTEC:   gpu.barrier

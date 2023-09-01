@@ -75,6 +75,10 @@ IREE_API_EXPORT void iree_vm_context_retain(iree_vm_context_t* context);
 // Releases the given |context| from the caller.
 IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context);
 
+// Returns the instance this context was created within.
+IREE_API_EXPORT iree_vm_instance_t* iree_vm_context_instance(
+    const iree_vm_context_t* context);
+
 // Returns a process-unique ID for the |context|.
 IREE_API_EXPORT iree_vm_context_id_t
 iree_vm_context_id(const iree_vm_context_t* context);
@@ -82,6 +86,14 @@ iree_vm_context_id(const iree_vm_context_t* context);
 // Returns |context| flags.
 IREE_API_EXPORT iree_vm_context_flags_t
 iree_vm_context_flags(const iree_vm_context_t* context);
+
+// Returns the total number of modules registered in |context|.
+IREE_API_EXPORT iree_host_size_t
+iree_vm_context_module_count(const iree_vm_context_t* context);
+
+// Returns the module registered at index |i| in |context|.
+IREE_API_EXPORT iree_vm_module_t* iree_vm_context_module_at(
+    const iree_vm_context_t* context, iree_host_size_t i);
 
 // Registers a list of modules with the context and resolves imports in the
 // order provided.

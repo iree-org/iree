@@ -5,19 +5,21 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -28,6 +30,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
 namespace {
 /// Lowers a hal.executable.variant inner module to SPIR-V scalar/native-vector
 /// code. Invokes different compilation pipeline to
@@ -35,22 +39,23 @@ namespace {
 /// - then convert to SPIRV dialect.
 class SPIRVLowerExecutableTargetPass
     : public SPIRVLowerExecutableTargetBase<SPIRVLowerExecutableTargetPass> {
- public:
+public:
   SPIRVLowerExecutableTargetPass() = default;
   SPIRVLowerExecutableTargetPass(const SPIRVLowerExecutableTargetPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<IREE::Codegen::IREECodegenDialect, AffineDialect,
+        .insert<IREE::Codegen::IREECodegenDialect, affine::AffineDialect,
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
                 IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
                 bufferization::BufferizationDialect, scf::SCFDialect,
-                spirv::SPIRVDialect, vector::VectorDialect>();
+                spirv::SPIRVDialect, transform::TransformDialect,
+                vector::VectorDialect>();
   }
 
   void runOnOperation() override;
 
- private:
+private:
   Option<bool> testLoweringConfiguration{
       *this, "test-lowering-configuration",
       llvm::cl::desc("Flag used for lit-testing the configuration set for root "
@@ -58,27 +63,36 @@ class SPIRVLowerExecutableTargetPass
                      "to true for lit tests; not for general usage"),
       llvm::cl::init(false)};
 };
-}  // namespace
+} // namespace
 
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
 template <typename F>
-static LogicalResult verifyLoweringConfiguration(
-    ModuleOp module, IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize, F verificationFn) {
+static LogicalResult
+verifyLoweringConfiguration(ModuleOp module,
+                            IREE::Codegen::TranslationInfoAttr translationInfo,
+                            ArrayRef<int64_t> workgroupSize, F verificationFn) {
   auto walkResult = module.walk([&](Operation *op) -> WalkResult {
     IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
-    if (!loweringConfig) return WalkResult::advance();
+    if (!loweringConfig)
+      return WalkResult::advance();
     return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
   });
   return failure(walkResult.wasInterrupted());
 }
 
-static LogicalResult verifyEntryPoint(
-    ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
-    IREE::HAL::ExecutableExportOp exportOp) {
-  Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
+static LogicalResult
+verifyEntryPoint(ModuleOp moduleOp,
+                 IREE::Codegen::TranslationInfoAttr translationInfo,
+                 IREE::HAL::ExecutableExportOp exportOp) {
+  if (translationInfo.getDispatchLoweringPassPipeline() ==
+      CodeGenPipeline::TransformDialectCodegen) {
+    // Transform dialect encodes configuration into the schedule directly.
+    return success();
+  }
 
+  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
+      exportOp.getWorkgroupSize();
   if (!workgroupSizeAttr || workgroupSizeAttr->size() != 3) {
     return moduleOp.emitError(
         "expected workgroup size to have three dimensions for SPIR-V "
@@ -87,28 +101,24 @@ static LogicalResult verifyEntryPoint(
 
   std::array<int64_t, 3> workgroupSizes;
   for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-    workgroupSizes[index] = attr.cast<IntegerAttr>().getInt();
+    workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
   }
 
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
-      return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                         workgroupSizes,
-                                         verifySPIRVBaseVectorizePassPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        SPIRVMatmulPromoteVectorize:
-      return verifyLoweringConfiguration(
-          moduleOp, translationInfo, workgroupSizes,
-          verifySPIRVMatmulPromoteVectorizePassPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        SPIRVCooperativeMatrixVectorize:
-      return verifyLoweringConfiguration(
-          moduleOp, translationInfo, workgroupSizes,
-          verifySPIRVCooperativeMatrixVectorizePassPipeline);
-      break;
-    default:;
+  case CodeGenPipeline::SPIRVBaseVectorize:
+    return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                       workgroupSizes,
+                                       verifySPIRVBaseVectorizePassPipeline);
+  case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
+    return verifyLoweringConfiguration(
+        moduleOp, translationInfo, workgroupSizes,
+        verifySPIRVMatmulPromoteVectorizePassPipeline);
+  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
+    return verifyLoweringConfiguration(
+        moduleOp, translationInfo, workgroupSizes,
+        verifySPIRVCooperativeMatrixVectorizePassPipeline);
+  default:
+    break;
   }
   return success();
 }
@@ -129,7 +139,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   // is fine.
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
-  Optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
   for (auto &it : exportOps) {
     auto exportOp = it.second;
     if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
@@ -156,33 +166,37 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute:
-        addSPIRVBaseDistributePassPipeline(pipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
-        addSPIRVBaseVectorizePassPipeline(pipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVCooperativeMatrixVectorize:
-        addSPIRVCooperativeMatrixVectorizePassPipeline(
-            pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-            translationInfo.value().getSoftwarePipelineStoreStage());
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVMatmulPromoteVectorize:
-        addSPIRVMatmulPromoteVectorizePassPipeline(
-            pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-            translationInfo.value().getSoftwarePipelineStoreStage());
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce:
-        addSPIRVSubgroupReducePassPipeline(pipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVWinogradVectorize:
-        addSPIRVWinogradVectorizePassPipeline(pipeline);
-        break;
-      default:
-        variantOp.emitOpError("Unsupported pipeline on GPU target.");
-        return signalPassFailure();
+    case CodeGenPipeline::SPIRVBaseLowering:
+      addSPIRVBaseLoweringPassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVBaseDistribute:
+      addSPIRVBaseDistributePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVBaseVectorize:
+      addSPIRVBaseVectorizePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
+      addSPIRVCooperativeMatrixVectorizePassPipeline(
+          pipeline, translationInfo.value().getSoftwarePipelineDepth(),
+          translationInfo.value().getSoftwarePipelineStoreStage());
+      break;
+    case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
+      addSPIRVMatmulPromoteVectorizePassPipeline(
+          pipeline, translationInfo.value().getSoftwarePipelineDepth(),
+          translationInfo.value().getSoftwarePipelineStoreStage());
+      break;
+    case CodeGenPipeline::SPIRVSubgroupReduce:
+      addSPIRVSubgroupReducePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVWinogradVectorize:
+      addSPIRVWinogradVectorizePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::TransformDialectCodegen:
+      addSPIRVTransformDialectPassPipeline(pipeline);
+      break;
+    default:
+      variantOp.emitOpError("Unsupported pipeline on GPU target.");
+      return signalPassFailure();
     }
   }
 
@@ -202,5 +216,5 @@ createSPIRVLowerExecutableTargetPass() {
   return std::make_unique<SPIRVLowerExecutableTargetPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -69,6 +69,10 @@ function(iree_cc_test)
   iree_package_ns(_PACKAGE_NS)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "  : iree_cc_test(${_NAME})")
+    message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
+  endif()
   add_executable(${_NAME} "")
   # Alias the iree_package_name test binary to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
@@ -160,8 +164,8 @@ function(iree_cc_test)
         TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
     )
     set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
-  elseif((CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" OR
-          CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32") AND
+  elseif((IREE_ARCH STREQUAL "riscv_64" OR
+          IREE_ARCH STREQUAL "riscv_32") AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # The test target needs to run within the QEMU emulator for RV64 Linux
     # crosscompile build or on-device.

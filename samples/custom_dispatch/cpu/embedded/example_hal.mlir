@@ -2,6 +2,7 @@
 // RUN:     --iree-hal-executable-object-search-path=$IREE_BINARY_DIR | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
+// RUN:     --module=- \
 // RUN:     --function=mixed_invocation \
 // RUN:     --input=8xf32=2 \
 // RUN:     --input=8xf32=4 | \
@@ -33,7 +34,7 @@
 #x86_64_target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 32 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"
+  target_triple = "x86_64-none-elf"
 }>
 
 // The target devices that the program will run on.
@@ -243,9 +244,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
     %dim_i32 = arith.index_cast %dim : index to i32
 
     // Dispatch a basic `ret = lhs * rhs` using an external function.
-    // This form (@executable::@export) allows for automatic variant selection
-    // when multi-targeting (@x86_64 will be chosen if available).
-    %0 = flow.dispatch @executable::@simple_mul[%dim](%dim_i32, %arg0, %arg1) {
+    %0 = flow.dispatch @executable::@x86_64::@simple_mul[%dim](%dim_i32, %arg0, %arg1) {
       // Bindings are automatically inferred when possible as part of the ABI
       // but can be overridden if the user wants to use features such as sparse
       // bindings or multiple descriptor sets. To do so the

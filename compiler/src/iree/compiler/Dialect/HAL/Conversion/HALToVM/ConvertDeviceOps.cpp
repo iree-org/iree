@@ -16,18 +16,20 @@ namespace iree_compiler {
 // i64 with a truncation on the result.
 class DeviceQueryIntCastOpConversion
     : public OpConversionPattern<IREE::HAL::DeviceQueryOp> {
- public:
+public:
   DeviceQueryIntCastOpConversion(MLIRContext *context,
                                  TypeConverter &typeConverter)
       : OpConversionPattern(typeConverter, context) {}
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // We only deal with in-dialect conversions to i32 in this pattern.
     auto targetType = op.getValue().getType();
-    if (targetType.isInteger(64)) return failure();
-    if (!targetType.isIntOrIndex()) return failure();
+    if (targetType.isInteger(64))
+      return failure();
+    if (!targetType.isIntOrIndex())
+      return failure();
 
     // Query as I64.
     // Note that due to type conversion we need to handle the default logic
@@ -37,8 +39,8 @@ class DeviceQueryIntCastOpConversion
     auto queryOp = rewriter.create<IREE::HAL::DeviceQueryOp>(
         op.getLoc(), rewriter.getI1Type(), rewriter.getI64Type(),
         adaptor.getDevice(), op.getCategoryAttr(), op.getKeyAttr(),
-        Attribute{});
-    auto ok = queryOp.getOk().cast<Value>();
+        TypedAttr{});
+    auto ok = llvm::cast<Value>(queryOp.getOk());
     auto value = queryOp.getValue();
 
     // Truncate or extend based on the target type.
@@ -46,7 +48,7 @@ class DeviceQueryIntCastOpConversion
       // i64 -> index cast.
       value = rewriter.createOrFold<arith::IndexCastOp>(op.getLoc(), targetType,
                                                         value);
-    } else if (targetType.isa<IntegerType>()) {
+    } else if (llvm::isa<IntegerType>(targetType)) {
       // i64 -> {integer} cast.
       if (targetType.getIntOrFloatBitWidth() <
           value.getType().getIntOrFloatBitWidth()) {
@@ -78,7 +80,7 @@ class DeviceQueryIntCastOpConversion
 
 class DeviceQueryI64OpConversion
     : public OpConversionPattern<IREE::HAL::DeviceQueryOp> {
- public:
+public:
   DeviceQueryI64OpConversion(MLIRContext *context, SymbolTable &importSymbols,
                              TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern(typeConverter, context) {
@@ -86,13 +88,15 @@ class DeviceQueryI64OpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    if (!op.getValue().getType().isInteger(64)) return failure();
+  LogicalResult
+  matchAndRewrite(IREE::HAL::DeviceQueryOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!op.getValue().getType().isInteger(64))
+      return failure();
     auto results =
         rewriteToCall(op, adaptor, importOp, *getTypeConverter(), rewriter);
-    if (!results.has_value()) return failure();
+    if (!results.has_value())
+      return failure();
     auto ok = results->front();
     auto value = results->back();
     if (op.getDefaultValue().has_value()) {
@@ -106,7 +110,7 @@ class DeviceQueryI64OpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
@@ -125,11 +129,15 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.device.queue.alloca");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueDeallocaOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.dealloca");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueReadOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.read");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueWriteOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.write");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueExecuteOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.execute");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueFlushOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.flush");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

@@ -25,6 +25,12 @@
 #   ./fetch_cuda_deps.sh /usr/local/iree_cuda_deps
 set -e
 
+ARCH="$(uname -m)"
+if [[ "${ARCH}" == "aarch64" ]]; then
+  echo "ERROR: Script does not support ${ARCH}."
+  exit 1
+fi
+
 TARGET_DIR="$1"
 if [ -z "$TARGET_DIR" ]; then
   echo "ERROR: Expected target directory (typically /usr/local/iree_cuda_deps for CI or $HOME/.iree_cuda_deps for local)"
@@ -38,15 +44,16 @@ DOWNLOAD_SCRIPT_PATH="$DOWNLOAD_DIR/parse_redist.py"
 # Parameters to the download script.
 # Look for an appropriate redistrib_*.json here to verify:
 #   https://developer.download.nvidia.com/compute/cuda/redist/
-VERSION="11.6.2"
+VERSION="12.1.1"
 PRODUCT="cuda"
 OS="linux"
 ARCH="x86_64"
 
 # Components that we need to fetch.
 COMPONENTS=(
-  cuda_nvcc
-  cuda_cudart
+  cuda_cccl   # CXX Core Compute Libraries
+  cuda_nvcc   # CUDA NVCC
+  cuda_cudart # CUDA Runtime
 )
 
 # Paths within the arch specific installation that we want to retain.

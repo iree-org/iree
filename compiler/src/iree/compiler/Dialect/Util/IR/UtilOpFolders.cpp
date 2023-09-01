@@ -4,10 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
+
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
@@ -26,6 +29,42 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Util {
+
+//===----------------------------------------------------------------------===//
+// util.cast
+//===----------------------------------------------------------------------===//
+
+OpFoldResult CastOp::fold(FoldAdaptor operands) {
+  if (auto castOp = dyn_cast_or_null<CastOp>(getOperand().getDefiningOp())) {
+    if (castOp.getOperand().getType() == getResult().getType()) {
+      return castOp.getOperand();
+    }
+  }
+  return {};
+}
+
+namespace {
+
+/// Folds cast ops into the result of other ops.
+/// Only safe to apply to ops that don't care about their types.
+struct FoldCastIntoNullOp : public OpRewritePattern<CastOp> {
+  using OpRewritePattern<CastOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(CastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    auto nullOp = dyn_cast_or_null<NullOp>(castOp.getOperand().getDefiningOp());
+    if (!nullOp)
+      return failure();
+    rewriter.replaceOpWithNewOp<NullOp>(castOp, castOp.getResult().getType());
+    return success();
+  }
+};
+
+} // namespace
+
+void CastOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                         MLIRContext *context) {
+  results.add<FoldCastIntoNullOp>(context);
+}
 
 //===----------------------------------------------------------------------===//
 // util.cmp.eq
@@ -66,8 +105,9 @@ static OpFoldResult foldRangeOp(Type type, ValueRange operands,
   // If all operands are constant then fold into a constant.
   int64_t value = initialValue;
   for (auto operand : attrOperands) {
-    auto intValue = operand.dyn_cast_or_null<IntegerAttr>();
-    if (!intValue) return {};
+    auto intValue = llvm::dyn_cast_if_present<IntegerAttr>(operand);
+    if (!intValue)
+      return {};
     value = expr(value, intValue.getValue().getSExtValue());
   }
   return IntegerAttr::get(type, value);
@@ -138,9 +178,8 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
     }
     if (constantValue != initialValue) {
       operands.insert(rewriter.create<arith::ConstantOp>(
-          op.getLoc(),
-          rewriter.getIntegerAttr(op.getResult().getType(), constantValue),
-          op.getResult().getType()));
+          op.getLoc(), op.getResult().getType(),
+          rewriter.getIntegerAttr(op.getResult().getType(), constantValue)));
     }
     rewriter.replaceOpWithNewOp<OpT>(op, op.getResult().getType(),
                                      operands.takeVector());
@@ -148,7 +187,7 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void RangeMinOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
@@ -176,7 +215,7 @@ static Value makeRangeEnd(Location loc, Value offset, Value length,
   return makeRangeEnd(
       loc, offset, length,
       builder.create<arith::ConstantOp>(
-          loc, builder.getIntegerAttr(offset.getType(), 1), offset.getType()),
+          loc, offset.getType(), builder.getIntegerAttr(offset.getType(), 1)),
       builder);
 }
 
@@ -208,7 +247,8 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
         lengths.push_back(length);
       }
     }
-    if (offsets.size() == op.getOffsets().size()) return failure();
+    if (offsets.size() == op.getOffsets().size())
+      return failure();
 
     // Preserve dynamic ranges.
     Value min;
@@ -224,14 +264,12 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
     // Min/max with constant ranges. This allows for normal folding to happen
     // downstream of the op.
     auto constantMinOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(),
-        rewriter.getIntegerAttr(op.getMin().getType(), constantMin),
-        op.getMin().getType());
+        op.getLoc(), op.getMin().getType(),
+        rewriter.getIntegerAttr(op.getMin().getType(), constantMin));
     auto constantMaxOp = rewriter.create<arith::ConstantOp>(
-        op.getLoc(),
+        op.getLoc(), op.getMax().getType(),
         rewriter.getIntegerAttr(op.getMax().getType(),
-                                constantMax - constantMin + 1),
-        op.getMax().getType());
+                                constantMax - constantMin + 1));
     min = min ? rewriter.create<arith::MinUIOp>(op.getLoc(), min, constantMinOp)
                     .getResult()
               : constantMinOp.getResult();
@@ -260,15 +298,16 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
       minValue = rewriter.create<arith::MinUIOp>(loc, op.getOffsets().front(),
                                                  op.getOffsets().back());
       auto one = rewriter.create<arith::ConstantOp>(
-          loc, rewriter.getIntegerAttr(op.getMin().getType(), 1),
-          op.getMin().getType());
+          loc, op.getMin().getType(),
+          rewriter.getIntegerAttr(op.getMin().getType(), 1));
       auto endLhs = makeRangeEnd(loc, op.getOffsets().front(),
                                  op.getLengths().front(), one, rewriter);
       auto endRhs = makeRangeEnd(loc, op.getOffsets().back(),
                                  op.getLengths().back(), one, rewriter);
       maxValue = rewriter.create<arith::MaxUIOp>(loc, endLhs, endRhs);
     }
-    if (!minValue || !maxValue) return failure();
+    if (!minValue || !maxValue)
+      return failure();
     rewriter.replaceOp(op, {minValue, maxValue});
     return success();
   }
@@ -285,7 +324,8 @@ struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
     for (auto range : llvm::zip_equal(op.getOffsets(), op.getLengths())) {
       ranges.insert(range);
     }
-    if (ranges.size() == op.getOffsets().size()) return failure();
+    if (ranges.size() == op.getOffsets().size())
+      return failure();
 
     // Recreate with the deduplicated ranges.
     SmallVector<Value> offsets;
@@ -302,7 +342,7 @@ struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void RangeExtentsOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
@@ -327,34 +367,47 @@ void RangeExtentsOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // a large majority of the cases we generate ourselves from packing/allocation.
 static bool isAlignedTo(Value value, Value alignment) {
   APInt staticValue;
+  bool hasStaticValue = matchPattern(value, m_ConstantInt(&staticValue));
   APInt staticAlignment;
-  if (matchPattern(value, m_ConstantInt(&staticValue)) &&
-      matchPattern(alignment, m_ConstantInt(&staticAlignment))) {
+  bool hasStaticAlignment =
+      matchPattern(alignment, m_ConstantInt(&staticAlignment));
+  if (hasStaticValue && hasStaticAlignment) {
     // If this value is itself a multiple of the alignment then we can fold.
     if (staticValue.urem(staticAlignment).isZero()) {
-      return true;  // value % alignment == 0
+      return true; // value % alignment == 0
     }
   }
 
   // If the value is produced by an align op we can check that.
   if (auto sourceAlignOp = value.getDefiningOp<IREE::Util::AlignOp>()) {
     // Check for same exact alignment - even if dynamic.
-    if (sourceAlignOp.getAlignment() == alignment) return true;
+    if (sourceAlignOp.getAlignment() == alignment)
+      return true;
 
     // If the alignments are constant we can compare them inline.
     APInt sourceAlignment;
-    APInt selfAlignment;
-    if (matchPattern(sourceAlignOp.getAlignment(),
-                     m_ConstantInt(&sourceAlignment)) &&
-        matchPattern(alignment, m_ConstantInt(&selfAlignment))) {
-      if (sourceAlignment.uge(selfAlignment)) {
-        return true;  // source alignment is >= our alignment
+    if (hasStaticAlignment && matchPattern(sourceAlignOp.getAlignment(),
+                                           m_ConstantInt(&sourceAlignment))) {
+      if (sourceAlignment.uge(staticAlignment) &&
+          std::gcd(sourceAlignment.getZExtValue(),
+                   staticAlignment.getZExtValue()) ==
+              staticAlignment.getZExtValue()) {
+        return true; // source alignment is >= our alignment
       }
     }
 
     // Recurse and check the alignment on the input to the align; if it was
     // aligned earlier we can rely on that as align will never shrink a value.
     return isAlignedTo(sourceAlignOp.getValue(), alignment);
+  }
+
+  // Affine apply ops producing the value to be aligned usually include
+  // alignment already.
+  if (auto affineOp = value.getDefiningOp<affine::AffineApplyOp>()) {
+    if (hasStaticAlignment) {
+      return (affineOp.getAffineMap().getLargestKnownDivisorOfMapExprs() %
+              staticAlignment.getZExtValue()) == 0;
+    }
   }
 
   // If we are sourced from add/mul we peephole check to see if what is being
@@ -376,7 +429,7 @@ static bool isAlignedTo(Value value, Value alignment) {
     }
   } else if (auto sourceMulOp = value.getDefiningOp<arith::MulIOp>()) {
     // Two aligned values multiplied together are still aligned.
-    if (isAlignedTo(sourceMulOp.getLhs(), alignment) &&
+    if (isAlignedTo(sourceMulOp.getLhs(), alignment) ||
         isAlignedTo(sourceMulOp.getRhs(), alignment)) {
       return true;
     }
@@ -388,7 +441,18 @@ static bool isAlignedTo(Value value, Value alignment) {
 OpFoldResult AlignOp::fold(FoldAdaptor operands) {
   // If aligning an already-aligned value then fold if this is provably a
   // no-op. We can check this for equality even with dynamic alignments.
-  if (isAlignedTo(getValue(), getAlignment())) return getValue();
+  if (isAlignedTo(getValue(), getAlignment()))
+    return getValue();
+
+  // If values are static we can perform the alignment here.
+  APInt staticValue;
+  APInt staticAlignment;
+  if (matchPattern(getValue(), m_ConstantInt(&staticValue)) &&
+      matchPattern(getAlignment(), m_ConstantInt(&staticAlignment))) {
+    return IntegerAttr::get(getResult().getType(),
+                            align(staticValue.getZExtValue(), staticAlignment));
+  }
+
   return {};
 }
 
@@ -398,10 +462,41 @@ OpFoldResult AlignOp::fold(FoldAdaptor operands) {
 
 OpFoldResult SizeOfOp::fold(FoldAdaptor operands) {
   Type t = getSizedType();
-  if (t.isa<IntegerType>() || t.isa<FloatType>()) {
+  if (llvm::isa<IntegerType>(t) || llvm::isa<FloatType>(t)) {
     return IntegerAttr::get(IndexType::get(getContext()),
                             getRoundedElementByteWidth(t));
   }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
+// util.switch
+//===----------------------------------------------------------------------===//
+
+OpFoldResult SwitchOp::fold(FoldAdaptor operands) {
+  APInt indexValue;
+  if (matchPattern(getIndex(), m_ConstantInt(&indexValue))) {
+    // Index is constant and we can resolve immediately.
+    int64_t index = indexValue.getSExtValue();
+    if (index < 0 || index >= getValues().size()) {
+      return getDefaultValue();
+    }
+    return getValues()[index];
+  }
+
+  bool allValuesMatch = true;
+  for (auto value : getValues()) {
+    if (value != getDefaultValue()) {
+      allValuesMatch = false;
+      break;
+    }
+  }
+  if (allValuesMatch) {
+    // All values (and the default) are the same so just return it regardless of
+    // the provided index.
+    return getDefaultValue();
+  }
+
   return {};
 }
 
@@ -416,15 +511,15 @@ struct ExpandUnfoldableConstantOp
   using OpRewritePattern<IREE::Util::UnfoldableConstantOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(UnfoldableConstantOp op,
                                 PatternRewriter &rewriter) const override {
-    auto stdConst =
-        rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
+    auto stdConst = rewriter.create<arith::ConstantOp>(
+        op.getLoc(), cast<TypedAttr>(op.getValue()));
     rewriter.replaceOpWithNewOp<OptimizationBarrierOp>(op,
                                                        stdConst.getResult());
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void UnfoldableConstantOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -443,7 +538,8 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
 
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getBody().getBlocks().size() != 1) return failure();
+    if (op.getBody().getBlocks().size() != 1)
+      return failure();
     auto &block = op.getBody().front();
     if (block.empty() || isa<InitializerReturnOp>(block.front())) {
       rewriter.eraseOp(op);
@@ -477,13 +573,15 @@ struct InlineConstantGlobalInitializer
 
       deadOps.push_back(storeOp);
     });
-    if (deadOps.empty()) return failure();
-    for (auto deadOp : deadOps) rewriter.eraseOp(deadOp);
+    if (deadOps.empty())
+      return failure();
+    for (auto deadOp : deadOps)
+      rewriter.eraseOp(deadOp);
     return success();
   }
 };
 
-}  // namespace
+} // namespace
 
 void InitializerOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
@@ -501,7 +599,7 @@ class PropagateGlobalLoadAddress
     : public OpRewritePattern<GlobalLoadIndirectOp> {
   using OpRewritePattern::OpRewritePattern;
 
- public:
+public:
   LogicalResult matchAndRewrite(GlobalLoadIndirectOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<GlobalAddressOpInterface>(
@@ -514,7 +612,7 @@ class PropagateGlobalLoadAddress
   }
 };
 
-}  // namespace
+} // namespace
 
 void GlobalLoadIndirectOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -543,7 +641,7 @@ struct EraseUnusedGlobalStoreOp : public OpRewritePattern<GlobalStoreOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void GlobalStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
@@ -557,7 +655,7 @@ class PropagateGlobalStoreAddress
     : public OpRewritePattern<GlobalStoreIndirectOp> {
   using OpRewritePattern::OpRewritePattern;
 
- public:
+public:
   LogicalResult matchAndRewrite(GlobalStoreIndirectOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<GlobalAddressOpInterface>(
@@ -570,7 +668,7 @@ class PropagateGlobalStoreAddress
   }
 };
 
-}  // namespace
+} // namespace
 
 void GlobalStoreIndirectOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -607,7 +705,8 @@ struct FoldBufferSubspanOps : public OpRewritePattern<BufferSubspanOp> {
   LogicalResult matchAndRewrite(BufferSubspanOp op,
                                 PatternRewriter &rewriter) const override {
     auto parentOp = BufferSubspanOp::findSubspanOp(op.getSource());
-    if (!parentOp) return failure();
+    if (!parentOp)
+      return failure();
     auto fusedLoc = rewriter.getFusedLoc({parentOp.getLoc(), op.getLoc()});
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(
         fusedLoc, parentOp.getSourceOffset(), op.getSourceOffset());
@@ -637,7 +736,8 @@ struct FoldBufferSubspanOpsIntoConsumers
     for (auto &use : llvm::make_early_inc_range(op.getResult().getUses())) {
       auto subrangeOp =
           dyn_cast<IREE::Util::SubrangeOperandOpInterface>(use.getOwner());
-      if (!subrangeOp) continue;
+      if (!subrangeOp)
+        continue;
       didUpdateAny = true;
       rewriter.setInsertionPoint(subrangeOp);
       auto oldRange = subrangeOp.getSubrangeOperand(use.getOperandNumber());
@@ -670,12 +770,14 @@ struct SinkSubspanAcrossSelectOps
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getType().isa<IREE::Util::BufferType>()) return failure();
+    if (!llvm::isa<IREE::Util::BufferType>(op.getType()))
+      return failure();
     auto trueSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
         op.getTrueValue().getDefiningOp());
     auto falseSubspan = dyn_cast_or_null<IREE::Util::BufferSubspanOp>(
         op.getFalseValue().getDefiningOp());
-    if (!trueSubspan || !falseSubspan) return failure();
+    if (!trueSubspan || !falseSubspan)
+      return failure();
     if (trueSubspan.getSource() != falseSubspan.getSource() ||
         trueSubspan.getResultSize() != falseSubspan.getResultSize()) {
       return failure();
@@ -691,7 +793,7 @@ struct SinkSubspanAcrossSelectOps
   }
 };
 
-}  // namespace
+} // namespace
 
 void BufferSubspanOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
@@ -710,8 +812,8 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   // During A->B->C dialect conversion, the type may not be legal so be
   // defensive.
   auto operand = getOperand();
-  if (auto sizeAwareType =
-          operand.getType().dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
+  if (auto sizeAwareType = llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
+          operand.getType())) {
     Operation *op = this->getOperation();
     if (auto sizeValue = sizeAwareType.findSizeValue(operand, op->getBlock(),
                                                      Block::iterator(op))) {
@@ -723,8 +825,8 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   if (auto constantOp = dyn_cast_or_null<IREE::Util::BufferConstantOp>(
           operand.getDefiningOp())) {
     if (auto attr =
-            constantOp.getValue()
-                .dyn_cast_or_null<IREE::Util::SerializableAttrInterface>()) {
+            llvm::dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
+                constantOp.getValue())) {
       return IntegerAttr::get(IndexType::get(attr.getContext()),
                               attr.getStorageSize());
     }
@@ -751,7 +853,8 @@ struct SelectBufferSizeOp : public OpRewritePattern<BufferSizeOp> {
   LogicalResult matchAndRewrite(BufferSizeOp op,
                                 PatternRewriter &rewriter) const override {
     auto selectOp = op.getOperand().getDefiningOp<mlir::arith::SelectOp>();
-    if (!selectOp) return failure();
+    if (!selectOp)
+      return failure();
     auto trueSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
         op.getLoc(), selectOp.getTrueValue());
     auto falseSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
@@ -762,7 +865,7 @@ struct SelectBufferSizeOp : public OpRewritePattern<BufferSizeOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void BufferSizeOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
@@ -788,7 +891,8 @@ struct FoldSubspansIntoStorageOp : public OpRewritePattern<BufferStorageOp> {
   LogicalResult matchAndRewrite(BufferStorageOp op,
                                 PatternRewriter &rewriter) const override {
     auto subspanOp = BufferSubspanOp::findSubspanOp(op.getOperand());
-    if (!subspanOp) return failure();
+    if (!subspanOp)
+      return failure();
     auto fusedLoc = rewriter.getFusedLoc({subspanOp.getLoc(), op.getLoc()});
     rewriter.setInsertionPointAfter(op);
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(
@@ -807,7 +911,7 @@ struct FoldSubspansIntoStorageOp : public OpRewritePattern<BufferStorageOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void BufferStorageOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
@@ -823,7 +927,7 @@ OpFoldResult BufferLoadOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

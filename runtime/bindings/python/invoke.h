@@ -12,7 +12,7 @@
 namespace iree {
 namespace python {
 
-void SetupInvokeBindings(pybind11::module &m);
+void SetupInvokeBindings(py::module_ &m);
 
 }  // namespace python
 }  // namespace iree

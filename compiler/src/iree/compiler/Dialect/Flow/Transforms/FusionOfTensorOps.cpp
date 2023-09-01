@@ -14,15 +14,19 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/Iterators.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-fusion-of-tensor-ops"
 
@@ -31,9 +35,16 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+// TODO: Remove this and the backing code once consteval is beyond being
+// rolled back.
+static llvm::cl::opt<int64_t> clLinalgMaxConstantFoldElements(
+    "iree-codegen-linalg-max-constant-fold-elements",
+    llvm::cl::desc("Maximum number of elements to try to constant fold."),
+    llvm::cl::init(0));
+
 /// Check if any of the use dominates all other uses of the operation.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo &dominanceInfo) {
+static std::optional<OpOperand *> getFusableUse(Operation *op,
+                                                DominanceInfo &dominanceInfo) {
   auto uses = op->getUses();
   for (OpOperand &source : uses) {
     Operation *sourceOp = source.getOwner();
@@ -46,13 +57,6 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
       }
     }
     if (dominatesAllUsers) {
-      // For now check that the `sourceOp` is only used once in the consumer.
-      // This can be generalized if needed
-      unsigned numUsesOfOp = 0;
-      for (OpOperand &operand : sourceOp->getOpOperands()) {
-        if (operand.get().getDefiningOp() == op) numUsesOfOp++;
-      }
-      if (numUsesOfOp != 1) return std::nullopt;
       return &source;
     }
   }
@@ -60,146 +64,242 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
 }
 
 /// Check if the producer generic op is fusable with the consumer generic op.
-static bool areFusableOps(MLIRContext *context, Operation *producerOp,
-                          Operation *consumerOp) {
+static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
+  Operation *producerOp = fusedOperand->get().getDefiningOp();
+  Operation *consumerOp = fusedOperand->getOwner();
+  if (!producerOp)
+    return false;
+
   // Check for i1 return types, if so aggressively fuse to avoid `i1` buffers.
   if (llvm::all_of(producerOp->getResultTypes(), [](Type t) {
-        if (t.isInteger(1)) return true;
-        if (auto shapedType = t.dyn_cast<ShapedType>()) {
-          if (shapedType.getElementType().isInteger(1)) return true;
+        if (t.isInteger(1))
+          return true;
+        if (auto shapedType = llvm::dyn_cast<ShapedType>(t)) {
+          if (shapedType.getElementType().isInteger(1))
+            return true;
         }
         return false;
       })) {
     return true;
   }
 
-  // If producer has a single user, always fuse
-  if (producerOp->hasOneUse()) return true;
+  // Don't fuse if all of the consumer maps aren't projected permutations.
+  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+    if (!llvm::all_of(
+            linalgConsumerOp.getIndexingMapsArray(),
+            [](AffineMap map) { return map.isProjectedPermutation(); })) {
+      return false;
+    }
+  }
 
   // If the generic op is "just" copy, then fuse always.
   Block &body = producerOp->getRegion(0).front();
-  if (std::begin(body)->hasTrait<OpTrait::IsTerminator>()) return true;
+  if (std::begin(body)->hasTrait<OpTrait::IsTerminator>())
+    return true;
+  if (llvm::all_of(body.getArguments(),
+                   [](BlockArgument arg) { return arg.use_empty(); })) {
+    // THe operands arent used, its just an `linalg.index` op.
+    return true;
+  }
+
+  // If producer does not have a single user, dont fuse.
+  if (!producerOp->hasOneUse())
+    return false;
+
+  // If the producer has a single use (this op), only fuse if
+  // - 1) The consumer op is all parallel loops. The parallelism of the consumer
+  //      can be used as a way to amortize cost of redundant computation
+  // - 2) If consumer op is a reduction, only fuse if the indexing map in the
+  //      consumer for the producer result is a permutation. If it is a
+  //      broadcast this ends up redundantly computing operations without more
+  //      parallelism.
+  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+    return linalgConsumerOp.getNumParallelLoops() ==
+               linalgConsumerOp.getNumLoops() ||
+           linalgConsumerOp.getMatchingIndexingMap(fusedOperand)
+               .isPermutation();
+  }
 
   // All other cases dont fuse.
   return false;
 }
 
-namespace {
-
-struct FuseElementwiseOpsWithMultipleUses
-    : public OpRewritePattern<linalg::GenericOp> {
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  static const char *getConsumerAttributeName() {
-    return "__fusable_conumer__";
-  }
-  static const char *getProducerAttributeName() {
-    return "__fusable_producer__";
-  }
-
-  LogicalResult matchAndRewrite(linalg::GenericOp consumerOp,
-                                PatternRewriter &rewriter) const override {
-    auto consumerMarker =
-        consumerOp->getAttrOfType<IntegerAttr>(getConsumerAttributeName());
-    if (!consumerMarker) return failure();
-
-    auto fusedOperandIt =
-        llvm::find_if(consumerOp->getOpOperands(), [&](OpOperand &operand) {
-          Operation *operandProducer = operand.get().getDefiningOp();
-          if (!operandProducer) return false;
-          auto producerMarker = operandProducer->getAttrOfType<IntegerAttr>(
-              getProducerAttributeName());
-          if (!producerMarker) return false;
-          return consumerMarker.getValue() == producerMarker.getValue();
-        });
-    assert(fusedOperandIt != consumerOp->getOpOperands().end() &&
-           "expected to find the fusable producer");
-    OpOperand *fusedOperand = fusedOperandIt;
-    assert(linalg::areElementwiseOpsFusable(fusedOperand) &&
-           "expected producer and consumer to be fusable");
-    Operation *producerOp = fusedOperand->get().getDefiningOp();
-
-    // Cleanup the markers.
-    consumerOp->removeAttr(getConsumerAttributeName());
-    producerOp->removeAttr(getProducerAttributeName());
-
-    FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
-        linalg::fuseElementwiseOps(rewriter, fusedOperand);
-    if (failed(fusionResult)) {
-      return rewriter.notifyMatchFailure(consumerOp,
-                                         "failed to fuse with producer");
+static OpOperand *getFirstUseInConsumer(Operation *producer,
+                                        Operation *consumer) {
+  for (OpOperand &opOperand : consumer->getOpOperands()) {
+    if (opOperand.get().getDefiningOp() == producer) {
+      return &opOperand;
     }
-    for (auto replacement : fusionResult->replacements) {
-      rewriter.replaceUseIf(
-          replacement.first, replacement.second,
-          [&](OpOperand &use) { return use.getOwner() != consumerOp; });
-    }
-    return success();
   }
-};
+  return nullptr;
+}
+
+static SmallVector<OpOperand *> getAllUsesInConsumer(Operation *producer,
+                                                     Operation *consumer) {
+  SmallVector<OpOperand *> allUses;
+  for (OpOperand &opOperand : consumer->getOpOperands()) {
+    if (opOperand.get().getDefiningOp() == producer) {
+      allUses.push_back(&opOperand);
+    }
+  }
+  return allUses;
+}
+
+/// Perform the fusion of `rootOp` with all the operations in `fusableOps`
+/// using elementwise fusion.
+static LogicalResult doMultiUseFusion(Operation *rootOp,
+                                      llvm::SetVector<Operation *> &fusableOps,
+                                      RewriterBase &rewriter) {
+  assert(rootOp && "root op cant be null");
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Fusion root : \n";
+    rootOp->print(llvm::dbgs());
+    llvm::dbgs() << "\nFused with :";
+
+    for (auto producer : fusableOps) {
+      llvm::dbgs() << "\t";
+      producer->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+  });
+
+  SmallVector<Operation *> fusedOpsVec = llvm::to_vector(fusableOps);
+  mlir::computeTopologicalSorting(fusedOpsVec);
+
+  Operation *consumerOp = rootOp;
+  OpBuilder::InsertionGuard g(rewriter);
+  for (Operation *producerOp : llvm::reverse(fusedOpsVec)) {
+    // Fuse all uses from producer -> consumer. It has been checked
+    // before that all uses are fusable.
+    while (OpOperand *fusedOperand =
+               getFirstUseInConsumer(producerOp, consumerOp)) {
+      rewriter.setInsertionPoint(consumerOp);
+      FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
+          linalg::fuseElementwiseOps(rewriter, fusedOperand);
+      if (failed(fusionResult)) {
+        return rewriter.notifyMatchFailure(consumerOp,
+                                           "failed to fuse with producer");
+      }
+      for (auto replacement : fusionResult->replacements) {
+        rewriter.replaceUsesWithIf(
+            replacement.first, replacement.second, [&](OpOperand &use) {
+              return use.getOwner() != fusionResult->fusedOp &&
+                     fusableOps.count(use.getOwner()) == 0;
+            });
+      }
+      consumerOp = fusionResult->fusedOp;
+      if (failed(cast<linalg::GenericOp>(consumerOp).verify())) {
+        return consumerOp->emitOpError("failed to verify op");
+      }
+    }
+  }
+  return success();
+}
 
 static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
                                                  MLIRContext *context,
                                                  DominanceInfo &dominanceInfo) {
-  // Try fusion of operations when producer has multiple uses.
-  // 1. Walk the function in pre-order.
-  // 2. Check if a `linalg.generic` op has a consumer `linalg.generic` op
-  //    that dominates all uses of the producer op. Then fuse the producer
-  //    consumer
-  unsigned numCandidates = 0;
   OpBuilder builder(context);
-  funcOp->walk<WalkOrder::PreOrder>([&](linalg::GenericOp genericOp) {
-    auto consumerAttrName =
-        FuseElementwiseOpsWithMultipleUses::getConsumerAttributeName();
-    auto producerAttrName =
-        FuseElementwiseOpsWithMultipleUses::getProducerAttributeName();
-    if (genericOp->hasAttr(consumerAttrName) ||
-        genericOp->hasAttr(producerAttrName)) {
-      return;
+  llvm::MapVector<Operation *, llvm::SetVector<Operation *>> fusedOps;
+  DenseMap<Operation *, Operation *> opToRootMap;
+  funcOp->walk<WalkOrder::PostOrder, ReverseIterator>(
+      [&](linalg::GenericOp genericOp) {
+        if (!isNonNullAndOutsideDispatch(genericOp)) {
+          return;
+        }
+
+        // 1. Only look at all parallel consumers.
+        if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+          return;
+        }
+
+        Operation *fusableProducer = nullptr;
+        for (OpOperand &operand : genericOp->getOpOperands()) {
+          // 2. Only fuse with `linalg.generic` producers that arent
+          //    already part of another fusion group.
+          auto producer = dyn_cast_or_null<linalg::GenericOp>(
+              operand.get().getDefiningOp());
+          if (!producer || opToRootMap.count(producer)) {
+            continue;
+          }
+
+          // 3. For now do not fuse with ops in another block.
+          if (producer->getBlock() != genericOp->getBlock()) {
+            continue;
+          }
+
+          // 4. Basic fusability checks.
+          if (!linalg::areElementwiseOpsFusable(&operand)) {
+            continue;
+          }
+
+          // 5. Only consider all parallel `producer` with same iteration space
+          //    as the consumer.
+          if (producer.getNumLoops() != producer.getNumParallelLoops() ||
+              genericOp.getNumLoops() != producer.getNumLoops()) {
+            continue;
+          }
+
+          // 6. Check that the `genericOp` dominates all uses of `producer`.
+          std::optional<OpOperand *> fusableUse =
+              getFusableUse(producer, dominanceInfo);
+          if (!fusableUse || fusableUse.value()->getOwner() != genericOp) {
+            continue;
+          }
+
+          // 7. All uses from `producer` -> `consumer` need to be fusable.
+          //    Without this the `producer` is still live, and there is no
+          //    advantage to do the fusion.
+          if (llvm::any_of(getAllUsesInConsumer(producer, genericOp),
+                           [&](OpOperand *use) {
+                             return !linalg::areElementwiseOpsFusable(use);
+                           })) {
+            continue;
+          }
+
+          fusableProducer = producer;
+          break;
+        }
+        if (!fusableProducer)
+          return;
+
+        // If the `genericOp` is already part of a fusion group, just add the
+        // the `fusableProducer` to the same group.
+        llvm::SetVector<Operation *> &fusedOpSet = fusedOps[genericOp];
+        fusedOpSet.insert(fusableProducer);
+        opToRootMap[fusableProducer] = genericOp;
+        return;
+      });
+
+  if (fusedOps.empty()) {
+    return 0;
+  }
+
+  IRRewriter rewriter(context);
+  for (auto it = fusedOps.rbegin(), ie = fusedOps.rend(); it != ie; ++it) {
+    if (failed(doMultiUseFusion(it->first, it->second, rewriter))) {
+      return funcOp->emitOpError("failed multi use fusion");
     }
+  }
 
-    Optional<OpOperand *> fusableUse = getFusableUse(genericOp, dominanceInfo);
-    if (!fusableUse) return;
-    if (!linalg::areElementwiseOpsFusable(fusableUse.value())) return;
-
-    auto consumer = dyn_cast<linalg::GenericOp>(fusableUse.value()->getOwner());
-    auto isParallelIteratorType = [](Attribute attr) {
-      return linalg::isParallelIterator(
-          attr.cast<linalg::IteratorTypeAttr>().getValue());
-    };
-    if (!consumer ||
-        !(llvm::all_of(genericOp.getIteratorTypes(), isParallelIteratorType) &&
-          llvm::all_of(consumer.getIteratorTypes(), isParallelIteratorType))) {
-      return;
-    }
-
-    genericOp->setAttr(producerAttrName,
-                       builder.getI64IntegerAttr(numCandidates));
-    consumer->setAttr(consumerAttrName,
-                      builder.getI64IntegerAttr(numCandidates));
-    numCandidates++;
-    return;
-  });
-  LLVM_DEBUG({
-    llvm::dbgs() << "Num of multiuse fusable candidates : " << numCandidates
-                 << "\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-  });
   RewritePatternSet fusionPatterns(context);
-  fusionPatterns.insert<FuseElementwiseOpsWithMultipleUses>(context);
-  linalg::GenericOp::getCanonicalizationPatterns(fusionPatterns, context);
+  linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {
     return funcOp->emitOpError("multi use producer -> consumer fusion failed");
   }
-  return numCandidates;
+  return fusedOps.size();
 }
+
+namespace {
 
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
 struct FusionOfTensorOpsPass
     : public FusionOfTensorOpsBase<FusionOfTensorOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, linalg::LinalgDialect, math::MathDialect>();
+    registry.insert<affine::AffineDialect, arith::ArithDialect,
+                    linalg::LinalgDialect, math::MathDialect>();
   }
   FusionOfTensorOpsPass(bool fuseMultiUse, unsigned multiUseFusionIteration) {
     this->fuseMultiUse = fuseMultiUse;
@@ -221,8 +321,11 @@ struct FusionOfTensorOpsPass
       linalg::ControlFusionFn fuseElementwiseOpsControlFn =
           [&](OpOperand *fusedOperand) {
             Operation *producer = fusedOperand->get().getDefiningOp();
-            if (!producer) return false;
             Operation *consumer = fusedOperand->getOwner();
+
+            if (!isNonNullAndOutsideDispatch({producer, consumer})) {
+              return false;
+            }
 
             // Limit the number of operands. We have hard limit (32) of bindings
             // passing down to HAL. Set the number to be as same as the limit --
@@ -236,9 +339,10 @@ struct FusionOfTensorOpsPass
             operands.insert(std::next(consumer->operand_begin(),
                                       fusedOperand->getOperandNumber() + 1),
                             consumer->operand_end());
-            if (operands.size() >= kIreeMaxOperandCount) return false;
+            if (operands.size() >= kIreeMaxOperandCount)
+              return false;
 
-            return areFusableOps(context, producer, consumer);
+            return areFusableOps(context, fusedOperand);
           };
       linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
                                                    fuseElementwiseOpsControlFn);
@@ -247,9 +351,11 @@ struct FusionOfTensorOpsPass
       linalg::ControlFusionFn fuseByExpansionControlFn =
           [](OpOperand *fusedOperand) {
             Operation *producer = fusedOperand->get().getDefiningOp();
-            if (!producer) {
+            Operation *consumer = fusedOperand->get().getDefiningOp();
+            if (!isNonNullAndOutsideDispatch({producer, consumer})) {
               return false;
             }
+
             // Do not fuse producer generic op if it has more than one user.
             if (auto producerGenericOp =
                     dyn_cast<linalg::GenericOp>(producer)) {
@@ -263,13 +369,25 @@ struct FusionOfTensorOpsPass
 
       // Constant fold Linalg operations.
       auto constantFoldControlFn = [](OpOperand *fusedOperand) {
-        auto producer = fusedOperand->get().getDefiningOp();
-        return producer && producer->hasOneUse();
+        Operation *producer = fusedOperand->get().getDefiningOp();
+        Operation *consumer = fusedOperand->getOwner();
+        if (!isNonNullAndOutsideDispatch({producer, consumer})) {
+          return false;
+        }
+        if (auto shapedType =
+                dyn_cast<ShapedType>(fusedOperand->get().getType())) {
+          if (shapedType.hasStaticShape() &&
+              shapedType.getNumElements() > clLinalgMaxConstantFoldElements) {
+            return false;
+          }
+        }
+        return producer->hasOneUse();
       };
       linalg::populateConstantFoldLinalgOperations(fusionPatterns,
                                                    constantFoldControlFn);
 
-      AffineApplyOp::getCanonicalizationPatterns(fusionPatterns, context);
+      affine::AffineApplyOp::getCanonicalizationPatterns(fusionPatterns,
+                                                         context);
       linalg::GenericOp::getCanonicalizationPatterns(fusionPatterns, context);
       tensor::ExpandShapeOp::getCanonicalizationPatterns(fusionPatterns,
                                                          context);
@@ -278,7 +396,7 @@ struct FusionOfTensorOpsPass
                                                            context);
       context->getLoadedDialect<linalg::LinalgDialect>()
           ->getCanonicalizationPatterns(fusionPatterns);
-      memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
+      memref::populateResolveRankedShapedTypeResultDimsPatterns(fusionPatterns);
 
       GreedyRewriteConfig rewriteConfig;
       rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
@@ -300,13 +418,15 @@ struct FusionOfTensorOpsPass
       // fuse.
       linalg::ControlFusionFn fuseByCollapsingControlFn =
           [](OpOperand *fusedOperand) {
-            auto producer = fusedOperand->get().getDefiningOp();
-            if (!producer) {
+            Operation *producer = fusedOperand->get().getDefiningOp();
+            Operation *consumer = fusedOperand->getOwner();
+            if (!isNonNullAndOutsideDispatch({producer, consumer})) {
               return false;
             }
 
             auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer);
-            if (!reshapeOp) return true;
+            if (!reshapeOp)
+              return true;
 
             return reshapeOp.getSrc().getDefiningOp<linalg::LinalgOp>() !=
                    nullptr;
@@ -320,7 +440,7 @@ struct FusionOfTensorOpsPass
       tensor::ExpandShapeOp::getCanonicalizationPatterns(
           collapsingReshapePatterns, context);
       tensor::populateFoldTensorEmptyPatterns(collapsingReshapePatterns);
-      memref::populateResolveRankedShapeTypeResultDimsPatterns(
+      memref::populateResolveRankedShapedTypeResultDimsPatterns(
           collapsingReshapePatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(collapsingReshapePatterns)))) {
@@ -346,26 +466,25 @@ struct FusionOfTensorOpsPass
       }
     }
 
-    if (fuseMultiUse) {
-      // Run fusion of producer with consumer when producer has multiple uses.
-      // For now run this sequence a fixed times (2 by default). Ideally we
-      // would run it till no candidates exist.
-      for (auto i : llvm::seq<unsigned>(0, multiUseFusionIteration)) {
-        (void)i;
-        auto &dominanceInfo = getAnalysis<DominanceInfo>();
-        FailureOr<unsigned> numOfFusableCandidates =
-            fuseMultiUseProducers(funcOp, context, dominanceInfo);
-        if (failed(numOfFusableCandidates)) {
-          funcOp->emitError("failed to fuse multi-use producers");
-          return signalPassFailure();
-        }
-        if (numOfFusableCandidates.value() == 0) break;
+    // Run fusion of producer with consumer when producer has multiple uses.
+    // For now run this sequence a fixed times (2 by default). Ideally we
+    // would run it till no candidates exist.
+    for (auto i : llvm::seq<unsigned>(0, multiUseFusionIteration)) {
+      (void)i;
+      auto &dominanceInfo = getAnalysis<DominanceInfo>();
+      FailureOr<unsigned> numOfFusableCandidates =
+          fuseMultiUseProducers(funcOp, context, dominanceInfo);
+      if (failed(numOfFusableCandidates)) {
+        funcOp->emitError("failed to fuse multi-use producers");
+        return signalPassFailure();
       }
+      if (numOfFusableCandidates.value() == 0)
+        break;
     }
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse,
@@ -374,7 +493,7 @@ createFusionOfTensorOpsPass(bool fuseMultiUse,
                                                  multiUseFusionIteration);
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

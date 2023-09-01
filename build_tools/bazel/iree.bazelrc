@@ -5,14 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 ###############################################################################
-# Short-hand config settings for IREE specific features.
-###############################################################################
-
-# Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING.
-# Builds the runtime with tracing support enabled.
-build --flag_alias=iree_enable_runtime_tracing=@tracy_client//:runtime_enable
-
-###############################################################################
 # Common flags that apply to all configurations.
 # Use sparingly for things common to all compilers and platforms.
 ###############################################################################
@@ -21,7 +13,7 @@ build --experimental_guard_against_concurrent_changes
 # Default to optimized builds
 # Override via: "-c dbg" or --compilation_mode=dbg
 build --compilation_mode=opt
-# Used in TensorFlow, so we have to enable it here as well.
+# Legacy from when we depended on TensorFlow, might not be needed in IREE.
 common --experimental_repo_remote_exec
 # Actually printing output on errors is... a useful default
 test --test_output=errors
@@ -41,10 +33,19 @@ build --enable_runfiles
 # breadcrumb.
 # build --incompatible_default_to_explicit_init_py
 
+# Disable split PIC/non-PIC build graphs and disable heuristic to link binaries
+# dynamically by default. See: https://github.com/openxla/iree/issues/13470
+build --dynamic_mode=off
+build --force_pic
+
 ###############################################################################
 # Build settings flag aliases. See https://bazel.build/rules/config
 ###############################################################################
 build --flag_alias=iree_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:link_shared
+# Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING + IREE_TRACING_PROVIDER.
+# Builds the runtime with tracing support enabled.
+build --flag_alias=iree_enable_runtime_tracing=//runtime/src/iree/base/tracing:tracing_provider
 
 ###############################################################################
 # Options for "generic_gcc" builds
@@ -63,8 +64,6 @@ build:generic_gcc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build:generic_gcc --copt=-Wno-unused-but-set-parameter
 build:generic_gcc --copt=-Wno-comment
 build:generic_gcc --copt=-Wno-attributes
-# NOTE: from a TF dep: external/upb/upb/upb.c and fails on GCC 10.
-build:generic_gcc --copt=-Wno-stringop-truncation
 
 ###############################################################################
 # Options for "generic_clang" builds: these options should generally apply to
@@ -132,6 +131,7 @@ build:generic_clang --copt=-Wno-user-defined-warnings
 # Explicitly enable some additional warnings.
 # Some of these aren't on by default, or under -Wall, or are subsets of warnings
 # turned off above.
+build:generic_clang --copt=-Wc++20-extensions
 build:generic_clang --copt=-Wctad-maybe-unsupported
 build:generic_clang --copt=-Wfloat-overflow-conversion
 build:generic_clang --copt=-Wfloat-zero-conversion
@@ -162,12 +162,10 @@ build:generic_clang --linkopt=-Wl,--fatal-warnings
 ###############################################################################
 
 build:macos_clang --config=generic_clang
-build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler@-Wno-unused-variable
-build:macos_clang --per_file_copt=tensorflow,iree_tf_compiler,utils@-Wno-range-loop-analysis
+build:macos_clang --per_file_copt=utils@-Wno-range-loop-analysis
 
 build:macos_clang_release --config=macos_clang
-build:macos_clang_release --per_file_copt=tensorflow,iree_tf_compiler@-Wno-unused-variable
-build:macos_clang_release --per_file_copt=tensorflow,iree_tf_compiler,utils@-Wno-range-loop-analysis
+build:macos_clang_release --per_file_copt=utils@-Wno-range-loop-analysis
 build:macos_clang_release --compilation_mode=opt
 build:macos_clang_release --copt=-DNDEBUG
 
@@ -279,8 +277,7 @@ build:remote_cache_bazel_ci --config=_remote_cache_base
 # specific docker container the CI Bazel builds are run in. The image URL is
 # included for clarity and so that this reference is automatically updated by
 # manage_images.py
-build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:8be446ba48a571b37c861574391c10715130d28cd5cadc86e5ec8080c0c6d4fa"}'
-build:remote_cache_bazel_tf_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/frontends-swiftshader@sha256:414071144e8b742ec61eccf69a657e13424513b7574153820367de355e494e0a"}'
+build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:89656f131eb6efc97585f6b71b2cedbaa9ae79b539362d2545b19a9bbaf7501c"}'
 
 
 ###############################################################################
@@ -340,38 +337,9 @@ build:_msvc_base --per_file_copt=farmhash@/wd4319 # zero extending to T of great
 build:_msvc_base --linkopt=/IGNORE:4217 # mismatch import/export declspec
 build:_msvc_base --linkopt=/IGNORE:4001 # no object files
 
-# Flags to make tensorflow build.
-# Some of these are also of general use and fine to enable globally for windows.
-build:_msvc_base --copt=/arch:AVX
-# Host and target are the same in windows so don't waste time building both.
-build:_msvc_base --distinct_host_configuration=false
-# TensorFlow requires the "monolithic" build mode for now on Windows.
-build:_msvc_base --define framework_shared_object=false
-
-# Workaround WinGDI.h defining `ERROR`, which conflicts with logging macros.
-# Note that IREE and TensorFlow both `#undef ERROR` and define their own
-# separate logging constants with the same name, but IREE needs the Windows
-# "graphics device interface" (GDI) for certain GUI sample projects.
-build:_msvc_base --per_file_copt=tensorflow@-DNOGDI
-
-# Disables TensorFlow eigen bloat and reduces compile times.
-build:_msvc_base --define=override_eigen_strong_inline=true
-
-# Another TensorFlow flag from their config script.
-build:_msvc_base --define with_default_optimizations=true
-
 # Separate configs for different MSVC versions as we might want slightly different options.
 build:msvc2017 --config=_msvc_base
 build:msvc2019 --config=_msvc_base
-
-# TensorFlow builds depend on this flag, but it doesn't appear to work with
-# gmock in some of our unit tests, so only enable it for TensorFlow files.
-# MSVC (Windows): Standards-conformant preprocessor mode
-# See https://docs.microsoft.com/en-us/cpp/preprocessor/preprocessor-experimental-overview
-build:msvc2017 --per_file_copt=tensorflow@/experimental:preprocessor
-# It's also called different things in different MSVC versions and will spam the logs
-# if we use the old name with a newer msvc.
-build:msvc2019 --per_file_copt=tensorflow@/Zc:preprocessor
 
 # Assume the newer version and alias to --config=windows
 build:msvc --config=msvc2019

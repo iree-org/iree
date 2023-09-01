@@ -22,11 +22,6 @@
 // !custom.string type
 //===----------------------------------------------------------------------===//
 
-// Runtime type descriptor for the !custom.string describing how to manage it
-// and destroy it. The type ID is allocated at runtime and does not need to
-// match the compiler ID.
-static iree_vm_ref_type_descriptor_t iree_custom_string_descriptor = {0};
-
 // The "string" type we use to store and retain string data.
 // This could be arbitrarily complex or simply wrap another user-defined type.
 // The descriptor that is registered at startup defines how to manage the
@@ -43,6 +38,9 @@ typedef struct iree_custom_string_t {
   iree_string_view_t value;
 } iree_custom_string_t;
 
+// Runtime type descriptor for the !custom.string describing how to manage it
+// and destroy it. The type ID is allocated at runtime and does not need to
+// match the compiler ID.
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_custom_string, iree_custom_string_t);
 
 extern "C" iree_status_t iree_custom_string_create(
@@ -67,17 +65,27 @@ extern "C" void iree_custom_string_destroy(void* ptr) {
   iree_allocator_free(string->allocator, ptr);
 }
 
-extern "C" iree_status_t iree_custom_module_basic_register_types(
+static iree_vm_ref_type_descriptor_t iree_custom_string_descriptor_storage = {
+    0};
+
+// Registers types provided by the custom module.
+// We must call this before any of our types can be resolved.
+iree_status_t iree_custom_module_basic_register_types(
     iree_vm_instance_t* instance) {
-  if (iree_custom_string_descriptor.type) {
-    return iree_ok_status();  // Already registered.
-  }
-  iree_custom_string_descriptor.type_name =
-      iree_make_cstring_view("custom.string");
-  iree_custom_string_descriptor.offsetof_counter =
-      offsetof(iree_custom_string_t, ref_object.counter);
-  iree_custom_string_descriptor.destroy = iree_custom_string_destroy;
-  return iree_vm_ref_register_type(&iree_custom_string_descriptor);
+  iree_custom_string_descriptor_storage.destroy = iree_custom_string_destroy;
+  iree_custom_string_descriptor_storage.type_name = IREE_SV("custom.string");
+  iree_custom_string_descriptor_storage.offsetof_counter =
+      offsetof(iree_custom_string_t, ref_object.counter) /
+      IREE_VM_REF_COUNTER_ALIGNMENT;
+  return iree_vm_instance_register_type(instance,
+                                        &iree_custom_string_descriptor_storage,
+                                        &iree_custom_string_registration);
+}
+
+static void iree_custom_module_basic_unregister_types(
+    iree_vm_instance_t* instance) {
+  iree_vm_instance_unregister_type(instance,
+                                   &iree_custom_string_descriptor_storage);
 }
 
 //===----------------------------------------------------------------------===//
@@ -96,8 +104,8 @@ using namespace iree;
 // it must synchronize itself.
 class CustomModuleState final {
  public:
-  explicit CustomModuleState(iree_allocator_t allocator)
-      : allocator_(allocator) {}
+  explicit CustomModuleState(iree_allocator_t host_allocator)
+      : host_allocator_(host_allocator) {}
   ~CustomModuleState() = default;
 
   // Creates a new string with a copy of the given string data.
@@ -105,7 +113,8 @@ class CustomModuleState final {
   StatusOr<vm::ref<iree_custom_string_t>> StringCreate(
       iree_string_view_t data) {
     vm::ref<iree_custom_string_t> string;
-    IREE_RETURN_IF_ERROR(iree_custom_string_create(data, allocator_, &string));
+    IREE_RETURN_IF_ERROR(
+        iree_custom_string_create(data, host_allocator_, &string));
     fprintf(stdout, "CREATE %.*s\n", static_cast<int>(string->value.size),
             string->value.data);
     fflush(stdout);
@@ -118,8 +127,9 @@ class CustomModuleState final {
       // Passed in refs may be null.
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "null string arg");
     }
-    fprintf(stdout, "LENGTH %.*s = %zu\n", static_cast<int>(string->value.size),
-            string->value.data, string->value.size);
+    fprintf(stdout, "LENGTH %.*s = %" PRIhsz "\n",
+            static_cast<int>(string->value.size), string->value.data,
+            string->value.size);
     fflush(stdout);
     return static_cast<int64_t>(string->value.size);
   }
@@ -142,7 +152,7 @@ class CustomModuleState final {
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
-  iree_allocator_t allocator_ = iree_allocator_system();
+  iree_allocator_t host_allocator_;
 };
 
 // Function table mapping imported function names to their implementation.
@@ -171,6 +181,10 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
  public:
   using vm::NativeModule<CustomModuleState>::NativeModule;
 
+  ~CustomModule() override {
+    iree_custom_module_basic_unregister_types(instance());
+  }
+
   // Creates per-context state when the module is added to a new context.
   // May be called from any thread.
   StatusOr<std::unique_ptr<CustomModuleState>> CreateState(
@@ -189,10 +203,22 @@ extern "C" iree_status_t iree_custom_module_basic_create(
     iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
+
+  // Register the types used by the module.
+  // The CustomModule destructor will unregister them when it's done.
+  // Unregistration isn't strictly required in some cases but is good practice.
+  iree_custom_module_basic_register_types(instance);
+
+  // NOTE: this isn't using the allocator here and that's bad as it leaves
+  // untracked allocations and pulls in the system allocator that may differ
+  // from the one requested by the user.
+  // TODO(benvanik): std::allocator wrapper around iree_allocator_t so this can
+  // use that instead.
   auto module = std::make_unique<CustomModule>(
       "custom", /*version=*/0, instance, allocator,
       iree::span<const vm::NativeFunction<CustomModuleState>>(
           kCustomModuleFunctions));
+
   *out_module = module.release()->interface();
   return iree_ok_status();
 }

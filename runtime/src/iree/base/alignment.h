@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/base/attributes.h"
 #include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 
@@ -48,6 +49,18 @@ static_assert(sizeof(void*) == sizeof(uintptr_t),
 // Alignment utilities
 //===----------------------------------------------------------------------===//
 
+// Returns the number of elements in an array as a compile-time constant, which
+// can be used in defining new arrays. Fails at compile-time if |arr| is not a
+// static array (such as if used on a pointer type). Similar to `countof()`.
+//
+// Example:
+//  uint8_t kConstantArray[512];
+//  assert(IREE_ARRAYSIZE(kConstantArray) == 512);
+#define IREE_ARRAYSIZE(arr) (sizeof(arr) / sizeof(arr[0]))
+
+#define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
+#define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
+
 // https://en.cppreference.com/w/c/types/max_align_t
 #if defined(IREE_PLATFORM_WINDOWS)
 // NOTE: 16 is a specified Microsoft API requirement for some functions.
@@ -73,6 +86,11 @@ static inline iree_host_size_t iree_host_align(iree_host_size_t value,
   return (value + (alignment - 1)) & ~(alignment - 1);
 }
 
+// Returns true if |value| is a power-of-two.
+static inline bool iree_host_size_is_power_of_two(iree_host_size_t value) {
+  return (value != 0) && ((value & (value - 1)) == 0);
+}
+
 // Returns true if |value| matches the given minimum |alignment|.
 static inline bool iree_host_size_has_alignment(iree_host_size_t value,
                                                 iree_host_size_t alignment) {
@@ -84,6 +102,11 @@ static inline bool iree_host_size_has_alignment(iree_host_size_t value,
 static inline iree_device_size_t iree_device_align(
     iree_device_size_t value, iree_device_size_t alignment) {
   return (value + (alignment - 1)) & ~(alignment - 1);
+}
+
+// Returns true if |value| is a power-of-two.
+static inline bool iree_device_size_is_power_of_two(iree_device_size_t value) {
+  return (value != 0) && ((value & (value - 1)) == 0);
 }
 
 // Returns true if |value| matches the given minimum |alignment|.
@@ -105,6 +128,79 @@ static inline bool iree_device_size_has_alignment(
 //  iree_host_size_t total_size = iree_sizeof_struct(*buffer) + extra_data_size;
 //  IREE_CHECK_OK(iree_allocator_malloc(allocator, total_size, (void**)&p));
 #define iree_sizeof_struct(t) iree_host_align(sizeof(t), iree_max_align_t)
+
+// Returns the ceil-divide of |lhs| by non-zero |rhs|.
+static inline iree_device_size_t iree_device_size_ceil_div(
+    iree_device_size_t lhs, iree_device_size_t rhs) {
+  return ((lhs != 0) && (lhs > 0) == (rhs > 0))
+             ? ((lhs + ((rhs > 0) ? -1 : 1)) / rhs) + 1
+             : -(-lhs / rhs);
+}
+
+// Returns the floor-divide of |lhs| by non-zero |rhs|.
+static inline iree_device_size_t iree_device_size_floor_div(
+    iree_device_size_t lhs, iree_device_size_t rhs) {
+  return ((lhs != 0) && ((lhs < 0) != (rhs < 0)))
+             ? -((-lhs + ((rhs < 0) ? 1 : -1)) / rhs) - 1
+             : lhs / rhs;
+}
+
+// Returns the greatest common divisor between two values.
+//
+// See: https://en.wikipedia.org/wiki/Greatest_common_divisor
+//
+// Examples:
+//  gcd(8, 16) = 8
+//  gcd(3, 5) = 1
+static inline iree_device_size_t iree_device_size_gcd(iree_device_size_t a,
+                                                      iree_device_size_t b) {
+  if (b == 0) return a;
+  return iree_device_size_gcd(b, a % b);
+}
+
+// Returns the least common multiple between two values, often used for
+// finding a common alignment.
+//
+// See: https://en.wikipedia.org/wiki/Least_common_multiple
+//
+// Examples:
+//  lcm(8, 16) = 16
+//  lcm(3, 5) = 15 (15 % 3 == 0, 15 % 5 == 0)
+static inline iree_device_size_t iree_device_size_lcm(iree_device_size_t a,
+                                                      iree_device_size_t b) {
+  return a * (b / iree_device_size_gcd(a, b));
+}
+
+//===----------------------------------------------------------------------===//
+// Alignment intrinsics
+//===----------------------------------------------------------------------===//
+
+#if IREE_HAVE_BUILTIN(__builtin_unreachable) || defined(__GNUC__)
+#define IREE_BUILTIN_UNREACHABLE() __builtin_unreachable()
+#elif defined(IREE_COMPILER_MSVC)
+#define IREE_BUILTIN_UNREACHABLE() __assume(false)
+#else
+#define IREE_BUILTIN_UNREACHABLE() ((void)0)
+#endif  // IREE_HAVE_BUILTIN(__builtin_unreachable) || defined(__GNUC__)
+
+#if !defined(__cplusplus)
+#define IREE_DECLTYPE(v) __typeof__(v)
+#else
+#define IREE_DECLTYPE(v) decltype(v)
+#endif  // __cplusplus
+
+#if IREE_HAVE_BUILTIN(__builtin_assume_aligned) || defined(__GNUC__)
+// NOTE: gcc only assumes on the result so we have to reset ptr.
+#define IREE_BUILTIN_ASSUME_ALIGNED(ptr, size) \
+  (ptr = (IREE_DECLTYPE(ptr))(__builtin_assume_aligned((void*)(ptr), (size))))
+#elif 0  // defined(IREE_COMPILER_MSVC)
+#define IREE_BUILTIN_ASSUME_ALIGNED(ptr, size) \
+  (__assume((((uintptr_t)(ptr)) & ((1 << (size))) - 1)) == 0)
+#else
+#define IREE_BUILTIN_ASSUME_ALIGNED(ptr, size) \
+  ((((uintptr_t)(ptr) % (size)) == 0) ? (ptr)  \
+                                      : (IREE_BUILTIN_UNREACHABLE(), (ptr)))
+#endif  // IREE_HAVE_BUILTIN(__builtin_assume_aligned) || defined(__GNUC__)
 
 //===----------------------------------------------------------------------===//
 // Alignment-safe memory accesses

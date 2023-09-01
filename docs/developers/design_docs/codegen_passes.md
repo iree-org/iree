@@ -639,8 +639,8 @@ SPIR-V within the [`ConvertToSPIRVPass`][ConvertToSPIRV]. These are
 Once applied the resulting IR is in SPIR-V dialect that can be serialized to a
 SPIR-V binary.
 
-[ConvertToGPU]: https://github.com/iree-org/iree/blob/main/iree/compiler/Conversion/LinalgToSPIRV/ConvertToGPUPass.cpp
-[ConvertToSPIRV]: https://github.com/iree-org/iree/blob/main/iree/compiler/Conversion/LinalgToSPIRV/ConvertToSPIRVPass.cpp
+[ConvertToGPU]: https://github.com/openxla/iree/blob/main/iree/compiler/Conversion/LinalgToSPIRV/ConvertToGPUPass.cpp
+[ConvertToSPIRV]: https://github.com/openxla/iree/blob/main/iree/compiler/Conversion/LinalgToSPIRV/ConvertToSPIRVPass.cpp
 [DotAfterAll]: https://gist.github.com/MaheshRavishankar/9e2d406296f469515c4a79bf1e7eef44
 [GPUToSPIRV]: https://github.com/llvm/llvm-project/blob/master/mlir/include/mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h
 [HLOToLinalgPass]: https://github.com/tensorflow/tensorflow/blob/75c40f6bff2faa3d90a375dfa4025b2e6e2d7a3d/tensorflow/compiler/mlir/xla/transforms/passes.h#L67
@@ -649,7 +649,7 @@ SPIR-V binary.
 [LinalgFusionOfTensorOps]: https://github.com/llvm/llvm-project/blob/80cb25cbd555f9634836b766c86aead435b60eaa/mlir/include/mlir/Dialect/Linalg/Passes.td#L30
 [LinalgPromotionPatterns]: https://github.com/llvm/llvm-project/blob/303a7f7a26e2aae1cb85f49dccbc0b5d14e0b2e0/mlir/include/mlir/Dialect/Linalg/Transforms/Transforms.h#L358
 [LinalgRationale]: https://mlir.llvm.org/docs/Rationale/RationaleLinalgDialect/
-[LinalgTileAndFuse]: https://github.com/iree-org/iree/blob/main/iree/compiler/Conversion/LinalgToSPIRV/LinalgTileAndFusePass.cpp
+[LinalgTileAndFuse]: https://github.com/openxla/iree/blob/main/iree/compiler/Conversion/LinalgToSPIRV/LinalgTileAndFusePass.cpp
 [LinalgTiling]: https://mlir.llvm.org/docs/Dialects/Linalg/#set-of-key-transformationsa-namekey_transformationsa
 [LinalgTilingPatterns]: https://github.com/llvm/llvm-project/blob/master/mlir/include/mlir/Dialect/Linalg/Transforms/Transforms.h
 [NVVMAddressSpace]: https://docs.nvidia.com/cuda/nvvm-ir-spec/index.html#address-space

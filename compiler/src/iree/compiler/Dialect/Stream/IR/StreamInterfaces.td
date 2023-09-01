@@ -18,7 +18,7 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
 
   let summary = [{defines execution context affinity}];
   let description = [{
-    WIP; see https://github.com/iree-org/iree/issues/10765.
+    WIP; see [#10765](https://github.com/openxla/iree/issues/10765).
 
     TBD. The intent is that this can specify host, device, and queue affinity.
     Scopes can be annotated with an affinity to ensure execution within happens
@@ -234,53 +234,6 @@ def Stream_SubviewEffectOp : OpInterface<"SubviewEffectOpInterface"> {
     // AsyncAccessOpInterface this will not be able to provide the access
     // range end as we don't track that (we assume it's been taken care of
     // earlier on in lowering).
-  ];
-}
-
-//===----------------------------------------------------------------------===//
-// IREE::Stream::BuiltinOpInterface
-//===----------------------------------------------------------------------===//
-
-def Stream_BuiltinOp : OpInterface<"BuiltinOpInterface"> {
-  let description = [{
-    Interface for ops that can be asynchronous executed in a streaming context.
-  }];
-
-  let methods = [
-    InterfaceMethod<
-      /*desc=*/[{
-        Merges the builtin module for the op into the target user module. By
-        doing a top level module merge the builtin can provide host functions
-        and multiple executables as needed.
-
-        This should not specialize the executable yet as callers currently
-        assume all builtin ops of the same type will have the same module IR.
-        If we want to specialize the executables based on usage we'll need a
-        more complex interface.
-
-        Fails if there's a name conflict; we have a __ prefix and things outside
-        the compiler shouldn't use it.
-      }],
-      /*retTy=*/"LogicalResult",
-      /*methodName=*/"mergeBuiltinModule",
-      /*args=*/(ins "Operation *":$targetOp, "OpBuilder &":$targetBuilder)
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Converts a stream.builtin.* op to its stream.async.* form. Any number of
-        ops may be inserted such as transfers and resource operations.
-
-        This is called in the stream.async.* phase of lowering and before
-        resource refinement or copy-on-write materialization has happened; this
-        enables the conversion to create new tensors as `!stream.resource<*>`.
-
-        The original op must remain valid after the call completes; the caller
-        of this needs to erase it themselves.
-      }],
-      /*retTy=*/"LogicalResult",
-      /*methodName=*/"convertBuiltinOp",
-      /*args=*/(ins "OpBuilder &":$builder)
-    >,
   ];
 }
 

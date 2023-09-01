@@ -47,7 +47,8 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
 
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer(
+    status = iree_hal_buffer_view_allocate_buffer_copy(
+        iree_runtime_session_device(session),
         iree_runtime_session_device_allocator(session),
         /*shape_rank=*/0, /*shape=*/NULL, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
@@ -79,7 +80,8 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
 
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer(
+    status = iree_hal_buffer_view_allocate_buffer_copy(
+        iree_runtime_session_device(session),
         iree_runtime_session_device_allocator(session), /*shape_rank=*/0,
         /*shape=*/NULL, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,

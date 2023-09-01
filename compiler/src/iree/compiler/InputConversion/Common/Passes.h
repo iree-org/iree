@@ -7,12 +7,16 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 #define IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 
+#include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+#define GEN_PASS_DECL
+#include "iree/compiler/InputConversion/Common/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Pipelines
@@ -26,6 +30,10 @@ void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
 // Passes
 //===----------------------------------------------------------------------===//
 
+std::unique_ptr<OperationPass<ModuleOp>>
+createAutoInputConversionPipelinePass();
+std::unique_ptr<OperationPass<ModuleOp>> createAutoInputConversionPipelinePass(
+    const AutoInputConversionPipelineOptions &options);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
 std::unique_ptr<OperationPass<ModuleOp>> createImportMLProgramPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -33,7 +41,6 @@ createLinalgQuantizedConvToConvPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedMatmulToMatmulPass();
 std::unique_ptr<OperationPass<ModuleOp>> createSanitizeModuleNamesPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createTopLevelSCFToCFGPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -41,7 +48,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTopLevelSCFToCFGPass();
 
 void registerCommonInputConversionPasses();
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
+#endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_

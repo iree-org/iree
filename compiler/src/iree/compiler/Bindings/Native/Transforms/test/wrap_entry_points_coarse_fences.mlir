@@ -8,12 +8,12 @@
 //  CHECK-SAME:   iree.abi.stub
 //  CHECK-SAME:   iree.reflection = {iree.abi.model = "coarse-fences"}
 //  CHECK-SAME: } {
-//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] : !hal.buffer_view -> tensor<4xf32>
-//  CHECK-NEXT:   %[[ARG1_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG1]] : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[ARG1_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<4xf32>
 //  CHECK-NEXT:   %[[RESULT_TENSORS:.+]]:2 = call @_asyncEntry(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
 //  CHECK-NEXT:   %[[READY_TENSORS:.+]]:2 = hal.tensor.barrier join(%[[RESULT_TENSORS]]#0, %[[RESULT_TENSORS]]#1 : tensor<4xf32>, tensor<4xf32>) => %[[SIGNAL]] : !hal.fence
-//  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[READY_TENSORS]]#0 : tensor<4xf32> -> !hal.buffer_view
-//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[READY_TENSORS]]#1 : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[READY_TENSORS]]#0 "output 0" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[READY_TENSORS]]#1 "output 1" : tensor<4xf32> -> !hal.buffer_view
 //  CHECK-NEXT:   return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }
 
@@ -56,7 +56,7 @@ func.func @primitiveArgOnly(%arg0: i32) {
 
 // CHECK-LABEL: func.func @tensorArgOnly
 //  CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
-//       CHECK:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] : !hal.buffer_view -> tensor<4xf32>
+//       CHECK:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<4xf32>
 //  CHECK-NEXT:   call @_tensorArgOnly(%[[ARG0_TENSOR]])
 //  CHECK-NEXT:   hal.fence.signal<%[[SIGNAL]] : !hal.fence>
 //  CHECK-NEXT:   return

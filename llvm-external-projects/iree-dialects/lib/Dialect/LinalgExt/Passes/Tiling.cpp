@@ -56,7 +56,7 @@ verifySupportedTilingOptions(PatternRewriter &rewriter, Operation *op,
 /// converted to an `IntegerAttr` of that value. So here just return true if
 /// this is an attribute with a zero value.
 static bool isUntiledLoop(OpFoldResult valueOrAttr) {
-  Optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
+  std::optional<int64_t> intVal = getConstantIntValue(valueOrAttr);
   return intVal && *intVal == 0;
 }
 
@@ -89,32 +89,27 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
   // the op by invoking the TiledOpInterface methods.
   if (loopDepth == tileSizes.size()) {
     TiledOp ret;
-    SmallVector<Operation *> tiledOps =
+    FailureOr<TilingResult> tiledOps =
         tilableOp.getTiledImplementation(builder, offsets, tileSizes);
-    if (tiledOps.empty()) {
+    if (failed(tiledOps)) {
       return static_cast<LogicalResult>(
           tilableOp.emitOpError("failed to get tiled implementation"));
     }
-    assert(
-        (tiledOps.size() == 1 ||
-         (tiledOps.size() == 2 &&
-          isa<IREE::LinalgExt::UnPackOp>(tilableOp.getOperation()))) &&
-        "expected only a single operation returned from tiling implementation");
-    ret.op.assign(tiledOps);
-    for (auto result : llvm::enumerate(ret.op.back()->getResults())) {
-      if (!result.value().getType().isa<RankedTensorType>()) {
-        ret.results.push_back(result.value());
+    ret.op.append(tiledOps->tiledOps);
+    for (auto [index, result] : llvm::enumerate(tilableOp->getResults())) {
+      if (!result.getType().isa<RankedTensorType>()) {
+        ret.results.push_back(result);
         continue;
       }
       SmallVector<OpFoldResult> resultOffsets, resultSizes;
-      if (succeeded(tilableOp.getResultTilePosition(
-              builder, result.index(), offsets, tileSizes, resultOffsets,
-              resultSizes))) {
+      if (succeeded(tilableOp.getResultTilePosition(builder, index, offsets,
+                                                    tileSizes, resultOffsets,
+                                                    resultSizes))) {
         SmallVector<OpFoldResult> resultStrides(resultOffsets.size(),
                                                 builder.getIndexAttr(1));
         Value insertSlice = builder.create<tensor::InsertSliceOp>(
-            loc, ret.op.back()->getResult(result.index()),
-            outputs[result.index()], resultOffsets, resultSizes, resultStrides);
+            loc, tiledOps->tiledValues[index], outputs[index], resultOffsets,
+            resultSizes, resultStrides);
         ret.results.push_back(insertSlice);
       }
     }
@@ -166,7 +161,7 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
         // Similar to linalg tiling, the tile size is the min(tileSizes, ub -
         // iv) to account for cases where tile size does not divide (ub - lb)
         // exactly.
-        Value inBoundsTileSize = b.create<AffineMinOp>(
+        Value inBoundsTileSize = b.create<affine::AffineMinOp>(
             loc, affineMaps,
             ValueRange{iv,
                        getValueOrCreateConstantIndexOp(builder, loc,
@@ -307,20 +302,14 @@ TilingInterfaceTilingPattern::matchAndRewrite(TilingInterface tilableOp,
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// A simple pattern rewriter that implements no special logic.
-class SimpleRewriter : public PatternRewriter {
-public:
-  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
-};
-
 struct TilingInterfaceTilingPass
     : public TilingInterfaceTilingBase<TilingInterfaceTilingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<
-        AffineDialect, IREE::Input::IREEInputDialect, linalg::LinalgDialect,
-        IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-        func::FuncDialect, mlir::arith::ArithDialect, math::MathDialect,
-        tensor::TensorDialect, scf::SCFDialect>();
+        affine::AffineDialect, IREE::Input::IREEInputDialect,
+        linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+        memref::MemRefDialect, func::FuncDialect, mlir::arith::ArithDialect,
+        math::MathDialect, tensor::TensorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override;
 };
@@ -414,33 +403,6 @@ void TilingInterfaceTilingPass::runOnOperation() {
 
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
-  }
-
-  // TODO(hanchung): Deprecate IREE specific logic. We should move to use
-  // upstream scf::tileUsingSCFForOp method. For now only uses it for packing
-  // and unpacking ops.
-  {
-    SimpleRewriter rewriter(context);
-    auto filter = IREE::LinalgExt::LinalgTransformationFilter(
-        StringAttr::get(context, "tiling_pack_input"),
-        StringAttr::get(context, "tiling_pack_output"));
-    auto options = scf::SCFTilingOptions().setTileSizes({2, 4});
-    auto funcOp = getOperation();
-    funcOp->walk([&](Operation *tilableOp) {
-      if (failed(filter.checkAndNotify(rewriter, tilableOp))) {
-        return;
-      }
-
-      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-          rewriter, cast<TilingInterface>(tilableOp), options);
-      if (failed(tilingResult))
-        return signalPassFailure();
-      rewriter.replaceOp(tilableOp, tilingResult->replacements);
-
-      for (auto op : tilingResult.value().tiledOps) {
-        filter.replaceLinalgTransformationFilter(rewriter, op);
-      }
-    });
   }
 }
 

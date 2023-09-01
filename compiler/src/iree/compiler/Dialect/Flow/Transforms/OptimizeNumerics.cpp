@@ -23,22 +23,23 @@ namespace {
 
 int getNextPotBitWidth(int bitWidth, int minBitWidth = 8) {
   for (int i = minBitWidth;; i *= 2) {
-    if (i >= bitWidth) return i;
+    if (i >= bitWidth)
+      return i;
   }
 }
 
-Type withNewElementType(Type origType, Type elementType) {
-  if (auto st = origType.dyn_cast<ShapedType>()) {
+Type withNewElementType(Type originalType, Type elementType) {
+  if (auto st = llvm::dyn_cast<ShapedType>(originalType)) {
     return st.clone(elementType);
   } else {
     return elementType;
   }
 }
 
-Type makeLowPType(Type origType, int bitWidth) {
-  auto *context = origType.getContext();
+Type makeLowPType(Type originalType, int bitWidth) {
+  auto *context = originalType.getContext();
   auto elementType = IntegerType::get(context, bitWidth);
-  return withNewElementType(origType, elementType);
+  return withNewElementType(originalType, elementType);
 }
 
 Value castNumeric(Value origValue, Type toType, bool isSigned,
@@ -47,14 +48,15 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
   Type origElementType = getElementTypeOrSelf(origValue.getType());
   Type toElementType = getElementTypeOrSelf(toType);
 
-  if (origElementType.isa<FloatType>() && toElementType.isa<IntegerType>()) {
+  if (llvm::isa<FloatType>(origElementType) &&
+      llvm::isa<IntegerType>(toElementType)) {
     if (isSigned) {
       return builder.create<arith::FPToSIOp>(loc, toType, origValue);
     } else {
       return builder.create<arith::FPToUIOp>(loc, toType, origValue);
     }
-  } else if (origElementType.isa<IntegerType>() &&
-             toElementType.isa<FloatType>()) {
+  } else if (llvm::isa<IntegerType>(origElementType) &&
+             llvm::isa<FloatType>(toElementType)) {
     if (isSigned) {
       return builder.create<arith::SIToFPOp>(loc, toType, origValue);
     } else {
@@ -70,7 +72,7 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
 }
 
 struct NarrowParams {
-  static Optional<NarrowParams> forValue(Value value) {
+  static std::optional<NarrowParams> forValue(Value value) {
     if (auto narrowOp =
             llvm::dyn_cast_or_null<IREE::Util::NumericOptionalNarrowOp>(
                 value.getDefiningOp())) {
@@ -85,34 +87,41 @@ struct NarrowParams {
     return {};
   }
 
-  bool isFromFloat() { return getElementTypeOrSelf(fromType).isa<FloatType>(); }
+  bool isFromFloat() {
+    return llvm::isa<FloatType>(getElementTypeOrSelf(fromType));
+  }
 
-  bool isToInteger() { return toElementType.isa<IntegerType>(); }
+  bool isToInteger() { return llvm::isa<IntegerType>(toElementType); }
 
-  bool isToSigned() { return toElementType.cast<IntegerType>().isSigned(); }
+  bool isToSigned() {
+    return llvm::cast<IntegerType>(toElementType).isSigned();
+  }
 
-  int getToBitWidth() { return toElementType.cast<IntegerType>().getWidth(); }
+  int getToBitWidth() {
+    return llvm::cast<IntegerType>(toElementType).getWidth();
+  }
 
   Value producer;
   Type fromType;
   Type toElementType;
-  Optional<std::pair<int64_t, int64_t>> range;
+  std::optional<std::pair<int64_t, int64_t>> range;
 };
 
-// Eliminates a cast produced by an init_tensor by just initializing to that
+// Eliminates a cast produced by an empty by just initializing to that
 // type directly.
-struct LinalgInitTensorCast
+struct TensorEmptyCast
     : OpInterfaceRewritePattern<IREE::Util::NumericCastOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(IREE::Util::NumericCastOpInterface castOp,
                                 PatternRewriter &rewriter) const override {
-    auto emptyTensorOp = castOp.getInput().getDefiningOp<tensor::EmptyOp>();
-    if (!emptyTensorOp) return failure();
+    auto emptyOp = castOp.getInput().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp)
+      return failure();
     Type resultType = castOp.getCasted().getType();
 
-    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
-        castOp, resultType, emptyTensorOp.getDynamicSizes());
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(castOp, resultType,
+                                                 emptyOp.getDynamicSizes());
     return success();
   }
 };
@@ -126,7 +135,8 @@ struct LinalgFillCast
                                 PatternRewriter &rewriter) const override {
     auto loc = castOp.getLoc();
     auto fillOp = castOp.getInput().getDefiningOp<linalg::FillOp>();
-    if (!fillOp) return failure();
+    if (!fillOp)
+      return failure();
     Type toElementType = getElementTypeOrSelf(castOp.getCastedType());
 
     Value fillInput = fillOp.value();
@@ -263,7 +273,7 @@ class OptimizeNumericsPass : public OptimizeNumericsBase<OptimizeNumericsPass> {
     patterns.insert<LinalgFpMatmulToLowP>(context);
 
     // Cast propagation.
-    patterns.insert<LinalgInitTensorCast>(context);
+    patterns.insert<TensorEmptyCast>(context);
     patterns.insert<LinalgFillCast>(context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
@@ -273,13 +283,13 @@ class OptimizeNumericsPass : public OptimizeNumericsBase<OptimizeNumericsPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<Pass> createOptimizeNumericsPass() {
   return std::make_unique<OptimizeNumericsPass>();
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

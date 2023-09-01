@@ -66,8 +66,8 @@ trap "deactivate 2> /dev/null" EXIT
 # specific version when iterating on metrics is useful, and fetching is slow.
 
 python -m pip install --upgrade \
-  --find-links https://iree-org.github.io/iree/pip-release-links.html \
-  iree-compiler iree-tools-tflite iree-tools-xla
+  --find-links https://openxla.github.io/iree/pip-release-links.html \
+  iree-compiler iree-tools-tflite
 
 ###############################################################################
 # Download program source files                                               #
@@ -84,8 +84,8 @@ wget -nc https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallSta
 # Import programs into MLIR                                                   #
 ###############################################################################
 
-# Note: you can also download imported programs from runs of the
-# https://buildkite.com/iree/iree-benchmark-android pipeline.
+# Note: you can also download imported programs from CI runs:
+# https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/benchmark_suites.md#fetching-benchmark-artifacts-from-ci
 
 IREE_IMPORT_TFLITE_PATH=iree-import-tflite
 
@@ -131,7 +131,7 @@ function compile_program_wasm {
   "${IREE_COMPILE_PATH?}" "${INPUT_FILE}" \
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-target-triple=wasm32-unknown-emscripten \
+    --iree-llvmcpu-target-triple=wasm32-unknown-emscripten \
     --iree-hal-dump-executable-sources-to="${ARTIFACTS_DIR}" \
     --iree-hal-dump-executable-binaries-to="${ARTIFACTS_DIR}" \
     --iree-scheduling-dump-statistics-format=csv \

@@ -151,3 +151,25 @@ vm.module @my_module {
     vm.return %0 : i32
   }
 }
+
+// -----
+
+// CHECK-LABEL: @min_i32_s
+vm.module @my_module {
+  vm.func @min_i32_s(%arg0 : i32, %arg1 : i32) -> i32 {
+    // CHECK: %0 = vm.min.i32.s %arg0, %arg1 : i32
+    %0 = vm.min.i32.s %arg0, %arg1 : i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @max_i32_s
+vm.module @my_module {
+  vm.func @max_i32_s(%arg0 : i32, %arg1 : i32) -> i32 {
+    // CHECK: %0 = vm.max.i32.s %arg0, %arg1 : i32
+    %0 = vm.max.i32.s %arg0, %arg1 : i32
+    vm.return %0 : i32
+  }
+}

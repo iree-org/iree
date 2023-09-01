@@ -9,7 +9,6 @@
 #include <cstddef>
 #include <cstdio>
 
-#include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
 struct iree_hal_vulkan_debug_reporter_t {

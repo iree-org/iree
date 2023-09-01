@@ -7,10 +7,10 @@
 # Import the main bazelrc config. This is in a separate file so that it's
 # possible to turn off some or all user and system bazelrc options by specifying
 # `--nosystem_rc --nohome_rc --noworkspace_rc --bazelrc=build_tools/bazel/iree.bazelrc`
-try-import %workspace%/build_tools/bazel/iree.bazelrc
+import %workspace%/build_tools/bazel/iree.bazelrc
 
 # Run the configure_bazel.py script to generate.
-try-import %workspace%/configured.bazelrc
+import %workspace%/configured.bazelrc
 
 # The user.bazelrc file is not checked in but available for local mods.
 # Always keep this at the end of the file so that user flags override.

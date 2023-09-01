@@ -55,7 +55,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu  \
 // RUN:     --iree-codegen-llvmcpu-enable-transform-dialect-jit | \
-// RUN: iree-run-module --function=reduce --device=local-task --input="32x256xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=local-task --input="32x256xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
 //      CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
@@ -67,7 +67,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 //          CHECK:   scf.yield %{{.*}} : vector<8xf32>
 //          CHECK: }
 //          CHECK: math.sqrt %{{.*}} : vector<8xf32>
-//          CHECK: vector.store %{{.*}} : memref<8xf32, strided<[1], offset: ?>>, vector<8xf32>
+//          CHECK: vector.store %{{.*}} : memref<8xf32, strided<[1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<8xf32>
 
 //      EXEC: result[0]: hal.buffer_view
 // EXEC-NEXT: 32xf32=32 32 32 32 32 32 32 32

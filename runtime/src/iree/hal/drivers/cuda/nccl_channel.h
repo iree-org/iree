@@ -19,6 +19,21 @@
 extern "C" {
 #endif  // __cplusplus
 
+// Returns true if |id| is all zeros indicating an empty ID.
+static inline bool iree_hal_cuda_nccl_id_is_empty(
+    const iree_hal_cuda_nccl_id_t* id) {
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(id->data); ++i) {
+    if (id->data[i] != 0) return false;
+  }
+  return true;
+}
+
+// Calls ncclGetUniqueId to bootstrap a new communicator.
+iree_status_t iree_hal_cuda_nccl_get_unique_id_from_context(
+    iree_hal_cuda_context_wrapper_t* context_wrapper,
+    iree_hal_cuda_nccl_id_t* out_id);
+
+// Creates a NCCL channel using the given NCCL ID, rank, and count.
 iree_status_t iree_hal_cuda_nccl_channel_create(
     iree_hal_cuda_context_wrapper_t* context_wrapper,
     const iree_hal_cuda_nccl_id_t* id, int rank, int count,

@@ -6,6 +6,7 @@
 
 #include <array>
 #include <string>
+#include <string_view>
 
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
@@ -17,6 +18,7 @@ using iree::StatusCode;
 using iree::testing::status::IsOkAndHolds;
 using iree::testing::status::StatusIs;
 using testing::ElementsAre;
+using testing::Eq;
 
 static std::string ToString(iree_string_view_t value) {
   return std::string(value.data, value.size);
@@ -328,35 +330,35 @@ TEST(StringViewTest, Substr) {
   };
   EXPECT_EQ(substr("", 0, 0), "");
   EXPECT_EQ(substr("", 0, 1), "");
-  EXPECT_EQ(substr("", 0, INTPTR_MAX), "");
+  EXPECT_EQ(substr("", 0, IREE_STRING_VIEW_NPOS), "");
   EXPECT_EQ(substr("", 1, 0), "");
   EXPECT_EQ(substr("", 1, 1), "");
-  EXPECT_EQ(substr("", 1, INTPTR_MAX), "");
+  EXPECT_EQ(substr("", 1, IREE_STRING_VIEW_NPOS), "");
 
   EXPECT_EQ(substr("a", 0, 0), "");
   EXPECT_EQ(substr("a", 0, 1), "a");
   EXPECT_EQ(substr("a", 0, 2), "a");
-  EXPECT_EQ(substr("a", 0, INTPTR_MAX), "a");
+  EXPECT_EQ(substr("a", 0, IREE_STRING_VIEW_NPOS), "a");
   EXPECT_EQ(substr("a", 1, 0), "");
   EXPECT_EQ(substr("a", 1, 1), "");
-  EXPECT_EQ(substr("a", 1, INTPTR_MAX), "");
+  EXPECT_EQ(substr("a", 1, IREE_STRING_VIEW_NPOS), "");
 
   EXPECT_EQ(substr("abc", 0, 1), "a");
   EXPECT_EQ(substr("abc", 1, 1), "b");
   EXPECT_EQ(substr("abc", 2, 1), "c");
   EXPECT_EQ(substr("abc", 0, 2), "ab");
   EXPECT_EQ(substr("abc", 1, 2), "bc");
-  EXPECT_EQ(substr("abc", 1, INTPTR_MAX), "bc");
+  EXPECT_EQ(substr("abc", 1, IREE_STRING_VIEW_NPOS), "bc");
   EXPECT_EQ(substr("abc", 0, 3), "abc");
-  EXPECT_EQ(substr("abc", 0, INTPTR_MAX), "abc");
+  EXPECT_EQ(substr("abc", 0, IREE_STRING_VIEW_NPOS), "abc");
 }
 
 TEST(StringViewTest, Split) {
   auto split =
       [](const char* value,
          char split_char) -> std::tuple<intptr_t, std::string, std::string> {
-    iree_string_view_t lhs;
-    iree_string_view_t rhs;
+    iree_string_view_t lhs = iree_string_view_empty();
+    iree_string_view_t rhs = iree_string_view_empty();
     intptr_t index = iree_string_view_split(iree_make_cstring_view(value),
                                             split_char, &lhs, &rhs);
     return std::make_tuple(index, ToString(lhs), ToString(rhs));
@@ -370,6 +372,61 @@ TEST(StringViewTest, Split) {
   EXPECT_EQ(split("ax", 'x'), std::make_tuple(1, "a", ""));
   EXPECT_EQ(split("xb", 'x'), std::make_tuple(0, "", "b"));
   EXPECT_EQ(split("axbxc", 'x'), std::make_tuple(1, "a", "bxc"));
+}
+
+// Tests that partial returns from iree_string_view_split (only LHS or RHS) work
+// as expected even when no storage is provided.
+TEST(StringViewTest, SplitLHSOnly) {
+  auto split_lhs = [](const char* value,
+                      char split_char) -> std::tuple<intptr_t, std::string> {
+    iree_string_view_t lhs = iree_string_view_empty();
+    intptr_t index = iree_string_view_split(iree_make_cstring_view(value),
+                                            split_char, &lhs, nullptr);
+    return std::make_tuple(index, ToString(lhs));
+  };
+  EXPECT_EQ(split_lhs("", 'x'), std::make_tuple(-1, ""));
+  EXPECT_EQ(split_lhs(" ", 'x'), std::make_tuple(-1, " "));
+  EXPECT_EQ(split_lhs("x", 'x'), std::make_tuple(0, ""));
+  EXPECT_EQ(split_lhs(" x ", 'x'), std::make_tuple(1, " "));
+  EXPECT_EQ(split_lhs("axb", 'x'), std::make_tuple(1, "a"));
+  EXPECT_EQ(split_lhs("axxxb", 'x'), std::make_tuple(1, "a"));
+  EXPECT_EQ(split_lhs("ax", 'x'), std::make_tuple(1, "a"));
+  EXPECT_EQ(split_lhs("xb", 'x'), std::make_tuple(0, ""));
+  EXPECT_EQ(split_lhs("axbxc", 'x'), std::make_tuple(1, "a"));
+}
+TEST(StringViewTest, SplitRHSOnly) {
+  auto split_rhs = [](const char* value,
+                      char split_char) -> std::tuple<intptr_t, std::string> {
+    iree_string_view_t rhs = iree_string_view_empty();
+    intptr_t index = iree_string_view_split(iree_make_cstring_view(value),
+                                            split_char, nullptr, &rhs);
+    return std::make_tuple(index, ToString(rhs));
+  };
+  EXPECT_EQ(split_rhs("", 'x'), std::make_tuple(-1, ""));
+  EXPECT_EQ(split_rhs(" ", 'x'), std::make_tuple(-1, ""));
+  EXPECT_EQ(split_rhs("x", 'x'), std::make_tuple(0, ""));
+  EXPECT_EQ(split_rhs(" x ", 'x'), std::make_tuple(1, " "));
+  EXPECT_EQ(split_rhs("axb", 'x'), std::make_tuple(1, "b"));
+  EXPECT_EQ(split_rhs("axxxb", 'x'), std::make_tuple(1, "xxb"));
+  EXPECT_EQ(split_rhs("ax", 'x'), std::make_tuple(1, ""));
+  EXPECT_EQ(split_rhs("xb", 'x'), std::make_tuple(0, "b"));
+  EXPECT_EQ(split_rhs("axbxc", 'x'), std::make_tuple(1, "bxc"));
+}
+TEST(StringViewTest, SplitReturnOnly) {
+  // This is effectively a find but with extra steps.
+  auto split_return = [](const char* value, char split_char) -> intptr_t {
+    return iree_string_view_split(iree_make_cstring_view(value), split_char,
+                                  nullptr, nullptr);
+  };
+  EXPECT_EQ(split_return("", 'x'), -1);
+  EXPECT_EQ(split_return(" ", 'x'), -1);
+  EXPECT_EQ(split_return("x", 'x'), 0);
+  EXPECT_EQ(split_return(" x ", 'x'), 1);
+  EXPECT_EQ(split_return("axb", 'x'), 1);
+  EXPECT_EQ(split_return("axxxb", 'x'), 1);
+  EXPECT_EQ(split_return("ax", 'x'), 1);
+  EXPECT_EQ(split_return("xb", 'x'), 0);
+  EXPECT_EQ(split_return("axbxc", 'x'), 1);
 }
 
 TEST(StringViewTest, ReplaceChar) {
@@ -386,6 +443,30 @@ TEST(StringViewTest, ReplaceChar) {
   EXPECT_EQ(replace_char("x", 'x', 'y'), "y");
   EXPECT_EQ(replace_char("xx", 'x', 'y'), "yy");
   EXPECT_EQ(replace_char("axbxc", 'x', 'y'), "aybyc");
+}
+
+TEST(StringViewTest, ToCStringEmpty) {
+  char buffer[3] = {0x7F, 0x7F, 0x7F};
+  iree_string_view_to_cstring(IREE_SV(""), buffer, sizeof(buffer));
+  EXPECT_EQ(buffer[0], 0);     // NUL
+  EXPECT_EQ(buffer[1], 0x7F);  // unchanged
+}
+
+TEST(StringViewTest, ToCStringNoBuffer) {
+  // Nothing to test but ASAN ensuring we don't null deref.
+  iree_string_view_to_cstring(IREE_SV("abc"), NULL, 0);
+}
+
+TEST(StringViewTest, ToCString) {
+  char buffer[6] = {0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F};
+  iree_string_view_to_cstring(IREE_SV("abc"), buffer, sizeof(buffer));
+  EXPECT_THAT(buffer, ElementsAre('a', 'b', 'c', 0, 0x7F, 0x7F));
+}
+
+TEST(StringViewTest, ToCStringTruncate) {
+  char buffer[3] = {0x7F, 0x7F, 0x7F};
+  iree_string_view_to_cstring(IREE_SV("abcdef"), buffer, sizeof(buffer));
+  EXPECT_THAT(buffer, ElementsAre('a', 'b', 0));
 }
 
 TEST(StringViewTest, AppendToBuffer) {
@@ -522,6 +603,38 @@ TEST(StringViewTest, InvalidParseHex) {
   // Invalid characters:
   EXPECT_THAT(ParseHex<1>("ZF"), StatusIs(StatusCode::kInvalidArgument));
   EXPECT_THAT(ParseHex<2>("AB-C?"), StatusIs(StatusCode::kInvalidArgument));
+}
+
+iree::StatusOr<iree_device_size_t> ParseDeviceSize(std::string_view value) {
+  iree_device_size_t size = 0;
+  IREE_RETURN_IF_ERROR(iree::Status(iree_string_view_parse_device_size(
+      iree_string_view_t{value.data(), (iree_host_size_t)value.size()},
+      &size)));
+  return size;
+}
+
+TEST(StringViewTest, ParseDeviceSize) {
+  EXPECT_THAT(ParseDeviceSize("0"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("1"), IsOkAndHolds(Eq(1u)));
+  EXPECT_THAT(ParseDeviceSize("10000"), IsOkAndHolds(Eq(10000u)));
+  EXPECT_THAT(ParseDeviceSize("0b"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("0kb"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("0gib"), IsOkAndHolds(Eq(0u)));
+  EXPECT_THAT(ParseDeviceSize("1b"), IsOkAndHolds(Eq(1)));
+  EXPECT_THAT(ParseDeviceSize("1kb"), IsOkAndHolds(Eq(1 * 1000u)));
+  EXPECT_THAT(ParseDeviceSize("1kib"), IsOkAndHolds(Eq(1 * 1024u)));
+  EXPECT_THAT(ParseDeviceSize("1000b"), IsOkAndHolds(Eq(1000 * 1u)));
+  EXPECT_THAT(ParseDeviceSize("1000kb"), IsOkAndHolds(Eq(1000 * 1000u)));
+  EXPECT_THAT(ParseDeviceSize("1000kib"), IsOkAndHolds(Eq(1000 * 1024u)));
+
+  // NOTE: we don't verify very hard here and accept random suffixes just like
+  // atoi does (because under the covers we're using atoi).
+  EXPECT_THAT(ParseDeviceSize("123fb"), IsOkAndHolds(Eq(123u)));
+}
+
+TEST(StringViewTest, ParseDeviceSizeInvalid) {
+  EXPECT_THAT(ParseDeviceSize(""), StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseDeviceSize("abc"), StatusIs(StatusCode::kInvalidArgument));
 }
 
 }  // namespace

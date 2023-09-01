@@ -20,7 +20,7 @@
 #include "mlir/IR/Location.h"
 
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.cpp.inc" // IWYU pragma: keep
 
 namespace mlir {
 namespace iree_compiler {
@@ -40,12 +40,8 @@ struct TargetEnvAttributeStorage : public AttributeStorage {
                             Attribute extensions, spirv::Vendor vendorID,
                             spirv::DeviceType deviceType, uint32_t deviceID,
                             Attribute capabilities)
-      : version(version),
-        revision(revision),
-        extensions(extensions),
-        capabilities(capabilities),
-        vendorID(vendorID),
-        deviceType(deviceType),
+      : version(version), revision(revision), extensions(extensions),
+        capabilities(capabilities), vendorID(vendorID), deviceType(deviceType),
         deviceID(deviceID) {}
 
   bool operator==(const KeyTy &key) const {
@@ -53,8 +49,8 @@ struct TargetEnvAttributeStorage : public AttributeStorage {
                                   deviceType, deviceID, capabilities);
   }
 
-  static TargetEnvAttributeStorage *construct(
-      AttributeStorageAllocator &allocator, const KeyTy &key) {
+  static TargetEnvAttributeStorage *
+  construct(AttributeStorageAllocator &allocator, const KeyTy &key) {
     return new (allocator.allocate<TargetEnvAttributeStorage>())
         TargetEnvAttributeStorage(std::get<0>(key), std::get<1>(key),
                                   std::get<2>(key), std::get<3>(key),
@@ -70,7 +66,7 @@ struct TargetEnvAttributeStorage : public AttributeStorage {
   spirv::DeviceType deviceType;
   uint32_t deviceID;
 };
-}  // namespace detail
+} // namespace detail
 
 TargetEnvAttr TargetEnvAttr::get(Vulkan::Version version, uint32_t revision,
                                  ArrayRef<Extension> extensions,
@@ -105,17 +101,17 @@ StringRef TargetEnvAttr::getKindName() { return "target_env"; }
 
 Version TargetEnvAttr::getVersion() {
   return static_cast<Version>(
-      getImpl()->version.cast<IntegerAttr>().getValue().getZExtValue());
+      llvm::cast<IntegerAttr>(getImpl()->version).getValue().getZExtValue());
 }
 
 unsigned TargetEnvAttr::getRevision() {
-  return getImpl()->revision.cast<IntegerAttr>().getValue().getZExtValue();
+  return llvm::cast<IntegerAttr>(getImpl()->revision).getValue().getZExtValue();
 }
 
 TargetEnvAttr::ext_iterator::ext_iterator(ArrayAttr::iterator it)
     : llvm::mapped_iterator<ArrayAttr::iterator, Extension (*)(Attribute)>(
           it, [](Attribute attr) {
-            return attr.cast<ExtensionAttr>().getValue();
+            return llvm::cast<ExtensionAttr>(attr).getValue();
           }) {}
 
 TargetEnvAttr::ext_range TargetEnvAttr::getExtensions() {
@@ -124,7 +120,7 @@ TargetEnvAttr::ext_range TargetEnvAttr::getExtensions() {
 }
 
 ArrayAttr TargetEnvAttr::getExtensionsAttr() {
-  return getImpl()->extensions.cast<ArrayAttr>();
+  return llvm::cast<ArrayAttr>(getImpl()->extensions);
 }
 
 spirv::Vendor TargetEnvAttr::getVendorID() { return getImpl()->vendorID; }
@@ -136,14 +132,15 @@ spirv::DeviceType TargetEnvAttr::getDeviceType() {
 uint32_t TargetEnvAttr::getDeviceID() { return getImpl()->deviceID; }
 
 CapabilitiesAttr TargetEnvAttr::getCapabilitiesAttr() {
-  return getImpl()->capabilities.cast<CapabilitiesAttr>();
+  return llvm::cast<CapabilitiesAttr>(getImpl()->capabilities);
 }
 
-LogicalResult TargetEnvAttr::verify(
-    function_ref<InFlightDiagnostic()> emitError, IntegerAttr version,
-    IntegerAttr revision, ArrayAttr extensions, spirv::Vendor /*vendorID*/,
-    spirv::DeviceType /*deviceType*/, uint32_t /*deviceID*/,
-    CapabilitiesAttr capabilities) {
+LogicalResult
+TargetEnvAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                      IntegerAttr version, IntegerAttr revision,
+                      ArrayAttr extensions, spirv::Vendor /*vendorID*/,
+                      spirv::DeviceType /*deviceType*/, uint32_t /*deviceID*/,
+                      CapabilitiesAttr capabilities) {
   if (!version.getType().isInteger(32))
     return emitError() << "expected 32-bit integer for version";
 
@@ -164,10 +161,12 @@ namespace {
 ParseResult parseKeywordList(
     DialectAsmParser &parser,
     function_ref<LogicalResult(llvm::SMLoc, StringRef)> processKeyword) {
-  if (parser.parseLSquare()) return failure();
+  if (parser.parseLSquare())
+    return failure();
 
   // Special case for empty list.
-  if (succeeded(parser.parseOptionalRSquare())) return success();
+  if (succeeded(parser.parseOptionalRSquare()))
+    return success();
 
   // Keep parsing the keyword and an optional comma following it. If the comma
   // is successfully parsed, then we have more keywords to parse.
@@ -178,14 +177,16 @@ ParseResult parseKeywordList(
       return failure();
   } while (succeeded(parser.parseOptionalComma()));
 
-  if (parser.parseRSquare()) return failure();
+  if (parser.parseRSquare())
+    return failure();
 
   return success();
 }
 
 /// Parses a TargetEnvAttr.
 Attribute parseTargetAttr(DialectAsmParser &parser) {
-  if (parser.parseLess()) return {};
+  if (parser.parseLess())
+    return {};
 
   Builder &builder = parser.getBuilder();
 
@@ -193,7 +194,8 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
   {
     auto loc = parser.getCurrentLocation();
     StringRef version;
-    if (parser.parseKeyword(&version) || parser.parseComma()) return {};
+    if (parser.parseKeyword(&version) || parser.parseComma())
+      return {};
 
     if (auto versionSymbol = symbolizeVersion(version)) {
       versionAttr =
@@ -223,7 +225,7 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
 
     MLIRContext *context = parser.getContext();
     auto processExtension = [&](llvm::SMLoc loc, StringRef extension) {
-      if (Optional<Extension> symbol = symbolizeExtension(extension)) {
+      if (std::optional<Extension> symbol = symbolizeExtension(extension)) {
         extensions.push_back(ExtensionAttr::get(context, *symbol));
         return success();
       }
@@ -246,7 +248,8 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
   {
     auto loc = parser.getCurrentLocation();
     StringRef vendorStr;
-    if (parser.parseKeyword(&vendorStr)) return {};
+    if (parser.parseKeyword(&vendorStr))
+      return {};
     if (auto vendorSymbol = spirv::symbolizeVendor(vendorStr)) {
       vendorID = *vendorSymbol;
     } else {
@@ -255,7 +258,8 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
 
     loc = parser.getCurrentLocation();
     StringRef deviceTypeStr;
-    if (parser.parseColon() || parser.parseKeyword(&deviceTypeStr)) return {};
+    if (parser.parseColon() || parser.parseKeyword(&deviceTypeStr))
+      return {};
     if (auto deviceTypeSymbol = spirv::symbolizeDeviceType(deviceTypeStr)) {
       deviceType = *deviceTypeSymbol;
     } else {
@@ -264,21 +268,25 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
 
     loc = parser.getCurrentLocation();
     if (succeeded(parser.parseOptionalColon())) {
-      if (parser.parseInteger(deviceID)) return {};
+      if (parser.parseInteger(deviceID))
+        return {};
     }
 
-    if (parser.parseComma()) return {};
+    if (parser.parseComma())
+      return {};
   }
 
   CapabilitiesAttr capabilities;
-  if (parser.parseAttribute(capabilities)) return {};
+  if (parser.parseAttribute(capabilities))
+    return {};
 
-  if (parser.parseGreater()) return {};
+  if (parser.parseGreater())
+    return {};
 
   return TargetEnvAttr::get(versionAttr, revisionAttr, extensionsAttr, vendorID,
                             deviceType, deviceID, capabilities);
 }
-}  // anonymous namespace
+} // anonymous namespace
 
 Attribute VulkanDialect::parseAttribute(DialectAsmParser &parser,
                                         Type type) const {
@@ -294,11 +302,13 @@ Attribute VulkanDialect::parseAttribute(DialectAsmParser &parser,
   OptionalParseResult result =
       generatedAttributeParser(parser, &attrKind, type, attr);
   if (result.has_value()) {
-    if (failed(result.value())) return {};
+    if (failed(result.value()))
+      return {};
     return attr;
   }
 
-  if (attrKind == TargetEnvAttr::getKindName()) return parseTargetAttr(parser);
+  if (attrKind == TargetEnvAttr::getKindName())
+    return parseTargetAttr(parser);
 
   parser.emitError(parser.getNameLoc(), "unknown Vulkan attriubte kind: ")
       << attrKind;
@@ -325,13 +335,14 @@ void print(TargetEnvAttr targetEnv, DialectAsmPrinter &printer) {
   }
   printer << ", " << targetEnv.getCapabilitiesAttr() << ">";
 }
-}  // anonymous namespace
+} // anonymous namespace
 
 void VulkanDialect::printAttribute(Attribute attr,
                                    DialectAsmPrinter &printer) const {
-  if (succeeded(generatedAttributePrinter(attr, printer))) return;
+  if (succeeded(generatedAttributePrinter(attr, printer)))
+    return;
 
-  if (auto targetEnv = attr.dyn_cast<TargetEnvAttr>())
+  if (auto targetEnv = llvm::dyn_cast<TargetEnvAttr>(attr))
     return print(targetEnv, printer);
 
   assert(false && "unhandled Vulkan attribute kind");
@@ -348,7 +359,7 @@ void VulkanDialect::registerAttributes() {
                 >();
 }
 
-}  // namespace Vulkan
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Vulkan
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

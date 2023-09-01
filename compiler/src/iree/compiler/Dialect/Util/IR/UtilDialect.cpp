@@ -37,7 +37,7 @@ struct UtilOpAsmInterface : public OpAsmDialectInterface {
   /// end with a numeric digit([0-9]+). Returns success if an alias was
   /// provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (auto compositeAttr = attr.dyn_cast<CompositeAttr>()) {
+    if (auto compositeAttr = llvm::dyn_cast<CompositeAttr>(attr)) {
       os << "composite_of_" << compositeAttr.getTotalLength() << "b";
       return AliasResult::OverridableAlias;
     }
@@ -69,7 +69,8 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
 
   void handleTerminator(Operation *op, Block *newDest) const final {
     auto returnOp = dyn_cast<IREE::Util::InitializerReturnOp>(op);
-    if (!returnOp) return;
+    if (!returnOp)
+      return;
     // util.initialize.return takes no args - just branch to the new block.
     OpBuilder builder(op);
     builder.create<mlir::cf::BranchOp>(op->getLoc(), newDest, ValueRange{});
@@ -96,7 +97,7 @@ UtilDialect::UtilDialect(MLIRContext *context)
 Operation *UtilDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                             Type type, Location loc) {
   if (arith::ConstantOp::isBuildableWith(value, type)) {
-    return builder.create<arith::ConstantOp>(loc, value, type);
+    return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(value));
   }
   return nullptr;
 }
@@ -108,7 +109,8 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
                                 PatternRewriter &rewriter) const override {
     auto shapeAwareOp =
         dyn_cast_or_null<ShapeAwareOpInterface>(op.getSource().getDefiningOp());
-    if (!shapeAwareOp) return failure();
+    if (!shapeAwareOp)
+      return failure();
 
     // We only support static dimension indices today (as in general we only
     // support ranked shapes). If we find dynamic indices sneaking in we will
@@ -121,7 +123,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     }
 
     // If it's a static dim then just fold to that.
-    auto type = op.getSource().getType().template cast<ShapedType>();
+    auto type = llvm::cast<ShapedType>(op.getSource().getType());
     int64_t staticDim = type.getDimSize(index.getZExtValue());
     if (staticDim != ShapedType::kDynamic) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op, staticDim);
@@ -145,7 +147,7 @@ void UtilDialect::getCanonicalizationPatterns(
   results.insert<FoldDimOp<tensor::DimOp>>(getContext());
 }
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

@@ -1,8 +1,6 @@
 
 add_mlir_library(IREEDialectsTransforms
-  Listener.cpp
   ListenerCSE.cpp
-  ListenerGreedyPatternRewriteDriver.cpp
   TransformMatchers.cpp
 
   LINK_LIBS PRIVATE
@@ -20,3 +18,5 @@ add_mlir_library(IREEDialectsTransforms
   IREELinalgExtIncGen
   IREELinalgExtInterfacesIncGen
 )
+
+iree_dialects_target_includes(IREEDialectsTransforms)

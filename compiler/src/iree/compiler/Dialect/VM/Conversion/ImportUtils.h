@@ -32,10 +32,10 @@ LogicalResult appendImportModule(StringRef importModuleSrc,
 
 namespace detail {
 size_t getSegmentSpanSize(Type spanType);
-Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
-    Location loc, Attribute attrValue, Type inputType,
-    ConversionPatternRewriter &rewriter);
-}  // namespace detail
+std::optional<SmallVector<Value>>
+rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
+                      ConversionPatternRewriter &rewriter);
+} // namespace detail
 
 // Casts |value| to |targetType| ala static_cast for when the declared type
 // differs from the type provided by the input dialect.
@@ -56,21 +56,22 @@ void copyImportAttrs(IREE::VM::ImportOp importOp, Operation *callOp);
 // Automatically handles type conversion and special logic for variadic operands
 // and special types (such as ranked shape).
 template <typename T, typename Adaptor = typename T::Adaptor>
-Optional<SmallVector<Value>> rewriteToCall(
-    T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
-    TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
+std::optional<SmallVector<Value>>
+rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
+              const TypeConverter &typeConverter,
+              ConversionPatternRewriter &rewriter) {
   auto *operation = op.getOperation();
   bool isOpVariadic = importOp.isVariadic();
   OperationState state{
       op.getLoc(), isOpVariadic ? IREE::VM::CallVariadicOp::getOperationName()
                                 : IREE::VM::CallOp::getOperationName()};
-  state.addAttributes(llvm::to_vector<4>(operation->getDialectAttrs()));
+  state.addAttributes(llvm::to_vector(operation->getDialectAttrs()));
   state.addAttribute("callee", SymbolRefAttr::get(importOp));
 
   auto importType = importOp.getFunctionType();
   state.addTypes(importType.getResults());
 
-  SmallVector<uint16_t, 4> segmentSizes;
+  SmallVector<uint16_t> segmentSizes;
   int inputSetIndex = 0;
   for (auto input : llvm::enumerate(importType.getInputs())) {
     auto inputType = input.value();
@@ -78,7 +79,8 @@ Optional<SmallVector<Value>> rewriteToCall(
     if (auto attrValue = op->getAttr(inputName)) {
       auto flattenedAttrs = detail::rewriteAttrToOperands(
           op.getLoc(), attrValue, inputType, rewriter);
-      if (!flattenedAttrs) return std::nullopt;
+      if (!flattenedAttrs)
+        return std::nullopt;
       state.addOperands(*flattenedAttrs);
       if (importOp.isFuncArgumentVariadic(input.index())) {
         segmentSizes.push_back(flattenedAttrs->size() /
@@ -89,11 +91,10 @@ Optional<SmallVector<Value>> rewriteToCall(
         segmentSizes.push_back(kFixedSingleValue);
       }
     } else {
-      auto oldOperands = llvm::to_vector<4>(op.getODSOperands(inputSetIndex));
-      auto newOperands =
-          llvm::to_vector<4>(adaptor.getODSOperands(inputSetIndex));
+      auto oldOperands = llvm::to_vector(op.getODSOperands(inputSetIndex));
+      auto newOperands = llvm::to_vector(adaptor.getODSOperands(inputSetIndex));
       ++inputSetIndex;
-      if (auto inputTupleType = inputType.dyn_cast<TupleType>()) {
+      if (auto inputTupleType = inputType.template dyn_cast<TupleType>()) {
         // Unpack a tuple<...> from the variadic.
         // This only supports a single level of unpacking.
         if (inputTupleType.size() != newOperands.size()) {
@@ -125,10 +126,10 @@ Optional<SmallVector<Value>> rewriteToCall(
                             rewriter.getIntegerType(16)),
             segmentSizes));
     state.addAttribute("segment_types",
-                       rewriter.getArrayAttr(llvm::to_vector<4>(llvm::map_range(
+                       rewriter.getArrayAttr(llvm::map_to_vector(
                            importType.getInputs(), [&](Type type) {
                              return TypeAttr::get(type).cast<Attribute>();
-                           }))));
+                           })));
   }
 
   auto *callOp = rewriter.create(state);
@@ -138,7 +139,8 @@ Optional<SmallVector<Value>> rewriteToCall(
   for (auto [result, targetType] :
        llvm::zip_equal(callOp->getResults(), operation->getResultTypes())) {
     targetType = typeConverter.convertType(targetType);
-    if (!targetType) return std::nullopt;
+    if (!targetType)
+      return std::nullopt;
     results.push_back(castFromImportType(result, targetType, rewriter));
   }
   return results;
@@ -147,7 +149,7 @@ Optional<SmallVector<Value>> rewriteToCall(
 // Utility for op to vm.call conversion.
 template <typename T, typename Adaptor = typename T::Adaptor>
 class VMImportOpConversion : public OpConversionPattern<T> {
- public:
+public:
   VMImportOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                        TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern<T>(typeConverter, context) {
@@ -155,21 +157,22 @@ class VMImportOpConversion : public OpConversionPattern<T> {
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      T op, typename T::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(T op, typename T::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto results = rewriteToCall(op, adaptor, importOp,
                                  *this->getTypeConverter(), rewriter);
-    if (!results.has_value()) return failure();
+    if (!results.has_value())
+      return failure();
     rewriter.replaceOp(op, results.value());
     return success();
   }
 
- protected:
+protected:
   mutable IREE::VM::ImportOp importOp;
 };
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_IMPORTUTILS_H_
+#endif // IREE_COMPILER_DIALECT_VM_CONVERSION_IMPORTUTILS_H_

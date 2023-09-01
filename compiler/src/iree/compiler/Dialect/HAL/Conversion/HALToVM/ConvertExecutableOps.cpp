@@ -50,14 +50,16 @@ Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
   auto constantBuffer = builder.create<IREE::VM::BufferAllocOp>(
       constantBufferLoc, bufferRefType,
       builder.create<IREE::VM::ConstI64Op>(constantBufferLoc,
-                                           constantCount * sizeof(uint32_t)));
+                                           constantCount * sizeof(uint32_t)),
+      builder.create<IREE::VM::ConstI32Op>(constantBufferLoc, 16));
 
   // Store each constant into it.
   // TODO(#8477): better ops for this pattern; this creates a lot of
   // extra IR for the indices. We should batch them up and append in one go.
   for (auto constantValue : llvm::enumerate(constantValues)) {
     // Buffer is zero-initialized so we can skip zero values.
-    if (mlir::matchPattern(constantValue.value(), m_Zero())) continue;
+    if (mlir::matchPattern(constantValue.value(), m_Zero()))
+      continue;
     auto constantLoc = constantValue.value().getLoc();
     builder.create<IREE::VM::BufferStoreI32Op>(
         constantLoc, constantBuffer,
@@ -69,8 +71,9 @@ Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
   return constantBuffer;
 }
 
-IREE::VM::RodataOp createExecutableBinaryRodata(
-    IREE::HAL::ExecutableBinaryOp binaryOp, OpBuilder &builder) {
+IREE::VM::RodataOp
+createExecutableBinaryRodata(IREE::HAL::ExecutableBinaryOp binaryOp,
+                             OpBuilder &builder) {
   auto executableOp =
       binaryOp.getOperation()->getParentOfType<IREE::HAL::ExecutableOp>();
   auto insertPoint = builder.saveInsertionPoint();
@@ -98,12 +101,12 @@ namespace {
 
 class RemoveExecutableOpConversion
     : public OpConversionPattern<IREE::HAL::ExecutableOp> {
- public:
+public:
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::ExecutableOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::ExecutableOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return success();
   }
@@ -111,7 +114,7 @@ class RemoveExecutableOpConversion
 
 class ExecutableCreateOpConversion
     : public OpConversionPattern<IREE::HAL::ExecutableCreateOp> {
- public:
+public:
   ExecutableCreateOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                                TypeConverter &typeConverter,
                                StringRef importName)
@@ -120,9 +123,9 @@ class ExecutableCreateOpConversion
     assert(importOp);
   }
 
-  LogicalResult matchAndRewrite(
-      IREE::HAL::ExecutableCreateOp createOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::HAL::ExecutableCreateOp createOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // Materialize vm.rodata for the binary.
     auto executableBinaryOp =
         SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableBinaryOp>(
@@ -165,11 +168,11 @@ class ExecutableCreateOpConversion
     return success();
   }
 
- private:
+private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-}  // namespace
+} // namespace
 
 void populateHALExecutableToVMPatterns(MLIRContext *context,
                                        SymbolTable &importSymbols,
@@ -189,5 +192,5 @@ void populateHALExecutableToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.pipeline_layout.create");
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

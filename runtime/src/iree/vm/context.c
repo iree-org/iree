@@ -12,7 +12,6 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/debugging.h"
-#include "iree/base/tracing.h"
 
 struct iree_vm_context_t {
   iree_atomic_ref_count_t ref_count;
@@ -39,6 +38,11 @@ struct iree_vm_context_t {
     iree_vm_module_state_t** module_states;
   } list;
 };
+
+static iree_status_t iree_vm_context_resolve_function_impl(
+    const iree_vm_context_t* context, iree_string_view_t full_name,
+    const iree_vm_function_signature_t* expected_signature,
+    iree_vm_function_t* out_function);
 
 static void iree_vm_context_destroy(iree_vm_context_t* context);
 
@@ -182,8 +186,8 @@ static iree_status_t iree_vm_context_resolve_module_imports(
     // Resolve the function to the module that contains it and return the
     // information.
     iree_vm_function_t import_function;
-    iree_status_t resolve_status =
-        iree_vm_context_resolve_function(context, full_name, &import_function);
+    iree_status_t resolve_status = iree_vm_context_resolve_function_impl(
+        context, full_name, &expected_signature, &import_function);
     if (!iree_status_is_ok(resolve_status)) {
       if (iree_status_is_not_found(resolve_status) &&
           decl_function.linkage == IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL) {
@@ -381,11 +385,15 @@ IREE_API_EXPORT void iree_vm_context_release(iree_vm_context_t* context) {
   }
 }
 
+IREE_API_EXPORT iree_vm_instance_t* iree_vm_context_instance(
+    const iree_vm_context_t* context) {
+  IREE_ASSERT_ARGUMENT(context);
+  return context->instance;
+}
+
 IREE_API_EXPORT iree_vm_context_id_t
 iree_vm_context_id(const iree_vm_context_t* context) {
-  if (!context) {
-    return -1;
-  }
+  if (!context) return -1;
   return context->context_id;
 }
 
@@ -393,6 +401,19 @@ IREE_API_EXPORT iree_vm_context_flags_t
 iree_vm_context_flags(const iree_vm_context_t* context) {
   IREE_ASSERT_ARGUMENT(context);
   return context->flags;
+}
+
+IREE_API_EXPORT iree_host_size_t
+iree_vm_context_module_count(const iree_vm_context_t* context) {
+  IREE_ASSERT_ARGUMENT(context);
+  return context->list.count;
+}
+
+IREE_API_EXPORT iree_vm_module_t* iree_vm_context_module_at(
+    const iree_vm_context_t* context, iree_host_size_t i) {
+  IREE_ASSERT_ARGUMENT(context);
+  if (i >= context->list.count) return NULL;
+  return context->list.modules[i];
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
@@ -406,7 +427,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
   for (iree_host_size_t i = 0; i < module_count; ++i) {
     if (!modules[i]) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "modules[%zu] is null", i);
+                              "modules[%" PRIhsz "] is null", i);
     }
   }
   if (!module_count) return iree_ok_status();
@@ -543,8 +564,9 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_module_state(
                                             out_module_state);
 }
 
-IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
+static iree_status_t iree_vm_context_resolve_function_impl(
     const iree_vm_context_t* context, iree_string_view_t full_name,
+    const iree_vm_function_signature_t* expected_signature,
     iree_vm_function_t* out_function) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_function);
@@ -563,8 +585,9 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
   for (int i = (int)context->list.count - 1; i >= 0; --i) {
     iree_vm_module_t* module = context->list.modules[i];
     if (iree_string_view_equal(module_name, iree_vm_module_name(module))) {
-      return iree_vm_module_lookup_function_by_name(
-          module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, out_function);
+      return module->lookup_function(
+          module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name,
+          expected_signature, out_function);
     }
   }
 
@@ -573,6 +596,13 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
                           "registered with the context",
                           (int)module_name.size, module_name.data,
                           (int)full_name.size, full_name.data);
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
+    const iree_vm_context_t* context, iree_string_view_t full_name,
+    iree_vm_function_t* out_function) {
+  return iree_vm_context_resolve_function_impl(
+      context, full_name, /*expected_signature=*/NULL, out_function);
 }
 
 // Calls the '__notify(i32)' function in |module|, if present.
@@ -667,7 +697,7 @@ static iree_status_t iree_vm_context_notify_reverse(iree_vm_stack_t* stack,
 IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
                                                      iree_vm_signal_t signal) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)signal);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)signal);
 
   // VM stack used to call into module __init methods.
   IREE_VM_INLINE_STACK_INITIALIZE(

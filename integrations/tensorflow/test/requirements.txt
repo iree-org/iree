@@ -1,5 +1,7 @@
 # Requirements for running TF tests
-tensorflow>=2.7.1
+# Temporarily pinning to nightly to make sure we have the newest feature
+# in the TFLite to TOSA importer.
+tf-nightly==2.15.0.dev20230824
 keras>=2.7.0
 Pillow>=9.2.0
 
@@ -12,4 +14,4 @@ Pillow>=9.2.0
 # If that fails with a stack trace, put this line back.
 # On behalf of Google, we are sorry for the live at head philosophy
 # and shoddy version management leaking into everything. We're victims too.
-protobuf>=3.20.1, <4
+protobuf>=3.20.3, <4

@@ -27,7 +27,7 @@ class Solver;
 // Each element represents some assumed and known knowledge anchored on a
 // specific position in the IR such as a Value or Operation.
 class AbstractElement : public Position, public DepGraphNode {
- public:
+public:
   using StateType = AbstractState;
 
   AbstractElement(const Position &pos) : Position(pos) {}
@@ -74,7 +74,7 @@ class AbstractElement : public Position, public DepGraphNode {
 
   friend class Solver;
 
- protected:
+protected:
   // Hook for the solver to trigger an update of the internal state.
   //
   // If this attribute is already fixed this method will return UNCHANGED,
@@ -145,7 +145,8 @@ struct TypedOperationElement : public AbstractElement {
   ChangeStatus updateImpl(Solver &solver) override {
     if (isOperation()) {
       auto op = dyn_cast<OpT>(getOperation());
-      if (op) return updateOperation(op, solver);
+      if (op)
+        return updateOperation(op, solver);
     }
     return getState().indicatePessimisticFixpoint();
   }
@@ -184,8 +185,8 @@ struct ValueElement : public AbstractElement {
   virtual ChangeStatus updateValue(Value value, Solver &solver) = 0;
 };
 
-}  // namespace DFX
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace DFX
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_ELEMENT_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_ELEMENT_H_

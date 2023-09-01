@@ -7,19 +7,19 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS
 
-include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreach_thread_to_flow",
+def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.forall_to_flow",
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
-     TransformOpInterface]> {
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Rewrite an scf.foreach_thread to Flow::DispatchWorkgroups.
+    Rewrite an scf.forall to Flow::DispatchWorkgroups.
 
     #### Return modes
 
@@ -28,7 +28,7 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
 
     If any rewrite fails, the transform definitely fails.
 
-    If all the operations referred to by the `target` PDLOperation generalize
+    If all the operations referred to by the `target` operand generalize
     properly, the transform succeeds. Otherwise the transform silently fails.
 
     The return handle points to only the subset of successfully produced
@@ -38,14 +38,15 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
     handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::scf::ForeachThreadOp target,
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::scf::ForallOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -55,7 +56,8 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,
-     TransformEachOpTrait]> {
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Convert a flow.dispatch.region op into a flow.dispatch.workgroups op.
 
@@ -69,13 +71,14 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
     handle.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
-  let results = (outs PDL_Operation:$transformed);
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::iree_compiler::IREE::Flow::DispatchRegionOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -84,13 +87,13 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
 
 def WrapInDispatchRegionOp : Op<
     Transform_Dialect, "iree.wrap_in_dispatch_region",
-    [FunctionalStyleTransformOpTrait,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,
-     TransformEachOpTrait]> {
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Wrap the `target` op in a new `dispatch.region` op. All uses of target op
-    are replaces with the results of the newly generated `dispach.region` op.
+    are replaces with the results of the newly generated `dispatch.region` op.
 
     The argument `generateWorkload` can be set to generate workload information
     from the given `target` op.
@@ -101,14 +104,15 @@ def WrapInDispatchRegionOp : Op<
     handle (i.e., the `dispatch.region` op).
   }];
 
-  let arguments = (ins PDL_Operation:$target,
+  let arguments = (ins TransformHandleTypeInterface:$target,
                        DefaultValuedAttr<BoolAttr, "true">:$generateWorkload);
-  let results = (outs PDL_Operation:$transformed);
+  let results = (outs TransformHandleTypeInterface:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
@@ -118,7 +122,8 @@ def WrapInDispatchRegionOp : Op<
 def ClonePrecedingOpIntoDispatchRegionOp : Op<
     Transform_Dialect, "iree.clone_preceding_op_into_dispatch_region", [
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-      TransformOpInterface]> {
+      DeclareOpInterfaceMethods<TransformOpInterface>,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Clone the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -133,22 +138,21 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
     handle. It produces a new handle to the cloned ops.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       PDL_Operation:$dispatch_region);
-  let results = (outs PDL_Operation:$cloned);
-  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformHandleTypeInterface:$dispatch_region);
+  let results = (outs TransformHandleTypeInterface:$cloned);
+  let assemblyFormat = [{
+    $target `into` $dispatch_region attr-dict
+    `:` functional-type(operands, results)
   }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 def MovePrecedingOpIntoDispatchRegionOp : Op<
     Transform_Dialect, "iree.move_preceding_op_into_dispatch_region", [
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-      TransformOpInterface]> {
+      DeclareOpInterfaceMethods<TransformOpInterface>,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Move the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -166,22 +170,21 @@ def MovePrecedingOpIntoDispatchRegionOp : Op<
     handle. It produces a new handle to the extended dispatch region.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       PDL_Operation:$dispatch_region);
-  let results = (outs PDL_Operation:$transformed);
-  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformHandleTypeInterface:$dispatch_region);
+  let results = (outs TransformHandleTypeInterface:$transformed);
+  let assemblyFormat = [{
+    $target `into` $dispatch_region attr-dict
+    `:` functional-type(operands, results)
   }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 def CloneSucceedingOpIntoDispatchRegionOp : Op<
     Transform_Dialect, "iree.clone_succeeding_op_into_dispatch_region", [
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-      TransformOpInterface]> {
+      DeclareOpInterfaceMethods<TransformOpInterface>,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Clone the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -199,22 +202,21 @@ def CloneSucceedingOpIntoDispatchRegionOp : Op<
     handle. It produces a new handle to the cloned ops.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       PDL_Operation:$dispatch_region);
-  let results = (outs PDL_Operation:$cloned);
-  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformHandleTypeInterface:$dispatch_region);
+  let results = (outs TransformHandleTypeInterface:$cloned);
+  let assemblyFormat = [{
+    $target `into` $dispatch_region attr-dict
+    `:` functional-type(operands, results)
   }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 def MoveSucceedingOpIntoDispatchRegionOp : Op<
     Transform_Dialect, "iree.move_succeeding_op_into_dispatch_region", [
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-      TransformOpInterface]> {
+      DeclareOpInterfaceMethods<TransformOpInterface>,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Move the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -232,16 +234,14 @@ def MoveSucceedingOpIntoDispatchRegionOp : Op<
     handle. It produces a new handle to the new dispatch region.
   }];
 
-  let arguments = (ins PDL_Operation:$target,
-                       PDL_Operation:$dispatch_region);
-  let results = (outs PDL_Operation:$transformed);
-  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults,
-        ::mlir::transform::TransformState &state);
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformHandleTypeInterface:$dispatch_region);
+  let results = (outs TransformHandleTypeInterface:$transformed);
+  let assemblyFormat = [{
+    $target `into` $dispatch_region attr-dict
+    `:` functional-type(operands, results)
   }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMEXTENSIONS_FLOWEXTENSIONS

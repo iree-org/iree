@@ -7,7 +7,6 @@
 #include "iree/hal/utils/caching_allocator.h"
 
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/tracing.h"
 
 // Default capacity of a pool free list when not specified by the user.
 #define IREE_HAL_CACHING_ALLOCATOR_DEFAULT_FREE_LIST_CAPACITY 64
@@ -193,7 +192,7 @@ static iree_hal_buffer_t* iree_hal_caching_allocator_pool_find_and_take_buffer(
 static void iree_hal_caching_allocator_pool_trim_to_size(
     iree_hal_caching_allocator_pool_t* pool, iree_device_size_t target_size) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)target_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)target_size);
 
   iree_slim_mutex_lock(&pool->mutex);
 
@@ -241,9 +240,9 @@ static void iree_hal_caching_allocator_pool_trim(
 static iree_status_t iree_hal_caching_allocator_pool_acquire(
     iree_hal_caching_allocator_pool_t* pool,
     const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
-    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_t** out_buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)allocation_size);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)allocation_size);
 
   // Scan the free list to find an appropriate block.
   // If found we pop it off the list and return it without needing to allocate.
@@ -258,7 +257,7 @@ static iree_status_t iree_hal_caching_allocator_pool_acquire(
   }
   iree_slim_mutex_unlock(&pool->mutex);
   if (existing_buffer) {
-    // Found a buffer - return it.
+    // Found a buffer! Return it uninitialized.
     *out_buffer = existing_buffer;
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
@@ -274,16 +273,7 @@ static iree_status_t iree_hal_caching_allocator_pool_acquire(
   // to the pool by another thread while we're allocating here but that's OK.
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_allocator_allocate_buffer(
-      pool->device_allocator, *params, allocation_size, initial_data, &buffer);
-
-  // If initial data was provided then write it into the buffer.
-  // We can only do this if the buffer supports mapping and expect unmappable
-  // buffers to have been filtered out earlier up.
-  if (iree_status_is_ok(status) &&
-      !iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_buffer_map_write(buffer, 0, initial_data.data,
-                                       initial_data.data_length);
-  }
+      pool->device_allocator, *params, allocation_size, &buffer);
 
   // If the allocation failed then remove the size from the total.
   if (iree_status_is_ok(status)) {
@@ -305,7 +295,7 @@ static iree_status_t iree_hal_caching_allocator_pool_acquire(
 static void iree_hal_caching_allocator_pool_release(
     iree_hal_caching_allocator_pool_t* pool, iree_hal_buffer_t* buffer) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(buffer));
 
   // Try to add the buffer to the pool. If the pool is at capacity we'll just
@@ -451,6 +441,155 @@ iree_status_t iree_hal_caching_allocator_create_with_pools(
   return iree_ok_status();
 }
 
+// Selects a heap from |heaps| matching the given |heap_key|.
+// Fails if no heap matches the given key. Optionally a buffer usage bitfield
+// can be provided. Wildcards can be used with either to match the first heap
+// that meets either requirement.
+//
+// Examples:
+//   *: first heap
+//   *;transfer: first heap with transfer usage
+//   device_local: first heap with the IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL bit
+//   device_local|host_visible
+//   device_local;transfer|dispatch_storage
+static iree_status_t iree_hal_select_heap(
+    iree_string_view_t heap_key, iree_host_size_t heap_count,
+    const iree_hal_allocator_memory_heap_t* heaps,
+    const iree_hal_allocator_memory_heap_t** out_heap) {
+  iree_string_view_t memory_type_str = iree_string_view_empty();
+  iree_string_view_t buffer_usage_str = iree_string_view_empty();
+  iree_string_view_split(heap_key, ';', &memory_type_str, &buffer_usage_str);
+
+  // Parse the provided filters, if any.
+  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_NONE;
+  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_NONE;
+  if (!iree_string_view_is_empty(memory_type_str) &&
+      !iree_string_view_equal(memory_type_str, IREE_SV("*"))) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_memory_type_parse(memory_type_str, &memory_type));
+  }
+  if (!iree_string_view_is_empty(buffer_usage_str) &&
+      !iree_string_view_equal(buffer_usage_str, IREE_SV("*"))) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_usage_parse(buffer_usage_str, &buffer_usage));
+  }
+
+  // Return the first heap satisfying all filters.
+  for (iree_host_size_t i = 0; i < heap_count; ++i) {
+    if ((!memory_type || iree_all_bits_set(heaps[i].type, memory_type)) &&
+        (!buffer_usage ||
+         iree_all_bits_set(heaps[i].allowed_usage, buffer_usage))) {
+      *out_heap = &heaps[i];
+      return iree_ok_status();
+    }
+  }
+
+  // No matching heap found; can happen if the device doesn't have the kind of
+  // heaps the user was expecting with the configuration.
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "no heap matching requested config params "
+                          "memory_type='%.*s', buffer_usage='%.*s'",
+                          (int)memory_type_str.size, memory_type_str.data,
+                          (int)buffer_usage_str.size, buffer_usage_str.data);
+}
+
+iree_status_t iree_hal_caching_allocator_create_from_spec(
+    iree_string_view_t config_pairs, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
+  if (iree_string_view_is_empty(config_pairs)) {
+    // No parameters implies unbounded; we'll hang on to all memory forever.
+    // This is only useful in very specific usage patterns such as statically
+    // shaped and deterministic benchmarks that always allocate the same amounts
+    // of memory per invocation.
+    return iree_hal_caching_allocator_create_unbounded(
+        device_allocator, host_allocator, out_allocator);
+  }
+
+  // Query all heaps from the base allocator. We'll use this list to match the
+  // user-provided pool parameters to heaps. It's likely that not all heaps
+  // will be selected by the user.
+  iree_host_size_t heap_count = 0;
+  iree_hal_allocator_memory_heap_t heaps[16];
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_query_memory_heaps(
+      device_allocator, IREE_ARRAYSIZE(heaps), heaps, &heap_count));
+
+  // Build a list of pools based on user specification.
+  iree_host_size_t pool_count = 0;
+  iree_hal_caching_allocator_pool_params_t pool_params_storage[16];
+  do {
+    if (pool_count + 1 > IREE_ARRAYSIZE(pool_params_storage)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "too many pools specified");
+    }
+
+    // Pop the key=value config pair from the list.
+    iree_string_view_t config_pair = iree_string_view_empty();
+    iree_string_view_split(config_pairs, ',', &config_pair, &config_pairs);
+    iree_string_view_t heap_key = iree_string_view_empty();
+    iree_string_view_t pool_config = iree_string_view_empty();
+    iree_string_view_split(config_pair, '=', &heap_key, &pool_config);
+    heap_key = iree_string_view_trim(heap_key);
+    if (iree_string_view_is_empty(heap_key)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "heap key must specified in pool params");
+    }
+
+    // Select the heap based on the key.
+    const iree_hal_allocator_memory_heap_t* heap = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_select_heap(heap_key, heap_count, heaps, &heap));
+
+    // Configure the pool based on the provided parameters.
+    iree_hal_caching_allocator_pool_params_t* pool_params =
+        &pool_params_storage[pool_count++];
+    iree_hal_caching_allocator_pool_params_initialize(*heap, pool_params);
+
+    iree_string_view_t max_allocation_size_str = iree_string_view_empty();
+    iree_string_view_t max_allocation_capacity_str = iree_string_view_empty();
+    iree_string_view_t max_free_allocation_count_str = iree_string_view_empty();
+    iree_string_view_split(pool_config, ';', &max_allocation_size_str,
+                           &pool_config);
+    iree_string_view_split(pool_config, ';', &max_allocation_capacity_str,
+                           &pool_config);
+    iree_string_view_split(pool_config, ';', &max_free_allocation_count_str,
+                           &pool_config);
+    max_allocation_size_str = iree_string_view_trim(max_allocation_size_str);
+    if (!iree_string_view_is_empty(max_allocation_size_str) &&
+        !iree_string_view_equal(max_allocation_size_str, IREE_SV("*"))) {
+      IREE_RETURN_IF_ERROR(
+          iree_string_view_parse_device_size(max_allocation_size_str,
+                                             &pool_params->max_allocation_size),
+          "parsing max_allocation_size");
+    }
+    max_allocation_capacity_str =
+        iree_string_view_trim(max_allocation_capacity_str);
+    if (!iree_string_view_is_empty(max_allocation_capacity_str) &&
+        !iree_string_view_equal(max_allocation_capacity_str, IREE_SV("*"))) {
+      IREE_RETURN_IF_ERROR(iree_string_view_parse_device_size(
+                               max_allocation_capacity_str,
+                               &pool_params->max_allocation_capacity),
+                           "parsing max_allocation_capacity");
+    }
+    max_free_allocation_count_str =
+        iree_string_view_trim(max_free_allocation_count_str);
+    if (!iree_string_view_is_empty(max_free_allocation_count_str) &&
+        !iree_string_view_equal(max_free_allocation_count_str, IREE_SV("*"))) {
+      uint32_t max_free_allocation_count = 0;
+      if (!iree_string_view_atoi_uint32(max_free_allocation_count_str,
+                                        &max_free_allocation_count)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "invalid count '%.*s'",
+                                (int)max_free_allocation_count_str.size,
+                                max_free_allocation_count_str.data);
+      }
+      pool_params->max_free_allocation_count = max_free_allocation_count;
+    }
+  } while (!iree_string_view_is_empty(config_pairs));
+  return iree_hal_caching_allocator_create_with_pools(
+      pool_count, pool_params_storage, device_allocator, host_allocator,
+      out_allocator);
+}
+
 static void iree_hal_caching_allocator_destroy(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_caching_allocator_t* allocator =
@@ -484,7 +623,7 @@ static iree_status_t iree_hal_caching_allocator_trim(
   for (iree_host_size_t i = 0; i < allocator->pool_count; ++i) {
     iree_hal_caching_allocator_pool_trim(allocator->pools[i]);
   }
-  return iree_ok_status();
+  return iree_hal_allocator_trim(allocator->device_allocator);
 }
 
 static void iree_hal_caching_allocator_query_statistics(
@@ -539,7 +678,7 @@ static iree_hal_caching_allocator_pool_t* iree_hal_caching_allocator_find_pool(
 static iree_status_t iree_hal_caching_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_caching_allocator_t* allocator =
       iree_hal_caching_allocator_cast(base_allocator);
@@ -556,24 +695,10 @@ static iree_status_t iree_hal_caching_allocator_allocate_buffer(
     can_pool = false;
   }
 
-  // Performance warning: if the initial_data is non-empty and the memory type
-  // does not support mapping we bypass the pool and go straight to the
-  // underlying allocator. This is because initial data uploads require transfer
-  // operations and we don't want to require a device as that would prevent us
-  // from sharing the same pool across several devices. We could pass in a
-  // device per allocation request if it becomes a heavily used pattern but in
-  // most cases where initial_data is used it's for a CONSTANT buffer that we
-  // aren't pooling anyway.
-  if (!iree_const_byte_span_is_empty(initial_data) &&
-      !iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
-    can_pool = false;
-  }
-
   // If we don't want to pool then early-exit to the backing allocator.
   if (!can_pool) {
-    return iree_hal_allocator_allocate_buffer(allocator->device_allocator,
-                                              *params, allocation_size,
-                                              initial_data, out_buffer);
+    return iree_hal_allocator_allocate_buffer(
+        allocator->device_allocator, *params, allocation_size, out_buffer);
   }
 
   // We need to ensure we have the same parameters the allocator will use so
@@ -597,12 +722,12 @@ static iree_status_t iree_hal_caching_allocator_allocate_buffer(
     // Fallback to the underlying allocator.
     return iree_hal_allocator_allocate_buffer(allocator->device_allocator,
                                               compat_params, allocation_size,
-                                              initial_data, out_buffer);
+                                              out_buffer);
   }
 
   // Acquire the buffer from the pool.
   IREE_RETURN_IF_ERROR(iree_hal_caching_allocator_pool_acquire(
-      pool, &compat_params, allocation_size, initial_data, out_buffer));
+      pool, &compat_params, allocation_size, out_buffer));
 
   // Point the buffer back to us for deallocation.
   (*out_buffer)->device_allocator = base_allocator;

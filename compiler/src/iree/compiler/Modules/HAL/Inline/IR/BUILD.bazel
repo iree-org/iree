@@ -1,0 +1,112 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+exports_files(["HALInlineOps.td"])
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "HALInlineBase.td",
+            "HALInlineOps.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:td_files",
+        "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "@llvm-project//mlir:FuncTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "IR",
+    srcs = [
+        "HALInlineOps.cpp",
+    ],
+    hdrs = [
+        "HALInlineOps.h",
+        "HALInlineOps.h.inc",
+    ],
+    textual_hdrs = [
+        "HALInlineOps.cpp.inc",
+    ],
+    deps = [
+        ":HALInlineOpsGen",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Dialect/VM/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SideEffectInterfaces",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:TranslateLib",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "HALInlineDialect",
+    srcs = ["HALInlineDialect.cpp"],
+    hdrs = ["HALInlineDialect.h"],
+    deps = [
+        ":IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
+        "//compiler/src/iree/compiler/Modules/HAL/Inline:hal_inline_imports",
+        "//compiler/src/iree/compiler/Modules/HAL/Inline/Conversion/HALInlineToVM",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "HALInlineOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "HALInlineOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "HALInlineOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "HALInlineOps.td",
+    deps = [":td_files"],
+)
+
+iree_tablegen_doc(
+    name = "HALInlineDialecDocGen",
+    tbl_outs = [
+        (
+            [
+                "--dialect=hal_inline",
+                "--gen-dialect-doc",
+            ],
+            "HALInlineDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "HALInlineOps.td",
+    deps = [":td_files"],
+)

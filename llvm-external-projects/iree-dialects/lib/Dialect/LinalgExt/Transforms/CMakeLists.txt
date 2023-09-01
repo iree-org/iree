@@ -1,5 +1,4 @@
 add_mlir_library(IREELinalgExtTransforms
-  CodegenStrategy.cpp
   ForeachThreadToAsync.cpp
   ForeachThreadToSequentialFor.cpp
   Fusion.cpp
@@ -18,7 +17,6 @@ add_mlir_library(IREELinalgExtTransforms
   MLIRAffineToStandard
   MLIRAsyncDialect
   MLIRSCFToControlFlow
-  MLIRLinalgToLLVM
   MLIRDialectUtils
   MLIRVectorToLLVM
   MLIRMathToLLVM

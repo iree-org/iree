@@ -27,7 +27,7 @@ extern void print_success();
 // released by the caller.
 iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
                                                iree_hal_device_t** out_device) {
-  // Set paramters for the device created in the next step.
+  // Set parameters for the device created in the next step.
   iree_hal_sync_device_params_t params;
   iree_hal_sync_device_params_initialize(&params);
 
@@ -121,8 +121,8 @@ iree_status_t Run() {
   float kFloat2[] = {2.0f, 2.0f, 2.0f, 2.0f};
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer(
-        iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
+    status = iree_hal_buffer_view_allocate_buffer_copy(
+        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
@@ -133,8 +133,8 @@ iree_status_t Run() {
         &arg0_buffer_view);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer(
-        iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
+    status = iree_hal_buffer_view_allocate_buffer_copy(
+        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
             .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
@@ -163,7 +163,7 @@ iree_status_t Run() {
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
   }
 
-  // Retreive output buffer view with results from the invocation.
+  // Retrieve output buffer view with results from the invocation.
   iree_hal_buffer_view_t* ret_buffer_view = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_outputs_pop_front_buffer_view(&call,

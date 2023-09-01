@@ -19,7 +19,7 @@
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode/module.h"
 
 namespace iree {
 namespace {
@@ -92,7 +92,8 @@ class ModuleLoader {
 Status RunModule(const IreeModuleInvocation& invocation) {
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance),
+      iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                              iree_allocator_system(), &instance),
       "creating instance");
   IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(instance),
                        "registering HAL types");
@@ -141,12 +142,13 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   }
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(iree_tooling_parse_to_variant_list(
-      iree_hal_device_allocator(device), input_views.data(), input_views.size(),
-      iree_allocator_system(), &inputs));
+      device, iree_hal_device_allocator(device), input_views.data(),
+      input_views.size(), iree_allocator_system(), &inputs));
 
   vm::ref<iree_vm_list_t> outputs;
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
-                                           iree_allocator_system(), &outputs));
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                           16, iree_allocator_system(),
+                                           &outputs));
 
   LOGI("Execute @%s", function_name.c_str());
   IREE_RETURN_IF_ERROR(
@@ -157,10 +159,10 @@ Status RunModule(const IreeModuleInvocation& invocation) {
 
   iree_string_builder_t result_str;
   iree_string_builder_initialize(iree_allocator_system(), &result_str);
-  IREE_RETURN_IF_ERROR(
-      iree_tooling_append_variant_list_lines(
-          outputs.get(), /*max_element_count=*/1024, &result_str),
-      "printing results");
+  IREE_RETURN_IF_ERROR(iree_tooling_append_variant_list_lines(
+                           IREE_SV("result"), outputs.get(),
+                           /*max_element_count=*/1024, &result_str),
+                       "printing results");
   LOGI("Execution Result:");
   LOGI("%.*s", (int)iree_string_builder_size(&result_str),
        iree_string_builder_buffer(&result_str));

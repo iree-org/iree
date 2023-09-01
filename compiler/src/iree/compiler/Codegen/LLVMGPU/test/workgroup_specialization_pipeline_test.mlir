@@ -56,7 +56,7 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
 
 #map = affine_map<(d0) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#executable_target_cuda_nvptx_fb], legacy_sync}>
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @vectorized_dispatch_0 {
@@ -90,16 +90,16 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 }
 
 // CHECK-LABEL: func.func @vectorized_dispatch_0_generic_102401
-//      CHECK:   %[[cst:.*]] = arith.constant 0.000000e+00 : f32
-//      CHECK:   %[[c256:.*]] = arith.constant 256 : index
-//      CHECK:   %[[c0:.*]] = arith.constant 0 : index
-//      CHECK:   %[[ARR:.*]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[c0]]) : memref<102401xf32>
-//      CHECK:   %[[ARR2:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[c0]]) : memref<102401xf32>
+//  CHECK-DAG:   %[[cst:.*]] = arith.constant 0.000000e+00 : f32
+//  CHECK-DAG:   %[[c256:.*]] = arith.constant 256 : index
+//  CHECK-DAG:   %[[c0:.*]] = arith.constant 0 : index
 //      CHECK:   %[[BLKX:.*]] = hal.interface.workgroup.id[0] : index
 //      CHECK:   %[[BLKX2:.*]] = affine.min #{{.+}}()[%[[BLKX]]]
 //      CHECK:   %[[CMP:.*]] = arith.cmpi eq, %[[BLKX2]], %[[c256]] : index
 //      CHECK:   scf.if %[[CMP]]
+//      CHECK:   %[[ARR:.*]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[c0]]) : memref<102401xf32, #hal.descriptor_type<storage_buffer>>
+//      CHECK:   %[[ARR2:.*]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[c0]]) : memref<102401xf32, #hal.descriptor_type<storage_buffer>>
 //      CHECK:   %[[TIDX:.*]] = gpu.thread_id  x
 //      CHECK:   %[[AFF:.*]] = affine.apply #{{.+}}(%[[TIDX]])[%[[BLKX]]]
-//      CHECK:   vector.transfer_read %[[ARR]][%[[AFF]]], %[[cst]] {in_bounds = [true]} : memref<102401xf32>, vector<4xf32>
-//      CHECK:   vector.transfer_read %[[ARR2]][%[[AFF]]], %[[cst]] {in_bounds = [true]} : memref<102401xf32>, vector<4xf32>
+//      CHECK:   vector.transfer_read %[[ARR]][%[[AFF]]], %[[cst]] {in_bounds = [true]} : memref<102401xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
+//      CHECK:   vector.transfer_read %[[ARR2]][%[[AFF]]], %[[cst]] {in_bounds = [true]} : memref<102401xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>

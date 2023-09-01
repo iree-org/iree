@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_CONVERTREGIONTOWORKGROUPS_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_CONVERTREGIONTOWORKGROUPS_H_
 
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
@@ -31,9 +30,6 @@ struct WorkloadBuilder {
   using RegionBuilderFn =
       std::function<void(OpBuilder &, Location, ArrayRef<BlockArgument>)>;
 
-  /// Values to be used as `workload` operands of a WorkgroupsOp.
-  SmallVector<Value> workload;
-
   /// A function that builds the workload region of a WorkgroupsOp.
   RegionBuilderFn regionBuilder;
 };
@@ -48,9 +44,9 @@ FailureOr<DispatchWorkgroupsOp>
 rewriteFlowDispatchRegionToFlowDispatchWorkgroups(DispatchRegionOp regionOp,
                                                   RewriterBase &rewriter);
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Flow
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_CONVERTREGIONTOWORKGROUPS_H_
+#endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_CONVERTREGIONTOWORKGROUPS_H_

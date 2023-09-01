@@ -8,8 +8,10 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -70,7 +72,8 @@ struct StripResourceConversionCastPattern
   LogicalResult matchAndRewrite(UnrealizedConversionCastOp castOp,
                                 PatternRewriter &rewriter) const override {
     auto result = castOp.getResult(0);
-    if (!result.getType().isa<IREE::Stream::ResourceType>()) return failure();
+    if (!llvm::isa<IREE::Stream::ResourceType>(result.getType()))
+      return failure();
     assert(castOp.getNumOperands() == 2 &&
            "expect resource, index -> resource");
     auto resourceValue = castOp.getOperand(0);
@@ -78,10 +81,10 @@ struct StripResourceConversionCastPattern
     for (auto &use : llvm::make_early_inc_range(result.getUses())) {
       if (auto sizeOp =
               dyn_cast<IREE::Stream::ResourceSizeOp>(use.getOwner())) {
-        sizeOp.getResult().replaceAllUsesWith(sizeValue);
-        rewriter.eraseOp(sizeOp);
+        rewriter.replaceOp(sizeOp, sizeValue);
       } else {
-        use.set(resourceValue);
+        rewriter.updateRootInPlace(use.getOwner(),
+                                   [&]() { use.set(resourceValue); });
       }
     }
     rewriter.eraseOp(castOp);
@@ -89,10 +92,13 @@ struct StripResourceConversionCastPattern
   }
 };
 
-}  // namespace
+} // namespace
 
 StreamDialect::StreamDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<StreamDialect>()) {
+  context->loadDialect<IREE::Util::UtilDialect>();
+  context->loadDialect<mlir::complex::ComplexDialect>();
+
   registerAttributes();
   registerTypes();
 
@@ -113,16 +119,16 @@ Operation *StreamDialect::materializeConstant(OpBuilder &builder,
                                               Location loc) {
   if (mlir::func::ConstantOp::isBuildableWith(value, type)) {
     return builder.create<mlir::func::ConstantOp>(
-        loc, type, value.cast<FlatSymbolRefAttr>());
+        loc, type, llvm::cast<FlatSymbolRefAttr>(value));
   } else if (arith::ConstantOp::isBuildableWith(value, type)) {
-    return builder.create<arith::ConstantOp>(loc, type, value);
-  } else if (value.isa<IREE::Stream::TimepointAttr>()) {
+    return builder.create<arith::ConstantOp>(loc, type, cast<TypedAttr>(value));
+  } else if (llvm::isa<IREE::Stream::TimepointAttr>(value)) {
     return builder.create<IREE::Stream::TimepointImmediateOp>(loc);
   }
   return nullptr;
 }
 
-}  // namespace Stream
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Stream
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

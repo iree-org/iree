@@ -1,4 +1,4 @@
-"""Module init for the python bindings."""
+"""IREE runtime Python bindings."""
 
 # Copyright 2019 The IREE Authors
 #
@@ -20,18 +20,22 @@ from ._binding import (
     HalAllocator,
     HalBuffer,
     HalBufferView,
+    HalCommandBuffer,
     HalDevice,
     HalDriver,
     HalElementType,
+    HalFence,
+    HalSemaphore,
+    MappedMemory,
     MemoryAccess,
     MemoryType,
     PyModuleInterface,
     Shape,
+    create_hal_module,
 )
 
 # Vm imports
 from ._binding import (
-    create_hal_module,
     Linkage,
     VmBuffer,
     VmVariantList,

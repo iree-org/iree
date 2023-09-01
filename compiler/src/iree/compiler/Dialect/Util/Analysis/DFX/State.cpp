@@ -25,12 +25,14 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   if (!S.isValidState()) {
     os << "full-set";
   } else {
-    for (auto &it : S.getAssumedSet()) os << it << ", ";
-    if (S.isUndefContained()) os << "undef ";
+    for (auto &it : S.getAssumedSet())
+      os << it << ", ";
+    if (S.isUndefContained())
+      os << "undef ";
   }
   os << "} >)";
   return os;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir

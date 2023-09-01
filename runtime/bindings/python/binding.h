@@ -11,13 +11,18 @@
 #include <vector>
 
 #include "iree/base/api.h"
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
+#include "nanobind/nanobind.h"
+#include "nanobind/ndarray.h"
+#include "nanobind/stl/optional.h"
+#include "nanobind/stl/string.h"
+#include "nanobind/stl/string_view.h"
+#include "nanobind/stl/vector.h"
 
 namespace iree {
 namespace python {
 
-namespace py = pybind11;
+namespace py = nanobind;
+using namespace nanobind::literals;
 
 template <typename T>
 struct ApiPtrAdapter {};
@@ -93,6 +98,22 @@ class ApiRefCounted {
  private:
   T* instance_;
 };
+
+// Pybind11 had an isintance for Python objects helper. Nanobind doesn't.
+inline bool is_instance_of_type_object(py::handle inst,
+                                       py::handle type_object) {
+  int rc = PyObject_IsInstance(inst.ptr(), type_object.ptr());
+  if (rc == -1) {
+    throw py::python_error();
+  }
+  return static_cast<bool>(rc);
+}
+
+// Nanobind's tuple class has a default constructor that creates a nullptr
+// tuple. Which is not really what one wants.
+inline py::object create_empty_tuple() {
+  return py::steal(py::handle(PyTuple_New(0)));
+}
 
 }  // namespace python
 }  // namespace iree

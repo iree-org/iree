@@ -77,21 +77,24 @@ int main(int argc, char** argv) {
   }
 
   iree_vm_list_t* inputs = NULL;
-  IREE_CHECK_OK(iree_vm_list_create(NULL, 1, host_allocator, &inputs));
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                    host_allocator, &inputs));
   iree_vm_list_t* outputs = NULL;
-  IREE_CHECK_OK(iree_vm_list_create(NULL, 1, host_allocator, &outputs));
+  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                    host_allocator, &outputs));
 
   // Pass in the tensor<?xi32> arg:
   const int32_t input_data[5] = {1, 2, 3, 4, 5};
   const iree_hal_dim_t shape[1] = {IREE_ARRAYSIZE(input_data)};
   iree_hal_buffer_view_t* input_view = NULL;
-  IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
+  IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer_copy(
+      iree_runtime_session_device(session),
       iree_runtime_session_device_allocator(session), IREE_ARRAYSIZE(shape),
       shape, IREE_HAL_ELEMENT_TYPE_INT_32,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          .access = IREE_HAL_MEMORY_ACCESS_READ,
+          .access = IREE_HAL_MEMORY_ACCESS_ALL,
           .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
       },
       iree_make_const_byte_span(input_data, sizeof(input_data)), &input_view));

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/APInt.h"
@@ -36,16 +36,16 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
                                            const spirv::TargetEnv &targetEnv) {
   // First try to see if we can use tensor cores.
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-  if (failed(setCooperativeMatrixConfig(targetEnv, op,
-                                        NVIDIANumSubgroupsPerWorkgroup,
-                                        NVIDIANumMNTilesPerSubgroup)))
-    return failure();
-  if (getLoweringConfig(op)) return success();
+  if (succeeded(setCooperativeMatrixConfig(targetEnv, op,
+                                           NVIDIANumSubgroupsPerWorkgroup,
+                                           NVIDIANumMNTilesPerSubgroup)))
+    return success();
 
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType =
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {8, 8, 32};
   } else {
@@ -92,12 +92,9 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setNVIDIAMatmulConfig(linalgOp, targetEnv);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [&](auto op) { return setNVIDIAMatmulConfig(op, targetEnv); })
-      .Default([](Operation *) { return success(); });
+  return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

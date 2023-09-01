@@ -145,3 +145,20 @@ func.func @regionStaticShape(%arg0: tensor<5x10xf32>) -> tensor<5x10xf32> {
   // CHECK: return %[[R]]
   return %r : tensor<5x10xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @regionDynamicShape
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x?x16xf32>, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index, %[[DIM3:.+]]: index)
+func.func @regionDynamicShape(%arg0: tensor<?x?x16xf32>, %dim0: index, %dim1: index, %dim2: index, %dim3: index) -> tensor<?x?x16xf32> {
+  // CHECK: %[[C16:.+]] = arith.constant 16 : index
+  %c16 = arith.constant 16 : index
+  // CHECK: %[[R:.+]] = flow.dispatch.region[%[[DIM0]], %[[DIM1]], %[[C16]]] -> (tensor<?x?x16xf32>{%[[DIM2]], %[[DIM3]]}) {
+  // CHECK:   flow.return %[[ARG0]] : tensor<?x?x16xf32>
+  // CHECK: }
+  %region = flow.dispatch.region[%dim0, %dim1, %c16] -> (tensor<?x?x16xf32>{%dim2, %dim3}) {
+    flow.return %arg0 : tensor<?x?x16xf32>
+  }
+  // CHECK: return %[[R]]
+  return %region: tensor<?x?x16xf32>
+}

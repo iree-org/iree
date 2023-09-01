@@ -13,6 +13,19 @@ include "iree-dialects/Dialect/Input/InputBase.td"
 // Types
 //===----------------------------------------------------------------------===//
 
+def IREEInput_BufferType : IREEInput_Type<"Buffer"> {
+  let mnemonic = "buffer";
+
+  let summary = "Buffer is an untyped bag of bits with no shape or dtype";
+
+  let description = [{
+    Buffers represent an untyped bag of bits that can be reinterpreted depending
+    on a use case using `buffer_view` operation. Buffers can be used for packing
+    multiple tensors into the same underlying storage. It is left to higher
+    level code to decide how exactly tensors layed out in the buffer.
+  }];
+}
+
 def IREEInput_BufferViewType : IREEInput_Type<"BufferView"> {
   let mnemonic = "buffer_view";
 
@@ -43,6 +56,21 @@ def IREEInput_VariantType : IREEInput_Type<"Variant"> {
     The variant type is typically used to parameterize container types that
     can contain any legal primitive, reference or null in the IREE type system.
   }];
+}
+
+def IREEInput_ByteBufferType : IREEInput_Type<"ByteBuffer"> {
+  let mnemonic = "byte_buffer";
+
+  let summary = [{a reference counted byte buffer}];
+  let description = [{
+    A reference counted byte buffer that models a pointer, offset, and length.
+  }];
+
+  let builders = [
+    TypeBuilder<(ins), [{
+      return $_get($_ctxt);
+    }]>
+  ];
 }
 
 def IREEInput_ListType : IREEInput_Type<"List"> {

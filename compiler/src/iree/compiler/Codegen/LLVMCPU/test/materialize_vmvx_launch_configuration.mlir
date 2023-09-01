@@ -161,7 +161,7 @@ hal.executable @fusion_quant_matmul_generic {
           %16 = arith.muli %in_1, %c-128_i32 : i32
           %17 = arith.subi %in_0, %16 : i32
           %18 = arith.addi %in, %17 : i32
-          %19 = "tosa.apply_scale"(%18, %c1101627623_i32, %c36_i8) {double_round = true} : (i32, i32, i8) -> i32
+          %19 = tosa.apply_scale %18, %c1101627623_i32, %c36_i8 {double_round = true} : (i32, i32, i8) -> i32
           %20 = arith.addi %19, %c-128_i32 : i32
           %21 = arith.cmpi slt, %20, %c-128_i32 : i32
           %22 = arith.select %21, %c-128_i32, %20 : i32
@@ -212,16 +212,16 @@ hal.executable private @unpack_outer_dynamic  {
         %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c131072) : !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
         %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
-        %12 = iree_linalg_ext.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+        %12 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11 : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
         flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         return
       }
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 16]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [32, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
 //      CHECK: hal.executable.export public @unpack_outer_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   iree_linalg_ext.unpack
+//      CHECK:   tensor.unpack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]

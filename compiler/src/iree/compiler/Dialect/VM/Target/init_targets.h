@@ -16,9 +16,9 @@ namespace VM {
 void registerToVMBytecodeTranslation();
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
 void registerToCTranslation();
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
-}  // namespace VM
-}  // namespace IREE
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
+} // namespace VM
+} // namespace IREE
 
 // This function should be called before creating any MLIRContext if one
 // expects all the possible target backends to be available. Custom tools can
@@ -30,14 +30,14 @@ inline void registerVMTargets() {
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
     IREE::VM::registerToCTranslation();
-#endif  // IREE_HAVE_C_OUTPUT_FORMAT
+#endif // IREE_HAVE_C_OUTPUT_FORMAT
 
     return true;
   }();
   (void)init_once;
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_INIT_TARGETS_H_
+#endif // IREE_COMPILER_DIALECT_VM_TARGET_INIT_TARGETS_H_

@@ -10,10 +10,38 @@
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
-// Buffer attributes
+// #util.byte_pattern
+//===----------------------------------------------------------------------===//
+
+def Util_BytePatternAttr : AttrDef<Util_Dialect, "BytePattern", [
+  TypedAttrInterface,
+  DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
+    "serializeToBuffer",
+    "serializeToStream",
+  ]>,
+]> {
+  let mnemonic = "byte_pattern";
+  let summary = [{an attribute containing a filled byte pattern}];
+  let description = [{
+    A dense serializable attribute with the given byte pattern.
+  }];
+
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type,
+    AttrParameter<"int64_t", "">:$pattern
+  );
+
+  let assemblyFormat = [{
+    `<` $pattern `>`
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// #util.byte_range
 //===----------------------------------------------------------------------===//
 
 def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
@@ -31,6 +59,10 @@ def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
   let hasCustomAssemblyFormat = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// #util.composite
+//===----------------------------------------------------------------------===//
+
 def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
     "serializeToBuffer",
@@ -46,8 +78,10 @@ def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
     the full flattened range is required it can be efficiently streamed via the
     SerializableAttrInterface. All values must also be serializable.
 
-    All values are tightly packed. If padding is required it can be inserted as
-    splat elements attributes with the padding value (usually 0).
+    All values are tightly packed to byte boundaries. If padding is required it
+    can be inserted as splat elements attributes with the padding value
+    (usually 0). Sub-byte aligned element types will have their individual
+    components padded to byte alignment.
   }];
 
   let parameters = (ins

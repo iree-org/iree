@@ -8,16 +8,16 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 #include "iree/task/topology.h"
+
+#if !defined(IREE_PLATFORM_WINDOWS)
 
 // Initializes |out_topology| with a standardized behavior when cpuinfo is not
 // available (unsupported arch, failed to query, etc).
 static void iree_task_topology_initialize_fallback(
     iree_host_size_t max_group_count, iree_task_topology_t* out_topology) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, max_group_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_group_count);
   // TODO(benvanik): implement our own query... but that seems not so great.
   // For now we default to a single group: if a user wants more then they can
   // either get cpuinfo working for their platform or manually construct the
@@ -35,10 +35,11 @@ iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
   return 0;
 }
 
-void iree_task_topology_initialize_from_physical_cores(
+iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
     iree_task_topology_t* out_topology) {
   iree_task_topology_initialize_fallback(max_core_count, out_topology);
+  return iree_ok_status();
 }
 
 #else
@@ -243,7 +244,7 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, max_core_count);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_core_count);
 
   // Count cores that match the filter.
   iree_host_size_t core_count = 0;
@@ -279,12 +280,15 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
   IREE_TRACE_ZONE_END(z0);
 }
 
-void iree_task_topology_initialize_from_physical_cores(
+iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
     iree_task_topology_t* out_topology) {
   iree_task_topology_initialize_from_physical_cores_with_filter(
       iree_task_topology_core_filter_by_cluster_id, (uintptr_t)node_id,
       max_core_count, out_topology);
+  return iree_ok_status();
 }
 
 #endif  // IREE_TASK_CPUINFO_DISABLED
+
+#endif  // !IREE_PLATFORM_WINDOWS

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -22,7 +23,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-#include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.cpp.inc" // IWYU pragma: keep
 
 // Fallback asm printer for ops that do not define their own. See op-specific
 // printers in the op implementations.
@@ -40,14 +41,14 @@ struct VMDialect::VMOpAsmInterface
     SmallString<32> osBuffer;
     llvm::raw_svector_ostream os(osBuffer);
 
-    if (op->getResult(0).getType().isa<VectorType>()) {
+    if (llvm::isa<VectorType>(op->getResult(0).getType())) {
       os << "v";
     }
     if (auto refType =
-            op->getResult(0).getType().dyn_cast<IREE::VM::RefType>()) {
-      if (refType.getObjectType().isa<BufferType>()) {
+            llvm::dyn_cast<IREE::VM::RefType>(op->getResult(0).getType())) {
+      if (llvm::isa<BufferType>(refType.getObjectType())) {
         os << "buffer";
-      } else if (refType.getObjectType().isa<ListType>()) {
+      } else if (llvm::isa<ListType>(refType.getObjectType())) {
         os << "list";
       } else {
         os << "ref";
@@ -141,18 +142,20 @@ struct VMFolderInterface : public DialectFoldInterface {
   }
 };
 
-}  // namespace
+} // namespace
 
 VMDialect::VMDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()),
       fallbackOpAsmInterface(new VMOpAsmInterface) {
+  context->loadDialect<IREE::Util::UtilDialect>();
+
   registerAttributes();
   registerTypes();
   addInterfaces<VMInlinerInterface, VMFolderInterface>();
 
 #define GET_OP_LIST
   addOperations<
-#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"  // IWYU pragma: keep
+#include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc" // IWYU pragma: keep
       >();
 }
 
@@ -188,7 +191,8 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
     if (spec == "?") {
       elementType = OpaqueType::get(getContext());
     } else {
-      elementType = mlir::parseType(spec, getContext());
+      // Make sure to pass a null-terminated string to the type parser.
+      elementType = mlir::parseType(spec.str(), getContext());
     }
     if (!elementType) {
       parser.emitError(parser.getCurrentLocation())
@@ -209,7 +213,8 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
       return IREE::VM::RefType::getChecked(
           IREE::VM::OpaqueType::get(getContext()), loc);
     }
-    auto objectType = mlir::parseType(spec, getContext());
+    // Make sure to pass a null-terminated string to the type parser.
+    auto objectType = mlir::parseType(spec.str(), getContext());
     if (!objectType) {
       parser.emitError(parser.getCurrentLocation())
           << "invalid ref object type specification: '"
@@ -225,24 +230,24 @@ Type VMDialect::parseType(DialectAsmParser &parser) const {
 }
 
 void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
-  if (auto refType = type.dyn_cast<IREE::VM::RefType>()) {
+  if (auto refType = llvm::dyn_cast<IREE::VM::RefType>(type)) {
     auto objectType = refType.getObjectType();
-    if (auto bufferType = objectType.dyn_cast<IREE::VM::BufferType>()) {
+    if (auto bufferType = llvm::dyn_cast<IREE::VM::BufferType>(objectType)) {
       printType(bufferType, os);
-    } else if (auto listType = objectType.dyn_cast<IREE::VM::ListType>()) {
+    } else if (auto listType = llvm::dyn_cast<IREE::VM::ListType>(objectType)) {
       printType(listType, os);
-    } else if (objectType.isa<IREE::VM::OpaqueType>()) {
+    } else if (llvm::isa<IREE::VM::OpaqueType>(objectType)) {
       os << "ref<?>";
     } else {
       os << "ref<" << objectType << ">";
     }
-  } else if (type.isa<IREE::VM::OpaqueType>()) {
+  } else if (llvm::isa<IREE::VM::OpaqueType>(type)) {
     os << "opaque";
-  } else if (type.isa<IREE::VM::BufferType>()) {
+  } else if (llvm::isa<IREE::VM::BufferType>(type)) {
     os << "buffer";
-  } else if (auto listType = type.dyn_cast<IREE::VM::ListType>()) {
+  } else if (auto listType = llvm::dyn_cast<IREE::VM::ListType>(type)) {
     os << "list<";
-    if (listType.getElementType().isa<OpaqueType>()) {
+    if (llvm::isa<OpaqueType>(listType.getElementType())) {
       os << "?";
     } else {
       os << listType.getElementType();
@@ -259,31 +264,35 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
 
 Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
                                           Type type, Location loc) {
-  if (ConstI32Op::isBuildableWith(value, type)) {
-    auto convertedValue = ConstI32Op::convertConstValue(value);
-    if (convertedValue.cast<IntegerAttr>().getValue() == 0) {
+  auto typedValue = dyn_cast<TypedAttr>(value);
+  if (!typedValue)
+    return nullptr;
+
+  if (ConstI32Op::isBuildableWith(typedValue, type)) {
+    auto convertedValue = ConstI32Op::convertConstValue(typedValue);
+    if (llvm::cast<IntegerAttr>(convertedValue).getValue() == 0) {
       return builder.create<VM::ConstI32ZeroOp>(loc);
     }
     return builder.create<VM::ConstI32Op>(loc, convertedValue);
-  } else if (ConstI64Op::isBuildableWith(value, type)) {
-    auto convertedValue = ConstI64Op::convertConstValue(value);
-    if (convertedValue.cast<IntegerAttr>().getValue() == 0) {
+  } else if (ConstI64Op::isBuildableWith(typedValue, type)) {
+    auto convertedValue = ConstI64Op::convertConstValue(typedValue);
+    if (llvm::cast<IntegerAttr>(convertedValue).getValue() == 0) {
       return builder.create<VM::ConstI64ZeroOp>(loc);
     }
     return builder.create<VM::ConstI64Op>(loc, convertedValue);
-  } else if (ConstF32Op::isBuildableWith(value, type)) {
-    auto convertedValue = ConstF32Op::convertConstValue(value);
-    if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
+  } else if (ConstF32Op::isBuildableWith(typedValue, type)) {
+    auto convertedValue = ConstF32Op::convertConstValue(typedValue);
+    if (llvm::cast<FloatAttr>(convertedValue).getValue().isZero()) {
       return builder.create<VM::ConstF32ZeroOp>(loc);
     }
     return builder.create<VM::ConstF32Op>(loc, convertedValue);
-  } else if (ConstF64Op::isBuildableWith(value, type)) {
-    auto convertedValue = ConstF64Op::convertConstValue(value);
-    if (convertedValue.cast<FloatAttr>().getValue().isZero()) {
+  } else if (ConstF64Op::isBuildableWith(typedValue, type)) {
+    auto convertedValue = ConstF64Op::convertConstValue(typedValue);
+    if (llvm::cast<FloatAttr>(convertedValue).getValue().isZero()) {
       return builder.create<VM::ConstF64ZeroOp>(loc);
     }
     return builder.create<VM::ConstF64Op>(loc, convertedValue);
-  } else if (type.isa<IREE::VM::RefType>()) {
+  } else if (llvm::isa<IREE::VM::RefType>(type)) {
     // The only constant type we support for refs is null so we can just
     // emit that here.
     // TODO(benvanik): relace unit attr with a proper null ref attr.
@@ -293,7 +302,7 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
   return nullptr;
 }
 
-}  // namespace VM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace VM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

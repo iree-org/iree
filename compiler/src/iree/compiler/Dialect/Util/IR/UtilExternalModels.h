@@ -14,11 +14,11 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
-void registerUtilExternalModels(DialectRegistry& registry);
+void registerUtilExternalModels(DialectRegistry &registry);
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_IR_UTILEXTERNALMODELS_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILEXTERNALMODELS_H_

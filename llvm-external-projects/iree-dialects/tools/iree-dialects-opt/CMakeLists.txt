@@ -13,9 +13,12 @@ set(LIBS
   MLIRAffineDialect
   MLIRArithDialect
   MLIRAsyncDialect
+  MLIRBufferizationTransformOps
   MLIRControlFlowDialect
   MLIRDialect
   MLIRFuncDialect
+  MLIRFuncInlinerExtension
+  MLIRIndexToLLVM
   MLIRLinalgDialect
   MLIRLinalgTransformOps
   MLIRMemRefDialect
@@ -27,11 +30,13 @@ set(LIBS
   MLIRSCFTransformOps
   MLIRSCFTransforms
   MLIRTensorDialect
+  MLIRTensorTransformOps
   MLIRTransforms
+  MLIRTransformPDLExtension
   MLIRVectorTransformOps
 )
 
-add_llvm_tool(iree-dialects-opt
+add_llvm_executable(iree-dialects-opt
   iree-dialects-opt.cpp
 
   DEPENDS

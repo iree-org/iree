@@ -13,48 +13,29 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef enum iree_uk_unpack_type_t {
-  iree_uk_unpack_type_f32f32 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
-  iree_uk_unpack_type_i8i8 = IREE_UK_TIE_2_TYPES_LITERAL(INT_8, INT_8),
-  iree_uk_unpack_type_i32i32 = IREE_UK_TIE_2_TYPES_LITERAL(INT_32, INT_32),
-} iree_uk_unpack_type_t;
+// `unpack` microkernel. Currently only used in the VMVX backend, not used in
+// the LLVMCPU backend, because codegen is thought to be good enough and because
+// pack ops tend to get fused with many other ops, with substantial performance
+// benefit outweighing the microkernel advantage.
 
-static inline iree_uk_type_t iree_uk_unpack_in_type(
-    iree_uk_unpack_type_t type) {
-  return iree_uk_untie_type(0, type);
-}
-
-static inline iree_uk_type_t iree_uk_unpack_out_type(
-    iree_uk_unpack_type_t type) {
-  return iree_uk_untie_type(1, type);
-}
-
-// Parameters for a unpack operation.
 typedef struct iree_uk_unpack_params_t {
-  iree_uk_unpack_type_t type;
-  iree_uk_uint32_t flags;
-  iree_uk_ssize_t in_stride0;
-  iree_uk_ssize_t out_stride0;
-  iree_uk_ssize_t in_size0;
-  iree_uk_ssize_t in_size1;
-  iree_uk_ssize_t in_size2;
-  iree_uk_ssize_t in_size3;
-  iree_uk_ssize_t out_size0;
-  iree_uk_ssize_t out_size1;
   const void* in_buffer;
+  iree_uk_index_t in_offset;
+  iree_uk_index_t in_stride0;
   void* out_buffer;
+  iree_uk_index_t out_offset;
+  iree_uk_index_t out_stride0;
+  iree_uk_index_t in_size0;
+  iree_uk_index_t in_size1;
+  iree_uk_index_t in_size2;
+  iree_uk_index_t in_size3;
+  iree_uk_index_t out_size0;
+  iree_uk_index_t out_size1;
+  iree_uk_uint32_t flags;
   const iree_uk_uint64_t* cpu_data;
 } iree_uk_unpack_params_t;
 
-typedef void (*iree_uk_unpack_tile_func_t)(
-    void* IREE_UK_RESTRICT /*out_tile_ptr*/,
-    const void* IREE_UK_RESTRICT /*in_tile_ptr*/,
-    iree_uk_ssize_t /*outer_size1*/, iree_uk_ssize_t /*out_stride0*/,
-    iree_uk_ssize_t /*in_stride1*/, iree_uk_ssize_t /*elem_size*/,
-    iree_uk_ssize_t /*tile_size0*/, iree_uk_ssize_t /*tile_size1*/);
-
-// Main entry point.
-IREE_UK_EXPORT void iree_uk_unpack(const iree_uk_unpack_params_t* params);
+IREE_UK_EXPORT int iree_uk_unpack(const iree_uk_unpack_params_t* params);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -83,3 +83,16 @@ func.func @tensor_pad(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<1x2x2x3xf32>
 // CHECK:   %[[WRITE:.+]] = vector.transfer_write %[[INSERT3]], %[[INIT]][%[[I0]], %[[I0]], %[[I0]], %[[I0]]] {in_bounds = [true, true, true]} : vector<2x2x3xf32>, tensor<1x2x2x3xf32>
 // CHECK:   return %[[WRITE]]
+
+// -----
+
+func.func @no_vectorize_tensor_pad(%source: tensor<1x?x?x3xf32>, %low1: index,
+    %low2: index, %high1: index, %high2: index, %arg0 : f32) -> tensor<1x2x2x3xf32> {
+  %pad = tensor.pad %source low[0, %low1, %low2, 0] high[0, %high1, %high2, 0]  {
+  ^bb0(%b0: index, %b1: index, %b2: index, %b3: index):
+    tensor.yield %arg0 : f32
+  } : tensor<1x?x?x3xf32> to tensor<1x2x2x3xf32>
+  return %pad: tensor<1x2x2x3xf32>
+}
+// CHECK-LABEL: func @no_vectorize_tensor_pad
+//       CHECK:   tensor.pad

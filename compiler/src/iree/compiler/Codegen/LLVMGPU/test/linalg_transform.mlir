@@ -8,9 +8,9 @@
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/transform_dialect_codegen_foreach_to_gpu_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=FOREACH-TO-GPU
 
-#device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>]}>
+#device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>]}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @matmul_static_dispatch_0 {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
@@ -28,13 +28,13 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %cst = arith.constant 0.000000e+00 : f32
           %5 = linalg.fill ins(%cst : f32) outs(%50 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
-          //      CHECK: memref.assume_alignment %{{.*}}, 64 : memref<250x1020xf32>
-          // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32>)
-          // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32>, memref<500x1020xf32>) outs(%{{.*}} : memref<250x1020xf32>)
+          //      CHECK: memref.assume_alignment %{{.*}}, 64 : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>
+          // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
+          // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32, #hal.descriptor_type<storage_buffer>>, memref<500x1020xf32, #hal.descriptor_type<storage_buffer>>) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
           // CHECK-NEXT: return
 
           // workgroup_size is explicitly set to [10, 11].
-          // FOREACH-TO-GPU-DAG: hal.executable.export {{.*}}{translation_info = #translation, workgroup_size = [10 : index, 11 : index, 1 : index]}
+          // FOREACH-TO-GPU-DAG: hal.executable.export {{.*}}{subgroup_size = 32 : index, translation_info = #translation, workgroup_size = [10 : index, 11 : index, 1 : index]}
           // FOREACH-TO-GPU-DAG: %[[C0:.*]] = arith.constant 0 : index
           // FOREACH-TO-GPU-DAG: %[[C1:.*]] = arith.constant 1 : index
           // FOREACH-TO-GPU-DAG: %[[C5:.*]] = arith.constant 5 : index
@@ -63,10 +63,10 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDX]]]
           // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDY]]]
           // FOREACH-TO-GPU-DAG:   affine.apply #{{.*}}()[%[[TIDX]]]
-          // FOREACH-TO-GPU-DAG:   %[[svA:.*]] = memref.subview {{.*}} : memref<250x500xf32> to memref<?x500xf32
+          // FOREACH-TO-GPU-DAG:   %[[svA:.*]] = memref.subview {{.*}} : memref<250x500xf32{{.*}}> to memref<?x500xf32
           // FOREACH-TO-GPU-DAG:   affine.apply #{{.*}}()[%[[TIDY]]]
-          // FOREACH-TO-GPU-DAG:   %[[svB:.*]] = memref.subview {{.*}} : memref<500x1020xf32> to memref<500x?xf32
-          // FOREACH-TO-GPU-DAG:   %[[svC:.*]] = memref.subview {{.*}} : memref<250x1020xf32> to memref<?x?xf32
+          // FOREACH-TO-GPU-DAG:   %[[svB:.*]] = memref.subview {{.*}} : memref<500x1020xf32{{.*}}> to memref<500x?xf32
+          // FOREACH-TO-GPU-DAG:   %[[svC:.*]] = memref.subview {{.*}} : memref<250x1020xf32{{.*}}> to memref<?x?xf32
           // FOREACH-TO-GPU:   linalg.matmul ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
           // FOREACH-TO-GPU: }
           // FOREACH-TO-GPU: gpu.barrier

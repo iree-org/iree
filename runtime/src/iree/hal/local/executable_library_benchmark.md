@@ -85,8 +85,8 @@ iree-compile \
     iree/hal/local/testdata/elementwise_mul.mlir \
     -o=elementwise_mul.so \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-debug-symbols=false \
-    --iree-llvm-target-triple=x86_64-pc-linux-elf
+    --iree-llvmcpu-debug-symbols=false \
+    --iree-llvmcpu-target-triple=x86_64-pc-linux-elf
 ```
 
 Note that the architecture and other related LLVM flags must be specified by the
@@ -114,12 +114,12 @@ inspect the IR to find the proper way to call their kernels.
 
 ```
 iree-compile \
-    --iree-input-type=mhlo \
+    --iree-input-type=stablehlo \
     iree/samples/simple_embedding/simple_embedding_test.mlir \
     -o=module.vmfb \
     --iree-hal-target-backends=llvm-cpu \
-    --iree-llvm-debug-symbols=false \
-    --iree-llvm-target-triple=x86_64-pc-linux-elf \
+    --iree-llvmcpu-debug-symbols=false \
+    --iree-llvmcpu-target-triple=x86_64-pc-linux-elf \
     --mlir-print-ir-after-all \
     >module_dump.mlir 2>&1
 ```

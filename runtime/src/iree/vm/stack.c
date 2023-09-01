@@ -11,16 +11,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "iree/base/alignment.h"
 #include "iree/base/api.h"
-#include "iree/base/tracing.h"
 #include "iree/vm/module.h"
-
-#ifndef NDEBUG
-#define VMCHECK(expr) assert(expr)
-#else
-#define VMCHECK(expr)
-#endif  // NDEBUG
 
 //===----------------------------------------------------------------------===//
 // Stack implementation
@@ -203,7 +195,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
   if (storage.data_length < IREE_VM_STACK_MIN_SIZE) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
-        "stack storage under minimum required amount: %zu < %d",
+        "stack storage under minimum required amount: %" PRIhsz " < %d",
         storage.data_length, IREE_VM_STACK_MIN_SIZE);
   }
 
@@ -419,12 +411,12 @@ static iree_zone_id_t iree_vm_stack_trace_wait_zone_begin(
     }
     case IREE_VM_WAIT_ANY: {
       IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_any");
-      IREE_TRACE_ZONE_APPEND_VALUE(z0, wait_count);
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, wait_count);
       return z0;
     }
     case IREE_VM_WAIT_ALL: {
       IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_vm_stack_wait_all");
-      IREE_TRACE_ZONE_APPEND_VALUE(z0, wait_count);
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, wait_count);
       return z0;
     }
   }
@@ -548,7 +540,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     iree_vm_stack_t* stack, const iree_vm_function_t* function,
     iree_vm_stack_frame_type_t frame_type, iree_host_size_t frame_size,
     iree_vm_stack_frame_cleanup_fn_t frame_cleanup_fn,
-    iree_vm_stack_frame_t** out_callee_frame) {
+    iree_vm_stack_frame_t* IREE_RESTRICT* out_callee_frame) {
   if (out_callee_frame) *out_callee_frame = NULL;
 
   // Allocate stack space and grow stack, if required.
@@ -597,7 +589,8 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
     frame_header->trace_zone =
         iree_vm_stack_trace_function_zone_begin(frame_type, function);
     if (frame_header->trace_zone) {
-      IREE_TRACE_ZONE_APPEND_VALUE(frame_header->trace_zone, (uint64_t)stack);
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(frame_header->trace_zone,
+                                       (uint64_t)stack);
     }
   });
 
@@ -677,7 +670,7 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_format_backtrace(
 
     iree_vm_source_location_t source_location;
     iree_status_t status = iree_vm_module_resolve_source_location(
-        module, &frame->frame, &source_location);
+        module, frame->frame.function, frame->frame.pc, &source_location);
     if (iree_status_is_ok(status)) {
       status = iree_vm_source_location_format(
           &source_location, IREE_VM_SOURCE_LOCATION_FORMAT_FLAG_NONE, builder);
@@ -760,7 +753,8 @@ static void iree_vm_stack_resume_trace_zones_recursive(
     frame_header->trace_zone = iree_vm_stack_trace_function_zone_begin(
         frame_header->frame.type, &frame_header->frame.function);
     if (frame_header->trace_zone) {
-      IREE_TRACE_ZONE_APPEND_VALUE(frame_header->trace_zone, (uint64_t)stack);
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(frame_header->trace_zone,
+                                       (uint64_t)stack);
     }
   }
 }

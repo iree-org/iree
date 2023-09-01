@@ -1,4 +1,4 @@
-// Tested by iree/vm/bytecode_dispatch_async_test.cc.
+// Tested by iree/vm/bytecode/dispatch_async_test.cc.
 //
 // NOTE: we don't want to rely on vm.check.* and the main runner here for
 // testing as it makes it hard to test failure cases; a test that doesn't run

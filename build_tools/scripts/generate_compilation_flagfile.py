@@ -16,23 +16,24 @@ import argparse
 
 
 def parse_arguments():
-  """Parses command line arguments."""
-  parser = argparse.ArgumentParser()
-  parser.add_argument("--output",
-                      type=str,
-                      required=True,
-                      help="output file to write to")
-  parser.add_argument("compilation_flags",
-                      metavar="<compilation-flags>",
-                      nargs="*",
-                      help="list of compilation flags")
-  return parser.parse_args()
+    """Parses command line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--output", type=str, required=True, help="output file to write to"
+    )
+    parser.add_argument(
+        "compilation_flags",
+        metavar="<compilation-flags>",
+        nargs="*",
+        help="list of compilation flags",
+    )
+    return parser.parse_args()
 
 
 def main(args):
-  with open(args.output, "w") as f:
-    f.write("\n".join(args.compilation_flags) + "\n")
+    with open(args.output, "w") as f:
+        f.write("\n".join(args.compilation_flags) + "\n")
 
 
 if __name__ == "__main__":
-  main(parse_arguments())
+    main(parse_arguments())

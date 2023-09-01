@@ -15,6 +15,11 @@ include(CMakeParseArguments)
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
+# DISABLE_LLVM_LINK_LLVM_DYLIB: Disables linking against the libLLVM.so dynamic
+#   library, even if the build is configured to do so. This must be used with
+#   care as it can only contain dependencies and be used by binaries that also
+#   so disable it (either in upstream LLVM or locally). In practice, it is used
+#   for LLVM dependency chains that must always result in static-linked tools.
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # LINKOPTS: List of link options
@@ -49,7 +54,7 @@ include(CMakeParseArguments)
 function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
-    "EXCLUDE_FROM_ALL;HOSTONLY;TESTONLY;SETUP_INSTALL_RPATH"
+    "EXCLUDE_FROM_ALL;HOSTONLY;TESTONLY;SETUP_INSTALL_RPATH;DISABLE_LLVM_LINK_LLVM_DYLIB"
     "NAME"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
@@ -68,12 +73,19 @@ function(iree_cc_binary)
     set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   endif()
 
+  if(_DEBUG_IREE_PACKAGE_NAME)
+    message(STATUS "  : iree_cc_binary(${_NAME})")
+  endif()
+
   add_executable(${_NAME} "")
 
   if(NOT "${_PACKAGE_NS}" STREQUAL "")
     # Alias the iree_package_name binary to iree::package::name.
     # This lets us more clearly map to Bazel and makes it possible to
     # disambiguate the underscores in paths vs. the separators.
+    if(_DEBUG_IREE_PACKAGE_NAME)
+      message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
+    endif()
     add_executable(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
 
     # If the binary name matches the package then treat it as a default. For
@@ -94,7 +106,7 @@ function(iree_cc_binary)
     )
   else()
     set(_DUMMY_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_NAME}_dummy.cc")
-    file(WRITE ${_DUMMY_SRC} "")
+    iree_make_empty_file("${_DUMMY_SRC}")
     target_sources(${_NAME}
       PRIVATE
         ${_DUMMY_SRC}
@@ -122,6 +134,9 @@ function(iree_cc_binary)
 
   # Replace dependencies passed by ::name with iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  if(NOT _RULE_DISABLE_LLVM_LINK_LLVM_DYLIB)
+    iree_redirect_llvm_dylib_deps(_RULE_DEPS)
+  endif()
 
   # Implicit deps.
   if(IREE_IMPLICIT_DEFS_CC_DEPS)

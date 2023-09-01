@@ -118,8 +118,7 @@ class CustomModuleState final {
     vm::ref<iree_hal_buffer_t> result_buffer;
     IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
         device_allocator, buffer_params,
-        iree_hal_buffer_view_byte_length(arg_view.get()),
-        iree_const_byte_span_empty(), &result_buffer));
+        iree_hal_buffer_view_byte_length(arg_view.get()), &result_buffer));
 
     // Hacky example accessing the source contents and producing the result
     // contents. This emulates what an external library the user is calling that
@@ -185,11 +184,18 @@ extern "C" iree_status_t iree_custom_module_sync_create(
     iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
+
+  // NOTE: this isn't using the allocator here and that's bad as it leaves
+  // untracked allocations and pulls in the system allocator that may differ
+  // from the one requested by the user.
+  // TODO(benvanik): std::allocator wrapper around iree_allocator_t so this can
+  // use that instead.
   auto module = std::make_unique<CustomModule>(
       "custom", /*version=*/0, instance, host_allocator,
       iree::span<const vm::NativeFunction<CustomModuleState>>(
           kCustomModuleFunctions));
   module->SetDevice(vm::retain_ref(device));
+
   *out_module = module.release()->interface();
   return iree_ok_status();
 }

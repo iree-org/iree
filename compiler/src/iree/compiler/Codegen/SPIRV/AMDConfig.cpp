@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -37,18 +37,18 @@ constexpr unsigned AMDNumMNTilesPerSubgroup = 8;
 
 static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
                                         const spirv::TargetEnv &targetEnv) {
-  if (failed(setCooperativeMatrixConfig(
+  if (succeeded(setCooperativeMatrixConfig(
           targetEnv, op, AMDNumSubgroupsPerWorkgroup, AMDNumMNTilesPerSubgroup,
           AMDCoopMatrixSoftwarePipelineDepth,
           AMDCoopMatrixSoftwarePipelineStoreStage)))
-    return failure();
-  if (getLoweringConfig(op)) return success();
+    return success();
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType =
+      llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {8, 8, 32};
   } else {
@@ -82,25 +82,22 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
       return setAMDMatmulConfig(linalgOp, targetEnv);
   }
 
-  return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [targetEnv](auto op) { return setAMDMatmulConfig(op, targetEnv); })
-      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
-          [subgroupSize](auto op) {
-            bool hasPaddedInput =
-                op.image().template getDefiningOp<tensor::PadOp>();
-            int bestTilingFactor = hasPaddedInput ? 16 : 32;
-            return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-          })
-      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        bool hasPaddedInput =
-            op.image().template getDefiningOp<tensor::PadOp>();
-        int bestTilingFactor = hasPaddedInput ? 16 : 32;
-        return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-      })
-      .Default([](Operation *) { return success(); });
+  if (auto convOp = dyn_cast<linalg::ConvolutionOpInterface>(rootOp)) {
+    // Use the result type in case of larger bitwidth for accumulators.
+    auto type = cast<ShapedType>(convOp->getResult(0).getType());
+    const int bitwidth = type.getElementTypeBitWidth();
+    if (bitwidth > 32)
+      return failure();
+    const int multipler = 32 / bitwidth;
+    bool hasPaddedInput = convOp.image().getDefiningOp<tensor::PadOp>();
+    const int bestTilingFactor = (hasPaddedInput ? 16 : 32) * multipler;
+    return setConvOpConfig(cast<linalg::LinalgOp>(rootOp), subgroupSize,
+                           bestTilingFactor);
+  }
+
+  return failure();
 }
 
-}  // namespace detail
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace detail
+} // namespace iree_compiler
+} // namespace mlir

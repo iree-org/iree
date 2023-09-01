@@ -28,26 +28,34 @@ namespace Util {
 // Modifies in-place the operand results vectors for a closure operation.
 // |excludedOperandIndices| and |excludedResultIndices| are sets containing the
 // operands and results in the lists to remove.
-void excludeClosureOperandsAndResults(SmallVector<Value, 4> &operandValues,
+void excludeClosureOperandsAndResults(SmallVector<Value> &operandValues,
                                       ArrayRef<unsigned> excludedOperandIndices,
-                                      SmallVector<Type, 4> &resultTypes,
+                                      SmallVector<Type> &resultTypes,
                                       ArrayRef<unsigned> excludedResultIndices);
-void excludeClosureOperandsAndResults(SmallVector<Value, 4> &operandValues,
-                                      SmallVector<Value, 4> &operandDims,
+void excludeClosureOperandsAndResults(SmallVector<Value> &operandValues,
+                                      SmallVector<Value> &operandDims,
                                       ArrayRef<unsigned> excludedOperandIndices,
-                                      SmallVector<Type, 4> &resultTypes,
-                                      SmallVector<Value, 4> &resultDims,
+                                      SmallVector<Type> &resultTypes,
+                                      SmallVector<Value> &resultDims,
                                       ArrayRef<unsigned> excludedResultIndices);
 
 // Erases the given result indices from terminators in the given region.
 void eraseRegionResults(Region &region,
                         ArrayRef<unsigned> excludedResultIndices);
 
+struct ClosureOptimizationOptions {
+  // Maximum size in bytes of constant values to inline into the closure.
+  // When 0 no constants will be inlined; when None all constants will be
+  // inlined.
+  std::optional<int64_t> maxInlinedConstantBytes = {256};
+};
+
 // Optimizes closure |closureOp| to remove duplicate operands and unused
 // results. The op may be mutated, destroyed, or replaced with a new one. If an
 // optional |rewriter| is provided then it will be notified of the operations
 // performed on the op. Returns true if the op was optimized.
-LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
+LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
+                                    ClosureOpInterface closureOp,
                                     PatternRewriter &rewriter);
 
 // A pattern that optimizes the given region-containing op T (CSE, DCE, etc).
@@ -56,19 +64,26 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
 //
 // T must implement the IREE::Util::ClosureOpInterface.
 template <typename T>
-struct ClosureOptimizationPattern : public OpRewritePattern<T> {
-  using OpRewritePattern<T>::OpRewritePattern;
+class ClosureOptimizationPattern : public OpRewritePattern<T> {
+public:
+  ClosureOptimizationPattern(MLIRContext *context,
+                             ClosureOptimizationOptions options = {},
+                             PatternBenefit benefit = 1)
+      : OpRewritePattern<T>(context, benefit), options(options) {}
 
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
     auto closureOp = cast<ClosureOpInterface>(op.getOperation());
-    return optimizeClosureLikeOp(closureOp, rewriter);
+    return optimizeClosureLikeOp(options, closureOp, rewriter);
   }
+
+private:
+  const ClosureOptimizationOptions options;
 };
 
-}  // namespace Util
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Util
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_UTIL_IR_CLOSUREOPUTILS_H_
+#endif // IREE_COMPILER_DIALECT_UTIL_IR_CLOSUREOPUTILS_H_

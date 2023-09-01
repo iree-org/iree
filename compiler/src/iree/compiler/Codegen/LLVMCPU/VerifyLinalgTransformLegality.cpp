@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -20,7 +20,7 @@ struct VerifyLinalgTransformLegalityPass
     : VerifyLinalgTransformLegalityBase<VerifyLinalgTransformLegalityPass> {
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 void VerifyLinalgTransformLegalityPass::runOnOperation() {
   auto moduleOp = getOperation();
@@ -42,5 +42,5 @@ createVerifyLinalgTransformLegalityPass() {
   return std::make_unique<VerifyLinalgTransformLegalityPass>();
 }
 
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace iree_compiler
+} // namespace mlir
