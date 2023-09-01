@@ -298,6 +298,12 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTilePass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizeGatherAccesses = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+  }
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -598,6 +604,13 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
       createSPIRVAnnotateWinogradLoopsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizeGatherAccesses = true;
+    options.enableCleanup = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+  }
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -621,6 +634,7 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
   // Run SPIRVVectorize pass additionally to convert vectors into forms needed
   // for SPIR-V.
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 

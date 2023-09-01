@@ -252,20 +252,6 @@ getNativeVectorShape(Operation *op, bool targetSupportsDotProd) {
       .Default([](Operation *) { return std::nullopt; });
 }
 
-/// Add patterns to vectorize any supported Linalg ops.
-void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  IREE::LinalgExt::LinalgTransformationFilter filter;
-  IREE::LinalgExt::LinalgVectorizationOptions options;
-  // Enable vectorizing tensor.extract in Linalg ops.
-  options.vectorizeGatherAccesses = true;
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, options, filter);
-  linalg::populateConvolutionVectorizationPatterns(patterns);
-  patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), options,
-      filter.addOpFilter<linalg::ContractionOpInterface>());
-}
-
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.
 void populateVectorUnrollPatterns(RewritePatternSet &patterns,
                                   bool targetSupportsDotProd) {
@@ -321,10 +307,9 @@ public:
     bool emitIntegerDotProdOps = supportsIntegerDotProductOps(funcOp);
 
     // First apply vectorization to generate vectors of the original tensor
-    // shape.
+    // shape for tensor.pad ops.
     {
       RewritePatternSet patterns(context);
-      populateVectorizationPatterns(patterns);
       // Pull in additional vectorization patterns in IREE.
       populateVectorizePadPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
@@ -333,25 +318,10 @@ public:
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After vectorization ---\n";
+      llvm::dbgs() << "--- After IREE tensor.pad vectorization ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
-
-    {
-      auto result = funcOp.walk([&](linalg::LinalgOp op) {
-        // linalg.generic ops for copy are fine to not vectorize; they will be
-        // handled in later steps.
-        if (isa<linalg::YieldOp>(op.getBlock()->begin())) {
-          return WalkResult::advance();
-        }
-        // Other ones should error out.
-        op.emitOpError("should not remain after vectorization");
-        return WalkResult::interrupt();
-      });
-      if (result.wasInterrupted())
-        return signalPassFailure();
-    }
 
     // Special peephole optimizations to clean up IR before further processing.
     {
