@@ -11,7 +11,7 @@ include "mlir/Pass/PassBase.td"
 
 def MaterializeHomogeneousEncodings :
   Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
-  let summary = "Mateiralizes logical encodings to physical encodings if there is a single device target.";
+  let summary = "Materializes logical encodings to physical encodings if there is a single device target.";
   let constructor =
   "mlir::iree_compiler::GlobalOptimization::createMaterializeHomogeneousEncodingsPass()";
 }

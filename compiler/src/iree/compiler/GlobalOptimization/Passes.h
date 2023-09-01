@@ -37,7 +37,7 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions);
 
-// Mateiralizes logical encodings to physical encodings if there is a single
+// Materializes logical encodings to physical encodings if there is a single
 // device target.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createMaterializeHomogeneousEncodingsPass();

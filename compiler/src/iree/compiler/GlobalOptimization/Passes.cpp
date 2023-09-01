@@ -13,11 +13,6 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
-static llvm::cl::opt<bool>
-    clEnableDataTiling("iree-global-opt-data-tiling",
-                       llvm::cl::desc("Enable data tiling path."),
-                       llvm::cl::init(false));
-
 namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
@@ -70,7 +65,8 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       // Enable data tiling after they are in a canonical form.
-      .addPredicatedPass(clEnableDataTiling, IREE::Flow::createSetEncodingPass)
+      .addPredicatedPass(transformOptions.options.dataTiling,
+                         IREE::Flow::createSetEncodingPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
   mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
