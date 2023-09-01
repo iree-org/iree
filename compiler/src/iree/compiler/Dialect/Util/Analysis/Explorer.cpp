@@ -1044,8 +1044,16 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
       }
 
       // If op is a return then we need to walk into the caller results.
-      if (ownerOp->hasTrait<OpTrait::ReturnLike>()) {
+      if (ownerOp->hasTrait<OpTrait::ReturnLike>() &&
+          llvm::isa<CallableOpInterface>(ownerOp->getParentOp())) {
         result |= traverseReturnOp(ownerOp, use.getOperandNumber());
+      }
+
+      if (ownerOp->hasTrait<OpTrait::ReturnLike>() &&
+          !llvm::isa<CallableOpInterface>(ownerOp->getParentOp())) {
+        auto parent = ownerOp->getParentOp();
+        auto result = parent->getResult(use.getOperandNumber());
+        worklist.insert(result);
       }
 
       // Step across global stores and into all of the loads across the program.

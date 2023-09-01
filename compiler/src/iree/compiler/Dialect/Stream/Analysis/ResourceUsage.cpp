@@ -20,6 +20,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -491,6 +492,30 @@ private:
                 return WalkResult::advance();
               });
         })
+        .Case([&](mlir::scf::ConditionOp op) {
+          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op->getOperand(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= operandUsage.getState();
+
+          auto parentUsage = solver.getElementFor<ValueResourceUsage>(
+              *this,
+              Position::forValue(op->getParentOp()->getResult(operandIdx - 1)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= parentUsage.getState();
+        })
+        .Case([&](mlir::scf::YieldOp op) {
+          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op->getOperand(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= operandUsage.getState();
+
+          auto parentUsage = solver.getElementFor<ValueResourceUsage>(
+              *this,
+              Position::forValue(op->getParentOp()->getResult(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= parentUsage.getState();
+        })
         .Case([&](mlir::func::ReturnOp op) {
           auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getOperand(operandIdx)),
@@ -707,6 +732,7 @@ ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
     : explorer(rootOp, TraversalAction::SHALLOW), solver(explorer, allocator) {
   explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
+  explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
   explorer.setDialectAction<IREE::Stream::StreamDialect>(
       TraversalAction::RECURSE);
   // Ignore the contents of executables (linalg goo, etc).

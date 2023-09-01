@@ -432,10 +432,11 @@ public:
             std::string("_function_like_") + std::to_string(it.index());
       }
 
-      auto &bodyRegion = op.getFunctionBody();
+      llvm::SmallVector<DispatchWorkgroupsOp> dispatchWorkgroupsOps;
       // Outline all of the dispatch regions ops in this function.
-      auto dispatchWorkgroupsOps =
-          llvm::to_vector<8>(bodyRegion.getOps<DispatchWorkgroupsOp>());
+      op.walk([&](DispatchWorkgroupsOp op) {
+        dispatchWorkgroupsOps.push_back(op);
+      });
       for (int i = 0; i < dispatchWorkgroupsOps.size(); ++i) {
         std::string executableOpName =
             (namePrefix + "_dispatch_" + llvm::Twine(i)).str();
