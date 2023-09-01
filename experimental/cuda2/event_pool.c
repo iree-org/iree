@@ -266,9 +266,9 @@ iree_status_t iree_hal_cuda2_event_pool_acquire(
     IREE_TRACE_ZONE_END(z1);
   }
 
-  // Retain a reference to a pool when we pass event to the caller. When caller
-  // returns event to the pool we'll release the reference.
-  for (unsigned i = 0; i < event_count; ++i) {
+  // Retain a reference to a pool when we pass event to the caller. When the
+  // caller returns event back to the pool they'll release the reference.
+  for (iree_host_size_t i = 0; i < event_count; ++i) {
     iree_hal_cuda2_event_pool_retain(out_events[i]->pool);  // +1
   }
 
