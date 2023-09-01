@@ -378,7 +378,7 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
 === "Windows"
 
     ``` powershell
-    ..\iree-build\.env.bat
+    ..\iree-build\.env.ps1  # or ..\iree-build\.env.bat
     # The 'PYTHONPATH' environment variable should now contain
     #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
 
