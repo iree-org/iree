@@ -46,10 +46,10 @@ public:
   // value aliasing set provides efficient access to discovered value alises.
   class Builder {
   public:
-    void addAlias(Value streamValue, Value aliasedValue) {
-      int64_t streamValueRoot = getRoot(streamValue);
-      int64_t aliasedValueRoot = getRoot(aliasedValue);
-      root[aliasedValueRoot] = streamValueRoot;
+    void addAlias(Value aliasee, Value aliaser) {
+      int64_t aliaseeRoot = getRoot(aliasee);
+      int64_t aliaserRoot = getRoot(aliaser);
+      root[aliaserRoot] = aliaseeRoot;
     }
 
     ValueAliasingSet build();
