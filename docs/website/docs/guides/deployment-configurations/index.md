@@ -7,15 +7,15 @@ runtime entirely or interface with custom accelerators.
 
 ## Stable configurations
 
-* [:octicons-cpu-16: CPU](./deployment-configurations/cpu.md) for general
+* [:octicons-cpu-16: CPU](./cpu.md) for general
   purpose CPU deployment
-* [:octicons-cpu-16: CPU - Bare-Metal](./deployment-configurations/bare-metal.md)
+* [:octicons-cpu-16: CPU - Bare-Metal](./bare-metal.md)
   with minimal platform dependencies
-* [:octicons-server-16: GPU - Vulkan](./deployment-configurations/gpu-vulkan.md)
+* [:octicons-server-16: GPU - Vulkan](./gpu-vulkan.md)
   for cross-platform usage and interop with graphics applications
-* [:octicons-server-16: GPU - CUDA/ROCm](./deployment-configurations/gpu-cuda-rocm.md)
+* [:octicons-server-16: GPU - CUDA/ROCm](./gpu-cuda-rocm.md)
   for NVIDIA/AMD-specific solutions
-* [:simple-apple: GPU - Metal](./deployment-configurations/gpu-metal.md)
+* [:simple-apple: GPU - Metal](./gpu-metal.md)
   for running on Apple hardware
 
 These are just the most stable configurations IREE supports. Feel free to reach
