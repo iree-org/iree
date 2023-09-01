@@ -177,8 +177,8 @@ def EraseDeadAllocAndStores :
       "mlir::iree_compiler::createEraseDeadAllocAndStoresPass()";
 }
 
-def EraseHALDescriptorTypeFromMemRef :
-    Pass<"iree-codegen-erase-hal-descriptor-type-from-memref", "func::FuncOp"> {
+def EraseHALDescriptorTypeFromMemRef
+    : Pass<"iree-codegen-erase-hal-descriptor-type-from-memref"> {
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
   let constructor =
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
@@ -249,6 +249,14 @@ def GenericVectorization :
       "Rewrite all tensor.pad ops in the function to vector form.">,
     Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
       "Enable vectorizaiton of operations that may generate vector.gather operations.">,
+    Option<"enableCleanup", "enable-cleanup", "bool",/*default=*/"true",
+      "Enable cleanups after vectorization. The patterns touch the structure"
+      "generated from tiling so it affects later steps like bufferization and vector hoisting.">,
+    Option<"generateContract", "generate-contract", "bool",/*default=*/"true",
+      "Enable conversion for reduction ops to contraction ops.">,
+    Option<"maxVectorSize", "max-vector-size", "int64_t",
+            /*default=*/"2147483647",
+           "Max vector size allowed to avoid creating large vectors.">
   ];
   let constructor =
       "mlir::iree_compiler::createGenericVectorizationPass()";

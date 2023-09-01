@@ -132,9 +132,6 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
     CUstream dispatch_stream, CUstream callback_stream, CUcontext context,
     const iree_hal_cuda2_dynamic_symbols_t* cuda_symbols,
     const iree_hal_cuda2_nccl_dynamic_symbols_t* nccl_symbols,
-    iree_event_pool_t* host_event_pool,
-    iree_hal_cuda2_event_pool_t* device_event_pool,
-    iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_cuda2_device_t* device = NULL;
   iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
@@ -159,9 +156,6 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
   device->dispatch_cu_stream = dispatch_stream;
   device->callback_cu_stream = callback_stream;
   device->host_allocator = host_allocator;
-  device->host_event_pool = host_event_pool;
-  device->device_event_pool = device_event_pool;
-  device->timepoint_pool = timepoint_pool;
 
   iree_status_t status = iree_hal_cuda2_pending_queue_actions_create(
       cuda_symbols, &device->block_pool, host_allocator,
@@ -245,6 +239,17 @@ iree_status_t iree_hal_cuda2_device_create(
         cuda_symbols, cuStreamCreate(&callback_stream, CU_STREAM_NON_BLOCKING));
   }
 
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_cuda2_device_create_internal(
+        driver, identifier, params, device, dispatch_stream, callback_stream,
+        context, cuda_symbols, nccl_symbols, host_allocator, out_device);
+  } else {
+    // Release resources we have accquired thus far.
+    if (callback_stream) cuda_symbols->cuStreamDestroy(callback_stream);
+    if (dispatch_stream) cuda_symbols->cuStreamDestroy(dispatch_stream);
+    if (context) cuda_symbols->cuDevicePrimaryCtxRelease(device);
+  }
+
   iree_event_pool_t* host_event_pool = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_event_pool_allocate(params->event_pool_capacity,
@@ -254,7 +259,7 @@ iree_status_t iree_hal_cuda2_device_create(
   iree_hal_cuda2_event_pool_t* device_event_pool = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda2_event_pool_allocate(
-        cuda_symbols, params->event_pool_capacity, host_allocator,
+        *out_device, cuda_symbols, params->event_pool_capacity, host_allocator,
         &device_event_pool);
   }
 
@@ -266,19 +271,18 @@ iree_status_t iree_hal_cuda2_device_create(
   }
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_cuda2_device_create_internal(
-        driver, identifier, params, device, dispatch_stream, callback_stream,
-        context, cuda_symbols, nccl_symbols, host_event_pool, device_event_pool,
-        timepoint_pool, host_allocator, out_device);
-  }
-
-  if (!iree_status_is_ok(status)) {
+    iree_hal_cuda2_device_t* cuda_device =
+        iree_hal_cuda2_device_cast(*out_device);
+    cuda_device->host_event_pool = host_event_pool;
+    cuda_device->device_event_pool = device_event_pool;
+    cuda_device->timepoint_pool = timepoint_pool;
+  } else {
+    // Release resources we have accquired after HAL device creation.
     if (timepoint_pool) iree_hal_cuda2_timepoint_pool_free(timepoint_pool);
-    if (device_event_pool) iree_hal_cuda2_event_pool_free(device_event_pool);
+    if (device_event_pool) iree_hal_cuda2_event_pool_release(device_event_pool);
     if (host_event_pool) iree_event_pool_free(host_event_pool);
-    if (callback_stream) cuda_symbols->cuStreamDestroy(callback_stream);
-    if (dispatch_stream) cuda_symbols->cuStreamDestroy(dispatch_stream);
-    if (context) cuda_symbols->cuDevicePrimaryCtxRelease(device);
+    // Release other resources via the HAL device.
+    iree_hal_device_release(*out_device);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -320,9 +324,13 @@ static void iree_hal_cuda2_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_cuda2_tracing_context_free(device->tracing_context);
 
   // Destroy various pools for synchronization.
-  iree_hal_cuda2_timepoint_pool_free(device->timepoint_pool);
-  iree_hal_cuda2_event_pool_free(device->device_event_pool);
-  iree_event_pool_free(device->host_event_pool);
+  if (device->timepoint_pool) {
+    iree_hal_cuda2_timepoint_pool_free(device->timepoint_pool);
+  }
+  if (device->device_event_pool) {
+    iree_hal_cuda2_event_pool_release(device->device_event_pool);
+  }
+  if (device->host_event_pool) iree_event_pool_free(device->host_event_pool);
 
   IREE_CUDA_IGNORE_ERROR(symbols, cuStreamDestroy(device->dispatch_cu_stream));
   IREE_CUDA_IGNORE_ERROR(symbols, cuStreamDestroy(device->callback_cu_stream));

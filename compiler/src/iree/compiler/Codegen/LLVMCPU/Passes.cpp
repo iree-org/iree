@@ -607,6 +607,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
   if (enableMicrokernels) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createDecomposeBatchMmt4DOpsPass());
     nestedModulePM.addPass(
         createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   } else {
@@ -686,8 +688,7 @@ void addTransformDialectPasses(OpPassManager &passManager) {
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // TODO: Remove the following pass and plumb support for #hal.descriptor_type
   // memory space through the stack.
-  passManager.addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
+  passManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
 
   // Lower `ukernel.*` ops to function calls
   passManager.addPass(createLowerUKernelOpsToCallsPass());
@@ -774,8 +775,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
         createCPUMaterializeEncodingPass());
     // TODO: Remove the following pass the plumb support for
     // #hal.descriptor_type memory space through the stack.
-    modulePassManager.addNestedPass<func::FuncOp>(
-        createEraseHALDescriptorTypeFromMemRefPass());
+    modulePassManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
   }
 
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());

@@ -19,6 +19,7 @@
 #include "experimental/rocm/rocm_allocator.h"
 #include "experimental/rocm/rocm_event.h"
 #include "experimental/rocm/status_util.h"
+#include "experimental/rocm/tracing.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/file_transfer.h"
@@ -44,6 +45,7 @@ typedef struct iree_hal_rocm_device_t {
 
   // TODO: support multiple streams.
   hipStream_t stream;
+  iree_hal_rocm_tracing_context_t* tracing_context;
   iree_hal_rocm_context_wrapper_t context_wrapper;
   iree_hal_allocator_t* device_allocator;
 
@@ -70,6 +72,7 @@ static void iree_hal_rocm_device_destroy(iree_hal_device_t* base_device) {
   // Buffers may have been retaining collective resources.
   iree_hal_channel_provider_release(device->channel_provider);
 
+  iree_hal_rocm_tracing_context_free(device->tracing_context);
   ROCM_IGNORE_ERROR(device->context_wrapper.syms,
                     hipStreamDestroy(device->stream));
 
@@ -102,8 +105,14 @@ static iree_status_t iree_hal_rocm_device_create_internal(
   device->context_wrapper.rocm_context = context;
   device->context_wrapper.host_allocator = host_allocator;
   device->context_wrapper.syms = syms;
-  iree_status_t status = iree_hal_rocm_allocator_create(
-      &device->context_wrapper, &device->device_allocator);
+  // Enable tracing for the (currently only) stream - no-op if disabled.
+  iree_status_t status = iree_hal_rocm_tracing_context_allocate(
+      &device->context_wrapper, device->identifier, stream, &device->block_pool,
+      host_allocator, &device->tracing_context);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_rocm_allocator_create(&device->context_wrapper,
+                                            &device->device_allocator);
+  }
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -216,8 +225,8 @@ static iree_status_t iree_hal_rocm_device_create_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   return iree_hal_rocm_direct_command_buffer_create(
-      base_device, &device->context_wrapper, mode, command_categories,
-      queue_affinity, binding_capacity, &device->block_pool,
+      base_device, &device->context_wrapper, device->tracing_context, mode,
+      command_categories, queue_affinity, binding_capacity, &device->block_pool,
       out_command_buffer);
 }
 
@@ -372,8 +381,11 @@ static iree_status_t iree_hal_rocm_device_queue_execute(
   // synchronizes after every submit.
   // TODO(raikonenfnu): currently run on default/null stream, when cmd buffer
   // stream work with device->stream, we'll change
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "hipStreamSynchronize");
   ROCM_RETURN_IF_ERROR(device->context_wrapper.syms, hipStreamSynchronize(0),
                        "hipStreamSynchronize");
+  iree_hal_rocm_tracing_context_collect(device->tracing_context);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 

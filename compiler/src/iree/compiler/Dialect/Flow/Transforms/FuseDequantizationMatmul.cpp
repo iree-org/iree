@@ -64,15 +64,6 @@ static LogicalResult isGroupedContractionOp(linalg::GenericOp genericOp) {
     return failure();
   if (genericOp.getNumReductionLoops() != 2)
     return failure();
-  if (!llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
-           .hasStaticShape() ||
-      !llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
-           .hasStaticShape() ||
-      !llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
-           .hasStaticShape()) {
-    // Codegen can't handle the dynamic case yet.
-    return failure();
-  }
   return success();
 }
 

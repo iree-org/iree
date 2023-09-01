@@ -192,7 +192,8 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
 
   // Never hoist empty. These are sometimes used for pure shape metadata
   // and must not be separated from their consumers.
-  if (isa<tensor::EmptyOp>(op)) {
+  if (isa<tensor::EmptyOp, tensor::ExpandShapeOp, tensor::CollapseShapeOp>(
+          op)) {
     return false;
   }
 

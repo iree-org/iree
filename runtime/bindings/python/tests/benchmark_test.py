@@ -82,3 +82,7 @@ class BenchmarkTest(unittest.TestCase):
                 inputs=[arg0, arg1, arg2],
                 timeout=0.1,
             )
+
+
+if __name__ == "__main__":
+    unittest.main()

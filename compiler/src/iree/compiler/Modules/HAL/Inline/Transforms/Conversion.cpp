@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/Patterns.h"
 #include "iree/compiler/Dialect/HAL/Conversion/UtilToHAL/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Modules/HAL/Inline/Conversion/HALToHALInline/Patterns.h"
@@ -15,15 +14,12 @@
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/PassDetail.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
-#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -81,8 +77,6 @@ public:
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    patterns);
-    populateGenericStructuralConversionPatterns(context, conversionTarget,
-                                                typeConverter, patterns);
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(patterns)))) {

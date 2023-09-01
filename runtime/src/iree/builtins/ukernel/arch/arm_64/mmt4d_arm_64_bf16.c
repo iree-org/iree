@@ -33,9 +33,8 @@ static inline float32x4_t iree_uk_neon_uzp2_f32_as_s64(float32x4_t a,
 
 void iree_uk_mmt4d_tile_bf16bf16f32_8x8x4_arm_64_bf16(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
-  (void)params;
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params) {
   const bfloat16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const bfloat16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
   float* IREE_UK_RESTRICT out_ptr = out_tile;
@@ -43,7 +42,7 @@ void iree_uk_mmt4d_tile_bf16bf16f32_8x8x4_arm_64_bf16(
   float32x4_t acc_23_01, acc_23_23, acc_23_45, acc_23_67;
   float32x4_t acc_45_01, acc_45_23, acc_45_45, acc_45_67;
   float32x4_t acc_67_01, acc_67_23, acc_67_45, acc_67_67;
-  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     float32x4_t acc_0_0123 = vld1q_f32(out_ptr + 8 * 0 + 0);
     float32x4_t acc_0_4567 = vld1q_f32(out_ptr + 8 * 0 + 4);
     float32x4_t acc_1_0123 = vld1q_f32(out_ptr + 8 * 1 + 0);
@@ -95,8 +94,8 @@ void iree_uk_mmt4d_tile_bf16bf16f32_8x8x4_arm_64_bf16(
     acc_67_67 = vdupq_n_f32(0);
   }
 
-  IREE_UK_ASSUME(K >= 1);
-  for (int k = 0; k < K; ++k) {
+  IREE_UK_ASSUME(params->K >= 1);
+  for (int k = 0; k < params->K; ++k) {
     bfloat16x8_t lhs01 = vld1q_bf16(lhs_ptr + 0);
     bfloat16x8_t lhs23 = vld1q_bf16(lhs_ptr + 8);
     bfloat16x8_t lhs45 = vld1q_bf16(lhs_ptr + 16);

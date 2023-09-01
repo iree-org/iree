@@ -29,6 +29,8 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "llvm/Support/Debug.h"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -232,6 +234,100 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
   }
 };
 
+struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
+  SetBatchMatmulEncoding(MLIRContext *context, PatternBenefit benefit = 1)
+      : OpRewritePattern<linalg::BatchMatmulOp>(context, benefit) {}
+
+  LogicalResult matchAndRewrite(linalg::BatchMatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    if (!matmulOp.hasTensorSemantics())
+      return failure();
+    auto inputs = matmulOp.getDpsInputOperands();
+    auto outputs = matmulOp.getDpsInitOperands();
+    auto hasEncoding = [](OpOperand *operand) -> bool {
+      auto type = llvm::dyn_cast<RankedTensorType>(operand->get().getType());
+      return type && type.getEncoding();
+    };
+    if (llvm::any_of(inputs, hasEncoding) ||
+        llvm::any_of(outputs, hasEncoding)) {
+      return failure();
+    }
+
+    Value origLhs = inputs[0]->get();
+    Value origRhs = inputs[1]->get();
+    Value origOut = outputs[0]->get();
+
+    auto getElemType = [](Value v) -> Type {
+      if (auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType())) {
+        return tensorType.getElementType();
+      }
+      return {};
+    };
+    Type lhsElemType = getElemType(origLhs);
+    Type rhsElemType = getElemType(origRhs);
+    Type outElemType = getElemType(origOut);
+
+    if (!lhsElemType || !rhsElemType || !outElemType) {
+      return failure();
+    }
+
+    LinalgExt::EncodingUser user;
+
+    if (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()) {
+      user = LinalgExt::EncodingUser::BATCH_MATMUL_F32F32F32;
+    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+               outElemType.isF32()) {
+      user = LinalgExt::EncodingUser::BATCH_MATMUL_F16F16F32;
+    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+               outElemType.isF16()) {
+      user = LinalgExt::EncodingUser::BATCH_MATMUL_F16F16F16;
+    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+               outElemType.isF32()) {
+      user = LinalgExt::EncodingUser::BATCH_MATMUL_BF16BF16F32;
+    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+               outElemType.isBF16()) {
+      user = LinalgExt::EncodingUser::BATCH_MATMUL_BF16BF16BF16;
+    } else if (lhsElemType.isSignlessInteger(8) &&
+               rhsElemType.isSignlessInteger(8) &&
+               outElemType.isSignlessInteger(32)) {
+      user = LinalgExt::EncodingUser::BATCH_MATMUL_I8I8I32;
+    } else {
+      return rewriter.notifyMatchFailure(
+          matmulOp,
+          "unhandled combination of (lhs, rhs, result) element types");
+    }
+
+    Location loc = matmulOp.getLoc();
+
+    Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
+                                         LinalgExt::EncodingRole::LHS);
+    Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
+                                         LinalgExt::EncodingRole::RHS);
+    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
+                                         LinalgExt::EncodingRole::RESULT);
+
+    Value matmulTiled = rewriter
+                            .create<linalg::BatchMatmulOp>(
+                                loc, encodedOut.getType(),
+                                ValueRange{encodedLhs, encodedRhs}, encodedOut)
+                            .getResult(0);
+
+    // Sizes are computed by original output size.
+    FailureOr<SmallVector<OpFoldResult>> origOutSizes =
+        LinalgExt::getDims(rewriter, loc, origOut);
+    if (failed(origOutSizes)) {
+      return rewriter.notifyMatchFailure(matmulOp,
+                                         "failed to get shape of result");
+    }
+
+    Value result = unsetEncodingAndExtractSlice(rewriter, loc, matmulTiled,
+                                                origOutSizes.value());
+
+    rewriter.replaceOp(matmulOp, result);
+    return success();
+  }
+};
+
 /// Pattern to fold a `linalg.fill` -> `iree_linalg_ext.set_encoding`
 /// operation into a `linalg.fill` of the encoded type.
 struct FoldFillWithSetEncoding
@@ -271,7 +367,7 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);
-    patterns.insert<SetMatmulEncoding>(context);
+    patterns.insert<SetBatchMatmulEncoding, SetMatmulEncoding>(context);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);

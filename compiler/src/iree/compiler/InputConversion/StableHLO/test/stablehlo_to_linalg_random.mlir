@@ -527,6 +527,15 @@ func.func @philox_i32(%arg0: tensor<2xi64>) -> (tensor<2xi64>, tensor<8xi32>) {
 
 // -----
 
+// CHECK-LABEL: func.func @philox_128_i32
+// CHECK-SAME:  %[[ARG0:.*]]: tensor<3xi64>
+func.func @philox_128_i32(%arg0: tensor<3xi64>) -> (tensor<3xi64>, tensor<8xi32>) {
+  %output_state, %output = "stablehlo.rng_bit_generator"(%arg0) {rng_algorithm = #stablehlo<rng_algorithm PHILOX>} : (tensor<3xi64>) -> (tensor<3xi64>, tensor<8xi32>)
+  return %output_state, %output : tensor<3xi64>, tensor<8xi32>
+}
+
+// -----
+
 func.func @philox_i32_odd(%arg0: tensor<2xi64>) -> (tensor<2xi64>, tensor<7x11xi32>) {
   %output_state, %output = "stablehlo.rng_bit_generator"(%arg0) {rng_algorithm = #stablehlo<rng_algorithm PHILOX>} : (tensor<2xi64>) -> (tensor<2xi64>, tensor<7x11xi32>)
   return %output_state, %output : tensor<2xi64>, tensor<7x11xi32>
