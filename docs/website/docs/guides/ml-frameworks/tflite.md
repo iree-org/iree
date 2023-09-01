@@ -7,10 +7,10 @@ tags:
 icon: simple/tensorflow
 ---
 
-# TFLite Integration
+# TensorFlow Lite integration
 
-IREE supports compiling and running TensorFlow Lite programs stored as [TFLite
-FlatBuffers](https://www.tensorflow.org/lite/guide). These files can be
+IREE supports compiling and running TensorFlow Lite (TFLite) programs stored as
+[TFLite FlatBuffers](https://www.tensorflow.org/lite/guide). These files can be
 imported into an IREE-compatible format then compiled to a series of backends.
 
 ``` mermaid

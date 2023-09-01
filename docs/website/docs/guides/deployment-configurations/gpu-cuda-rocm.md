@@ -7,7 +7,7 @@ tags:
 icon: octicons/server-16
 ---
 
-# GPU Deployment using CUDA and ROCm
+# GPU deployment using CUDA and ROCm
 
 IREE can accelerate model execution on Nvidia GPUs using CUDA and on AMD GPUs
 using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the
