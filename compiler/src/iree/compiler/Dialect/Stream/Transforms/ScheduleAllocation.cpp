@@ -105,7 +105,7 @@ ValueAliasingSet ValueAliasingSet::Builder::build() {
   SmallVector<std::pair<Value, int64_t>> values(id.begin(), id.end());
   llvm::sort(values, [](auto a, auto b) { return a.second < b.second; });
 
-  // Run path compression to propage roots to all values and guarantee that in
+  // Run path compression to propagate roots to all values and guarantee that in
   // the next step we'll get only "real" roots.
   for (auto &[value, index] : values)
     (void)getRoot(value);
@@ -335,10 +335,8 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
       end = std::max(end, aliaserInterval.end);
     }
 
-    // Propage interval back to all values in the aliasing set.
-    aliaseeInterval.start = start;
-    aliaseeInterval.end = end;
-    for (Value aliaser : aliasers) {
+    // Propagate interval back to all values in the aliasing set.
+    for (Value aliaser : aliasSet) {
       auto &aliaserInterval = valueIntervals[aliaser];
       aliaserInterval.start = start;
       aliaserInterval.end = end;
