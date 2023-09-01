@@ -17,6 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "transformation_pipeline.mlir",
+            "materialize_homogeneous_encodings.mlir",
         ],
         include = ["*.mlir"],
     ),

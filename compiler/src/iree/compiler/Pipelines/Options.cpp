@@ -128,6 +128,10 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                      "unconditionally before main global optimizations."),
       llvm::cl::cat(category));
 
+  binder.opt<bool>("iree-opt-data-tiling", dataTiling,
+                   llvm::cl::desc("Enables data tiling path."),
+                   llvm::cl::cat(category));
+
   binder.opt<bool>(
       "iree-opt-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "

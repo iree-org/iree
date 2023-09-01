@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -97,6 +98,13 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
       return getInfoForDefaultConstExprOp(op);
     }
 
+    return {};
+  }
+
+  // Target-dependent ops are not const-expr.
+  // TODO(#14887): Use trait/interface instead.
+  if (isa<IREE::LinalgExt::UpperBoundTileSizeOp,
+          IREE::LinalgExt::SetEncodingOp>(op)) {
     return {};
   }
 

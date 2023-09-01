@@ -83,6 +83,9 @@ struct GlobalOptimizationOptions {
   bool promoteBF16ToF32 = false;
   bool demoteI64ToI32 = false;
 
+  // Enables data tiling.
+  bool dataTiling = false;
+
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;
 
