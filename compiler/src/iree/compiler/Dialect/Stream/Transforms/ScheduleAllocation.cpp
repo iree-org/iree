@@ -84,7 +84,7 @@ public:
       aliasers = valueAliasSets[it->second];
     }
     return llvm::make_filter_range(
-        aliasers, [&](Value aliaser) { return aliaser != value; });
+        aliasers, [=](Value aliaser) { return aliaser != value; });
   }
 
 private:
