@@ -38,11 +38,12 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 // Disjoint-set data structure holding non-overlapping sets of aliasing values.
-// We use union-find algorithm to construct it from pairs of aliasing values.
 class ValueAliasingSet {
 public:
   void addAlias(Value aliasee, Value aliaser) {
-    valueAliasing.unionSets(getWithId(aliasee), getWithId(aliaser));
+    auto aliaseeWithId = getWithId(aliasee);
+    auto aliaserWithId = getWithId(aliaser);
+    valueAliasing.unionSets(aliaseeWithId, aliaserWithId);
   }
 
   SmallVector<SmallVector<Value>> getValueAliasSets() const {
