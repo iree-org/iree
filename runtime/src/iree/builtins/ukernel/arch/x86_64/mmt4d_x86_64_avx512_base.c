@@ -85,6 +85,7 @@ static void iree_uk_mmt4d_tile_f16f16fXX_16x16x1_x86_64_avx512_base(
     __m512 rhs = _mm512_cvtph_ps(_mm256_loadu_si256((const __m256i*)rhs_ptr));
     _mm_prefetch((const char*)(rhs_ptr + 128), _MM_HINT_T0);
     rhs_ptr += 16;
+    // Unrolling needed to avoid 20% perf regression on Clang 15 on AMD Zen4.
 #define IREE_UK_F16F16F32_FMA_STEP(i)                                      \
   acc[i] = _mm512_fmadd_ps(_mm512_cvtph_ps(_mm256_set1_epi16(lhs_ptr[i])), \
                            rhs, acc[i]);
