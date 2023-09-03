@@ -248,6 +248,7 @@ ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv, bool enable);
 enum iree_compiler_pipeline_t {
   IREE_COMPILER_PIPELINE_STD = 0,
   IREE_COMPILER_PIPELINE_HAL_EXECUTABLE = 1,
+  IREE_COMPILER_PIPELINE_PRECOMPILE = 2,
 };
 IREE_EMBED_EXPORTED bool
 ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,
