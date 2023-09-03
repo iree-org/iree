@@ -85,10 +85,27 @@ static void iree_uk_mmt4d_tile_f16f16fXX_16x16x1_x86_64_avx512_base(
     __m512 rhs = _mm512_cvtph_ps(_mm256_loadu_si256((const __m256i*)rhs_ptr));
     _mm_prefetch((const char*)(rhs_ptr + 128), _MM_HINT_T0);
     rhs_ptr += 16;
-    for (int i = 0; i < 16; ++i) {
-      acc[i] = _mm512_fmadd_ps(_mm512_cvtph_ps(_mm256_set1_epi16(lhs_ptr[i])),
-                               rhs, acc[i]);
-    }
+#define IREE_UK_F16F16F32_FMA_STEP(i)                                      \
+  acc[i] = _mm512_fmadd_ps(_mm512_cvtph_ps(_mm256_set1_epi16(lhs_ptr[i])), \
+                           rhs, acc[i]);
+    IREE_UK_F16F16F32_FMA_STEP(0);
+    IREE_UK_F16F16F32_FMA_STEP(1);
+    IREE_UK_F16F16F32_FMA_STEP(2);
+    IREE_UK_F16F16F32_FMA_STEP(3);
+    IREE_UK_F16F16F32_FMA_STEP(4);
+    IREE_UK_F16F16F32_FMA_STEP(5);
+    IREE_UK_F16F16F32_FMA_STEP(6);
+    IREE_UK_F16F16F32_FMA_STEP(7);
+    IREE_UK_F16F16F32_FMA_STEP(8);
+    IREE_UK_F16F16F32_FMA_STEP(9);
+    IREE_UK_F16F16F32_FMA_STEP(10);
+    IREE_UK_F16F16F32_FMA_STEP(11);
+    IREE_UK_F16F16F32_FMA_STEP(12);
+    IREE_UK_F16F16F32_FMA_STEP(13);
+    IREE_UK_F16F16F32_FMA_STEP(14);
+    IREE_UK_F16F16F32_FMA_STEP(15);
+#undef IREE_UK_F16F16F32_FMA_STEP
+
     _mm_prefetch((const char*)(lhs_ptr + 128), _MM_HINT_T0);
     lhs_ptr += 16;
   }
