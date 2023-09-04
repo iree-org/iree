@@ -27,10 +27,9 @@ enum class OutputFormat {
   vm_asm,
   vm_bytecode,
   vm_c,
-  // Non-user exposed output format for use with --compile-mode=hal-executable.
+  // Non-user exposed output formats.
   hal_executable,
-  // Non-user exposed output format for use with --compile-mode=hal-executable.
-  precompile, 
+  precompile,
 };
 
 enum class CompileMode {
@@ -43,7 +42,8 @@ enum class CompileMode {
   // target-specific binary form (such as an ELF file or a flatbuffer containing
   // a SPIR-V blob).
   hal_executable,
-  // Applies the global optimization pipeline on the input.
+  // IREE's precompilation pipeline, which does input preprocessing and
+  // pre-fusion global optimizations.
   precompile,
 };
 
@@ -258,7 +258,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       break;
     }
     case CompileMode::precompile: {
-      // Compiling a HAL executable, it is only valid to output in that form.
       outputFormat = OutputFormat::precompile;
       if (!ireeCompilerInvocationPipeline(
               r.inv, IREE_COMPILER_PIPELINE_PRECOMPILE))

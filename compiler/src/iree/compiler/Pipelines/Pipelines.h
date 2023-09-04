@@ -80,7 +80,7 @@ inline static void enumerateIREEVMPipelinePhases(
 }
 
 // Builds a pass pipeline to perform pre-compilation global optimizations.
-void buildIREEGlobalOptTransformPassPipeline(
+void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
