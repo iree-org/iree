@@ -809,7 +809,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
       return false;
     }
 
-    buildIREEGlobalOptTransformPassPipeline(session.targetRegistry,
+    buildIREEPrecompileTransformPassPipeline(session.targetRegistry,
         session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
         session.schedulingOptions, session.halTargetOptions, pipelineHooks,
