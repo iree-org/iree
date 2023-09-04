@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG
-#define IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG
+#ifndef IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
+#define IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
 
 include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
 include "mlir/IR/EnumAttr.td"
@@ -28,58 +28,75 @@ def CPU_BufferOpsTileAndVectorize
 def CPU_DataTiling
     : I32EnumAttrCase<"CPUDataTiling", 7>;
 
-def LLVMGPU_Default : I32EnumAttrCase<"LLVMGPUDefault", 8>;
-def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 9>;
-def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 10>;
-def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 11>;
-def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
-def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 13>;
-def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
-def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 15>;
-def LLVMGPU_MatmulTensorCoreMmaSync : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 16>;
+def LLVMGPU_Default
+    : I32EnumAttrCase<"LLVMGPUDefault", 100>;
+def LLVMGPU_SimpleDistribute
+    : I32EnumAttrCase<"LLVMGPUDistribute", 101>;
+def LLVMGPU_Vectorize
+    : I32EnumAttrCase<"LLVMGPUVectorize", 102>;
+def LLVMGPU_MatmulSimt
+    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 103>;
+def LLVMGPU_MatmulTensorCore
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 104>;
+def LLVMGPU_TransposeSharedMem
+    : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 105>;
+def LLVMGPU_WarpReduction
+    : I32EnumAttrCase<"LLVMGPUWarpReduction", 106>;
+def LLVMGPU_PackUnPack
+    : I32EnumAttrCase<"LLVMGPUPackUnPack", 107>;
+def LLVMGPU_MatmulTensorCoreMmaSync
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 108>;
 
 def SPIRV_BaseLowering
-    : I32EnumAttrCase<"SPIRVBaseLowering", 17>;
+    : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
 def SPIRV_BaseDistribute
-    : I32EnumAttrCase<"SPIRVBaseDistribute", 18>;
+    : I32EnumAttrCase<"SPIRVBaseDistribute", 201>;
 def SPIRV_BaseVectorize
-    : I32EnumAttrCase<"SPIRVBaseVectorize", 19>;
-def SPIRV_MatmulPromoteVectorize
-    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 20>;
-def SPIRV_CooperativeMatrixVectorize
-    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 21>;
+    : I32EnumAttrCase<"SPIRVBaseVectorize", 202>;
 def SPIRV_SubgroupReduce
-    : I32EnumAttrCase<"SPIRVSubgroupReduce", 22>;
+    : I32EnumAttrCase<"SPIRVSubgroupReduce", 203>;
+def SPIRV_MatmulPromoteVectorize
+    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 204>;
+def SPIRV_CooperativeMatrixVectorize
+    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 205>;
 def SPIRV_WinogradVectorize
-    : I32EnumAttrCase<"SPIRVWinogradVectorize", 23>;
+    : I32EnumAttrCase<"SPIRVWinogradVectorize", 206>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 24>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 300>;
 
 
 def Linalg_TransformDialectCodegen
-    : I32EnumAttrCase<"TransformDialectCodegen", 100>;
+    : I32EnumAttrCase<"TransformDialectCodegen", 1000>;
 
-def None : I32EnumAttrCase<"None", 0xff>;
+def None : I32EnumAttrCase<"None", 0xffff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
-def DispatchLoweringPassPipelineEnum
-    : I32EnumAttr<
-          "DispatchLoweringPassPipeline",
-          "identifier for pass pipeline use to lower dispatch region", [
-            CPU_Default, CPU_DoubleTilingExpert, CPU_DoubleTilingPadExpert,
-            CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
-            CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
-            CPU_DataTiling, LLVMGPU_Default, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
-            LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
-            LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-            LLVMGPU_PackUnPack, LLVMGPU_MatmulTensorCoreMmaSync,
-            SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
-            SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
-            SPIRV_SubgroupReduce, SPIRV_WinogradVectorize, VMVX_Default,
-            // Transform dialect based codegen
-            Linalg_TransformDialectCodegen, None
-          ]> {
+def DispatchLoweringPassPipelineEnum : I32EnumAttr<
+  "DispatchLoweringPassPipeline",
+  "identifier for pass pipeline use to lower dispatch region", [
+    // CPU CodeGen pipelines
+    CPU_Default, CPU_DoubleTilingExpert, CPU_DoubleTilingPadExpert,
+    CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
+    CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
+    CPU_DataTiling,
+
+    // LLVMGPU CodeGen pipelines
+    LLVMGPU_Default, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
+    LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
+    LLVMGPU_PackUnPack, LLVMGPU_MatmulTensorCoreMmaSync,
+
+    // SPIR-V CodeGen pipelines
+    SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
+    SPIRV_SubgroupReduce, SPIRV_MatmulPromoteVectorize,
+    SPIRV_CooperativeMatrixVectorize, SPIRV_WinogradVectorize,
+
+    VMVX_Default,
+
+    // Transform dialect based codegen
+    Linalg_TransformDialectCodegen, None
+  ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;
@@ -257,4 +274,4 @@ def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> 
   let genVerifyDecl = 1;
 }
 
-#endif // IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG
+#endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

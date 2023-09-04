@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- IREECodegenAttrs.h - Codegen dialect attributes -------------------===//
+//===- IREECodegenAttrs.h - Codegen dialect attributes --------------------===//
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
@@ -36,7 +36,7 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on the
 // `hal.executable.export`
-// ===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// Gets the translate executable info attribute value associated with
 /// `exportOp`. It expects that the attribute is stored using the identifier
@@ -80,7 +80,7 @@ setTranslationInfo(func::FuncOp entryPoint,
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.lowering_config` attribute on root
 // operations.
-// ===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// Returns the op that carries the `lowering_config` attribute; returns nullptr
 /// if none is carrying the attribute.
@@ -140,7 +140,7 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.compilation_info` attribute on root
 // operations to override IREEs default compilation.
-// ===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 /// Returns the `#iree_codegen.compilation_info` set on the operation. Assumes
 /// that the identifier used is `compilation_info`.
