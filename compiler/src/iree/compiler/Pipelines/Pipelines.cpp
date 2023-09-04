@@ -205,6 +205,9 @@ void buildIREEVMTransformPassPipeline(
       globalOptimizationOptions, schedulingOptions, executableOptions, hooks,
       passManager, compileFrom, compileTo);
 
+  if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
+    return; // early-exit
+
   IREE::Stream::TransformOptions streamOptions;
   // TODO(benvanik): find a way to share the enums w/o circular deps.
   streamOptions.dumpStatisticsFormat =
