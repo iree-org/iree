@@ -85,9 +85,9 @@ void buildIREEPrecompileTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions highLevelOptimizationOptions,
-    SchedulingOptions schedulingOptions, 
-    IREE::HAL::TargetOptions executableOptions,
-    IREEVMPipelineHooks &hooks, OpPassManager &passManager,
+    SchedulingOptions schedulingOptions,
+    IREE::HAL::TargetOptions executableOptions, IREEVMPipelineHooks &hooks,
+    OpPassManager &passManager,
     IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Start,
     IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::GlobalOptimization);
 

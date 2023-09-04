@@ -101,7 +101,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
               "Compile an MLIR module containing a single hal.executable into "
               "a target-specific binary form (such as an ELF file or a "
               "flatbuffer containing a SPIR-V blob)"),
-          clEnumValN(CompileMode::precompile, "precompile", "Precompilation pipeline which does input conversion and global optimizations.")),
+          clEnumValN(CompileMode::precompile, "precompile",
+                     "Precompilation pipeline which does input conversion and "
+                     "global optimizations.")),
       llvm::cl::init(CompileMode::std), llvm::cl::cat(mainOptions));
 
   // Debugging/diagnostics.
@@ -259,8 +261,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     }
     case CompileMode::precompile: {
       outputFormat = OutputFormat::precompile;
-      if (!ireeCompilerInvocationPipeline(
-              r.inv, IREE_COMPILER_PIPELINE_PRECOMPILE))
+      if (!ireeCompilerInvocationPipeline(r.inv,
+                                          IREE_COMPILER_PIPELINE_PRECOMPILE))
         return false;
       break;
     }

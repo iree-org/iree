@@ -539,7 +539,7 @@ struct Invocation {
   bool importModule(Operation *inputModule, bool steal);
   bool runPipeline(enum iree_compiler_pipeline_t pipeline);
   bool getCompilationPhase(IREEVMPipelinePhase &compileFrom,
-      IREEVMPipelinePhase &compileTo);
+                           IREEVMPipelinePhase &compileTo);
   bool runTextualPassPipeline(const char *textPassPipeline);
   Error *outputIR(Output &output);
   Error *outputIRBytecode(Output &output, int bytecodeVersion);
@@ -718,7 +718,7 @@ Operation *Invocation::exportModule() {
 }
 
 bool Invocation::getCompilationPhase(IREEVMPipelinePhase &compileFrom,
-    IREEVMPipelinePhase &compileTo) {
+                                     IREEVMPipelinePhase &compileTo) {
   // Parse the compile to phase name.
   std::optional<IREEVMPipelinePhase> compileFromPhase;
   std::optional<IREEVMPipelinePhase> compileToPhase;
@@ -809,8 +809,8 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
       return false;
     }
 
-    buildIREEPrecompileTransformPassPipeline(session.targetRegistry,
-        session.bindingOptions, session.inputOptions,
+    buildIREEPrecompileTransformPassPipeline(
+        session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
         session.schedulingOptions, session.halTargetOptions, pipelineHooks,
         *passManager, compileFrom, compileTo);

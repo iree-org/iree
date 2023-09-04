@@ -39,10 +39,8 @@ void buildIREEPrecompileTransformPassPipeline(
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     SchedulingOptions schedulingOptions,
-    IREE::HAL::TargetOptions executableOptions,
-    IREEVMPipelineHooks &hooks,
-    OpPassManager &passManager,
-    IREEVMPipelinePhase compileFrom,
+    IREE::HAL::TargetOptions executableOptions, IREEVMPipelineHooks &hooks,
+    OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
     IREEVMPipelinePhase compileTo) {
   // If the user specified a set of target devices we attach them to the module
   // IR so that they are available for all passes that may want to use this
@@ -202,10 +200,10 @@ void buildIREEVMTransformPassPipeline(
     OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
     IREEVMPipelinePhase compileTo) {
 
-  buildIREEPrecompileTransformPassPipeline(targetRegistry, bindingOptions,
-      inputOptions, preprocessingOptions, globalOptimizationOptions,
-      schedulingOptions, executableOptions, hooks, passManager, compileFrom,
-      compileTo);
+  buildIREEPrecompileTransformPassPipeline(
+      targetRegistry, bindingOptions, inputOptions, preprocessingOptions,
+      globalOptimizationOptions, schedulingOptions, executableOptions, hooks,
+      passManager, compileFrom, compileTo);
 
   IREE::Stream::TransformOptions streamOptions;
   // TODO(benvanik): find a way to share the enums w/o circular deps.
