@@ -111,6 +111,20 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
+  NAME "model-GPT2_117M_TF_1X4XI32"
+  SOURCE_URL "https://storage.googleapis.com/iree-shared-files/tf_gpt2/static_input_seqlen5/stablehlo.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-GPT2_117M_TF_1X1XI32"
+  SOURCE_URL "https://storage.googleapis.com/iree-shared-files/tf_gpt2/static_input_seqlen1/stablehlo.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-BertLargeTFBatch1"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975/BERT_LARGE_FP32_TF_384XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1.mlirbc"
