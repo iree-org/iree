@@ -326,6 +326,7 @@ class Source:
 class PipelineType(IntEnum):
     IREE_COMPILER_PIPELINE_STD = 0
     IREE_COMPILER_PIPELINE_HAL_EXECUTABLE = 1
+    IREE_COMPILER_PIPELINE_PRECOMPILE = 2
 
 
 class Invocation:

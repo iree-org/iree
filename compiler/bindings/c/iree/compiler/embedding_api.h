@@ -246,8 +246,17 @@ ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv, bool enable);
 // Runs a compilation pipeline.
 // Returns false and emits diagnostics on failure.
 enum iree_compiler_pipeline_t {
+  // IREE's full compilation pipeline.
   IREE_COMPILER_PIPELINE_STD = 0,
+  // Pipeline to translate a single hal.executable into a target-specific
+  // binary form (such as an ELF file or a flatbuffer containing a SPIR-V
+  // blob).
   IREE_COMPILER_PIPELINE_HAL_EXECUTABLE = 1,
+  // IREE's precompilation pipeline, which does input preprocessing and
+  // pre-fusion global optimization.
+  // This is experimental and this should be changed as we move to a more
+  // cohesive approach for managing compilation phases.
+  IREE_COMPILER_PIPELINE_PRECOMPILE = 2,
 };
 IREE_EMBED_EXPORTED bool
 ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,

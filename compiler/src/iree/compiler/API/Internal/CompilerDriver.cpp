@@ -538,6 +538,8 @@ struct Invocation {
   Operation *exportModule();
   bool importModule(Operation *inputModule, bool steal);
   bool runPipeline(enum iree_compiler_pipeline_t pipeline);
+  bool getCompilationPhase(IREEVMPipelinePhase &compileFrom,
+                           IREEVMPipelinePhase &compileTo);
   bool runTextualPassPipeline(const char *textPassPipeline);
   Error *outputIR(Output &output);
   Error *outputIRBytecode(Output &output, int bytecodeVersion);
@@ -715,39 +717,52 @@ Operation *Invocation::exportModule() {
   return parsedModule;
 }
 
+bool Invocation::getCompilationPhase(IREEVMPipelinePhase &compileFrom,
+                                     IREEVMPipelinePhase &compileTo) {
+  // Parse the compile to phase name.
+  std::optional<IREEVMPipelinePhase> compileFromPhase;
+  std::optional<IREEVMPipelinePhase> compileToPhase;
+  enumerateIREEVMPipelinePhases(
+      [&](IREEVMPipelinePhase phase, StringRef mnemonic, StringRef desc) {
+        if (mnemonic == compileFromPhaseName) {
+          compileFromPhase = phase;
+        }
+        if (mnemonic == compileToPhaseName) {
+          compileToPhase = phase;
+        }
+      });
+  if (!compileFromPhase) {
+    parsedModule->emitError()
+        << "unrecognized compile-from phase name: " << compileFromPhaseName;
+    return false;
+  }
+  if (!compileToPhase) {
+    parsedModule->emitError()
+        << "unrecognized compile-to phase name: " << compileToPhaseName;
+    return false;
+  }
+  if (compileFromPhase >= compileToPhase) {
+    parsedModule->emitError()
+        << "compile-from phase " << compileFromPhaseName
+        << " must precede compile-to phase " << compileToPhaseName;
+    return false;
+  }
+
+  compileFrom = *compileFromPhase;
+  compileTo = *compileToPhase;
+
+  return true;
+}
+
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
   switch (pipeline) {
   case IREE_COMPILER_PIPELINE_STD: {
-    // Parse the compile to phase name.
-    std::optional<IREEVMPipelinePhase> compileFromPhase;
-    std::optional<IREEVMPipelinePhase> compileToPhase;
-    enumerateIREEVMPipelinePhases(
-        [&](IREEVMPipelinePhase phase, StringRef mnemonic, StringRef desc) {
-          if (mnemonic == compileFromPhaseName) {
-            compileFromPhase = phase;
-          }
-          if (mnemonic == compileToPhaseName) {
-            compileToPhase = phase;
-          }
-        });
-    if (!compileFromPhase) {
-      parsedModule->emitError()
-          << "unrecognized compile-from phase name: " << compileFromPhaseName;
+    IREEVMPipelinePhase compileFrom;
+    IREEVMPipelinePhase compileTo;
+    if (!getCompilationPhase(compileFrom, compileTo)) {
       return false;
     }
-    if (!compileToPhase) {
-      parsedModule->emitError()
-          << "unrecognized compile-to phase name: " << compileToPhaseName;
-      return false;
-    }
-    if (compileFromPhase >= compileToPhase) {
-      parsedModule->emitError()
-          << "compile-from phase " << compileFromPhaseName
-          << " must precede compile-to phase " << compileToPhaseName;
-      return false;
-    }
-
     // InlineStatic (currently) only supports the `vmvx-inline` backend.
     if (session.schedulingOptions.executionModel ==
         SchedulingOptions::ExecutionModel::InlineStatic) {
@@ -765,8 +780,8 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
         session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
         session.schedulingOptions, session.halTargetOptions,
-        session.vmTargetOptions, pipelineHooks, *passManager, *compileFromPhase,
-        *compileToPhase);
+        session.vmTargetOptions, pipelineHooks, *passManager, compileFrom,
+        compileTo);
     break;
   }
   case IREE_COMPILER_PIPELINE_HAL_EXECUTABLE: {
@@ -785,6 +800,20 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     }
     IREE::HAL::buildHALTransformPassPipeline(
         *passManager, session.targetRegistry, session.halTargetOptions);
+    break;
+  }
+  case IREE_COMPILER_PIPELINE_PRECOMPILE: {
+    IREEVMPipelinePhase compileFrom;
+    IREEVMPipelinePhase compileTo;
+    if (!getCompilationPhase(compileFrom, compileTo)) {
+      return false;
+    }
+
+    buildIREEPrecompileTransformPassPipeline(
+        session.targetRegistry, session.bindingOptions, session.inputOptions,
+        session.preprocessingOptions, session.highLevelOptimizationOptions,
+        session.schedulingOptions, session.halTargetOptions, pipelineHooks,
+        *passManager, compileFrom, compileTo);
     break;
   }
   default:
