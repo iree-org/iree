@@ -10,7 +10,7 @@ from typing import List
 from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.models import tflite_models
+from e2e_test_framework.models import tflite_models, tf_models
 from e2e_test_framework.device_specs import device_collections
 
 
@@ -46,6 +46,8 @@ class Android_Adreno_Benchmarks(object):
     ) -> List[iree_definitions.E2EModelRunConfig]:
         default_models = [
             tflite_models.MOBILEBERT_FP32,
+            tf_models.GPT2_117M_1x4_FP32_TF,
+            tf_models.GPT2_117M_1x1_FP32_TF,
         ]
         default_gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(

@@ -73,6 +73,12 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[8]
     ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x4_FP32_TF, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
+    ),
 ]
 
 # A subset of `x86_64_MODELS_AND_THREADS`.
@@ -119,6 +125,12 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     # Large models.
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x4_FP32_TF, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
     ),
 ]
 
