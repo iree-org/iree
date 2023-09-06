@@ -326,6 +326,7 @@ class Source:
 class PipelineType(IntEnum):
     IREE_COMPILER_PIPELINE_STD = 0
     IREE_COMPILER_PIPELINE_HAL_EXECUTABLE = 1
+    IREE_COMPILER_PIPELINE_PRECOMPILE = 2
 
 
 class Invocation:
@@ -439,8 +440,11 @@ def _probe_iree_compiler_dylib() -> str:
         # Traverse up and find CMakeCache.txt
         build_dir = Path(_mlir_libs.__path__[0]).parent
         while True:
-            anchor_file = build_dir / "CMakeCache.txt"
-            if anchor_file.exists():
+            anchor_files = [
+                build_dir / "tools" / f"iree-compile",
+                build_dir / "tools" / f"iree-compile.exe",
+            ]
+            if any([f.exists() for f in anchor_files]):
                 # Most OS's keep their libs in lib. Windows keeps them
                 # in bin (tools in the dev tree). Just check them all.
                 paths = [build_dir / "lib", build_dir / "tools", build_dir / "bin"]

@@ -9,15 +9,14 @@
 
 void iree_uk_mmt4d_tile_i8i8i32_8x8x4_arm_64_dotprod(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
-  (void)params;
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params) {
   const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
   int32x4_t acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7, acc8, acc9, acc10,
       acc11, acc12, acc13, acc14, acc15;
-  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     acc0 = vld1q_s32(out_ptr + 4 * 0);
     acc1 = vld1q_s32(out_ptr + 4 * 1);
     acc2 = vld1q_s32(out_ptr + 4 * 2);
@@ -52,8 +51,8 @@ void iree_uk_mmt4d_tile_i8i8i32_8x8x4_arm_64_dotprod(
     acc14 = vdupq_n_s32(0);
     acc15 = vdupq_n_s32(0);
   }
-  IREE_UK_ASSUME(K >= 1);
-  for (int k = 0; k < K; ++k) {
+  IREE_UK_ASSUME(params->K >= 1);
+  for (int k = 0; k < params->K; ++k) {
     int8x16_t lhs0 = vld1q_s8(lhs_ptr + 0);
     int8x16_t lhs1 = vld1q_s8(lhs_ptr + 16);
     lhs_ptr += 32;

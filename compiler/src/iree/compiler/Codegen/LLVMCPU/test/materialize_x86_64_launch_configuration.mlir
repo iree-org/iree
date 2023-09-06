@@ -1889,3 +1889,51 @@ hal.executable private @no_compute_ops {
 //      CHECK: hal.executable private @no_compute_ops
 //      CHECK:   hal.executable.export public @test
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
+
+// -----
+
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {cpu = "cascadelake", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", link_embedded = false, native_vector_size = 64 : index, target_triple = "x86_64-unknown-linux-gnu", ukernels = false}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
+
+hal.executable private @non_trivial_program {
+  hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
+    hal.executable.export public @non_trivial_program ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @non_trivial_program() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x1x128x1xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x1xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [128, 1, 128, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x1x128x1xf32>> -> tensor<128x1x128x1xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [128, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x1xf32>> -> tensor<128x1xf32>
+        %5 = tensor.empty() : tensor<1x1xf32>
+        %6 = tensor.empty() : tensor<128xf32>
+        %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<128xf32>) -> tensor<128xf32>
+        %8 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x1xf32>) -> tensor<1x1xf32>
+        %collapsed = tensor.collapse_shape %3 [[0, 1], [2, 3]] : tensor<128x1x128x1xf32> into tensor<128x128xf32>
+        %9 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%collapsed : tensor<128x128xf32>) outs(%7 : tensor<128xf32>) {
+        ^bb0(%in: f32, %out: f32):
+          %11 = arith.addf %out, %in : f32
+          linalg.yield %11 : f32
+        } -> tensor<128xf32>
+        %expanded = tensor.expand_shape %9 [[0, 1]] : tensor<128xf32> into tensor<1x128xf32>
+        %10 = linalg.matmul ins(%expanded, %4 : tensor<1x128xf32>, tensor<128x1xf32>) outs(%8 : tensor<1x1xf32>) -> tensor<1x1xf32>
+        flow.dispatch.tensor.store %10, %2, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x1xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+//  CHECK-NOT:   lowering_config
+//      CHECK: hal.executable.export public @non_trivial_program
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.matmul
+// CHECK-SAME:       lowering_config = #[[CONFIG]]

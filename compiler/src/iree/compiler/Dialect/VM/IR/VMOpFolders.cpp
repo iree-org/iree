@@ -1497,6 +1497,12 @@ static Attribute constFoldConversionOp(Type resultType, Attribute rawOperand,
   return {};
 }
 
+OpFoldResult TruncI16I8Op::fold(FoldAdaptor operands) {
+  return constFoldConversionOp<IntegerAttr>(
+      IntegerType::get(getContext(), 32), operands.getOperand(),
+      [&](const APInt &a) { return a.trunc(8).zext(32); });
+}
+
 OpFoldResult TruncI32I8Op::fold(FoldAdaptor operands) {
   return constFoldConversionOp<IntegerAttr>(
       IntegerType::get(getContext(), 32), operands.getOperand(),
@@ -1615,6 +1621,12 @@ struct PseudoIntegerConversionToSplitConversionOp
 };
 
 } // namespace
+
+void TruncI16I8Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
+  results.insert<PseudoIntegerConversionToSplitConversionOp<
+      TruncI16I8Op, ExtI16I32UOp, 32, TruncI32I8Op>>(context);
+}
 
 void TruncI64I8Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {

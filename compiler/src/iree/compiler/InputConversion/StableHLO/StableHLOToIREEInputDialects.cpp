@@ -521,7 +521,10 @@ struct ConvertStableHloToIreeInputDialects final
     for (StringRef opName :
          {func::ReturnOp::getOperationName(), func::CallOp::getOperationName(),
           cf::CondBranchOp::getOperationName(),
-          cf::BranchOp::getOperationName(),
+          cf::BranchOp::getOperationName(), scf::ForOp::getOperationName(),
+          scf::IfOp::getOperationName(), scf::YieldOp::getOperationName(),
+          scf::ConditionOp::getOperationName(),
+          scf::WhileOp::getOperationName(),
           ml_program::GlobalLoadOp::getOperationName(),
           ml_program::GlobalLoadConstOp::getOperationName(),
           ml_program::GlobalStoreOp::getOperationName(),

@@ -239,6 +239,9 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
+    if (hasAnySVEFeature(targetAttr)) {
+      return VectorPreProcStrategy::Masking;
+    }
     if ((linalg::isElementwise(linalgOp) || isFullyDynamicOp(linalgOp)) &&
         enableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
@@ -899,11 +902,12 @@ static LogicalResult setMatmulNoPadRootConfig(
       entryPointFn, op, newTileSizes, getNoPadTilingExpert(vecPreProcStrategy));
 }
 
-static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
-                                          linalg::ContractionOpInterface op,
-                                          ArrayRef<int64_t> distTileSizes,
-                                          ArrayRef<int64_t> vecTileSizes,
-                                          int vectorSize) {
+/// Configure the Mmt4d tiling expert for AArch64
+static LogicalResult
+setMmt4dAArch64RootConfig(func::FuncOp entryPointFn,
+                          linalg::ContractionOpInterface op,
+                          ArrayRef<int64_t> distTileSizes,
+                          ArrayRef<int64_t> vecTileSizes, int vectorSize) {
   assert(distTileSizes.size() == vecTileSizes.size());
   SmallVector<int64_t> parallelTileSizes;
   auto shape = cast<linalg::LinalgOp>(op.getOperation()).getStaticLoopRanges();
@@ -946,6 +950,12 @@ static void getDefaultMatmulVectorSizes(linalg::LinalgOp op,
     return;
   }
 
+  // Specialisation for SVE
+  if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr)) {
+    sizes.append({8, 32, 16});
+    return;
+  }
+
   if (isRISCV(targetAttr)) {
     // RISC-V natively supports scalar x vector operations so we don't have to
     // vectorize dimension k. Vectorizing dimension k results in a vector load
@@ -972,7 +982,8 @@ static SmallVector<int64_t> getMatmulVectorSizes(func::FuncOp entryPointFn,
   // Compute vector tile sizes using heuristics.
   // TODO: if (isX86(targetAttr) || isRISCV(targetAttr)) {
 
-  if (isAArch64(targetAttr)) {
+  // FIXME: Introduce a more structured way to specialise for SVE
+  if (isAArch64(targetAttr) && !hasAnySVEFeature(targetAttr)) {
     if (isQuantized) {
       matmulTileSizes = {vectorSize, vectorSize * 4, vectorSize};
     } else {
@@ -1037,7 +1048,8 @@ setRootConfig(func::FuncOp entryPointFn,
 
   // Use the default distribution for the matmul loops.
   int64_t defaultMaxSize = defaultDistTileSize;
-  if (isX86(targetAttr) || isRISCV(targetAttr)) {
+  if (isX86(targetAttr) || isRISCV(targetAttr) ||
+      (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr))) {
     defaultMaxSize = 128;
   }
 
@@ -1078,12 +1090,12 @@ setRootConfig(func::FuncOp entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
 
-  // ARM codgen does not switch to use codegen driver based approach, so we have
-  // special logic for it. All the new pipeline is expected to use codegen
-  // driver based approach.
-  if (isAArch64(targetAttr) && !isQuantized) {
-    return setAArch64RootConfig(entryPointFn, contractionOp, distTileSizes,
-                                vecTileSizes, vectorSize);
+  // ARM SVE codgen switches to use codegen driver based approach. In non-SVE
+  // cases we use special logic instead. All the new pipeline is expected to use
+  // codegen driver based approach.
+  if (isAArch64(targetAttr) && !isQuantized && !hasAnySVEFeature(targetAttr)) {
+    return setMmt4dAArch64RootConfig(entryPointFn, contractionOp, distTileSizes,
+                                     vecTileSizes, vectorSize);
   }
 
   TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
@@ -1236,6 +1248,12 @@ getDefaultDistributionTileSizes(TilingInterface op) {
 }
 
 static bool isPackMatmulLHS(tensor::PackOp op) {
+  // linalg.batch_matmul LHS shape
+  if (op.getSourceRank() == 3 && op.getInnerDimsPos().size() == 2 &&
+      op.getInnerDimsPos()[0] == 1 && op.getInnerDimsPos()[1] == 2) {
+    return true;
+  }
+  // linalg.matmul LHS shape
   return op.getSourceRank() == 2 && op.getInnerDimsPos().size() == 2 &&
          op.getInnerDimsPos()[0] == 0 && op.getInnerDimsPos()[1] == 1;
 }
@@ -2168,6 +2186,21 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   auto rootLoweringConfig = getLoweringConfig(rootOperation);
   auto distTileSizes = rootLoweringConfig.getTileSizeVals(0);
   auto tileAndFuseSizes = rootLoweringConfig.getTileSizeVals(1);
+
+  // multi-lowering config works only if all the operations can share the same
+  // distribution and TileAndFuse tile sizes.
+  for (auto op : computeOps) {
+    auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
+    for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
+      if (idx >= tileAndFuseSizes.size())
+        break;
+      if (iterType == utils::IteratorType::parallel)
+        continue;
+      if (distTileSizes[idx] || tileAndFuseSizes[idx])
+        return;
+    }
+  }
+
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto targetMLTransInfo =
       TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);

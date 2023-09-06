@@ -211,6 +211,20 @@ getVectorSizes(linalg::LinalgOp linalgOp,
   return vecSize;
 }
 
+static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
+                                             int64_t maxVectorSize) {
+  int64_t maxFlatVecSize = 1;
+  for (OpOperand &operand : linalgOp->getOpOperands()) {
+    auto type = llvm::dyn_cast<ShapedType>(operand.get().getType());
+    if (!type)
+      continue;
+    if (!type.hasStaticShape())
+      return failure();
+    maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());
+  }
+  return success(maxFlatVecSize < maxVectorSize);
+}
+
 class GenericVectorizationPass
     : public GenericVectorizationBase<GenericVectorizationPass> {
 public:
@@ -219,6 +233,9 @@ public:
     this->enableVectorMasking.setValue(options.enableVectorMasking);
     this->vectorizePadding.setValue(options.vectorizePadding);
     this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
+    this->enableCleanup.setValue(options.enableCleanup);
+    this->generateContract.setValue(options.generateContract);
+    this->maxVectorSize.setValue(options.maxVectorSize);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -246,18 +263,27 @@ void GenericVectorizationPass::runOnOperation() {
   });
   for (auto op : candidates) {
     SmallVector<int64_t> vectorSizes;
-    if (enableVectorMasking) {
-      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      // Do not vectorize the op if the vector size is greater than or eqaul
+      // to limit.
+      if (enableVectorMasking) {
         vectorSizes.append(getVectorSizes(linalgOp, canonicalVectorShape));
-      } else if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
-        auto ty = padOp.getResultType();
-        // TODO(hanchung): Infer the vector sizes for pad op after
-        // maskedVectorize method allows dynamic result shapes.
-        if (!ty.hasStaticShape())
+        if (std::accumulate(vectorSizes.begin(), vectorSizes.end(), 1,
+                            std::multiplies<int64_t>()) >= maxVectorSize)
           continue;
-        vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
+      } else {
+        if (failed(isWithinVectorSizeLimit(linalgOp, maxVectorSize)))
+          continue;
       }
+    } else if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
+      auto ty = padOp.getResultType();
+      // TODO(hanchung): Infer the vector sizes for pad op after
+      // maskedVectorize method allows dynamic result shapes.
+      if (!ty.hasStaticShape())
+        continue;
+      vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
     }
+
     SmallVector<bool> scalableVecDims(vectorSizes.size(), false);
     (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
                             vectorizeGatherAccesses);
@@ -266,20 +292,26 @@ void GenericVectorizationPass::runOnOperation() {
   // TODO: Move this down the pipeline once we have the ODM-based masking
   // representation.
   RewritePatternSet vectorizationPatterns(funcOp.getContext());
-  vector::populateVectorMaskLoweringPatternsForSideEffectingOps(
-      vectorizationPatterns);
-  vector::populateVectorTransferPermutationMapLoweringPatterns(
-      vectorizationPatterns);
-  vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
-  vector::populateFoldArithExtensionPatterns(vectorizationPatterns);
-  vectorizationPatterns.add<linalg::LinalgCopyVTRForwardingPattern,
-                            linalg::LinalgCopyVTWForwardingPattern>(
-      funcOp.getContext(), /*benefit=*/2);
-  vector::TransferReadOp::getCanonicalizationPatterns(vectorizationPatterns,
-                                                      funcOp.getContext());
-  vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
-                                                       funcOp.getContext());
-  populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
+  if (generateContract) {
+    vector::populateVectorTransferPermutationMapLoweringPatterns(
+        vectorizationPatterns);
+    vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
+    vector::populateFoldArithExtensionPatterns(vectorizationPatterns);
+  }
+  if (enableVectorMasking) {
+    vector::populateVectorMaskLoweringPatternsForSideEffectingOps(
+        vectorizationPatterns);
+    vectorizationPatterns.add<linalg::LinalgCopyVTRForwardingPattern,
+                              linalg::LinalgCopyVTWForwardingPattern>(
+        funcOp.getContext(), /*benefit=*/2);
+  }
+  if (enableCleanup) {
+    vector::TransferReadOp::getCanonicalizationPatterns(vectorizationPatterns,
+                                                        funcOp.getContext());
+    vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
+                                                         funcOp.getContext());
+    populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
+  }
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 
   // Apply the pad tensor op vectorization separately to avoid running the

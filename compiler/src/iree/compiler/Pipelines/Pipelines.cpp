@@ -33,14 +33,13 @@
 namespace mlir {
 namespace iree_compiler {
 
-void buildIREEVMTransformPassPipeline(
+void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     SchedulingOptions schedulingOptions,
-    IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
+    IREE::HAL::TargetOptions executableOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
     IREEVMPipelinePhase compileTo) {
   // If the user specified a set of target devices we attach them to the module
@@ -163,13 +162,6 @@ void buildIREEVMTransformPassPipeline(
         hooks.buildConstEvalPassPipelineCallback;
   }
 
-  IREE::Stream::TransformOptions streamOptions;
-  // TODO(benvanik): find a way to share the enums w/o circular deps.
-  streamOptions.dumpStatisticsFormat =
-      (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
-  streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
-  streamOptions.optimizeBindings = schedulingOptions.optimizeBindings;
-
   switch (schedulingOptions.executionModel) {
   case SchedulingOptions::ExecutionModel::HostOnly:
     // No flow/stream processing (implies no tensors).
@@ -190,7 +182,44 @@ void buildIREEVMTransformPassPipeline(
           passManager, globalTransformOptions);
       IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
     }
+    if (compileTo == IREEVMPipelinePhase::GlobalOptimization)
+      return; // early-exit
 
+    break;
+  }
+}
+
+void buildIREEVMTransformPassPipeline(
+    const IREE::HAL::TargetBackendRegistry &targetRegistry,
+    BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    PreprocessingOptions preprocessingOptions,
+    GlobalOptimizationOptions globalOptimizationOptions,
+    SchedulingOptions schedulingOptions,
+    IREE::HAL::TargetOptions executableOptions,
+    IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
+    OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
+    IREEVMPipelinePhase compileTo) {
+
+  buildIREEPrecompileTransformPassPipeline(
+      targetRegistry, bindingOptions, inputOptions, preprocessingOptions,
+      globalOptimizationOptions, schedulingOptions, executableOptions, hooks,
+      passManager, compileFrom, compileTo);
+
+  if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
+    return; // early-exit
+
+  IREE::Stream::TransformOptions streamOptions;
+  // TODO(benvanik): find a way to share the enums w/o circular deps.
+  streamOptions.dumpStatisticsFormat =
+      (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
+  streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
+  streamOptions.optimizeBindings = schedulingOptions.optimizeBindings;
+
+  switch (schedulingOptions.executionModel) {
+  case SchedulingOptions::ExecutionModel::HostOnly:
+    // No flow/stream processing (implies no tensors).
+    break;
+  default:
     IREE::Flow::TransformOptions flowOptions;
     if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");

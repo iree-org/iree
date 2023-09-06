@@ -69,24 +69,17 @@ static inline iree_uk_type_t iree_uk_mmt4d_out_type(iree_uk_mmt4d_type_t type) {
 // the inner-most loop of the matmul, i.e. the thing that we should actually
 // be calling "micro kernel" except that the name is already taken by the
 // higher-level builtin name.
-//
-// The 'params' argument is only used by generic kernels. Actual optimized
-// kernels are already specialized for a given tile shape (M0xN0xK0), so the
-// five first arguments here are the only information that they need. Not having
-// to address 'params' struct fields in the middle of assembly kernels is
-// good, because it's hard to get the struct field offsets right in assembly
-// and keep that in sync with future struct changes.
 typedef void (*iree_uk_mmt4d_tile_func_t)(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params);
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params);
 
 // Tile kernel declarations. Prototype matches iree_uk_mmt4d_tile_func_t.
-#define IREE_UK_MMT4D_TILE_FUNC_DECL(NAME)                             \
-  void NAME(void* IREE_UK_RESTRICT out_tile,                           \
-            const void* IREE_UK_RESTRICT lhs_panel,                    \
-            const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K, \
-            iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params);
+#define IREE_UK_MMT4D_TILE_FUNC_DECL(NAME)          \
+  void NAME(void* IREE_UK_RESTRICT out_tile,        \
+            const void* IREE_UK_RESTRICT lhs_panel, \
+            const void* IREE_UK_RESTRICT rhs_panel, \
+            const iree_uk_mmt4d_params_t* params);
 
 // In order to be helpful as a reference for future architecture-specific
 // kernels, the generic kernels are structured like an actual optimized kernel,

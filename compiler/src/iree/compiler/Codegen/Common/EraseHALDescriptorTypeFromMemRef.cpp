@@ -71,8 +71,20 @@ static bool isLegalType(Type type) {
 
 /// Returns true if the given `op` is considered as legal.
 static bool isLegalOp(Operation *op) {
-  return llvm::all_of(op->getOperandTypes(), isLegalType) &&
-         llvm::all_of(op->getResultTypes(), isLegalType);
+  if (!llvm::all_of(op->getOperandTypes(), isLegalType) ||
+      !llvm::all_of(op->getResultTypes(), isLegalType)) {
+    return false;
+  }
+
+  for (Region &region : op->getRegions()) {
+    for (Block &block : region) {
+      if (!llvm::all_of(block.getArgumentTypes(), isLegalType)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -91,8 +103,11 @@ struct EraseMemorySpacePattern final : public ConversionPattern {
 LogicalResult EraseMemorySpacePattern::matchAndRewrite(
     Operation *op, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
+  const TypeConverter &typeConverter = *getTypeConverter();
   llvm::SmallVector<Type> newResults;
-  (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
+  if (failed(typeConverter.convertTypes(op->getResultTypes(), newResults))) {
+    op->emitError("Can't convert results");
+  }
 
   OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
                        newResults, op->getAttrs(), op->getSuccessors());
@@ -100,10 +115,9 @@ LogicalResult EraseMemorySpacePattern::matchAndRewrite(
   for (Region &region : op->getRegions()) {
     Region *newRegion = state.addRegion();
     rewriter.inlineRegionBefore(region, *newRegion, newRegion->begin());
-    TypeConverter::SignatureConversion result(newRegion->getNumArguments());
-    (void)getTypeConverter()->convertSignatureArgs(
-        newRegion->getArgumentTypes(), result);
-    rewriter.applySignatureConversion(newRegion, result);
+    if (failed(rewriter.convertRegionTypes(newRegion, typeConverter))) {
+      return op->emitError("Cant'convert region types");
+    }
   }
 
   Operation *newOp = rewriter.create(state);
@@ -119,7 +133,7 @@ struct EraseHALDescriptorTypeFromMemRefPass final
     : public EraseHALDescriptorTypeFromMemRefBase<
           EraseHALDescriptorTypeFromMemRefPass> {
   void runOnOperation() override {
-    func::FuncOp op = getOperation();
+    Operation *op = getOperation();
     if (failed(eraseHALDescriptorTypeFromMemRef(op)))
       return signalPassFailure();
   }
@@ -127,8 +141,8 @@ struct EraseHALDescriptorTypeFromMemRefPass final
 
 } // namespace
 
-LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp) {
-  MLIRContext *context = funcOp.getContext();
+LogicalResult eraseHALDescriptorTypeFromMemRef(Operation *op) {
+  MLIRContext *context = op->getContext();
   ConversionTarget target(*context);
   target.markUnknownOpDynamicallyLegal(isLegalOp);
 
@@ -136,11 +150,10 @@ LogicalResult eraseHALDescriptorTypeFromMemRef(func::FuncOp funcOp) {
   RewritePatternSet patterns(context);
   patterns.add<EraseMemorySpacePattern>(context, typeConverter);
 
-  return applyFullConversion(funcOp, target, std::move(patterns));
+  return applyFullConversion(op, target, std::move(patterns));
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createEraseHALDescriptorTypeFromMemRefPass() {
+std::unique_ptr<Pass> createEraseHALDescriptorTypeFromMemRefPass() {
   return std::make_unique<EraseHALDescriptorTypeFromMemRefPass>();
 }
 

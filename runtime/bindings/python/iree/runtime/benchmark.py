@@ -57,7 +57,9 @@ class BenchmarkTimeoutError(Exception):
 
 
 def benchmark_exe():
-    return os.path.join(os.path.dirname(__file__), "iree-benchmark-module")
+    return os.path.join(
+        os.path.dirname(__file__), "..", "_runtime_libs", "iree-benchmark-module"
+    )
 
 
 def benchmark_module(module, entry_functiong=None, inputs=[], timeout=None, **kwargs):

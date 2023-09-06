@@ -63,6 +63,8 @@ iree_cc_library(
     "pipeline_layout.h"
     "status_util.c"
     "status_util.h"
+    "tracing.c"
+    "tracing.h"
   INCLUDES
     "${CMAKE_CURRENT_LIST_DIR}/../.."
     "${PROJECT_BINARY_DIR}"

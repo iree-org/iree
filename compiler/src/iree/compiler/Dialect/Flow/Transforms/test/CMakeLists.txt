@@ -55,7 +55,6 @@ iree_lit_test_suite(
     "tensor_pad_to_tensor_insert_slice.mlir"
     "top_level_scf_to_cfg.mlir"
     "transform_dispatch_region_formation.mlir"
-    "transformation_pipeline.mlir"
     "verify_input_ir.mlir"
   TOOLS
     FileCheck

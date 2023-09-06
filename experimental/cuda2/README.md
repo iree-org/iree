@@ -107,7 +107,9 @@ instead:
 
 * We keep track of all GPU signals in the timeline. Once we see a GPU wait
   request, try to scan the timeline to find a GPU signal that advances the
-  timeline past the desired value, and use that for waiting instead.
+  timeline past the desired value, and use that for waiting instead. (This
+  actually applies to CPU waits too, and it's an optimization over pure
+  CPU side `iree_event_t` polling.)
 * We may not see GPU signal before seeing GPU wait requests, then we can also
   keep track of all GPU waits in the timeline. Later once see either a CPU
   signal or GPU signal advancing past the waited value, we can handle them

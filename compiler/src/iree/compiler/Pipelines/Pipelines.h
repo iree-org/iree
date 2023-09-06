@@ -79,6 +79,18 @@ inline static void enumerateIREEVMPipelinePhases(
            "Complete the full compilation pipeline.");
 }
 
+// Builds a pass pipeline to perform pre-compilation global optimizations.
+void buildIREEPrecompileTransformPassPipeline(
+    const IREE::HAL::TargetBackendRegistry &targetRegistry,
+    BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    PreprocessingOptions preprocessingOptions,
+    GlobalOptimizationOptions highLevelOptimizationOptions,
+    SchedulingOptions schedulingOptions,
+    IREE::HAL::TargetOptions executableOptions, IREEVMPipelineHooks &hooks,
+    OpPassManager &passManager,
+    IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Start,
+    IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::GlobalOptimization);
+
 // Builds a pass pipeline to perform end-to-end compilation from a
 // supported MLIR-based input to the IREE vm dialect.
 //

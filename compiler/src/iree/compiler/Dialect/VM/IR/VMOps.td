@@ -2951,6 +2951,12 @@ class VM_ConversionPseudoOp<Type src_type, Type dst_type, string mnemonic,
   let hasCanonicalizer = 1;
 }
 
+def VM_TruncI16I8Op :
+    VM_ConversionPseudoOp<I32, I32, "trunc.i16.i8"> {
+  let summary = [{integer truncate to 8 bits}];
+  let hasFolder = 1;
+}
+
 def VM_TruncI32I8Op :
     VM_ConversionOp<I32, I32, "trunc.i32.i8", VM_OPC_TruncI32I8> {
   let summary = [{integer truncate to 8 bits}];

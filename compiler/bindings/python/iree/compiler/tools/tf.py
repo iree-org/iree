@@ -129,11 +129,11 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
         elif options.save_temp_iree_input:
             # Saving the file, use tfs.
             tf_iree_input = tfs.alloc_optional(
-                "tf-iree-input.mlir", export_as=options.save_temp_iree_input
+                "tf-iree-input.mlirbc", export_as=options.save_temp_iree_input
             )
         else:
             # Not saving the file, so generate a loose temp file without tfs.
-            tf_iree_input = os.path.join(tmpdir, "tf-iree-input.mlir")
+            tf_iree_input = os.path.join(tmpdir, "tf-iree-input.mlirbc")
 
         __main__.import_saved_model(
             output_path=tf_iree_input,
@@ -146,7 +146,7 @@ def compile_saved_model(saved_model_dir: str, **kwargs):
         if options.import_only:
             if options.output_file:
                 return None
-            with open(tf_iree_input, "r") as f:
+            with open(tf_iree_input, "rb") as f:
                 return f.read()
 
         # Run IREE compilation pipeline

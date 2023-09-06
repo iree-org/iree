@@ -10,6 +10,7 @@
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
@@ -51,11 +52,24 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
-  // The more we are able to equate shape dimensions at this level the better
-  // our fusions will be.
-  FunctionLikeNest(mainPassManager)
-      .addPass(IREE::Flow::createTopLevelSCFToCFGPass);
+  // The more we are able to equate shape dimensions at this level the
+  // better our fusions will be.
   mainPassManager.addPass(IREE::Flow::createExpandTensorShapesPass());
+
+  FunctionLikeNest(mainPassManager)
+      // Preprocess the input to a form more amenable for fusion
+      // - Convert all elementwise ops to Linalg
+      // - Remove unit-extent dimensions.
+      .addPass(mlir::createConvertElementwiseToLinalgPass)
+      .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
+      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
+      .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      // Enable data tiling after they are in a canonical form.
+      .addPredicatedPass(transformOptions.options.dataTiling,
+                         IREE::Flow::createSetEncodingPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
+  mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
@@ -63,8 +77,8 @@ void buildGlobalOptimizationPassPipeline(
       // region formation as redundant store-loads are removed.
       .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
-  // Module level cleanup and canonicalization of util.global (and other util
-  // ops).
+  // Module level cleanup and canonicalization of util.global (and other
+  // util ops).
   pipeline.addPass(IREE::Util::createApplyPatternsPass());
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
   pipeline.addPass(IREE::Util::createIPOPass());
@@ -99,7 +113,14 @@ void buildGlobalOptimizationPassPipeline(
   }
 }
 
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/GlobalOptimization/Passes.h.inc" // IWYU pragma: export
+} // namespace
+
 void registerGlobalOptimizationPipeline() {
+  registerPasses();
+
   PassPipelineRegistration<TransformOptions>
       globalOptimizationTransformPassPipeline(
           "iree-global-optimization-transformation-pipeline",
