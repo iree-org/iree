@@ -7,7 +7,7 @@
 }>
 
 // CHECK-LABEL: func.func @hello_sparse_world(
-//  CHECK-SAME:   %[[ARG.*]]: tensor<?x?xf32, #sparse_tensor.encoding<{{{.*}}}>>)
+//  CHECK-SAME:   %[[ARG:.*]]: tensor<?x?xf32, #sparse_tensor.encoding<{{{.*}}}>>)
 func.func @hello_sparse_world(%arg0: tensor<?x?xf32, #CSR>) -> tensor<?x?xf32, #CSR> {
   return %arg0 : tensor<?x?xf32, #CSR>
 }
