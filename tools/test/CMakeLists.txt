@@ -19,7 +19,7 @@ iree_lit_test_suite(
     "compile_to_phase.mlir"
     "executable_benchmarks.mlir"
     "executable_sources.mlir"
-    "hello_sparse_world.mlir",
+    "hello_sparse_world.mlir"
     "iree-benchmark-module.mlir"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
