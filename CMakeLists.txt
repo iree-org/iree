@@ -170,7 +170,6 @@ endif()
 
 option(IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS "Build experimental plugins making builtin ukernels available to llvm-cpu modules compiled with --iree-llvmcpu-enable-microkernels" OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
-option(IREE_BUILD_EXPERIMENTAL_DISTRIBUTED "Builds experimental distributed package." OFF)
 
 #-------------------------------------------------------------------------------
 # CUDA Toolkit.
@@ -982,10 +981,6 @@ endif()
 
 if(IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS)
   add_subdirectory(experimental/cpu_ukernel)
-endif()
-
-if(IREE_BUILD_EXPERIMENTAL_DISTRIBUTED)
-  add_subdirectory(experimental/distributed)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
