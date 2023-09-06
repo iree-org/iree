@@ -45,6 +45,11 @@ def LLVMCPUAssignImportOrdinals :
   let constructor = "mlir::iree_compiler::createLLVMCPUAssignImportOrdinalsPass()";
 }
 
+def LLVMCPUBreakDownSubbyteExtend : Pass<"iree-llvmcpu-breakdown-subbyte-extend", "func::FuncOp"> {
+  let summary = "Pass to break down subbyte extui ops.";
+  let constructor = "mlir::iree_compiler::createLLVMCPUBreakDownSubbyteExtendPass()";
+}
+
 def LLVMCPUCheckIRBeforeLLVMConversion :
     Pass<"iree-llvmcpu-check-ir-before-llvm-conversion", "ModuleOp"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
