@@ -37,6 +37,8 @@ internal_headers = [
     "static_assert.h",
     "unpack.h",
     "unpack_internal.h",
+    "softmax.h",
+    "softmax_internal.h"
 ]
 
 # Filegroup used in Bazel only (only Bazel enforces header dependencies).
@@ -65,6 +67,8 @@ iree_runtime_cc_library(
         "query_tile_sizes.c",
         "unpack.c",
         "unpack_tile.c",
+        "softmax.c",
+        "softmax_tile.c"
     ] + internal_headers,
     hdrs = ["api.h"],
     visibility = ["//visibility:private"],
@@ -121,6 +125,7 @@ if(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
         "query_tile_sizes.c",
         "unpack_tile.c",
         "weak.c",
+        "softmax.c"
     ],
     # wasm_X here is a proxy for "some reasonable X-bit architecture". The
     # exact architecture should not matter (other than bitness) as the code here
@@ -145,6 +150,8 @@ c_embed_data(
         "//runtime/src/iree/builtins/ukernel/arch/arm_64:ukernel_bitcode_arm_64_entry_points.bc",
         "//runtime/src/iree/builtins/ukernel/arch/x86_64:ukernel_bitcode_x86_64.bc",
         "//runtime/src/iree/builtins/ukernel/arch/x86_64:ukernel_bitcode_x86_64_entry_points.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/riscv_64:ukernel_bitcode_riscv_64.bc",
+        "//runtime/src/iree/builtins/ukernel/arch/riscv_64:ukernel_bitcode_riscv_64_entry_points.bc",
     ],
     c_file_output = "ukernel_bitcode.c",
     flatten = True,

@@ -462,6 +462,31 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
   auto input = op.input();
   auto output = op.output();
   auto outputType = op.getInputOperandType();
+  auto outputElemType = outputType.getElementType();
+  uint64_t dim = op.getDimension();
+  uint64_t output_rank = op.getOutputOperandRank();
+  ArrayRef<int64_t> shapes = outputType.getShape();
+  uint64_t last_dim = shapes[output_rank - 1];
+  uint64_t flattened_dim = 1;
+  uint32_t flags = 0;
+
+  if (!outputElemType.isF32()) {
+    return rewriter.notifyMatchFailure(op, "unsupported softmax data type for ukernel");
+  }
+  flags |= IREE_UK_FLAG_SOFTMAX_TYPE_F32;
+
+  for (int d = 0; d < output_rank - 1; d++) {
+    flattened_dim *= shapes[d];
+  }
+
+  if (dim != output_rank - 1) {
+    return rewriter.notifyMatchFailure(op, "unsupported softmax dim for ukernel");
+  }
+
+  Value m = rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(flattened_dim));
+  Value n = rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(last_dim));
+  Value flagsVal = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI32IntegerAttr(flags));
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   auto fn = getFnNameAndDefAttrs("softmax", rewriter, targetAttr);
@@ -472,9 +497,9 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
       fn.name,
       input,
       output,
-      ValueRange{},
+      ValueRange{m, n, flagsVal},
       rewriter.getDictionaryAttr(fn.defAttrs),
-      IntegerAttr{}
+      rewriter.getIndexAttr(1)
       );
 
   return cast<IREE::Codegen::UKernelOpInterface>(

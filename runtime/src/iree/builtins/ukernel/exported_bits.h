@@ -113,4 +113,11 @@ IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_MMT4D_ACCUMULATE);
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32 0x0500
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16 0x0600
 
+//===----------------------------------------------------------------------===//
+// softmax
+//===----------------------------------------------------------------------===//
+#define IREE_UK_FLAG_SOFTMAX_TYPE_MASK 0xFF
+#define IREE_UK_FLAG_SOFTMAX_TYPE_NONE 0x00
+#define IREE_UK_FLAG_SOFTMAX_TYPE_F32 0x01
+
 #endif  // IREE_BUILTINS_UKERNEL_EXPORTED_BITS_H_

@@ -76,7 +76,9 @@ iree_cc_library(
     "unpack_internal.h"
     "unpack_tile.c"
     "softmax.c"
+    "softmax_tile.c"
     "softmax.h"
+    "softmax_internal.h"
   DEPS
     ::exported_bits
     ::static_assert
@@ -122,6 +124,7 @@ iree_bitcode_library(
     "unpack_tile.c"
     "weak.c"
     "softmax.c"
+    "softmax_tile.c"
 )
 
 iree_bitcode_library(
@@ -138,6 +141,7 @@ iree_bitcode_library(
     "unpack_tile.c"
     "weak.c"
     "softmax.c"
+    "softmax_tile.c"
 )
 
 iree_c_embed_data(
@@ -148,6 +152,8 @@ iree_c_embed_data(
     "runtime/src/iree/builtins/ukernel/arch/arm_64/ukernel_bitcode_arm_64_entry_points.bc"
     "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64.bc"
     "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64_entry_points.bc"
+    "runtime/src/iree/builtins/ukernel/arch/riscv_64/ukernel_bitcode_riscv_64.bc"
+    "runtime/src/iree/builtins/ukernel/arch/riscv_64/ukernel_bitcode_riscv_64_entry_points.bc"
     "ukernel_bitcode_32bit_base.bc"
     "ukernel_bitcode_64bit_base.bc"
   DEPS

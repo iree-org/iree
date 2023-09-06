@@ -8,6 +8,7 @@
 #include "iree/builtins/ukernel/pack_internal.h"
 #include "iree/builtins/ukernel/query_tile_sizes_internal.h"
 #include "iree/builtins/ukernel/unpack_internal.h"
+#include "iree/builtins/ukernel/softmax_internal.h"
 
 #if defined(IREE_UK_HAVE_WEAK)
 
@@ -32,4 +33,8 @@ IREE_UK_WEAK bool iree_uk_query_matmul_tile_sizes_arch(
   return false;
 }
 
+IREE_UK_WEAK iree_uk_softmax_tile_func_t
+iree_uk_softmax_select_tile_func_arch(const iree_uk_softmax_params_t* params) {
+  return 0;
+}
 #endif  // defined(IREE_UK_HAVE_WEAK)
