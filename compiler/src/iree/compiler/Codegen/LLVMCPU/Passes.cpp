@@ -745,6 +745,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createEmulateNarrowTypePass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createLLVMCPUBreakDownSubbyteExtendPass());
   if (clInstrumentMemoryAccesses) {
     passManager.addNestedPass<func::FuncOp>(
         createInstrumentMemoryAccessesPass());
