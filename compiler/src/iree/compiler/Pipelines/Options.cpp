@@ -48,9 +48,6 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
 #ifdef IREE_HAVE_TOSA_INPUT
           "  =tosa          - Legalize from TOSA ops.\n"
 #endif  // IREE_HAVE_TOSA_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-          "  =torch         - Legalize from TMTensor ops.\n"
-#endif  // IREE_HAVE_TORCH_INPUT
           "  =*             - An extensible input type defined in a plugin."
           // clang-format on
           ),
