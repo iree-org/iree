@@ -6,6 +6,7 @@
 
 # Enable input dialects based on options.
 set(IREE_INPUT_DEPS "")
+set(IREE_INPUT_DEFINES "")
 if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
 endif()
@@ -23,6 +24,7 @@ iree_cc_library(
   DEPS
     ${IREE_INPUT_DEPS}
     iree::compiler::Utils
+    iree::compiler::PluginAPI::Config::Defs
   PUBLIC
 )
 
