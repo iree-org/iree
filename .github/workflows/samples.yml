@@ -32,7 +32,7 @@ jobs:
       - name: "Testing Colab Notebooks"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
-            gcr.io/iree-oss/samples@sha256:a1ac01746d4dde6959499ad6fc5e811fb286b606a2a1f48500d58c48e351fac6 \
+            gcr.io/iree-oss/samples@sha256:c1312188958a58d464079651061311e5fb0e77a44ad19239b5c244ed2bf5b027 \
             ./samples/colab/test_notebooks.py
 
   samples:
@@ -43,7 +43,7 @@ jobs:
       - name: "Testing Samples"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
-            gcr.io/iree-oss/samples@sha256:a1ac01746d4dde6959499ad6fc5e811fb286b606a2a1f48500d58c48e351fac6 \
+            gcr.io/iree-oss/samples@sha256:c1312188958a58d464079651061311e5fb0e77a44ad19239b5c244ed2bf5b027 \
             ./build_tools/testing/test_samples.sh
 
   # FIXME: unify this with host build from ci.yml. This is complicated by

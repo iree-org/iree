@@ -239,7 +239,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:89656f131eb6efc97585f6b71b2cedbaa9ae79b539362d2545b19a9bbaf7501c \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:d2483ac643184a16942489d8f709ef3714543ae795fa9ae8fd2e4d8bf68a24a0 \
             ./build_tools/bazel/build_core.sh
 
   test_all:
@@ -268,7 +268,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
-            gcr.io/iree-oss/swiftshader@sha256:e9501304b0a19acfae4a1295dca78f24c839975f25e3c2d434b92c0b5e5f5c5d \
+            gcr.io/iree-oss/swiftshader@sha256:035ac89d3c357787052a836f4cbd227035260c05c95fa9a53d809600c454e819 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -485,7 +485,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VMVX_DISABLE=0 \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:c3f171feac512e2491c1ac96ef8a1290014d11114ea7eac94b191f8245e25abe \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:4b74c16cb3cda0b748bb3562a489da10cd637ca07a56a81bff0d75690f6c3d5b \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -591,7 +591,7 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=swiftshader-bleeding-edge@sha256:c22afc61198e14a98e06e5261149de74c629acd2bc61b82e57ec90e5461b69be" \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:89656f131eb6efc97585f6b71b2cedbaa9ae79b539362d2545b19a9bbaf7501c \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:d2483ac643184a16942489d8f709ef3714543ae795fa9ae8fd2e4d8bf68a24a0 \
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
