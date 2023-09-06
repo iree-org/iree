@@ -41,6 +41,12 @@ static int iree_uk_plugin_unpack(void* params_ptr, void* context,
   return 0;
 }
 
+static int iree_uk_plugin_softmax(void* params_ptr, void* context,
+                                 void* reserved) {
+  iree_uk_softmax((const iree_uk_softmax_params_t*)params_ptr);
+  return 0;
+}
+
 static iree_hal_executable_plugin_status_t iree_uk_plugin_load(
     const iree_hal_executable_plugin_environment_v0_t* environment,
     size_t param_count, const iree_hal_executable_plugin_string_pair_t* params,
@@ -68,6 +74,7 @@ static iree_hal_executable_plugin_status_t iree_uk_plugin_resolve(
       {"iree_uk_mmt4d", iree_uk_plugin_mmt4d},
       {"iree_uk_pack", iree_uk_plugin_pack},
       {"iree_uk_unpack", iree_uk_plugin_unpack},
+      {"iree_uk_softmax", iree_uk_plugin_softmax},
   };
   *out_resolution = 0;
   bool any_required_not_found = false;

@@ -45,6 +45,7 @@ iree_cc_library(
     "static_assert.h"
     "unpack.h"
     "unpack_internal.h"
+    "softmax.h"
   DEPS
     iree::base::core_headers
   PUBLIC
@@ -74,6 +75,8 @@ iree_cc_library(
     "unpack.h"
     "unpack_internal.h"
     "unpack_tile.c"
+    "softmax.c"
+    "softmax.h"
   DEPS
     ::exported_bits
     ::static_assert
@@ -118,6 +121,7 @@ iree_bitcode_library(
     "query_tile_sizes.c"
     "unpack_tile.c"
     "weak.c"
+    "softmax.c"
 )
 
 iree_bitcode_library(
@@ -133,6 +137,7 @@ iree_bitcode_library(
     "query_tile_sizes.c"
     "unpack_tile.c"
     "weak.c"
+    "softmax.c"
 )
 
 iree_c_embed_data(

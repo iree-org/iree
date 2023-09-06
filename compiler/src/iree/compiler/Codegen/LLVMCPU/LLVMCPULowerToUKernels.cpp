@@ -455,6 +455,31 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
       genericMicroKernelOp.getOperation());
 }
 
+static FailureOr<IREE::Codegen::UKernelOpInterface>
+matchDAGForUKernel(RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
+                   bool /*skipIntermediateRoundings*/) {
+  Location loc = op.getLoc();
+  auto input = op.input();
+  auto output = op.output();
+  auto outputType = op.getInputOperandType();
+
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  auto fn = getFnNameAndDefAttrs("softmax", rewriter, targetAttr);
+
+  auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
+      loc,
+      outputType,
+      fn.name,
+      input,
+      output,
+      ValueRange{},
+      rewriter.getDictionaryAttr(fn.defAttrs),
+      IntegerAttr{}
+      );
+
+  return cast<IREE::Codegen::UKernelOpInterface>(
+      genericMicroKernelOp.getOperation());
+}
 namespace {
 
 using TargetPredicate = std::function<bool(IREE::HAL::ExecutableTargetAttr)>;
@@ -521,6 +546,8 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
   // These patterns are inherently specific to the VMVX backend.
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
       context, isVMVXBackend);
+  // These patterns are used on LLVMCPU and VMVX. Only for riscv target.
+  patterns.insert<LowerToUKernelPattern<IREE::LinalgExt::SoftmaxOp>>(context, isRISCV);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
