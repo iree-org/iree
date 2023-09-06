@@ -11,9 +11,9 @@
 // CHECK-LABEL: func.func @hello_sparse_world(
 // CHECK-SAME:    %[[ARG0:.*]]: tensor<3xf64>,
 // CHECK-SAME:    %[[ARG1:.*]]: tensor<3xi32>,
-// CHECK-SAME:    %[[ARG2:.*]]: tensor<11xi32>) -> (index) {
-// CHECK:         %[[T.*]] = sparse_tensor.pack %[[ARG0]], %[[ARG2]], %[[ARG1]] : tensor<3xf64>, tensor<11xi32>, tensor<3xi32> to tensor<10x10xf64, #sparse_tensor.encoding<{{{.*}}}>
-// CHECK:         %[[NSE:.*]] = sparse_tensor.number_of_entries %[[T]] : tensor<10x10xf64, #sparse_tensor.encoding<{{{.*}}}>
+// CHECK-SAME:    %[[ARG2:.*]]: tensor<11xi32>) -> index {
+// CHECK:         %[[T:.*]] = sparse_tensor.pack %[[ARG0]], %[[ARG2]], %[[ARG1]] : tensor<3xf64>, tensor<11xi32>, tensor<3xi32> to tensor<10x10xf64, #sparse_tensor.encoding<{{{.*}}}>>
+// CHECK:         %[[NSE:.*]] = sparse_tensor.number_of_entries %[[T]] : tensor<10x10xf64, #sparse_tensor.encoding<{{{.*}}}>>
 // CHECK:         return %[[NSE]] : index
 // CHECK:       }
 func.func @hello_sparse_world(%arg0: tensor<3xf64>,
