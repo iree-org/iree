@@ -154,13 +154,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.new_local_repository,
-        name = "torch-mlir-dialects",
-        build_file = iree_repo_alias + "//:build_tools/third_party/torch-mlir-dialects/BUILD.overlay",
-        path = paths.join(iree_path, "third_party/torch-mlir-dialects"),
-    )
-
-    maybe(
-        native.new_local_repository,
         name = "tracy_client",
         build_file = iree_repo_alias + "//:build_tools/third_party/tracy_client/BUILD.overlay",
         path = paths.join(iree_path, "third_party/tracy"),
