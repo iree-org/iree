@@ -18,7 +18,7 @@
 // CHECK:       }
 func.func @hello_sparse_world(%arg0: tensor<3xf64>,
                               %arg1: tensor<3xi32>,
-			      %arg2: tensor<11xi32>) -> (index) {
+                              %arg2: tensor<11xi32>) -> (index) {
     %t = sparse_tensor.pack %arg0, %arg2, %arg1
       : tensor<3xf64>,
         tensor<11xi32>,
