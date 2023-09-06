@@ -21,10 +21,6 @@
 #ifdef IREE_HAVE_TOSA_INPUT
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #endif // IREE_HAVE_TOSA_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-#include "iree/compiler/InputConversion/TMTensor/Passes.h"
-#include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
-#endif // IREE_HAVE_TORCH_INPUT
 
 namespace mlir::iree_compiler {
 namespace {
@@ -46,12 +42,8 @@ struct InputFeatures {
   bool hasStableHLO = false;
   // - XLA import features.
   bool hasTuples = false;
-
   // TOSA features.
   bool hasTOSA = false;
-
-  // tm_tensor
-  bool hasTmTensor = false;
 };
 
 static void populateHloFeatures(Operation *op, InputFeatures &features) {
@@ -91,7 +83,6 @@ static void populateHloFeatures(Operation *op, InputFeatures &features) {
 }
 
 static void populateFeatures(Operation *op, const Dialect *stablehloDialect,
-                             const Dialect *tmTensorDialect,
                              const Dialect *tosaDialect,
                              InputFeatures &features) {
   Dialect *d = op->getDialect();
@@ -103,10 +94,6 @@ static void populateFeatures(Operation *op, const Dialect *stablehloDialect,
     features.hasTOSA = true;
     return;
   }
-  if (d == tmTensorDialect) {
-    features.hasTmTensor = true;
-    return;
-  }
 }
 
 void AutoInputConversionPipelinePass::runOnOperation() {
@@ -116,24 +103,14 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   InputFeatures features;
   const Dialect *stablehloDialect = ctxt->getLoadedDialect("stablehlo");
   const Dialect *tosaDialect = ctxt->getLoadedDialect("tosa");
-  const Dialect *tmTensorDialect = ctxt->getLoadedDialect("tm_tensor");
-  if (!stablehloDialect && !tosaDialect && !tmTensorDialect) {
+  if (!stablehloDialect && !tosaDialect) {
     return;
   }
 
   auto res = module.walk([&](Operation *op) {
-    populateFeatures(op, stablehloDialect, tmTensorDialect, tosaDialect,
-                     features);
+    populateFeatures(op, stablehloDialect, tosaDialect, features);
     if (features.hasStableHLO && features.hasTOSA) {
       module.emitError("not yet implemented mixture of *HLO and TOSA");
-      return WalkResult::interrupt();
-    }
-    if (features.hasStableHLO && features.hasTmTensor) {
-      module.emitError("not yet implemented mixture of *HLO and TM Tensor");
-      return WalkResult::interrupt();
-    }
-    if (features.hasTOSA && features.hasTmTensor) {
-      module.emitError("not yet implemented mixture of TOSA and TM Tensor");
       return WalkResult::interrupt();
     }
     return WalkResult::advance();
@@ -141,7 +118,7 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   if (res.wasInterrupted()) {
     return signalPassFailure();
   }
-  if (!features.hasStableHLO && !features.hasTOSA && !features.hasTmTensor) {
+  if (!features.hasStableHLO && !features.hasTOSA) {
     return;
   }
 
@@ -165,12 +142,6 @@ void AutoInputConversionPipelinePass::runOnOperation() {
     buildTOSAInputConversionPassPipeline(pm);
   }
 #endif // IREE_HAVE_TOSA_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-  if (features.hasTmTensor) {
-    pm.addNestedPass<func::FuncOp>(
-        TMTensor::createConvertTMTensorToLinalgExtPass());
-  }
-#endif // IREE_HAVE_TORCH_INPUT
 
   if (failed(runPipeline(pm, module))) {
     signalPassFailure();
@@ -212,13 +183,6 @@ void AutoInputConversionPipelinePass::getDependentDialects(
 #ifdef IREE_HAVE_TOSA_INPUT
   appendPipelineDialects(buildTOSAInputConversionPassPipeline);
 #endif // IREE_HAVE_TOSA_INPUT
-
-#ifdef IREE_HAVE_TORCH_INPUT
-  appendPipelineDialects([](OpPassManager &pm) {
-    pm.addNestedPass<func::FuncOp>(
-        TMTensor::createConvertTMTensorToLinalgExtPass());
-  });
-#endif // IREE_HAVE_TORCH_INPUT
 }
 } // namespace
 

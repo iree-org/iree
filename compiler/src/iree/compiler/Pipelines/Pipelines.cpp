@@ -23,9 +23,6 @@
 #ifdef IREE_HAVE_STABLEHLO_INPUT
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-#include "iree/compiler/InputConversion/TMTensor/Passes.h"
-#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #endif // IREE_HAVE_TOSA_INPUT
@@ -108,12 +105,6 @@ void buildIREEPrecompileTransformPassPipeline(
                                                               stablehloOptions);
       break;
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-    case InputDialectOptions::Type::tm_tensor:
-      passManager.addNestedPass<func::FuncOp>(
-          TMTensor::createConvertTMTensorToLinalgExtPass());
-      break;
-#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
     case InputDialectOptions::Type::tosa:
       buildTOSAInputConversionPassPipeline(passManager);

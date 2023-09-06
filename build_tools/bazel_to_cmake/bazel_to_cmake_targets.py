@@ -86,10 +86,6 @@ class TargetConverter:
                 "@nccl//:headers": [
                     "nccl::headers",
                 ],
-                # Torch-MLIR.
-                "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
-                    "TorchMLIRTMTensorDialect"
-                ],
                 # Tracy.
                 "@tracy_client//:runtime": ["tracy_client::runtime"],
                 # Vulkan

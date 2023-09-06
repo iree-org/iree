@@ -48,9 +48,12 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
 #ifdef IREE_HAVE_TOSA_INPUT
           "  =tosa          - Legalize from TOSA ops.\n"
 #endif  // IREE_HAVE_TOSA_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-          "  =torch         - Legalize from TMTensor ops.\n"
-#endif  // IREE_HAVE_TORCH_INPUT
+// NOTE: The plugin system does not have a good way to populate CL help
+// messages, so we err on the side of being helpful and populating Torch
+// options here, even though it is a layering violation.
+#ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_TORCH_IREE
+          "  =tm_tensor     - Legalize a subset of Torch input ops.\n"
+#endif  // IREE_COMPILER_PLUGIN_HAVE_STATIC_TORCH_IREE
           "  =*             - An extensible input type defined in a plugin."
           // clang-format on
           ),

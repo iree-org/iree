@@ -28,6 +28,10 @@ genrule(
 )
 
 iree_compiler_cc_library(
+    name = "Defs",
+)
+
+iree_compiler_cc_library(
     name = "StaticLinkedPlugins",
     hdrs = ["StaticLinkedPlugins.inc"],
     deps = [

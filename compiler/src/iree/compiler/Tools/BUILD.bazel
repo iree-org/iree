@@ -38,14 +38,12 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/InputConversion/Common",
         "//compiler/src/iree/compiler/InputConversion/StableHLO",
-        "//compiler/src/iree/compiler/InputConversion/TMTensor",
         "//compiler/src/iree/compiler/InputConversion/TOSA",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:TosaDialect",
         "@stablehlo//:chlo_ops",
         "@stablehlo//:stablehlo_ops",
-        "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
 )
 
