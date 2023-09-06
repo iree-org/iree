@@ -129,6 +129,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:ShapeDialect",
+        "@llvm-project//mlir:SparseTensorDialect",
         "@llvm-project//mlir:TensorInferTypeOpInterfaceImpl",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",

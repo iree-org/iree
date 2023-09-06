@@ -145,6 +145,7 @@ iree_cc_library(
     MLIRSPIRVDialect
     MLIRSPIRVTransforms
     MLIRShapeDialect
+    MLIRSparseTensorDialect
     MLIRFuncDialect
     MLIRFuncToSPIRV
     MLIRTensorInferTypeOpInterfaceImpl

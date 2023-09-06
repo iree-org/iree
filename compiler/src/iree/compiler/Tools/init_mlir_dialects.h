@@ -32,6 +32,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
+#include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/IR/TensorTilingInterfaceImpl.h"
@@ -69,6 +70,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   mlir::arith::ArithDialect,
                   vector::VectorDialect,
                   tensor::TensorDialect,
+                  sparse_tensor::SparseTensorDialect,
                   transform::TransformDialect,
                   shape::ShapeDialect>();
   // clang-format on
