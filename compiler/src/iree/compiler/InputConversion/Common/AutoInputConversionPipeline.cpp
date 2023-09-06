@@ -108,8 +108,7 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   }
 
   auto res = module.walk([&](Operation *op) {
-    populateFeatures(op, stablehloDialect, tosaDialect,
-                     features);
+    populateFeatures(op, stablehloDialect, tosaDialect, features);
     if (features.hasStableHLO && features.hasTOSA) {
       module.emitError("not yet implemented mixture of *HLO and TOSA");
       return WalkResult::interrupt();
