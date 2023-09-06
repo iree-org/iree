@@ -126,12 +126,10 @@ public:
 };
 
 static bool isIllegalType(Type type) {
-  if (type.isInteger(48))
-    return true;
   if (auto shapedType = dyn_cast<ShapedType>(type)) {
     return isIllegalType(shapedType.getElementType());
   }
-  return false;
+  return type.isInteger(48);
 }
 
 void Converti48Toi64Pass::runOnOperation() {
