@@ -64,7 +64,7 @@ function find_git_dir_parent() {
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
-manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:e83893d35be4ce3558c989e9d5ccc4ff88d058bc3e74a83181059cc76e2cf1f8" }')}"
+manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/nod-ai/manylinux_x86_64:main" }')}"
 python_versions="${override_python_versions:-cp39-cp39 cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-compiler}"
@@ -200,7 +200,7 @@ function install_deps() {
     yum install -y capstone-devel tbb-devel libzstd-devel
   elif [[ "$uname_m" == "x86_64" ]]; then
     # Check if the output is x86_64
-    echo "The architecture is x86_64 so assume we are on older manylinux2014 with TBB deps installed in the image"
+    echo "The architecture is x86_64 so assume we are on a managed image with deps"
   else
     echo "The architecture is unknown. Exiting"
     exit 1
