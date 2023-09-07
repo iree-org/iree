@@ -700,26 +700,40 @@ setVectorSizesForDynamicShapes(linalg::LinalgOp op,
                                VectorPreProcStrategy vecPreProcStrategy,
                                SmallVectorImpl<int64_t> &parallelSizes,
                                SmallVectorImpl<int64_t> &reductionSizes) {
-  // Masking doesn't need any dim set to 1.
-  if (vecPreProcStrategy == VectorPreProcStrategy::Masking) {
+  // TODO: Add support for ops with a mix of dynamic and static dims
+  if (!isFullyDynamicOp(op))
+    return;
+
+  if (vecPreProcStrategy != VectorPreProcStrategy::Peeling &&
+      vecPreProcStrategy != VectorPreProcStrategy::Masking) {
     return;
   }
 
+  const bool isSVEMatmul =
+      (isa<linalg::MatmulOp>(op) &&
+       hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr::lookup(op)));
+
+  // In prinicple, masking doesn't need any dim set to 1. However, for SVE we
+  // need to avoid non-unit trailing dims when vectorising a matmul. Indeed,
+  // types like the following cannot be lowered to LLVM IR:
+  //    * vector<4x[8]x4xi32>
+  // This would lead to a "scallable" array of vectors. However, trailing unit
+  // dims can be folded away, so that's not a problem.
+  // TODO: Extend to ops other than matmul
+  if (vecPreProcStrategy == VectorPreProcStrategy::Masking && !isSVEMatmul) {
+    return;
+  }
+
+  // The following logic makes sure that we only vectorize the lowest order
+  // parallel dimension. If no parallel dimension is found to be vectorized,
+  // we try to vectorize the lowest order reduction dimension. Note that this
+  // was implemented with peeling in mind and may require tweaking for other
+  // types of vector pre-processing strategies.
   SmallVector<int64_t> origParallelSizes(parallelSizes.begin(),
                                          parallelSizes.end());
   SmallVector<int64_t> origReductionSizes(reductionSizes.begin(),
                                           reductionSizes.end());
   setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
-
-  // If peeling is enabled and the 'op' is fully dynamic, we only vectorize the
-  // lowest order parallel dimension for now to avoid peeling higher level
-  // dimensions. If no parallel dimension is found to be vectorized, we try to
-  // vectorize the lowest order reduction dimension.
-
-  if (!isFullyDynamicOp(op) ||
-      vecPreProcStrategy != VectorPreProcStrategy::Peeling) {
-    return;
-  }
 
   bool isParallelDimVectorized = false;
   for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
