@@ -69,6 +69,7 @@ python_versions="${override_python_versions:-cp39-cp39 cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-compiler}"
 package_suffix="${package_suffix:-}"
+toolchain_suffix="${toolchain_suffix:-release}"
 
 function run_on_host() {
   echo "Running on host"
@@ -87,6 +88,7 @@ function run_on_host() {
     -e "packages=${packages}" \
     -e "package_suffix=${package_suffix}" \
     -e "output_dir=${output_dir}" \
+    -e "toolchain_suffix=${toolchain_suffix}" \
     "${manylinux_docker_image}" \
     -- ${this_dir}/${script_name}
 
@@ -101,8 +103,15 @@ function run_in_docker() {
   git config --global --add safe.directory '*'
 
   echo "Using python versions: ${python_versions}"
-
   local orig_path="${PATH}"
+
+  # Configure toolchain.
+  export CMAKE_TOOLCHAIN_FILE="${repo_root}/build_tools/pkgci/linux_toolchain_${toolchain_suffix}.cmake"
+  echo "Using CMake toolchain ${CMAKE_TOOLCHAIN_FILE}"
+  if ! [ -f "$CMAKE_TOOLCHAIN_FILE" ]; then
+    echo "CMake toolchain not found (wrong toolchain_suffix?)"
+    exit 1
+  fi
 
   # Build phase.
   for package in ${packages}; do
@@ -198,6 +207,7 @@ function install_deps() {
     yum update -y
     # Required for Tracy
     yum install -y capstone-devel tbb-devel libzstd-devel
+    yum install -y clang lld
   elif [[ "$uname_m" == "x86_64" ]]; then
     # Check if the output is x86_64
     echo "The architecture is x86_64 so assume we are on a managed image with deps"
