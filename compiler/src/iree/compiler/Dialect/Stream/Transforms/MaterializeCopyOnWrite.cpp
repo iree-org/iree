@@ -57,8 +57,13 @@ static bool isSafeToElideCOW(Value operand, IREE::Stream::ResourceType type) {
   // If there's more than one user we can't make a local decision. It's
   // expensive to query relative operation order within a block and within a
   // region the lifetime of values may vary - all things we can't tell here.
-  if (!operand.hasOneUse())
-    return false;
+  Operation *singleUser = nullptr;
+  for (Operation *user : operand.getUsers()) {
+    if (singleUser == nullptr)
+      singleUser = user;
+    else if (singleUser != user)
+      return false;
+  }
 
   // We are the only user and the value is contained entirely within the
   // current region. We by construction know we do not need to worry.
