@@ -33,15 +33,15 @@ hal.executable private @aligned_generic_pack {
     }
   }
 }
-// CHECK:         func.func @aligned_generic_pack
-// CHECK:           %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
-// CHECK-COUNT-15:  %{{.+}} = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
-// CHECK:           %[[IN_1:.+]] = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
-// CHECK:           %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
-// CHECK:           %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
-// CHECK:           %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>
-// CHECK-COUNT-16:  vector.extract %[[T2]]
-// CHECK-COUNT-64:  vector.shuffle
+// CHECK-LABEL:     func.func @aligned_generic_pack
+// CHECK:             %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
+// CHECK-COUNT-15:    %{{.+}} = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
+// CHECK:             %[[IN_1:.+]] = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
+// CHECK:             %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
+// CHECK:             %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
+// CHECK:             %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>
+// CHECK-COUNT-16:    vector.extract %[[T2]]
+// CHECK-COUNT-64:    vector.shuffle
 
 // -----
 
@@ -77,16 +77,16 @@ hal.executable private @aligned_unpack_generic {
     }
   }
 }
-// CHECK:         func.func @aligned_unpack_generic
-// CHECK:           %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>>
-// CHECK:             %[[SUBVIEW:.+]] = memref.subview %{{.*}} memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>> to memref<
-// CHECK-COUNT-15:      vector.load %[[SUBVIEW]]
-// CHECK:               %[[LAST_LOAD:.+]] = vector.load %[[SUBVIEW]]
-// CHECK-NEXT:          %[[IN_1:.+]] = vector.insert %[[LAST_LOAD]], %{{.*}}
-// CHECK:               %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
-// CHECK:               %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
-// CHECK:               %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
-// CHECK:               %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>
+// CHECK-LABEL:     func.func @aligned_unpack_generic
+// CHECK:             %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>>
+// CHECK:               %[[SUBVIEW:.+]] = memref.subview %{{.*}} memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>> to memref<
+// CHECK-COUNT-15:        vector.load %[[SUBVIEW]]
+// CHECK:                 %[[LAST_LOAD:.+]] = vector.load %[[SUBVIEW]]
+// CHECK-NEXT:            %[[IN_1:.+]] = vector.insert %[[LAST_LOAD]], %{{.*}}
+// CHECK:                 %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
+// CHECK:                 %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
+// CHECK:                 %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
+// CHECK:                 %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>
 
 // -----
 
@@ -123,6 +123,6 @@ hal.executable private @unaligned_pack  {
     }
   }
 }
-// CHECK:          func.func @unaligned_pack
-// CHECK-COUNT-16:   vector.maskedload {{.+}} vector<16xf32>
-// CHECK-COUNT-64:   vector.shuffle
+// CHECK-LABEL:     func.func @unaligned_pack
+// CHECK-COUNT-16:    vector.maskedload {{.+}} vector<16xf32>
+// CHECK-COUNT-64:    vector.shuffle

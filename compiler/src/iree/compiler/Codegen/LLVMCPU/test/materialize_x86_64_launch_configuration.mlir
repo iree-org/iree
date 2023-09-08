@@ -1180,7 +1180,7 @@ hal.executable private @gemm_unit_M_unit_N {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [1, 32, 0], [0, 0, 16], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.export public @gemm_unit_M_unit_N
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
@@ -1902,7 +1902,7 @@ hal.executable private @no_compute_ops {
     }
   }
 }
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault> 
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @no_compute_ops
 //      CHECK:   hal.executable.export public @test
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
@@ -1948,7 +1948,7 @@ hal.executable private @non_trivial_program {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [1, 32, 0], [0, 0, 16], [0, 0, 0]]>
 //  CHECK-NOT:   lowering_config
 //      CHECK: hal.executable.export public @non_trivial_program
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

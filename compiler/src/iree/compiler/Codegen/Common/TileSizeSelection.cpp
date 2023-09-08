@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
@@ -56,16 +56,16 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
 /// and reduction dimensions.
 SmallVector<int64_t> TilingConfig::getVectorTileSizes() {
   unsigned numDims = getNumDimensions();
-  SmallVector<int64_t> vectorSizes(numDims);
+  SmallVector<int64_t> vectorSizes(numDims, 0);
   SmallVector<int64_t> parallelCommonSizes = getVectorCommonParallelSizes();
   SmallVector<int64_t> reductionSizes = getVectorReductionSizes();
   SmallVector<int64_t> parallelInnerSizes = getVectorInnerParallelSizes();
   for (int i = 0; i < numDims; ++i) {
-    bool nonZeroCnt = llvm::count_if(ArrayRef<int64_t>{parallelCommonSizes[i],
-                                                       reductionSizes[i],
-                                                       parallelInnerSizes[i]},
-                                     [](auto v) { return v != 0; });
-    assert(nonZeroCnt == 1 && "expected only one tile size can be non-zero");
+    unsigned nonZeroCnt = llvm::count_if(
+        ArrayRef<int64_t>{parallelCommonSizes[i], reductionSizes[i],
+                          parallelInnerSizes[i]},
+        [](auto v) { return v != 0; });
+    assert(nonZeroCnt <= 1 && "expected one tile size at most to be non-zero");
     (void)nonZeroCnt;
     vectorSizes[i] =
         parallelCommonSizes[i] ^ reductionSizes[i] ^ parallelInnerSizes[i];
