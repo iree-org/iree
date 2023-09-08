@@ -556,8 +556,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
   // Cast address spaces of all function arguments to generic
-  if (!useROCM)
-    pm.addPass(createLLVMGPUCastAddressSpaceFunction());
+  pm.addPass(createLLVMGPUCastAddressSpaceFunction());
   if (useROCM) {
     // convert to ROCDL.
     pm.addPass(createConvertToROCDLPass());

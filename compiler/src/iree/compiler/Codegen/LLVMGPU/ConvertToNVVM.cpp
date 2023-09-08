@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -37,22 +37,6 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-
-// A `dealloc` is converted into a call to `free` on the underlying data buffer.
-// The memref descriptor being an SSA value, there is no need to clean it up
-// in any way.
-struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(memref::DeallocOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!hasSharedMemoryAddressSpace(
-            llvm::cast<MemRefType>(op.getMemref().getType())))
-      return failure();
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
 
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding NVVM equivalent.
@@ -99,7 +83,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
-      patterns.insert<DropSharedMemoryDeallocOp>(&getContext());
+      populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
