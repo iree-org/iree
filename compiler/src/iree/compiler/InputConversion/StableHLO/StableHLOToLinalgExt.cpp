@@ -596,8 +596,8 @@ struct ScanOpConversion final
     signatureConverter.addInputs(1, init0Ty.getElementType());
     rewriter.applySignatureConversion(&scanOp.getRegion(), signatureConverter);
 
-    rewriter.replaceOp(op, result);
-    return success()
+    rewriter.replaceOp(op, scanOp.getResult(0));
+    return success();
   }
 };
 
