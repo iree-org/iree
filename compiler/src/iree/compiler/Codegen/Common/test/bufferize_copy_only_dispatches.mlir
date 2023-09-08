@@ -89,7 +89,6 @@ builtin.module {
 
 // -----
 
-#map = affine_map<(d0) -> (d0)>
 module {
   func.func @already_bufferized() {
     %c0 = arith.constant 0 : index
@@ -98,7 +97,7 @@ module {
     memref.assume_alignment %0, 64 : memref<1001xf32, #hal.descriptor_type<storage_buffer>>
     %alloc = memref.alloc() : memref<1001xf32>
     linalg.fill ins(%cst : f32) outs(%alloc : memref<1001xf32>)
-    linalg.generic {indexing_maps = [#map, #map], iterator_types = ["reduction"]} ins(%alloc : memref<1001xf32>) outs(%0 : memref<1001xf32, #hal.descriptor_type<storage_buffer>>) {
+    linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["reduction"]} ins(%alloc : memref<1001xf32>) outs(%0 : memref<1001xf32, #hal.descriptor_type<storage_buffer>>) {
     ^bb0(%in: f32, %out: f32):
       linalg.yield %in : f32
     }
