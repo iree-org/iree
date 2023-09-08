@@ -288,12 +288,11 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
     // Constant accesses can either be rank reducing or an access into a unit
     // dim. This is tracked by counting the number of unit output dimensions
     // between non-unit ones.
-    if (expr.isa<AffineConstantExpr>()) {
-      IntegerAttr constIdx = rewriter.getI64IntegerAttr(
-          expr.cast<AffineConstantExpr>().getValue());
+    if (auto constExpr = expr.dyn_cast<AffineConstantExpr>()) {
+      IntegerAttr constIdx = rewriter.getI64IntegerAttr(constExpr.getValue());
       offsets.push_back(constIdx);
       sizes.push_back(one);
-      if (outShape[leadOutDim] == 1) {
+      if (leadOutDim < outShape.size() && outShape[leadOutDim] == 1) {
         ++leadOutDim;
       }
       continue;
