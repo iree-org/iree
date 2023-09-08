@@ -138,10 +138,14 @@ iree_status_t iree_hal_task_command_buffer_create(
 
   iree_hal_task_command_buffer_t* command_buffer = NULL;
   iree_status_t status = iree_allocator_malloc(
-      host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
+      host_allocator,
+      sizeof(*command_buffer) +
+          iree_hal_command_buffer_validation_state_size(mode, binding_capacity),
+      (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
         device, mode, command_categories, queue_affinity, binding_capacity,
+        (uint8_t*)command_buffer + sizeof(*command_buffer),
         &iree_hal_task_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     command_buffer->scope = scope;
@@ -472,7 +476,8 @@ static iree_status_t iree_hal_task_command_buffer_wait_events(
 //===----------------------------------------------------------------------===//
 
 static iree_status_t iree_hal_task_command_buffer_discard_buffer(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* buffer) {
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t buffer_ref) {
   return iree_ok_status();
 }
 
@@ -490,9 +495,7 @@ static iree_status_t iree_hal_task_command_buffer_discard_buffer(
 
 typedef struct iree_hal_cmd_fill_buffer_t {
   iree_task_dispatch_t task;
-  iree_hal_buffer_t* target_buffer;
-  iree_device_size_t target_offset;
-  iree_device_size_t length;
+  iree_hal_buffer_ref_t target_ref;
   uint32_t pattern_length;
   uint8_t pattern[8];
 } iree_hal_cmd_fill_buffer_t;
@@ -507,14 +510,14 @@ static iree_status_t iree_hal_cmd_fill_tile(
   iree_device_size_t length_per_slice = tile_context->workgroup_size[0];
   iree_device_size_t slice_offset =
       (iree_device_size_t)tile_context->workgroup_xyz[0] * length_per_slice;
-  iree_device_size_t remaining_length = cmd->length - slice_offset;
+  iree_device_size_t remaining_length = cmd->target_ref.length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_map_fill(
-      cmd->target_buffer, cmd->target_offset + slice_offset, slice_length,
-      cmd->pattern, cmd->pattern_length);
+      cmd->target_ref.buffer, cmd->target_ref.offset + slice_offset,
+      slice_length, cmd->pattern, cmd->pattern_length);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -522,14 +525,13 @@ static iree_status_t iree_hal_cmd_fill_tile(
 
 static iree_status_t iree_hal_task_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, const void* pattern,
+    iree_hal_buffer_ref_t target_ref, const void* pattern,
     iree_host_size_t pattern_length) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &target_buffer));
+      command_buffer->resource_set, 1, &target_ref.buffer));
 
   iree_hal_cmd_fill_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(
@@ -541,7 +543,7 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
       /*z=*/1,
   };
   const uint32_t workgroup_count[3] = {
-      /*x=*/iree_device_size_ceil_div(length, workgroup_size[0]),
+      /*x=*/iree_device_size_ceil_div(target_ref.length, workgroup_size[0]),
       /*y=*/1,
       /*z=*/1,
   };
@@ -549,9 +551,7 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
       command_buffer->scope,
       iree_task_make_dispatch_closure(iree_hal_cmd_fill_tile, (void*)cmd),
       workgroup_size, workgroup_count, &cmd->task);
-  cmd->target_buffer = target_buffer;
-  cmd->target_offset = target_offset;
-  cmd->length = length;
+  cmd->target_ref = target_ref;
   memcpy(cmd->pattern, pattern, pattern_length);
   cmd->pattern_length = pattern_length;
 
@@ -565,9 +565,7 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
 
 typedef struct iree_hal_cmd_update_buffer_t {
   iree_task_call_t task;
-  iree_hal_buffer_t* target_buffer;
-  iree_device_size_t target_offset;
-  iree_device_size_t length;
+  iree_hal_buffer_ref_t target_ref;
   uint8_t source_buffer[];
 } iree_hal_cmd_update_buffer_t;
 
@@ -577,24 +575,24 @@ static iree_status_t iree_hal_cmd_update_buffer(
   const iree_hal_cmd_update_buffer_t* cmd =
       (const iree_hal_cmd_update_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = iree_hal_buffer_map_write(
-      cmd->target_buffer, cmd->target_offset, cmd->source_buffer, cmd->length);
+  iree_status_t status =
+      iree_hal_buffer_map_write(cmd->target_ref.buffer, cmd->target_ref.offset,
+                                cmd->source_buffer, cmd->target_ref.length);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 static iree_status_t iree_hal_task_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &target_buffer));
+      command_buffer->resource_set, 1, &target_ref.buffer));
 
   iree_host_size_t total_cmd_size =
-      sizeof(iree_hal_cmd_update_buffer_t) + length;
+      sizeof(iree_hal_cmd_update_buffer_t) + target_ref.length;
 
   iree_hal_cmd_update_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_arena_allocate(&command_buffer->arena,
@@ -604,12 +602,9 @@ static iree_status_t iree_hal_task_command_buffer_update_buffer(
       command_buffer->scope,
       iree_task_make_call_closure(iree_hal_cmd_update_buffer, (void*)cmd),
       &cmd->task);
-  cmd->target_buffer = target_buffer;
-  cmd->target_offset = target_offset;
-  cmd->length = length;
-
+  cmd->target_ref = target_ref;
   memcpy(cmd->source_buffer, (const uint8_t*)source_buffer + source_offset,
-         cmd->length);
+         cmd->target_ref.length);
 
   return iree_hal_task_command_buffer_emit_execution_task(command_buffer,
                                                           &cmd->task.header);
@@ -629,11 +624,8 @@ static iree_status_t iree_hal_task_command_buffer_update_buffer(
 
 typedef struct iree_hal_cmd_copy_buffer_t {
   iree_task_dispatch_t task;
-  iree_hal_buffer_t* source_buffer;
-  iree_device_size_t source_offset;
-  iree_hal_buffer_t* target_buffer;
-  iree_device_size_t target_offset;
-  iree_device_size_t length;
+  iree_hal_buffer_ref_t source_ref;
+  iree_hal_buffer_ref_t target_ref;
 } iree_hal_cmd_copy_buffer_t;
 
 static iree_status_t iree_hal_cmd_copy_tile(
@@ -646,14 +638,15 @@ static iree_status_t iree_hal_cmd_copy_tile(
   iree_device_size_t length_per_slice = tile_context->workgroup_size[0];
   iree_device_size_t slice_offset =
       (iree_device_size_t)tile_context->workgroup_xyz[0] * length_per_slice;
-  iree_device_size_t remaining_length = cmd->length - slice_offset;
+  iree_device_size_t remaining_length = cmd->target_ref.length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_map_copy(
-      cmd->source_buffer, cmd->source_offset + slice_offset, cmd->target_buffer,
-      cmd->target_offset + slice_offset, slice_length);
+      cmd->source_ref.buffer, cmd->source_ref.offset + slice_offset,
+      cmd->target_ref.buffer, cmd->target_ref.offset + slice_offset,
+      slice_length);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -661,15 +654,16 @@ static iree_status_t iree_hal_cmd_copy_tile(
 
 static iree_status_t iree_hal_task_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
 
-  const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
-  IREE_RETURN_IF_ERROR(
-      iree_hal_resource_set_insert(command_buffer->resource_set, 2, buffers));
+  const iree_hal_buffer_t* buffers[2] = {
+      source_ref.buffer,
+      target_ref.buffer,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, IREE_ARRAYSIZE(buffers), buffers));
 
   iree_hal_cmd_copy_buffer_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(
@@ -681,7 +675,7 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
       /*z=*/1,
   };
   const uint32_t workgroup_count[3] = {
-      /*x=*/iree_device_size_ceil_div(length, workgroup_size[0]),
+      /*x=*/iree_device_size_ceil_div(target_ref.length, workgroup_size[0]),
       /*y=*/1,
       /*z=*/1,
   };
@@ -689,11 +683,8 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
       command_buffer->scope,
       iree_task_make_dispatch_closure(iree_hal_cmd_copy_tile, (void*)cmd),
       workgroup_size, workgroup_count, &cmd->task);
-  cmd->source_buffer = source_buffer;
-  cmd->source_offset = source_offset;
-  cmd->target_buffer = target_buffer;
-  cmd->target_offset = target_offset;
-  cmd->length = length;
+  cmd->source_ref = source_ref;
+  cmd->target_ref = target_ref;
 
   return iree_hal_task_command_buffer_emit_execution_task(command_buffer,
                                                           &cmd->task.header);
@@ -705,9 +696,8 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_task_command_buffer_collective(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
-    iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
+    iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
+    iree_hal_buffer_ref_t recv_ref, iree_device_size_t element_count) {
   // The channel can be used as a vtable if we want to inject collective APIs -
   // the device creation function would set up the channel once and we'll
   // receive it here each time. When interacting with the task system we want to
@@ -764,8 +754,7 @@ static iree_status_t iree_hal_task_command_buffer_push_constants(
 static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings) {
+    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
 
@@ -777,12 +766,12 @@ static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
   iree_host_size_t binding_base =
       set * IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    if (IREE_UNLIKELY(bindings[i].binding >=
+    if (IREE_UNLIKELY(bindings[i].ordinal >=
                       IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "buffer binding index out of bounds");
     }
-    iree_host_size_t binding_ordinal = binding_base + bindings[i].binding;
+    iree_host_size_t binding_ordinal = binding_base + bindings[i].ordinal;
 
     // TODO(benvanik): batch insert by getting the resources in their own list.
     IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
@@ -822,7 +811,7 @@ typedef struct iree_hal_cmd_dispatch_t {
   uint16_t push_constant_count;
 
   // Total number of binding base pointers in |binding_ptrs| and
-  // |binding_lengths|. The set is packed densely based on which binidngs are
+  // |binding_lengths|. The set is packed densely based on which bindings are
   // used (known at compile-time).
   uint16_t binding_count;
 
@@ -998,20 +987,19 @@ static iree_status_t iree_hal_task_command_buffer_dispatch(
 static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_t* workgroups_buffer,
-    iree_device_size_t workgroups_offset) {
+    iree_hal_buffer_ref_t workgroups_ref) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
 
-  const void* resources[2] = {executable, workgroups_buffer};
+  const void* resources[2] = {executable, workgroups_ref.buffer};
   IREE_RETURN_IF_ERROR(
       iree_hal_resource_set_insert(command_buffer->resource_set, 2, resources));
 
   // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
   iree_hal_buffer_mapping_t buffer_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      workgroups_buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-      IREE_HAL_MEMORY_ACCESS_READ, workgroups_offset, 3 * sizeof(uint32_t),
+      workgroups_ref.buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+      IREE_HAL_MEMORY_ACCESS_READ, workgroups_ref.offset, 3 * sizeof(uint32_t),
       &buffer_mapping));
 
   iree_hal_cmd_dispatch_t* cmd = NULL;

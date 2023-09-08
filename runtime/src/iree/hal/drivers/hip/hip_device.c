@@ -774,7 +774,7 @@ static iree_status_t iree_hal_hip_device_queue_execute(
       device->pending_queue_actions,
       iree_hal_hip_device_collect_tracing_context, device->tracing_context,
       wait_semaphore_list, signal_semaphore_list, command_buffer_count,
-      command_buffers);
+      command_buffers, binding_tables);
   if (iree_status_is_ok(status)) {
     // Try to advance the pending workload queue.
     status =

@@ -207,10 +207,14 @@ iree_status_t iree_hal_webgpu_command_buffer_create(
 
   iree_hal_webgpu_command_buffer_t* command_buffer = NULL;
   iree_status_t status = iree_allocator_malloc(
-      host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
+      host_allocator,
+      sizeof(*command_buffer) +
+          iree_hal_command_buffer_validation_state_size(mode, binding_capacity),
+      (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
         device, mode, command_categories, queue_affinity, binding_capacity,
+        (uint8_t*)command_buffer + sizeof(*command_buffer),
         &iree_hal_webgpu_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     command_buffer->device = device_handle;
@@ -562,7 +566,8 @@ static iree_status_t iree_hal_webgpu_command_buffer_wait_events(
 }
 
 static iree_status_t iree_hal_webgpu_command_buffer_discard_buffer(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* buffer) {
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t buffer_ref) {
   // No-op: though maybe it'd be a useful addition to the spec as otherwise
   // false dependencies can creep in.
   return iree_ok_status();
@@ -592,15 +597,15 @@ static uint32_t iree_hal_webgpu_splat_pattern(const void* pattern,
 
 static iree_status_t iree_hal_webgpu_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, const void* pattern,
+    iree_hal_buffer_ref_t target_ref, const void* pattern,
     iree_host_size_t pattern_length) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   iree_hal_webgpu_builtin_fill_buffer_t* builtin =
       &command_buffer->builtins->fill_buffer;
-  target_offset += iree_hal_buffer_byte_offset(target_buffer);
+  iree_device_size_t target_offset =
+      iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
 
   // TODO(scotttodd): change to using what the vulkan emulation does
   uint32_t dword_pattern =
@@ -630,7 +635,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_fill_buffer(
   // buffer is exhausted.
   const uint32_t params_data[] = {
       /*offset=*/target_offset,
-      /*length=*/length,
+      /*length=*/target_ref.length,
       /*pattern=*/dword_pattern,
   };
   uint32_t params_offset = 0;
@@ -657,9 +662,9 @@ static iree_status_t iree_hal_webgpu_command_buffer_fill_buffer(
   const iree_hal_webgpu_bind_group_binding_t buffer_binding = {
       .type = WGPUBufferBindingType_Storage,
       .buffer = iree_hal_webgpu_buffer_handle(
-          iree_hal_buffer_allocated_buffer(target_buffer)),
+          iree_hal_buffer_allocated_buffer(target_ref.buffer)),
       .offset = 0,
-      .length = length,
+      .length = target_ref.length,
   };
   WGPUBindGroup buffer_group = iree_hal_webgpu_bind_group_cache_acquire(
       command_buffer->bind_group_cache, builtin->buffer_group_layout,
@@ -670,15 +675,15 @@ static iree_status_t iree_hal_webgpu_command_buffer_fill_buffer(
 
   // NOTE: this is not the right way to do this - we need to be tiling inside
   // the fill.
-  wgpuComputePassEncoderDispatchWorkgroups(compute_pass, length, 1, 1);
+  wgpuComputePassEncoderDispatchWorkgroups(compute_pass, target_ref.length, 1,
+                                           1);
 
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_webgpu_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
@@ -690,7 +695,8 @@ static iree_status_t iree_hal_webgpu_command_buffer_update_buffer(
   uint8_t* storage_base = NULL;
   iree_hal_webgpu_command_segment_t* segment = NULL;
   iree_status_t status = iree_arena_allocate(
-      &command_buffer->arena, sizeof(*segment) + length, (void**)&storage_base);
+      &command_buffer->arena, sizeof(*segment) + target_ref.length,
+      (void**)&storage_base);
   if (iree_status_is_ok(status)) {
     // Copy the update data into the command buffer so the user can change
     // it immediately after this call returns. This results in a double copy
@@ -707,9 +713,9 @@ static iree_status_t iree_hal_webgpu_command_buffer_update_buffer(
     segment->write_buffer.source_buffer = storage_buffer;
     segment->write_buffer.source_offset = 0;
     segment->write_buffer.target_buffer =
-        iree_hal_webgpu_buffer_handle(target_buffer);
-    segment->write_buffer.target_offset = target_offset;
-    segment->write_buffer.length = length;
+        iree_hal_webgpu_buffer_handle(target_ref.buffer);
+    segment->write_buffer.target_offset = target_ref.offset;
+    segment->write_buffer.length = target_ref.length;
     iree_hal_webgpu_command_segment_list_push_back(&command_buffer->segments,
                                                    segment);
   }
@@ -718,9 +724,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_update_buffer(
 
 static iree_status_t iree_hal_webgpu_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length) {
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
@@ -729,9 +733,9 @@ static iree_status_t iree_hal_webgpu_command_buffer_copy_buffer(
       command_buffer, &command_encoder));
 
   wgpuCommandEncoderCopyBufferToBuffer(
-      command_encoder, iree_hal_webgpu_buffer_handle(source_buffer),
-      source_offset, iree_hal_webgpu_buffer_handle(target_buffer),
-      target_offset, length);
+      command_encoder, iree_hal_webgpu_buffer_handle(source_ref.buffer),
+      source_ref.offset, iree_hal_webgpu_buffer_handle(target_ref.buffer),
+      target_ref.offset, target_ref.length);
 
   return iree_ok_status();
 }
@@ -761,8 +765,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_push_constants(
 static iree_status_t iree_hal_webgpu_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings) {
+    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
@@ -772,7 +775,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_push_descriptor_set(
   iree_hal_webgpu_bind_group_binding_t* group_bindings =
       command_buffer->state.bind_groups[set].bindings;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    uint32_t ordinal = bindings[i].binding;
+    uint32_t ordinal = bindings[i].ordinal;
     if (ordinal >= IREE_HAL_WEBGPU_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
@@ -780,7 +783,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_push_descriptor_set(
           IREE_HAL_WEBGPU_MAX_DESCRIPTOR_SET_BINDING_COUNT);
     }
     iree_hal_webgpu_bind_group_binding_t* group_binding =
-        &group_bindings[bindings[i].binding];
+        &group_bindings[ordinal];
 
     // TODO(benvanik): lookup binding type from layout. We should also be
     // tagging whether it's dynamic here.
@@ -897,8 +900,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch(
 static iree_status_t iree_hal_webgpu_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_t* workgroups_buffer,
-    iree_device_size_t workgroups_offset) {
+    iree_hal_buffer_ref_t workgroups_ref) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
@@ -906,8 +908,8 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch_indirect(
   IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_prepare_dispatch(
       command_buffer, executable, entry_point, &compute_pass));
   wgpuComputePassEncoderDispatchWorkgroupsIndirect(
-      compute_pass, iree_hal_webgpu_buffer_handle(workgroups_buffer),
-      workgroups_offset);
+      compute_pass, iree_hal_webgpu_buffer_handle(workgroups_ref.buffer),
+      workgroups_ref.offset);
 
   return iree_ok_status();
 }

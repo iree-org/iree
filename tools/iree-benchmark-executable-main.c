@@ -206,7 +206,7 @@ typedef struct iree_benchmark_executable_args_t {
   iree_hal_device_t* device;
   iree_hal_executable_t* executable;
   iree_hal_pipeline_layout_t* pipeline_layout;
-  const iree_hal_descriptor_set_binding_t* bindings;
+  const iree_hal_buffer_ref_t* bindings;
   uint32_t workgroup_count[3];
 } iree_benchmark_executable_args_t;
 
@@ -388,7 +388,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
       (iree_string_view_list_t){parsed_params.binding_count,
                                 parsed_params.binding_specs},
       device, device_allocator, host_allocator, &binding_list));
-  iree_hal_descriptor_set_binding_t bindings[IREE_HAL_MAX_TOTAL_BINDING_COUNT];
+  iree_hal_buffer_ref_t bindings[IREE_HAL_MAX_TOTAL_BINDING_COUNT];
   for (iree_host_size_t i = 0; i < parsed_params.binding_count; ++i) {
     iree_vm_ref_t value = iree_vm_ref_null();
     IREE_RETURN_IF_ERROR(iree_vm_list_get_ref_assign(binding_list, i, &value));
@@ -404,13 +404,8 @@ static iree_status_t iree_benchmark_executable_from_flags(
           " is not",
           i);
     }
-    bindings[i] = (iree_hal_descriptor_set_binding_t){
-        .binding = i,
-        .buffer_slot = 0,
-        .buffer = buffer,
-        .offset = 0,
-        .length = IREE_WHOLE_BUFFER,
-    };
+    bindings[i] = iree_hal_make_buffer_ref(buffer, 0, IREE_WHOLE_BUFFER);
+    bindings[i].ordinal = i;
   }
 
   // Setup the specification used to perform the executable load.

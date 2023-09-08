@@ -17,7 +17,8 @@ extern "C" {
 // Returns the size, in bytes, of an inline command buffer.
 // This can be used for arena/stack allocations along with
 // iree_hal_inline_command_buffer_initialize/iree_hal_inline_command_buffer_deinitialize.
-iree_host_size_t iree_hal_inline_command_buffer_size(void);
+iree_host_size_t iree_hal_inline_command_buffer_size(
+    iree_hal_command_buffer_mode_t mode, iree_host_size_t binding_capacity);
 
 // Initializes an inline synchronous one-shot single-threaded command "buffer".
 // This is equivalent to iree_hal_inline_command_buffer_create but uses

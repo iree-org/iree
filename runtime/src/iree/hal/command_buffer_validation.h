@@ -10,6 +10,36 @@
 #include "iree/base/api.h"
 #include "iree/hal/command_buffer.h"
 
+// Requirements for a buffer resource used within a command buffer.
+// Buffers bound to must have all bits set from the included bitfields and
+// support the given min/max byte offsets as in-range.
+typedef struct iree_hal_buffer_binding_requirements_t {
+  iree_hal_buffer_compatibility_t required_compatibility;
+  iree_hal_buffer_usage_t usage;
+  iree_hal_memory_access_t access;
+  iree_hal_memory_type_t type;
+  // Maximum offset in the binding referenced by any command.
+  iree_device_size_t max_byte_offset;
+  // Minimum required alignment by at least one command.
+  iree_device_size_t min_byte_alignment;
+} iree_hal_buffer_binding_requirements_t;
+
+// Storage for command buffer validation state.
+// Designed to be embedded in concrete implementations that want validation.
+typedef struct iree_hal_command_buffer_validation_state_t {
+  iree_hal_device_t* device;
+  // 1 when in a begin/end recording sequence.
+  int32_t is_recording : 1;
+  // Debug group depth for tracking proper begin/end pairing.
+  int32_t debug_group_depth : 31;
+  // TODO(benvanik): current pipeline layout/descriptor set layout info.
+  // TODO(benvanik): valid push constant bit ranges.
+  // Requirements for each binding table entry.
+  // Unused slots in the binding table will have IREE_HAL_BUFFER_USAGE_NONE and
+  // are ignored if set when executed.
+  iree_hal_buffer_binding_requirements_t binding_requirements[0];
+} iree_hal_command_buffer_validation_state_t;
+
 void iree_hal_command_buffer_initialize_validation(
     iree_hal_device_t* device, iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* out_validation_state);
@@ -67,35 +97,31 @@ iree_status_t iree_hal_command_buffer_wait_events_validation(
 iree_status_t iree_hal_command_buffer_discard_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_buffer_t* buffer);
+    iree_hal_buffer_ref_t buffer_ref);
 
 iree_status_t iree_hal_command_buffer_fill_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length, const void* pattern,
+    iree_hal_buffer_ref_t target_ref, const void* pattern,
     iree_host_size_t pattern_length);
 
 iree_status_t iree_hal_command_buffer_update_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     const void* source_buffer, iree_host_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length);
+    iree_hal_buffer_ref_t target_ref);
 
 iree_status_t iree_hal_command_buffer_copy_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
-    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
-    iree_device_size_t length);
+    iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref);
 
 iree_status_t iree_hal_command_buffer_collective_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_channel_t* channel, iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count);
+    iree_hal_buffer_ref_t send_ref, iree_hal_buffer_ref_t recv_ref,
+    iree_device_size_t element_count);
 
 iree_status_t iree_hal_command_buffer_push_constants_validation(
     iree_hal_command_buffer_t* command_buffer,
@@ -107,8 +133,7 @@ iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings);
+    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings);
 
 iree_status_t iree_hal_command_buffer_dispatch_validation(
     iree_hal_command_buffer_t* command_buffer,
@@ -120,6 +145,11 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
+    iree_hal_buffer_ref_t workgroups_ref);
+
+iree_status_t iree_hal_command_buffer_binding_table_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    const iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_binding_table_t binding_table);
 
 #endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_H_

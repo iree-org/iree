@@ -153,6 +153,8 @@ enum iree_hal_memory_access_bits_t {
 };
 typedef uint16_t iree_hal_memory_access_t;
 
+typedef uint32_t iree_hal_buffer_compatibility_t;
+
 // Bitfield that defines how a buffer is intended to be used.
 // Usage allows the driver to appropriately place the buffer for more
 // efficient operations of the specified types. Validation will fail if a buffer

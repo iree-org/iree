@@ -1693,8 +1693,11 @@ void SetupHalBindings(nanobind::module_ m) {
             }
             CheckApiStatus(
                 iree_hal_command_buffer_copy_buffer(
-                    self.raw_ptr(), source_buffer.raw_ptr(), source_offset,
-                    target_buffer.raw_ptr(), target_offset, resolved_length),
+                    self.raw_ptr(),
+                    iree_hal_make_buffer_ref(source_buffer.raw_ptr(),
+                                             source_offset, resolved_length),
+                    iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
+                                             target_offset, resolved_length)),
                 "copy command");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),
@@ -1729,8 +1732,10 @@ void SetupHalBindings(nanobind::module_ m) {
             }
             CheckApiStatus(
                 iree_hal_command_buffer_fill_buffer(
-                    self.raw_ptr(), target_buffer.raw_ptr(), target_offset,
-                    resolved_length, pattern_view.buf, pattern_view.len),
+                    self.raw_ptr(),
+                    iree_hal_make_buffer_ref(target_buffer.raw_ptr(),
+                                             target_offset, resolved_length),
+                    pattern_view.buf, pattern_view.len),
                 "command buffer fill");
             if (end) {
               CheckApiStatus(iree_hal_command_buffer_end(self.raw_ptr()),

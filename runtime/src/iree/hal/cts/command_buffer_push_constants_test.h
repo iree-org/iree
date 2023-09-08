@@ -101,7 +101,7 @@ TEST_P(command_buffer_push_constants_test, DispatchWithPushConstants) {
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, output_params, 4 * sizeof(uint32_t), &output_buffer));
 
-  iree_hal_descriptor_set_binding_t descriptor_set_bindings[] = {
+  iree_hal_buffer_ref_t descriptor_set_bindings[] = {
       {
           /*binding=*/0,
           /*buffer_slot=*/0,

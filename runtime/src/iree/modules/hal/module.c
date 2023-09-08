@@ -768,9 +768,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
   uint32_t pattern = (uint32_t)args->i4;
   uint32_t pattern_length = (uint32_t)args->i5;
 
-  return iree_hal_command_buffer_fill_buffer(command_buffer, target_buffer,
-                                             target_offset, length, &pattern,
-                                             pattern_length);
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(target_buffer, target_offset, length);
+  return iree_hal_command_buffer_fill_buffer(command_buffer, target_ref,
+                                             &pattern, pattern_length);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer,  //
@@ -787,9 +788,12 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer,  //
   iree_device_size_t target_offset = iree_hal_cast_device_size(args->i4);
   iree_device_size_t length = iree_hal_cast_device_size(args->i5);
 
-  return iree_hal_command_buffer_copy_buffer(command_buffer, source_buffer,
-                                             source_offset, target_buffer,
-                                             target_offset, length);
+  iree_hal_buffer_ref_t source_ref =
+      iree_hal_make_buffer_ref(source_buffer, source_offset, length);
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(target_buffer, target_offset, length);
+  return iree_hal_command_buffer_copy_buffer(command_buffer, source_ref,
+                                             target_ref);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_collective,  //
@@ -802,25 +806,20 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_collective,  //
   IREE_RETURN_IF_ERROR(iree_hal_channel_check_deref(args->r1, &channel));
   iree_hal_collective_op_t op = {.packed = args->i2};
   uint32_t param = args->i3;
-  iree_hal_buffer_binding_t send_binding = {
-      .buffer = NULL,
-      .offset = iree_hal_cast_device_size(args->i5),
-      .length = iree_hal_cast_device_size(args->i6),
-  };
+  iree_hal_buffer_ref_t send_ref =
+      iree_hal_make_buffer_ref(NULL, iree_hal_cast_device_size(args->i5),
+                               iree_hal_cast_device_size(args->i6));
   IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_check_deref_or_null(args->r4, &send_binding.buffer));
-  iree_hal_buffer_binding_t recv_binding = {
-      .buffer = NULL,
-      .offset = iree_hal_cast_device_size(args->i8),
-      .length = iree_hal_cast_device_size(args->i9),
-  };
+      iree_hal_buffer_check_deref_or_null(args->r4, &send_ref.buffer));
+  iree_hal_buffer_ref_t recv_ref =
+      iree_hal_make_buffer_ref(NULL, iree_hal_cast_device_size(args->i8),
+                               iree_hal_cast_device_size(args->i9));
   IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_check_deref_or_null(args->r7, &recv_binding.buffer));
+      iree_hal_buffer_check_deref_or_null(args->r7, &recv_ref.buffer));
   iree_device_size_t element_count = iree_hal_cast_device_size(args->i10);
 
   return iree_hal_command_buffer_collective(command_buffer, channel, op, param,
-                                            send_binding, recv_binding,
-                                            element_count);
+                                            send_ref, recv_ref, element_count);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_constants,  //
@@ -859,11 +858,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
         IREE_STATUS_OUT_OF_RANGE, "binding count %" PRIhsz " > %" PRIhsz,
         binding_count, IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
   }
-  iree_hal_descriptor_set_binding_t* bindings =
-      (iree_hal_descriptor_set_binding_t*)iree_alloca(
-          binding_count * sizeof(iree_hal_descriptor_set_binding_t));
+  iree_hal_buffer_ref_t* bindings = (iree_hal_buffer_ref_t*)iree_alloca(
+      binding_count * sizeof(iree_hal_buffer_ref_t));
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    bindings[i].binding = (uint32_t)args->a3[i].i0;
+    bindings[i].ordinal = (uint32_t)args->a3[i].i0;
     bindings[i].buffer_slot = (uint32_t)args->a3[i].i1;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref_or_null(
         args->a3[i].r2, &bindings[i].buffer));
@@ -907,9 +905,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
       iree_hal_buffer_check_deref(args->r3, &workgroups_buffer));
   iree_device_size_t workgroups_offset = iree_hal_cast_device_size(args->i4);
 
-  return iree_hal_command_buffer_dispatch_indirect(
-      command_buffer, executable, entry_point, workgroups_buffer,
-      workgroups_offset);
+  iree_hal_buffer_ref_t workgroups_ref = iree_hal_make_buffer_ref(
+      workgroups_buffer, workgroups_offset, 3 * sizeof(uint32_t));
+  return iree_hal_command_buffer_dispatch_indirect(command_buffer, executable,
+                                                   entry_point, workgroups_ref);
 }
 
 //===----------------------------------------------------------------------===//

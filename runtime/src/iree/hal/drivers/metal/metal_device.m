@@ -247,9 +247,13 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
     iree_host_size_t binding_capacity, iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
 
-  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT))
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "multi-shot command buffer not yet supported");
+  } else if (binding_capacity > 0) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "indirect command buffers not yet supported");
+  }
 
   return iree_hal_metal_direct_command_buffer_create(
       base_device, mode, command_categories, binding_capacity,
