@@ -90,35 +90,21 @@ builtin.module {
 // -----
 
 #map = affine_map<(d0) -> (d0)>
-#map1 = affine_map<(d0) -> ()>
-#map2 = affine_map<(d0, d1) -> (d0, d1)>
-#map3 = affine_map<(d0, d1) -> ()>
 module {
   func.func @already_bufferized() {
     %c5120 = arith.constant 5120 : index
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %cst_0 = arith.constant 1.000000e+00 : f32
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c5120) : memref<1001xf32, strided<[1], offset: 1280>, #hal.descriptor_type<storage_buffer>>
-    memref.assume_alignment %0, 64 : memref<1001xf32, strided<[1], offset: 1280>, #hal.descriptor_type<storage_buffer>>
-    %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c5120) : memref<1x1001xf32, strided<[1001, 1], offset: 1280>, #hal.descriptor_type<storage_buffer>>
-    memref.assume_alignment %1, 64 : memref<1x1001xf32, strided<[1001, 1], offset: 1280>, #hal.descriptor_type<storage_buffer>>
-    %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1x1001xf32, #hal.descriptor_type<storage_buffer>>
-    memref.assume_alignment %2, 64 : memref<1x1001xf32, #hal.descriptor_type<storage_buffer>>
-    %alloc = memref.alloc() : memref<f32>
-    linalg.fill ins(%cst : f32) outs(%alloc : memref<f32>)
-    linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["reduction"]} ins(%0 : memref<1001xf32, strided<[1], offset: 1280>, #hal.descriptor_type<storage_buffer>>) outs(%alloc : memref<f32>) {
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<1001xf32, #hal.descriptor_type<storage_buffer>>
+    memref.assume_alignment %0, 64 : memref<1001xf32, #hal.descriptor_type<storage_buffer>>
+    %alloc = memref.alloc() : memref<1001xf32>
+    linalg.fill ins(%cst : f32) outs(%alloc : memref<1001xf32>)
+    linalg.generic {indexing_maps = [#map, #map], iterator_types = ["reduction"]} ins(%alloc : memref<1001xf32>) outs(%0 : memref<1001xf32, #hal.descriptor_type<storage_buffer>>) {
     ^bb0(%in: f32, %out: f32):
-      %3 = arith.addf %in, %out : f32
-      linalg.yield %3 : f32
+      linalg.yield %in : f32
     }
-    linalg.generic {indexing_maps = [#map2, #map3, #map2], iterator_types = ["parallel", "parallel"]} ins(%1, %alloc : memref<1x1001xf32, strided<[1001, 1], offset: 1280>, #hal.descriptor_type<storage_buffer>>, memref<f32>) outs(%2 : memref<1x1001xf32, #hal.descriptor_type<storage_buffer>>) {
-    ^bb0(%in: f32, %in_1: f32, %out: f32):
-      %3 = arith.divf %cst_0, %in_1 : f32
-      %4 = arith.mulf %in, %3 : f32
-      linalg.yield %4 : f32
-    }
-    memref.dealloc %alloc : memref<f32>
+    memref.dealloc %alloc : memref<1001xf32>
     return
   }
 }
