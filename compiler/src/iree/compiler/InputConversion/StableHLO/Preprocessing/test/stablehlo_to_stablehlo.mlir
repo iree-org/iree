@@ -473,4 +473,3 @@ func.func @concat_remove_zero_extents(%arg0: tensor<2x3xi32>, %arg1 : tensor<2x3
   // CHECK: [[R0:%.+]] = stablehlo.concatenate  %[[ARG0]], %[[ARG1]], dim = 1 : (tensor<2x3xi32>, tensor<2x3xi32>) -> tensor<2x6xi32>
   return %0 : tensor<2x6xi32>
 }
-
