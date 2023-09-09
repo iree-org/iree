@@ -491,9 +491,8 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   if (!strategy.alignedLhs()) {
     MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
     SmallVector<bool> scalableSizes(lhsCopyMapping.tileSizes.size(), false);
-    b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
-                                           scalableSizes,
-                                           lhsCopyMapping.tileSizes);
+    b.create<transform::MaskedVectorizeOp>(
+        lhsCopyOpH, ValueRange(), scalableSizes, lhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRhs()) {
     MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
@@ -505,9 +504,8 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   if (!strategy.alignedRes()) {
     MappingInfo resCopyMapping = strategy.resCopyMapping();
     SmallVector<bool> scalableSizes(resCopyMapping.tileSizes.size(), false);
-    b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
-                                           scalableSizes,
-                                           resCopyMapping.tileSizes);
+    b.create<transform::MaskedVectorizeOp>(
+        copyBackOpH, ValueRange(), scalableSizes, resCopyMapping.tileSizes);
   }
 
   // Lower all masked vector transfers at this point, as they make
