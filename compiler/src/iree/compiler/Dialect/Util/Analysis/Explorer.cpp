@@ -504,9 +504,8 @@ TraversalResult Explorer::walkIncomingBranchOperands(
       SmallVector<RegionSuccessor, 2> entrySuccessors;
       regionOp.getSuccessorRegions(/*index=*/std::nullopt, entrySuccessors);
       for (auto &entrySuccessor : entrySuccessors) {
-        if (fn(regionOp->getBlock(),
-               regionOp.getEntrySuccessorOperands(
-                   entrySuccessor.getSuccessor()->getRegionNumber()))
+        if (fn(regionOp->getBlock(), regionOp.getEntrySuccessorOperands(
+                                         entrySuccessor.getSuccessor()))
                 .wasInterrupted()) {
           break;
         }
