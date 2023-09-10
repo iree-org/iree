@@ -39,6 +39,13 @@ def CleanupBufferAllocView :
   let constructor = "mlir::iree_compiler::createCleanupBufferAllocViewPass()";
 }
 
+def CollapseElementwiseOpDims :
+    Pass<"iree-codegen-collapse-elementwise-op-dims", "func::FuncOp"> {
+  let summary =
+      "TODO";
+  let constructor = "mlir::iree_compiler::createCollapseElementwiseOpDimsPass()";
+}
+
 def ConcretizePadResultShape :
     Pass<"iree-codegen-concretize-pad-result-shape", "func::FuncOp"> {
   let summary =

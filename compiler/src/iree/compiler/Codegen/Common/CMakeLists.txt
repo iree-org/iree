@@ -124,6 +124,7 @@ iree_cc_library(
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"
+    "CollapseElementwiseOpDims.cpp"
     "ConcretizePadResultShape.cpp"
     "ConvertBf16ArithToF32.cpp"
     "ConvertBf16ToUInt16Buffers.cpp"

@@ -372,9 +372,12 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
                                           TilingConfig &tilingConfig,
                                           bool enableVectorMasking) {
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createCollapseElementwiseOpDimsPass());
+
   addTileAndDistributePasses(passManager);
 
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
       tilingConfig.getVectorCommonParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -448,9 +451,11 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
 void addMultiTilingExpertPassPipeline(
     OpPassManager &passManager, TilingConfig &tilingConfig, bool enablePeeling,
     bool enableVectorMasking, bool lowerToAVX2, bool enableAArch64SSVE) {
-  addTileAndDistributePasses(passManager);
-
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createCollapseElementwiseOpDimsPass());
+
+  addTileAndDistributePasses(passManager);
 
   SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
   // Apply tile and fuse to all the non-distribution fusable levels. Skip
@@ -531,9 +536,12 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
                                                TilingConfig &tilingConfig,
                                                bool enableVectorMasking,
                                                bool enableAArch64SSVE) {
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createCollapseElementwiseOpDimsPass());
+
   addTileAndDistributePasses(passManager);
 
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   // Run LLVMTileAndFuse firstly in case that we have fill + conv + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
   // get tiled if the case is conv + generic op. In this case, we have to tile

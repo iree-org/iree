@@ -59,6 +59,10 @@ createBufferizeCopyOnlyDispatchesPass();
 /// allocations and view operations.
 std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 
+/// TODO.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createCollapseElementwiseOpDimsPass();
+
 /// Concretizes tensor.pad op's result shape if its source op implements
 /// OffsetSizeAndStrideOpInterface. For example, pad(extract_slice).
 std::unique_ptr<OperationPass<func::FuncOp>>
