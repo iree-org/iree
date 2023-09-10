@@ -1276,8 +1276,8 @@ void AsyncUpdateOp::getAsyncAccessRanges(
 LogicalResult AsyncCopyOp::verify() {
   AsyncCopyOp op = *this;
   // TODO(ezhulenev): We should reject copy operations when we know that buffers
-  // overlap. This will be verified at runtime by command buffer validation, but
-  // it would be better to reject invalid IR early.
+  // overlap. This will be verified at run time by command buffer validation,
+  // but it would be better to reject invalid IR early.
   if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
       failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
