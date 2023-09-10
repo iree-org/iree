@@ -72,7 +72,7 @@ static bool isSafeToElideCOW(Value operand, IREE::Stream::ResourceType type) {
 
 // Materializes a copy for a mutated |operand| on |affinity| if required.
 // If it's determined that eliding the copy is safe it will be omitted.
-// Returns a copy operation result if the copy was required and materialized,
+// Returns a clone operation result if the copy was required and materialized,
 // and nullptr otherwise.
 static Value materializeOperandCOW(Location loc, OpOperand &operand,
                                    IREE::Stream::AffinityAttr affinity,
