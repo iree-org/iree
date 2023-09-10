@@ -196,4 +196,35 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    softmax_benchmark
+  SRCS
+    "softmax_benchmark.c"
+  DEPS
+    ::benchmark
+    ::util
+    iree::base
+    iree::base::internal::flags
+    iree::builtins::ukernel
+    iree::builtins::ukernel::internal_headers
+    iree::testing::benchmark
+  TESTONLY
+)
+
+iree_cc_test(
+  NAME
+    softmax_test
+  SRCS
+    "softmax_test.c"
+  DEPS
+    ::test
+    ::util
+    iree::base
+    iree::base::internal
+    iree::base::internal::flags
+    iree::builtins::ukernel
+    iree::builtins::ukernel::internal_headers
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

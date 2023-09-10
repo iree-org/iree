@@ -9,6 +9,20 @@
 
 #include "iree/builtins/ukernel/softmax.h"
 
+typedef enum iree_uk_softmax_type_t {
+    iree_uk_softmax_type_f32 = IREE_UK_TYPE_FLOAT_32,
+} iree_uk_softmax_type_t;
+
+static inline iree_uk_softmax_type_t iree_uk_softmax_type(
+        iree_uk_int32_t flags) {
+    switch (flags & IREE_UK_FLAG_SOFTMAX_TYPE_MASK) {
+        case IREE_UK_FLAG_SOFTMAX_TYPE_F32:
+            return iree_uk_softmax_type_f32;
+        default:
+            IREE_UK_ASSUME_UNREACHABLE;
+    }
+}
+
 typedef void (*iree_uk_softmax_tile_func_t)(
     const void* IREE_UK_RESTRICT src_buffer,
     void* IREE_UK_RESTRICT out_buffer,

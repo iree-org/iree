@@ -174,3 +174,31 @@ cc_binary_benchmark(
         "//runtime/src/iree/testing:benchmark",
     ],
 )
+
+cc_binary_benchmark(
+    name = "softmax_benchmark",
+    srcs = ["softmax_benchmark.c"],
+    deps = [
+        ":benchmark",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
+        "//runtime/src/iree/testing:benchmark",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "softmax_test",
+    srcs = ["softmax_test.c"],
+    deps = [
+        ":test",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
+    ],
+)

@@ -18,6 +18,9 @@ bool iree_uk_2d_buffers_equal(const void* buf1, const void* buf2,
                               iree_uk_type_t type, iree_uk_index_t size0,
                               iree_uk_index_t size1, iree_uk_index_t stride0);
 
+bool iree_uk_buffers_equal_f32(const float* buf1, const float* buf2,
+                               iree_uk_index_t size, float relative_error);
+
 // Simple deterministic pseudorandom generator. Same as C++'s std::minstd_rand.
 typedef struct iree_uk_random_engine_t {
   iree_uk_uint32_t state;
