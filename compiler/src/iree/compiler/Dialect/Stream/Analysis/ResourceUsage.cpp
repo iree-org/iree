@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Stream/Analysis/ResourceUsage.h"
-#include <iree/compiler/Dialect/Stream/IR/StreamTypes.h>
 
 #include <utility>
 
