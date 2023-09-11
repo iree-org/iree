@@ -29,6 +29,9 @@ iree_cc_library(
     ::TorchDialectGen
     ::TorchDialectTypesGen
     ::TorchDialectUtils
+    MLIRBytecodeOpInterface
+    MLIRBytecodeReader
+    MLIRBytecodeWriter
     MLIRFuncDialect
     MLIRIR
     MLIRSupport
