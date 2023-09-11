@@ -1,0 +1,114 @@
+// Copyright 2023 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/compiler/Reducer/iree_reduce_lib.h"
+#include "iree/compiler/tool_entry_points_api.h"
+
+#include "iree/compiler/Tools/init_dialects.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/Process.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Debug/Counter.h"
+#include "mlir/IR/AsmState.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Tools/ParseUtilities.h"
+
+using namespace mlir;
+using namespace llvm;
+using namespace mlir::iree_compiler;
+
+llvm::cl::OptionCategory ireeReduceCategory("iree-reduce options");
+
+// Parse and verify the input MLIR file. Returns null on error.
+OwningOpRef<Operation *> loadModule(MLIRContext &context,
+                                    StringRef inputFilename,
+                                    bool insertImplictModule) {
+  // Set up the input file.
+  std::string errorMessage;
+  auto file = openInputFile(inputFilename, &errorMessage);
+  if (!file) {
+    llvm::errs() << errorMessage << "\n";
+    return nullptr;
+  }
+
+  auto sourceMgr = std::make_shared<llvm::SourceMgr>();
+  sourceMgr->AddNewSourceBuffer(std::move(file), SMLoc());
+  return parseSourceFileForTool(sourceMgr, &context, insertImplictModule);
+}
+
+static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
+                                          MLIRContext &registry) {
+
+  static llvm::cl::opt<std::string> testScript(cl::Positional, cl::Required,
+                                               cl::desc("<test script>"),
+                                               cl::cat(ireeReduceCategory));
+
+  static cl::opt<std::string> inputFilename(
+      cl::Positional, cl::desc("<input file>"), cl::init("-"),
+      llvm::cl::cat(ireeReduceCategory));
+
+  static cl::opt<std::string> outputFilename(
+      "o", cl::desc("Output filename for the reduced test case."),
+      cl::value_desc("filename"), cl::init("-"),
+      llvm::cl::cat(ireeReduceCategory));
+
+  llvm::cl::HideUnrelatedOptions(ireeReduceCategory);
+
+  InitLLVM y(argc, argv);
+
+  llvm::cl::ParseCommandLineOptions(argc, argv,
+                                    "IREE test case reduction tool.\n");
+
+  // When reading from stdin and the input is a tty, it is often a user mistake
+  // and the process "appears to be stuck". Print a message to let the user know
+  // about it!
+  if (inputFilename == "-" &&
+      sys::Process::FileDescriptorIsDisplayed(fileno(stdin)))
+    llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to "
+                    "interrupt)\n";
+
+  OwningOpRef<Operation *> module = loadModule(registry, inputFilename, true);
+
+  std::string errorMessage;
+  auto output = openOutputFile(outputFilename, &errorMessage);
+  if (!output) {
+    llvm::errs() << errorMessage << "\n";
+    return failure();
+  }
+
+  Operation *newModule =
+      ireeRunReducingStrategies(std::move(module), testScript);
+  module = OwningOpRef<Operation *>(newModule);
+
+  // Print module to output file.
+  module->print(output->os());
+
+  // Keep the output file if the invocation of MlirOptMain was successful.
+  output->keep();
+  return success();
+}
+
+int ireeReduceRunMain(int argc, char **argv) {
+  llvm::setBugReportMsg(
+      "Please report issues to https://github.com/openxla/iree/issues and "
+      "include the crash backtrace.\n");
+
+  mlir::DialectRegistry registry;
+  mlir::iree_compiler::registerAllDialects(registry);
+
+  MLIRContext context(registry);
+
+  if (ireeReduceMainFromCL(argc, argv, context).failed()) {
+    return 1;
+  }
+
+  return 0;
+}

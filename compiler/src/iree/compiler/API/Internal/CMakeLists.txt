@@ -88,6 +88,22 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    IREEReduceToolEntryPoint
+  SRCS
+    "IREEReduceToolEntryPoint.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    iree::compiler::Reducer::iree_reduce_lib
+    iree::compiler::Tools::init_passes_and_dialects
+    iree::compiler::bindings::c::headers
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 set(_lld_copts)
