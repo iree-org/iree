@@ -96,6 +96,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRParser
     MLIRPass
     MLIRSupport
     iree::compiler::Reducer::iree_reduce_lib
