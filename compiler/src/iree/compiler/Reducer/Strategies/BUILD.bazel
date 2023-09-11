@@ -15,12 +15,12 @@ package(
 iree_compiler_cc_library(
     name = "DeltaStrategies",
     srcs = [
-      "ReduceFlowDispatchOperandToResult.cpp",
-      "ReduceFlowDispatchResultBySplat.cpp",
-      "ReduceLinalgOnTensorsDelta.cpp",
+        "ReduceFlowDispatchOperandToResult.cpp",
+        "ReduceFlowDispatchResultBySplat.cpp",
+        "ReduceLinalgOnTensorsDelta.cpp",
     ],
     hdrs = [
-      "DeltaStrategies.h",
+        "DeltaStrategies.h",
     ],
     deps = [
         "//compiler/bindings/c:headers",

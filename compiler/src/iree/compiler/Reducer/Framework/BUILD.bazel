@@ -21,10 +21,10 @@ iree_compiler_cc_library(
         "WorkItem.cpp",
     ],
     hdrs = [
-      "ChunkManager.h",
-      "Delta.h",
-      "Oracle.h",
-      "WorkItem.h",
+        "ChunkManager.h",
+        "Delta.h",
+        "Oracle.h",
+        "WorkItem.h",
     ],
     deps = [
         "//compiler/bindings/c:headers",
