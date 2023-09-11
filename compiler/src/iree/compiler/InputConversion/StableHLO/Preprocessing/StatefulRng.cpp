@@ -106,7 +106,7 @@ public:
       out = b.create<::mlir::chlo::BroadcastMulOp>(out, range, nullptr);
       out = b.create<::mlir::chlo::BroadcastAddOp>(out, op.getA(), nullptr);
     }
-    b.create<ml_program::GlobalStoreOp>(symbol, rngOp.getOutputState());
+    // b.create<ml_program::GlobalStoreOp>(symbol, rngOp.getOutputState());
 
     rewriter.replaceOp(op, out);
     return success();
