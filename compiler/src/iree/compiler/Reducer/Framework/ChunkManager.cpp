@@ -11,11 +11,11 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 
 bool Chunk::contains(unsigned index) const {
-  return index >= begin && index < end;
+  return index >= begin && index < getEnd();
 }
 
 bool mlir::iree_compiler::operator==(const Chunk &C1, const Chunk &C2) {
-  return C1.begin == C2.begin && C1.end == C2.end;
+  return C1.getBegin() == C2.getBegin() && C1.getEnd() == C2.getEnd();
 }
 
 bool mlir::iree_compiler::operator!=(const Chunk &C1, const Chunk &C2) {
@@ -23,7 +23,8 @@ bool mlir::iree_compiler::operator!=(const Chunk &C1, const Chunk &C2) {
 }
 
 bool mlir::iree_compiler::operator<(const Chunk &C1, const Chunk &C2) {
-  return std::tie(C1.begin, C1.end) < std::tie(C2.begin, C2.end);
+  return std::make_pair(C1.getBegin(), C1.getEnd()) <
+         std::make_pair(C2.getBegin(), C2.getEnd());
 }
 
 void Chunk::print(raw_ostream &os) const {

@@ -25,10 +25,6 @@ public:
 
   bool contains(unsigned index) const;
 
-  friend bool operator==(const Chunk &C1, const Chunk &C2);
-  friend bool operator!=(const Chunk &C1, const Chunk &C2);
-  friend bool operator<(const Chunk &C1, const Chunk &C2);
-
   void print(raw_ostream &os) const;
   void dump() const;
 
@@ -36,6 +32,10 @@ private:
   unsigned begin;
   unsigned end;
 };
+
+bool operator==(const Chunk &C1, const Chunk &C2);
+bool operator!=(const Chunk &C1, const Chunk &C2);
+bool operator<(const Chunk &C1, const Chunk &C2);
 
 /// Interface for a delta pass to query into chunks.
 class ChunkManager {
