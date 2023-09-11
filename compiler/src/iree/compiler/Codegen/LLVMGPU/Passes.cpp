@@ -471,6 +471,7 @@ void addGPUDefaultPassPipeline(OpPassManager &pm) {
 static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
   pm.addPass(createExtractAddressComputationGPUPass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  pm.addPass(memref::createFoldMemRefAliasOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   // Hoist loop invariant variables to give decompose affine pass the right loop
   // dependencies.
@@ -546,8 +547,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
-  pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(memref::createFoldMemRefAliasOpsPass());
+  pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createEmulateNarrowTypePass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
