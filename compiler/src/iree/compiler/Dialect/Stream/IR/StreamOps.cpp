@@ -1275,13 +1275,9 @@ void AsyncUpdateOp::getAsyncAccessRanges(
 
 LogicalResult AsyncCopyOp::verify() {
   AsyncCopyOp op = *this;
-  if (op.getSource() == op.getTarget()) {
-    // If we want to perform memmove-like operations where it's safe to copy
-    // overlapping ranges we'll need to emit some runtime checks. We can in
-    // many cases statically detect a lack of overlap just based on symbolic
-    // offset equality but that requires some analysis we don't have yet.
-    return op.emitOpError() << "cannot copy within the same resource (yet)";
-  }
+  // TODO(ezhulenev): We should reject copy operations when we know that buffers
+  // overlap. This will be verified at run time by command buffer validation,
+  // but it would be better to reject invalid IR early.
   if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
       failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
