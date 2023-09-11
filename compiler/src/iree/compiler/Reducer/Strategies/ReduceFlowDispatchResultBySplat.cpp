@@ -20,8 +20,8 @@
 using namespace mlir;
 using namespace mlir::iree_compiler;
 
-static void extractFlowDispatchInModule(ChunkManager &chunker,
-                                        WorkItem &workItem) {
+void mlir::iree_compiler::reduceFlowDispatchResultBySplatDelta(
+    ChunkManager &chunker, WorkItem &workItem) {
   ModuleOp module = workItem.getModule();
 
   // Create a list of dispatch ops we want to replace.
@@ -80,10 +80,4 @@ static void extractFlowDispatchInModule(ChunkManager &chunker,
     // Erase the dispatch.
     dispatch.erase();
   }
-}
-
-void mlir::iree_compiler::reduceFlowDispatchResultBySplatDelta(
-    Oracle &oracle, WorkItem &workItem) {
-  runDeltaPass(oracle, workItem, extractFlowDispatchInModule,
-               "Reducing Flow Results with splats");
 }

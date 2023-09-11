@@ -19,8 +19,8 @@
 using namespace mlir;
 using namespace mlir::iree_compiler;
 
-static void extractFlowDispatchInModule(ChunkManager &chunker,
-                                        WorkItem &workItem) {
+void mlir::iree_compiler::reduceFlowDispatchOperandToResultDelta(
+    ChunkManager &chunker, WorkItem &workItem) {
   ModuleOp module = workItem.getModule();
 
   // Create an result to operand map.
@@ -55,10 +55,4 @@ static void extractFlowDispatchInModule(ChunkManager &chunker,
   if (failed(pm.run(module))) {
     return;
   }
-}
-
-void mlir::iree_compiler::reduceFlowDispatchOperandToResultDelta(
-    Oracle &oracle, WorkItem &workItem) {
-  runDeltaPass(oracle, workItem, extractFlowDispatchInModule,
-               "Reducing Flow Results with its Operands");
 }

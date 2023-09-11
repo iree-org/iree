@@ -12,9 +12,11 @@
 namespace mlir {
 namespace iree_compiler {
 
-void reduceLinalgOnTensorsDelta(Oracle &oracle, WorkItem &workItem);
-void reduceFlowDispatchOperandToResultDelta(Oracle &oracle, WorkItem &workItem);
-void reduceFlowDispatchResultBySplatDelta(Oracle &oracle, WorkItem &workItem);
+void reduceLinalgOnTensorsDelta(ChunkManager &chunker, WorkItem &workItem);
+void reduceFlowDispatchOperandToResultDelta(ChunkManager &chunker,
+                                            WorkItem &workItem);
+void reduceFlowDispatchResultBySplatDelta(ChunkManager &chunker,
+                                          WorkItem &workItem);
 
 } // namespace iree_compiler
 } // namespace mlir

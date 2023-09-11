@@ -18,8 +18,8 @@
 using namespace mlir;
 using namespace mlir::iree_compiler;
 
-static void extractLinalgOpsInModule(ChunkManager &chunker,
-                                     WorkItem &workItem) {
+void mlir::iree_compiler::reduceLinalgOnTensorsDelta(ChunkManager &chunker,
+                                                     WorkItem &workItem) {
   ModuleOp module = workItem.getModule();
 
   SmallVector<linalg::LinalgOp> linalgOps;
@@ -105,10 +105,4 @@ static void extractLinalgOpsInModule(ChunkManager &chunker,
   pm.addPass(createCSEPass());
   if (failed(pm.run(module)))
     return;
-}
-
-void mlir::iree_compiler::reduceLinalgOnTensorsDelta(Oracle &oracle,
-                                                     WorkItem &workItem) {
-  runDeltaPass(oracle, workItem, extractLinalgOpsInModule,
-               "Reducing Linalg ops");
 }

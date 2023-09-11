@@ -23,9 +23,12 @@ mlir::iree_compiler::ireeRunReducingStrategies(OwningOpRef<Operation *> module,
   WorkItem workItem(root);
   Oracle oracle(testScript);
 
-  reduceFlowDispatchOperandToResultDelta(oracle, workItem);
-  reduceFlowDispatchResultBySplatDelta(oracle, workItem);
-  reduceLinalgOnTensorsDelta(oracle, workItem);
+  runDeltaPass(oracle, workItem, reduceFlowDispatchOperandToResultDelta,
+               "Dispatch operand to result delta");
+  runDeltaPass(oracle, workItem, reduceFlowDispatchResultBySplatDelta,
+               "Dispatch result to splat delta");
+  runDeltaPass(oracle, workItem, reduceLinalgOnTensorsDelta,
+               "Linalg on tensors delta");
 
   return workItem.getModule();
 }
