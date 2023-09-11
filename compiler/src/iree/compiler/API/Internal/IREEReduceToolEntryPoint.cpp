@@ -18,7 +18,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Tools/ParseUtilities.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -27,9 +26,8 @@ using namespace mlir::iree_compiler;
 llvm::cl::OptionCategory ireeReduceCategory("iree-reduce options");
 
 // Parse and verify the input MLIR file. Returns null on error.
-OwningOpRef<Operation *> loadModule(MLIRContext &context,
-                                    StringRef inputFilename,
-                                    bool insertImplictModule) {
+static OwningOpRef<Operation *> loadModule(MLIRContext &context,
+                                           StringRef inputFilename) {
   // Set up the input file.
   std::string errorMessage;
   auto file = openInputFile(inputFilename, &errorMessage);
@@ -40,7 +38,7 @@ OwningOpRef<Operation *> loadModule(MLIRContext &context,
 
   auto sourceMgr = std::make_shared<llvm::SourceMgr>();
   sourceMgr->AddNewSourceBuffer(std::move(file), SMLoc());
-  return parseSourceFileForTool(sourceMgr, &context, insertImplictModule);
+  return parseSourceFile<ModuleOp>(sourceMgr, &context);
 }
 
 static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
@@ -74,7 +72,7 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
     llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to "
                     "interrupt)\n";
 
-  OwningOpRef<Operation *> module = loadModule(registry, inputFilename, true);
+  OwningOpRef<Operation *> module = loadModule(registry, inputFilename);
 
   std::string errorMessage;
   auto output = openOutputFile(outputFilename, &errorMessage);
