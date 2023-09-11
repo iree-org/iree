@@ -48,10 +48,15 @@ tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options);
 
-/// Populate IREE patterns related to resolving
-/// `memref.extract_strided_metadata`.
+/// Populates patterns for expanding memref operations that modify the metadata
+/// (sizes, offset, strides) of a memref into easier to analyze constructs.
+void populateIREEExpandExtractStridedMetadataPatterns(
+    RewritePatternSet &patterns);
+
+/// Populates patterns for resolving `memref.extract_strided_metadata` into
+/// `memref.extract_strided_metadata` of its source.
 void populateIREEResolveExtractStridedMetadataPatterns(
-    MLIRContext *context, RewritePatternSet &patterns);
+    RewritePatternSet &patterns);
 
 } // namespace iree_compiler
 } // namespace mlir

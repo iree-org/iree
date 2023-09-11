@@ -244,10 +244,10 @@ void populateIREEExpandExtractStridedMetadataPatterns(
 }
 
 void populateIREEResolveExtractStridedMetadataPatterns(
-    MLIRContext *context, RewritePatternSet &patterns) {
+    RewritePatternSet &patterns) {
   memref::populateResolveExtractStridedMetadataPatterns(patterns);
   patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
-      context);
+      patterns.getContext());
 }
 
 void IREEExpandStridedMetadataPass::runOnOperation() {

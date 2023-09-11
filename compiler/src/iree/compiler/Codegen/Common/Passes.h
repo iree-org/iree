@@ -260,16 +260,6 @@ void populateConcretizePadResultShapePatterns(
 void populateFoldAffineMinInDistributedLoopsPatterns(
     RewritePatternSet &patterns, ArrayRef<int64_t> staticNumWorkgroup = {});
 
-/// Populates patterns for expanding memref operations that modify the metadata
-/// (sizes, offset, strides) of a memref into easier to analyze constructs.
-void populateIREEExpandExtractStridedMetadataPatterns(
-    RewritePatternSet &patterns);
-
-/// Populates patterns for resolving `memref.extract_strided_metadata` into
-/// `memref.extract_strided_metadata` of its source.
-void populateIREEResolveExtractStridedMetadataPatterns(
-    RewritePatternSet &patterns);
-
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on
 /// static-sized subviews. To match, output shape must be 1x1xWoxCo, where Co
