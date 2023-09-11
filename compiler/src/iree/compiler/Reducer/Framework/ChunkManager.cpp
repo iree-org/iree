@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Reducer/ChunkManager.h"
+#include "iree/compiler/Reducer/Framework/ChunkManager.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;

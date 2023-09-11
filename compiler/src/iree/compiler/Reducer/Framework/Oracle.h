@@ -7,8 +7,8 @@
 #ifndef IREE_COMPILER_REDUCER_ORACLE_H
 #define IREE_COMPILER_REDUCER_ORACLE_H
 
-#include "iree/compiler/Reducer/ChunkManager.h"
-#include "iree/compiler/Reducer/WorkItem.h"
+#include "iree/compiler/Reducer/Framework/ChunkManager.h"
+#include "iree/compiler/Reducer/Framework/WorkItem.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {

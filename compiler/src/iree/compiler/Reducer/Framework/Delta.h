@@ -7,9 +7,9 @@
 #ifndef IREE_COMPILER_REDUCER_DELTA_H
 #define IREE_COMPILER_REDUCER_DELTA_H
 
-#include "iree/compiler/Reducer/ChunkManager.h"
-#include "iree/compiler/Reducer/Oracle.h"
-#include "iree/compiler/Reducer/WorkItem.h"
+#include "iree/compiler/Reducer/Framework/ChunkManager.h"
+#include "iree/compiler/Reducer/Framework/Oracle.h"
+#include "iree/compiler/Reducer/Framework/WorkItem.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {

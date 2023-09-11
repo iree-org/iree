@@ -6,7 +6,7 @@
 
 #include <random>
 
-#include "iree/compiler/Reducer/DeltaStratergies.h"
+#include "iree/compiler/Reducer/Strategies/DeltaStrategies.h"
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"

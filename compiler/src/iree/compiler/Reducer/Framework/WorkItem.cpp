@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Reducer/WorkItem.h"
+#include "iree/compiler/Reducer/Framework/WorkItem.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;

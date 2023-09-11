@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Reducer/iree_reduce_lib.h"
 
-#include "iree/compiler/Reducer/DeltaStratergies.h"
+#include "iree/compiler/Reducer/Strategies/DeltaStrategies.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"

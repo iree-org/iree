@@ -6,7 +6,7 @@
 
 #include <random>
 
-#include "iree/compiler/Reducer/DeltaStratergies.h"
+#include "iree/compiler/Reducer/Strategies/DeltaStrategies.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

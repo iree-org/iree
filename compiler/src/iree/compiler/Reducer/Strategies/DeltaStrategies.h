@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_REDUCER_DELTA_STRATEGIES_H_
 #define IREE_COMPILER_REDUCER_DELTA_STRATEGIES_H_
 
-#include "iree/compiler/Reducer/Delta.h"
+#include "iree/compiler/Reducer/Framework/Delta.h"
 
 namespace mlir {
 namespace iree_compiler {
