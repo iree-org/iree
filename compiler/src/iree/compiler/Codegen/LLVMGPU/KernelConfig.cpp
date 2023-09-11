@@ -251,13 +251,21 @@ getTensorCorePipeline(Type elementType) {
 static LogicalResult setContractConfig(func::FuncOp entryPoint,
                                        linalg::LinalgOp op,
                                        const TargetInfo &targetInfo) {
-  if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2)
+  if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2) {
     return failure();
+  }
   // Don't consider operations that don't have a broadcast, those should go
   // through reductions.
   if (llvm::any_of(op.getIndexingMapsArray(),
-                   [](AffineMap m) { return m.isPermutation(); }))
+                   [](AffineMap m) { return m.isPermutation(); })) {
     return failure();
+  }
+
+  // TODO: Properly rematerialize leading elementwise with shared memory
+  // promotion.
+  if (hasFusedLeadingOp(op)) {
+    return failure();
+  }
 
   auto setMatmulConfig =
       [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
@@ -730,14 +738,20 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   if (!isa<linalg::GenericOp>(op))
     return failure();
-  // TODO(thomasraoux): Enable dynamic shape.
-  bool hasDynamicShape = false;
-  entryPoint.walk([&hasDynamicShape](linalg::LinalgOp op) {
-    if (op.hasDynamicShape())
-      hasDynamicShape = true;
+  // TODO: Enable dynamic shape.
+  auto walkResult = entryPoint.walk([](linalg::LinalgOp op) {
+    using utils::IteratorType;
+    SmallVector<IteratorType, 4> kinds = op.getIteratorTypesArray();
+    SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+    for (auto [kind, bound] : llvm::zip_equal(kinds, bounds)) {
+      if (kind == IteratorType::reduction && ShapedType::isDynamic(bound))
+        return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
   });
-  if (hasDynamicShape)
+  if (walkResult.wasInterrupted()) {
     return failure();
+  }
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
   if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
