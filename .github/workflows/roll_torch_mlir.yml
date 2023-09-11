@@ -1,0 +1,65 @@
+name: Roll PyTorch
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  roll_torch_mlir:
+    runs-on: ubuntu-20.04-64core
+    # Don't run this in everyone's forks.
+    if: github.repository == 'openxla/iree'
+
+    steps:
+
+      - name: Prepare workspace
+        run: |
+          # Clear the workspace directory so that we don't run into errors about
+          # existing lock files.
+          sudo rm -rf $GITHUB_WORKSPACE/*
+
+      - name: Get iree
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
+        with:
+          submodules: 'true'
+          ref: main
+          fetch-depth: 0
+
+
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          APPROVAL_TOKEN: ${{ github.token }}
+        run: |
+          git config --local user.email "iree-github-actions-bot@google.com"
+          git config --local user.name "IREE torch-mlir Roller"
+          git submodule update --init --recursive third_party/torch-mlir
+          echo "entering torch-mlir"
+          cd third_party/torch-mlir
+          initial_sha="$(git rev-parse --short HEAD)"
+          echo "$initial_sha"
+          git fetch --tags origin
+          git checkout origin/main
+          new_sha="$(git rev-parse --short HEAD)"
+          echo "$new_sha"
+          if [ "$initial_sha" == "$new_sha" ]; then
+            echo "No updates made"
+          else
+            echo "SHA changed, updating submodule"
+            cd ../..
+            branch="rolltorchmlir_${{ github.run_number }}"
+            git add -A
+            git checkout -b "$branch"
+            git commit -m "Update torch-mlir"
+            git push --set-upstream origin "$branch"
+            body=""
+            pr="$(gh pr create --base main --head "$branch" --title "Update torch-mlir" --body "$body")"
+            echo "Created pull request $pr"
+            gh pr merge $pr --auto --delete-branch --squash
+            # Can't approve your own PR, so approve with the github actions bot.
+            echo "Approving PR"
+            export GH_TOKEN="$APPROVAL_TOKEN"
+            gh pr review $pr -a
+          fi
