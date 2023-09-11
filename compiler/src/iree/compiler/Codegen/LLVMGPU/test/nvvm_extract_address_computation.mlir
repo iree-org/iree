@@ -53,8 +53,7 @@
 // CHECK: %[[GRP_IDX3:.*]] = llvm.shl %[[GRP_IDX2]], %[[C2]]  : i64
 // CHECK: %{{.*}} = llvm.xor %[[SRC:.*]], %[[GRP_IDX3]]  : i64
 // CHECK: %[[ADJ_SRC:.*]] = llvm.add %[[SRC]], %[[C16]]  : i64
-// CHECK: %[[ADJ_SRC1:.*]] = llvm.xor %[[ADJ_SRC]], %[[GRP_IDX3]]  : i64
-// CHECK: %[[INV:.*]] = llvm.add %{{.*}}, %[[ADJ_SRC1]]  : i64
+// CHECK: %[[INV:.*]] = llvm.xor %[[ADJ_SRC]], %[[GRP_IDX3]]  : i64
 //
 // Find the basic block boundary.
 // CHECK: llvm.br ^[[LOOP_BODY:bb[0-9]+]](
@@ -66,7 +65,7 @@
 // CHECK: %[[VAR:.*]] = llvm.mul %[[IV]], %[[C4096]]
 //
 // Add the loop invariant part.
-// CHECK: %[[OFF:.*]] = llvm.add %[[INV]], %[[VAR]]
+// CHECK: %[[OFF:.*]] = llvm.add %{{.*}}, %[[INV]]
 //
 // Store the resulting offset in the memref descriptor.
 // llvm.insert %[[OFF]], %{{.*}}[2]
