@@ -7,11 +7,8 @@
 #include "iree/compiler/Reducer/iree_reduce_lib.h"
 
 #include "iree/compiler/Reducer/Strategies/DeltaStrategies.h"
-#include "llvm/Support/CommandLine.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 
 using namespace mlir;
 using namespace llvm;

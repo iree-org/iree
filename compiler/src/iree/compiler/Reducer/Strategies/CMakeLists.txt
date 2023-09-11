@@ -21,9 +21,17 @@ iree_cc_library(
     "ReduceLinalgOnTensorsDelta.cpp"
   DEPS
     LLVMSupport
+    MLIRArithDialect
+    MLIRFuncDialect
     MLIRIR
+    MLIRLinalgDialect
     MLIRPass
     MLIRSupport
+    MLIRTensorDialect
+    MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Reducer::Framework::ReducerFramework
     iree::compiler::bindings::c::headers
   PUBLIC

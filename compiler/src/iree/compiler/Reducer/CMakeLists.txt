@@ -18,6 +18,8 @@ iree_cc_library(
   SRCS
     "iree_reduce_lib.cc"
   DEPS
+    MLIRIR
+    MLIRSupport
     iree::compiler::Reducer::Framework::ReducerFramework
     iree::compiler::Reducer::Strategies::DeltaStrategies
   PUBLIC
