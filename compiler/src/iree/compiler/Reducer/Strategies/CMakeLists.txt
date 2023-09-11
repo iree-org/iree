@@ -20,9 +20,11 @@ iree_cc_library(
     "ReduceFlowDispatchResultBySplat.cpp"
     "ReduceLinalgOnTensorsDelta.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRPass
     MLIRSupport
+    iree::compiler::Reducer::Framework::ReducerFramework
     iree::compiler::bindings::c::headers
   PUBLIC
 )

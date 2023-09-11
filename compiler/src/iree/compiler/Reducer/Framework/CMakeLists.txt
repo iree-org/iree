@@ -24,6 +24,7 @@ iree_cc_library(
     "Oracle.cpp"
     "WorkItem.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRPass
     MLIRSupport
