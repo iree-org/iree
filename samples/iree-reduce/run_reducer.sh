@@ -1,3 +1,3 @@
 #!/bin/bash
 
-iree-reduce interesting.sh softmax.mlir
+iree-reduce -v interesting.sh softmax.mlir
