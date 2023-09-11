@@ -15,6 +15,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
@@ -22,8 +23,6 @@
 using namespace mlir;
 using namespace llvm;
 using namespace mlir::iree_compiler;
-
-llvm::cl::OptionCategory ireeReduceCategory("iree-reduce options");
 
 // Parse and verify the input MLIR file. Returns null on error.
 static OwningOpRef<Operation *> loadModule(MLIRContext &context,
@@ -37,12 +36,15 @@ static OwningOpRef<Operation *> loadModule(MLIRContext &context,
   }
 
   auto sourceMgr = std::make_shared<llvm::SourceMgr>();
+  ParserConfig config(&context);
   sourceMgr->AddNewSourceBuffer(std::move(file), SMLoc());
-  return parseSourceFile<ModuleOp>(sourceMgr, &context);
+  return parseSourceFile<ModuleOp>(sourceMgr, config);
 }
 
 static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
                                           MLIRContext &registry) {
+
+  llvm::cl::OptionCategory ireeReduceCategory("iree-reduce options");
 
   static llvm::cl::opt<std::string> testScript(cl::Positional, cl::Required,
                                                cl::desc("<test script>"),
@@ -55,6 +57,10 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
   static cl::opt<std::string> outputFilename(
       "o", cl::desc("Output filename for the reduced test case."),
       cl::value_desc("filename"), cl::init("-"),
+      llvm::cl::cat(ireeReduceCategory));
+
+  static cl::opt<bool> verbose(
+      "v", cl::desc("Output debug output to llvm::errs"), cl::init(false),
       llvm::cl::cat(ireeReduceCategory));
 
   llvm::cl::HideUnrelatedOptions(ireeReduceCategory);
@@ -81,8 +87,9 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
     return failure();
   }
 
+  llvm::raw_ostream &debugOs = verbose ? llvm::errs() : llvm::nulls();
   Operation *newModule =
-      ireeRunReducingStrategies(std::move(module), testScript);
+      ireeRunReducingStrategies(std::move(module), testScript, debugOs);
   module = OwningOpRef<Operation *>(newModule);
 
   // Print module to output file.

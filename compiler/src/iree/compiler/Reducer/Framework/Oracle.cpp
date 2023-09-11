@@ -40,8 +40,8 @@ bool Oracle::isInteresting(WorkItem &workItem) {
   testerArgs.push_back(testScript);
   testerArgs.push_back(filepath);
 
-  llvm::errs() << "Running interestingness test: " << testScript << " "
-               << filepath << "\n";
+  debugOs << "Running interestingness test: " << testScript << " " << filepath
+          << "\n";
 
   std::string errMsg;
   int exitCode = llvm::sys::ExecuteAndWait(testScript, testerArgs, std::nullopt,

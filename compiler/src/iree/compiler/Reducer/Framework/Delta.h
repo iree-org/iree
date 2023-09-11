@@ -17,8 +17,26 @@ namespace iree_compiler {
 
 using DeltaFunc = llvm::function_ref<void(ChunkManager &, WorkItem &)>;
 
-void runDeltaPass(Oracle &oracle, WorkItem &root, DeltaFunc delta,
-                  StringRef message);
+class Delta {
+public:
+  Delta(Oracle &oracle, WorkItem &root,
+        llvm::raw_ostream &debugOs = llvm::nulls())
+      : oracle(oracle), root(root), debugOs(debugOs) {}
+
+  void runDeltaPass(DeltaFunc delta, StringRef message);
+
+private:
+  FailureOr<WorkItem> checkChunk(Chunk maybeInterestingChunk,
+                                 DeltaFunc deltaFunc,
+                                 ArrayRef<Chunk> maybeInterestingChunks,
+                                 DenseSet<Chunk> &uninterestingChunks);
+
+  bool increaseGranuality(SmallVector<Chunk> &chunks);
+
+  Oracle &oracle;
+  WorkItem &root;
+  llvm::raw_ostream &debugOs;
+};
 
 } // namespace iree_compiler
 } // namespace mlir

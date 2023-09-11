@@ -16,12 +16,14 @@ namespace iree_compiler {
 
 class Oracle {
 public:
-  Oracle(StringRef testScript) : testScript(testScript) {}
+  Oracle(StringRef testScript, llvm::raw_ostream &debugOs)
+      : testScript(testScript), debugOs(debugOs) {}
 
   bool isInteresting(WorkItem &workItem);
 
 private:
   StringRef testScript;
+  llvm::raw_ostream &debugOs;
 };
 
 } // namespace iree_compiler

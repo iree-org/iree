@@ -122,6 +122,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
     ],

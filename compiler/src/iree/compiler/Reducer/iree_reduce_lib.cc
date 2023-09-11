@@ -15,17 +15,18 @@ using namespace llvm;
 
 Operation *
 mlir::iree_compiler::ireeRunReducingStrategies(OwningOpRef<Operation *> module,
-                                               StringRef testScript) {
+                                               StringRef testScript,
+                                               llvm::raw_ostream &debugOs) {
   ModuleOp root = dyn_cast<ModuleOp>(module.release());
   WorkItem workItem(root);
-  Oracle oracle(testScript);
+  Oracle oracle(testScript, debugOs);
+  Delta delta(oracle, workItem, debugOs);
 
-  runDeltaPass(oracle, workItem, reduceFlowDispatchOperandToResultDelta,
-               "Dispatch operand to result delta");
-  runDeltaPass(oracle, workItem, reduceFlowDispatchResultBySplatDelta,
-               "Dispatch result to splat delta");
-  runDeltaPass(oracle, workItem, reduceLinalgOnTensorsDelta,
-               "Linalg on tensors delta");
+  delta.runDeltaPass(reduceFlowDispatchOperandToResultDelta,
+                     "Dispatch operand to result delta");
+  delta.runDeltaPass(reduceFlowDispatchResultBySplatDelta,
+                     "Dispatch result to splat delta");
+  delta.runDeltaPass(reduceLinalgOnTensorsDelta, "Linalg on tensors delta");
 
   return workItem.getModule();
 }

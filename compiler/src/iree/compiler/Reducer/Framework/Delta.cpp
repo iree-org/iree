@@ -9,8 +9,7 @@
 using namespace mlir;
 using namespace mlir::iree_compiler;
 
-static FailureOr<WorkItem> checkChunk(Chunk maybeUninterestingChunk,
-                                      Oracle &oracle, WorkItem &root,
+FailureOr<WorkItem> Delta::checkChunk(Chunk maybeUninterestingChunk,
                                       DeltaFunc deltaFunc,
                                       ArrayRef<Chunk> maybeInterestingChunks,
                                       DenseSet<Chunk> &uninterestingChunks) {
@@ -21,9 +20,9 @@ static FailureOr<WorkItem> checkChunk(Chunk maybeUninterestingChunk,
                    !uninterestingChunks.count(chunk);
           });
 
-  llvm::errs() << "Checking chunk: \n";
+  debugOs << "Checking chunk: \n";
   maybeUninterestingChunk.dump();
-  llvm::errs() << "Saved chunks: \n";
+  debugOs << "Saved chunks: \n";
   for (Chunk c : currentChunks) {
     c.dump();
   }
@@ -33,17 +32,17 @@ static FailureOr<WorkItem> checkChunk(Chunk maybeUninterestingChunk,
   deltaFunc(chunker, clonedProgram);
 
   if (!oracle.isInteresting(clonedProgram)) {
-    llvm::errs() << "Chunk is uninteresting\n";
+    debugOs << "Chunk is uninteresting\n";
     clonedProgram.getModule()->erase();
     return failure();
   }
 
-  llvm::errs() << "Chunk is interesting\n";
+  debugOs << "Chunk is interesting\n";
   return clonedProgram;
 };
 
-static bool increaseGranuality(SmallVector<Chunk> &chunks) {
-  llvm::errs() << "Increasing granularity\n";
+bool Delta::increaseGranuality(SmallVector<Chunk> &chunks) {
+  debugOs << "Increasing granularity\n";
   SmallVector<Chunk> newChunks;
   bool anyNewSplit = false;
 
@@ -60,8 +59,8 @@ static bool increaseGranuality(SmallVector<Chunk> &chunks) {
 
   if (anyNewSplit) {
     chunks = newChunks;
-    llvm::errs() << "Successfully increased granularity\n";
-    llvm::errs() << "New Chunks:\n";
+    debugOs << "Successfully increased granularity\n";
+    debugOs << "New Chunks:\n";
     for (Chunk c : chunks) {
       c.dump();
     }
@@ -70,10 +69,9 @@ static bool increaseGranuality(SmallVector<Chunk> &chunks) {
   return anyNewSplit;
 };
 
-void mlir::iree_compiler::runDeltaPass(Oracle &oracle, WorkItem &root,
-                                       DeltaFunc deltaFunc, StringRef message) {
+void Delta::runDeltaPass(DeltaFunc deltaFunc, StringRef message) {
   assert(root.verify().succeeded() && "Input module does not verify.");
-  llvm::errs() << "=== " << message << " ===\n";
+  debugOs << "=== " << message << " ===\n";
 
   // Call the delta function with the whole program as the chunk.
   SmallVector<Chunk> chunks = {Chunk(UINT_MAX)};
@@ -87,8 +85,8 @@ void mlir::iree_compiler::runDeltaPass(Oracle &oracle, WorkItem &root,
          "Output module not interesting after counting chunks.");
 
   if (!numTargets) {
-    llvm::errs() << "\nNothing to reduce\n";
-    llvm::errs() << "--------------------------------";
+    debugOs << "\nNothing to reduce\n";
+    debugOs << "--------------------------------";
     return;
   }
 
@@ -102,8 +100,7 @@ void mlir::iree_compiler::runDeltaPass(Oracle &oracle, WorkItem &root,
 
     for (Chunk chunk : maybeInteresting) {
       FailureOr<WorkItem> result =
-          checkChunk(chunk, oracle, root, deltaFunc, maybeInteresting,
-                     uninterestingChunks);
+          checkChunk(chunk, deltaFunc, maybeInteresting, uninterestingChunks);
       if (failed(result))
         continue;
 
