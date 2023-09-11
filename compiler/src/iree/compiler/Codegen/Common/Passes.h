@@ -178,7 +178,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
         std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
-/// Pass to resolve `memref.expand_strided_metadata` operations.
+/// Pass to expand memref operations that modify the metadata (sizes, offset,
+/// strides) of a memref into easier to analyze constructs.
 std::unique_ptr<Pass> createIREEExpandStridedMetadataPass();
 
 /// Instruments memory reads and writes for address tracking.
@@ -258,6 +259,16 @@ void populateConcretizePadResultShapePatterns(
 /// distributed loops.
 void populateFoldAffineMinInDistributedLoopsPatterns(
     RewritePatternSet &patterns, ArrayRef<int64_t> staticNumWorkgroup = {});
+
+/// Populates patterns for expanding memref operations that modify the metadata
+/// (sizes, offset, strides) of a memref into easier to analyze constructs.
+void populateIREEExpandExtractStridedMetadataPatterns(
+    RewritePatternSet &patterns);
+
+/// Populates patterns for resolving `memref.extract_strided_metadata` into
+/// `memref.extract_strided_metadata` of its source.
+void populateIREEResolveExtractStridedMetadataPatterns(
+    RewritePatternSet &patterns);
 
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on

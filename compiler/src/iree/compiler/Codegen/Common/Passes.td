@@ -290,7 +290,8 @@ def IREEComprehensiveBufferize :
 
 def IREEExpandStridedMetadata :
     Pass<"iree-codegen-expand-strided-metadata", ""> {
-  let summary = "Resolve memref.extract_strided_metadata operations";
+  let summary = "Expand memref operations that modify metadata (sizes, offset,"
+                "strides) of a memref into easier to analyze constructs.";
   let constructor = "mlir::iree_compiler::createIREEExpandStridedMetadataPass()";
   let options = [
     Option<"allowUnresolved", "allow-unresolved", "bool", /*default=*/"false",

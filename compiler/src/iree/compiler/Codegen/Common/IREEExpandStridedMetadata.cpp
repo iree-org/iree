@@ -236,6 +236,13 @@ struct IREEExpandStridedMetadataPass
 };
 } // namespace
 
+void populateIREEExpandExtractStridedMetadataPatterns(
+    RewritePatternSet &patterns) {
+  memref::populateExpandStridedMetadataPatterns(patterns);
+  patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
+      patterns.getContext());
+}
+
 void populateIREEResolveExtractStridedMetadataPatterns(
     MLIRContext *context, RewritePatternSet &patterns) {
   memref::populateResolveExtractStridedMetadataPatterns(patterns);
@@ -246,7 +253,7 @@ void populateIREEResolveExtractStridedMetadataPatterns(
 void IREEExpandStridedMetadataPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  populateIREEResolveExtractStridedMetadataPatterns(context, patterns);
+  populateIREEExpandExtractStridedMetadataPatterns(patterns);
   populateRemoveDeadMemAllocPatterns(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
