@@ -84,7 +84,7 @@ void mlir::iree_compiler::runDeltaPass(Oracle &oracle, WorkItem &root,
   assert(root.verify().succeeded() &&
          "Output module does not verify after counting chunks.");
   assert(oracle.isInteresting(root) &&
-        "Output module not interesting after counting chunks.");
+         "Output module not interesting after counting chunks.");
 
   if (!numTargets) {
     llvm::errs() << "\nNothing to reduce\n";
