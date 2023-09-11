@@ -724,6 +724,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // Resolve get_buffer_descriptor ops. All structural buffer manipulations
   // must conclude before this point.
+  passManager.addPass(memref::createFoldMemRefAliasOpsPass());
   passManager.addNestedPass<func::FuncOp>(
       createIREEExpandStridedMetadataPass());
   passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());

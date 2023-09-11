@@ -73,6 +73,8 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Resolve get_buffer_descriptor ops. All structural buffer manipulations
   // must conclude before this point.
   nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
       createIREEExpandStridedMetadataPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createResolveBufferDescriptorsPass());
