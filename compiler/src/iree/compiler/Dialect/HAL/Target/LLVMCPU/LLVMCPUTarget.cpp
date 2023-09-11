@@ -438,9 +438,9 @@ public:
     llvm::Linker moduleLinker(*llvmModule);
 
     // Link any bitcode files specified on the command line.
-    if (failed(linkCmdlineBitcodeFile(variantOp.getLoc(), moduleLinker,
-                                      llvm::Linker::OverrideFromSrc,
-                                      *targetMachine, context))) {
+    if (failed(linkCmdlineBitcodeFiles(variantOp.getLoc(), moduleLinker,
+                                       llvm::Linker::OverrideFromSrc,
+                                       *targetMachine, context))) {
       return failure();
     }
 
