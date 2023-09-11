@@ -23,11 +23,9 @@ mlir::iree_compiler::ireeRunReducingStrategies(OwningOpRef<Operation *> module,
   WorkItem workItem(root);
   Oracle oracle(testScript);
 
-  // reduceWeightsToRandom(oracle, workItem);
   reduceFlowDispatchOperandToResultDelta(oracle, workItem);
-  reduceFlowDispatchDelta(oracle, workItem);
   reduceFlowDispatchResultBySplatDelta(oracle, workItem);
-  // reduceLinalgOnTensorsDelta(oracle, workItem);
+  reduceLinalgOnTensorsDelta(oracle, workItem);
 
   return workItem.getModule();
 }

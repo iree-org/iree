@@ -24,11 +24,9 @@ iree_cc_library(
     "ChunkManager.cpp"
     "Delta.cpp"
     "Oracle.cpp"
-    "ReduceFlowDispatchDelta.cpp"
     "ReduceFlowDispatchOperandToResult.cpp"
     "ReduceFlowDispatchResultBySplat.cpp"
     "ReduceLinalgOnTensorsDelta.cpp"
-    "ReduceWeightsToRandomDelta.cpp"
     "WorkItem.cpp"
     "iree_reduce_lib.cc"
   DEPS

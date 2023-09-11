@@ -12,8 +12,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-void reduceFlowDispatchDelta(Oracle &oracle, WorkItem &workItem);
-void reduceWeightsToRandom(Oracle &oracle, WorkItem &workItem);
 void reduceLinalgOnTensorsDelta(Oracle &oracle, WorkItem &workItem);
 void reduceFlowDispatchOperandToResultDelta(Oracle &oracle, WorkItem &workItem);
 void reduceFlowDispatchResultBySplatDelta(Oracle &oracle, WorkItem &workItem);
