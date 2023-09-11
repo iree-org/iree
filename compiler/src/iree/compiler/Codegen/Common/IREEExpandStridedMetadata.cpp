@@ -239,14 +239,14 @@ struct IREEExpandStridedMetadataPass
 void populateIREEExpandExtractStridedMetadataPatterns(
     RewritePatternSet &patterns) {
   memref::populateExpandStridedMetadataPatterns(patterns);
-  patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
+  patterns.add<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
       patterns.getContext());
 }
 
 void populateIREEResolveExtractStridedMetadataPatterns(
     RewritePatternSet &patterns) {
   memref::populateResolveExtractStridedMetadataPatterns(patterns);
-  patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
+  patterns.add<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
       patterns.getContext());
 }
 
