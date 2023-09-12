@@ -1864,17 +1864,17 @@ std::pair<unsigned, unsigned> AsyncExecuteOp::getTiedResultsIndexAndLength() {
 }
 
 OperandRange
-AsyncExecuteOp::getEntrySuccessorOperands(std::optional<unsigned> index) {
-  assert(index && index.value() == 0 && "invalid region index");
+AsyncExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
+  assert(point.getRegionOrNull() == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
 void AsyncExecuteOp::getSuccessorRegions(
-    std::optional<unsigned> index, SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor(getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -2019,17 +2019,17 @@ LogicalResult AsyncConcurrentOp::verify() {
 }
 
 OperandRange
-AsyncConcurrentOp::getEntrySuccessorOperands(std::optional<unsigned> index) {
-  assert(index && index.value() == 0 && "invalid region index");
+AsyncConcurrentOp::getEntrySuccessorOperands(RegionBranchPoint point) {
+  assert(point == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
 void AsyncConcurrentOp::getSuccessorRegions(
-    std::optional<unsigned> index, SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor(getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -2830,17 +2830,17 @@ LogicalResult CmdExecuteOp::verify() {
 }
 
 OperandRange
-CmdExecuteOp::getEntrySuccessorOperands(std::optional<unsigned> index) {
-  assert(index && index.value() == 0 && "invalid region index");
+CmdExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
+  assert(point == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
 void CmdExecuteOp::getSuccessorRegions(
-    std::optional<unsigned> index, SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -2905,11 +2905,11 @@ LogicalResult CmdSerialOp::verify() {
 }
 
 void CmdSerialOp::getSuccessorRegions(
-    std::optional<unsigned> index, SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
@@ -2930,11 +2930,11 @@ LogicalResult CmdConcurrentOp::verify() {
 }
 
 void CmdConcurrentOp::getSuccessorRegions(
-    std::optional<unsigned> index, SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
@@ -3133,7 +3133,7 @@ LogicalResult BindingSubspanOp::verify() {
 //===----------------------------------------------------------------------===//
 
 MutableOperandRange
-YieldOp::getMutableSuccessorOperands(std::optional<unsigned> index) {
+YieldOp::getMutableSuccessorOperands(RegionBranchPoint point) {
   return getResourceOperandsMutable();
 }
 
