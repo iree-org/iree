@@ -851,7 +851,8 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
   // Move within/out-of a region.
   auto traverseRegionBranchOp = [&](RegionBranchTerminatorOpInterface branchOp,
                                     unsigned operandIdx) {
-    auto successorOperands = branchOp.getSuccessorOperands(RegionBranchPoint::parent());
+    auto successorOperands =
+        branchOp.getSuccessorOperands(RegionBranchPoint::parent());
     unsigned beginIdx = successorOperands.getBeginOperandIndex();
     if (operandIdx < beginIdx ||
         operandIdx >= beginIdx + successorOperands.size()) {
