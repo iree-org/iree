@@ -340,7 +340,7 @@ struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
     if (rhsTy.getRank() == 2 && rhsTy.getDimSize(1) == 1) {
       rhs = b.create<mlir::stablehlo::ReshapeOp>(
           rhsTy.clone({rhsTy.getDimSize(0)}), rhs);
-    } else if (lhsTy.getRank() == 2) {
+    } else if (rhsTy.getRank() == 2) {
       dotShape.push_back(rhsTy.getDimSize(1));
     }
 
