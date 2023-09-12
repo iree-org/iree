@@ -118,9 +118,12 @@ public:
   }
 
 private:
-  IREE::Util::GlobalOp defineDescriptorSetLayoutOp(Location loc,
-                                                   ArrayAttr bindingAttrs) {
-    auto existingIt = descriptorSetLayoutCache_.find(bindingAttrs);
+  IREE::Util::GlobalOp
+  defineDescriptorSetLayoutOp(Location loc, ArrayAttr bindingAttrs,
+                              IREE::HAL::DescriptorSetLayoutFlags flags) {
+    std::pair<Attribute, IREE::HAL::DescriptorSetLayoutFlags> key = {
+        bindingAttrs, flags};
+    auto existingIt = descriptorSetLayoutCache_.find(key);
     if (existingIt != descriptorSetLayoutCache_.end()) {
       return existingIt->second;
     }
@@ -134,15 +137,14 @@ private:
         loc, symbolName,
         /*isMutable=*/false, layoutType);
     globalOp.setPrivate();
-    descriptorSetLayoutCache_.try_emplace(bindingAttrs, globalOp);
+    descriptorSetLayoutCache_.try_emplace(key, globalOp);
 
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
-    auto layoutFlags = IREE::HAL::DescriptorSetLayoutFlags::None;
     auto layoutValue = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
-        loc, layoutType, deviceValue, layoutFlags, bindingAttrs);
+        loc, layoutType, deviceValue, flags, bindingAttrs);
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layoutValue,
                                                    globalOp.getName());
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
@@ -167,7 +169,9 @@ private:
         bindingAttrs.push_back(bindingAttr);
       }
       setLayoutGlobalOps.push_back(defineDescriptorSetLayoutOp(
-          loc, ArrayAttr::get(loc.getContext(), bindingAttrs)));
+          loc, ArrayAttr::get(loc.getContext(), bindingAttrs),
+          setLayoutAttr.getFlags().value_or(
+              IREE::HAL::DescriptorSetLayoutFlags::None)));
     }
 
     auto symbolName = (StringRef("_pipeline_layout_") +
@@ -319,8 +323,8 @@ private:
   void
   replaceDescriptorSetLayoutLookupOp(DescriptorSetLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
-    auto globalOp =
-        defineDescriptorSetLayoutOp(lookupOp.getLoc(), lookupOp.getBindings());
+    auto globalOp = defineDescriptorSetLayoutOp(
+        lookupOp.getLoc(), lookupOp.getBindings(), lookupOp.getFlags());
     auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
         lookupOp.getLoc(), DescriptorSetLayoutType::get(lookupOp.getContext()),
         globalOp.getSymName());
@@ -355,7 +359,9 @@ private:
   TargetOptions targetOptions_;
 
   OpBuilder moduleBuilder{static_cast<MLIRContext *>(nullptr)};
-  DenseMap<Attribute, IREE::Util::GlobalOp> descriptorSetLayoutCache_;
+  DenseMap<std::pair<Attribute, IREE::HAL::DescriptorSetLayoutFlags>,
+           IREE::Util::GlobalOp>
+      descriptorSetLayoutCache_;
   DenseMap<Attribute, IREE::Util::GlobalOp> pipelineLayoutCache_;
   DenseMap<StringRef, IREE::Util::GlobalOp> executableCache_;
 

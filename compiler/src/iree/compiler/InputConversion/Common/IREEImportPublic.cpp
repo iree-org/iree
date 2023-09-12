@@ -91,7 +91,6 @@ static std::optional<IREE::HAL::DescriptorFlags>
 convertDescriptorFlags(std::optional<IREE::Input::DescriptorFlags> src) {
   if (!src.has_value())
     return std::nullopt;
-
   switch (*src) {
   case IREE::Input::DescriptorFlags::None:
     return IREE::HAL::DescriptorFlags::None;
@@ -109,12 +108,28 @@ convertDescriptorSetBinding(IREE::Input::DescriptorSetBindingAttr src) {
       convertDescriptorFlags(src.getFlags()));
 }
 
+static std::optional<IREE::HAL::DescriptorSetLayoutFlags>
+convertDescriptorSetLayoutFlags(
+    std::optional<IREE::Input::DescriptorSetLayoutFlags> src) {
+  if (!src.has_value())
+    return std::nullopt;
+  switch (*src) {
+  case IREE::Input::DescriptorSetLayoutFlags::None:
+    return IREE::HAL::DescriptorSetLayoutFlags::None;
+  case IREE::Input::DescriptorSetLayoutFlags::Indirect:
+    return IREE::HAL::DescriptorSetLayoutFlags::Indirect;
+  default:
+    return std::nullopt;
+  }
+}
+
 static IREE::HAL::DescriptorSetLayoutAttr
 convertDescriptorSetLayout(IREE::Input::DescriptorSetLayoutAttr src) {
   return IREE::HAL::DescriptorSetLayoutAttr::get(
       src.getContext(), src.getOrdinal(),
       convertAttributes<IREE::HAL::DescriptorSetBindingAttr>(
-          src.getBindings(), convertDescriptorSetBinding));
+          src.getBindings(), convertDescriptorSetBinding),
+      convertDescriptorSetLayoutFlags(src.getFlags()));
 }
 
 static IREE::HAL::PipelineLayoutAttr

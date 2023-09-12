@@ -516,6 +516,11 @@ Attribute ExecutableTargetAttr::getMatchExpression() {
   return DeviceMatchExecutableFormatAttr::get(getContext(), getFormat());
 }
 
+bool ExecutableTargetAttr::hasConfigurationAttr(StringRef name) {
+  auto configAttr = getConfiguration();
+  return configAttr && configAttr.get(name);
+}
+
 // For now this is very simple: if there are any specified fields that are
 // present in this attribute they must match. We could allow target backends
 // to customize this via attribute interfaces in the future if we needed.
