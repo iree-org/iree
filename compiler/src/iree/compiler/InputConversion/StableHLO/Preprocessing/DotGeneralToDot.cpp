@@ -318,9 +318,7 @@ struct GeneralDotConvert final
   }
 };
 
-
-struct DotVectorOptimization final
-    : OpRewritePattern<mlir::stablehlo::DotOp> {
+struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(mlir::stablehlo::DotOp op,
                                 PatternRewriter &rewriter) const override {
@@ -334,13 +332,15 @@ struct DotVectorOptimization final
 
     llvm::SmallVector<int64_t> dotShape;
     if (lhsTy.getRank() == 2 && lhsTy.getDimSize(0) == 1) {
-      lhs = b.create<mlir::stablehlo::ReshapeOp>(lhsTy.clone({lhsTy.getDimSize(1)}), lhs);
+      lhs = b.create<mlir::stablehlo::ReshapeOp>(
+          lhsTy.clone({lhsTy.getDimSize(1)}), lhs);
     } else if (lhsTy.getRank() == 2) {
       dotShape.push_back(lhsTy.getDimSize(0));
     }
 
     if (rhsTy.getRank() == 2 && rhsTy.getDimSize(1) == 1) {
-      rhs = b.create<mlir::stablehlo::ReshapeOp>(rhsTy.clone({rhsTy.getDimSize(0)}), rhs);
+      rhs = b.create<mlir::stablehlo::ReshapeOp>(
+          rhsTy.clone({rhsTy.getDimSize(0)}), rhs);
     } else if (lhsTy.getRank() == 2) {
       dotShape.push_back(rhsTy.getDimSize(1));
     }
@@ -350,9 +350,8 @@ struct DotVectorOptimization final
     }
 
     auto newDot = b.create<mlir::stablehlo::DotOp>(
-      resultTy.clone(dotShape), lhs, rhs, op.getPrecisionConfigAttr());
-    auto resultReshape = b.create<mlir::stablehlo::ReshapeOp>(
-      resultTy, newDot);
+        resultTy.clone(dotShape), lhs, rhs, op.getPrecisionConfigAttr());
+    auto resultReshape = b.create<mlir::stablehlo::ReshapeOp>(resultTy, newDot);
 
     rewriter.replaceOp(op, resultReshape);
     return success();
