@@ -351,7 +351,7 @@ struct FusionOfTensorOpsPass
       linalg::ControlFusionFn fuseByExpansionControlFn =
           [](OpOperand *fusedOperand) {
             Operation *producer = fusedOperand->get().getDefiningOp();
-            Operation *consumer = fusedOperand->get().getDefiningOp();
+            Operation *consumer = fusedOperand->getOwner();
             if (!isNonNullAndOutsideDispatch({producer, consumer})) {
               return false;
             }
