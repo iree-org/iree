@@ -110,19 +110,19 @@ class Android_ARMv8_A_Benchmarks(object):
             module_execution_configs=local_sync_execution_configs
             + local_task_execution_configs,
             device_specs=all_devices,
-            presets=[benchmark_presets.ANDROID_GPU],
+            presets=[benchmark_presets.ANDROID_CPU],
         )
         run_configs += utils.generate_e2e_model_run_configs(
             module_generation_configs=experimental_gen_confings,
             module_execution_configs=local_sync_execution_configs,
             device_specs=all_devices,
-            presets=[benchmark_presets.ANDROID_GPU],
+            presets=[benchmark_presets.ANDROID_CPU],
         )
         run_configs += utils.generate_e2e_model_run_configs(
             module_generation_configs=experimental_gen_confings,
             module_execution_configs=local_task_execution_configs,
             device_specs=big_cores_devices,
-            presets=[benchmark_presets.ANDROID_GPU],
+            presets=[benchmark_presets.ANDROID_CPU],
         )
 
         return run_configs
