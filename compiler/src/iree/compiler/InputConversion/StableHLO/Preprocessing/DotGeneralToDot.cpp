@@ -10,7 +10,6 @@
 #include "iree/compiler/InputConversion/StableHLO/Preprocessing/Rewriters.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Value.h"
@@ -359,10 +358,6 @@ struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
 };
 
 struct DotGeneralToDot final : impl::DotGeneralToDotBase<DotGeneralToDot> {
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::stablehlo::StablehloDialect, tensor::TensorDialect>();
-  }
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
