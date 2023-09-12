@@ -2829,8 +2829,7 @@ LogicalResult CmdExecuteOp::verify() {
   return success();
 }
 
-OperandRange
-CmdExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
+OperandRange CmdExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
   assert(point == &getBody() && "invalid region index");
   return getResourceOperands();
 }
