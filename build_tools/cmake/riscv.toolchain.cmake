@@ -72,7 +72,7 @@ if(RISCV_CPU STREQUAL "linux-riscv_64")
   # Specify ISP spec for march=rv64gc. This is to resolve the mismatch between
   # llvm and binutil ISA version.
   set(RISCV_COMPILER_FLAGS "${RISCV_COMPILER_FLAGS} \
-      -march=rv64i2p1ma2p1f2p2d2p2c2p0 -mabi=lp64d")
+      -march=rv64i2p1ma2p1f2p2d2p2c2p0v1p0 -mabi=lp64d")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lstdc++ -lpthread -lm -ldl")
   set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
     "--iree-llvmcpu-target-triple=riscv64"
