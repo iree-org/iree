@@ -38,25 +38,23 @@ class Android_ARMv8_A_Benchmarks(object):
         tags=["default-flags"],
         compile_targets=[ARMV8_A_CPU_TARGET],
     )
-    MMT4D_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+    DATA_TILING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D,
-        tags=["experimental-flags", "mmt4d"],
+        tags=["experimental-flags", "data-tiling", "ukernel"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",
-            "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-            "--iree-llvmcpu-enable-pad-consumer-fusion",
+            "--iree-llvmcpu-enable-microkernels",
         ],
     )
-    MMT4D_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+    DATA_TILING_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D_DOTPROD,
-        tags=["experimental-flags", "mmt4d", "dotprod"],
+        tags=["experimental-flags", "data-tiling", "ukernel", "dotprod"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",
+            "--iree-llvmcpu-enable-microkernels",
             "--iree-llvmcpu-target-cpu-features=+dotprod",
-            "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
-            "--iree-llvmcpu-enable-pad-consumer-fusion",
         ],
     )
 
@@ -82,13 +80,13 @@ class Android_ARMv8_A_Benchmarks(object):
         ]
         experimental_gen_confings = [
             iree_definitions.ModuleGenerationConfig.build(
-                compile_config=self.MMT4D_COMPILE_CONFIG,
+                compile_config=self.DATA_TILING_COMPILE_CONFIG,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
             for model in self.NONQUANT_MODELS
         ] + [
             iree_definitions.ModuleGenerationConfig.build(
-                compile_config=self.MMT4D_AND_DOTPROD_COMPILE_CONFIG,
+                compile_config=self.DATA_TILING_AND_DOTPROD_COMPILE_CONFIG,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
             for model in self.QUANT_MODELS
