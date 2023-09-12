@@ -57,10 +57,6 @@ iree_cc_library(
     "status_util.h"
     "tracing.cc"
     "tracing.h"
-    "vma_allocator.cc"
-    "vma_allocator.h"
-    "vma_impl.cc"
-    "vma_impl.h"
     "vulkan_device.cc"
     "vulkan_driver.cc"
     "vulkan_headers.h"
@@ -83,7 +79,6 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::spirv_executable_def_c_fbs
-    vulkan_memory_allocator
   PUBLIC
 )
 

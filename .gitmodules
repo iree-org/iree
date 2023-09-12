@@ -7,9 +7,6 @@
 [submodule "third_party/vulkan_headers"]
 	path = third_party/vulkan_headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
-[submodule "third_party/vulkan_memory_allocator"]
-	path = third_party/vulkan_memory_allocator
-	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
 [submodule "third_party/spirv_headers"]
 	path = third_party/spirv_headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git

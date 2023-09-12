@@ -115,13 +115,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
     )
 
     maybe(
-        native.new_local_repository,
-        name = "vulkan_memory_allocator",
-        build_file = iree_repo_alias + "//:build_tools/third_party/vulkan_memory_allocator/BUILD.overlay",
-        path = paths.join(iree_path, "third_party/vulkan_memory_allocator"),
-    )
-
-    maybe(
         native.local_repository,
         name = "spirv_headers",
         path = paths.join(iree_path, "third_party/spirv_headers"),
