@@ -69,7 +69,7 @@ LogicalResult splitReductionPrecondition(Operation *op,
   }
 
   auto elemType =
-      getElementTypeOrSelf(linalgOp.getDpsInputOperand(0)->get().getType());
+      getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
   if (!(fpReductionReordering || elemType.isIntOrIndex())) {
     LLVM_DEBUG(
         llvm::dbgs()
