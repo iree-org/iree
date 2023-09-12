@@ -27,6 +27,14 @@ LITTLE_CORES = common_definitions.DeviceSpec.build(
     device_parameters=[device_parameters.ARM_LITTLE_CORES],
     tags=["little-core"],
 )
+ALL_CORES = common_definitions.DeviceSpec.build(
+    id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_6_PRO + "-all-core",
+    device_name=DEVICE_NAME,
+    architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
+    host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
+    device_parameters=[device_parameters.ALL_CORES],
+    tags=["all-cores"],
+)
 GPU = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_6_PRO + "-gpu",
     device_name=DEVICE_NAME,

@@ -339,6 +339,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             return "80" if single_thread else "f0"
         elif device_parameters.ARM_LITTLE_CORES in device_params:
             return "08" if single_thread else "0f"
+        elif device_parameters.ALL_CORES in device_params:
+            return "80" if single_thread else "ff"
 
         raise ValueError(f"Unsupported config to deduce taskset: '{run_config}'.")
 
