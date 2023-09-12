@@ -331,24 +331,46 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
   while ((nread = getline(&line, &len, fp)) != -1) {
     if (sscanf(line, "isa : %s\n", &isa[0])) {
       // First 4 characters are "rv32" or "rv64"
-      // We search th character 'v' from the 4 character to '_' occur or string end.
-      char *end = strchr(&isa[0], '_');
+      // We search th character 'v' from the 4th character to '_' occur or string end.
+      char *first = strchr(&isa[0], '_');
 
-      // Can't find '_', search 'v' in whole isa string.
-      if (!end) {
+      // Can't find '_', search 'v' in the whole isa string.
+      if (!first) {
         if (strchr(&isa[IREE_RISCV_64_ISA_SEARCH_START], 'v')) {
           IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1,
                  1 << 0);
-          break;
         }
+        break;
       } else {
-        int search_len = end - &isa[IREE_RISCV_64_ISA_SEARCH_START];
+        // search 'v' to the first '_' occur.
+        int search_len = first - &isa[IREE_RISCV_64_ISA_SEARCH_START];
         if (memchr(&isa[IREE_RISCV_64_ISA_SEARCH_START], 'v', search_len)) {
           IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1,
                  1 << 0);
           break;
         }
       }
+
+      // No 'v' before the first '_', search for "zve".
+      char *start = first;
+      char *end = &isa[0] + len;
+      char *next;
+
+      while (start < end) {
+        next = strchr(start, '_');
+        if (!next) {
+          next = end;
+        }
+
+        if (strncmp("zve", start, 3) == 0) {
+          IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1,
+               1 << 0);
+          break;
+        }
+        // Next search start from the char after '_'
+        start = next + 1;
+      }
+      break;
     }
   }
 
