@@ -284,8 +284,8 @@ void populateStableHloDotProdToLinalgConversionPatterns(
             DotOpConversion<DotOperationType::kVectorDot, linalg::DotOp>,
             DotGeneralBatchMatMulOpConversion>(typeConverter, context,
                                                PatternBenefit(2));
-  // patterns->add<DotGeneralOpConversion>(typeConverter, context,
-  //                                       PatternBenefit(1));
+  patterns->add<DotGeneralOpConversion>(typeConverter, context,
+                                        PatternBenefit(1));
 }
 } // namespace detail
 } // namespace mlir::iree_compiler::stablehlo
