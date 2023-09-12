@@ -5867,16 +5867,28 @@ add_dependencies(iree-benchmark-import-models-large
 )
 
 add_dependencies(iree-benchmark-suites-android-cpu
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_dotprod_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
 )
 
 add_dependencies(iree-benchmark-suites-android-gpu
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
@@ -5888,36 +5900,26 @@ add_dependencies(iree-benchmark-suites-android-gpu
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_dotprod_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_repeated-kernel_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_repeated-kernel_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_repeated-kernel_
@@ -5927,8 +5929,6 @@ add_dependencies(iree-benchmark-suites-android-gpu
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_mmt4d_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_repeated-kernel_
