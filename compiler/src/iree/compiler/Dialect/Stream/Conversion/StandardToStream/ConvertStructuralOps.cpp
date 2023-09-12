@@ -466,28 +466,24 @@ void populateStandardStructuralToStreamPatterns(
           return typeConverter.isLegal(type);
         });
       });
-
   conversionTarget.addDynamicallyLegalOp<mlir::scf::IfOp>(
       [&](mlir::scf::IfOp op) {
         return llvm::all_of(op.getResultTypes(), [&](Type type) {
           return typeConverter.isLegal(type);
         });
       });
-
   conversionTarget.addDynamicallyLegalOp<mlir::scf::WhileOp>(
       [&](mlir::scf::WhileOp op) {
         return llvm::all_of(op.getResultTypes(), [&](Type type) {
           return typeConverter.isLegal(type);
         });
       });
-
   conversionTarget.addDynamicallyLegalOp<mlir::scf::ConditionOp>(
       [&](mlir::scf::ConditionOp op) {
         return llvm::all_of(op.getOperandTypes(), [&](Type type) {
           return typeConverter.isLegal(type);
         });
       });
-
   conversionTarget.addDynamicallyLegalOp<mlir::scf::YieldOp>(
       [&](mlir::scf::YieldOp op) {
         return llvm::all_of(op.getOperandTypes(), [&](Type type) {

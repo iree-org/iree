@@ -105,15 +105,23 @@ func.func @scfIfExpansion(%cond: i1, %arg0: tensor<1xf32>, %arg1: tensor<1xf32>)
 
 // -----
 
+// CHECK-LABEL: @scfWhileExpansion
+// CHECK-SAME: %[[ARG0:.+]]: i32, %[[ARG1:.+]]: !stream.resource<*>, %[[ARG2:.+]]: index
 func.func @scfWhileExpansion(%arg0 : i32, %arg1 : tensor<1xf32>) {
   %c1 = arith.constant 1 : i32
   %c10 = arith.constant 10 : i32
+  // CHECK: scf.while
+  // CHECK-SAME: (%[[ARG3:.+]] = %[[ARG0]], %[[ARG4:.+]] = %[[ARG1]], %[[ARG5:.+]] = %[[ARG2]])
+  // CHECK-SAME: (i32, !stream.resource<*>, index) -> (i32, !stream.resource<*>, index)
   %0:2 = scf.while (%arg2 = %arg0, %arg3 = %arg1) : (i32, tensor<1xf32>) -> (i32, tensor<1xf32>) {
     %1 = arith.cmpi slt, %arg2, %c10 : i32
+    // CHECK: scf.condition(%[[V:.+]]) %[[ARG3]], %[[ARG1]], %[[ARG2]] : i32, !stream.resource<*>, index
     scf.condition(%1) %arg2, %arg1 : i32, tensor<1xf32>
   } do {
+  // CHECK: ^bb0(%[[ARG3:.+]]: i32, %[[ARG4:.+]]: !stream.resource<*>, %[[ARG5:.+]]: index):
   ^bb0(%arg2: i32, %arg3 : tensor<1xf32>):
     %1 = arith.addi %arg2, %c1 : i32
+  // CHECK: scf.yield %[[V:.+]], %[[ARG1]], %[[ARG2]] : i32, !stream.resource<*>, index
     scf.yield %1, %arg1 : i32, tensor<1xf32>
   }
   return

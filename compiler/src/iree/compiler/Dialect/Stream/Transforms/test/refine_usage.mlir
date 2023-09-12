@@ -214,71 +214,52 @@ func.func @escapingAlloca() -> !hal.buffer_view {
 // -----
 
 // CHECK-LABEL: @testIf
-func.func @testIf(%arg0: i1, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
-  %c4 = arith.constant 4 : index
+func.func @testIf(%arg0: i1, %arg1: !stream.resource<*>, %arg2: !stream.resource<*>) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  %c268435488_i32 = arith.constant 268435488 : i32
-  %c1_i32 = arith.constant 1 : i32
-  %c1 = arith.constant 1 : index
-  hal.buffer_view.assert<%arg1 : !hal.buffer_view> message("input 1") shape([%c1]) type(%c268435488_i32) encoding(%c1_i32)
-  %0 = stream.tensor.import %arg1 : !hal.buffer_view -> tensor<1xi32> in !stream.resource<external>{%c4}
-  %1 = stream.async.transfer %0 : !stream.resource<external>{%c4} -> !stream.resource<*>{%c4}
-  hal.buffer_view.assert<%arg2 : !hal.buffer_view> message("input 2") shape([%c1]) type(%c268435488_i32) encoding(%c1_i32)
-  %2 = stream.tensor.import %arg2 : !hal.buffer_view -> tensor<1xi32> in !stream.resource<external>{%c4}
-  %3 = stream.async.transfer %2 : !stream.resource<external>{%c4} -> !stream.resource<*>{%c4}
+  %c4 = arith.constant 4 : index
   // CHECK: %[[IF:.+]] = scf.if
   // CHECK-SAME: !stream.resource<external>
-  %4 = scf.if %arg0 -> (!stream.resource<*>) {
+  %if = scf.if %arg0 -> (!stream.resource<*>) {
     // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch
     // CHECK-SAME: !stream.resource<external>
     // CHECK-SAME: !stream.resource<external>
     // CHECK-SAME: -> !stream.resource<external>
-    %7 = stream.async.dispatch @testIf_dispatch_0::@testIf_dispatch_0_generic(%1[%c0 to %c4 for %c4], %3[%c0 to %c4 for %c4]) : (!stream.resource<*>{%c4}, !stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    %disp = stream.async.dispatch @disp(%arg1[%c0 to %c4 for %c4], %arg2[%c0 to %c4 for %c4]) : (!stream.resource<*>{%c4}, !stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
     // CHECK: scf.yield
     // CHECK-SAME: !stream.resource<external>
-    scf.yield %7 : !stream.resource<*>
+    scf.yield %disp : !stream.resource<*>
   } else {
     // CHECK: scf.yield
     // CHECK-SAME: !stream.resource<external>
-    scf.yield %1 : !stream.resource<*>
+    scf.yield %arg1 : !stream.resource<*>
   }
-  %5 = stream.async.transfer %4 : !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
-  %6 = stream.tensor.export %5 : tensor<1xi32> in !stream.resource<external>{%c4} -> !hal.buffer_view
-  return %6 : !hal.buffer_view
+  return %if : !stream.resource<*>
 }
 
 // -----
 
 // CHECK: @testWhile
-func.func @testWhile(%arg0: i32, %arg1: !hal.buffer_view) -> (i32, !hal.buffer_view) attributes {iree.abi.stub} {
-  %c4 = arith.constant 4 : index
+func.func @testWhile(%arg0: i32, %arg1: !stream.resource<*>) -> (i32, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
-  %c10_i32 = arith.constant 10 : i32
-  %c1_i32 = arith.constant 1 : i32
-  %c268435488_i32 = arith.constant 268435488 : i32
-  %c1 = arith.constant 1 : index
-  hal.buffer_view.assert<%arg1 : !hal.buffer_view> message("input 1") shape([%c1]) type(%c268435488_i32) encoding(%c1_i32)
-  %0 = stream.tensor.import %arg1 : !hal.buffer_view -> tensor<1xi32> in !stream.resource<external>{%c4}
-  %1 = stream.async.transfer %0 : !stream.resource<external>{%c4} -> !stream.resource<*>{%c4}
+  %c1 = arith.constant 1 : i32
+  %c4 = arith.constant 4 : index
+  %c10 = arith.constant 10 : i32
   // CHECK: scf.while
   // CHECK-SAME: (i32, !stream.resource<external>)
   // CHECK-SAME: (i32, !stream.resource<external>)
-  %2:2 = scf.while (%arg2 = %arg0, %arg3 = %1) : (i32, !stream.resource<*>) -> (i32, !stream.resource<*>) {
-    %5 = arith.cmpi slt, %arg2, %c10_i32 : i32
+  %while:2 = scf.while (%arg2 = %arg0, %arg3 = %arg1) : (i32, !stream.resource<*>) -> (i32, !stream.resource<*>) {
+    %cmp = arith.cmpi slt, %arg2, %c10 : i32
     // CHECK: scf.condition
     // CHECK-SAME: !stream.resource<external>
-    scf.condition(%5) %arg2, %arg3 : i32, !stream.resource<*>
+    scf.condition(%cmp) %arg2, %arg3 : i32, !stream.resource<*>
   } do {
   ^bb0(%arg2: i32, %arg3: !stream.resource<*>):
-    %5 = arith.addi %arg2, %c1_i32 : i32
-    %6 = stream.async.dispatch @testWhile_dispatch_0::@testWhile_dispatch_0_generic(%arg3[%c0 to %c4 for %c4], %1[%c0 to %c4 for %c4]) : (!stream.resource<*>{%c4}, !stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    %add = arith.addi %arg2, %c1 : i32
+    %disp = stream.async.dispatch @disp(%arg3[%c0 to %c4 for %c4], %arg1[%c0 to %c4 for %c4]) : (!stream.resource<*>{%c4}, !stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
     // CHECK: scf.yield
     // CHECK-SAME: !stream.resource<external>
-    scf.yield %5, %6 : i32, !stream.resource<*>
+    scf.yield %add, %disp : i32, !stream.resource<*>
   }
-  %3 = stream.async.transfer %2#1 : !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
-  // CHECK: stream.tensor.export
-  // CHECK-SAME: !stream.resource<external>
-  %4 = stream.tensor.export %3 : tensor<1xi32> in !stream.resource<external>{%c4} -> !hal.buffer_view
-  return %2#0, %4 : i32, !hal.buffer_view
+  // CHECK: return %[[IF]]#0, %[[IF]]#1 : i32, !stream.resource<external>
+  return %while#0, %while#1 : i32, !stream.resource<*>
 }
