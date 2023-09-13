@@ -62,8 +62,8 @@ void buildGlobalOptimizationPassPipeline(
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
-      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
       // Enable data tiling after they are in a canonical form.
       .addPredicatedPass(transformOptions.options.dataTiling,
                          IREE::Flow::createSetEncodingPass)
