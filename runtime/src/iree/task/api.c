@@ -62,21 +62,17 @@ iree_status_t iree_task_executor_options_initialize_from_flags(
 //===----------------------------------------------------------------------===//
 
 IREE_FLAG(
-    string, task_topology_nodes, "current",
-    "Comma-separated list of NUMA nodes that topologies will be defined for.\n"
-    "Each node specified will be configured based on the other topology\n"
-    "flags. 'all' can be used to indicate all available NUMA nodes and\n"
-    "'current' will inherit the node of the calling thread.");
-
-IREE_FLAG(
     string, task_topology_mode, "physical_cores",
     "Available modes:\n"
     " --task_topology_group_count=non-zero:\n"
     "   Uses whatever the specified group count is and ignores the set mode.\n"
     "   All threads will be unpinned and run on system-determined processors.\n"
+    " --task_topology_cpu_ids=0,1,2 [+ --task_topology_cpu_ids=3,4,5]:\n"
+    "   Creates one executor per set of logical CPU IDs.\n"
     " 'physical_cores':\n"
-    "   Creates one group per physical core in each NUMA node up to\n"
-    "   the value specified by --task_topology_max_group_count=.");
+    "   Creates one executor per NUMA node in --task_topology_nodes= and one\n"
+    "   group per physical core in each NUMA node up to the value specified\n"
+    "   by --task_topology_max_group_count=.");
 
 IREE_FLAG(
     int32_t, task_topology_group_count, 0,
@@ -86,6 +82,20 @@ IREE_FLAG(
     "worker count and distribution.\n"
     "WARNING: setting this flag directly is not recommended; use\n"
     "--task_topology_max_group_count= instead.");
+
+IREE_FLAG_LIST(
+    string, task_topology_cpu_ids,
+    "A list of absolute logical CPU IDs to use for a single topology. One\n"
+    "topology will be created for each repetition of the flag. CPU IDs match\n"
+    "the Linux logical CPU ID scheme (as used by lscpu/lstopo) or a flattened\n"
+    "[0, total_processor_count) range on Windows.");
+
+IREE_FLAG(
+    string, task_topology_nodes, "current",
+    "Comma-separated list of NUMA nodes that topologies will be defined for.\n"
+    "Each node specified will be configured based on the other topology\n"
+    "flags. 'all' can be used to indicate all available NUMA nodes and\n"
+    "'current' will inherit the node of the calling thread.");
 
 IREE_FLAG(
     int32_t, task_topology_max_group_count, 8,
@@ -178,72 +188,90 @@ static void iree_task_flags_print_action_flag(iree_string_view_t flag_name,
   fprintf(file, "# --%.*s\n", (int)flag_name.size, flag_name.data);
 }
 
-static iree_status_t iree_task_flags_dump_task_topologies(
-    iree_string_view_t flag_name, void* storage, iree_string_view_t value) {
-  // Select which nodes in the machine we will be creating topologies for.
-  uint64_t node_mask = 0ull;
-  IREE_RETURN_IF_ERROR(
-      iree_task_topologies_select_nodes_from_flags(&node_mask));
-
-  // TODO(benvanik): macros to make this iteration easier (ala cpu_set
-  // iterators).
-  iree_host_size_t topology_count = iree_math_count_ones_u64(node_mask);
-  uint64_t node_mask_bits = node_mask;
-  iree_task_topology_node_id_t node_base_id = 0;
-  for (iree_host_size_t i = 0; i < topology_count; ++i) {
-    int node_offset =
-        iree_task_affinity_set_count_trailing_zeros(node_mask_bits);
-    iree_task_topology_node_id_t node_id = node_base_id + node_offset;
-    node_base_id += node_offset + 1;
-    node_mask_bits = iree_shr(node_mask_bits, node_offset + 1);
-    iree_task_topology_t topology;
-    IREE_RETURN_IF_ERROR(
-        iree_task_topology_initialize_from_flags(node_id, &topology));
-    fprintf(stdout,
-            "# "
-            "===-------------------------------------------------------------"
-            "-----------===\n");
-    fprintf(stdout, "# topology[%" PRIhsz "]: %" PRIhsz " worker groups\n", i,
-            topology.group_count);
-    fprintf(stdout,
-            "# "
-            "===-------------------------------------------------------------"
-            "-----------===\n");
-    fprintf(stdout, "#\n");
-    for (iree_host_size_t j = 0; j < topology.group_count; ++j) {
-      const iree_task_topology_group_t* group = &topology.groups[j];
-      fprintf(stdout, "# group[%d]: '%s'\n", group->group_index, group->name);
-      fprintf(stdout, "#      processor: %u\n", group->processor_index);
-      fprintf(stdout, "#       affinity: ");
-      if (group->ideal_thread_affinity.specified) {
-        fprintf(stdout, "group=%u, id=%u, smt=%u",
-                group->ideal_thread_affinity.group,
-                group->ideal_thread_affinity.id,
-                group->ideal_thread_affinity.smt);
-      } else {
-        fprintf(stdout, "(unspecified)");
+static void iree_task_flags_dump_task_topology(
+    iree_host_size_t topology_id, const iree_task_topology_t* topology) {
+  fprintf(stdout,
+          "# "
+          "===-------------------------------------------------------------"
+          "-----------===\n");
+  fprintf(stdout, "# topology[%" PRIhsz "]: %" PRIhsz " worker groups\n",
+          topology_id, topology->group_count);
+  fprintf(stdout,
+          "# "
+          "===-------------------------------------------------------------"
+          "-----------===\n");
+  fprintf(stdout, "#\n");
+  for (iree_host_size_t j = 0; j < topology->group_count; ++j) {
+    const iree_task_topology_group_t* group = &topology->groups[j];
+    fprintf(stdout, "# group[%d]: '%s'\n", group->group_index, group->name);
+    fprintf(stdout, "#      processor: %u\n", group->processor_index);
+    fprintf(stdout, "#       affinity: ");
+    if (group->ideal_thread_affinity.specified) {
+      fprintf(
+          stdout, "group=%u, id=%u, smt=%u", group->ideal_thread_affinity.group,
+          group->ideal_thread_affinity.id, group->ideal_thread_affinity.smt);
+    } else {
+      fprintf(stdout, "(unspecified)");
+    }
+    fprintf(stdout, "\n");
+    fprintf(stdout, "#  cache sharing: ");
+    if (group->constructive_sharing_mask == 0) {
+      fprintf(stdout, "(none)\n");
+    } else if (group->constructive_sharing_mask ==
+               IREE_TASK_TOPOLOGY_GROUP_MASK_ALL) {
+      fprintf(stdout, "(all/undefined)\n");
+    } else {
+      fprintf(stdout, "%d group(s): ",
+              iree_math_count_ones_u64(group->constructive_sharing_mask));
+      for (iree_host_size_t ic = 0, jc = 0;
+           ic < IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT; ++ic) {
+        if ((group->constructive_sharing_mask >> ic) & 1) {
+          if (jc > 0) fprintf(stdout, ", ");
+          fprintf(stdout, "%" PRIhsz, ic);
+          ++jc;
+        }
       }
       fprintf(stdout, "\n");
-      fprintf(stdout, "#  cache sharing: ");
-      if (group->constructive_sharing_mask == 0) {
-        fprintf(stdout, "(none)\n");
-      } else if (group->constructive_sharing_mask ==
-                 IREE_TASK_TOPOLOGY_GROUP_MASK_ALL) {
-        fprintf(stdout, "(all/undefined)\n");
-      } else {
-        fprintf(stdout, "%d group(s): ",
-                iree_math_count_ones_u64(group->constructive_sharing_mask));
-        for (iree_host_size_t ic = 0, jc = 0;
-             ic < IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT; ++ic) {
-          if ((group->constructive_sharing_mask >> ic) & 1) {
-            if (jc > 0) fprintf(stdout, ", ");
-            fprintf(stdout, "%" PRIhsz, ic);
-            ++jc;
-          }
-        }
-        fprintf(stdout, "\n");
-      }
-      fprintf(stdout, "#\n");
+    }
+    fprintf(stdout, "#\n");
+  }
+}
+
+static iree_status_t iree_task_flags_dump_task_topologies(
+    iree_string_view_t flag_name, void* storage, iree_string_view_t value) {
+  const iree_flag_string_list_t cpu_ids_list =
+      FLAG_task_topology_cpu_ids_list();
+  if (cpu_ids_list.count == 0) {
+    // Select which nodes in the machine we will be creating topologies for.
+    uint64_t node_mask = 0ull;
+    IREE_RETURN_IF_ERROR(
+        iree_task_topologies_select_nodes_from_flags(&node_mask));
+
+    // TODO(benvanik): macros to make this iteration easier (ala cpu_set
+    // iterators).
+    iree_host_size_t topology_count = iree_math_count_ones_u64(node_mask);
+    uint64_t node_mask_bits = node_mask;
+    iree_task_topology_node_id_t node_base_id = 0;
+    for (iree_host_size_t i = 0; i < topology_count; ++i) {
+      int node_offset =
+          iree_task_affinity_set_count_trailing_zeros(node_mask_bits);
+      iree_task_topology_node_id_t node_id = node_base_id + node_offset;
+      node_base_id += node_offset + 1;
+      node_mask_bits = iree_shr(node_mask_bits, node_offset + 1);
+      iree_task_topology_t topology;
+      IREE_RETURN_IF_ERROR(
+          iree_task_topology_initialize_from_flags(node_id, &topology));
+      iree_task_flags_dump_task_topology(i, &topology);
+      iree_task_topology_deinitialize(&topology);
+    }
+  } else {
+    for (iree_host_size_t i = 0; i < cpu_ids_list.count; ++i) {
+      iree_task_topology_t topology;
+      IREE_RETURN_IF_ERROR(
+          iree_task_topology_initialize_from_logical_cpu_set_string(
+              cpu_ids_list.values[i], &topology));
+      iree_task_flags_dump_task_topology(i, &topology);
+      iree_task_topology_deinitialize(&topology);
     }
   }
 
@@ -275,11 +303,19 @@ iree_status_t iree_task_executors_create_from_flags(
   IREE_RETURN_IF_ERROR(
       iree_task_executor_options_initialize_from_flags(&options));
 
-  // Select which nodes in the machine we will be creating topologies for.
+  // Select which nodes in the machine we will be creating topologies for based
+  // on the topology mode.
+  iree_host_size_t topology_count = 0;
   uint64_t node_mask = 0ull;
-  IREE_RETURN_IF_ERROR(
-      iree_task_topologies_select_nodes_from_flags(&node_mask));
-  const iree_host_size_t topology_count = iree_math_count_ones_u64(node_mask);
+  const iree_flag_string_list_t cpu_ids_list =
+      FLAG_task_topology_cpu_ids_list();
+  if (cpu_ids_list.count == 0) {
+    IREE_RETURN_IF_ERROR(
+        iree_task_topologies_select_nodes_from_flags(&node_mask));
+    topology_count = iree_math_count_ones_u64(node_mask);
+  } else {
+    topology_count = cpu_ids_list.count;
+  }
 
   // Since this utility function creates one executor per topology returned by
   // the query we can check the executor capacity immediately.
@@ -309,34 +345,58 @@ iree_status_t iree_task_executors_create_from_flags(
   }
 
   // Create one executor per topology.
-  // TODO(benvanik): macros to make this iteration easier (ala cpu_set
-  // iterators).
   iree_status_t status = iree_ok_status();
-  uint64_t node_mask_bits = node_mask;
-  iree_task_topology_node_id_t node_base_id = 0;
-  for (iree_host_size_t i = 0; i < topology_count; ++i) {
-    int node_offset =
-        iree_task_affinity_set_count_trailing_zeros(node_mask_bits);
-    iree_task_topology_node_id_t node_id = node_base_id + node_offset;
-    node_base_id += node_offset + 1;
-    node_mask_bits = iree_shr(node_mask_bits, node_offset + 1);
+  if (cpu_ids_list.count == 0) {
+    // TODO(benvanik): macros to make this iteration easier (ala cpu_set
+    // iterators).
+    uint64_t node_mask_bits = node_mask;
+    iree_task_topology_node_id_t node_base_id = 0;
+    for (iree_host_size_t i = 0; i < topology_count; ++i) {
+      int node_offset =
+          iree_task_affinity_set_count_trailing_zeros(node_mask_bits);
+      iree_task_topology_node_id_t node_id = node_base_id + node_offset;
+      node_base_id += node_offset + 1;
+      node_mask_bits = iree_shr(node_mask_bits, node_offset + 1);
 
-    // Query topology for the node this executor is pinned to.
-    iree_task_topology_t topology;
-    status = iree_task_topology_initialize_from_flags(node_id, &topology);
-    if (!iree_status_is_ok(status)) break;
+      // Query topology for the node this executor is pinned to.
+      iree_task_topology_t topology;
+      status = iree_task_topology_initialize_from_flags(node_id, &topology);
+      if (!iree_status_is_ok(status)) break;
 
-    // TODO(benvanik): if group count is 0 then don't create the executor. Today
-    // the executor creation will fail with 0 groups so the program won't get in
-    // a weird state but it's probably not what a user would expect.
+      // TODO(benvanik): if group count is 0 then don't create the executor.
+      // Today the executor creation will fail with 0 groups so the program
+      // won't get in a weird state but it's probably not what a user would
+      // expect.
 
-    // Create executor with the given topology.
-    status = iree_task_executor_create(options, &topology, host_allocator,
-                                       &executors[i]);
+      // Create executor with the given topology.
+      status = iree_task_executor_create(options, &topology, host_allocator,
+                                         &executors[i]);
 
-    // Executor has consumed the topology and it can be dropped now.
-    iree_task_topology_deinitialize(&topology);
-    if (!iree_status_is_ok(status)) break;
+      // Executor has consumed the topology and it can be dropped now.
+      iree_task_topology_deinitialize(&topology);
+      if (!iree_status_is_ok(status)) break;
+    }
+  } else {
+    for (iree_host_size_t i = 0; i < topology_count; ++i) {
+      // Query topology for the node this executor is pinned to.
+      iree_task_topology_t topology;
+      status = iree_task_topology_initialize_from_logical_cpu_set_string(
+          cpu_ids_list.values[i], &topology);
+      if (!iree_status_is_ok(status)) break;
+
+      // TODO(benvanik): if group count is 0 then don't create the executor.
+      // Today the executor creation will fail with 0 groups so the program
+      // won't get in a weird state but it's probably not what a user would
+      // expect.
+
+      // Create executor with the given topology.
+      status = iree_task_executor_create(options, &topology, host_allocator,
+                                         &executors[i]);
+
+      // Executor has consumed the topology and it can be dropped now.
+      iree_task_topology_deinitialize(&topology);
+      if (!iree_status_is_ok(status)) break;
+    }
   }
 
   if (iree_status_is_ok(status)) {
