@@ -10,11 +10,16 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-flow-fuse-dequantization-matmul"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir {
 namespace iree_compiler {
@@ -34,7 +39,7 @@ static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
                                           Operation *dequant,
                                           Operation *matmul) {
 
-  Flow::DispatchRegionOp regionOp = matmul->getParentOfType<DispatchRegionOp>();
+  DispatchRegionOp regionOp = matmul->getParentOfType<DispatchRegionOp>();
   if (!regionOp) {
     FailureOr<DispatchRegionOp> maybeRegionOp =
         wrapOpInDispatchRegion(rewriter, matmul);
@@ -47,6 +52,348 @@ static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
       movePrecedingOpsIntoDispatchRegion(rewriter, dequant, regionOp);
   if (failed(maybeFusedRegionOp))
     return failure();
+
+  return success();
+}
+
+static FailureOr<DispatchRegionOp> 
+wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
+                                   SmallVector<Operation *> ops) {
+  FailureOr<DispatchRegionOp> maybeRegionOp =
+        wrapOpInDispatchRegion(rewriter, ops.back());
+  if (failed(maybeRegionOp)) {
+    return failure();
+  }
+  DispatchRegionOp regionOp = maybeRegionOp.value();
+
+  SmallVector<Operation*> precedingOps(ops.begin(), ops.end()-1);
+  FailureOr<DispatchRegionOp> maybeFusedRegionOp =
+      movePrecedingOpsIntoDispatchRegion(rewriter, precedingOps, regionOp);
+  if (failed(maybeFusedRegionOp)){
+    return failure();
+  }
+  regionOp = maybeFusedRegionOp.value();
+
+  return regionOp;
+}
+
+static SmallVector<utils::IteratorType>
+getParallelAndReductionIterators(unsigned nLoops, unsigned nReduction) {
+  SmallVector<utils::IteratorType> res(nLoops - nReduction,
+                                          utils::IteratorType::parallel);
+  res.append(nReduction, utils::IteratorType::reduction);
+  return res;
+}
+
+static std::optional<SmallVector<OpOperand*>> getDequantMatmulInputs_f32(linalg::GenericOp dequant, linalg::GenericOp matmul) {
+  OpOperand *scales, *zps, *quantMat, *unquantMat, *dequantMat;
+  for (int operandIdx = 0; operandIdx < dequant.getNumDpsInputs(); operandIdx++){
+    OpOperand *operand = dequant.getDpsInputOperand(operandIdx);
+    Value input = operand->get();
+    RankedTensorType inputType = llvm::dyn_cast<RankedTensorType>(input.getType());
+    if (!inputType) {
+      continue;
+    }
+    if (inputType.getElementTypeBitWidth() != 32) {
+      quantMat = operand;
+      continue;
+    }
+    for (Operation &bodyOp : dequant.getBlock()->getOperations()) {
+      if (isa<arith::MulFOp>(bodyOp)) {
+        if (bodyOp.getOperand(1) == dequant.getBlock()->getArgument(operandIdx)) {
+          scales = operand;
+          break;
+        }
+      } 
+      else if (isa<arith::SubFOp>(bodyOp)) {
+        if (bodyOp.getOperand(1) == dequant.getBlock()->getArgument(operandIdx)) {
+          zps = operand;
+          break;
+        }
+      }
+    }
+  }
+  Value dequantOut = dequant.getResult(0);
+  if (matmul.getDpsInputOperand(0)->get() == dequantOut) {
+    unquantMat = matmul.getDpsInputOperand(1);
+    dequantMat = matmul.getDpsInputOperand(0);
+  }
+  else {
+    unquantMat = matmul.getDpsInputOperand(0);
+    dequantMat = matmul.getDpsInputOperand(1);
+  }
+  if (scales && zps && quantMat && unquantMat) {
+    return SmallVector<OpOperand*>({quantMat, unquantMat, scales, zps, dequantMat});
+  }
+  return std::nullopt;
+}
+
+// Creates a new flow.dipatch.region op and places the
+// passed ops inside as long as the dequant op is a
+// producer for the matmul op
+static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
+                                          linalg::GenericOp dequant,
+                                          linalg::GenericOp matmul) {
+  LDBG("Reassociating");
+  std::optional<SmallVector<OpOperand*>> maybeInputs = getDequantMatmulInputs_f32(dequant, matmul);
+  if (!maybeInputs) {
+    return failure();
+  }
+  LDBG("Got scales and zps");
+  SmallVector<OpOperand*> ins = maybeInputs.value();
+  OpOperand *quantInOperand = ins[0];
+  OpOperand *unquantInOperand = ins[1];
+  Value quantIn = quantInOperand->get();
+  Value unquantIn = unquantInOperand->get();
+  Value scales = ins[2]->get();
+  Value zps = ins[3]->get();
+  OpOperand *matmulDequantOperand = ins[4];
+  RankedTensorType unquantInType = llvm::dyn_cast<RankedTensorType>(unquantIn.getType());
+  if (!unquantInType) {
+    return failure();
+  }
+  LDBG("1");
+  RankedTensorType quantInType = llvm::dyn_cast<RankedTensorType>(quantIn.getType());
+  if (!quantInType) {
+    return failure();
+  }
+  LDBG("2");
+  OpOperand *matmulOutputOperand = matmul.getDpsInitOperand(0);
+  Value matmulOutput = matmulOutputOperand->get();
+  RankedTensorType matmulOutputType = llvm::dyn_cast<RankedTensorType>(matmulOutput.getType());
+  LDBG("3");
+  SmallVector<int64_t> matmulOutShape(matmulOutputType.getShape());
+  SmallVector<int64_t> unquantInShape(unquantInType.getShape());
+  SmallVector<int64_t> quantInShape(quantInType.getShape());
+  SmallVector<AffineMap> dequantIndexingMaps = dequant.getIndexingMapsArray();
+  SmallVector<AffineMap> matmulIndexingMaps = matmul.getIndexingMapsArray();
+  SmallVector<utils::IteratorType> dequantIteratorTypes = dequant.getIteratorTypesArray();
+  SmallVector<utils::IteratorType> matmulIteratorTypes = matmul.getIteratorTypesArray();
+  FloatType f32Type = rewriter.getF32Type();
+  IntegerType i32Type = rewriter.getI32Type();
+  IntegerType i16Type = rewriter.getI16Type();
+  IntegerType i8Type = rewriter.getI8Type();
+
+  // ----- Quantize unquantized input ----- //
+  Value cst = rewriter.create<arith::ConstantOp>(dequant.getLoc(), rewriter.getF32FloatAttr(127));
+  LDBG("cst:   " << cst);
+  Value zeroF32cst = rewriter.create<arith::ConstantOp>(dequant.getLoc(), rewriter.getF32FloatAttr(0));
+  Value zeroI16cst = rewriter.create<arith::ConstantOp>(dequant.getLoc(), rewriter.getI16IntegerAttr(0));
+  // Generic to find max along groups
+  SmallVector<int64_t> groupMaxShape;
+  SmallVector<utils::IteratorType> groupMaxIterators;
+  int64_t numGroups = 0;
+
+  SmallVector<AffineExpr> exprs;
+  AffineMap indexingMap = matmul.getMatchingIndexingMap(unquantInOperand);
+  for (const auto &expr : enumerate(indexingMap.getResults())) {
+    if (auto dimExpr = expr.value().dyn_cast<AffineDimExpr>()) {
+      if (matmulIteratorTypes[dimExpr.getPosition()] == utils::IteratorType::parallel ||
+          dimExpr.getPosition() != indexingMap.getNumDims()-1) {
+        groupMaxIterators.push_back(utils::IteratorType::parallel);
+        groupMaxShape.push_back(unquantInShape[expr.index()]);
+        exprs.push_back(rewriter.getAffineDimExpr(groupMaxShape.size()-1));
+        if (matmulIteratorTypes[dimExpr.getPosition()] == utils::IteratorType::reduction) {
+          numGroups = unquantInShape[expr.index()];
+        }
+      }
+      else {
+        groupMaxIterators.push_back(utils::IteratorType::reduction);
+      }
+    } else {
+      return failure();
+    }
+  }
+  if (!numGroups) {
+    return failure();
+  }
+  RankedTensorType groupMaxType = RankedTensorType::get(groupMaxShape, unquantInType.getElementType());
+  Value groupMaxEmpty = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), groupMaxType.getShape(), groupMaxType.getElementType());
+  Value groupMaxOut =
+      rewriter.create<linalg::FillOp>(dequant.getLoc(), zeroF32cst, groupMaxEmpty).result();
+  LDBG("groupMaxOut:   " << groupMaxOut);
+  SmallVector<AffineMap> groupMaxMaps;
+  groupMaxMaps.push_back(rewriter.getMultiDimIdentityMap(unquantInShape.size()));
+  groupMaxMaps.push_back(AffineMap::get(unquantInShape.size(), 0, exprs, exprs.front().getContext()));
+  auto groupMaxOp = rewriter
+      .create<linalg::GenericOp>(
+          dequant.getLoc(), groupMaxOut.getType(), unquantIn, groupMaxOut, groupMaxMaps, groupMaxIterators,
+          [&](OpBuilder &b, Location loc, ValueRange args) {
+            Value abs = b.create<math::AbsFOp>(loc, args[0]);
+            Value max = b.create<arith::MaxFOp>(loc, abs, args[1]);
+            b.create<linalg::YieldOp>(loc, max);
+          });
+  LDBG("groupMaxOp:   " << groupMaxOp);
+  Value groupMax = groupMaxOp.getResult(0);
+
+  // Generic to find scales
+  RankedTensorType unquantInScalesType = groupMaxType;
+  Value unquantInScalesOut = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), unquantInScalesType.getShape(), unquantInScalesType.getElementType());
+  LDBG("unquantInScalesOut:   " << unquantInScalesOut);
+  SmallVector<AffineMap> unquantInScalesMaps;
+  unquantInScalesMaps.push_back(rewriter.getMultiDimIdentityMap(unquantInShape.size()-1));
+  unquantInScalesMaps.push_back(rewriter.getMultiDimIdentityMap(unquantInShape.size()-1));
+
+  auto unquantInScalesOp = rewriter
+      .create<linalg::GenericOp>(
+          dequant.getLoc(), unquantInScalesOut.getType(), groupMax, unquantInScalesOut, unquantInScalesMaps, getParallelAndReductionIterators(unquantInScalesType.getRank(), 0),
+          [&](OpBuilder &b, Location loc, ValueRange args) {
+            Value scale = b.create<arith::DivFOp>(loc, args[0], cst);
+            b.create<linalg::YieldOp>(loc, scale);
+          });
+  LDBG("unquantInScalesOp:   " << unquantInScalesOp);
+  Value unquantInScales = unquantInScalesOp.getResult(0);
+
+  // Generic to find scaled sums
+  RankedTensorType scaledSumsType = groupMaxType;
+  Value scaledSumsEmpty = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), scaledSumsType.getShape(), scaledSumsType.getElementType());
+  Value scaledSumsOut =
+      rewriter.create<linalg::FillOp>(dequant.getLoc(), zeroF32cst, scaledSumsEmpty).result();
+  LDBG("scaledSumsOut:   " << scaledSumsOut);
+  SmallVector<AffineMap> scaledSumsMaps;
+  scaledSumsMaps.push_back(rewriter.getMultiDimIdentityMap(unquantInShape.size()));
+  scaledSumsMaps.push_back(AffineMap::get(unquantInShape.size(), 0, exprs, exprs.front().getContext()));
+  SmallVector<utils::IteratorType> scaledSumsIterators = groupMaxIterators;
+  auto scaledSumsOp = rewriter
+      .create<linalg::GenericOp>(
+          dequant.getLoc(), scaledSumsOut.getType(), unquantIn, scaledSumsOut, scaledSumsMaps, scaledSumsIterators,
+          [&](OpBuilder &b, Location loc, ValueRange args) {
+            Value sum = b.create<arith::AddFOp>(loc, args[0], args[1]);
+            b.create<linalg::YieldOp>(loc, sum);
+          });
+  LDBG("scaledSumsOp:   " << scaledSumsOp);
+  Value scaledSums = scaledSumsOp.getResult(0);
+
+  // Generic to quantized the unquantized input
+  Value newQuantInOut = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), unquantInShape, i8Type);
+  LDBG("newQuantInOut:   " << newQuantInOut);
+  SmallVector<AffineMap> newQuantInMaps;
+  newQuantInMaps.push_back(rewriter.getMultiDimIdentityMap(unquantInShape.size()));
+  newQuantInMaps.push_back(AffineMap::get(unquantInShape.size(), 0, exprs, exprs.front().getContext()));
+  newQuantInMaps.push_back(rewriter.getMultiDimIdentityMap(unquantInShape.size()));
+  auto newQuantInOp = rewriter
+      .create<linalg::GenericOp>(
+          dequant.getLoc(), newQuantInOut.getType(), ValueRange{unquantIn, unquantInScales}, newQuantInOut, newQuantInMaps, getParallelAndReductionIterators(unquantInShape.size(), 0),
+          [&](OpBuilder &b, Location loc, ValueRange args) {
+            Value scaled = b.create<arith::DivFOp>(loc, args[0], args[1]);
+            Value quant = b.create<arith::FPToUIOp>(loc, i8Type, scaled);
+            b.create<linalg::YieldOp>(loc, quant);
+          });
+  LDBG("newQuantInOp:   " << newQuantInOp);
+  Value newQuantIn = newQuantInOp.getResult(0);
+
+  // ----- Reassociated dequantization matmul ----- //
+
+  // Generic to perform integer matmul and reduce within groups
+  SmallVector<int64_t> integerMatmulShape = matmulOutShape;
+  integerMatmulShape.push_back(numGroups);
+  Value integerMatmulEmpty = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), integerMatmulShape, i16Type);
+  Value integerMatmulOut =
+      rewriter.create<linalg::FillOp>(dequant.getLoc(), zeroI16cst, integerMatmulEmpty).result();
+  LDBG("integerMatmulOut:   " << integerMatmulOut);
+  SmallVector<utils::IteratorType> integerMatmulIterators = getParallelAndReductionIterators(matmul.getNumLoops(), 1);
+  SmallVector<AffineMap> integerMatmulMaps;
+  integerMatmulMaps.push_back(matmul.getMatchingIndexingMap(unquantInOperand));
+  integerMatmulMaps.push_back(matmul.getMatchingIndexingMap(matmulDequantOperand));
+  SmallVector<AffineExpr> outputExprs(matmul.getMatchingIndexingMap(matmulOutputOperand).getResults());
+  outputExprs.push_back(rewriter.getAffineDimExpr(matmul.getNumLoops()-2));
+  integerMatmulMaps.push_back(AffineMap::get(integerMatmulIterators.size(), 0, outputExprs, outputExprs.front().getContext()));
+  auto integerMatmulOp = rewriter
+      .create<linalg::GenericOp>(
+          dequant.getLoc(), integerMatmulOut.getType(), ValueRange{newQuantIn, quantIn}, integerMatmulOut, integerMatmulMaps, integerMatmulIterators,
+          [&](OpBuilder &b, Location loc, ValueRange args) {
+            Value ext0 = b.create<arith::ExtSIOp>(loc, i16Type, args[0]);
+            Value ext1 = b.create<arith::ExtUIOp>(loc, i16Type, args[1]);
+            Value mul = b.create<arith::MulIOp>(loc, ext0, ext1);
+            Value sum = b.create<arith::AddIOp>(loc, mul, args[2]);
+            b.create<linalg::YieldOp>(loc, sum);
+          });
+  LDBG("integerMatmulOp:   " << integerMatmulOp);
+  Value integerMatmul = integerMatmulOp.getResult(0);
+
+  // Generic to perform dequantization and finish reduction
+  SmallVector<utils::IteratorType> dequantizedMatmulIterators = getParallelAndReductionIterators(matmul.getNumLoops()-1, 1);
+  SmallVector<AffineMap> dequantizedMatmulMaps;
+  dequantizedMatmulMaps.push_back(rewriter.getMultiDimIdentityMap(dequantizedMatmulIterators.size()));
+  AffineMap intMatmulNewQuantMap = matmul.getMatchingIndexingMap(unquantInOperand);
+  SmallVector<AffineExpr> newQuantScalesExprs;
+  for (const auto &expr : enumerate(intMatmulNewQuantMap.getResults())) {
+    if (auto dimExpr = expr.value().dyn_cast<AffineDimExpr>()) {
+      if (dimExpr.getPosition() != intMatmulNewQuantMap.getNumDims()-1) {
+        newQuantScalesExprs.push_back(rewriter.getAffineDimExpr(dimExpr.getPosition()));
+      }
+    } else {
+      return failure();
+    }
+  }
+  dequantizedMatmulMaps.push_back(AffineMap::get(dequantizedMatmulIterators.size(), 0, newQuantScalesExprs, newQuantScalesExprs.front().getContext()));
+  dequantizedMatmulMaps.push_back(AffineMap::get(dequantizedMatmulIterators.size(), 0, newQuantScalesExprs, newQuantScalesExprs.front().getContext()));
+  AffineMap matmulQuantInMap = matmul.getMatchingIndexingMap(matmulDequantOperand);
+  SmallVector<AffineExpr> quantScalesExprs;
+  for (const auto &expr : enumerate(matmulQuantInMap.getResults())) {
+    if (auto dimExpr = expr.value().dyn_cast<AffineDimExpr>()) {
+      if (dimExpr.getPosition() != matmulQuantInMap.getNumDims()-1) {
+        quantScalesExprs.push_back(rewriter.getAffineDimExpr(dimExpr.getPosition()));
+      }
+    } else {
+      return failure();
+    }
+  }
+  RankedTensorType scalesType = llvm::dyn_cast<RankedTensorType>(scales.getType());
+  if (!scalesType) {
+    return failure();
+  }
+  if (quantScalesExprs.size() < scalesType.getShape().size()) {
+    quantScalesExprs.push_back(rewriter.getAffineConstantExpr(0));
+    if (quantScalesExprs.size() < scalesType.getShape().size()) {
+      LDBG("quantScalesExprs size:   " << quantScalesExprs.size());
+      for (auto expr : quantScalesExprs) {
+        LDBG("expr:   " << expr);
+      }
+      LDBG("scales size:   " << scalesType.getShape().size());
+      for (auto shape : scalesType.getShape()) {
+        LDBG("shape:   " << shape);
+      }
+      return failure();
+    }
+  }
+  dequantizedMatmulMaps.push_back(AffineMap::get(dequantizedMatmulIterators.size(), 0, quantScalesExprs, quantScalesExprs.front().getContext()));
+  dequantizedMatmulMaps.push_back(AffineMap::get(dequantizedMatmulIterators.size(), 0, quantScalesExprs, quantScalesExprs.front().getContext()));
+  SmallVector<AffineExpr> finalOutputExprs(matmul.getMatchingIndexingMap(matmulOutputOperand).getResults());
+  dequantizedMatmulMaps.push_back(AffineMap::get(dequantizedMatmulIterators.size(), 0, finalOutputExprs, finalOutputExprs.front().getContext()));
+
+  auto dequantizedMatmulOp = rewriter
+      .create<linalg::GenericOp>(
+          dequant.getLoc(), matmulOutput.getType(), ValueRange{integerMatmul, unquantInScales, scaledSums, scales, zps}, matmulOutput, dequantizedMatmulMaps, dequantizedMatmulIterators,
+          [&](OpBuilder &b, Location loc, ValueRange args) {
+            Value ext = b.create<arith::ExtSIOp>(loc, i32Type, args[0]);
+            Value dq = b.create<arith::SIToFPOp>(loc, f32Type, ext);
+            Value scaledRes0 = b.create<arith::MulFOp>(loc, dq, args[1]);
+            Value scaledRes1 = b.create<arith::MulFOp>(loc, scaledRes0, args[3]);
+            Value scaledZp0 = b.create<arith::MulFOp>(loc, args[4], args[3]);
+            Value scaledZp1 = b.create<arith::MulFOp>(loc, scaledZp0, args[2]);
+            Value groupRes = b.create<arith::SubFOp>(loc, scaledRes1, scaledZp1);
+            Value sum = b.create<arith::AddFOp>(loc, groupRes, args[5]);
+            b.create<linalg::YieldOp>(loc, sum);
+          });
+  LDBG("dequantizedMatmulOp:   " << dequantizedMatmulOp);
+  Value dequantizedMatmul = dequantizedMatmulOp.getResult(0);
+
+  rewriter.replaceOp(matmul, dequantizedMatmul);
+
+  // Fuse ops that quantize the unquantized input into a single dispatch region
+  SmallVector<Operation *> quantizationOps({groupMaxOp, unquantInScalesOp, scaledSumsOp, newQuantInOp});
+  FailureOr<DispatchRegionOp> maybeQuantizationDispatch = wrapConsecutiveOpsInDispatchRegion(rewriter, quantizationOps);
+  if (failed(maybeQuantizationDispatch)) {
+    return failure();
+  }
+
+  // Fuse ops that perform the dequantization + matmul into a single dispatch region
+  SmallVector<Operation *> dequantMatmulOps({integerMatmulOp, dequantizedMatmulOp});
+  FailureOr<DispatchRegionOp> maybeDequantMatmulDispatch = wrapConsecutiveOpsInDispatchRegion(rewriter, dequantMatmulOps);
+  if (failed(maybeDequantMatmulDispatch)) {
+    return failure();
+  }
 
   return success();
 }
@@ -204,16 +551,56 @@ public:
   }
 };
 
+class ReassociateAndFuseDequantizationMatmulPattern final
+    : public OpRewritePattern<linalg::GenericOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp, PatternRewriter &rewriter) const override {
+    // Match first generic op as matmul
+    if (failed(isGroupedContractionOp(genericOp)))
+      return failure();
+
+    // Match operands to dequantizations and fuse if matched
+    OpOperand *lhs = genericOp.getDpsInputOperand(0);
+    OpOperand *rhs = genericOp.getDpsInputOperand(1);
+    auto lhsOp = lhs->get().getDefiningOp<linalg::GenericOp>();
+    auto rhsOp = rhs->get().getDefiningOp<linalg::GenericOp>();
+
+    if (lhsOp){
+      if (!failed(isGroupedDequantizationOp(lhsOp))) {
+        return ReassociateAndFuseDequantMatmul(rewriter, lhsOp, genericOp);
+      }
+    }
+    if (rhsOp){
+      if (!failed(isGroupedDequantizationOp(rhsOp))) {
+        return ReassociateAndFuseDequantMatmul(rewriter, rhsOp, genericOp);
+      }
+    }
+    return failure();
+  }
+};
+
 struct FuseDequantizationMatmulPass
     : public FuseDequantizationMatmulBase<FuseDequantizationMatmulPass> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, Flow::FlowDialect>();
+    registry.insert<linalg::LinalgDialect, Flow::FlowDialect, math::MathDialect>();
   }
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    // Main pattern.
+    // Reassociate and fuse pattern
+    {
+      RewritePatternSet patterns(&getContext());
+      patterns.insert<ReassociateAndFuseDequantizationMatmulPattern>(context);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Normal fusion pattern.
     {
       RewritePatternSet patterns(&getContext());
       patterns.insert<FuseDequantizationMatmulPattern>(context);
