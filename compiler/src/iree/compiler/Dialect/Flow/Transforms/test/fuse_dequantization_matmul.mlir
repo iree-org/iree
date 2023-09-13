@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-flow-fuse-dequantization-matmul --canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-flow-fuse-dequantization-matmul,canonicalize))" %s | FileCheck %s
 
 module {
   func.func @grouped_quantized_matmul(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1x32x128xf32>, %arg2: tensor<4096x32x1xf32>, %arg3: tensor<4096x32x1xf32>) -> tensor<1x1x4096xf32> {
