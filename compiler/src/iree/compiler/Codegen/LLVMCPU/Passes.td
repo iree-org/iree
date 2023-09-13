@@ -177,6 +177,12 @@ def VectorContractCustomKernels :
   let constructor = "mlir::iree_compiler::createVectorContractCustomKernelsPass()";
 }
 
+def SetSpecialTilingConfigs :
+    Pass<"iree-llvmcpu-set-special-tiling-configs", "func::FuncOp"> {
+  let summary = "Set the tile sizes for special cases before KernelDispatch.";
+  let constructor = "mlir::iree_compiler::createSetSpecialTilingConfigsPass()";
+}
+
 def VerifyLinalgTransformLegality :
     Pass<"iree-llvmcpu-verify-linalg-transform-legality", "ModuleOp"> {
   let summary = "Verify that only supported IR constructs are passed to the compiler.";
