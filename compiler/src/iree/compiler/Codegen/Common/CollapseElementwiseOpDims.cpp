@@ -114,7 +114,8 @@ struct CollapseElementwiseOpDimsPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createCollapseElementwiseOpDimsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createCollapseElementwiseOpDimsPass() {
   return std::make_unique<CollapseElementwiseOpDimsPass>();
 }
 
