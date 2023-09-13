@@ -87,15 +87,15 @@ In this guide, we reference this directory as `$SCRIPTS`.
 
 ### Advancing the mainline branch in forks
 
-The IREE team maintains fork repositories for both llvm-project and stablehlo,
-allowing them to be patched out of band. These repositories are:
+The [shark-infra](https://github.com/shark-infra) org maintains forks of
+key repositories for which we may need to carry local patches. Anyone who
+contributes to the project can request access to create patch branches here.
 
-* https://github.com/iree-org/iree-llvm-fork (`main` branch)
-* https://github.com/iree-org/stablehlo (`main` branch)
-* https://github.com/iree-org/iree-tf-fork (`master` branch)
+* https://github.com/shark-infra/llvm-project (`main` branch)
+* https://github.com/shark-infra/stablehlo (`main` branch)
 
-Iree repository has an
-action named [Advance Upstream Forks](https://github.com/openxla/iree/actions/workflows/advance_upstream_forks.yml)
+The [fork-roller](https://github.com/shark-infra/fork-roller) repository has an
+action named [Advance Upstream Forks](https://github.com/shark-infra/fork-roller/blob/main/.github/workflows/advance_forks.yml)
 to update the forks. Just select `Run Workflow` on that action and give it a
 minute. You should see the fork repository mainline branch move forward. This
 action runs hourly. If needing up to the minute changes, you may need to trigger
