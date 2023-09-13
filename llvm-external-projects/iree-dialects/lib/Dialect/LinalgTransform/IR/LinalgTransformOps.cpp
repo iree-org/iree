@@ -69,7 +69,7 @@ void linalg::transform::LinalgTransformDialect::initialize() {
 
 void linalg::transform::ScopeOp::getSuccessorRegions(
     RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
-  if (index)
+  if (!point.isParent())
     regions.emplace_back(getResults());
   else
     regions.emplace_back(&getBody());
