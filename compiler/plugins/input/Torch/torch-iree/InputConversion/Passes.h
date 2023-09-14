@@ -17,6 +17,11 @@ namespace TorchInput {
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertTMTensorToLinalgExtPass();
 
+// Creates a pipeline that lowers from the torch backend contract to IREE.
+// This is based on the torch-backend-to-linalg-on-tensors-backend-pipeline
+// pipeline in torch-mlir but includes IREE specific lowerings.
+void createTorchToIREEPipeline(OpPassManager &pm);
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
