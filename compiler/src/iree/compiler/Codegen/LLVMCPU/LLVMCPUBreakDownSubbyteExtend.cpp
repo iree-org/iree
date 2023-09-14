@@ -176,14 +176,15 @@ struct BreakDownSubbyteExtend final : OpRewritePattern<arith::ExtUIOp> {
     LDBG("extuiSrcType: " << extuiSrcType);
     LDBG("extuiDstType: " << extuiDstType);
 
-    // We only have power-of-two bitwidth cases for now.
-    if (!llvm::isPowerOf2_64(extuiSrcType.getNumElements()))
-      return failure();
-
     int64_t srcElemBitwidth = extuiSrcType.getElementTypeBitWidth();
     int64_t dstElemBitwidth = extuiDstType.getElementTypeBitWidth();
     LDBG("srcElemBitwidth: " << srcElemBitwidth);
     LDBG("dstElemBitwidth: " << dstElemBitwidth);
+
+    // We only have power-of-two bitwidth cases for now.
+    if (!llvm::isPowerOf2_64(dstElemBitwidth) ||
+        srcElemBitwidth != 4)
+      return failure();
 
     auto srcShape = extuiSrcType.getShape();
 
@@ -229,34 +230,68 @@ struct BreakDownSubbyteExtend final : OpRewritePattern<arith::ExtUIOp> {
 
       newVector = rewriter.create<vector::InsertOp>(extOp.getLoc(), shuffleResult, newVector, extractIndices);
     }
+      if (dstElemBitwidth == 32){
 
-    int32_t maskBase = (1u << srcElemBitwidth) - 1;
-    SmallVector<int32_t> maskArray(extuiDstType.getNumElements());
-    for (int32_t elemNum = 0; elemNum < extuiDstType.getNumElements(); elemNum++) {
-      maskArray[elemNum] = maskBase
-                           << (elemNum * srcElemBitwidth % dstElemBitwidth);
+      int32_t maskBase = (1u << srcElemBitwidth) - 1;
+      SmallVector<int32_t> maskArray(extuiDstType.getNumElements());
+      for (int32_t elemNum = 0; elemNum < extuiDstType.getNumElements(); elemNum++) {
+        maskArray[elemNum] = maskBase
+                            << (elemNum * srcElemBitwidth % dstElemBitwidth);
+      }
+      auto maskVals = rewriter.create<arith::ConstantOp>(
+          extOp.getLoc(), extuiDstType,
+          DenseIntElementsAttr::get(extuiDstType, maskArray));
+      LDBG("maskVals: " << maskVals);
+
+      SmallVector<int32_t> shruiArray(extuiDstType.getNumElements());
+      for (int32_t elemNum = 0; elemNum < extuiDstType.getNumElements(); elemNum++) {
+        shruiArray[elemNum] = elemNum * srcElemBitwidth % dstElemBitwidth;
+      }
+      auto shruiVals = rewriter.create<arith::ConstantOp>(
+          extOp.getLoc(), extuiDstType,
+          DenseIntElementsAttr::get(extuiDstType, shruiArray));
+      LDBG("shruiVals: " << shruiVals);
+
+      Value andResult =
+          rewriter.create<arith::AndIOp>(extOp.getLoc(), newVector, maskVals);
+      LDBG("andResult: " << andResult);
+
+      Value shruiResult =
+          rewriter.replaceOpWithNewOp<arith::ShRUIOp>(extOp, andResult, shruiVals);
+      LDBG("shruiResult: " << shruiResult);
     }
-    auto maskVals = rewriter.create<arith::ConstantOp>(
-        extOp.getLoc(), extuiDstType,
-        DenseIntElementsAttr::get(extuiDstType, maskArray));
-    LDBG("maskVals: " << maskVals);
+    else if (dstElemBitwidth == 16){
+      int16_t maskBase = (1u << srcElemBitwidth) - 1;
+      SmallVector<int16_t> maskArray(extuiDstType.getNumElements());
+      for (int16_t elemNum = 0; elemNum < extuiDstType.getNumElements(); elemNum++) {
+        maskArray[elemNum] = maskBase
+                            << (elemNum * srcElemBitwidth % dstElemBitwidth);
+      }
+      auto maskVals = rewriter.create<arith::ConstantOp>(
+          extOp.getLoc(), extuiDstType,
+          DenseIntElementsAttr::get(extuiDstType, maskArray));
+      LDBG("maskVals: " << maskVals);
 
-    SmallVector<int32_t> shruiArray(extuiDstType.getNumElements());
-    for (int32_t elemNum = 0; elemNum < extuiDstType.getNumElements(); elemNum++) {
-      shruiArray[elemNum] = elemNum * srcElemBitwidth % dstElemBitwidth;
+      SmallVector<int16_t> shruiArray(extuiDstType.getNumElements());
+      for (int16_t elemNum = 0; elemNum < extuiDstType.getNumElements(); elemNum++) {
+        shruiArray[elemNum] = elemNum * srcElemBitwidth % dstElemBitwidth;
+      }
+      auto shruiVals = rewriter.create<arith::ConstantOp>(
+          extOp.getLoc(), extuiDstType,
+          DenseIntElementsAttr::get(extuiDstType, shruiArray));
+      LDBG("shruiVals: " << shruiVals);
+
+      Value andResult =
+          rewriter.create<arith::AndIOp>(extOp.getLoc(), newVector, maskVals);
+      LDBG("andResult: " << andResult);
+
+      Value shruiResult =
+          rewriter.replaceOpWithNewOp<arith::ShRUIOp>(extOp, andResult, shruiVals);
+      LDBG("shruiResult: " << shruiResult);
     }
-    auto shruiVals = rewriter.create<arith::ConstantOp>(
-        extOp.getLoc(), extuiDstType,
-        DenseIntElementsAttr::get(extuiDstType, shruiArray));
-    LDBG("shruiVals: " << shruiVals);
-
-    Value andResult =
-        rewriter.create<arith::AndIOp>(extOp.getLoc(), newVector, maskVals);
-    LDBG("andResult: " << andResult);
-
-    Value shruiResult =
-        rewriter.replaceOpWithNewOp<arith::ShRUIOp>(extOp, andResult, shruiVals);
-    LDBG("shruiResult: " << shruiResult);
+    else {
+      return failure();
+    }
 
     return success();
   }
@@ -456,15 +491,15 @@ struct LLVMCPUBreakDownSubbyteExtendPass final
     // For the case when the innermost dimension of the src type is too small to
     // fill a single element of the dst type. Might not be worth doing anything in
     // this case
-    {
-      RewritePatternSet patterns(context);
-      patterns.add<BreakDownSubbyteExtendFlatten>(context);
-      vector::populateVectorShapeCastLoweringPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
+    // {
+    //   RewritePatternSet patterns(context);
+    //   patterns.add<BreakDownSubbyteExtendFlatten>(context);
+    //   vector::populateVectorShapeCastLoweringPatterns(patterns);
+    //   if (failed(applyPatternsAndFoldGreedily(getOperation(),
+    //                                           std::move(patterns)))) {
+    //     return signalPassFailure();
+    //   }
+    // }
   }
 };
 
