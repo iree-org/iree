@@ -43,9 +43,13 @@ iree_cc_library(
     IREELinalgExtDialect
     MLIRFuncDialect
     MLIRIR
+    MLIRMemRefDialect
     MLIRPass
     MLIRTensorDialect
     MLIRTransforms
+    torch-mlir::ConversionPasses
+    torch-mlir::TorchConversionDialectIR
+    torch-mlir::TorchDialectPasses
     torch-mlir-dialects::TMTensorDialectIR
   PUBLIC
 )

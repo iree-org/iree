@@ -6,6 +6,7 @@ iree_lit_test_suite(
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "torch_to_iree.mlir"
   TOOLS
     FileCheck
     iree-opt
