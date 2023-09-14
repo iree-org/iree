@@ -6,11 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/IR/FunctionInterfaces.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir {
 namespace iree_compiler {

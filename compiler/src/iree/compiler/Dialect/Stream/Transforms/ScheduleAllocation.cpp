@@ -1264,7 +1264,7 @@ static Value findTiedYieldResult(Value seedValue) {
   auto regionOp =
       cast<RegionBranchOpInterface>(seedValue.getParentRegion()->getParentOp());
   SmallVector<RegionSuccessor> regions;
-  regionOp.getSuccessorRegions(0, regions);
+  regionOp.getSuccessorRegions(regionOp->getRegion(0), regions);
   auto results = regions.front().getSuccessorInputs();
   SmallVector<Value> worklist;
   worklist.push_back(seedValue);
