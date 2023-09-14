@@ -7457,7 +7457,7 @@ possibly lazy-initialized executable.</p>
 </code></pre></div>
 <p>An executable module representing a target-specific compiled
 kernel/shader/etc.</p>
-<p>Traits: IsolatedFromAbove, SingleBlockImplicitTerminator<IREE::HAL::ExecutableEndOp>, SymbolTable</p>
+<p>Traits: IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::HAL::ExecutableEndOp>, SymbolTable</p>
 <p>Interfaces: Symbol</p>
 <h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
 <table>
@@ -7499,7 +7499,7 @@ kernel/shader/etc.</p>
 <p>This is an unspecialized source representation of an executable
 module without an assigned target. This is useful for hand-authoring
 executables prior to device specification.</p>
-<p>Traits: IsolatedFromAbove, SingleBlockImplicitTerminator<IREE::HAL::ExecutableSourceEndOp>, SymbolTable</p>
+<p>Traits: IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::HAL::ExecutableSourceEndOp>, SymbolTable</p>
 <p>Interfaces: Symbol</p>
 <h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
 <table>
@@ -7546,7 +7546,7 @@ executables prior to device specification.</p>
 </code></pre></div>
 <p>The target IR for the executable. This can be preserved for debugging but
 is usually removed during transformation.</p>
-<p>Traits: HasParent<IREE::HAL::ExecutableOp>, IsolatedFromAbove, SingleBlockImplicitTerminator<IREE::HAL::ExecutableVariantEndOp>, SymbolTable</p>
+<p>Traits: HasParent<IREE::HAL::ExecutableOp>, IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::HAL::ExecutableVariantEndOp>, SymbolTable</p>
 <p>Interfaces: Symbol</p>
 <h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
 <table>

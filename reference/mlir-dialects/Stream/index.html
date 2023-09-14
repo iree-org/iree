@@ -4233,7 +4233,7 @@ only ready once all nested ops complete execution.</p>
     stream.yield %1, %2
   }
 </code></pre></div></p>
-<p>Traits: AttrSizedOperandSegments, HasParent<IREE::Stream::AsyncExecuteOp, IREE::Stream::AsyncConcurrentOp>, RecursiveMemoryEffects, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_AsyncPhaseOp</p>
+<p>Traits: AttrSizedOperandSegments, HasParent<IREE::Stream::AsyncExecuteOp, IREE::Stream::AsyncConcurrentOp>, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_AsyncPhaseOp</p>
 <p>Interfaces: AsyncAccessOpInterface, ClosureOpInterface, RegionBranchOpInterface, Stream_AffinityOp, Stream_StreamableOp, TiedOpInterface, Util_SizeAwareOp</p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
@@ -4316,7 +4316,7 @@ results are only ready once all nested ops complete execution and the
 returned timepoint is reached. Zero or more timepoints may be provided to
 block execution until they are all reached; zero timepoints indicates that
 execution may begin immediately.</p>
-<p>Traits: AttrSizedOperandSegments, RecursiveMemoryEffects, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_AsyncPhaseOp</p>
+<p>Traits: AttrSizedOperandSegments, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_AsyncPhaseOp</p>
 <p>Interfaces: AsyncAccessOpInterface, ClosureOpInterface, RegionBranchOpInterface, Stream_AffinityOp, Stream_TimelineOp, TiedOpInterface, Util_SizeAwareOp</p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
@@ -4772,7 +4772,7 @@ produces an XYZ workgroup count for the 3D grid dispatch.</p>
 <p>An executable module containing one or more public functions. The contents
 of the functions are safe to dispatch and can be lowered further to
 target-specific backend IR representations.</p>
-<p>Traits: IsolatedFromAbove, SingleBlockImplicitTerminator<IREE::Stream::ExecutableEndOp>, SymbolTable</p>
+<p>Traits: IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::ExecutableEndOp>, SymbolTable</p>
 <p>Interfaces: Symbol</p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
@@ -5000,7 +5000,7 @@ same time).</p>
     }
   }
 </code></pre></div></p>
-<p>Traits: HasParent<IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp>, RecursiveMemoryEffects, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
+<p>Traits: HasParent<IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp>, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
 <p>Interfaces: RegionBranchOpInterface, Stream_StreamableOp</p>
 <h4 id="streamcmdcopy-streamcmdcopyop"><code>stream.cmd.copy</code> (Stream::CmdCopyOp)<a class="headerlink" href="#streamcmdcopy-streamcmdcopyop" title="Permanent link">link</a></h4>
 <p><em>Copies a subview of a stream resource to another</em></p>
@@ -5189,7 +5189,7 @@ results are only ready once all nested ops complete execution and the
 returned timepoint is reached. Zero or more timepoints may be provided to
 block execution until they are all reached; zero timepoints indicates that
 execution may begin immediately.</p>
-<p>Traits: AttrSizedOperandSegments, RecursiveMemoryEffects, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
+<p>Traits: AttrSizedOperandSegments, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
 <p>Interfaces: ClosureOpInterface, InferTypeOpInterface, RegionBranchOpInterface, Stream_AffinityOp, Stream_TimelineOp, Util_SizeAwareOp</p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
@@ -5494,7 +5494,7 @@ after the other).</p>
     }
   }
 </code></pre></div></p>
-<p>Traits: HasParent<IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp>, RecursiveMemoryEffects, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
+<p>Traits: HasParent<IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp>, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
 <p>Interfaces: RegionBranchOpInterface, Stream_StreamableOp</p>
 <h3 id="file-ops">File ops<a class="headerlink" href="#file-ops" title="Permanent link">link</a></h3>
 <p>File ops.</p>
