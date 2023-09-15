@@ -829,7 +829,7 @@ static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
-      DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert);
+      DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert);
 }
 
 static DispatchLoweringPassPipeline
