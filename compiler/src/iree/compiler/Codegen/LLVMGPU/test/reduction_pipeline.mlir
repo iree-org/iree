@@ -229,7 +229,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      arith.maximumf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <maxf>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    vector.reduction <maximumf>, %{{.*}} : vector<4xf32> into f32
 //         CHECK:    gpu.shuffle  xor
 //         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor

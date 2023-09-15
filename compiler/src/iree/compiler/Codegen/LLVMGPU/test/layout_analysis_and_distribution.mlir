@@ -143,7 +143,7 @@ builtin.module {
     %3 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
     %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<8x16xf16>, vector<8x16xf16>
     %5 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %3, %4, %cst : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf16>
-    %6 = vector.multi_reduction <maxf>, %5, %init [1] : vector<16x8xf16> to vector<16xf16>
+    %6 = vector.multi_reduction <maximumf>, %5, %init [1] : vector<16x8xf16> to vector<16xf16>
     %7 = vector.broadcast %6 : vector<16xf16> to vector<8x16xf16>
     %8 = vector.transpose %7, [1, 0] : vector<8x16xf16> to vector<16x8xf16>
     vector.transfer_write %8, %2[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
@@ -948,7 +948,7 @@ builtin.module {
     %9 = vector.transfer_read %1[%c0_0, %c0_0], %cst_1 {in_bounds = [true, true], permutation_map = #map1} : memref<16x16xf16>, vector<16x16xf16>
     %10 = vector.contract {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %8, %9, %cst : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf16>
     %11 = vector.transfer_read %2[%7], %cst_1 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
-    %12 = vector.multi_reduction <maxf>, %10, %11 [1] : vector<16x16xf16> to vector<16xf16>
+    %12 = vector.multi_reduction <maximumf>, %10, %11 [1] : vector<16x16xf16> to vector<16xf16>
     %13 = vector.transfer_read %3[%7], %cst_1 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
     %14 = arith.subf %11, %12 : vector<16xf16>
     %15 = math.exp %14 : vector<16xf16>
@@ -1022,7 +1022,7 @@ builtin.module {
 // CHECK-SAME:     vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf16>
 // CHECK:        %[[D11:.+]] = vector.transfer_read %[[D2]][%[[D7]]], %[[CST_0]] {in_bounds = [true]} : memref<16xf16>,
 // CHECK-SAME:     vector<16xf16>
-// CHECK:        %[[D12:.+]] = vector.multi_reduction <maxf>, %[[D10]], %[[D11]] [1] : vector<16x16xf16> to
+// CHECK:        %[[D12:.+]] = vector.multi_reduction <maximumf>, %[[D10]], %[[D11]] [1] : vector<16x16xf16> to
 // CHECK-SAME:     vector<16xf16>
 // CHECK:        %[[D13:.+]] = vector.transfer_read %[[D3]][%[[D7]]], %[[CST_0]] {in_bounds = [true]} : memref<16xf16>,
 // CHECK-SAME:     vector<16xf16>
