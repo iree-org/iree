@@ -67,6 +67,13 @@ LogicalResult splitReductionPrecondition(Operation *op,
     LLVM_DEBUG(llvm::dbgs() << "doesn't have exactly 1 input\n");
     return failure();
   }
+  // The `linalg::splitReduction` method does not work for ops with indexing
+  // semantics. See https://github.com/openxla/iree/pull/14979
+  if (linalgOp.hasIndexSemantics()) {
+    LLVM_DEBUG(llvm::dbgs() << "the split method used currently doesnt support "
+                               "indexing semantics\n");
+    return failure();
+  }
 
   auto elemType =
       getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
