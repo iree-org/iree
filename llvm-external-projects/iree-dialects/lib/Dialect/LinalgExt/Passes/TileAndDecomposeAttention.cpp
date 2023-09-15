@@ -250,7 +250,7 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
                                          zero, loc, builder, ops);
 
   // Compute current statistics
-  Value newMax = computeRowwiseReduction<arith::MaxFOp>(qkTranspose, maxSlice,
+  Value newMax = computeRowwiseReduction<arith::MaximumFOp>(qkTranspose, maxSlice,
                                                         loc, builder, ops);
   Value partialSoftmax =
       computePartialSoftmax(qkTranspose, newMax, loc, builder, ops);

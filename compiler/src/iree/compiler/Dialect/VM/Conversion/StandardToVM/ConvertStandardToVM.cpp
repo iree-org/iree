@@ -1160,9 +1160,9 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                            IREE::VM::RemF64Op>,
               BinaryArithmeticOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
                                            IREE::VM::SubF64Op>,
-              BinaryArithmeticOpConversion<arith::MinFOp, IREE::VM::MinF32Op,
+              BinaryArithmeticOpConversion<arith::MinimumFOp, IREE::VM::MinF32Op,
                                            IREE::VM::MinF64Op>,
-              BinaryArithmeticOpConversion<arith::MaxFOp, IREE::VM::MaxF32Op,
+              BinaryArithmeticOpConversion<arith::MaximumFOp, IREE::VM::MaxF32Op,
                                            IREE::VM::MaxF64Op>>(typeConverter,
                                                                 context);
 

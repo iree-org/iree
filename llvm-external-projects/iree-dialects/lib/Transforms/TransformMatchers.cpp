@@ -1630,7 +1630,7 @@ void transform_ext::makeSoftmaxMatcher(
                            .input(0, ConstantFloatMinOrMinusInf());
   auto &maxReduction =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::MaxFOp>(/*commutative=*/true)
+          .singleOpWithCanonicaleArgs<arith::MaximumFOp>(/*commutative=*/true)
           // Only handle most inner reduction for now.
           .dim(-1, utils::IteratorType::reduction)
           .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)
