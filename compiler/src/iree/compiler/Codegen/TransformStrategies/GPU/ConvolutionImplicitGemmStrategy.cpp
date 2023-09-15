@@ -265,8 +265,7 @@ buildTileFuseToSingleScfFor(ImplicitLocOpBuilder &b, Value isolatedParentOpH,
                             ArrayRef<int64_t> tileSizes) {
   iree_compiler::TileToScfForAndFuseResult result;
   Type rootType = rootH.getType();
-  auto tiletoScfForOp =
-      b.create<TileOp>(rootType, rootH, tileSizes);
+  auto tiletoScfForOp = b.create<TileOp>(rootType, rootH, tileSizes);
   result.forLoops = tiletoScfForOp.getLoops();
   result.tiledOpH = tiletoScfForOp.getTiledLinalgOp();
 
