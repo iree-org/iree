@@ -67,6 +67,11 @@ LogicalResult splitReductionPrecondition(Operation *op,
     LLVM_DEBUG(llvm::dbgs() << "doesn't have exactly 1 input\n");
     return failure();
   }
+  if (linalgOp.hasIndexSemantics()) {
+    LLVM_DEBUG(llvm::dbgs() << "the split method used currently doesnt support "
+                               "indexing semantics\n");
+    return failure();
+  }
 
   auto elemType =
       getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
