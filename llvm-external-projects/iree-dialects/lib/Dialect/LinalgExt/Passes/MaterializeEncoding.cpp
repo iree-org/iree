@@ -108,6 +108,7 @@ chooseEncodingInfo(RankedTensorType tensorType) {
   case EncodingUser::BATCH_MATMUL_I8I8I32:
     return chooseEncodingInfoForMatmul(user, role, /*tileParams=*/{8, 4, 8});
   }
+  llvm_unreachable("unhandled EncodingUser case");
 }
 
 //===---------------------------------------------------------------------===//
