@@ -135,6 +135,8 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
                                           linalg::GenericOp dequant,
                                           linalg::GenericOp matmul) {
   LDBG("Reassociating");
+  LDBG("dequant:   " << dequant);
+  LDBG("matmul:   " << matmul);
   std::optional<SmallVector<OpOperand*>> maybeInputs = getDequantMatmulInputs_f32(dequant, matmul);
   if (!maybeInputs) {
     return failure();
@@ -381,12 +383,12 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
 
   rewriter.replaceOp(matmul, dequantizedMatmul);
 
-  // Fuse ops that quantize the unquantized input into a single dispatch region
-  SmallVector<Operation *> quantizationOps({groupMaxOp, unquantInScalesOp, scaledSumsOp, newQuantInOp});
-  FailureOr<DispatchRegionOp> maybeQuantizationDispatch = wrapConsecutiveOpsInDispatchRegion(rewriter, quantizationOps);
-  if (failed(maybeQuantizationDispatch)) {
-    return failure();
-  }
+  // // Fuse ops that quantize the unquantized input into a single dispatch region
+  // SmallVector<Operation *> quantizationOps({groupMaxOp, unquantInScalesOp, scaledSumsOp, newQuantInOp});
+  // FailureOr<DispatchRegionOp> maybeQuantizationDispatch = wrapConsecutiveOpsInDispatchRegion(rewriter, quantizationOps);
+  // if (failed(maybeQuantizationDispatch)) {
+  //   return failure();
+  // }
 
   // Fuse ops that perform the dequantization + matmul into a single dispatch region
   SmallVector<Operation *> dequantMatmulOps({integerMatmulOp, dequantizedMatmulOp});
@@ -566,7 +568,15 @@ public:
     OpOperand *rhs = genericOp.getDpsInputOperand(1);
     auto lhsOp = lhs->get().getDefiningOp<linalg::GenericOp>();
     auto rhsOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-
+    if (!llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
+            .hasStaticShape() ||
+        !llvm::cast<ShapedType>(genericOp.getInputs()[1].getType())
+            .hasStaticShape() ||
+        !llvm::cast<ShapedType>(genericOp.getResults()[0].getType())
+            .hasStaticShape()) {
+      // Codegen can't handle the dynamic case yet.
+      return failure();
+    }
     if (lhsOp){
       if (!failed(isGroupedDequantizationOp(lhsOp))) {
         return ReassociateAndFuseDequantMatmul(rewriter, lhsOp, genericOp);
@@ -588,33 +598,77 @@ struct FuseDequantizationMatmulPass
     registry.insert<linalg::LinalgDialect, Flow::FlowDialect, math::MathDialect>();
   }
 
-  void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    // Reassociate and fuse pattern
-    {
-      RewritePatternSet patterns(&getContext());
-      patterns.insert<ReassociateAndFuseDequantizationMatmulPattern>(context);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
+  void runOnOperation() override;
+  // void runOnOperation() override {
+  //   MLIRContext *context = &getContext();
+  //   // Reassociate and fuse pattern
+  //   {
+  //     RewritePatternSet patterns(&getContext());
+  //     patterns.insert<ReassociateAndFuseDequantizationMatmulPattern>(context);
+  //     if (failed(applyPatternsAndFoldGreedily(getOperation(),
+  //                                             std::move(patterns)))) {
+  //       return signalPassFailure();
+  //     }
+  //   }
 
-    // Normal fusion pattern.
-    {
-      RewritePatternSet patterns(&getContext());
-      patterns.insert<FuseDequantizationMatmulPattern>(context);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-  }
+  //   // Normal fusion pattern.
+  //   {
+  //     RewritePatternSet patterns(&getContext());
+  //     patterns.insert<FuseDequantizationMatmulPattern>(context);
+  //     if (failed(applyPatternsAndFoldGreedily(getOperation(),
+  //                                             std::move(patterns)))) {
+  //       return signalPassFailure();
+  //     }
+  //   }
+  // }
 };
 
 } // namespace
 
-std::unique_ptr<Pass> createFuseDequantizationMatmulPass() {
+void FuseDequantizationMatmulPass::runOnOperation() {
+  MLIRContext *context = &getContext();
+  auto funcOp = getOperation();
+  SmallVector<std::pair<linalg::GenericOp, linalg::GenericOp>> candidates;
+  for (auto genericOp : funcOp.getFunctionBody().getOps<linalg::GenericOp>()) {
+    if (failed(isGroupedContractionOp(genericOp)))
+      continue;
+
+    OpOperand *lhs = genericOp.getDpsInputOperand(0);
+    OpOperand *rhs = genericOp.getDpsInputOperand(1);
+    auto lhsOp = lhs->get().getDefiningOp<linalg::GenericOp>();
+    auto rhsOp = rhs->get().getDefiningOp<linalg::GenericOp>();
+    if (!llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
+            .hasStaticShape() ||
+        !llvm::cast<ShapedType>(genericOp.getInputs()[1].getType())
+            .hasStaticShape() ||
+        !llvm::cast<ShapedType>(genericOp.getResults()[0].getType())
+            .hasStaticShape()) {
+      // Codegen can't handle the dynamic case yet.
+      continue;
+    }
+    if (lhsOp){
+      if (!failed(isGroupedDequantizationOp(lhsOp))) {
+        candidates.push_back(std::make_pair(lhsOp, genericOp));
+        continue;
+      }
+    }
+    if (rhsOp){
+      if (!failed(isGroupedDequantizationOp(rhsOp))) {
+        candidates.push_back(std::make_pair(rhsOp, genericOp));
+      }
+    }
+  }
+  IRRewriter rewriter(context);
+  for (auto candidate : candidates) {
+    rewriter.setInsertionPointAfter(candidate.second);
+    if (failed(ReassociateAndFuseDequantMatmul(rewriter, candidate.first, candidate.second))) {
+      return signalPassFailure();
+    }
+  }
+}
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> 
+createFuseDequantizationMatmulPass() {
   return std::make_unique<FuseDequantizationMatmulPass>();
 }
 

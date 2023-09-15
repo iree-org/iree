@@ -175,7 +175,8 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCloneProducersIntoDispatchRegionsPass();
 
 // A pass to fuse dequantization and matmul linalg.generic ops
-std::unique_ptr<Pass> createFuseDequantizationMatmulPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> 
+createFuseDequantizationMatmulPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
