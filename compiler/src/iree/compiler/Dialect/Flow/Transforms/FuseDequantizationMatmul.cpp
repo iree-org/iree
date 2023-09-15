@@ -173,14 +173,17 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
   SmallVector<utils::IteratorType> matmulIteratorTypes = matmul.getIteratorTypesArray();
   FloatType f32Type = rewriter.getF32Type();
   IntegerType i32Type = rewriter.getI32Type();
-  IntegerType i16Type = rewriter.getI16Type();
-  IntegerType i8Type = rewriter.getI8Type();
+  IntegerType accType = rewriter.getI32Type();
+  IntegerType quantType = rewriter.getI16Type();
+  Type srcQuantType = quantInType.getElementType();
+  IntegerType mulType = rewriter.getI16Type();
+  unsigned quantBitRange = std::min(quantType.getIntOrFloatBitWidth()-1, mulType.getIntOrFloatBitWidth() - srcQuantType.getIntOrFloatBitWidth() - 1);
 
   // ----- Quantize unquantized input ----- //
-  Value cst = rewriter.create<arith::ConstantOp>(dequant.getLoc(), rewriter.getF32FloatAttr(127));
+  Value cst = rewriter.create<arith::ConstantOp>(dequant.getLoc(), rewriter.getF32FloatAttr((1 << quantBitRange) - 1));
   LDBG("cst:   " << cst);
   Value zeroF32cst = rewriter.create<arith::ConstantOp>(dequant.getLoc(), rewriter.getF32FloatAttr(0));
-  Value zeroI16cst = rewriter.create<arith::ConstantOp>(dequant.getLoc(), rewriter.getI16IntegerAttr(0));
+  Value zeroI32cst = rewriter.create<arith::ConstantOp>(dequant.getLoc(), rewriter.getI32IntegerAttr(0));
   // Generic to find max along groups
   SmallVector<int64_t> groupMaxShape;
   SmallVector<utils::IteratorType> groupMaxIterators;
@@ -267,7 +270,7 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
   Value scaledSums = scaledSumsOp.getResult(0);
 
   // Generic to quantized the unquantized input
-  Value newQuantInOut = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), unquantInShape, i8Type);
+  Value newQuantInOut = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), unquantInShape, quantType);
   LDBG("newQuantInOut:   " << newQuantInOut);
   SmallVector<AffineMap> newQuantInMaps;
   newQuantInMaps.push_back(rewriter.getMultiDimIdentityMap(unquantInShape.size()));
@@ -278,7 +281,7 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
           dequant.getLoc(), newQuantInOut.getType(), ValueRange{unquantIn, unquantInScales}, newQuantInOut, newQuantInMaps, getParallelAndReductionIterators(unquantInShape.size(), 0),
           [&](OpBuilder &b, Location loc, ValueRange args) {
             Value scaled = b.create<arith::DivFOp>(loc, args[0], args[1]);
-            Value quant = b.create<arith::FPToUIOp>(loc, i8Type, scaled);
+            Value quant = b.create<arith::FPToSIOp>(loc, quantType, scaled);
             b.create<linalg::YieldOp>(loc, quant);
           });
   LDBG("newQuantInOp:   " << newQuantInOp);
@@ -289,9 +292,9 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
   // Generic to perform integer matmul and reduce within groups
   SmallVector<int64_t> integerMatmulShape = matmulOutShape;
   integerMatmulShape.push_back(numGroups);
-  Value integerMatmulEmpty = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), integerMatmulShape, i16Type);
+  Value integerMatmulEmpty = rewriter.create<tensor::EmptyOp>(dequant.getLoc(), integerMatmulShape, accType);
   Value integerMatmulOut =
-      rewriter.create<linalg::FillOp>(dequant.getLoc(), zeroI16cst, integerMatmulEmpty).result();
+      rewriter.create<linalg::FillOp>(dequant.getLoc(), zeroI32cst, integerMatmulEmpty).result();
   LDBG("integerMatmulOut:   " << integerMatmulOut);
   SmallVector<utils::IteratorType> integerMatmulIterators = getParallelAndReductionIterators(matmul.getNumLoops(), 1);
   SmallVector<AffineMap> integerMatmulMaps;
@@ -304,10 +307,24 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
       .create<linalg::GenericOp>(
           dequant.getLoc(), integerMatmulOut.getType(), ValueRange{newQuantIn, quantIn}, integerMatmulOut, integerMatmulMaps, integerMatmulIterators,
           [&](OpBuilder &b, Location loc, ValueRange args) {
-            Value ext0 = b.create<arith::ExtSIOp>(loc, i16Type, args[0]);
-            Value ext1 = b.create<arith::ExtUIOp>(loc, i16Type, args[1]);
-            Value mul = b.create<arith::MulIOp>(loc, ext0, ext1);
-            Value sum = b.create<arith::AddIOp>(loc, mul, args[2]);
+            Value mul;
+            if (quantType == mulType) {
+              Value ext1 = b.create<arith::ExtUIOp>(loc, mulType, args[1]);
+              mul = b.create<arith::MulIOp>(loc, args[0], ext1);
+            }
+            else {
+              Value ext0 = b.create<arith::ExtSIOp>(loc, mulType, args[0]);
+              Value ext1 = b.create<arith::ExtUIOp>(loc, mulType, args[1]);
+              mul = b.create<arith::MulIOp>(loc, ext0, ext1);
+            }
+            Value sum;
+            if (mulType == accType) {
+              sum = b.create<arith::AddIOp>(loc, mul, args[2]);
+            }
+            else {
+              Value extMul = b.create<arith::ExtSIOp>(loc, accType, mul);
+              sum = b.create<arith::AddIOp>(loc, extMul, args[2]);
+            }
             b.create<linalg::YieldOp>(loc, sum);
           });
   LDBG("integerMatmulOp:   " << integerMatmulOp);
@@ -368,8 +385,14 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
       .create<linalg::GenericOp>(
           dequant.getLoc(), matmulOutput.getType(), ValueRange{integerMatmul, unquantInScales, scaledSums, scales, zps}, matmulOutput, dequantizedMatmulMaps, dequantizedMatmulIterators,
           [&](OpBuilder &b, Location loc, ValueRange args) {
-            Value ext = b.create<arith::ExtSIOp>(loc, i32Type, args[0]);
-            Value dq = b.create<arith::SIToFPOp>(loc, f32Type, ext);
+            Value dq;
+            if (accType == i32Type) {
+              dq = b.create<arith::SIToFPOp>(loc, f32Type, args[0]);
+            }
+            else {
+              Value ext = b.create<arith::ExtSIOp>(loc, i32Type, args[0]);
+              dq = b.create<arith::SIToFPOp>(loc, f32Type, ext);
+            }
             Value scaledRes0 = b.create<arith::MulFOp>(loc, dq, args[1]);
             Value scaledRes1 = b.create<arith::MulFOp>(loc, scaledRes0, args[3]);
             Value scaledZp0 = b.create<arith::MulFOp>(loc, args[4], args[3]);
