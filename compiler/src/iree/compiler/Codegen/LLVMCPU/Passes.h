@@ -56,7 +56,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
 
 /// Pass to perform SplitReduction transformations of `LinalgOp`s.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = true);
+createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = false);
 
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>

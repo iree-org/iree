@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-split-reduction,cse,canonicalize))" --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-split-reduction{enable-fp-reduction-reordering=false},cse,canonicalize))" --split-input-file %s | FileCheck %s --check-prefix=DISABLEREASSOC
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-split-reduction{enable-fp-reduction-reordering=true},cse,canonicalize))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-split-reduction,cse,canonicalize))" --split-input-file %s | FileCheck %s --check-prefix=DISABLEREASSOC
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 5, 32, 0], [1, 1, 8, 0], [0, 0, 0, 8]]>
 #config1 = #iree_codegen.lowering_config<tile_sizes = [[2, 5, 32, 0], [1, 1, 8, 0], [0, 0, 0, 16]]>

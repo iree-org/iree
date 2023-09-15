@@ -105,7 +105,7 @@ def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp">
   let constructor = "mlir::iree_compiler::createLLVMCPUSplitReductionPass()";
   let options = [
     Option<"enableFpReductionReordering", "enable-fp-reduction-reordering",
-      "bool", /*default=*/"true",
+      "bool", /*default=*/"false",
       "Flag to enable reduction reordering on floating points.">,
   ];
 }
