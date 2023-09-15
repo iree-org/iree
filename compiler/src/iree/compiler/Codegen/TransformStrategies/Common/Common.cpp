@@ -170,7 +170,6 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
                                            bool canonicalize) {
   assert(opsHToFuse.empty() && "No fusion supported yet");
   iree_compiler::TileToScfForAndFuseResult result;
-  // TODO: Replace by transform::TileToScfForOp and deprecate transform::TileOp.
   auto tiletoScfForOp = b.create<transform::TileOp>(rootH, tileSizes);
   result.forLoops = tiletoScfForOp.getLoops();
   result.tiledOpH = tiletoScfForOp.getTiledLinalgOp();
