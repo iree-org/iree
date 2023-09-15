@@ -73,7 +73,7 @@ func.func @reduce_multi_inputs_no_contraction(%a: tensor<2x3x4xf32>, %b: tensor<
     iterator_types = ["parallel", "reduction", "reduction"]
   } ins(%a, %b : tensor<2x3x4xf32>, tensor<2x3x4xf32>) outs(%init : tensor<4xf32>) {
   ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
-    %max = arith.maxf %arg0, %arg1 : f32
+    %max = arith.maximumf %arg0, %arg1 : f32
     %add = arith.addf %max, %arg2 : f32
     linalg.yield %add : f32
   } -> tensor<4xf32>
@@ -94,7 +94,7 @@ func.func @reduce_multi_inputs_no_contraction(%a: tensor<2x3x4xf32>, %b: tensor<
 //     CHECK-NOT:   vector.broadcast
 //     CHECK-NOT:   vector.transpose
 //         CHECK:   vector.transfer_read %[[INIT]]{{.+}} : tensor<4xf32>, vector<4xf32>
-// CHECK-COUNT-6:   arith.maxf {{.+}} : vector<4xf32>
+// CHECK-COUNT-6:   arith.maximumf {{.+}} : vector<4xf32>
 // CHECK-COUNT-6:   arith.addf {{.+}} : vector<4xf32>
 //         CHECK:   vector.transfer_write %{{.+}}, %[[INIT]]{{.+}} : vector<4xf32>, tensor<4xf32>
 

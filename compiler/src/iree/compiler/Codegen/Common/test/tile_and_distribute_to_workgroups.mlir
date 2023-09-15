@@ -1845,7 +1845,7 @@ hal.executable private @tile_multiuse_producer {
             iterator_types = ["parallel", "parallel", "reduction"]}
             ins(%3 : tensor<12x128x128xf32>) outs(%1 : tensor<12x128xf32>) {
           ^bb0(%arg0: f32, %arg1: f32):
-            %11 = arith.maxf %arg0, %arg1 : f32
+            %11 = arith.maximumf %arg0, %arg1 : f32
             linalg.yield %11 : f32
           } -> tensor<12x128xf32>
         %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<12x128xf32>) -> tensor<12x128xf32>

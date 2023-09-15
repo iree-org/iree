@@ -511,7 +511,7 @@ func.func @reduce_window_max_4x6xf32() {
   %3 = tensor.empty() : tensor<2x2x3xf32>
   %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d2, d0 * 2 + d3, d1 * 3 + d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%2, %3 : tensor<2x4x6xf32>, tensor<2x2x3xf32>) outs(%cst : tensor<2x2xf32>) {
   ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
-    %5 = arith.maxf %arg0, %arg2 : f32
+    %5 = arith.maximumf %arg0, %arg2 : f32
     linalg.yield %5 : f32
   } -> tensor<2x2xf32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [2, 2], strides = [1, 1] : tensor<2x2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x2xf32>>
