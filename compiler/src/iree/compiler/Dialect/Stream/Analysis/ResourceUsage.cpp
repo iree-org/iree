@@ -492,6 +492,18 @@ private:
                 return WalkResult::advance();
               });
         })
+        .Case([&](mlir::scf::WhileOp op) {
+          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op->getOperand(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= operandUsage.getState();
+
+          auto beforeUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getBeforeBody()->getArgument(operandIdx)),
+              DFX::Resolution::REQUIRED);
+
+          getState() ^= beforeUsage.getState();
+        })
         .Case([&](mlir::scf::ConditionOp op) {
           auto operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op->getOperand(operandIdx)),
@@ -503,18 +515,35 @@ private:
               Position::forValue(op->getParentOp()->getResult(operandIdx - 1)),
               DFX::Resolution::REQUIRED);
           getState() ^= parentUsage.getState();
+
+          if (auto whileOp = dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+            auto value = Position::forValue(whileOp.getAfter().getArgument(operandIdx - 1));
+            auto valueUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, value, DFX::Resolution::REQUIRED);
+            getState() ^= valueUsage.getState();
+          }
+
         })
         .Case([&](mlir::scf::YieldOp op) {
-          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op->getOperand(operandIdx)),
-              DFX::Resolution::REQUIRED);
-          getState() ^= operandUsage.getState();
+          if(isa<scf::IfOp>(op->getParentOp()))  {
+            auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(op->getOperand(operandIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= operandUsage.getState();
 
-          auto parentUsage = solver.getElementFor<ValueResourceUsage>(
-              *this,
-              Position::forValue(op->getParentOp()->getResult(operandIdx)),
-              DFX::Resolution::REQUIRED);
-          getState() ^= parentUsage.getState();
+            auto parentUsage = solver.getElementFor<ValueResourceUsage>(
+                *this,
+                Position::forValue(op->getParentOp()->getResult(operandIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= parentUsage.getState();
+          }
+
+          if (auto whileOp = dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+            auto value = Position::forValue(whileOp.getBefore().getArgument(operandIdx));
+            auto valueUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, value, DFX::Resolution::REQUIRED);
+            getState() ^= valueUsage.getState();
+          }
         })
         .Case([&](mlir::func::ReturnOp op) {
           auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
@@ -733,6 +762,7 @@ ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
   explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
+  explorer.setOpAction<mlir::scf::WhileOp>(TraversalAction::RECURSE);
   explorer.setDialectAction<IREE::Stream::StreamDialect>(
       TraversalAction::RECURSE);
   // Ignore the contents of executables (linalg goo, etc).
