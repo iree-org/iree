@@ -210,6 +210,9 @@ createRematerializeParallelOpsPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRemoveSingleIterationLoopPass();
 
+/// Create a pass that replaces maximumf/minimumf with minumf/maxnumf ops.
+std::unique_ptr<OperationPass<func::FuncOp>> createReplaceSlowMinMaxOpsPass();
+
 /// Pass to optimize vector transfer_read and transfer_write. See Passes.td for
 /// `option` details.
 std::unique_ptr<OperationPass<func::FuncOp>>
