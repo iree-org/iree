@@ -245,6 +245,7 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
   }
 
+  IRRewriter rewriter(context);
   int numLoops = consumerOp.getLoopIteratorTypes().size();
   if (numLoops > tileSizes.size()) {
     tileSizes.append(numLoops - tileSizes.size(), 0);
@@ -256,8 +257,9 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     return;
   }
 
-  auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
-  IRRewriter rewriter(context);
+  SmallVector<OpFoldResult> tileSizesOfr =
+      getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
+  auto options = scf::SCFTilingOptions().setTileSizes(tileSizesOfr);
   if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
     return signalPassFailure();
