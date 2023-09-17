@@ -26,7 +26,7 @@
 !out_tensor_t = tensor<16x128x128xf32>
 
 // Compilation checks that shuffles are produced.
-// CHECK-SHUFFLE: vector.reduction <maxf>
+// CHECK-SHUFFLE: vector.reduction <maximumf>
 // CHECK-SHUFFLE-COUNT-5: gpu.shuffle  xor
 // CHECK-SHUFFLE: vector.reduction <add>
 // CHECK-SHUFFLE-COUNT-5: gpu.shuffle  xor
