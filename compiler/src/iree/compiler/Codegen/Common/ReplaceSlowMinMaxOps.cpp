@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -59,23 +60,29 @@ struct ReplaceSlowMinMaxOpsPass
     : public ReplaceSlowMinMaxOpsBase<ReplaceSlowMinMaxOpsPass> {
 public:
   using ReplaceSlowMinMaxOpsBase::ReplaceSlowMinMaxOpsBase;
-  void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    RewritePatternSet patterns(context);
-    patterns.add<
-        ReplaceSlowWithFastMinMaxOpPattern<arith::MinimumFOp, arith::MinNumFOp>,
-        ReplaceSlowWithFastMinMaxOpPattern<arith::MaximumFOp, arith::MaxNumFOp>,
-        ReplaceSlowWithFastReductionMinMaxOpPattern<vector::ReductionOp>,
-        ReplaceSlowWithFastReductionMinMaxOpPattern<
-            vector::MultiDimReductionOp>>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
-    }
-  }
+  void runOnOperation() override;
 };
 
 } // namespace
+
+void mlir::iree_compiler::populateReplaceSlowMinMaxOpsPatterns(
+    RewritePatternSet &patterns) {
+  patterns.add<
+      ReplaceSlowWithFastMinMaxOpPattern<arith::MinimumFOp, arith::MinNumFOp>,
+      ReplaceSlowWithFastMinMaxOpPattern<arith::MaximumFOp, arith::MaxNumFOp>,
+      ReplaceSlowWithFastReductionMinMaxOpPattern<vector::ReductionOp>,
+      ReplaceSlowWithFastReductionMinMaxOpPattern<vector::MultiDimReductionOp>>(
+      patterns.getContext());
+}
+
+void ReplaceSlowMinMaxOpsPass::runOnOperation() {
+  RewritePatternSet patterns(&getContext());
+  populateReplaceSlowMinMaxOpsPatterns(patterns);
+  if (failed(
+          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+    return signalPassFailure();
+  }
+}
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::iree_compiler::createReplaceSlowMinMaxOpsPass() {
