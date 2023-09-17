@@ -131,7 +131,11 @@ iree_status_t iree_hal_rocm_device_create(iree_hal_driver_t* driver,
   IREE_TRACE_ZONE_BEGIN(z0);
   hipCtx_t context;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, ROCM_RESULT_TO_STATUS(syms, hipCtxCreate(&context, 0, device)));
+      z0,
+      ROCM_RESULT_TO_STATUS(syms, hipDevicePrimaryCtxRetain(&context, device)));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, ROCM_RESULT_TO_STATUS(syms, hipCtxSetCurrent(context)));
+
   hipStream_t stream;
   iree_status_t status = ROCM_RESULT_TO_STATUS(
       syms, hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
@@ -145,7 +149,7 @@ iree_status_t iree_hal_rocm_device_create(iree_hal_driver_t* driver,
     if (stream) {
       syms->hipStreamDestroy(stream);
     }
-    syms->hipCtxDestroy(context);
+    syms->hipDevicePrimaryCtxRelease(device);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
