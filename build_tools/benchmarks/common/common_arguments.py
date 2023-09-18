@@ -75,28 +75,28 @@ class Parser(argparse.ArgumentParser):
             "--benchmark-name-regex",
             "--benchmark_name_regex",
             type=str,
-            default=None,
+            default=".*",
             help="Only run benchmarks matching the given benchmark name regex",
         )
         self.add_argument(
             "--driver-filter-regex",
             "--driver_filter_regex",
             type=str,
-            default=None,
+            default=".*",
             help="Only run benchmarks matching the given driver regex",
         )
         self.add_argument(
             "--model-name-regex",
             "--model_name_regex",
             type=str,
-            default=None,
+            default=".*",
             help="Only run benchmarks matching the given model name regex",
         )
         self.add_argument(
             "--mode-regex",
             "--mode_regex",
             type=str,
-            default=None,
+            default=".*",
             help="Only run benchmarks matching the given benchmarking mode regex",
         )
         self.add_argument(
@@ -180,14 +180,14 @@ class Parser(argparse.ArgumentParser):
         self.add_argument(
             "--execution_benchmark_config",
             type=_check_file_path,
-            required=True,
+            default=None,
             help="JSON config for the execution benchmarks",
         )
         self.add_argument(
             "--target_device_name",
             type=str,
-            required=True,
-            help="Target device in benchmark config to run",
+            default=None,
+            help="Target device in JSON config to run",
         )
         self.add_argument(
             "--shard_index",

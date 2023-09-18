@@ -65,10 +65,10 @@ class BenchmarkConfig:
     normal_benchmark_tool_dir: Optional[pathlib.Path] = None
     trace_capture_config: Optional[TraceCaptureConfig] = None
 
-    benchmark_name_filter: Optional[str] = None
-    driver_filter: Optional[str] = None
-    model_name_filter: Optional[str] = None
-    mode_filter: Optional[str] = None
+    benchmark_name_filter: str = ".*"
+    driver_filter: str = ".*"
+    model_name_filter: str = ".*"
+    mode_filter: str = ".*"
     use_compatible_filter: bool = False
 
     keep_going: bool = False

@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import tarfile
 
+from benchmark_suites.iree import benchmark_collections
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
@@ -34,6 +35,7 @@ from common.benchmark_definition import (
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_artifacts import iree_artifacts
 from e2e_model_tests import run_module_utils
+
 import common.common_arguments
 
 
@@ -149,10 +151,21 @@ def main(args):
     commit = get_git_commit_hash("HEAD")
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
-    benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    run_configs = benchmark_suite_module.get_run_configs_by_target_and_shard(
-        benchmark_groups, args.target_device_name, args.shard_index
-    )
+    if args.execution_benchmark_config is None:
+        _, run_configs = benchmark_collections.generate_benchmarks()
+        if args.target_device_name is not None:
+            run_configs = [
+                config
+                for config in run_configs
+                if config.target_device_spec.device_name == args.target_device_name
+            ]
+    else:
+        benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
+        if args.target_device_name is None:
+            raise ValueError("--target_device_name must be specified.")
+        run_configs = benchmark_suite_module.get_run_configs_by_target_and_shard(
+            benchmark_groups, args.target_device_name, args.shard_index
+        )
 
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs, root_benchmark_dir=benchmark_config.root_benchmark_dir

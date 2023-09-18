@@ -102,6 +102,7 @@ class BenchmarkDriver(object):
             available_drivers=drivers,
             available_loaders=loaders,
             target_architectures=compatible_arch_filter,
+            benchmark_name_filter=self.config.benchmark_name_filter,
             driver_filter=self.config.driver_filter,
             mode_filter=self.config.mode_filter,
             model_name_filter=self.config.model_name_filter,
