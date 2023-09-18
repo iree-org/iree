@@ -1762,7 +1762,7 @@ struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getCallTargetName() != "ApproxTopK")
-      return failure();
+      return rewriter.notifyMatchFailure(op, "not ApproxTopK operation.");
 
     auto computationName =
         dyn_cast<SymbolRefAttr>(op.getCalledComputationsAttr()[0]);
