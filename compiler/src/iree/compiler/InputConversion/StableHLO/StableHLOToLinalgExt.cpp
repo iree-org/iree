@@ -557,7 +557,6 @@ struct ScanOpConversion final
         op.getLoc(), input0Ty.getShape(), input0Ty.getElementType(),
         outputDynDims));
 
-    // TODO(suderman): Change this to something better
     Value newInit = rewriter.create<tensor::EmptyOp>(
         op.getLoc(), initDims, init0Ty.getElementType(), initDynDims);
 

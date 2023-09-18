@@ -615,8 +615,6 @@ func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tens
 // CHECK:        iree_linalg_ext.yield %[[D7]] : i1
 // CHECK:        return %[[D6]]#0, %[[D6]]#1
 
-
-
 // -----
 
 // CHECK-LABEL: @prefix
