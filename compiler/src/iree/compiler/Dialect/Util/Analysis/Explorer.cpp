@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #define DEBUG_TYPE "iree-util-explorer"
 
@@ -500,7 +501,16 @@ TraversalResult Explorer::walkIncomingBranchOperands(
   // containing region.
   if (targetBlock->isEntryBlock()) {
     auto *parentOp = targetBlock->getParentOp();
-    if (auto regionOp = dyn_cast<RegionBranchOpInterface>(parentOp)) {
+
+    // If the block is owned by a WhileOp we need to walk to the other region.
+    if (auto whileOp = dyn_cast<scf::WhileOp>(parentOp)) {
+      if (whileOp.getBeforeBody() == targetBlock) {
+        fn(parentOp->getBlock(), whileOp.getYieldOp().getOperands());
+      }
+      if (whileOp.getAfterBody() == targetBlock) {
+        fn(parentOp->getBlock(), whileOp.getConditionOp().getArgs());
+      }
+    } else if (auto regionOp = dyn_cast<RegionBranchOpInterface>(parentOp)) {
       SmallVector<RegionSuccessor, 2> entrySuccessors;
       regionOp.getSuccessorRegions(RegionBranchPoint::parent(),
                                    entrySuccessors);
@@ -862,8 +872,8 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
                  << operandIdx << "\n");
       return TraversalResult::COMPLETE;
     }
-    auto result =
-        branchOp.getSuccessorOperands(RegionBranchPoint::parent())[operandIdx];
+    auto result = branchOp.getSuccessorOperands(
+        RegionBranchPoint::parent())[operandIdx - beginIdx];
     LLVM_DEBUG({
       llvm::dbgs() << "   + queuing region result ";
       result.printAsOperand(llvm::dbgs(), asmState);
@@ -1044,8 +1054,16 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
       }
 
       // If op is a return then we need to walk into the caller results.
-      if (ownerOp->hasTrait<OpTrait::ReturnLike>()) {
+      if (ownerOp->hasTrait<OpTrait::ReturnLike>() &&
+          llvm::isa<CallableOpInterface>(ownerOp->getParentOp())) {
         result |= traverseReturnOp(ownerOp, use.getOperandNumber());
+      }
+
+      if (ownerOp->hasTrait<OpTrait::ReturnLike>() &&
+          !llvm::isa<CallableOpInterface>(ownerOp->getParentOp())) {
+        auto parent = ownerOp->getParentOp();
+        auto result = parent->getResult(use.getOperandNumber());
+        worklist.insert(result);
       }
 
       // Step across global stores and into all of the loads across the program.

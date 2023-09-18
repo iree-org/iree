@@ -391,3 +391,32 @@ func.func @no_yield_dead_results(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?xf32>,
 // CHECK:     %[[GENERIC:.+]]:2 = linalg.generic
 // CHECK:     flow.return %[[GENERIC]]#1
 // CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @scf_nested_dispatch(%arg0 : tensor<?xi32>) -> (tensor<?xi32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?xi32>
+  %empty = tensor.empty(%dim) : tensor<?xi32>
+  %cmp = arith.cmpi eq, %dim, %c1 : index
+  %scf = scf.if %cmp -> (tensor<?xi32>) {
+    %new = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg0 : tensor<?xi32>) outs(%empty : tensor<?xi32>) {
+    ^bb0(%in: i32, %out: i32):
+      %add = arith.addi %in, %in : i32
+      linalg.yield %add : i32
+    } -> tensor<?xi32>
+    scf.yield %new : tensor<?xi32>
+  } else {
+    scf.yield %arg0 : tensor<?xi32>
+  }
+
+  return %scf : tensor<?xi32>
+}
+
+// CHECK-LABEL: @scf_nested_dispatch
+// CHECK: scf.if
+// CHECK: flow.dispatch.region
+// CHECK: linalg.generic
+// CHECK: scf.yield
+// CHECK: scf.yield
