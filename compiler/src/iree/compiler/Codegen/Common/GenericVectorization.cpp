@@ -298,7 +298,10 @@ void GenericVectorizationPass::runOnOperation() {
                                                         funcOp.getContext());
     vector::MaskOp::getCanonicalizationPatterns(maskCanonPatterns,
                                                 funcOp.getContext());
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(maskCanonPatterns));
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(maskCanonPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   // TODO: Move this down the pipeline once we have the ODM-based masking
