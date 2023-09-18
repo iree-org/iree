@@ -65,6 +65,7 @@ class BenchmarkConfig:
     normal_benchmark_tool_dir: Optional[pathlib.Path] = None
     trace_capture_config: Optional[TraceCaptureConfig] = None
 
+    benchmark_name_filter: Optional[str] = None
     driver_filter: Optional[str] = None
     model_name_filter: Optional[str] = None
     mode_filter: Optional[str] = None
@@ -117,6 +118,7 @@ class BenchmarkConfig:
             git_commit_hash=git_commit_hash,
             normal_benchmark_tool_dir=real_path_or_none(args.normal_benchmark_tool_dir),
             trace_capture_config=trace_capture_config,
+            benchmark_name_filter=args.benchmark_name_regex,
             driver_filter=args.driver_filter_regex,
             model_name_filter=args.model_name_regex,
             mode_filter=args.mode_regex,

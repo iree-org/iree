@@ -9,7 +9,6 @@ See docs/developers/developing_iree/benchmark_suites.md for how to build the
 benchmark suite.
 """
 
-import collections
 import pathlib
 import re
 
@@ -98,9 +97,10 @@ class BenchmarkSuite(object):
         target_architectures: Optional[
             Sequence[common_definitions.DeviceArchitecture]
         ] = None,
-        driver_filter: Optional[str] = None,
-        mode_filter: Optional[str] = None,
-        model_name_filter: Optional[str] = None,
+        benchmark_name_filter: str = ".*",
+        driver_filter: str = ".*",
+        mode_filter: str = ".*",
+        model_name_filter: str = ".*",
     ) -> Sequence[BenchmarkCase]:
         """Filters benchmarks.
         Args:
@@ -122,47 +122,39 @@ class BenchmarkSuite(object):
             driver_info = benchmark_case.driver_info
 
             driver_name = driver_info.driver_name
-            matched_available_driver = (
-                available_drivers is None or driver_name in available_drivers
-            )
-            matched_driver_filter = (
-                driver_filter is None
-                or re.match(driver_filter, driver_name) is not None
-            )
-            matched_driver = matched_available_driver and matched_driver_filter
+            if available_drivers is not None and driver_name not in available_drivers:
+                continue
 
-            matched_loader = (
-                not driver_info.loader_name
-                or available_loaders is None
-                or (driver_info.loader_name in available_loaders)
-            )
+            if re.match(driver_filter, driver_name) is None:
+                continue
 
-            if target_architectures is None:
-                matched_arch = True
-            else:
-                matched_arch = benchmark_case.target_arch in target_architectures
+            if (
+                driver_info.loader_name
+                and available_loaders is not None
+                and driver_info.loader_name not in available_loaders
+            ):
+                continue
+
+            if (
+                target_architectures is not None
+                and benchmark_case.target_arch not in target_architectures
+            ):
+                continue
 
             bench_mode = ",".join(benchmark_case.bench_mode)
-            matched_mode = (
-                mode_filter is None or re.match(mode_filter, bench_mode) is not None
-            )
+            if re.match(mode_filter, bench_mode) is None:
+                continue
 
             model_name_with_tags = benchmark_case.model_name
             if len(benchmark_case.model_tags) > 0:
                 model_name_with_tags += f"-{','.join(benchmark_case.model_tags)}"
-            matched_model_name = (
-                model_name_filter is None
-                or re.match(model_name_filter, model_name_with_tags) is not None
-            )
+            if re.match(model_name_filter, model_name_with_tags) is None:
+                continue
 
-            if (
-                matched_driver
-                and matched_loader
-                and matched_arch
-                and matched_model_name
-                and matched_mode
-            ):
-                chosen_cases.append(benchmark_case)
+            if re.match(benchmark_name_filter, benchmark_case.run_config.name) is None:
+                continue
+
+            chosen_cases.append(benchmark_case)
 
         return chosen_cases
 

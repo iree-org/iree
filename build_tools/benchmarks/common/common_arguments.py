@@ -72,6 +72,13 @@ class Parser(argparse.ArgumentParser):
             help="Path to the tool for collecting captured traces",
         )
         self.add_argument(
+            "--benchmark-name-regex",
+            "--benchmark_name_regex",
+            type=str,
+            default=None,
+            help="Only run benchmarks matching the given benchmark name regex",
+        )
+        self.add_argument(
             "--driver-filter-regex",
             "--driver_filter_regex",
             type=str,
