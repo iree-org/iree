@@ -176,7 +176,7 @@ static LogicalResult ReassociateAndFuseDequantMatmul(RewriterBase &rewriter,
   IntegerType accType = rewriter.getI32Type();
   IntegerType quantType = rewriter.getI16Type();
   Type srcQuantType = quantInType.getElementType();
-  IntegerType mulType = rewriter.getI16Type();
+  IntegerType mulType = rewriter.getI32Type();
   unsigned quantBitRange = std::min(quantType.getIntOrFloatBitWidth()-1, mulType.getIntOrFloatBitWidth() - srcQuantType.getIntOrFloatBitWidth() - 1);
 
   // ----- Quantize unquantized input ----- //
