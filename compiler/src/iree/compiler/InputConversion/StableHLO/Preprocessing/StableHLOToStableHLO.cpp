@@ -1775,8 +1775,7 @@ struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
         break;
     }
     if (!funcOp)
-      return rewriter.notifyMatchFailure(
-        op, "computation function not found.");
+      return rewriter.notifyMatchFailure(op, "computation function not found.");
 
     int64_t k = cast<ShapedType>(op.getType(0)).getDimSize(1);
     auto input = op.getOperand(0);
