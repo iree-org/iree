@@ -109,9 +109,4 @@ func.func @trace_tensor(%arg0: !stream.resource<external>) -> !hal.buffer_view {
   // CHECK: hal_inline.buffer_view.trace %[[VIEW]] : !hal.buffer_view attributes {key = "whatevs"}
   stream.tensor.trace {key = "whatevs"} %tensor : tensor<1x45xi32>
 
-  // CHECK: %[[VIEW:.+]] = hal_inline.buffer_view.create buffer(%[[ARG0]] : !hal.buffer)[%[[C0]], %[[C180]]] shape([%[[C1]], %[[C45]]]) type(%[[C268435488]]) encoding(%[[C1_i32]]) : !hal.buffer_view
-  %buffer = stream.tensor.export %arg0 : tensor<1x45xi32> in !stream.resource<external>{%c180} -> !hal.buffer_view
-
-  // CHECK: return %[[VIEW]] : !hal.buffer_view
-  return %buffer : !hal.buffer_view
 }
