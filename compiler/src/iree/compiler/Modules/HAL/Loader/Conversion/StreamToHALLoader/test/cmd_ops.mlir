@@ -94,7 +94,7 @@ func.func @cmdDispatch(%buffer0: !stream.resource<transient>, %buffer0_size: ind
 
 // CHECK-LABEL: @trace_tensor
 // CHECK-SAME: %[[ARG0:.+]]: !hal.buffer
-func.func @trace_tensor(%arg0: !stream.resource<external>) -> !hal.buffer_view {
+func.func @trace_tensor(%arg0: !stream.resource<external>) -> () {
   // CHECK: %[[C180:.+]] = arith.constant 180 : index
   %c180 = arith.constant 180 : index
 
@@ -108,5 +108,5 @@ func.func @trace_tensor(%arg0: !stream.resource<external>) -> !hal.buffer_view {
 
   // CHECK: hal_inline.buffer_view.trace %[[VIEW]] : !hal.buffer_view attributes {key = "whatevs"}
   stream.tensor.trace {key = "whatevs"} %tensor : tensor<1x45xi32>
-
+  return
 }
