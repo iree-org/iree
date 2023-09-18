@@ -56,7 +56,7 @@ function run_on_host() {
   echo "Launching docker image ${manylinux_docker_image}"
 
   if [ -z "${manylinux_docker_image}" ]; then
-    manylinux_docker_image="$($repo_root/../iree/build_tools/docker/get_image_name.py manylinux2014_x86_64-release)"
+    manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:e83893d35be4ce3558c989e9d5ccc4ff88d058bc3e74a83181059cc76e2cf1f8" }')}"
     if [ -z "${manylinux_docker_image}" ]; then
       echo "ERROR: Could not determine manylinux docker image"
       exit 1
