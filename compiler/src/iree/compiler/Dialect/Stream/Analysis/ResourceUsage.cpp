@@ -544,7 +544,7 @@ private:
                   dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
             auto value =
                 Position::forValue(whileOp.getBefore().getArgument(operandIdx));
-            auto& valueUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
           }
