@@ -499,7 +499,8 @@ private:
           getState() ^= operandUsage.getState();
 
           auto beforeUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.getBeforeBody()->getArgument(operandIdx)),
+              *this,
+              Position::forValue(op.getBeforeBody()->getArgument(operandIdx)),
               DFX::Resolution::REQUIRED);
 
           getState() ^= beforeUsage.getState();
@@ -516,16 +517,17 @@ private:
               DFX::Resolution::REQUIRED);
           getState() ^= parentUsage.getState();
 
-          if (auto whileOp = dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
-            auto value = Position::forValue(whileOp.getAfter().getArgument(operandIdx - 1));
+          if (auto whileOp =
+                  dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+            auto value = Position::forValue(
+                whileOp.getAfter().getArgument(operandIdx - 1));
             auto valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
           }
-
         })
         .Case([&](mlir::scf::YieldOp op) {
-          if(isa<scf::IfOp>(op->getParentOp()))  {
+          if (isa<scf::IfOp>(op->getParentOp())) {
             auto operandUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(op->getOperand(operandIdx)),
                 DFX::Resolution::REQUIRED);
@@ -538,8 +540,10 @@ private:
             getState() ^= parentUsage.getState();
           }
 
-          if (auto whileOp = dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
-            auto value = Position::forValue(whileOp.getBefore().getArgument(operandIdx));
+          if (auto whileOp =
+                  dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+            auto value =
+                Position::forValue(whileOp.getBefore().getArgument(operandIdx));
             auto valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();

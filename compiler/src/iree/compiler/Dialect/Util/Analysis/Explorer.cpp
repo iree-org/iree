@@ -872,8 +872,8 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
                  << operandIdx << "\n");
       return TraversalResult::COMPLETE;
     }
-    auto result =
-        branchOp.getSuccessorOperands(RegionBranchPoint::parent())[operandIdx - beginIdx];
+    auto result = branchOp.getSuccessorOperands(
+        RegionBranchPoint::parent())[operandIdx - beginIdx];
     LLVM_DEBUG({
       llvm::dbgs() << "   + queuing region result ";
       result.printAsOperand(llvm::dbgs(), asmState);
