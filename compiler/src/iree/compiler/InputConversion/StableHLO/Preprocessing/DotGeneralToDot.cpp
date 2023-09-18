@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -316,7 +317,48 @@ struct GeneralDotConvert final
   }
 };
 
+struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mlir::stablehlo::DotOp op,
+                                PatternRewriter &rewriter) const override {
+    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
+
+    ShapedType lhsTy = lhs.getType().cast<ShapedType>();
+    ShapedType rhsTy = rhs.getType().cast<ShapedType>();
+    ShapedType resultTy = op.getType().cast<ShapedType>();
+
+    llvm::SmallVector<int64_t> dotShape;
+    if (lhsTy.getRank() == 2 && lhsTy.getDimSize(0) == 1) {
+      lhs = b.create<mlir::stablehlo::ReshapeOp>(
+          lhsTy.clone({lhsTy.getDimSize(1)}), lhs);
+    } else if (lhsTy.getRank() == 2) {
+      dotShape.push_back(lhsTy.getDimSize(0));
+    }
+
+    if (rhsTy.getRank() == 2 && rhsTy.getDimSize(1) == 1) {
+      rhs = b.create<mlir::stablehlo::ReshapeOp>(
+          rhsTy.clone({rhsTy.getDimSize(0)}), rhs);
+    } else if (rhsTy.getRank() == 2) {
+      dotShape.push_back(rhsTy.getDimSize(1));
+    }
+
+    if (lhs == op.getLhs() && rhs == op.getRhs()) {
+      return rewriter.notifyMatchFailure(op, "no vector reform available.");
+    }
+
+    auto newDot = b.create<mlir::stablehlo::DotOp>(
+        resultTy.clone(dotShape), lhs, rhs, op.getPrecisionConfigAttr());
+    auto resultReshape = b.create<mlir::stablehlo::ReshapeOp>(resultTy, newDot);
+
+    rewriter.replaceOp(op, resultReshape);
+    return success();
+  }
+};
+
 struct DotGeneralToDot final : impl::DotGeneralToDotBase<DotGeneralToDot> {
+
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populatePreprocessingDotGeneralToDotPatterns(&getContext(), &patterns);
@@ -330,8 +372,9 @@ struct DotGeneralToDot final : impl::DotGeneralToDotBase<DotGeneralToDot> {
 } // namespace
 
 void populatePreprocessingDotGeneralToDotPatterns(mlir::MLIRContext *context,
-                                                  RewritePatternSet *patterns) {
-  patterns->add<GeneralDotConvert>(context);
+                                                  RewritePatternSet *patterns,
+                                                  PatternBenefit benefit) {
+  patterns->add<GeneralDotConvert, DotVectorOptimization>(context, benefit);
 }
 
 } // namespace mlir::iree_compiler::stablehlo
