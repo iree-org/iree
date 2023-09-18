@@ -1680,14 +1680,14 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 // 3. Has 3 parallel dims
 // 4. Has 4 (rhs, weights, scales, zero points)
 //    inputs and 1 output
-static bool isGroupedDequantizationMatvecOp(linalg::GenericOp genericOp) {
+static bool isReassociatedQuantizedMatvecOp(linalg::GenericOp genericOp) {
   // Check for 1 result, and 2 (input, scales) or 3 (input, scales, zero points)
   // inputs
   if (genericOp.getNumDpsInits() != 1) {
     LLVM_DEBUG(KD_DBGS() << "Wrong number of outputs: " << genericOp.getNumDpsInits() << "\n");
     return false;
   }
-  if (genericOp.getNumDpsInputs() != 4) {
+  if (genericOp.getNumDpsInputs() != 5) {
     LLVM_DEBUG(KD_DBGS() << "Wrong number of inputs: " << genericOp.getNumDpsInputs() << "\n");
     return false;
   }
@@ -1695,11 +1695,11 @@ static bool isGroupedDequantizationMatvecOp(linalg::GenericOp genericOp) {
   // Check that the rank is at least 3 and all loops are parallel
   unsigned numLoops = genericOp.getNumLoops();
   unsigned numReductionLoops = genericOp.getNumReductionLoops();
-  if (numLoops != 5){
+  if (numLoops != 2){
     LLVM_DEBUG(KD_DBGS() << "Wrong number of loops: " << numLoops << "\n");
     return false;
   }
-  if (numReductionLoops != 2){
+  if (numReductionLoops != 1){
     LLVM_DEBUG(KD_DBGS() << "Wrong number of reduction loops: " << numReductionLoops << "\n");
     return false;
   }
@@ -1720,27 +1720,7 @@ static bool isGroupedDequantizationMatvecOp(linalg::GenericOp genericOp) {
       return false;
   }
 
-  // Producer of arith.addf op is arith.mulf
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
-      return false;
-    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
-      return false;
-  }
-
-  // Producer of arith.mulf op is arith.mulf
-  {
-    producerOutput = producer->getOperand(1);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
-      return false;
-    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
-      return false;
-  }
-
-  // Producer of arith.mulf op is arith.subf
+  // Producer of arith.addf op is arith.subf
   {
     producerOutput = producer->getOperand(0);
     producer = producerOutput.getDefiningOp();
@@ -1750,77 +1730,82 @@ static bool isGroupedDequantizationMatvecOp(linalg::GenericOp genericOp) {
       return false;
   }
 
-  // Producer of arith.subf op is arith.uitofp
+  Value subRhs;
+  // Producer of arith.subf op is arith.mulf
+  {
+    producerOutput = producer->getOperand(0);
+    subRhs = producer->getOperand(1);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0)
+      return false;
+    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
+      return false;
+  }
+
+  // Producer of arith.mulf op is arith.mulf
   {
     producerOutput = producer->getOperand(0);
     producer = producerOutput.getDefiningOp();
     if (!producer || producer->getNumOperands() == 0)
       return false;
-    if (!matchPattern(producer, m_Op<arith::UIToFPOp>()))
+    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
       return false;
   }
 
-  // Producer of arith.uitofp op is arith.extui
+  // Producer of arith.mulf op is arith.sitofp
   {
     producerOutput = producer->getOperand(0);
     producer = producerOutput.getDefiningOp();
-    if (!producer)
+    if (!producer || producer->getNumOperands() == 0)
       return false;
-    if (!matchPattern(producer, m_Op<arith::ExtUIOp>()))
+    if (!matchPattern(producer, m_Op<arith::SIToFPOp>()))
       return false;
   }
 
-  // Ensure that the dequantization increases the
-  // bitwidth from the input to the output
-  auto elementTypeOut =
-      llvm::cast<ShapedType>(genericOp.getOutputs()[0].getType())
-          .getElementType();
-  if (!elementTypeOut.isIntOrFloat())
-    return false;
-  unsigned bitWidthOut = elementTypeOut.getIntOrFloatBitWidth();
-  auto elementTypeIn =
-      llvm::cast<ShapedType>(genericOp.getInputs()[1].getType())
-          .getElementType();
-  if (!elementTypeIn.isIntOrFloat())
-    return false;
-  unsigned bitWidthIn = elementTypeIn.getIntOrFloatBitWidth();
-  if (bitWidthIn >= bitWidthOut)
-    return false;
+  // RHS producer of arith.subf op is arith.mulf
+  {
+    producer = subRhs.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0)
+      return false;
+    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
+      return false;
+  }
+
+  // Producer of arith.mulf op is arith.mulf
+  {
+    producerOutput = producer->getOperand(0);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0)
+      return false;
+    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
+      return false;
+  }
 
   return true;
 }
 
 /// Sets linalg.generic ops that represent rematerialized dequantized matvec
 /// ContractionOpInterface RootConfig
-static LogicalResult setDequantizationMatvecOpRootConfig(
+static LogicalResult setReassociatedQuantizedMatvecOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     const LinalgOpInfo &linalgOpInfo,
     const TargetMLTransformInfo &targetMLTransInfo) {
+  LLVM_DEBUG(KD_DBGS() << "Setting config for op:\n" << genericOp << "\n");
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
   unsigned numLoops = genericOp.getNumLoops();
-  if (!isGroupedDequantizationMatvecOp(genericOp)){
+  if (!isReassociatedQuantizedMatvecOp(genericOp)){
     LLVM_DEBUG(KD_DBGS() << "Failed matching for dequantized matvec\n");
     return failure();
   }
 
-  SmallVector<int64_t> distTileSizes = {0, 0, 32, 0, 0};
-  SmallVector<int64_t> parallelTileSizes = {0, 0, 1, 0, 0};
-  SmallVector<int64_t> reductionTileSizes = {0, 0, 0, 1, 64};
+  SmallVector<int64_t> distTileSizes = {32, 0};
+  SmallVector<int64_t> parallelTileSizes = {8, 0};
+  SmallVector<int64_t> reductionTileSizes = {0, 32};
 
   SmallVector<unsigned> reductionDims;
   genericOp.getReductionDims(reductionDims);
   SmallVector<int64_t, 4> bounds = genericOp.getStaticLoopRanges();
-  
-  for (auto dim : reductionDims){
-    if (!llvm::isPowerOf2_64(bounds[dim])){
-      LLVM_DEBUG(KD_DBGS() << "Reduction dim is not a power of 2: " << bounds << "\n");
-      distTileSizes = {0, 0, 8, 0, 0};
-      parallelTileSizes = {0, 0, 2, 0, 0};
-      reductionTileSizes = {0, 0, 0, 1, 64};
-      break;
-    }
-  }
 
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
@@ -1862,7 +1847,7 @@ setRootConfig(func::FuncOp entryPointFn, linalg::GenericOp genericOp,
           entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
     return success();
   }
-  if (succeeded(setDequantizationMatvecOpRootConfig(
+  if (succeeded(setReassociatedQuantizedMatvecOpRootConfig(
           entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo))) {
     return success();
   }
