@@ -64,6 +64,8 @@ jobs:
           else
             status="$(gh pr list -S 'Update nightly' -L 1 -A 'iree-github-actions-bot' | grep -q -v 'no pull')"
             if [ -z "$status" ]; then
+              echo "Pending failed integrate"
+            else                  
               echo "Dependencies updated"
               git diff
               branch="roll_nightly_${{ github.run_number }}"
@@ -78,8 +80,6 @@ jobs:
               # Can't approve your own PR, so approve with the github actions bot.
               echo "Approving PR"
               export GH_TOKEN="$APPROVAL_TOKEN"
-              gh pr review $pr -a
-            else
-              echo "Pending failed integrate"
+              gh pr review $pr -a 
             fi
           fi
