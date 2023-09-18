@@ -493,12 +493,12 @@ private:
               });
         })
         .Case([&](mlir::scf::WhileOp op) {
-          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op->getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);
           getState() ^= operandUsage.getState();
 
-          auto beforeUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &beforeUsage = solver.getElementFor<ValueResourceUsage>(
               *this,
               Position::forValue(op.getBeforeBody()->getArgument(operandIdx)),
               DFX::Resolution::REQUIRED);
@@ -506,12 +506,12 @@ private:
           getState() ^= beforeUsage.getState();
         })
         .Case([&](mlir::scf::ConditionOp op) {
-          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op->getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);
           getState() ^= operandUsage.getState();
 
-          auto parentUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
               *this,
               Position::forValue(op->getParentOp()->getResult(operandIdx - 1)),
               DFX::Resolution::REQUIRED);
@@ -521,19 +521,19 @@ private:
                   dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
             auto value = Position::forValue(
                 whileOp.getAfter().getArgument(operandIdx - 1));
-            auto valueUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
           }
         })
         .Case([&](mlir::scf::YieldOp op) {
           if (isa<scf::IfOp>(op->getParentOp())) {
-            auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(op->getOperand(operandIdx)),
                 DFX::Resolution::REQUIRED);
             getState() ^= operandUsage.getState();
 
-            auto parentUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
                 *this,
                 Position::forValue(op->getParentOp()->getResult(operandIdx)),
                 DFX::Resolution::REQUIRED);
