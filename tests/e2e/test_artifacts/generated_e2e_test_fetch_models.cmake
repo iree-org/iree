@@ -382,10 +382,3 @@ iree_fetch_artifact(
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH32.mlirbc"
   UNPACK
 )
-
-iree_fetch_artifact(
-  NAME "model-ClipTextSeqLen64PT"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/torch_models_20230307.103_1678163233/SD_CLIP_TEXT_MODEL_SEQLEN64/linalg.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_ClipTextSeqLen64PT.mlir"
-  UNPACK
-)

@@ -1237,22 +1237,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-ClipTextSeqLen64PT_linalg___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_ClipTextSeqLen64PT.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_ClipTextSeqLen64PT_linalg___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
-    "--iree-llvmcpu-target-abi=lp64d"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-  FRIENDLY_NAME "ClipTextSeqLen64PT(linalg) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
@@ -3666,26 +3650,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-ClipTextSeqLen64PT_linalg___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_ClipTextSeqLen64PT.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_ClipTextSeqLen64PT_linalg___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
-    "--iree-llvmcpu-target-abi=lp64d"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_ClipTextSeqLen64PT_linalg___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "ClipTextSeqLen64PT(linalg) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
@@ -4859,7 +4823,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-PoseNet_fp32_tflite_
   ${PACKAGE_NAME}_model-BertForMaskedLMTF
   ${PACKAGE_NAME}_model-BertLargeTF
-  ${PACKAGE_NAME}_model-ClipTextSeqLen64PT
   ${PACKAGE_NAME}_model-EfficientNetV2STF
   ${PACKAGE_NAME}_model-MiniLML12H384Uncased
   ${PACKAGE_NAME}_model-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default
@@ -4980,7 +4943,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
-  ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_
@@ -5189,7 +5151,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
-  ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
@@ -5345,7 +5306,6 @@ add_dependencies(iree-benchmark-suites-large
 )
 
 add_dependencies(iree-benchmark-suites-riscv
-  ${PACKAGE_NAME}_iree-module-ClipTextSeqLen64PT_linalg___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
