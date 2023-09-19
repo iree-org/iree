@@ -190,7 +190,7 @@ MICRO_MATMUL_SPLITK = [
 #     # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
 #     if batch_size < 64
 # ]
-# 
+#
 # BERT_LARGE_FP16_TORCH_BATCHES = [
 #     model
 #     for batch_size, model in torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES.items()
@@ -198,14 +198,14 @@ MICRO_MATMUL_SPLITK = [
 #     # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
 #     if batch_size != 1 and batch_size < 64
 # ]
-# 
+#
 # RESNET50_TORCH_BATCHES = [
 #     model
 #     for batch_size, model in torch_models.RESNET50_3X224X224_FP32_TORCH_BATCHES.items()
 #     # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
 #     if batch_size < 2048
 # ]
-# 
+#
 # RESNET50_FP16_TORCH_BATCHES = list(
 #     model
 #     for batch_size, model in torch_models.RESNET50_3X224X224_FP16_TORCH_BATCHES.items()
