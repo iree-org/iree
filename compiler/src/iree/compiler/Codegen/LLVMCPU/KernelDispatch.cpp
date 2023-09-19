@@ -791,9 +791,35 @@ setDefaultRootConfig(func::FuncOp entryPointFn,
   return success();
 }
 
+// TODO.
+static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
+                                                       bool isQuantized) {
+  unsigned numLoops = op.getNumLoops();
+  SmallVector<int64_t> noCacheLevelTiling(numLoops, 0);
+
+  // Cache-level tiling is only supported for 2-D matmuls.
+  if (numLoops < 3) {
+    return noCacheLevelTiling;
+  }
+
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  if (isX86(targetAttr)) {
+    if (isQuantized) {
+      return noCacheLevelTiling;
+    }
+
+    SmallVector<int64_t> defaultCacheTileSizes(numLoops - 3, 0);
+    defaultCacheTileSizes.append({8, 128, 16});
+    return defaultCacheTileSizes;
+  }
+
+  return noCacheLevelTiling;
+}
+
 static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
                                             linalg::ContractionOpInterface op,
                                             ArrayRef<int64_t> distTileSizes,
+                                            ArrayRef<int64_t> cacheTileSizes,
                                             ArrayRef<int64_t> vecTileSizes,
                                             int vectorSize) {
   // The tiling for parallel dims and reduction dims should be separated.
@@ -820,8 +846,15 @@ static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, vecTileSizes.back(), vectorSize));
 
+  SmallVector<int64_t> cacheParallelTileSizes(cacheTileSizes.begin(),
+                                              cacheTileSizes.end());
+  SmallVector<int64_t> cacheReductionTileSizes(numTilingDims, 0);
+  std::swap(cacheParallelTileSizes.back(), cacheReductionTileSizes.back());
+
   TileSizesListType tileSizes;
   tileSizes.emplace_back(distTileSizes.begin(), distTileSizes.end());
+  tileSizes.push_back(cacheParallelTileSizes);
+  tileSizes.push_back(cacheReductionTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
   // No need for tiling inner parallel dims.
@@ -1010,6 +1043,26 @@ static SmallVector<int64_t> getMatmulVectorSizes(func::FuncOp entryPointFn,
   return tileSizes;
 }
 
+// TODO.
+static SmallVector<int64_t>
+getMatmulCacheTileSizesForShape(ArrayRef<int64_t> inputTileSizes,
+                                ArrayRef<int64_t> inputShape) {
+  // Make sure the tile sizes are not larger than the dim sizes.
+  int numDims = inputShape.size();
+  SmallVector<int64_t> outputTileSizes(numDims);
+  for (int i = 0, end = numDims; i < end; ++i) {
+    outputTileSizes[i] =
+        (ShapedType::isDynamic(inputShape[i]) || inputShape[i] == 0)
+            ? inputTileSizes[i]
+            : std::min(inputTileSizes[i], inputShape[i]);
+  }
+
+  // TODO: Disable caching for reduction dim for now.
+  outputTileSizes.back() = 0;
+
+  return outputTileSizes;
+}
+
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult
@@ -1059,6 +1112,22 @@ setRootConfig(func::FuncOp entryPointFn,
     maxTileSizes[0] = 1;
   }
 
+  // Compute cache-level tile sizes. Cache a dimension only if there are
+  // enough iterations.
+  SmallVector<int64_t> cacheTileSizes;
+  cacheTileSizes = getDefaultMatmulCacheSizes(linalgOp, isQuantized);
+  cacheTileSizes = getMatmulCacheTileSizesForShape(
+      cacheTileSizes, linalgOp.getStaticLoopRanges());
+
+  // Choose the next non-zero tile size immediately after the distribution
+  // level to help compute the distribution tile sizes.
+  SmallVector<int64_t> minTileSizes;
+  for (auto [cacheTileSize, vecTileSize] :
+       llvm::zip_equal(cacheTileSizes, vecTileSizes)) {
+    int64_t minTileSize = cacheTileSize != 0 ? cacheTileSize : vecTileSize;
+    minTileSizes.push_back(minTileSize);
+  }
+
   // There are hard-coded configurations in DoubleTilingPadExpert, so it only
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
@@ -1086,7 +1155,15 @@ setRootConfig(func::FuncOp entryPointFn,
                                                         maxTileSizes);
   }
 
+  // Unfortunately, `getDefaultDistributedLevelTileSizes` may return sizes
+  // that are smaller than `minTileSizes` so we have to adjust the cache sizes
+  // again.
+  cacheTileSizes = distTileSizes;
+  // TODO:
+      //getMatmulCacheTileSizesForShape(cacheTileSizes, distTileSizes);
+
   LLVM_DEBUG(KD_DBGS() << "Distribution tile sizes: " << distTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Cache tile sizes: " << cacheTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
 
@@ -1101,8 +1178,9 @@ setRootConfig(func::FuncOp entryPointFn,
   TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
   if (usePaddingPipeline) {
     return setMatmulPadRootConfig(entryPointFn, contractionOp, distTileSizes,
-                                  vecTileSizes, vectorSize);
+                                  cacheTileSizes, vecTileSizes, vectorSize);
   }
+
   return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
                                   vectorSize, vecPreProcStrategy);
 }
