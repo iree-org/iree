@@ -186,7 +186,8 @@ void EliminateEmptyTensorsPass::runOnOperation() {
   }
 
   IRRewriter rewriter(moduleOp->getContext());
-  OneShotAnalysisState state(moduleOp, getBufferizationOptions());
+  auto bufferizationOptions = getBufferizationOptions();
+  OneShotAnalysisState state(moduleOp, bufferizationOptions);
   // Analyze IR.
   if (failed(analyzeOp(moduleOp, state)))
     return signalPassFailure();
