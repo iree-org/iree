@@ -117,6 +117,7 @@ PERSON_DETECT_INT8 = common_definitions.Model(
     source_url="https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite",
     entry_function="main",
     input_types=["1x96x96x1xi8"],
+    expected_output="test",
 )
 
 EFFICIENTNET_INT8 = common_definitions.Model(

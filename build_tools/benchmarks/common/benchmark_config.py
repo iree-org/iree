@@ -74,6 +74,7 @@ class BenchmarkConfig:
     keep_going: bool = False
     benchmark_min_time: float = 0
     continue_from_previous: bool = False
+    verify: bool = False
 
     @staticmethod
     def build_from_args(args: Namespace, git_commit_hash: str):
@@ -126,4 +127,5 @@ class BenchmarkConfig:
             keep_going=args.keep_going,
             benchmark_min_time=args.benchmark_min_time,
             continue_from_previous=args.continue_from_previous,
+            verify=args.verify,
         )

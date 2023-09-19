@@ -195,6 +195,11 @@ class Parser(argparse.ArgumentParser):
             default=None,
             help="Shard in benchmark config to run",
         )
+        self.add_argument(
+            "--verify",
+            action="store_true",
+            help="Verify model output",
+        )
 
 
 def expand_and_check_file_paths(paths: Sequence[str]) -> List[pathlib.Path]:

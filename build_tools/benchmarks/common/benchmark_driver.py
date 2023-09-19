@@ -145,7 +145,7 @@ class BenchmarkDriver(object):
             if results_path is None and capture_path is None:
                 continue
 
-            print(f"--> Benchmark started: {benchmark_name} <--")
+            print(f"\n--> Benchmark started: {benchmark_name} <--\n")
 
             try:
                 self.run_benchmark_case(benchmark_case, results_path, capture_path)

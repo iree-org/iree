@@ -89,7 +89,11 @@ def execute_cmd(
       CalledProcessError if the command fails.
     """
     if verbose:
-        print(f"cmd: {args}")
+        print("--> Execute:")
+        print(f"Command: {' '.join(str(arg) for arg in args)}")
+        print(f"Workdir: {kwargs.get('cwd', '.')}")
+        print("<--\n")
+
     try:
         return subprocess.run(args, check=True, text=True, **kwargs)
     except subprocess.CalledProcessError as exc:

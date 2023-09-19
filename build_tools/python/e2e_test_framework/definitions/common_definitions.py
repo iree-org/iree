@@ -8,7 +8,7 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from e2e_test_framework import serialization, unique_ids
 
@@ -189,6 +189,7 @@ class Model(object):
     entry_function: str
     # Input types. E.g., ["100x100xf32", "200x200x5xf32"].
     input_types: List[str]
+    expected_output: Optional[str] = None
 
     def __str__(self):
         return self.name
@@ -221,6 +222,16 @@ ZEROS_MODEL_INPUT_DATA = ModelInputData(
     name="zeros",
     tags=[],
     data_format=InputDataFormat.ZEROS,
+    source_url="",
+)
+
+# Download default npy input data came with the model.
+DEFAULT_MODEL_INPUT_DATA = ModelInputData(
+    id=unique_ids.MODEL_INPUT_DATA_DEFAULT,
+    model_id="",
+    name="default",
+    tags=[],
+    data_format=InputDataFormat.NUMPY_NPY,
     source_url="",
 )
 

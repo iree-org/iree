@@ -53,6 +53,12 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         capture_filename: Optional[pathlib.Path],
     ) -> None:
         if benchmark_results_filename:
+            if self.config.verify:
+                self.__run_verify(
+                    benchmark_case=benchmark_case,
+                    results_filename=benchmark_results_filename.with_suffix(".npy"),
+                )
+
             self.__run_benchmark(
                 benchmark_case=benchmark_case,
                 results_filename=benchmark_results_filename,
@@ -72,11 +78,25 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         )
         cmds.append(tool_path)
 
-        module_dir_path = benchmark_case.benchmark_case_dir
-        cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
+        cmds += [f"--module={iree_artifacts.MODULE_FILENAME}"]
         cmds += run_config.materialize_run_flags(gpu_id=self.gpu_id)
 
         return cmds
+
+    def __run_verify(
+        self, benchmark_case: BenchmarkCase, results_filename: pathlib.Path
+    ):
+        if self.config.normal_benchmark_tool_dir is None:
+            raise ValueError("normal_benchmark_tool_dir can't be None.")
+
+        cmd = self.__build_tool_cmds(
+            benchmark_case=benchmark_case,
+            tool_path=self.config.normal_benchmark_tool_dir / "iree-run-module",
+        )
+        cmd.append(f"--output=@{results_filename}")
+        execute_cmd_and_get_output(
+            cmd, verbose=self.verbose, cwd=benchmark_case.benchmark_case_dir
+        )
 
     def __run_benchmark(
         self, benchmark_case: BenchmarkCase, results_filename: pathlib.Path
@@ -98,7 +118,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             )
 
         benchmark_stdout, benchmark_stderr = execute_cmd_and_get_output(
-            cmd, verbose=self.verbose
+            cmd, verbose=self.verbose, cwd=benchmark_case.benchmark_case_dir
         )
         benchmark_metrics = parse_iree_benchmark_metrics(
             benchmark_stdout, benchmark_stderr
