@@ -52,8 +52,8 @@ func.func @tensor_const_non_trunc() -> tensor<2xf32> {
 func.func @min_max_no_trunc(%arg0 : f32) -> f32 {
   %0 = arith.constant -5.0 : f32
   %1 = arith.constant 5.0 : f32
-  %2 = arith.minf %arg0, %1 : f32
-  %3 = arith.maxf %2, %0 : f32
+  %2 = arith.minimumf %arg0, %1 : f32
+  %3 = arith.maximumf %2, %0 : f32
   // CHECK: fp-range: [-5.000000, 5.000000, !trunc]
   %result = "iree_unregistered.test_fprange"(%3) : (f32) -> f32
   return %result : f32
@@ -64,8 +64,8 @@ func.func @min_max_no_trunc(%arg0 : f32) -> f32 {
 func.func @min_max_floor(%arg0 : f32) -> f32 {
   %0 = arith.constant -5.0 : f32
   %1 = arith.constant 5.0 : f32
-  %2 = arith.minf %arg0, %1 : f32
-  %3 = arith.maxf %2, %0 : f32
+  %2 = arith.minimumf %arg0, %1 : f32
+  %3 = arith.maximumf %2, %0 : f32
   %4 = math.floor %3 : f32
   // CHECK: fp-range: [-5.000000, 5.000000, TRUNC]
   %result = "iree_unregistered.test_fprange"(%4) : (f32) -> f32
@@ -77,8 +77,8 @@ func.func @min_max_floor(%arg0 : f32) -> f32 {
 func.func @min_max_floor_adj_range(%arg0 : f32) -> f32 {
   %0 = arith.constant -5.2 : f32
   %1 = arith.constant 5.2 : f32
-  %2 = arith.minf %arg0, %1 : f32
-  %3 = arith.maxf %2, %0 : f32
+  %2 = arith.minimumf %arg0, %1 : f32
+  %3 = arith.maximumf %2, %0 : f32
   %4 = math.floor %3 : f32
   // CHECK: fp-range: [-6.000000, 5.000000, TRUNC]
   %result = "iree_unregistered.test_fprange"(%4) : (f32) -> f32
@@ -91,8 +91,8 @@ func.func @floor_min_max(%arg0 : f32) -> f32 {
   %0 = arith.constant -5.0 : f32
   %1 = arith.constant 5.0 : f32
   %2 = math.floor %arg0 : f32
-  %3 = arith.maxf %2, %0 : f32
-  %4 = arith.minf %3, %1 : f32
+  %3 = arith.maximumf %2, %0 : f32
+  %4 = arith.minimumf %3, %1 : f32
   // CHECK: fp-range: [-5.000000, 5.000000, TRUNC]
   %result = "iree_unregistered.test_fprange"(%4) : (f32) -> f32
   return %result : f32

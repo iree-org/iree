@@ -1501,7 +1501,7 @@ hal.executable private @multi_root {
             iterator_types = ["parallel", "parallel", "reduction"]}
             ins(%4 : tensor<12x128x128xf32>) outs(%5 : tensor<12x128xf32>) {
         ^bb0(%arg0: f32, %arg1: f32):
-          %11 = arith.maxf %arg0, %arg1 : f32
+          %11 = arith.maximumf %arg0, %arg1 : f32
           linalg.yield %11 : f32
         } -> tensor<12x128xf32>
         %10 = linalg.generic {
@@ -1606,8 +1606,8 @@ hal.executable private @unpack_generic_pack  {
         %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4, %unpack : tensor<512xf32>, tensor<384x512xf32>) outs(%6 : tensor<384x512xf32>) {
         ^bb0(%in: f32, %in_1: f32, %out: f32):
           %8 = arith.addf %in, %in_1 : f32
-          %9 = arith.minf %8, %cst : f32
-          %10 = arith.maxf %9, %cst_0 : f32
+          %9 = arith.minimumf %8, %cst : f32
+          %10 = arith.maximumf %9, %cst_0 : f32
           linalg.yield %10 : f32
         } -> tensor<384x512xf32>
         %pack = tensor.pack %7 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %5 : tensor<384x512xf32> -> tensor<24x512x16x1xf32>

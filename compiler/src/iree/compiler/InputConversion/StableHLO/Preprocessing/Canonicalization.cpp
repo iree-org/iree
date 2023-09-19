@@ -77,20 +77,22 @@ static TypedAttr foldBinaryOpIntOrFloat(TypedAttr lhs, TypedAttr rhs,
   Type elemTy = getElementTypeOrSelf(cast<TypedAttr>(lhs).getType());
 
   if (isa<IntegerType>(elemTy)) {
-    if (Attribute res = constFoldBinaryOp<IntegerAttr>(
-            operands, [&folder](const APInt &lhs, const APInt &rhs) {
-              return folder(lhs, rhs);
-            })) {
+    if (Attribute res =
+            constFoldBinaryOp<IntegerAttr, IntegerAttr::ValueType, void>(
+                operands, [&folder](const APInt &lhs, const APInt &rhs) {
+                  return folder(lhs, rhs);
+                })) {
       return cast<TypedAttr>(res);
     }
     return nullptr;
   }
 
   if (isa<FloatType>(elemTy)) {
-    if (Attribute res = constFoldBinaryOp<FloatAttr>(
-            operands, [&folder](const APFloat &lhs, const APFloat &rhs) {
-              return folder(lhs, rhs);
-            })) {
+    if (Attribute res =
+            constFoldBinaryOp<FloatAttr, FloatAttr::ValueType, void>(
+                operands, [&folder](const APFloat &lhs, const APFloat &rhs) {
+                  return folder(lhs, rhs);
+                })) {
       return cast<TypedAttr>(res);
     }
     return nullptr;
@@ -376,11 +378,13 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     }
 
     if (lhsAttr && rhsAttr) {
-      if (Attribute res = constFoldBinaryOp<IntegerAttr>(
-              ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
-              [direction, kind = *compType](const APInt &a, const APInt &b) {
-                return calculateComp(kind, direction, a, b);
-              })) {
+      if (Attribute res =
+              constFoldBinaryOp<IntegerAttr, IntegerAttr::ValueType, void>(
+                  ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
+                  [direction, kind = *compType](const APInt &a,
+                                                const APInt &b) {
+                    return calculateComp(kind, direction, a, b);
+                  })) {
         rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
         return success();
       }

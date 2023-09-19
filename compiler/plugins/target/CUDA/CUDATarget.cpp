@@ -264,7 +264,7 @@ static std::string translateModuleToISA(llvm::Module &module,
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
-                                      llvm::CGFT_AssemblyFile);
+                                      llvm::CodeGenFileType::AssemblyFile);
     codegenPasses.run(module);
   }
   return targetISA;

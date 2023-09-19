@@ -213,7 +213,7 @@ hal.executable private @pad_partially_unaligned_matmul {
         %18 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%17, %14 : tensor<1x144xf32>, tensor<1x144xf32>) outs(%15 : tensor<1x144xf32>) {
         ^bb0(%in: f32, %in_0: f32, %out: f32):
           %19 = arith.addf %in, %in_0 : f32
-          %20 = arith.maxf %19, %cst : f32
+          %20 = arith.maximumf %19, %cst : f32
           linalg.yield %20 : f32
         } -> tensor<1x144xf32>
         flow.dispatch.tensor.store %18, %11, offsets = [0, 0], sizes = [1, 144], strides = [1, 1] : tensor<1x144xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x144xf32>>
@@ -229,7 +229,7 @@ hal.executable private @pad_partially_unaligned_matmul {
 //   CHECK-NOT:   memref.alloca
 //       CHECK:     vector.fma
 //       CHECK:     arith.addf {{.*}} : vector<
-//       CHECK:     arith.maxf {{.*}} : vector<
+//       CHECK:     arith.maximumf {{.*}} : vector<
 
 // -----
 

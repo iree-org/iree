@@ -134,6 +134,7 @@ hal.executable private @pad_with_producer {
 //   CHECK-DAG:             %[[ALLOC:.+]] = memref.alloca
 //       CHECK:             %[[CONV_OUTPUT:.+]] = memref.subview %[[ALLOC]]
 //       CHECK:               scf.for
+//       CHECK:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
 //       CHECK:               %[[FILTER_SLICE:.+]] = memref.subview %[[FILTER_SUBVIEW]]
 //       CHECK:               linalg.fill
 //  CHECK-SAME:                   outs(%[[ALLOC]]
@@ -147,7 +148,6 @@ hal.executable private @pad_with_producer {
 //       CHECK:               linalg.generic
 //  CHECK-SAME:                   ins(%[[ALLOC]], %[[BIAS_INPUT]] :
 //  CHECK-SAME:                   outs(%[[ALLOC]]
-//       CHECK:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
 //       CHECK:               linalg.fill ins(%{{.+}} :   f32) outs(%[[OUTPUT_SLICE]]
 //       CHECK:               %[[INTERIOR_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
 //       CHECK:               linalg.generic

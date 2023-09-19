@@ -138,8 +138,8 @@ LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     Value negativeInit =
         rewriter.create<linalg::FillOp>(loc, Value{largeNegative}, output)
             .result();
-    Value max =
-        reduce<arith::MaxFOp>(input, negativeInit, reductionDim, loc, rewriter);
+    Value max = reduce<arith::MaximumFOp>(input, negativeInit, reductionDim,
+                                          loc, rewriter);
     // Subtract max from input and exponentiate
     linalg::GenericOp numeratorOp =
         subtractAndExp(input, max, outputNd, reductionDim, loc, rewriter);

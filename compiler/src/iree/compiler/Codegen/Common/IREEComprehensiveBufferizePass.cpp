@@ -164,11 +164,7 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
     return failure();
 
   // Rewrite tensor.empty ops that are anchored on specific ops.
-  if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
-          rewriter, op, state)))
-    return failure();
-  if (failed(
-          storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, op, state)))
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, op, state)))
     return failure();
 
   return success();
@@ -189,10 +185,14 @@ void EliminateEmptyTensorsPass::runOnOperation() {
     }
   }
 
-  OneShotBufferizationOptions options = getBufferizationOptions();
-
   IRRewriter rewriter(moduleOp->getContext());
-  if (failed(eliminateEmptyTensors(rewriter, moduleOp, options)))
+  auto bufferizationOptions = getBufferizationOptions();
+  OneShotAnalysisState state(moduleOp, bufferizationOptions);
+  // Analyze IR.
+  if (failed(analyzeOp(moduleOp, state)))
+    return signalPassFailure();
+  // Eliminate empty tensors.
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, moduleOp, state)))
     return signalPassFailure();
 }
 

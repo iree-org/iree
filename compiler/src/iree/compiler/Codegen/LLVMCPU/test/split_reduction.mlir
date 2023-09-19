@@ -15,7 +15,7 @@ module {
     %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<2x5x4096xf32>) -> tensor<2x5x4096xf32>
     %4 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%arg0 : tensor<2x5x4096x4096xf32>) outs(%3 : tensor<2x5x4096xf32>) attrs =  {lowering_config = #config} {
     ^bb0(%in: f32, %out: f32):
-      %9 = arith.maxf %in, %out : f32
+      %9 = arith.maximumf %in, %out : f32
       linalg.yield %9 : f32
     } -> tensor<2x5x4096xf32>
     %5 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0, %4 : tensor<2x5x4096x4096xf32>, tensor<2x5x4096xf32>) outs(%1 : tensor<2x5x4096x4096xf32>) {

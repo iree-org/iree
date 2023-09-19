@@ -23,12 +23,12 @@ func.func @linalg_generic_traversal(%arg0 : tensor<5x6xf32>) -> (tensor<5x6xf32>
   } -> tensor<5x6xf32>
   %max = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%floor, %broadcast_min : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
   ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-    %27 = arith.maxf %arg1, %arg2 : f32
+    %27 = arith.maximumf %arg1, %arg2 : f32
     linalg.yield %27 : f32
   } -> tensor<5x6xf32>
   %min = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%max, %broadcast_max : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
   ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-    %27 = arith.minf %arg1, %arg2 : f32
+    %27 = arith.minimumf %arg1, %arg2 : f32
     linalg.yield %27 : f32
   } -> tensor<5x6xf32>
 

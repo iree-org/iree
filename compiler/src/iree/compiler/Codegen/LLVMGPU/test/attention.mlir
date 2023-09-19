@@ -256,7 +256,7 @@ transform.sequence failures(propagate) {
 // CHECK:          %[[D15:.+]] = vector.contract {indexing_maps = [#[[MAP4]], #[[MAP5]], #[[MAP6]]], iterator_types =
 // CHECK-SAME:       ["parallel", "parallel", "reduction"], kind = #[[VECTOR:.+]].kind<add>} %[[D10]], %[[D14]],
 // CHECK-SAME:       %[[CST_2]] : vector<32x64xf32>, vector<128x64xf32> into vector<32x128xf32>
-// CHECK:          %[[D16:.+]] = vector.multi_reduction <maxf>, %[[D15]], %[[ARG1]] [1] : vector<32x128xf32> to
+// CHECK:          %[[D16:.+]] = vector.multi_reduction <maximumf>, %[[D15]], %[[ARG1]] [1] : vector<32x128xf32> to
 // CHECK-SAME:       vector<32xf32>
 // CHECK:          %[[D17:.+]] = vector.broadcast %[[D16]] : vector<32xf32> to vector<128x32xf32>
 // CHECK:          %[[D18:.+]] = vector.transpose %[[D17]], [1, 0] : vector<128x32xf32> to vector<32x128xf32>

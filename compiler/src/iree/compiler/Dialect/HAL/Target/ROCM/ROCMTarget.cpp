@@ -55,7 +55,7 @@ static std::string translateModuleToObj(llvm::Module &module,
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
-                                      llvm::CGFT_ObjectFile);
+                                      llvm::CodeGenFileType::ObjectFile);
     codegenPasses.run(module);
   }
   return targetObj;
@@ -69,7 +69,7 @@ static std::string translateModuleToISA(llvm::Module &module,
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
-                                      llvm::CGFT_AssemblyFile);
+                                      llvm::CodeGenFileType::AssemblyFile);
     codegenPasses.run(module);
   }
   return targetISA;

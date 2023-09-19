@@ -158,6 +158,7 @@ iree_cc_library(
     "PolynomialApproximationPass.cpp"
     "RematerializeParallelOps.cpp"
     "RemoveTrivialLoops.cpp"
+    "ReplaceSlowMinMaxOps.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"

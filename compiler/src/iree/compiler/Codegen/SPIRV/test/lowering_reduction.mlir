@@ -226,19 +226,19 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
 //   CHECK-LABEL:  func.func @softmax
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32{{.+}}>, vector<4xf32>
-//         CHECK:      arith.maxf {{.*}} : vector<4xf32>
+//         CHECK:      arith.maximumf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <maxf>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    vector.reduction <maximumf>, %{{.*}} : vector<4xf32> into f32
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    arith.remui
 //         CHECK:    scf.if
 //         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
@@ -247,16 +247,16 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
 //         CHECK:    arith.minui
 //         CHECK:    memref.load
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
+//         CHECK:    arith.maximumf
 //         CHECK:    vector.splat %{{.*}} : vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read

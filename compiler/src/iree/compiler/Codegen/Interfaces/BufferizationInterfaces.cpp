@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/Bufferization/IR/SubsetInsertionOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
@@ -38,6 +39,7 @@ using mlir::bufferization::OneShotAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
 using mlir::bufferization::replaceOpWithBufferizedValues;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
+using mlir::bufferization::SubsetInsertionOpInterface;
 
 namespace mlir {
 namespace iree_compiler {
@@ -556,71 +558,71 @@ struct PackUnPackOpInterface
   }
 };
 
-//===----------------------------------------------------------------------===//
-// IREE specific post analysis transformations.
-//===----------------------------------------------------------------------===//
-
 /// Returns true if the value of a `storeOp` bufferizes to an equivalent
 /// DispatchTensorLoadOp result that bufferizes inplace.
 static bool isValueEquivalentToAnInplaceTensorLoadOp(
-    const OneShotAnalysisState &aliasInfo,
-    IREE::Flow::DispatchTensorStoreOp storeOp) {
-  bool foundOp = false;
-  aliasInfo.applyOnEquivalenceClass(storeOp.getValue(), [&](Value value) {
-    auto loadOp = value.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-    // TODO: Assert that offsets, sizes and strides are the same.
-    if (loadOp &&
-        aliasInfo.areEquivalentBufferizedValues(loadOp.getResult(),
-                                                storeOp.getValue()) &&
-        loadOp.getSource() == storeOp.getTarget()) {
-      foundOp = true;
-    }
-  });
-
-  return foundOp;
+    IREE::Flow::DispatchTensorStoreOp storeOp, Value candidate,
+    function_ref<bool(Value, Value)> equivalenceFn) {
+  auto loadOp = candidate.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+  if (!loadOp)
+    return false;
+  if (!equivalenceFn(loadOp.getSource(), storeOp.getTarget()))
+    return false;
+  // TODO: Assert that offsets, sizes and strides are the same.
+  return true;
 }
 
-/// Try to eliminate tensor::EmptyOps that are eventually fed into a
-/// DispatchTensorStoreOp. Such tensor::EmptyOps are replaced with matching
-/// DispatchTensorLoadOps. Two conditions must be met:
-///
-/// * The target must be a "readwrite" tensor.
-/// * All ops along the reverse SSA use-def chain from the
-///   DispatchTensorStoreOp to the tensor::EmptyOp must have bufferized
-///   in-place.
-LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
-    RewriterBase &rewriter, Operation *op, OneShotAnalysisState &state) {
-  return eliminateEmptyTensors(
-      rewriter, op, state,
-      /*anchorMatchFunc=*/
-      [&](OpOperand &operand, SmallVector<Value> &neededValues) {
-        auto storeOp =
-            dyn_cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
-        if (!storeOp)
-          return false;
-        neededValues.push_back(storeOp.getTarget());
-        neededValues.append(storeOp.getTargetDims().begin(),
-                            storeOp.getTargetDims().end());
-        neededValues.append(storeOp.getOffsets().begin(),
-                            storeOp.getOffsets().end());
-        neededValues.append(storeOp.getSizes().begin(),
-                            storeOp.getSizes().end());
-        neededValues.append(storeOp.getStrides().begin(),
-                            storeOp.getStrides().end());
-        return true;
-      },
-      /*rewriteFunc=*/
-      [](OpBuilder &b, Location loc, OpOperand &operand) {
-        auto storeOp =
-            cast<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
-        auto loadOp = b.create<IREE::Flow::DispatchTensorLoadOp>(
-            loc, llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
-            storeOp.getTarget(), storeOp.getTargetDims(),
-            storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
-            storeOp.getMixedStrides());
-        return loadOp.getResult();
-      });
-}
+struct DispatchTensorStoreOpSubsetInterface
+    : public SubsetInsertionOpInterface::ExternalModel<
+          DispatchTensorStoreOpSubsetInterface,
+          IREE::Flow::DispatchTensorStoreOp> {
+
+  OpOperand &getSourceOperand(Operation *op) const {
+    return op->getOpOperand(0);
+  }
+
+  OpOperand &getDestinationOperand(Operation *op) const {
+    return op->getOpOperand(1);
+  }
+
+  bool
+  isEquivalentSubset(Operation *op, Value candidate,
+                     function_ref<bool(Value, Value)> equivalenceFn) const {
+    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    return isValueEquivalentToAnInplaceTensorLoadOp(storeOp, candidate,
+                                                    equivalenceFn);
+  }
+
+  Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
+                              Location loc) const {
+    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    auto loadOp = builder.create<IREE::Flow::DispatchTensorLoadOp>(
+        loc, llvm::cast<RankedTensorType>(storeOp.getValue().getType()),
+        storeOp.getTarget(), storeOp.getTargetDims(), storeOp.getMixedOffsets(),
+        storeOp.getMixedSizes(), storeOp.getMixedStrides());
+    return loadOp.getResult();
+  }
+
+  SmallVector<Value>
+  getValuesNeededToBuildSubsetExtraction(Operation *op) const {
+    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    SmallVector<Value> neededValues;
+    // Collect all values that are needed to construct the replacement op.
+    neededValues.push_back(storeOp.getTarget());
+    neededValues.append(storeOp.getTargetDims().begin(),
+                        storeOp.getTargetDims().end());
+    neededValues.append(storeOp.getOffsets().begin(),
+                        storeOp.getOffsets().end());
+    neededValues.append(storeOp.getSizes().begin(), storeOp.getSizes().end());
+    neededValues.append(storeOp.getStrides().begin(),
+                        storeOp.getStrides().end());
+    return neededValues;
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// IREE specific post analysis transformations.
+//===----------------------------------------------------------------------===//
 
 void registerBufferizationInterfaces(DialectRegistry &registry) {
   arith::registerBufferizableOpInterfaceExternalModels(registry);
@@ -638,6 +640,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             DispatchTensorLoadOpInterface>(*ctx);
         IREE::Flow::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpInterface>(*ctx);
+        IREE::Flow::DispatchTensorStoreOp::attachInterface<
+            DispatchTensorStoreOpSubsetInterface>(*ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {

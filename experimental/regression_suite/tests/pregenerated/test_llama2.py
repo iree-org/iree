@@ -19,7 +19,7 @@ COMMON_FLAGS = [
 ]
 
 llama2_7b_f16qi4_source = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/dan/llama/llama2_7b_int4_stripped.mlir",
+    "https://storage.googleapis.com/shark_tank/llama_regression/09152023/llama2_7b_int4_stripped.mlir",
     group="llama2_7b_f16qi4",
 )
 

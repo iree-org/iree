@@ -198,7 +198,7 @@ flow.executable @nested_ops_ex_0 {
       %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
@@ -213,7 +213,7 @@ flow.executable @nested_ops_ex_1 {
       %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
@@ -228,7 +228,7 @@ flow.executable @nested_ops_ex_2 {
       %init = tensor.empty() : tensor<5x6xf32>
       %min = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.minf %arg1, %arg2 : f32
+        %27 = arith.minimumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %min : tensor<5x6xf32>
@@ -260,7 +260,7 @@ flow.executable @attributes_ex_0 {
       %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
@@ -276,7 +276,7 @@ flow.executable @attributes_ex_1 {
       // map1 instead of map0
       %max = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
@@ -292,7 +292,7 @@ flow.executable @attributes_ex_2 {
       %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
