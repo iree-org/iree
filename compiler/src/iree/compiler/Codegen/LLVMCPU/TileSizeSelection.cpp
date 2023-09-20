@@ -86,7 +86,7 @@ SmallVector<int64_t> TilingConfig::getFusableLevels() {
   case 4:
     // Distribution + vector common parallel levels + vector inner parallel
     // levels.
-    return {0, 1, 3};
+    return {0, 1};
   case 5:
     // Distribution + cache parallel levels.
     return {0, 1};

@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
+#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -2035,8 +2036,8 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
   if (!linalgOp)
     return success();
 
-  TileSizesListType tileSizesList =
-      getLoweringConfig(linalgOp).getTileSizeVals();
+  auto loweringConfig = getLoweringConfig(linalgOp);
+  TileSizesListType tileSizesList = loweringConfig.getTileSizeVals();
 
   bool hasChanged = false;
   auto res = entryPointFn.walk([&](tensor::PackOp packOp) -> WalkResult {
@@ -2046,6 +2047,24 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
 
     hasChanged = true;
     LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n");
+
+    if (tileSizesList.size() >= 2) {
+      // Move the common vector tile sizes to inner vector tile sizes, because
+      // pack ops imply a different semantic on the common vector tiling level.
+      // This will make sure we still tile the linalg ops correctly at vector
+      // level.
+      SmallVector<int64_t> commonVecTileSizes = tileSizesList[1];
+      for (int i = tileSizesList.size(); i < 4; ++i) {
+        tileSizesList.emplace_back(commonVecTileSizes.size(), 0);
+      }
+      auto &innerVecTileSizes = tileSizesList[3];
+      for (auto [innerTileSize, commonTileSize] :
+           llvm::zip(innerVecTileSizes, commonVecTileSizes)) {
+        if (innerTileSize == 0) {
+          innerTileSize = commonTileSize;
+        }
+      }
+    }
 
     // Only adjust tile sizes for distribution and TileAndFuse, which are the
     // first two tile lists.
