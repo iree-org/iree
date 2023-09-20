@@ -182,6 +182,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
         return createFormDispatchWorkgroupsPass(
             clDispatchGenerateWorkloadRegion);
       })
+      // TODO(#15003): SCF support appears to be insufficient for stream work.
+      // Need to debug the cause.
+      .addPass(IREE::Flow::createTopLevelSCFToCFGPass)
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
