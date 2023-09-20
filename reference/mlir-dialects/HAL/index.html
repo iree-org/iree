@@ -8989,7 +8989,8 @@ the set of queues (0-64) provided. Operations will not run on other queues.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#hal.descriptor_set.layout&lt;
   int64_t,   # ordinal
-  ::llvm::ArrayRef&lt;DescriptorSetBindingAttr&gt;   # bindings
+  ::llvm::ArrayRef&lt;DescriptorSetBindingAttr&gt;,   # bindings
+  std::optional&lt;DescriptorSetLayoutFlags&gt;   # flags
 &gt;
 </code></pre></div>
 <p>Specifies the layout information of a single set of descriptors used within
@@ -9013,6 +9014,11 @@ point to allow for bindings with similar update frequencies to be grouped.</p>
 <tr>
 <td style="text-align: center;">bindings</td>
 <td style="text-align: center;"><code>::llvm::ArrayRef&lt;DescriptorSetBindingAttr&gt;</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">flags</td>
+<td style="text-align: center;"><code>std::optional&lt;DescriptorSetLayoutFlags&gt;</code></td>
 <td></td>
 </tr>
 </tbody>
