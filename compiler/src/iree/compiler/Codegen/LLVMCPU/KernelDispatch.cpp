@@ -2049,7 +2049,6 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
 
     // Only adjust tile sizes for distribution and TileAndFuse, which are the
     // first two tile lists.
-    auto outerDimsPerm = packOp.getOuterDimsPerm();
     for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e; ++i) {
       auto &tileSizes = tileSizesList[i];
       ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
@@ -2057,13 +2056,10 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
       for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
         if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
           continue;
-        tileSizes[pos] = tileSizes[pos] / size;
-        tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
-        LLVM_DEBUG(KD_DBGS() << "Scale # " << pos << " tile size to "
+        tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
+        LLVM_DEBUG(KD_DBGS() << "Align # " << pos << " tile size to "
                              << tileSizes[pos] << "\n");
       }
-      if (!outerDimsPerm.empty())
-        applyPermutationToVector(tileSizes, outerDimsPerm);
     }
 
     return WalkResult::advance();
@@ -2214,6 +2210,22 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
     TypeSwitch<Operation *>(op)
         .Case<tensor::PackOp>([&](auto packOp) {
+          for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e;
+               ++i) {
+            // Scale the outer dim tiles for pack up.
+            auto &tileSizes = tileSizesList[i];
+            ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+            ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+            for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+              if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
+                continue;
+              tileSizes[pos] = tileSizes[pos] / size;
+            }
+            auto outerDimsPerm = packOp.getOuterDimsPerm();
+            if (!outerDimsPerm.empty())
+              applyPermutationToVector(tileSizes, outerDimsPerm);
+          }
+
           SmallVector<int64_t> vecTileSizes =
               getPackVectorTileSizes(entryPointFn, packOp);
           tileSizesList.push_back(zeros); // tensor.pack op does not have
