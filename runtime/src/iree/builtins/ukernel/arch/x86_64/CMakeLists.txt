@@ -155,9 +155,18 @@ set(IREE_UK_COPTS_X86_64_AVX512_VNNI
   "${IREE_UK_COPTS_X86_64_AVX512_VNNI_RELATIVE}"
 )
 
+if ((CMAKE_C_COMPILER_ID STREQUAL GNU) AND
+    (CMAKE_C_COMPILER_VERSION VERSION_LESS 12))
+# Old GCC versions have incompatible x86 intrinsics. Supporting them
+# is not considered worth it. By not defining these tokens, we leave these
+# code paths out. At least GCC 9 is known to be problematic, while GCC 12 is
+# known working, so the current test is based on that.
+else()
 check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX2_FMA}" IREE_UK_BUILD_X86_64_AVX2_FMA)
 check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BASE}" IREE_UK_BUILD_X86_64_AVX512_BASE)
 check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_VNNI}" IREE_UK_BUILD_X86_64_AVX512_VNNI)
+endif()
+
 configure_file("config_x86_64.h.in" "config_x86_64.h")
 
 iree_cc_library(
