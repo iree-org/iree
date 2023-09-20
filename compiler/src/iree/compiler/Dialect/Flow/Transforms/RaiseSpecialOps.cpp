@@ -256,6 +256,7 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
     return failure();
   }
   ArrayRef<int64_t> outShape = outType.getShape();
+  int64_t outRank = outShape.size();
 
   // Try to match each output dimension to an input dimension, in order.
   // If we find a constant access, we assume that dimension is supposed to be
@@ -267,8 +268,17 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
   IntegerAttr one = rewriter.getI64IntegerAttr(1);
   unsigned currOutDim = 0;
   for (auto [idx, expr] : llvm::enumerate(inputIndexingMap.getResults())) {
+    // Assume that the constant access is a rank reducing access.
+    if (expr.isa<AffineConstantExpr>()) {
+      IntegerAttr constIdx = rewriter.getI64IntegerAttr(
+          expr.cast<AffineConstantExpr>().getValue());
+      offsets.push_back(constIdx);
+      sizes.push_back(one);
+      continue;
+    }
     // Check if the input dimension matches the current output dimension.
-    if (expr == outputIndexingMap.getResult(currOutDim)) {
+    if (currOutDim < outRank &&
+        expr == outputIndexingMap.getResult(currOutDim)) {
       offsets.push_back(zero);
       // Get the dim size from the output tensor.
       if (outShape[currOutDim] == ShapedType::kDynamic) {
@@ -279,14 +289,6 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
         sizes.push_back(rewriter.getI64IntegerAttr(outShape[currOutDim]));
       }
       ++currOutDim;
-      continue;
-    }
-    // Assume that the constant access is a rank reducing access.
-    if (expr.isa<AffineConstantExpr>()) {
-      IntegerAttr constIdx = rewriter.getI64IntegerAttr(
-          expr.cast<AffineConstantExpr>().getValue());
-      offsets.push_back(constIdx);
-      sizes.push_back(one);
       continue;
     }
     // Unknown access, fail.
