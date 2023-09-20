@@ -384,7 +384,9 @@ iree_status_t BufferInstance::GetLayoutData(
     xla::StatusOr<::pjrt::BufferMemoryLayoutData> status_or =
         ::pjrt::ConvertToBufferMemoryLayoutData(shape->layout());
     if (!status_or.ok()) {
-      return iree_make_status(IREE_STATUS_UNKNOWN, "Couldn't convert layout");
+      return iree_make_status(IREE_STATUS_UNKNOWN,
+                              "Couldn't convert layout: %s",
+                              status_or.status().error_message().c_str());
     }
     cached_layout_data_.emplace(std::move(*status_or));
   }
@@ -536,6 +538,10 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_Device = +[](PJRT_Buffer_Device_Args* args) -> PJRT_Error* {
     args->device = BufferInstance::Unwrap(args->buffer)->device();
     return nullptr;
+  };
+  api->PJRT_Buffer_Memory = +[](PJRT_Buffer_Memory_Args* args) -> PJRT_Error* {
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_Memory"));
   };
   api->PJRT_Buffer_ReadyEvent =
       +[](PJRT_Buffer_ReadyEvent_Args* args) -> PJRT_Error* {
@@ -1213,6 +1219,11 @@ void ClientInstance::BindApi(PJRT_Api* api) {
                 reinterpret_cast<BufferInstance**>(&args->buffer));
     return MakeError(status);
   };
+  api->PJRT_LoadedExecutable_Fingerprint =
+      +[](PJRT_LoadedExecutable_Fingerprint_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_LoadedExecutable_Fingerprint"));
+  };
 }
 
 PJRT_Error* ClientInstance::Initialize() {
@@ -1645,6 +1656,16 @@ void ExecutableImage::BindApi(PJRT_Api* api) {
       +[](PJRT_Executable_GetCostAnalysis_Args* args) -> PJRT_Error* {
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Executable_GetCostAnalysis"));
+  };
+  api->PJRT_Executable_OutputElementTypes =
+      +[](PJRT_Executable_OutputElementTypes_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_OutputElementTypes"));
+  };
+  api->PJRT_Executable_OutputDimensions =
+      +[](PJRT_Executable_OutputDimensions_Args* args) -> PJRT_Error* {
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Executable_OutputDimensions"));
   };
   api->PJRT_Executable_OutputMemoryKinds =
       +[](PJRT_Executable_OutputMemoryKinds_Args* args) -> PJRT_Error* {
