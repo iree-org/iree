@@ -2213,18 +2213,18 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
     TypeSwitch<Operation *>(op)
         .Case<tensor::PackOp>([&](auto packOp) {
+          ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+          ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+          auto outerDimsPerm = packOp.getOuterDimsPerm();
+          // Scale the outer dim tiles for pack op.
           for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e;
                ++i) {
-            // Scale the outer dim tiles for pack up.
             auto &tileSizes = tileSizesList[i];
-            ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
-            ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
             for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
               if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
                 continue;
               tileSizes[pos] = tileSizes[pos] / size;
             }
-            auto outerDimsPerm = packOp.getOuterDimsPerm();
             if (!outerDimsPerm.empty())
               applyPermutationToVector(tileSizes, outerDimsPerm);
           }
