@@ -184,7 +184,7 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     blockArgs.reserve(op.getInitArgs().size() + 1);
     blockArgs.push_back(op.getLowerBound());
     llvm::append_range(blockArgs, op.getInitArgs());
-    replaceOpWithRegion(rewriter, op, op.getLoopBody(), blockArgs);
+    replaceOpWithRegion(rewriter, op, op.getRegion(), blockArgs);
     return success();
   }
 

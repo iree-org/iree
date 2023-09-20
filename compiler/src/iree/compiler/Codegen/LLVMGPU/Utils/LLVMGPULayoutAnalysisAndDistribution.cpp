@@ -978,9 +978,8 @@ static void replaceForOpWithNewSignature(RewriterBase &rewriter,
       newOperands);
   newLoop.getBody()->erase();
 
-  newLoop.getLoopBody().getBlocks().splice(
-      newLoop.getLoopBody().getBlocks().begin(),
-      loop.getLoopBody().getBlocks());
+  newLoop.getRegion().getBlocks().splice(
+      newLoop.getRegion().getBlocks().begin(), loop.getRegion().getBlocks());
   for (Value operand : newIterOperands)
     newLoop.getBody()->addArgument(operand.getType(), operand.getLoc());
 
