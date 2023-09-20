@@ -96,7 +96,7 @@ struct CanonicalizeForOpInductionVarShape final
     SmallVector<Operation *, 8> resultOps;
     auto terminator = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
     auto returnValues = llvm::to_vector<8>(terminator.getOperands());
-    auto initArgs = llvm::to_vector<8>(forOp.getIterOperands());
+    auto initArgs = llvm::to_vector<8>(forOp.getInitArgs());
     for (auto [index, iterArg] : llvm::enumerate(forOp.getRegionIterArgs())) {
       if (!iterArg.hasOneUse())
         continue;
@@ -167,7 +167,7 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
       return failure();
 
     // Bit cast all init values from v8f16 to v4f32.
-    auto ivInitValues = llvm::to_vector<8>(forOp.getIterOperands());
+    auto ivInitValues = llvm::to_vector<8>(forOp.getInitArgs());
     for (unsigned index : ivIndices) {
       Value oldValue = ivInitValues[index];
       ivInitValues[index] = rewriter.create<vector::BitCastOp>(
