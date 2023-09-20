@@ -185,7 +185,12 @@ static void iree_task_topology_group_initialize_from_processor(
     uint32_t group_index, const struct cpuinfo_processor* processor,
     iree_task_topology_group_t* out_group) {
   iree_task_topology_group_initialize(group_index, out_group);
+#if defined(__linux__)
   out_group->processor_index = processor->linux_id;
+#else
+  out_group->processor_index =
+      processor->core->processor_start + processor->smt_id;
+#endif  // __linux__
   iree_task_topology_set_affinity_from_processor(
       processor, &out_group->ideal_thread_affinity);
 }
