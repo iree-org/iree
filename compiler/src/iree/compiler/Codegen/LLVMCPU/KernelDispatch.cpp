@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
+#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -2049,7 +2050,9 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
 
     // Only adjust tile sizes for distribution and TileAndFuse, which are the
     // first two tile lists.
-    auto outerDimsPerm = packOp.getOuterDimsPerm();
+    // Align the tile sizes of the root op to the pack op's inner tile sizes, so
+    // we can derive the outer tile sizes for pack ops later in
+    // setLoweringConfigForComputeOps by dividing with inner tile sizes.
     for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e; ++i) {
       auto &tileSizes = tileSizesList[i];
       ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
@@ -2057,13 +2060,10 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
       for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
         if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
           continue;
-        tileSizes[pos] = tileSizes[pos] / size;
-        tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
-        LLVM_DEBUG(KD_DBGS() << "Scale # " << pos << " tile size to "
+        tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
+        LLVM_DEBUG(KD_DBGS() << "Align # " << pos << " tile size to "
                              << tileSizes[pos] << "\n");
       }
-      if (!outerDimsPerm.empty())
-        applyPermutationToVector(tileSizes, outerDimsPerm);
     }
 
     return WalkResult::advance();
@@ -2214,6 +2214,22 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
     TypeSwitch<Operation *>(op)
         .Case<tensor::PackOp>([&](auto packOp) {
+          ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+          ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+          auto outerDimsPerm = packOp.getOuterDimsPerm();
+          // Scale the outer dim tiles for pack op.
+          for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e;
+               ++i) {
+            auto &tileSizes = tileSizesList[i];
+            for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+              if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
+                continue;
+              tileSizes[pos] = tileSizes[pos] / size;
+            }
+            if (!outerDimsPerm.empty())
+              applyPermutationToVector(tileSizes, outerDimsPerm);
+          }
+
           SmallVector<int64_t> vecTileSizes =
               getPackVectorTileSizes(entryPointFn, packOp);
           tileSizesList.push_back(zeros); // tensor.pack op does not have
