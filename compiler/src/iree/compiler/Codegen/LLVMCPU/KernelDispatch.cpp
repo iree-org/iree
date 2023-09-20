@@ -2049,6 +2049,9 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
 
     // Only adjust tile sizes for distribution and TileAndFuse, which are the
     // first two tile lists.
+    // Align the tile sizes of the root op to the pack op's inner tile sizes, so
+    // we can derive the outer tile sizes for pack ops later in
+    // setLoweringConfigForComputeOps by dividing with inner tile sizes.
     for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e; ++i) {
       auto &tileSizes = tileSizesList[i];
       ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
