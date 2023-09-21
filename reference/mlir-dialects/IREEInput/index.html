@@ -5148,7 +5148,8 @@ restricted to 3 (XYZ).</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_input.descriptor_set.layout&lt;
   int64_t,   # ordinal
-  ::llvm::ArrayRef&lt;DescriptorSetBindingAttr&gt;   # bindings
+  ::llvm::ArrayRef&lt;DescriptorSetBindingAttr&gt;,   # bindings
+  std::optional&lt;DescriptorSetLayoutFlags&gt;   # flags
 &gt;
 </code></pre></div>
 <h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
@@ -5169,6 +5170,11 @@ restricted to 3 (XYZ).</p>
 <tr>
 <td style="text-align: center;">bindings</td>
 <td style="text-align: center;"><code>::llvm::ArrayRef&lt;DescriptorSetBindingAttr&gt;</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">flags</td>
+<td style="text-align: center;"><code>std::optional&lt;DescriptorSetLayoutFlags&gt;</code></td>
 <td></td>
 </tr>
 </tbody>
