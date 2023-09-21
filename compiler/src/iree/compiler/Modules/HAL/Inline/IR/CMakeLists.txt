@@ -69,7 +69,7 @@ iree_tablegen_library(
 
 iree_tablegen_doc(
   NAME
-    HALInlineDialecDocGen
+    HALInlineDialectDocGen
   TD_FILE
     "HALInlineOps.td"
   OUTS

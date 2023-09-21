@@ -28,6 +28,8 @@ iree_lit_test_suite(
     "multiple_args.mlir"
     "multiple_exported_functions.mlir"
     "null_values.mlir"
+    "parameters_scoped.mlir"
+    "parameters_unscoped.mlir"
     "repeated_return.mlir"
     "scalars.mlir"
   TOOLS
@@ -44,6 +46,8 @@ iree_lit_test_suite(
   DATA
     echo_npy.py
     iree-run-trace.yml
+    parameters_a.safetensors
+    parameters_b.safetensors
   LABELS
     "driver=local-task"
     "driver=vulkan"

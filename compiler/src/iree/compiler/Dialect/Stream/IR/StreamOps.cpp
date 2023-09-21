@@ -391,6 +391,200 @@ static void printEncodedResourceOperands(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<ParameterGatherOperations>(
+//     $source_scope, $source_keys, $source_offsets,
+//     $target, type($target), $target_size, $target_offsets, $target_lengths)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseParameterGatherOperations(
+    OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
+    OpAsmParser::UnresolvedOperand &target, Type &targetType,
+    OpAsmParser::UnresolvedOperand &targetSize,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetLengths) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> sourceKeyAttrs;
+  do {
+    StringAttr rowSourceScopeAttr;
+    StringAttr sourceKeyAttr;
+    OpAsmParser::UnresolvedOperand sourceOffset;
+    OpAsmParser::UnresolvedOperand targetOffset;
+    OpAsmParser::UnresolvedOperand targetLength;
+    OpAsmParser::UnresolvedOperand rowTarget;
+    Type rowTargetType;
+    OpAsmParser::UnresolvedOperand rowTargetSize;
+    if (failed(parseParameterReference(parser, rowSourceScopeAttr,
+                                       sourceKeyAttr)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(sourceOffset)) ||
+        failed(parser.parseRSquare()) || failed(parser.parseArrow()) ||
+        failed(parser.parseOperand(rowTarget)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(targetOffset)) ||
+        failed(parser.parseKeyword("for")) ||
+        failed(parser.parseOperand(targetLength)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.parseColonType(rowTargetType)) ||
+        failed(parser.parseLBrace()) ||
+        failed(parser.parseOperand(rowTargetSize)) ||
+        failed(parser.parseRBrace())) {
+      return failure();
+    }
+    if (!targetType) {
+      sourceScopeAttr = rowSourceScopeAttr;
+      target = rowTarget;
+      targetType = rowTargetType;
+      targetSize = rowTargetSize;
+    } else if (rowSourceScopeAttr != sourceScopeAttr ||
+               rowTarget.name != target.name || rowTargetType != targetType ||
+               rowTargetSize.name != targetSize.name) {
+      return parser.emitError(
+          parser.getCurrentLocation(),
+          "each operation must use the same scope and target resource");
+    }
+    sourceKeyAttrs.push_back(sourceKeyAttr);
+    sourceOffsets.push_back(sourceOffset);
+    targetOffsets.push_back(targetOffset);
+    targetLengths.push_back(targetLength);
+  } while (succeeded(parser.parseOptionalComma()));
+  sourceKeysAttr = builder.getArrayAttr(sourceKeyAttrs);
+  return success();
+}
+
+static void printParameterGatherOperations(
+    OpAsmPrinter &p, Operation *op, StringAttr sourceScopeAttr,
+    ArrayAttr sourceKeysAttr, ValueRange sourceOffsets, Value target,
+    Type targetType, Value targetSize, ValueRange targetOffsets,
+    ValueRange targetLengths) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(sourceKeysAttr.getAsRange<StringAttr>(), sourceOffsets,
+                      targetOffsets, targetLengths),
+      [&](std::tuple<StringAttr, Value, Value, Value> it) {
+        auto [sourceKeyAttr, sourceOffset, targetOffset, targetLength] = it;
+        printParameterReference(p, op, sourceScopeAttr, sourceKeyAttr);
+        p << "[";
+        p.printOperand(sourceOffset);
+        p << "] -> ";
+        p.printOperand(target);
+        p << "[";
+        p.printOperand(targetOffset);
+        p << " for ";
+        p.printOperand(targetLength);
+        p << "] : ";
+        p.printType(targetType);
+        p << "{";
+        p.printOperand(targetSize);
+        p << "}";
+      },
+      [&]() {
+        p << ',';
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<ParameterScatterOperations>(
+//     $source, type($source), $source_size, $source_offsets, $source_lengths,
+//     $target_scope, $target_keys, $target_offsets)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseParameterScatterOperations(
+    OpAsmParser &parser, OpAsmParser::UnresolvedOperand &source,
+    Type &sourceType, OpAsmParser::UnresolvedOperand &sourceSize,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceLengths,
+    StringAttr &targetScopeAttr, ArrayAttr &targetKeysAttr,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &targetOffsets) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> targetKeyAttrs;
+  do {
+    OpAsmParser::UnresolvedOperand rowSource;
+    Type rowSourceType;
+    OpAsmParser::UnresolvedOperand rowSourceSize;
+    OpAsmParser::UnresolvedOperand sourceOffset;
+    OpAsmParser::UnresolvedOperand sourceLength;
+    StringAttr rowTargetScopeAttr;
+    StringAttr targetKeyAttr;
+    OpAsmParser::UnresolvedOperand targetOffset;
+    if (failed(parser.parseOperand(rowSource)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(sourceOffset)) ||
+        failed(parser.parseKeyword("for")) ||
+        failed(parser.parseOperand(sourceLength)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.parseColonType(rowSourceType)) ||
+        failed(parser.parseLBrace()) ||
+        failed(parser.parseOperand(rowSourceSize)) ||
+        failed(parser.parseRBrace()) || failed(parser.parseArrow()) ||
+        failed(parseParameterReference(parser, rowTargetScopeAttr,
+                                       targetKeyAttr)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(targetOffset)) ||
+        failed(parser.parseRSquare())) {
+      return failure();
+    }
+    if (!sourceType) {
+      source = rowSource;
+      sourceType = rowSourceType;
+      sourceSize = rowSourceSize;
+      targetScopeAttr = rowTargetScopeAttr;
+    } else if (rowSource.name != source.name || rowSourceType != sourceType ||
+               rowSourceSize.name != sourceSize.name ||
+               rowTargetScopeAttr != targetScopeAttr) {
+      return parser.emitError(
+          parser.getCurrentLocation(),
+          "each operation must use the same source resource and scope");
+    }
+    sourceOffsets.push_back(sourceOffset);
+    sourceLengths.push_back(sourceLength);
+    targetKeyAttrs.push_back(targetKeyAttr);
+    targetOffsets.push_back(targetOffset);
+  } while (succeeded(parser.parseOptionalComma()));
+  targetKeysAttr = builder.getArrayAttr(targetKeyAttrs);
+  return success();
+}
+
+static void printParameterScatterOperations(
+    OpAsmPrinter &p, Operation *op, Value source, Type sourceType,
+    Value sourceSize, ValueRange sourceOffsets, ValueRange sourceLengths,
+    StringAttr targetScopeAttr, ArrayAttr targetKeysAttr,
+    ValueRange targetOffsets) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(sourceOffsets, sourceLengths,
+                      targetKeysAttr.getAsRange<StringAttr>(), targetOffsets),
+      [&](std::tuple<Value, Value, StringAttr, Value> it) {
+        auto [sourceOffset, sourceLength, targetKeyAttr, targetOffset] = it;
+        p.printOperand(source);
+        p << "[";
+        p.printOperand(sourceOffset);
+        p << " for ";
+        p.printOperand(sourceLength);
+        p << "] : ";
+        p.printType(sourceType);
+        p << "{";
+        p.printOperand(sourceSize);
+        p << "} -> ";
+        printParameterReference(p, op, targetScopeAttr, targetKeyAttr);
+        p << "[";
+        p.printOperand(targetOffset);
+        p << "]";
+      },
+      [&]() {
+        p << ',';
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
 // custom<ResourceRegion>($operands, type($operands), $operand_sizes,
 //                        type($results), $result_sizes,
 //                        $tied_operands, $body)
@@ -944,6 +1138,9 @@ LogicalResult ResourceConstantsOp::verify() {
   if (op.getResultSizes().size() != count || op.getValues().size() != count) {
     return op.emitOpError() << "mismatched constant/result counts";
   }
+  if (!llvm::all_equal(op.getResults().getTypes())) {
+    return op.emitOpError() << "all results must be of the same type";
+  }
   return success();
 }
 
@@ -1000,6 +1197,74 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
     }
   }
   return {};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.load
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.read
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterReadOp::verify() {
+  ParameterReadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.write
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterWriteOp::verify() {
+  ParameterWriteOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.gather
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterGatherOp::verify() {
+  ParameterGatherOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount ||
+      op.getTargetLengths().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source keys, source offsets, target offsets, "
+              "and target lengths are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.parameter.scatter
+//===----------------------------------------------------------------------===//
+
+LogicalResult ParameterScatterOp::verify() {
+  ParameterScatterOp op = *this;
+  size_t expectedCount = op.getTargetKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getSourceLengths().size() != expectedCount ||
+      op.getTargetOffsets().size() != expectedCount) {
+    return op.emitOpError()
+           << "requires that the source offsets, source lengths, target keys, "
+              "and target offsets are all 1:1";
+  }
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -3189,6 +3454,23 @@ LogicalResult TimepointJoinOp::verify() {
   // strictly required but if we could avoid it things will be easier to
   // implement at runtime (won't have to do a cuda<->vulkan sync, etc).
   return success();
+}
+
+// static
+Value TimepointJoinOp::join(Location loc, ValueRange timepoints,
+                            OpBuilder &builder) {
+  assert(!timepoints.empty() && "must have at least one timepoint");
+  if (timepoints.size() == 1)
+    return timepoints.front();
+  return builder.create<IREE::Stream::TimepointJoinOp>(
+      loc, builder.getType<IREE::Stream::TimepointType>(), timepoints);
+}
+
+// static
+Value TimepointJoinOp::join(ValueRange timepoints, OpBuilder &builder) {
+  return join(builder.getFusedLoc(llvm::to_vector(llvm::map_range(
+                  timepoints, [](Value value) { return value.getLoc(); }))),
+              timepoints, builder);
 }
 
 //===----------------------------------------------------------------------===//
