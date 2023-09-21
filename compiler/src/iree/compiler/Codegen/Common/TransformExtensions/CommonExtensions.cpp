@@ -740,15 +740,23 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
+  OpBuilder::InsertionGuard g(builder);
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   MemRefType allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpaceAttr);
-  return builder
-      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
-                               builder.getI64IntegerAttr(alignment))
-      .getResult();
+  Value alloc =
+      builder
+          .create<memref::AllocOp>(loc, allocType, dynamicSizes,
+                                   builder.getI64IntegerAttr(alignment))
+          .getResult();
+  // Place deallocation at the end of the block. This assumes that allocations
+  // are not yielded. If this is no longer the case, switch to the buffer
+  // deallocation pass.
+  builder.setInsertionPoint(builder.getInsertionBlock()->getTerminator());
+  builder.create<memref::DeallocOp>(loc, alloc);
+  return alloc;
 }
 
 static LogicalResult gpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
