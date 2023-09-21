@@ -67,8 +67,6 @@ func.func @matmul() {
 // CHECK-SAME:           outs(%[[ALLOC]]
 //      CHECK:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILESIZE_Y]], %[[TILESIZE_X]]]
 //      CHECK:       linalg.generic {{.*}} ins(%[[ALLOC]] {{.*}} outs(%[[RESULT_TILE]]
-//      CHECK:       memref.dealloc %[[ALLOC]]
-
 
 // -----
 
@@ -400,7 +398,6 @@ module {
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
 //  CHECK-SAME:         outs(%[[RESULT]]
-//       CHECK:       memref.dealloc %[[ALLOC]]
 
 // -----
 
@@ -929,7 +926,6 @@ module {
 //       CHECK:   %[[SUB_ALLOC:.+]] = memref.subview %[[ALLOC]]
 //       CHECK:   linalg.generic {{.*}} ins(%[[ARG0]] {{.*}} outs(%[[SUB_ALLOC]]
 //       CHECK:   linalg.generic {{.*}} ins(%[[ALLOC]] {{.*}} outs(%[[RET0]]
-//       CHECK:   memref.dealloc %[[ALLOC]]
 
 // -----
 
@@ -2194,7 +2190,6 @@ module {
 //  CHECK-SAME:       ins(%[[cst]] :
 //  CHECK-SAME:       outs(%[[alloc]] :
 //       CHECK:   %[[load:.*]] = memref.load %[[alloc]]
-//       CHECK:   memref.dealloc %[[alloc]]
 //       CHECK:   return %[[load]]
 func.func @reverse_dim(%pos: index) -> f32 {
   %input = arith.constant dense<[[1.0, 2.0, 3.0],

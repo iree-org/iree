@@ -133,8 +133,6 @@ struct SwapAllocTensorPattern final
         allocOp.getLoc(), allocOp.getType(), allocOp.getDynamicSizes(),
         /*copy=*/Value(),
         memorySpace ? cast<IntegerAttr>(*memorySpace) : IntegerAttr());
-    newAllocOp->setAttr(bufferization::BufferizationDialect::kEscapeAttrName,
-                        rewriter.getBoolArrayAttr({false}));
     rewriter.updateRootInPlace(linalgOp, [&]() {
       linalgOp->setOperand(linalgOp.getNumDpsInputs() + resultNumber,
                            newAllocOp);
@@ -193,7 +191,7 @@ public:
         // Promote all the input operands
         for (auto operand : linalgOp.getDpsInputOperands()) {
           FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-              builder, op->getLoc(), operand->get(), false, options, true);
+              builder, op->getLoc(), operand->get(), options);
           if (failed(ret)) {
             return signalPassFailure();
           }
@@ -207,7 +205,7 @@ public:
 
         for (auto operand : opInfo.getTransposeOperands()) {
           FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-              builder, op->getLoc(), operand->get(), false, options, true);
+              builder, op->getLoc(), operand->get(), options);
           if (failed(ret)) {
             return signalPassFailure();
           }
