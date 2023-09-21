@@ -1156,7 +1156,7 @@ func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x32xf32>) -> te
 
 func.func @softmax(%arg0: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
   %0 = tensor.empty() : tensor<16x64x256xf32>
-  %1 = iree_linalg_ext.softmax {__internal_linalg_transform__ = "distribute_input"}
+  %1 = linalg.softmax {__internal_linalg_transform__ = "distribute_input"}
          dimension(1) ins(%arg0 : tensor<16x64x256xf32>) outs(%0 : tensor<16x64x256xf32>) -> tensor<16x64x256xf32>
   return %1 : tensor<16x64x256xf32>
 }
@@ -1165,11 +1165,10 @@ func.func @softmax(%arg0: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 30)>
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (30, -d0 + s1)>
 // CHECK:      func.func @softmax(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
-// CHECK-DAG:        %[[C16:.+]] = arith.constant 16 : index
-// CHECK-DAG:        %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:        %[[C30:.+]] = arith.constant 30 : index
 // CHECK-DAG:        %[[C256:.+]] = arith.constant 256 : index
 // CHECK-DAG:        %[[C10:.+]] = arith.constant 10 : index
-// CHECK-DAG:        %[[C30:.+]] = arith.constant 30 : index
+// CHECK-DAG:        %[[C16:.+]] = arith.constant 16 : index
 // CHECK-DAG:        %[[D0:.+]] = tensor.empty() : tensor<16x64x256xf32>
 // CHECK-DAG:        %[[D1:.+]] = iree_input.dispatch.workgroup.id[0] : index
 // CHECK-DAG:        %[[D2:.+]] = iree_input.dispatch.workgroup.count[0] : index
@@ -1186,14 +1185,14 @@ func.func @softmax(%arg0: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
 // CHECK-SAME:       iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[ARG2]]) -> (tensor<16x64x256xf32>) {
 // CHECK-DAG:          %[[D12:.+]] = affine.min #[[MAP3]](%[[ARG3]])[%[[C30]], %[[C256]]]
 // CHECK:            %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG1]], 0, %[[ARG3]]] [%[[D8]],
-// CHECK-SAME:         %[[C64]], %[[D12]]] [1, 1, 1] : tensor<16x64x256xf32> to tensor<?x?x?xf32>
+// CHECK-SAME:         64, %[[D12]]] [1, 1, 1] : tensor<16x64x256xf32> to tensor<?x64x?xf32>
 // CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[D0]][%[[ARG1]], 0, %[[ARG3]]] [%[[D8]],
-// CHECK-SAME:         %[[C64]], %[[D12]]] [1, 1, 1] : tensor<16x64x256xf32> to tensor<?x?x?xf32>
-// CHECK:            %[[D13:.+]] = iree_linalg_ext.softmax {__internal_linalg_transform__ = "distribute_output"}
-// CHECK-SAME:         dimension(1) ins(%[[EXTRACTED_SLICE]] : tensor<?x?x?xf32>) outs(%[[EXTRACTED_SLICE_0]] :
-// CHECK-SAME:         tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+// CHECK-SAME:         64, %[[D12]]] [1, 1, 1] : tensor<16x64x256xf32> to tensor<?x64x?xf32>
+// CHECK:            %[[D13:.+]] = linalg.softmax {__internal_linalg_transform__ = "distribute_output"}
+// CHECK-SAME:         dimension(1) ins(%[[EXTRACTED_SLICE]] : tensor<?x64x?xf32>) outs(%[[EXTRACTED_SLICE_0]] :
+// CHECK-SAME:         tensor<?x64x?xf32>) -> tensor<?x64x?xf32>
 // CHECK:            %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D13]] into %[[ARG4]][%[[ARG1]], 0, %[[ARG3]]]
-// CHECK-SAME:         [%[[D8]], %[[C64]], %[[D12]]] [1, 1, 1] : tensor<?x?x?xf32> into tensor<16x64x256xf32>
+// CHECK-SAME:         [%[[D8]], 64, %[[D12]]] [1, 1, 1] : tensor<?x64x?xf32> into tensor<16x64x256xf32>
 // CHECK:            scf.yield %[[INSERTED_SLICE]] : tensor<16x64x256xf32>
 // CHECK:          }
 // CHECK:          scf.yield %[[D11]] : tensor<16x64x256xf32>
@@ -1204,7 +1203,7 @@ func.func @softmax(%arg0: tensor<16x64x256xf32>) -> tensor<16x64x256xf32> {
 // -----
 
 func.func @softmax_memref(%arg0: memref<16x64x256xf32>, %arg1: memref<16x64x256xf32>) {
-  iree_linalg_ext.softmax {__internal_linalg_transform__ = "distribute_input"}
+  linalg.softmax {__internal_linalg_transform__ = "distribute_input"}
     dimension(1) ins(%arg0 : memref<16x64x256xf32>) outs(%arg1 : memref<16x64x256xf32>)
   return
 }
@@ -1214,11 +1213,10 @@ func.func @softmax_memref(%arg0: memref<16x64x256xf32>, %arg1: memref<16x64x256x
 // CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0)[s0, s1] -> (30, -d0 + s1)>
 // CHECK:      func.func @softmax_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<16x64x256xf32>, %[[ARG1:[a-zA-Z0-9_]+]]:
 // CHECK-SAME:   memref<16x64x256xf32>) {
-// CHECK-DAG:    %[[C16:.+]] = arith.constant 16 : index
-// CHECK-DAG:    %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:    %[[C30:.+]] = arith.constant 30 : index
 // CHECK-DAG:    %[[C256:.+]] = arith.constant 256 : index
 // CHECK-DAG:    %[[C10:.+]] = arith.constant 10 : index
-// CHECK-DAG:    %[[C30:.+]] = arith.constant 30 : index
+// CHECK-DAG:    %[[C16:.+]] = arith.constant 16 : index
 // CHECK:        %[[D0:.+]] = iree_input.dispatch.workgroup.id[0] : index
 // CHECK:        %[[D1:.+]] = iree_input.dispatch.workgroup.count[0] : index
 // CHECK:        %[[D2:.+]] = iree_input.dispatch.workgroup.id[1] : index
@@ -1231,13 +1229,13 @@ func.func @softmax_memref(%arg0: memref<16x64x256xf32>, %arg1: memref<16x64x256x
 // CHECK-DAG:        %[[D8:.+]] = affine.apply #[[MAP2]]()[%[[D1]]]
 // CHECK:          scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[D7]] to %[[C256]] step %[[D8]] {
 // CHECK-DAG:          %[[D9:.+]] = affine.min #[[MAP3]](%[[ARG3]])[%[[C30]], %[[C256]]]
-// CHECK:            %[[SUBVIEW:.+]] = memref.subview %[[ARG0]][%[[ARG2]], 0, %[[ARG3]]] [%[[D6]], %[[C64]], %[[D9]]]
-// CHECK-SAME:         [1, 1, 1] : memref<16x64x256xf32> to memref<?x?x?xf32, strided<[16384, 256, 1], offset: ?>>
-// CHECK:            %[[SUBVIEW_0:.+]] = memref.subview %[[ARG1]][%[[ARG2]], 0, %[[ARG3]]] [%[[D6]], %[[C64]], %[[D9]]]
-// CHECK-SAME:         [1, 1, 1] : memref<16x64x256xf32> to memref<?x?x?xf32, strided<[16384, 256, 1], offset: ?>>
-// CHECK:            iree_linalg_ext.softmax {__internal_linalg_transform__ = "distribute_output"} dimension(1)
-// CHECK-SAME:         ins(%[[SUBVIEW]] : memref<?x?x?xf32, strided<[16384, 256, 1], offset: ?>>) outs(%[[SUBVIEW_0]] :
-// CHECK-SAME:         memref<?x?x?xf32, strided<[16384, 256, 1], offset: ?>>)
+// CHECK:            %[[SUBVIEW:.+]] = memref.subview %[[ARG0]][%[[ARG2]], 0, %[[ARG3]]] [%[[D6]], 64, %[[D9]]]
+// CHECK-SAME:         [1, 1, 1] : memref<16x64x256xf32> to memref<?x64x?xf32, strided<[16384, 256, 1], offset: ?>>
+// CHECK:            %[[SUBVIEW_0:.+]] = memref.subview %[[ARG1]][%[[ARG2]], 0, %[[ARG3]]] [%[[D6]], 64, %[[D9]]]
+// CHECK-SAME:         [1, 1, 1] : memref<16x64x256xf32> to memref<?x64x?xf32, strided<[16384, 256, 1], offset: ?>>
+// CHECK:            linalg.softmax {__internal_linalg_transform__ = "distribute_output"} dimension(1)
+// CHECK-SAME:         ins(%[[SUBVIEW]] : memref<?x64x?xf32, strided<[16384, 256, 1], offset: ?>>) outs(%[[SUBVIEW_0]] :
+// CHECK-SAME:         memref<?x64x?xf32, strided<[16384, 256, 1], offset: ?>>)
 // CHECK:          }
 // CHECK:        }
 // CHECK:        return
