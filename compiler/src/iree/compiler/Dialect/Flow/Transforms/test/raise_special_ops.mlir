@@ -240,9 +240,8 @@ func.func @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
 // -----
 
 #map = affine_map<(d0) -> (d0)>
-func.func @test(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) -> tensor<5120xf32> {
+func.func @test_rank_reduce(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) -> tensor<5120xf32> {
   %c0 = arith.constant 0 : index
-  // CHECK: tensor.extract_slice
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%B : tensor<5120xf32>) {
   ^bb0(%out: f32):
     %12 = linalg.index 0 : index
@@ -252,12 +251,55 @@ func.func @test(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) -> tensor<5120
   return %0 : tensor<5120xf32>
 }
 
+// CHECK-LABEL: func @test_rank_reduce
+//       CHECK:   tensor.extract_slice %{{.*}}[0, 0, 0] [1, 1, 5120] [1, 1, 1]
+//  CHECK-SAME:     tensor<1x1x5120xf32> to tensor<5120xf32>
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @test_slice_middle(%A : tensor<64x64x64xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
+  ^bb0(%out: f32):
+    %i1 = linalg.index 0 : index
+    %i2 = linalg.index 1 : index
+    %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<64x64x64xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<64x64xf32>
+  return %0 : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: func @test_slice_middle
+//       CHECK:   tensor.extract_slice %{{.*}}[0, 0, 0] [64, 1, 64] [1, 1, 1]
+//  CHECK-SAME:     tensor<64x64x64xf32> to tensor<64x64xf32>
+
+// -----
+
+func.func @test_trailing_elementwise(%arg0: tensor<180x320x1xf32>) -> tensor<320xf32> {
+  %c0 = arith.constant 0 : index
+  %c179 = arith.constant 179 : index
+  %70 = tensor.empty() : tensor<320xf32>
+  %71 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} outs(%70 : tensor<320xf32>) {
+  ^bb0(%out: f32):
+    %76 = linalg.index 0 : index
+    %extracted = tensor.extract %arg0[%c0, %76, %c0] : tensor<180x320x1xf32>
+    linalg.yield %extracted : f32
+  } -> tensor<320xf32>
+  return %71 : tensor<320xf32>
+}
+
+// CHECK-LABEL: func @test_trailing_elementwise
+//       CHECK:   tensor.extract_slice %{{.*}}[0, 0, 0] [1, 320, 1] [1, 1, 1]
+//  CHECK-SAME:     tensor<180x320x1xf32> to tensor<320xf32>
+
 // -----
 
 // This currently should not be raised as the operation does not remain
 // elementwise after raising the tensor.extract to input.
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @test(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+// CHECK-LABEL: func @test_non_slice
+func.func @test_non_slice(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
   %c0 = arith.constant 0 : index
   // CHECK: linalg.generic
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
@@ -265,22 +307,6 @@ func.func @test(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) -> tensor<
     %i1 = linalg.index 0 : index
     %i2 = linalg.index 1 : index
     %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<128x128x128xf32>
-    linalg.yield %extracted : f32
-  } -> tensor<64x64xf32>
-  return %0 : tensor<64x64xf32>
-}
-
-// -----
-
-#map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @test(%A : tensor<64x64x64xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
-  %c0 = arith.constant 0 : index
-  %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
-  ^bb0(%out: f32):
-    %i1 = linalg.index 0 : index
-    %i2 = linalg.index 1 : index
-    // CHECK: tensor.extract_slice
-    %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<64x64x64xf32>
     linalg.yield %extracted : f32
   } -> tensor<64x64xf32>
   return %0 : tensor<64x64xf32>
