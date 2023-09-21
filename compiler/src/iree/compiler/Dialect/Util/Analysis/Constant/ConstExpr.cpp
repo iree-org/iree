@@ -148,6 +148,10 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
         assert(definingOp && "const values should have defining op");
         for (auto &use : definingOp->getUses()) {
           Operation *useOp = use.getOwner();
+          // Skip expanding of ops within dispatch or nested regions.
+          if (definingOp->getParentOp() != useOp->getParentOp()) {
+            continue;
+          }
           expandToOp(useOp);
         }
       }
