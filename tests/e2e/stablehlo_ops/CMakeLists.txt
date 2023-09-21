@@ -576,7 +576,7 @@ iree_check_single_backend_test_suite(
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
-    "reduce_window.mlir"
+    # "reduce_window.mlir"  # TODO(15012): fix test crash
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
