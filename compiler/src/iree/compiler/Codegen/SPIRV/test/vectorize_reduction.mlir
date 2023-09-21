@@ -1,4 +1,6 @@
-// RUN: iree-opt -split-input-file -iree-spirv-vectorize %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization,iree-spirv-vector-lowering))' \
+// RUN:   %s | FileCheck %s
 
 func.func @reduce_outmost_dim(%input: tensor<4x1x4xf32>, %init: tensor<1x4xf32>) -> tensor<1x4xf32> {
   %f0 = arith.constant 0.0 : f32
