@@ -233,9 +233,8 @@ struct ConvertTensorBarrierOp
       signaledResources.push_back(barrierOp.getResult());
       signaledTimepoints.push_back(barrierOp.getResultTimepoint());
     }
-    Value joinedTimepoint =
-        rewriter.createOrFold<IREE::Stream::TimepointJoinOp>(
-            op.getLoc(), timepointType, signaledTimepoints);
+    Value joinedTimepoint = IREE::Stream::TimepointJoinOp::join(
+        op.getLoc(), signaledTimepoints, rewriter);
     rewriter.create<IREE::Stream::TimepointChainExternalOp>(
         op.getLoc(), joinedTimepoint, ValueRange{adaptor.getSignalFence()},
         /*affinity=*/nullptr);
