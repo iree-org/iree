@@ -746,17 +746,10 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
   MemRefType allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
                       AffineMap(), addressSpaceAttr);
-  Value alloc =
-      builder
-          .create<memref::AllocOp>(loc, allocType, dynamicSizes,
-                                   builder.getI64IntegerAttr(alignment))
-          .getResult();
-  // Place deallocation at the end of the block. This assumes that allocations
-  // are not yielded. If this is no longer the case, switch to the buffer
-  // deallocation pass.
-  builder.setInsertionPoint(builder.getInsertionBlock()->getTerminator());
-  builder.create<memref::DeallocOp>(loc, alloc);
-  return alloc;
+  return builder
+      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
+                               builder.getI64IntegerAttr(alignment))
+      .getResult();
 }
 
 static LogicalResult gpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,

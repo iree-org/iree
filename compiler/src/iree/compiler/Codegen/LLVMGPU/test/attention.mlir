@@ -285,15 +285,12 @@ transform.sequence failures(propagate) {
 // CHECK-SAME:       ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>} %[[D36]], %[[D38]], %[[D34]] :
 // CHECK-SAME:       vector<32x128xf32>, vector<64x128xf32> into vector<32x64xf32>
 // CHECK:          gpu.barrier
-// CHECK:          memref.dealloc %[[ALLOC_10]] : memref<128x64xf16, #[[GPU]].address_space<workgroup>>
-// CHECK:          memref.dealloc %[[ALLOC_11]] : memref<128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:          scf.yield %[[D16]], %[[D24]], %[[D39]] : vector<32xf32>, vector<32xf32>, vector<32x64xf32>
 // CHECK:        }
 // CHECK:        %[[D12:.+]] = arith.truncf %[[D11]]#[[D2:.+]] : vector<32x64xf32> to vector<32x64xf16>
 // CHECK:        vector.transfer_write %[[D12]], %[[ALLOC_7]][%[[C0]], %[[D8]], %[[C0]]] {in_bounds = [true, true]} :
 // CHECK-SAME:     vector<32x64xf16>, memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:        gpu.barrier
-// CHECK:        memref.dealloc %[[ALLOC]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:        gpu.barrier
 // CHECK:        linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]]], iterator_types = ["parallel", "parallel",
 // CHECK-SAME:     "parallel"]} ins(%[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>)
@@ -302,4 +299,3 @@ transform.sequence failures(propagate) {
 // CHECK:          linalg.yield %[[IN]] : f16
 // CHECK:        }
 // CHECK:        gpu.barrier
-// CHECK:        memref.dealloc %[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
