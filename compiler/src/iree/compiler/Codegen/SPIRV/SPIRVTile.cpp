@@ -138,7 +138,7 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
   // We don't distribute here; instead, it will be done in a later step
   // after bufferization. So add attributes to the tiled loop nest to
   // indicate that they should be distributed to invocations.
-  ArrayRef<scf::ForOp> loops = tileAndFuseResult.value().loops;
+  ArrayRef<Operation *> loops = tileAndFuseResult.value().loops;
   const char *attrName = getSPIRVDistributeAttrName();
   // We can have more than 3 dimensions being tiled (e.g., for convolutions with
   // non-1 batch). But only the innermost 3 dimensions are distributed.
@@ -273,10 +273,10 @@ static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
     // for parallel output window dimension, so it helps future vector
     // transformations.
 
-    ArrayRef<scf::ForOp> loops = tileAndFuseResult.value().loops;
+    ArrayRef<Operation *> loops = tileAndFuseResult.value().loops;
     if (!loops.empty()) {
       assert(loops.size() == 1);
-      scf::ForOp loopOp = loops.front();
+      scf::ForOp loopOp = cast<scf::ForOp>(loops.front());
       IntegerAttr ub;
       if (!matchPattern(loopOp.getUpperBound(), m_Constant(&ub))) {
         return loopOp.emitOpError("upper bound should be a constant");
