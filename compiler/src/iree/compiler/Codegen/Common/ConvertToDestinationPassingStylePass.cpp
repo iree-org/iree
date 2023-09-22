@@ -350,18 +350,18 @@ canModifyUseToGetValueIntoStoreSet(BufferizationPlan &plan, OpOperand *use,
     return std::nullopt;
 
   for (auto [index, initOperand] :
-       llvm::enumerate(genericOpConsumer.getDpsInitOperands())) {
+       llvm::enumerate(genericOpConsumer.getDpsInitsMutable())) {
     // Output tensor is unused in the body computation.
-    if (genericOpConsumer.payloadUsesValueFromOperand(initOperand))
+    if (genericOpConsumer.payloadUsesValueFromOperand(&initOperand))
       continue;
     // The result of this operation needs to be in a store set.
     if (!plan.isInStoreSet(genericOpConsumer->getResult(index)))
       continue;
-    if (!canUseInOperandAsInitOperand(use, initOperand,
+    if (!canUseInOperandAsInitOperand(use, &initOperand,
                                       useWARForCooperativeMatrixCodegen)) {
       continue;
     }
-    return initOperand;
+    return &initOperand;
   }
   return std::nullopt;
 }
@@ -390,14 +390,14 @@ static LogicalResult modifyUseToGetValueIntoStoreSet(RewriterBase &rewriter,
       maps.push_back(genericOp.getMatchingIndexingMap(in));
     }
   }
-  for (OpOperand *out : genericOp.getDpsInitOperands()) {
-    maps.push_back(genericOp.getMatchingIndexingMap(out));
-    if (initOperand == out) {
+  for (OpOperand &out : genericOp.getDpsInitsMutable()) {
+    maps.push_back(genericOp.getMatchingIndexingMap(&out));
+    if (initOperand == &out) {
       newOutputs.push_back(inOperand->get());
       newResultTypes.push_back(inOperand->get().getType());
     } else {
-      newOutputs.push_back(out->get());
-      newResultTypes.push_back(out->get().getType());
+      newOutputs.push_back(out.get());
+      newResultTypes.push_back(out.get().getType());
     }
   }
   OpBuilder::InsertionGuard g(rewriter);
@@ -515,9 +515,9 @@ struct RemoveCstOutsDependency
     rewriter.startRootUpdate(op);
     bool modifiedOutput = false;
     Location loc = op.getLoc();
-    for (OpOperand *opOperand : op.getDpsInitOperands()) {
+    for (OpOperand &opOperand : op.getDpsInitsMutable()) {
       DenseElementsAttr attr;
-      if (!matchPattern(opOperand->get(), m_Constant(&attr)))
+      if (!matchPattern(opOperand.get(), m_Constant(&attr)))
         continue;
       if (!attr.isSplat())
         continue;
@@ -532,7 +532,7 @@ struct RemoveCstOutsDependency
       Value cstOp = rewriter.create<arith::ConstantOp>(loc, scalarAttr);
       Value fillOp =
           rewriter.create<linalg::FillOp>(loc, cstOp, emptyTensor).result();
-      op->setOperand(opOperand->getOperandNumber(), fillOp);
+      op->setOperand(opOperand.getOperandNumber(), fillOp);
     }
     if (!modifiedOutput) {
       rewriter.cancelRootUpdate(op);

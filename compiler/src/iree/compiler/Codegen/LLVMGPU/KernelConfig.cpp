@@ -549,18 +549,14 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   int64_t skipInnerTiling = 0;
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     for (auto [index, outputOperand] :
-         llvm::enumerate(genericOp.getDpsInitOperands())) {
-      if (!genericOp.getMatchingIndexingMap(outputOperand)
+         llvm::enumerate(genericOp.getDpsInitsMutable())) {
+      if (!genericOp.getMatchingIndexingMap(&outputOperand)
                .isProjectedPermutation()) {
         vectorSize = 1;
         break;
       }
       ArrayRef<int64_t> shape =
-          llvm::cast<ShapedType>(cast<linalg::LinalgOp>(op)
-                                     .getDpsInitOperand(index)
-                                     ->get()
-                                     .getType())
-              .getShape();
+          llvm::cast<ShapedType>(outputOperand.get().getType()).getShape();
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         vectorSize = 1;
         break;
@@ -767,17 +763,17 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
 
   bool foundSingleReductionOutput = false;
-  for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
+  for (auto [index, initOpOperand] : llvm::enumerate(op.getDpsInitsMutable())) {
     // Only single combiner operations are supported for now.
     SmallVector<Operation *> combinerOps;
-    if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
+    if (matchReduction(op.getRegionOutputArgs(), index, combinerOps) &&
         combinerOps.size() == 1) {
       if (foundSingleReductionOutput)
         return failure();
       foundSingleReductionOutput = true;
       continue;
     }
-    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity())
+    if (!op.getMatchingIndexingMap(&initOpOperand).isIdentity())
       return failure();
   }
   if (!foundSingleReductionOutput)

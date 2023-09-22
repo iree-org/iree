@@ -245,13 +245,13 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   if (!matmulOp.hasTensorSemantics())
     return failure();
   auto inputs = matmulOp.getDpsInputOperands();
-  auto outputs = matmulOp.getDpsInitOperands();
+  auto outputs = matmulOp.getDpsInits();
   auto lhsEncoding =
       getEncodingAttr(inputs[0]->get().getType().cast<RankedTensorType>());
   auto rhsEncoding =
       getEncodingAttr(inputs[1]->get().getType().cast<RankedTensorType>());
   auto resultEncoding =
-      getEncodingAttr(outputs[0]->get().getType().cast<RankedTensorType>());
+      getEncodingAttr(outputs[0].getType().cast<RankedTensorType>());
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }
@@ -285,13 +285,13 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::BatchMatmulOp batchMatmulOp,
   if (!batchMatmulOp.hasTensorSemantics())
     return failure();
   auto inputs = batchMatmulOp.getDpsInputOperands();
-  auto outputs = batchMatmulOp.getDpsInitOperands();
+  auto outputs = batchMatmulOp.getDpsInits();
   auto lhsEncoding =
       getEncodingAttr(inputs[0]->get().getType().cast<RankedTensorType>());
   auto rhsEncoding =
       getEncodingAttr(inputs[1]->get().getType().cast<RankedTensorType>());
   auto resultEncoding =
-      getEncodingAttr(outputs[0]->get().getType().cast<RankedTensorType>());
+      getEncodingAttr(outputs[0].getType().cast<RankedTensorType>());
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }

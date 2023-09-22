@@ -148,10 +148,10 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasTensorSemantics())
       return failure();
-    auto inputs = matmulOp.getDpsInputOperands();
-    auto outputs = matmulOp.getDpsInitOperands();
-    auto hasEncoding = [](OpOperand *operand) -> bool {
-      auto type = llvm::dyn_cast<RankedTensorType>(operand->get().getType());
+    auto inputs = matmulOp.getDpsInputs();
+    auto outputs = matmulOp.getDpsInits();
+    auto hasEncoding = [](Value operand) -> bool {
+      auto type = llvm::dyn_cast<RankedTensorType>(operand.getType());
       return type && type.getEncoding();
     };
     if (llvm::any_of(inputs, hasEncoding) ||
@@ -159,9 +159,9 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       return failure();
     }
 
-    Value origLhs = inputs[0]->get();
-    Value origRhs = inputs[1]->get();
-    Value origOut = outputs[0]->get();
+    Value origLhs = inputs[0];
+    Value origRhs = inputs[1];
+    Value origOut = outputs[0];
 
     auto getElemType = [](Value v) -> Type {
       if (auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType())) {
@@ -242,10 +242,10 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasTensorSemantics())
       return failure();
-    auto inputs = matmulOp.getDpsInputOperands();
-    auto outputs = matmulOp.getDpsInitOperands();
-    auto hasEncoding = [](OpOperand *operand) -> bool {
-      auto type = llvm::dyn_cast<RankedTensorType>(operand->get().getType());
+    auto inputs = matmulOp.getDpsInputs();
+    auto outputs = matmulOp.getDpsInits();
+    auto hasEncoding = [](Value operand) -> bool {
+      auto type = llvm::dyn_cast<RankedTensorType>(operand.getType());
       return type && type.getEncoding();
     };
     if (llvm::any_of(inputs, hasEncoding) ||
@@ -253,9 +253,9 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
       return failure();
     }
 
-    Value origLhs = inputs[0]->get();
-    Value origRhs = inputs[1]->get();
-    Value origOut = outputs[0]->get();
+    Value origLhs = inputs[0];
+    Value origRhs = inputs[1];
+    Value origOut = outputs[0];
 
     auto getElemType = [](Value v) -> Type {
       if (auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType())) {

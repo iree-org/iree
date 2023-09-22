@@ -1219,7 +1219,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   }
 
   bool foundSingleReductionOutput = false;
-  for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
+  for (int64_t i = 0, e = op.getDpsInits().size(); i < e; i++) {
     // Only single combiner operations are supported for now.
     SmallVector<Operation *> combinerOps;
     if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
@@ -1351,8 +1351,8 @@ static int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
     unsigned b = getElementTypeOrSelf(operand->get()).getIntOrFloatBitWidth();
     bitwidth = std::min(bitwidth, b);
   }
-  for (OpOperand *result : linalgOp.getDpsInitOperands()) {
-    unsigned b = getElementTypeOrSelf(result->get()).getIntOrFloatBitWidth();
+  for (Value result : linalgOp.getDpsInits()) {
+    unsigned b = getElementTypeOrSelf(result).getIntOrFloatBitWidth();
     bitwidth = std::min(bitwidth, b);
   }
   return bitwidth;

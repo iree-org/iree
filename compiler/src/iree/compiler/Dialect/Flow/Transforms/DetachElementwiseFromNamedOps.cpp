@@ -46,9 +46,11 @@ struct DetachElementwisePattern
       return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
-    OpOperandVector outputOperands;
+    SmallVector<OpOperand *> outputOperands;
     if (!linalgOp.hasBufferSemantics()) {
-      outputOperands = linalgOp.getDpsInitOperands();
+      outputOperands = llvm::to_vector(
+          llvm::map_range(linalgOp.getDpsInitsMutable(),
+                          [](OpOperand &opOperand) { return &opOperand; }));
     }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.
@@ -142,10 +144,9 @@ struct DetachSplatConstantOutsOperands
           interfaceOp, "expected op to implement DPS interface");
     }
     bool madeChanges = false;
-    for (auto outOperand :
-         llvm::enumerate(dpsInterfaceOp.getDpsInitOperands())) {
+    for (auto outOperand : llvm::enumerate(dpsInterfaceOp.getDpsInits())) {
       auto constOp =
-          outOperand.value()->get().template getDefiningOp<arith::ConstantOp>();
+          outOperand.value().template getDefiningOp<arith::ConstantOp>();
       if (!constOp)
         continue;
 

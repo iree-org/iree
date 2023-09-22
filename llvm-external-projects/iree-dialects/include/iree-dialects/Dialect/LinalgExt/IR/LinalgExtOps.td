@@ -171,7 +171,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
     int64_t getIndexDepth() {
-      return getInputOperand(1)
+      return getDpsInputOperand(1)
           ->get()
           .getType()
           .cast<ShapedType>()
@@ -180,7 +180,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     }
 
     Value updates() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
 
     ShapedType getUpdateType() {
@@ -188,7 +188,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     }
 
     Value indices() {
-      return getInputOperand(1)->get();
+      return getDpsInputOperand(1)->get();
     }
 
     ShapedType getIndicesType() {
@@ -196,7 +196,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     }
 
     Value original() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
 
     ShapedType getOriginalType() {
@@ -213,12 +213,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -268,12 +264,8 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -314,7 +306,7 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
     Value getStage() { return getInputs()[0]; }
     Value getReal() { return getOutputs()[0]; }
     Value getImag() { return getOutputs()[1]; }
-    bool hasCoeff() { return getNumInputs() > 1; }
+    bool hasCoeff() { return getNumDpsInputs() > 1; }
     void generateScalarImplWithoutCoeffBuf(
         OpBuilder & b, Location loc, ArrayRef<Value> operands, Value wholeSize);
     void generateScalarImplWithCoeffBuf(OpBuilder & b, Location loc,
@@ -342,12 +334,8 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -390,13 +378,13 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value input() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
     Value accumulator() {
-      return getOutputOperand(1)->get();
+      return getDpsInitOperand(1)->get();
     }
     Value output() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
     ShapedType getOperandType() {
       return input().getType().cast<ShapedType>();
@@ -407,12 +395,8 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -447,10 +431,10 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value input() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
     Value output() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
     ShapedType getOperandType() {
       return input().getType().cast<ShapedType>();
@@ -471,12 +455,8 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -528,20 +508,20 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value values() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
     std::optional<Value> indices() {
-      if (getNumInputs() < 2) {
+      if (getNumDpsInputs() < 2) {
         return {};
       } else {
-        return getInputOperand(1)->get();
+        return getDpsInputOperand(1)->get();
       }
     }
     Value outputValues() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
     Value outputIndices() {
-      return getOutputOperand(1)->get();
+      return getDpsInitOperand(1)->get();
     }
     ShapedType getInputType() {
       return values().getType().cast<ShapedType>();
@@ -552,12 +532,8 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -606,10 +582,10 @@ def IREELinalgExt_SoftmaxOp : IREELinalgExt_Op<"softmax",
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value input() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
     Value output() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
     ShapedType getInputOperandType() {
       return input().getType().cast<ShapedType>();
@@ -625,12 +601,8 @@ def IREELinalgExt_SoftmaxOp : IREELinalgExt_Op<"softmax",
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -684,16 +656,16 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value getQuery() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
     Value getKey() {
-      return getInputOperand(1)->get();
+      return getDpsInputOperand(1)->get();
     }
     Value getValue() {
-      return getInputOperand(2)->get();
+      return getDpsInputOperand(2)->get();
     }
     Value getOutput() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
     ShapedType getQueryType() {
       return getQuery().getType().cast<ShapedType>();
@@ -724,12 +696,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     };
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -838,12 +806,12 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Return the output operand.
     Value getOutput() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
 
     // Return the input operand.
     Value getInput() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
 
     // Return the output rank.
@@ -907,12 +875,8 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -985,12 +949,12 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 
     // Return the output operand.
     Value getOutput() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
 
     // Return the input operand.
     Value getInput() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
 
     // Return the output rank.
@@ -1032,12 +996,8 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -1180,10 +1140,10 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value input() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
     Value output() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
     ShapedType getInputOperandType() {
       return input().getType().cast<ShapedType>();
@@ -1228,12 +1188,8 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
@@ -1290,10 +1246,10 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value input() {
-      return getInputOperand(0)->get();
+      return getDpsInputOperand(0)->get();
     }
     Value output() {
-      return getOutputOperand(0)->get();
+      return getDpsInitOperand(0)->get();
     }
     ShapedType getInputOperandType() {
       return input().getType().cast<ShapedType>();
@@ -1338,12 +1294,8 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    std::pair<int64_t, int64_t> getDpsInitsPositionRange() {
-      std::pair<unsigned, unsigned> outputsIndexAndLength =
-        getODSOperandIndexAndLength(1);
-      return std::make_pair<int64_t, int64_t>(
-          outputsIndexAndLength.first,
-          outputsIndexAndLength.first + outputsIndexAndLength.second);
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
     }
   }];
 }
