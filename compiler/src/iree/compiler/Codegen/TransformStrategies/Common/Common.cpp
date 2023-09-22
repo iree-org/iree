@@ -42,7 +42,7 @@ using transform::SequenceOp;
 using transform::SplitHandleOp;
 using transform::SplitReductionOp;
 using transform::TileToForallOp;
-using transform::VectorizeOp;
+using transform::VectorizeChildrenAndApplyPatternsOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::TakeFirstOp;
 
@@ -291,7 +291,8 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
                                           bool applyCleanups,
                                           bool vectorizePadding,
                                           bool vectorizeNdExtract) {
-  funcH = b.create<VectorizeOp>(funcH, vectorizePadding, vectorizeNdExtract);
+  funcH = b.create<VectorizeChildrenAndApplyPatternsOp>(funcH, vectorizePadding,
+                                                        vectorizeNdExtract);
   if (applyCleanups) {
     iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   }
