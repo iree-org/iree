@@ -881,8 +881,9 @@ getCooperativeMatrixSize(spirv::ResourceLimitsAttr resourceLimits,
                          const unsigned numMNTilesPerSubgroup, Type aType,
                          Type bType, Type cType, int64_t m, int64_t n,
                          int64_t k) {
-  auto properties = resourceLimits.getCooperativeMatrixPropertiesNv()
-                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  auto properties =
+      resourceLimits.getCooperativeMatrixPropertiesKhr()
+          .getAsRange<spirv::CooperativeMatrixPropertiesKHRAttr>();
   for (auto property : properties) {
     if (property.getAType() != aType || property.getBType() != bType ||
         property.getCType() != cType || property.getResultType() != cType ||
@@ -982,8 +983,8 @@ LogicalResult setCooperativeMatrixConfig(
     unsigned softwarePipelineStoreStage) {
   LLVM_DEBUG(llvm::dbgs() << "trying to matmul tensorcore config...\n");
   // This configuration is only for cooperative matrix.
-  if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
-      !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
+  if (!targetEnv.allows(spirv::Capability::CooperativeMatrixKHR) ||
+      !targetEnv.allows(spirv::Extension::SPV_KHR_cooperative_matrix)) {
     return failure();
   }
 
@@ -1014,7 +1015,7 @@ LogicalResult setCooperativeMatrixConfig(
 
   // TODO: Cooperative matrix support is fairly restricted. We can only have
   // a curated list of fused element wise ops as defined in the extension
-  // SPV_NV_cooperative_matrix. Check that once we move bufferization after
+  // SPV_KHR_cooperative_matrix. Check that once we move bufferization after
   // vectorization.
 
   auto getElementType = [](Value v) {
@@ -1623,8 +1624,9 @@ setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
 
   // Populates the supported WMMA fragment combinations from the target
   // environment. Infer tf32 support from the list of supported fragment types.
-  auto properties = limits.getCooperativeMatrixPropertiesNv()
-                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  auto properties =
+      limits.getCooperativeMatrixPropertiesKhr()
+          .getAsRange<spirv::CooperativeMatrixPropertiesKHRAttr>();
   for (auto property : properties) {
     if (property.getScope().getValue() != spirv::Scope::Subgroup)
       continue;
