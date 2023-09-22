@@ -27,7 +27,7 @@ hal.executable public @generic_static {
         %5 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
         %6 = flow.dispatch.tensor.load %0, offsets = [%4, %5], sizes = [%3, %2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x4096xf32>> -> tensor<?x?xf32>
         %7 = tensor.empty(%2, %3) : tensor<?x?xf32>
-        %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<?x?xf32>) outs(%7 : tensor<?x?xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 32]]>} {
+        %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<?x?xf32>) outs(%7 : tensor<?x?xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[32, 32]]>} {
         ^bb0(%in: f32, %out: f32):
           linalg.yield %in : f32
         } -> tensor<?x?xf32>

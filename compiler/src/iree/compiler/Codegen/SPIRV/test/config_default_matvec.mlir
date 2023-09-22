@@ -55,7 +55,7 @@ hal.executable @i4_dequant_matvec_f32 {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1], [0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 // CHECK-LABEL: hal.executable.export public @i4_dequant_matvec_f32
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -136,7 +136,7 @@ hal.executable @i4_dequant_matvec_f32 {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 32, 128]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1, 1, 1], [0, 0, 0, 32, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 // CHECK-LABEL: hal.executable.export public @i4_dequant_matvec_f32
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -227,7 +227,7 @@ hal.executable @i4_dequant_matvec_f32 {
         } -> tensor<4096x86x128xf32>
         %41 = linalg.generic {
             indexing_maps = [
-                affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, 
+                affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
                 affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
                 affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
@@ -244,7 +244,7 @@ hal.executable @i4_dequant_matvec_f32 {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 // CHECK-LABEL: hal.executable.export public @i4_dequant_matvec_f32
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -330,7 +330,7 @@ hal.executable @i4_dequant_matvec_f16 {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1, 1, 1], [0, 0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 // CHECK-LABEL: hal.executable.export public @i4_dequant_matvec_f16
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -421,7 +421,7 @@ hal.executable @i4_dequant_matvec {
         } -> tensor<4096x86x128xf32>
         %41 = linalg.generic {
             indexing_maps = [
-                affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, 
+                affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
                 affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
                 affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
@@ -438,7 +438,7 @@ hal.executable @i4_dequant_matvec {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 // CHECK-LABEL: hal.executable.export public @i4_dequant_matvec
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]

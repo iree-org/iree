@@ -3,7 +3,7 @@
 // RUN:   --verify-diagnostics --split-input-file %s
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = []>,
+    lowering_config = <tiling_levels = []>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -40,9 +40,8 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize>,
-    workgroup_size = []>
+    lowering_config = <tiling_levels = [[32, 64], [4, 4], [0, 0, 4]]>,
+    translation_info = <SPIRVMatmulPromoteVectorize>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -77,7 +76,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>,
+    lowering_config = <tiling_levels = [[32, 64], [4, 4], [0, 0, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [16, 8, 128]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -114,7 +113,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [4, 2], [0, 0, 4]]>,
+    lowering_config = <tiling_levels = [[32, 64], [4, 2], [0, 0, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [32, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -151,7 +150,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64], [16, 8], [0, 0, 4]]>,
+    lowering_config = <tiling_levels = [[32, 64], [16, 8], [0, 0, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [8, 2, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -188,7 +187,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 60], [4, 4], [0, 0, 4]]>,
+    lowering_config = <tiling_levels = [[32, 60], [4, 4], [0, 0, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [15, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -225,7 +224,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64, 4]]>,
+    lowering_config = <tiling_levels = [[32, 64, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -262,7 +261,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 64, 4]]>,
+    lowering_config = <tiling_levels = [[32, 64, 4]]>,
     translation_info = <SPIRVMatmulPromoteVectorize>,
     workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -299,7 +298,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16]]>,
+    lowering_config = <tiling_levels = [[64, 64], [32, 32], [0, 0, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
     workgroup_size = [128, 2, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -352,7 +351,7 @@ hal.executable public @matmul_tensor {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [8, 8, 8]]>,
+    lowering_config = <tiling_levels = [[64, 64], [32, 32], [0, 0, 16], [8, 8, 8]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
     workgroup_size = [128, 2, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -405,7 +404,7 @@ hal.executable public @matmul_tensor {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 32], [8, 8], [0, 0, 4], [16, 16, 16]]>,
+    lowering_config = <tiling_levels = [[32, 32], [8, 8], [0, 0, 4], [16, 16, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
     workgroup_size = [256, 4, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -458,7 +457,7 @@ hal.executable public @matmul_tensor {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>,
+    lowering_config = <tiling_levels = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
     workgroup_size = [64, 2, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -511,7 +510,7 @@ hal.executable public @matmul_tensor {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>,
+    lowering_config = <tiling_levels = [[64, 64], [32, 32], [0, 0, 16], [16, 16, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
     workgroup_size = [128, 4, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -564,7 +563,7 @@ hal.executable public @matmul_tensor {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>,
+    lowering_config = <tiling_levels = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>,
     translation_info = <SPIRVBaseVectorize>,
     workgroup_size = [8, 2, 2]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -630,7 +629,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 6, 6, 16], [0, 3, 3, 2], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>,
+    lowering_config = <tiling_levels = [[0, 6, 6, 16], [0, 3, 3, 2], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>,
     translation_info = <SPIRVBaseVectorize>,
     workgroup_size = [8, 2, 2]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -696,7 +695,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>,
+    lowering_config = <tiling_levels = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>,
     translation_info = <SPIRVBaseVectorize>,
     workgroup_size = [8, 2, 2]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -762,7 +761,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 5, 5], [0, 1, 0, 0]]>,
+    lowering_config = <tiling_levels = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 5, 5], [0, 1, 0, 0]]>,
     translation_info = <SPIRVBaseVectorize>,
     workgroup_size = [32, 1, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -800,7 +799,7 @@ hal.executable private @depthwise_conv_2d_nhwc_hwc {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 1, 1], [0, 0, 1, 1]]>,
+    lowering_config = <tiling_levels = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 1, 1], [0, 0, 1, 1]]>,
     translation_info = <SPIRVBaseVectorize>,
     workgroup_size = [32, 1, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

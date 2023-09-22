@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-tile-and-distribute)))))" %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[2, 256, 4]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -133,8 +133,8 @@ builtin.module {
           %7 = memref.subview %0[%arg0, %arg1, 0] [1, 8, 1024] [1, 1, 1] : memref<4x32x1024xf32> to memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>
           %8 = memref.subview %1[%arg0, 0, %arg2] [1, 1024, 32] [1, 1, 1] : memref<4x1024x64xf32> to memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>
           %9 = memref.subview %2[%arg0, %arg1, %arg2] [1, 8, 32] [1, 1, 1] : memref<4x32x64xf32> to memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>
-          linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 32, 32]]>} ins(%cst : f32) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
-          linalg.batch_matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 32, 32]]>} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
+          linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1, 8, 32, 32]]>} ins(%cst : f32) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
+          linalg.batch_matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1, 8, 32, 32]]>} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
         }
       }
     }
@@ -168,7 +168,7 @@ builtin.module {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[2, 32, 4]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -260,7 +260,7 @@ hal.executable private @dot_dispatch_0  {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[]]>
 #translation = #iree_codegen.translation_info<LLVMGPUVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -297,7 +297,7 @@ hal.executable @reduction_dispatch {
   }
 }
 
-//      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[]{{\]}}>
+//      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[]{{\]}}>
 //      CHECK: hal.executable public @reduction_dispatch
 //      CHECK: linalg.fill
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -351,8 +351,8 @@ hal.executable private @conv_dispatch  {
               %6 = memref.subview %0[0, 0, %arg1, %arg2] [1, 64, 1, %5] [1, 1, 1, 1] : memref<1x64x56x56xf32> to memref<1x64x1x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>>
               %7 = memref.subview %1[%arg0, 0, 0, 0] [1, 64, 1, 1] [1, 1, 1, 1] : memref<64x64x1x1xf32> to memref<1x64x1x1xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 64 + s0 + d1 + d2 + d3)>>
               %8 = memref.subview %2[0, %arg0, %arg1, %arg2] [1, 1, 1, %5] [1, 1, 1, 1] : memref<1x64x56x56xf32> to memref<1x1x1x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>>
-              linalg.fill{lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 1, 256, 4, 4, 4]]>} ins(%cst : f32) outs(%8 : memref<1x1x1x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>>)
-              linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 1, 256, 4, 4, 4]]>, strides = dense<1> : vector<2xi64>} ins(%6, %7 : memref<1x64x1x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>>, memref<1x64x1x1xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 64 + s0 + d1 + d2 + d3)>>) outs(%8 : memref<1x1x1x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>>)
+              linalg.fill{lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0, 1, 1, 256, 4, 4, 4]]>} ins(%cst : f32) outs(%8 : memref<1x1x1x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>>)
+              linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0, 1, 1, 256, 4, 4, 4]]>, strides = dense<1> : vector<2xi64>} ins(%6, %7 : memref<1x64x1x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>>, memref<1x64x1x1xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 64 + s0 + d1 + d2 + d3)>>) outs(%8 : memref<1x1x1x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>>)
             }
           }
         }
@@ -377,7 +377,7 @@ hal.executable private @conv_dispatch  {
 
 // Check contract-4d, we currently emit suboptimal code as we don't distribute
 // more than 3 dimensions but make sure we emit correct code.
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 1, 2, 256, 4]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -421,8 +421,8 @@ hal.executable private @contract_4d  {
               %22 = memref.subview %15[0, %arg0, %arg1, %arg2] [%6, 1, %20, %21] [1, 1, 1, 1] : memref<?x12x?x?xf32> to memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>
               %24 = memref.subview %12[0, %arg1, %arg0, 0] [%6, %20, 1, 64] [1, 1, 1, 1] : memref<?x?x12x64xf32> to memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>
               %25 = memref.subview %13[0, %arg2, %arg0, 0] [%6, %21, 1, 64] [1, 1, 1, 1] : memref<?x?x12x64xf32> to memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>
-              linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>} ins(%cst_0 : f32) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>)
-              linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%24, %25 : memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>, memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>} {
+              linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0, 1, 2, 256, 4]]>} ins(%cst_0 : f32) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>)
+              linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%24, %25 : memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>, memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0, 1, 2, 256, 4]]>} {
               ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
                 %26 = arith.mulf %arg3, %arg4 : f32
                 %27 = arith.addf %26, %arg5 : f32

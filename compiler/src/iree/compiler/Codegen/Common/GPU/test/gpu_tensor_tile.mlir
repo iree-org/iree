@@ -23,7 +23,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
       %4 = flow.dispatch.tensor.load %2, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
       %5 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
       %6 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_y, %3], sizes = [1, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>> -> tensor<1x256xf32>
-      %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5, %6 : tensor<1x256xf32>, tensor<1x256xf32>) outs(%4 : tensor<1x256xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 256]]>} {
+      %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5, %6 : tensor<1x256xf32>, tensor<1x256xf32>) outs(%4 : tensor<1x256xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1, 256]]>} {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
         %8 = arith.addf %arg0, %arg1 : f32
         linalg.yield %8 : f32
@@ -81,8 +81,8 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
       %2 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
       %3 = flow.dispatch.tensor.load %1, offsets = [%2], sizes = [64], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<128xf32>> -> tensor<64xf32>
       %4 = flow.dispatch.tensor.load %0, offsets = [%2, 0], sizes = [64, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x384xf32>> -> tensor<64x384xf32>
-      %5 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 4]]>} ins(%cst : f32) outs(%3 : tensor<64xf32>) -> tensor<64xf32>
-      %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%4 : tensor<64x384xf32>) outs(%5 : tensor<64xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 4]]>} {
+      %5 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[64, 4]]>} ins(%cst : f32) outs(%3 : tensor<64xf32>) -> tensor<64xf32>
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%4 : tensor<64x384xf32>) outs(%5 : tensor<64xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[64, 4]]>} {
       ^bb0(%arg0: f32, %arg1: f32):
         %7 = arith.addf %arg0, %arg1 : f32
         linalg.yield %7 : f32
@@ -143,12 +143,12 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
       %3 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x32x10x4096xf32>> -> tensor<1x32x10x4096xf32>
       %4 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x32x10x4096xf32>> -> tensor<1x32x10x4096xf32>
       %5 = tensor.empty() : tensor<1x32xf32>
-      %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>} ins(%cst : f32) outs(%5 : tensor<1x32xf32>) -> tensor<1x32xf32>
+      %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1, 64, 4, 4]]>} ins(%cst : f32) outs(%5 : tensor<1x32xf32>) -> tensor<1x32xf32>
       %7 = linalg.generic {
         indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
         iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
         ins(%4 : tensor<1x32x10x4096xf32>) outs(%6 : tensor<1x32xf32>)
-        attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>} {
+        attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1, 64, 4, 4]]>} {
       ^bb0(%arg0: f32, %arg1: f32):
         %9 = arith.addf %arg0, %arg1 : f32
         linalg.yield %9 : f32
@@ -157,7 +157,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
         indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
         iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
         ins(%4, %7 : tensor<1x32x10x4096xf32>, tensor<1x32xf32>) outs(%3 : tensor<1x32x10x4096xf32>)
-        attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>} {
+        attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1, 64, 4, 4]]>} {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
         %9 = arith.addf %arg0, %arg1 : f32
         linalg.yield %9 : f32

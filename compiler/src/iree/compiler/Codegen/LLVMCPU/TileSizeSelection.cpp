@@ -28,7 +28,7 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   //       [vector-inner-parallel]]
   //   4. [[distribution], [cache-parallel], [cache-reduction],
   //       [vector-parallel], [vector-reduction]]
-  int numTileLevels = loweringConfig.getTileSizes().size();
+  int numTileLevels = loweringConfig.getTilingLevels().size();
   switch (numTileLevels) {
   case 4:
     tilingLevelToActualLevelMap[VectorInnerParallelTiles] = 3;

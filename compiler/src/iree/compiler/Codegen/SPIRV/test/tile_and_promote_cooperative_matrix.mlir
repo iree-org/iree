@@ -16,7 +16,7 @@
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 32], [16, 16, 16], [0, 0, 32]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32, 32, 32], [16, 16, 16], [0, 0, 32]]>
 
 hal.executable @matmul_f16_32x32x32 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
@@ -122,7 +122,7 @@ hal.executable @matmul_f16_32x32x32 {
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
@@ -272,7 +272,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
@@ -391,7 +391,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
@@ -508,7 +508,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]]>
 
 hal.executable @batch_matmul_f16_1x64x128x512 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
@@ -616,7 +616,7 @@ hal.executable @batch_matmul_f16_1x64x128x512 {
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 
 hal.executable @matmul_f16_f512x4096x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
@@ -733,7 +733,7 @@ hal.executable @matmul_f16_f512x4096x64 {
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 
 hal.executable @matmul_f16_f512x4096x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
@@ -850,7 +850,7 @@ hal.executable @matmul_f16_f512x4096x64 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 
 hal.executable @matmul_f16_128x262144x2304 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
@@ -900,7 +900,7 @@ hal.executable @matmul_f16_128x262144x2304 {
             %subview_1 = memref.subview %1[%arg0, 0] [64, 2304] [1, 1] : memref<128x2304xf16> to memref<64x2304xf16, strided<[2304, 1], offset: ?>>
             %subview_2 = memref.subview %2[0, %arg1] [2304, 128] [1, 1] : memref<2304x262144xf16> to memref<2304x128xf16, strided<[262144, 1], offset: ?>>
             linalg.fill ins(%cst : f16) outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>)
-            linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>}
+            linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>}
               ins(%subview_1, %subview_2 : memref<64x2304xf16, strided<[2304, 1], offset: ?>>, memref<2304x128xf16, strided<[262144, 1], offset: ?>>)
               outs(%subview : memref<64x128xf16, strided<[262144, 1], offset: ?>>)
             %subview_3 = memref.subview %0[%arg0] [64] [1] : memref<128xf16> to memref<64xf16, strided<[1], offset: ?>>

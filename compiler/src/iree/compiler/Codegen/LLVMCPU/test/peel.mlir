@@ -41,7 +41,7 @@ func.func @peel_static_matmul() {
             %18 = affine.min affine_map<(d0) -> (-d0 + 49, 16)>(%arg6)
             %extracted_slice_5 = tensor.extract_slice %extracted_slice[0, %arg6] [%13, %18] [1, 1] : tensor<?x49xf32> to tensor<?x?xf32>
             %extracted_slice_6 = tensor.extract_slice %extracted_slice_0[%arg6, 0] [%18, %15] [1, 1] : tensor<49x?xf32> to tensor<?x?xf32>
-            %19 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16]]>} ins(%extracted_slice_5, %extracted_slice_6 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%arg7 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %19 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[65, 65, 0], [8, 32, 0], [0, 0, 16]]>} ins(%extracted_slice_5, %extracted_slice_6 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%arg7 : tensor<?x?xf32>) -> tensor<?x?xf32>
             scf.yield %19 : tensor<?x?xf32>
           }
           %inserted_slice = tensor.insert_slice %17 into %16[0, 0] [%13, %15] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
@@ -75,7 +75,7 @@ func.func @peel_static_matmul() {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[4, 64], [1, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[4, 64], [1, 16]]>
 #map = affine_map<(d0)[s0] -> (-d0 + s0, 16)>
 #map1 = affine_map<(d0) -> (d0 * 16)>
 module {

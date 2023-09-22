@@ -2,7 +2,7 @@
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile,canonicalize,cse,iree-codegen-generic-vectorization,iree-spirv-vector-lowering,canonicalize,cse)))))' \
 // RUN:   %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

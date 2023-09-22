@@ -35,7 +35,7 @@ hal.executable @copy_as_generic {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16], [1, 1]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1, 16], [1, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @copy_as_generic
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -79,7 +79,7 @@ hal.executable @tensor_insert {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 32, 1], [0, 1, 1, 1]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[0, 2, 32, 1], [0, 1, 1, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @copy
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -129,7 +129,7 @@ hal.executable @avg_pool {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 2, 8], [1, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[0, 2, 2, 8], [1, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @avg_pool
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -184,7 +184,7 @@ hal.executable @avg_pool {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 1, 128], [1, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[0, 1, 1, 128], [1, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @avg_pool
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -235,7 +235,7 @@ hal.executable @max_pool {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 32], [0, 1]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[0, 32], [0, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @max_pool
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -352,7 +352,7 @@ hal.executable @dwconv_elementwise {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 2, 0, 4], [0, 1, 1, 0, 1]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[0, 4, 2, 0, 4], [0, 1, 1, 0, 1]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @dwconv_elementwise
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -404,7 +404,7 @@ hal.executable @outermost_reduction {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128], [1, 4],  [0, 0, 4]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1, 128], [1, 4],  [0, 0, 4]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 // CHECK-LABEL: hal.executable.export public @outermost_reduction
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -464,7 +464,7 @@ hal.executable private @innermost_reduction {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32], [1],  [0, 4]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[32], [1],  [0, 4]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 // CHECK-LABEL: hal.executable.export public @innermost_reduction
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -513,7 +513,7 @@ hal.executable @four_dim_elementwise {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 2, 4, 8], [0, 1, 1, 4]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1, 2, 4, 8], [0, 1, 1, 4]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 // CHECK-LABEL: hal.executable.export public @four_dim_elementwise
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -572,7 +572,7 @@ hal.executable private @odd_reduction_dimension_size_501 {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 3]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[128], [4],  [0, 3]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 // CHECK-LABEL: hal.executable.export public @odd_reduction_dimension_size_501
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -631,7 +631,7 @@ hal.executable private @odd_reduction_dimension_size_2809 {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 1]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[128], [4],  [0, 1]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 // CHECK-LABEL: hal.executable.export public @odd_reduction_dimension_size_2809
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
@@ -681,7 +681,7 @@ hal.executable private @broadcast {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128], [4],  [0, 1, 1, 1]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[128], [4],  [0, 1, 1, 1]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 // CHECK-LABEL: hal.executable.export public @broadcast
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]

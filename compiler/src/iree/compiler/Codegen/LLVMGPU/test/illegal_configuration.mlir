@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration=true})))" --verify-diagnostics --split-input-file %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = []>
+#config = #iree_codegen.lowering_config<tiling_levels = []>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -32,7 +32,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = []>
+#config = #iree_codegen.lowering_config<tiling_levels = []>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -64,7 +64,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -96,7 +96,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -128,7 +128,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -160,7 +160,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 20]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32, 32, 20]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -192,7 +192,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -224,7 +224,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -256,7 +256,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -288,7 +288,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 32, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[2, 32, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -347,7 +347,7 @@ builtin.module {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 48]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 32, 48]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -380,7 +380,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 32, 4]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -412,7 +412,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64, 64]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

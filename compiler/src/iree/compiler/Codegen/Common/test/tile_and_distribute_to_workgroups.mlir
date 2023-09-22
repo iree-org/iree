@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups)), canonicalize, cse)' --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{max-workgroup-parallel-dims=1})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=CHECKW
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups{distribution-method=2})), canonicalize, cse)' --split-input-file %s | FileCheck %s -check-prefix=NO-LOOP
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -99,7 +99,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [1, 4], [0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64], [1, 4], [0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -174,7 +174,7 @@ hal.executable private @add {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -254,7 +254,7 @@ hal.executable private @add4D {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[2, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -375,7 +375,7 @@ hal.executable private @add_distribute4D {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 64, 0, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[2, 64, 0, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -451,7 +451,7 @@ hal.executable private @add_distribute4D_zero_tile_size {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 64, 0], [1, 16, 4, 0], [0, 0, 0, 64]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 64, 64, 0], [1, 16, 4, 0], [0, 0, 0, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -525,7 +525,7 @@ hal.executable private @batch_matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 16, 0], [16, 8, 0], [0, 0, 2]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32, 16, 0], [16, 8, 0], [0, 0, 2]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -590,7 +590,7 @@ hal.executable private @preset_config_matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -691,7 +691,7 @@ hal.executable public @copy_op {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[15]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[15]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -746,7 +746,7 @@ hal.executable private @static_1d_fft_stage2 {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -798,7 +798,7 @@ hal.executable private @static_3d_fft_stage3 {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [1, 4, 0], [0, 0, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64, 0], [1, 4, 0], [0, 0, 4]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -883,7 +883,7 @@ hal.executable private @outs_fusion {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 64, 64, 64, 0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 64, 64, 64, 0, 0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -973,7 +973,7 @@ hal.executable private @conv {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 20, 40, 48, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 20, 40, 48, 0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1047,7 +1047,7 @@ hal.executable private @conv_static {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[16, 32], [16, 16], [0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[16, 32], [16, 16], [0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1119,7 +1119,7 @@ hal.executable private @generic_static {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[28, 8, 0], [4, 4, 0], [0, 0, 60]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[28, 8, 0], [4, 4, 0], [0, 0, 60]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1176,7 +1176,7 @@ hal.executable private @matmul_static {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 1, 7, 64, 0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1233,7 +1233,7 @@ hal.executable private @restrict_num_workgroups {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[4, 0, 0], [4, 0, 0], [0, 1, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[4, 0, 0], [4, 0, 0], [0, 1, 4]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1306,7 +1306,7 @@ hal.executable private @reduction {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 0, 0], [8, 0, 0], [0, 0, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 0, 0], [8, 0, 0], [0, 0, 16]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1378,7 +1378,7 @@ hal.executable private @gemm_unit_N {
 // CHECK-SAME:         offsets = [%[[IV0]], 0]
 
 // -----
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [0, 0, 0], [0, 0, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 0, 0], [0, 0, 0], [0, 0, 16]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1437,7 +1437,7 @@ hal.executable private @gemm_unit_M_unit_N {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 64, 64, 0, 64], [0, 1, 0, 0, 1, 1, 0, 4], [0, 0, 0, 0, 0, 0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 0, 0, 0, 64, 64, 0, 64], [0, 1, 0, 0, 1, 1, 0, 4], [0, 0, 0, 0, 0, 0, 0, 0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1512,7 +1512,7 @@ hal.executable private @generic_unit_dims {
 // CHECK-SAME:             offsets = [0, 0, 0, 0, %[[IV0]], %[[IV1]], 0, %[[IV2]]]
 
 // -----
-#config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0], [0], [4]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1573,7 +1573,7 @@ hal.executable private @reduce_to_scalar {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1631,7 +1631,7 @@ hal.executable private @scalar {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2], [2], [0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[2], [2], [0]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1698,7 +1698,7 @@ hal.executable private @rank_reduced_slice {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 0], [8, 32, 0], [0, 0, 16]], tile_interchange = [[1, 0, 2], [], []]>
+#config = #iree_codegen.lowering_config<tiling_levels = [{sizes=[32, 64, 0], interchange=[1, 0, 2]}, [8, 32, 0], [0, 0, 16]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1855,7 +1855,7 @@ hal.executable private @tile_multiuse_producer {
             iterator_types = ["parallel", "parallel", "reduction"]}
             ins(%3, %8 : tensor<12x128x128xf32>, tensor<12x128xf32>)
             outs(%5, %7 : tensor<12x128x128xf32>, tensor<12x128xf32>)
-            attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[4, 32, 0], [1, 4, 0], [0, 0, 4]]>} {
+            attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[4, 32, 0], [1, 4, 0], [0, 0, 4]]>} {
           ^bb0(%arg0: f32, %arg1: f32, %arg2: f32, %arg3: f32):
             %11 = arith.subf %arg0, %arg1 : f32
             %12 = math.exp %11 : f32
@@ -1930,7 +1930,7 @@ hal.executable private @no_tile {
         %5 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [10], strides = [1] : !flow.dispatch.tensor<readonly:tensor<10xi32>> -> tensor<10xi32>
         %6 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [3], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<3xf32>> -> tensor<3xf32>
         %7 = flow.dispatch.tensor.load %3, offsets = [0], sizes = [3], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<3xi32>> -> tensor<3xi32>
-        %8:2 = iree_linalg_ext.topk {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0]]>} dimension(0) ins(%4, %5 : tensor<10xf32>, tensor<10xi32>) outs(%6, %7 : tensor<3xf32>, tensor<3xi32>) {
+        %8:2 = iree_linalg_ext.topk {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0]]>} dimension(0) ins(%4, %5 : tensor<10xf32>, tensor<10xi32>) outs(%6, %7 : tensor<3xf32>, tensor<3xi32>) {
         ^bb0(%arg0: f32, %arg1: f32):
           %9 = arith.cmpf ogt, %arg0, %arg1 : f32
           iree_linalg_ext.yield %9 : i1
@@ -1970,7 +1970,7 @@ hal.executable private @pack_lowering {
             : !flow.dispatch.tensor<readonly:tensor<100x250xf32>> -> tensor<100x250xf32>
         %3 = tensor.empty() : tensor<14x64x8x4xf32>
         %4 = tensor.pack %2 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %3
-            {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[12, 12]]>}
+            {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[12, 12]]>}
             : tensor<100x250xf32> -> tensor<14x64x8x4xf32>
         flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [14, 64, 8, 4], strides = [1, 1, 1, 1]
             : tensor<14x64x8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<14x64x8x4xf32>>
@@ -2011,7 +2011,7 @@ hal.executable private @pack_lowering {
             : !flow.dispatch.tensor<readonly:tensor<250x500xf32>> -> tensor<250x500xf32>
         %3 = tensor.empty() : tensor<64x64x8x4xf32>
         %4 = tensor.pack %2 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 4] into %3
-            {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[12, 14]]>}
+            {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[12, 14]]>}
             : tensor<250x500xf32> -> tensor<64x64x8x4xf32>
         flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [64, 64, 8, 4], strides = [1, 1, 1, 1]
             : tensor<64x64x8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<64x64x8x4xf32>>
@@ -2068,7 +2068,7 @@ hal.executable private @clone_index_computations {
         %16 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%14]
         %17 = tensor.empty(%15, %16) : tensor<?x?x8x4xf32>
         %18 = tensor.pack %12 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %17
-            {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+            {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[64, 64]]>}
             : tensor<?x?xf32> -> tensor<?x?x8x4xf32>
         %19 = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%6]
         %20 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%7]
@@ -2122,7 +2122,7 @@ hal.executable private @dynamic_unpack {
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, 32, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x32x16xi32>>{%4, %5} -> tensor<?x?x32x16xi32>
         %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
         %12 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %11
-          {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+          {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[64, 64]]>}
           : tensor<?x?x32x16xi32> -> tensor<?x?xi32>
         flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         return
@@ -2170,7 +2170,7 @@ hal.executable private @dynamic_unpack_dynamic_tile {
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0, 0], sizes = [%4, %5, %c32, %c16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%4, %5, %c32, %c16} -> tensor<?x?x?x?xi32>
         %11 = tensor.empty(%6, %7) : tensor<?x?xi32>
         %12 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [%c32, %c16] into %11
-          {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>}
+          {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[64, 64]]>}
           : tensor<?x?x?x?xi32> -> tensor<?x?xi32>
         flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [%6, %7], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xi32>>{%6, %7}
         return
@@ -2202,7 +2202,7 @@ hal.executable private @unpack_elem {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x384xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [16, 48, 8, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<16x48x8x8xf32>> -> tensor<16x48x8x8xf32>
         %3 = tensor.empty() : tensor<128x384xf32>
-        %4 = tensor.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %3 {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>} : tensor<16x48x8x8xf32> -> tensor<128x384xf32>
+        %4 = tensor.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %3 {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[64, 64]]>} : tensor<16x48x8x8xf32> -> tensor<128x384xf32>
         %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<128x384xf32>) outs(%3 : tensor<128x384xf32>) {
         ^bb0(%in: f32, %out: f32):
           %6 = arith.addf %in, %in : f32
@@ -2254,7 +2254,7 @@ hal.executable private @dynamic_unpack_fusion {
         %12 = flow.dispatch.tensor.load %5, offsets = [0], sizes = [16], strides = [1] : !flow.dispatch.tensor<readonly:tensor<16xi32>> -> tensor<16xi32>
         %13 = tensor.empty() : tensor<12544x16xi32>
         %14 = tensor.empty() : tensor<12544x16xi32>
-        %16 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [%0#0, %0#1] into %14 {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[16, 16]]>} : tensor<?x?x?x?xi32> -> tensor<12544x16xi32>
+        %16 = tensor.unpack %10 inner_dims_pos = [0, 1] inner_tiles = [%0#0, %0#1] into %14 {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[16, 16]]>} : tensor<?x?x?x?xi32> -> tensor<12544x16xi32>
         %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%cst, %16, %11, %12 : tensor<16xi32>, tensor<12544x16xi32>, tensor<12544xi32>, tensor<16xi32>) outs(%13 : tensor<12544x16xi32>) {
         ^bb0(%in: i32, %in_0: i32, %in_1: i32, %in_2: i32, %out: i32):
           %18 = arith.muli %in_1, %c-30_i32 : i32
@@ -2326,7 +2326,7 @@ hal.executable private @elem_pack {
           linalg.yield %23, %25 : f32, f32
         } -> (tensor<384x512xf32>, tensor<384x512xf32>)
         %17 = tensor.empty() : tensor<48x512x8x1xf32>
-        %18 = tensor.pack %16#0 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %17 {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, 64]]>} : tensor<384x512xf32> -> tensor<48x512x8x1xf32>
+        %18 = tensor.pack %16#0 inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %17 {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[8, 64]]>} : tensor<384x512xf32> -> tensor<48x512x8x1xf32>
         flow.dispatch.tensor.store %18, %6, offsets = [0, 0, 0, 0], sizes = [48, 512, 8, 1], strides = [1, 1, 1, 1] : tensor<48x512x8x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<48x512x8x1xf32>>
         flow.dispatch.tensor.store %16#0, %7, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : tensor<384x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
         return
@@ -2365,8 +2365,8 @@ hal.executable private @scatter {
         %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [5898240], strides = [1] : !flow.dispatch.tensor<readonly:tensor<5898240xf32>> -> tensor<5898240xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [5898240, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<5898240x4xi32>> -> tensor<5898240x4xi32>
         %5 = tensor.empty() : tensor<1x640x48x48xf32>
-        %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[]]>} ins(%cst : f32) outs(%5 : tensor<1x640x48x48xf32>) -> tensor<1x640x48x48xf32>
-        %7 = iree_linalg_ext.scatter {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[]]>} dimension_map = [0, 1, 2, 3] unique_indices(false) ins(%3, %4 : tensor<5898240xf32>, tensor<5898240x4xi32>) outs(%6 : tensor<1x640x48x48xf32>) {
+        %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[]]>} ins(%cst : f32) outs(%5 : tensor<1x640x48x48xf32>) -> tensor<1x640x48x48xf32>
+        %7 = iree_linalg_ext.scatter {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[]]>} dimension_map = [0, 1, 2, 3] unique_indices(false) ins(%3, %4 : tensor<5898240xf32>, tensor<5898240x4xi32>) outs(%6 : tensor<1x640x48x48xf32>) {
         ^bb0(%arg0: f32, %arg1: f32):
           %8 = arith.addf %arg1, %arg0 : f32
           iree_linalg_ext.yield %8 : f32
@@ -2397,7 +2397,7 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
           %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x128x16x64xf32>>
           %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1024, 16, 128, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x16x128x64xf32>> -> tensor<1024x16x128x64xf32>
           %3 = tensor.empty() : tensor<1024x128x16x64xf32>
-          %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<1024x16x128x64xf32>) outs(%3 : tensor<1024x128x16x64xf32>) attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1, 64]]>} {
+          %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<1024x16x128x64xf32>) outs(%3 : tensor<1024x128x16x64xf32>) attrs = {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1, 1, 1, 64]]>} {
           ^bb0(%in: f32, %out: f32):
             linalg.yield %in : f32
           } -> tensor<1024x128x16x64xf32>
@@ -2420,7 +2420,7 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,

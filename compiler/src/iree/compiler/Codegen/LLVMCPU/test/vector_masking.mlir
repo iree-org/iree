@@ -2,9 +2,8 @@
 
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[127, 255], [8, 32], [0, 0]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    lowering_config = <tiling_levels = [[127, 255], [8, 32], [0, 0]]>,
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -72,9 +71,8 @@ hal.executable private @preset_config_generic_add  {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[127, 255], [8, 0], [0, 32]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    lowering_config = <tiling_levels = [[127, 255], [8, 0], [0, 32]]>,
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -130,9 +128,8 @@ hal.executable private @preset_config_reduction  {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[127, 255], [8, 32], [0, 0]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    lowering_config = <tiling_levels = [[127, 255], [8, 32], [0, 0]]>,
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -200,9 +197,8 @@ hal.executable private @preset_config_generic_add  {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[127, 255], [8, 32], [0, 0]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    lowering_config = <tiling_levels = [[127, 255], [8, 32], [0, 0]]>,
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -322,9 +318,8 @@ hal.executable private @preset_config_matmul  {
 // -----
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[127, 255], [8, 32], [0, 0]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    lowering_config = <tiling_levels = [[127, 255], [8, 32], [0, 0]]>,
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,

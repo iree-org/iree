@@ -8,7 +8,7 @@ func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %ar
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   %init = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}
+  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[10, 20, 30]]>}
       ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %2 = linalg.generic {
@@ -43,7 +43,7 @@ func.func @all_zeros(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : t
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   %init = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0]]>}
+  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0, 0, 0]]>}
       ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %2 = linalg.generic {
@@ -73,14 +73,14 @@ func.func @multi_config(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   %init = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0]]>}
+  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0, 0]]>}
       ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %2 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1)-> (d0, d1)>],
     iterator_types = ["parallel", "parallel"]}
     ins(%1, %arg2 : tensor<?x?xf32>, tensor<?xf32>)
-    outs(%init : tensor<?x?xf32>) attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20]]>} {
+    outs(%init : tensor<?x?xf32>) attrs = {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[10, 20]]>} {
       ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
         %3 = arith.addf %arg3, %arg4 : f32
         linalg.yield %3 : f32
@@ -119,7 +119,7 @@ func.func @shared_out_operand() {
   %10 = flow.dispatch.tensor.load %6, offsets = [0], sizes = [384], strides = [1] : !flow.dispatch.tensor<readonly:tensor<384xf32>> -> tensor<384xf32>
   %11 = flow.dispatch.tensor.load %7, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<391x384xf32>> -> tensor<391x384xf32>
   %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<391x384xf32>) -> tensor<391x384xf32>
-  %13 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, 128, 0]]>}
+  %13 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[8, 128, 0]]>}
     ins(%8, %9 : tensor<391x384xf32>, tensor<384x384xf32>)
     outs(%12 : tensor<391x384xf32>) -> tensor<391x384xf32>
   %14 = linalg.generic {

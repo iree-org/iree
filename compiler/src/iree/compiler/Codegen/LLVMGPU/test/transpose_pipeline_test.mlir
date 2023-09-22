@@ -334,7 +334,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
                 %7 = tensor.empty() : tensor<1x1x256xf32>
                 %8 = tensor.cast %5 : tensor<1x?x1xf32> to tensor<1x256x1xf32>
                 %9 = tensor.cast %6 : tensor<?x1x1xf32> to tensor<256x1x1xf32>
-                %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d2, d1, d0)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%8, %9 : tensor<1x256x1xf32>, tensor<256x1x1xf32>) outs(%7 : tensor<1x1x256xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 256]]>} {
+                %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d2, d1, d0)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%8, %9 : tensor<1x256x1xf32>, tensor<256x1x1xf32>) outs(%7 : tensor<1x1x256xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1, 1, 256]]>} {
                 ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
                 %12 = arith.addf %arg3, %arg4 : f32
                 linalg.yield %12 : f32

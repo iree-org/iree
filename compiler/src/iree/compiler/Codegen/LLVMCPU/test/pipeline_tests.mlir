@@ -69,9 +69,8 @@ hal.executable private @check_no_cse {
 // be non-divisible by problem sizes. If padding and vectorizing are kicked in,
 // vector ops will be generated.
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[65, 65], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>,
-    workgroup_size = []>
+    lowering_config = <tiling_levels = [[65, 65], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
+    translation_info  = <CPUDoubleTilingPadExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -115,9 +114,8 @@ hal.executable private @preset_pad_config_matmul  {
 // be non-divisible by problem sizes. If padding and vectorizing are kicked in,
 // vector ops will be generated.
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>,
-    workgroup_size = []>
+    lowering_config = <tiling_levels = [[192, 128, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
+    translation_info  = <CPUDoubleTilingPadExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -644,7 +642,7 @@ hal.executable private @ukernel_pass_through {
 hal.executable private @aarch64_ssve__cpu_buffer_ops_tile_and_vectorize {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>,
+      lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0], [1], [0], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -672,7 +670,7 @@ hal.executable private @aarch64_ssve__cpu_buffer_ops_tile_and_vectorize {
 hal.executable private @aarch64_ssve__cpu_double_tiling_peeling_expert {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>,
+      lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0], [1], [0], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -700,7 +698,7 @@ hal.executable private @aarch64_ssve__cpu_double_tiling_peeling_expert {
 hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>,
+      lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0], [1], [0], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -738,7 +736,7 @@ hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
 hal.executable private @aarch64_ssve_sve_disabled {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_no_sve {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>,
+      lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0], [1], [0], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):

@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[128, 256], [16, 16]]>,
+    lowering_config = <tiling_levels = [[128, 256], [16, 16]]>,
     translation_info = <SPIRVBaseVectorize>,
     workgroup_size = [16, 8, 1], subgroup_size = 64>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -44,7 +44,7 @@ hal.executable public @user_config {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256], [16, 16]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[128, 256], [16, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @matmul_128x1024x256
 // CHECK-SAME:     subgroup_size = 64 : index

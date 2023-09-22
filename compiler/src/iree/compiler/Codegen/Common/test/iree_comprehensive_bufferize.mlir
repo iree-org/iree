@@ -2459,7 +2459,7 @@ module {
     %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1, 1001], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1001xf32>> -> tensor<1x1001xf32>
     %6 = bufferization.alloc_tensor() : tensor<f32>
     %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<f32>) -> tensor<f32>
-    %8 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%4 : tensor<1001xf32>) outs(%7 : tensor<f32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0]]>} {
+    %8 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%4 : tensor<1001xf32>) outs(%7 : tensor<f32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0]]>} {
     ^bb0(%arg0: f32, %arg1: f32):
       %10 = arith.addf %arg0, %arg1 : f32
       linalg.yield %10 : f32

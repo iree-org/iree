@@ -26,7 +26,7 @@ func.func @innermost_reduction() {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>],
       iterator_types = ["parallel", "reduction"]
     } ins(%11, %12 : tensor<128x384xf32>, tensor<128xf32>) outs(%14 : tensor<128xf32>)
-    attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[128], [4], [0, 4]]>} {
+    attrs = {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[128], [4], [0, 4]]>} {
     ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
       %16 = arith.subf %arg1, %arg2 : f32
       %17 = arith.mulf %16, %16 : f32
@@ -71,7 +71,7 @@ func.func @has_scf_if() {
   scf.for %arg0 = %2 to %c49152 step %3 {
     %4 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [256], strides = [1] : !flow.dispatch.tensor<readonly:tensor<49152xi32>> -> tensor<256xi32>
     %5 = flow.dispatch.tensor.load %1, offsets = [%arg0], sizes = [256], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<49152xi32>> -> tensor<256xi32>
-    %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4 : tensor<256xi32>) outs(%5 : tensor<256xi32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[256], [4]]>} {
+    %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4 : tensor<256xi32>) outs(%5 : tensor<256xi32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[256], [4]]>} {
     ^bb0(%in: i32, %out: i32):
       %7 = arith.cmpi sle, %in, %c0_i32 : i32
       %8 = scf.if %7 -> (i32) {

@@ -7,12 +7,12 @@ func.func @warp_reduction_dispatch() {
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %2 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_x], sizes = [1], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<512xf32>> -> tensor<1xf32>
   %3 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_x, 0], sizes = [1, 10240], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>> -> tensor<1x10240xf32>
-  %4 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} ins(%cst : f32) outs(%2 : tensor<1xf32>) -> tensor<1xf32>
+  %4 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1], [0, 2048]]>} ins(%cst : f32) outs(%2 : tensor<1xf32>) -> tensor<1xf32>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%3 : tensor<1x10240xf32>) outs(%4 : tensor<1xf32>)
-    attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} {
+    attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1], [0, 2048]]>} {
   ^bb0(%in: f32, %out: f32):
     %6 = arith.addf %in, %out : f32
     linalg.yield %6 : f32
@@ -52,12 +52,12 @@ func.func @warp_reduction_broadcast_dispatch() {
   %2 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_x, 0], sizes = [1, 10240], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<512x10240xf32>> -> tensor<1x10240xf32>
   %3 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_x, 0], sizes = [1, 10240], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>> -> tensor<1x10240xf32>
   %e = tensor.empty() : tensor<1xf32>
-  %4 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} ins(%cst : f32) outs(%e : tensor<1xf32>) -> tensor<1xf32>
+  %4 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1], [0, 2048]]>} ins(%cst : f32) outs(%e : tensor<1xf32>) -> tensor<1xf32>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
     iterator_types = ["parallel", "reduction"]}
     ins(%3 : tensor<1x10240xf32>) outs(%4 : tensor<1xf32>)
-    attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} {
+    attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1], [0, 2048]]>} {
   ^bb0(%in: f32, %out: f32):
     %6 = arith.addf %in, %out : f32
     linalg.yield %6 : f32
@@ -66,7 +66,7 @@ func.func @warp_reduction_broadcast_dispatch() {
     indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
     iterator_types = ["parallel", "parallel"]}
     ins(%5 : tensor<1xf32>) outs(%2 : tensor<1x10240xf32>)
-    attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [0, 2048]]>} {
+    attrs = {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[], [0, 2048]]>} {
   ^bb0(%in: f32, %out: f32):
     %6 = arith.addf %in, %in : f32
     linalg.yield %6 : f32
@@ -129,7 +129,7 @@ func.func @warp_reduction_multi_reduction() {
     iterator_types = ["parallel", "reduction", "reduction"]
   }
   ins(%16, %17, %18, %19 : tensor<86x128xf32>, tensor<1x86x128xi4>, tensor<1x86xf32>, tensor<1x86xf32>)
-  outs(%20 : tensor<1xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2, 64]]>} {
+  outs(%20 : tensor<1xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[1], [0, 2, 64]]>} {
   ^bb0(%in: f32, %in_0: i4, %in_1: f32, %in_2: f32, %out: f32):
     %22 = arith.extui %in_0 : i4 to i32
     %23 = arith.uitofp %22 : i32 to f32
@@ -154,7 +154,7 @@ func.func @warp_reduction_multi_reduction() {
 //       CHECK:      scf.yield %{{.+}} : tensor<1x2x64xf32>
 //       CHECK:    scf.yield %{{.+}} : tensor<1x2x64xf32>
 
-//       CHECK:  linalg.generic 
+//       CHECK:  linalg.generic
 //  CHECK-SAME:    iterator_types = ["parallel", "reduction", "reduction"]
 //  CHECK-SAME:    ins(%[[LN]] : tensor<1x2x64xf32>)
 //  CHECK-SAME:    outs(%{{.+}} : tensor<1xf32>)

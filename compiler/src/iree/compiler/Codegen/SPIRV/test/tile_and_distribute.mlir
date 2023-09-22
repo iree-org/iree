@@ -8,7 +8,7 @@
 #map5 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[8, 16], [1, 1], [0, 0, 1]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[8, 16], [1, 1], [0, 0, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -78,7 +78,7 @@ hal.executable private @matmul {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 32], [1, 1, 1]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 4, 32], [1, 1, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -158,7 +158,7 @@ hal.executable private @conv_1d {
 #map6 = affine_map<(d0)[s0] -> (4, -d0 + s0)>
 #map7 = affine_map<(d0)[s0] -> (32, -d0 + s0)>
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 9, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -273,7 +273,7 @@ hal.executable private @conv_2d {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -343,7 +343,7 @@ hal.executable private @conv_3d {
 #map6 = affine_map<()[s0] -> (32, s0 * -32 + 13)>
 #map7 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1092 + s0 + d1 * 78 + d2 * 6 + d3)>
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 32], [1, 1, 1]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 4, 32], [1, 1, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -410,7 +410,7 @@ module  {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32], [1]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32], [1]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

@@ -43,7 +43,7 @@ hal.executable private @subgroup_reduce_f32 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 512]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1], [0, 512]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 //      CHECK: hal.executable.export public @subgroup_reduce_f32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -101,7 +101,7 @@ hal.executable private @subgroup_reduce_f16 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 4096]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[1, 1], [0, 0, 4096]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce>
 //      CHECK: hal.executable.export public @subgroup_reduce_f16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]

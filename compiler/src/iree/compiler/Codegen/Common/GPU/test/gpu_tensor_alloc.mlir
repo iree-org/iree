@@ -13,8 +13,8 @@ func.func @matmul_2048x512x1024() {
   %5 = flow.dispatch.tensor.load %2, offsets = [%3, %4], sizes = [32, 128], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>> -> tensor<32x128xf32>
   %6 = flow.dispatch.tensor.load %0, offsets = [%3, 0], sizes = [32, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2048x1024xf32>> -> tensor<32x1024xf32>
   %7 = flow.dispatch.tensor.load %1, offsets = [0, %4], sizes = [1024, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x512xf32>> -> tensor<1024x128xf32>
-  %8 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>} ins(%cst : f32) outs(%5 : tensor<32x128xf32>) -> tensor<32x128xf32>
-  %9 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>} ins(%6, %7 : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%8 : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %8 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[32, 128, 32]]>} ins(%cst : f32) outs(%5 : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %9 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[32, 128, 32]]>} ins(%6, %7 : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%8 : tensor<32x128xf32>) -> tensor<32x128xf32>
   flow.dispatch.tensor.store %9, %2, offsets = [%3, %4], sizes = [32, 128], strides = [1, 1] : tensor<32x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<2048x512xf32>>
   return
 }
@@ -41,8 +41,8 @@ func.func @matmul_1x384x384() {
   %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
   %5 = flow.dispatch.tensor.load %2, offsets = [0, %4], sizes = [1, 128], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x384xf32>> -> tensor<1x128xf32>
   %6 = flow.dispatch.tensor.load %1, offsets = [0, %4], sizes = [384, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x384xf32>> -> tensor<384x128xf32>
-  %7 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 128, 8]]>} ins(%cst : f32) outs(%5 : tensor<1x128xf32>) -> tensor<1x128xf32>
-  %8 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 128, 8]]>} ins(%3, %6 : tensor<1x384xf32>, tensor<384x128xf32>) outs(%7 : tensor<1x128xf32>) -> tensor<1x128xf32>
+  %7 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0, 128, 8]]>} ins(%cst : f32) outs(%5 : tensor<1x128xf32>) -> tensor<1x128xf32>
+  %8 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[0, 128, 8]]>} ins(%3, %6 : tensor<1x384xf32>, tensor<384x128xf32>) outs(%7 : tensor<1x128xf32>) -> tensor<1x128xf32>
   flow.dispatch.tensor.store %8, %2, offsets = [0, %4], sizes = [1, 128], strides = [1, 1] : tensor<1x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x384xf32>>
   return
 }
@@ -110,9 +110,9 @@ func.func @matmul_multi_uses() {
       %14 = flow.dispatch.tensor.load %9, offsets = [0, 0], sizes = [903168, 33], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<903168x33xf32>> -> tensor<903168x33xf32>
       %15 = flow.dispatch.tensor.load %10, offsets = [%12, 0], sizes = [32, 33], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<33x33xf32>> -> tensor<32x33xf32>
       %16 = flow.dispatch.tensor.load %8, offsets = [%12, 0], sizes = [32, 903168], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<33x903168xf32>> -> tensor<32x903168xf32>
-      %17 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>} ins(%cst : f32) outs(%13 : tensor<32x33xf32>) -> tensor<32x33xf32>
-      %18 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>} ins(%16, %14 : tensor<32x903168xf32>, tensor<903168x33xf32>) outs(%17 : tensor<32x33xf32>) -> tensor<32x33xf32>
-      %19 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%15 : tensor<32x33xf32>) outs(%18 : tensor<32x33xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>} {
+      %17 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[32, 128, 32]]>} ins(%cst : f32) outs(%13 : tensor<32x33xf32>) -> tensor<32x33xf32>
+      %18 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[32, 128, 32]]>} ins(%16, %14 : tensor<32x903168xf32>, tensor<903168x33xf32>) outs(%17 : tensor<32x33xf32>) -> tensor<32x33xf32>
+      %19 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%15 : tensor<32x33xf32>) outs(%18 : tensor<32x33xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[32, 128, 32]]>} {
       ^bb0(%in: f32, %out: f32):
         %20 = arith.divf %out, %cst_0 : f32
         %21 = arith.mulf %in, %cst_1 : f32
@@ -165,7 +165,7 @@ func.func @weight_dequant_matmul() {
   %15 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d2, d3, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]
-  } ins(%8, %13 : tensor<32x86x128xf32>, tensor<86x128x128xf32>) outs(%14 : tensor<32x128xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 1, 32]]>} {
+  } ins(%8, %13 : tensor<32x86x128xf32>, tensor<86x128x128xf32>) outs(%14 : tensor<32x128xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[32, 128, 1, 32]]>} {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %16 = arith.mulf %in, %in_0 : f32
     %17 = arith.addf %out, %16 : f32

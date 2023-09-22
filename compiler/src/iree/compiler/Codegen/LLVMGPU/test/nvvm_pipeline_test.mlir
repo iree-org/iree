@@ -873,7 +873,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:     nvvm.barrier0
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> f32
 // CHECK-COUNT-3:     nvvm.shfl.sync  bfly
-//         CHECK:     llvm.fdiv %{{.*}}, %{{.*}} 
+//         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr
 
 // -----
@@ -925,7 +925,7 @@ hal.executable private @shared_mem_alloc {
 // -----
 
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32,32]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[32,32]]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

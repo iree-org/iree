@@ -1,8 +1,8 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-split-reduction{enable-fp-reduction-reordering=true},cse,canonicalize))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-split-reduction,cse,canonicalize))" --split-input-file %s | FileCheck %s --check-prefix=DISABLEREASSOC
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 5, 32, 0], [1, 1, 8, 0], [0, 0, 0, 8]]>
-#config1 = #iree_codegen.lowering_config<tile_sizes = [[2, 5, 32, 0], [1, 1, 8, 0], [0, 0, 0, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[2, 5, 32, 0], [1, 1, 8, 0], [0, 0, 0, 8]]>
+#config1 = #iree_codegen.lowering_config<tiling_levels = [[2, 5, 32, 0], [1, 1, 8, 0], [0, 0, 0, 16]]>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 module {

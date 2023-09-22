@@ -19,7 +19,7 @@ func.func @transpose_no_align_dispatch_0_generic_48x32() {
     scf.for %arg1 = %5 to %c32 step %6 {
       %7 = flow.dispatch.tensor.load %1, offsets = [%arg0, %arg1], sizes = [%4, 32], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<48x32xf32>> -> tensor<?x32xf32>
       %8 = flow.dispatch.tensor.load %0, offsets = [%arg1, %arg0], sizes = [32, %4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x48xf32>> -> tensor<32x?xf32>
-      %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%8 : tensor<32x?xf32>) outs(%7 : tensor<?x32xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 32]]>} {
+      %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%8 : tensor<32x?xf32>) outs(%7 : tensor<?x32xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[32, 32]]>} {
       ^bb0(%arg2: f32, %arg3: f32):
         linalg.yield %arg2 : f32
       } -> tensor<?x32xf32>

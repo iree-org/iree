@@ -39,7 +39,7 @@ func.func @pad_for_fusion() {
           %extracted_slice_0 = tensor.extract_slice %19[0, %arg4] [%4, %23] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
           %extracted_slice_1 = tensor.extract_slice %arg5[%arg2, %arg4] [%21, %23] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
           %24 = linalg.fill ins(%cst : f32) outs(%extracted_slice_1 : tensor<?x?xf32>) -> tensor<?x?xf32>
-          %25 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16]]>} ins(%extracted_slice, %extracted_slice_0 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%24 : tensor<?x?xf32>) -> tensor<?x?xf32>
+          %25 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[192, 128, 0], [8, 32, 0], [0, 0, 16]]>} ins(%extracted_slice, %extracted_slice_0 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%24 : tensor<?x?xf32>) -> tensor<?x?xf32>
           %26 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} outs(%25 : tensor<?x?xf32>) {
           ^bb0(%out: f32):
             %27 = math.exp %out : f32
@@ -107,7 +107,7 @@ func.func @complex_pad_for_fusion() {
           %extracted_slice_0 = tensor.extract_slice %19[0, %arg4] [%4, %23] [1, 1] : tensor<?x?xcomplex<f32>> to tensor<?x?xcomplex<f32>>
           %extracted_slice_1 = tensor.extract_slice %arg5[%arg2, %arg4] [%21, %23] [1, 1] : tensor<?x?xcomplex<f32>> to tensor<?x?xcomplex<f32>>
           %24 = linalg.fill ins(%cst : complex<f32>) outs(%extracted_slice_1 : tensor<?x?xcomplex<f32>>) -> tensor<?x?xcomplex<f32>>
-          %25 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16]]>} ins(%extracted_slice, %extracted_slice_0 : tensor<?x?xcomplex<f32>>, tensor<?x?xcomplex<f32>>) outs(%24 : tensor<?x?xcomplex<f32>>) -> tensor<?x?xcomplex<f32>>
+          %25 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tiling_levels = [[192, 128, 0], [8, 32, 0], [0, 0, 16]]>} ins(%extracted_slice, %extracted_slice_0 : tensor<?x?xcomplex<f32>>, tensor<?x?xcomplex<f32>>) outs(%24 : tensor<?x?xcomplex<f32>>) -> tensor<?x?xcomplex<f32>>
           %26 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} outs(%25 : tensor<?x?xcomplex<f32>>) {
           ^bb0(%out: complex<f32>):
             %27 = complex.exp %out : complex<f32>

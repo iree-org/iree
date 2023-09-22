@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true})))' --verify-diagnostics --split-input-file %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = []>
+#config = #iree_codegen.lowering_config<tiling_levels = []>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -29,7 +29,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[4, 8], [8, 8, 0], [0, 0, 8], [0, 0, 0]], tile_interchange = [[], [], [], []], native_vector_size = [0, 0, 4]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[4, 8], [8, 8, 0], [0, 0, 8], [0, 0, 0]], native_vector_size = [0, 0, 4]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -58,7 +58,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 32, 16], [0, 0, 16], [0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64], [8, 32, 16], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -87,7 +87,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 0, 0], [0, 16, 16], [0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64], [8, 0, 0], [0, 16, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -116,7 +116,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[4, 8], [8, 8, 0], [0, 0, 8], [0, 0, 0]], tile_interchange = [[1], [], [], []]>
+#config = #iree_codegen.lowering_config<tiling_levels = [{sizes=[4, 8], interchange=[1]}, [8, 8, 0], [0, 0, 8], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -147,7 +147,7 @@ hal.executable private @matmul_tensors {
 
 // The constraints of CPUDoubleTilingPadExpert is as same as
 // CPUDoubleTilingExpert, checking one test it enough.
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 32, 16], [0, 0, 16], [0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64], [8, 32, 16], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -176,7 +176,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 7, 7, 64, 0, 0, 0], [6, 1, 7, 32, 0, 0, 0], [0, 0, 0, 0, 3, 3, 4], [0, 0, 0, 0, 0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 7, 7, 64, 0, 0, 0], [6, 1, 7, 32, 0, 0, 0], [0, 0, 0, 0, 3, 3, 4], [0, 0, 0, 0, 0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -206,7 +206,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64, 0, 0], [1, 1, 7, 8, 0, 0], [0, 0, 0, 0, 5, 5], [0, 0, 0, 0, 0, 0]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0, 1, 7, 64, 0, 0], [1, 1, 7, 8, 0, 0], [0, 0, 0, 0, 5, 5], [0, 0, 0, 0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

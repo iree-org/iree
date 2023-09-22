@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[32, 128, 1, 32]]>,
+    lowering_config = <tiling_levels = [[32, 128, 1, 32]]>,
     translation_info = <SPIRVMatmulPromoteVectorize pipeline_depth = 1>,
     workgroup_size = [32, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

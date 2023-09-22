@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-codegen-enable-workgroup-specialization --iree-codegen-workgroup-specialization --canonicalize --cse --split-input-file %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * -64 + 123, 64)>
 #map2 = affine_map<()[s0] -> (s0 * -64 + 789, 64)>
@@ -39,7 +39,7 @@ func.func @matmul_tensors() {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * -64 + 123, 64)>
 #map2 = affine_map<()[s0] -> (s0 * -64 + 789, 64)>
@@ -82,7 +82,7 @@ func.func @add_tensors() {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[2, 256, 4]]>
 #map = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
 #map2 = affine_map<()[s0] -> (s0 * -256 + 30522, 256)>

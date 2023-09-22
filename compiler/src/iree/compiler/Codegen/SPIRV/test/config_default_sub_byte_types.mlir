@@ -46,7 +46,7 @@ hal.executable @i4_dequant {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 128], [2, 8]{{\]}}>
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tiling_levels = {{\[}}[8, 128], [2, 8]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 // CHECK-LABEL: hal.executable.export public @i4_dequant
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]

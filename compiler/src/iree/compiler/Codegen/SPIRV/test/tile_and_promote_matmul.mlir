@@ -8,7 +8,7 @@
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[128, 128], [16, 4], [0, 0, 32]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[128, 128], [16, 4], [0, 0, 32]]>
 
 hal.executable @matmul_f32_256x1024x128 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
@@ -138,7 +138,7 @@ hal.executable @matmul_f32_256x1024x128 {
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 256], [1, 8, 8], [0, 0, 0, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 64, 256], [1, 8, 8], [0, 0, 0, 16]]>
 
 hal.executable @batch_matmul_16x1024x1024x80 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
@@ -221,7 +221,7 @@ hal.executable @batch_matmul_16x1024x1024x80 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 512, 8], [1, 8, 4], [0, 0, 0, 16]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[1, 512, 8], [1, 8, 4], [0, 0, 0, 16]]>
 
 hal.executable @batch_matmul_f32_16x4096x40x4096 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
