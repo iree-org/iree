@@ -56,13 +56,15 @@ jobs:
           GH_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
           APPROVAL_TOKEN: ${{ github.token }}
         run: |
+          # Make failures easier to trace.
+          set -ex
           git config --local user.email "iree-github-actions-bot@google.com"
           git config --local user.name "OpenXLA Dep Roller"
           status="$(git status --porcelain)"
           if [ -z "$status" ]; then
             echo "No updates made"
           else
-            status="$(gh pr list -S 'Update nightly' -L 1 -A 'iree-github-actions-bot' | grep -q -v 'no pull')"
+            (gh pr list -S 'Update nightly' -L 1 -A 'iree-github-actions-bot' | grep -q -v 'no pull') || status=$?
             if [ -z "$status" ]; then
               echo "Pending failed integrate"
             else                  
