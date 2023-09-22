@@ -47,8 +47,7 @@ namespace {
 /// can vectorize, including vector transfer ops and GPU subgroup MMA ops, or
 /// other ops that doesn't care. If so, places all vector transfer or GPU
 /// subgroup MMA ops in `uses` and returns true.
-bool getUsesIfAllTransferOp(Value value,
-                                   SmallVectorImpl<Operation *> &uses) {
+bool getUsesIfAllTransferOp(Value value, SmallVectorImpl<Operation *> &uses) {
   assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : value.getUsers()) {
     if (isa<memref::DeallocOp, memref::AssumeAlignmentOp>(userOp))
@@ -90,8 +89,7 @@ std::optional<unsigned> getBitWidth(Type type) {
 }
 
 // Calculates the vector bit count we want to use based on the memref uses.
-unsigned
-calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
+unsigned calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
   unsigned minBits = kMaxVectorNumBits;
   for (Operation *op : uses) {
     if (isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp>(op)) {
@@ -142,8 +140,7 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
 /// If the memref is vectorizable return the vector bit count we want to use,
 /// otherwise return 0. If it returns a value greater than 0 it also returns the
 /// memref uses.
-unsigned isMemRefVectorizable(Value value,
-                                     SmallVectorImpl<Operation *> &uses) {
+unsigned isMemRefVectorizable(Value value, SmallVectorImpl<Operation *> &uses) {
   auto memrefType = dyn_cast<MemRefType>(value.getType());
 
   // Require scalar element type
@@ -562,8 +559,7 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   newShape.back() = newShape.back() / ratio;
 
   MemRefLayoutAttrInterface layout = {};
-  if (auto stridedLayout =
-          dyn_cast<StridedLayoutAttr>(type.getLayout())) {
+  if (auto stridedLayout = dyn_cast<StridedLayoutAttr>(type.getLayout())) {
     auto offset = stridedLayout.getOffset();
     if (offset != ShapedType::kDynamic) {
       offset = offset / ratio;
