@@ -405,6 +405,18 @@ void ConvertToSPIRVPass::runOnOperation() {
     }
   }
 
+  /// Rewrite exti(bitcast) as a mix of vector.shuffle + bitwise arithmetic to
+  /// help manage sub-byte types.
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+    RewritePatternSet narrowingPatterns(context);
+    vector::populateVectorNarrowTypeRewritePatterns(narrowingPatterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(narrowingPatterns)))) {
+      funcOp.emitOpError() << "failed running narrowing patterns";
+      return signalPassFailure();
+    }
+  }
+
   spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);
   moduleOp->setAttr(spirv::getTargetEnvAttrName(), targetAttr);
 

@@ -195,6 +195,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
   pm.addPass(memref::createFoldMemRefAliasOpsPass());
+  pm.addPass(createEmulateNarrowTypePass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
