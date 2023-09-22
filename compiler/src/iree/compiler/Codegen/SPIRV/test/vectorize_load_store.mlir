@@ -521,17 +521,19 @@ func.func @transfer_write_vector2_vector8(%x: index, %val0: vector<2xi32>, %val1
 
 // CHECK-LABEL: func @transfer_write_vector2_vector8
 //  CHECK-SAME: (%[[INDEX:.+]]: index, %[[VAL0:.+]]: vector<2xi32>, %[[VAL1:.+]]: vector<8xi32>)
-// CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024xvector<2xi32>>
-// CHECK:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[INDEX]]]
-// CHECK:   memref.store %[[VAL0]], %[[SUBSPAN]][%[[OFFSET0]]]
-// CHECK:   %[[SLICE0:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [0], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
-// CHECK:   memref.store %[[SLICE0]], %[[SUBSPAN]][%[[OFFSET0]]]
-// CHECK:   %[[SLICE1:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [2], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
-// CHECK:   %[[OFFSET1:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 1)>()[%[[INDEX]]]
-// CHECK:   memref.store %[[SLICE1]], %[[SUBSPAN]][%[[OFFSET1]]]
-// CHECK:   %[[SLICE2:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [4], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
-// CHECK:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 2)>()[%[[INDEX]]]
-// CHECK:   memref.store %[[SLICE2]], %[[SUBSPAN]][%[[OFFSET2]]]
-// CHECK:   %[[SLICE3:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [6], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
-// CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[INDEX]]]
-// CHECK:   memref.store %[[SLICE3]], %[[SUBSPAN]][%[[OFFSET3]]]
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024xvector<2xi32>>
+
+//       CHECK:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[INDEX]]]
+//       CHECK:   memref.store %[[VAL0]], %[[SUBSPAN]][%[[OFFSET0]]]
+
+//       CHECK:   %[[SLICE0:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [0], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
+//       CHECK:   memref.store %[[SLICE0]], %[[SUBSPAN]][%[[OFFSET0]]]
+//       CHECK:   %[[SLICE1:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [2], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
+//       CHECK:   %[[OFFSET1:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 1)>()[%[[INDEX]]]
+//       CHECK:   memref.store %[[SLICE1]], %[[SUBSPAN]][%[[OFFSET1]]]
+//       CHECK:   %[[SLICE2:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [4], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
+//       CHECK:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 2)>()[%[[INDEX]]]
+//       CHECK:   memref.store %[[SLICE2]], %[[SUBSPAN]][%[[OFFSET2]]]
+//       CHECK:   %[[SLICE3:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [6], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
+//       CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[INDEX]]]
+//       CHECK:   memref.store %[[SLICE3]], %[[SUBSPAN]][%[[OFFSET3]]]
