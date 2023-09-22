@@ -324,7 +324,8 @@ getMinTilingSizesForEachDim(func::FuncOp entryPointFn, linalg::LinalgOp op,
     // If the fastest varying dimension for the operand is broadcasted along a
     // faster varying reduction dimension, we should prefer a vector size of 1
     // as the values will splat along the faster varying dim.
-    if (itTypes[fastestVaryingDim] == utils::IteratorType::reduction &&
+    if (fastestVaryingReductionDim &&
+        itTypes[fastestVaryingDim] == utils::IteratorType::reduction &&
         fastestVaryingDim < *fastestVaryingReductionDim &&
         !map.isFunctionOfDim(*fastestVaryingReductionDim)) {
       minTileSizes[fastestVaryingDim] = 1;
