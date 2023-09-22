@@ -301,7 +301,7 @@ getMinTilingSizesForEachDim(func::FuncOp entryPointFn, linalg::LinalgOp op,
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op->getOpOperands();
-  int64_t fastestVaryingReductionDim = -1;
+  std::optional<unsigned> fastestVaryingReductionDim = std::nullopt;
   auto itTypes = op.getIteratorTypesArray();
   for (int64_t idx = itTypes.size() - 1, e = 0; idx >= e; --idx) {
     if (itTypes[idx] == utils::IteratorType::reduction) {
@@ -325,8 +325,8 @@ getMinTilingSizesForEachDim(func::FuncOp entryPointFn, linalg::LinalgOp op,
     // faster varying reduction dimension, we should prefer a vector size of 1
     // as the values will splat along the faster varying dim.
     if (itTypes[fastestVaryingDim] == utils::IteratorType::reduction &&
-        fastestVaryingDim < fastestVaryingReductionDim &&
-        !map.isFunctionOfDim(fastestVaryingReductionDim)) {
+        fastestVaryingDim < *fastestVaryingReductionDim &&
+        !map.isFunctionOfDim(*fastestVaryingReductionDim)) {
       minTileSizes[fastestVaryingDim] = 1;
       continue;
     }
