@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "openxla/partitioner/loader.h"
+#include "iree_pjrt/partitioner_api/loader.h"
 
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "openxla/partitioner/embedding_api.h"
+#include "iree_pjrt/partitioner_api/embedding_api.h"
 
 // // static int flagCount = 0;
 

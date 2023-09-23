@@ -9,10 +9,10 @@
 #include <cstring>
 
 #include "iree/base/internal/path.h"  // TODO: Make public trampoline.
-#include "iree/integrations/pjrt/common/api_impl.h"
+#include "iree_pjrt/common/api_impl.h"
 //#include "iree/vm/api.h"
-//#include "iree/integrations/pjrt/common/pjrt_plugin_defs.h"
-//#include "iree/integrations/pjrt/common/pjrt_plugin_impl.h"
+//#include "iree_pjrt/common/pjrt_plugin_defs.h"
+//#include "iree_pjrt/common/pjrt_plugin_impl.h"
 #include "xla/pjrt/c/pjrt_c_api.h"
 
 #if (defined(_WIN32) || defined(__CYGWIN__)) && \

@@ -14,8 +14,8 @@
 #include <unordered_map>
 
 #include "iree/base/api.h"
-#include "iree/integrations/pjrt/common/compiler.h"
-#include "iree/integrations/pjrt/common/debugging.h"
+#include "iree_pjrt/common/compiler.h"
+#include "iree_pjrt/common/debugging.h"
 
 namespace iree::pjrt {
 

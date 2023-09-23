@@ -4,20 +4,21 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/integrations/pjrt/common/api_impl.h"
+#include "iree_pjrt/common/api_impl.h"
 
 #include <optional>
 
 #include "iree/hal/api.h"
-#include "iree/integrations/pjrt/common/iree_helpers.h"
-#include "iree/integrations/pjrt/common/tensor_utils.h"
-#include "xla/pjrt/transpose.h"
+#include "iree_pjrt/common/iree_helpers.h"
+#include "iree_pjrt/common/tensor_utils.h"
+// TODO: Excise. Uses deep XLA internals.
+// #include "xla/pjrt/transpose.h"
 
 using iree::vm::retain_ref;
 
 namespace iree::pjrt {
 
-const absl::string_view kMlirFormat = "mlir";
+const std::string_view kMlirFormat = "mlir";
 
 // Some general conversion functions for managing around some API layering
 // that is in flight. It is expected that most of this goes away over time.
@@ -25,83 +26,85 @@ namespace PJRTApiConverter {
 namespace {
 
 // Enum converter functions
-iree_status_t MapElementTypeToXlaElementType(
-    iree_hal_element_type_t element_type, xla::PrimitiveType* xla_primitive) {
-  // TODO: Cascade on bit-field sub-types to avoid large linear scan.
-  switch (element_type) {
-    // TODO: How do I interpret signless?
-    case IREE_HAL_ELEMENT_TYPE_BOOL_8:
-      *xla_primitive = xla::PrimitiveType::PRED;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_INT_4:
-      *xla_primitive = xla::PrimitiveType::S4;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_INT_8:
-      *xla_primitive = xla::PrimitiveType::S8;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_INT_16:
-      *xla_primitive = xla::PrimitiveType::S16;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_INT_32:
-      *xla_primitive = xla::PrimitiveType::S32;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_INT_64:
-      *xla_primitive = xla::PrimitiveType::S64;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_SINT_4:
-      *xla_primitive = xla::PrimitiveType::S4;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      *xla_primitive = xla::PrimitiveType::S8;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      *xla_primitive = xla::PrimitiveType::S16;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      *xla_primitive = xla::PrimitiveType::S32;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      *xla_primitive = xla::PrimitiveType::S64;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_UINT_4:
-      *xla_primitive = xla::PrimitiveType::U4;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      *xla_primitive = xla::PrimitiveType::U8;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      *xla_primitive = xla::PrimitiveType::U16;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      *xla_primitive = xla::PrimitiveType::U32;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      *xla_primitive = xla::PrimitiveType::U64;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      *xla_primitive = xla::PrimitiveType::F16;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      *xla_primitive = xla::PrimitiveType::F32;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
-      *xla_primitive = xla::PrimitiveType::F64;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
-      *xla_primitive = xla::PrimitiveType::BF16;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
-      *xla_primitive = xla::PrimitiveType::C64;
-      return iree_ok_status();
-    case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
-      *xla_primitive = xla::PrimitiveType::C128;
-      return iree_ok_status();
-    default:
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "conversion from unknown element type 0x%x",
-                              (int)element_type);
-  }
-}
+// TODO: Remove once not using xla::Shape.
+// iree_status_t MapElementTypeToXlaElementType(
+//     iree_hal_element_type_t element_type, xla::PrimitiveType* xla_primitive)
+//     {
+//   // TODO: Cascade on bit-field sub-types to avoid large linear scan.
+//   switch (element_type) {
+//     // TODO: How do I interpret signless?
+//     case IREE_HAL_ELEMENT_TYPE_BOOL_8:
+//       *xla_primitive = xla::PrimitiveType::PRED;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_INT_4:
+//       *xla_primitive = xla::PrimitiveType::S4;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_INT_8:
+//       *xla_primitive = xla::PrimitiveType::S8;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_INT_16:
+//       *xla_primitive = xla::PrimitiveType::S16;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_INT_32:
+//       *xla_primitive = xla::PrimitiveType::S32;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_INT_64:
+//       *xla_primitive = xla::PrimitiveType::S64;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_SINT_4:
+//       *xla_primitive = xla::PrimitiveType::S4;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_SINT_8:
+//       *xla_primitive = xla::PrimitiveType::S8;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_SINT_16:
+//       *xla_primitive = xla::PrimitiveType::S16;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_SINT_32:
+//       *xla_primitive = xla::PrimitiveType::S32;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_SINT_64:
+//       *xla_primitive = xla::PrimitiveType::S64;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_UINT_4:
+//       *xla_primitive = xla::PrimitiveType::U4;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_UINT_8:
+//       *xla_primitive = xla::PrimitiveType::U8;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_UINT_16:
+//       *xla_primitive = xla::PrimitiveType::U16;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_UINT_32:
+//       *xla_primitive = xla::PrimitiveType::U32;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_UINT_64:
+//       *xla_primitive = xla::PrimitiveType::U64;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+//       *xla_primitive = xla::PrimitiveType::F16;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+//       *xla_primitive = xla::PrimitiveType::F32;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+//       *xla_primitive = xla::PrimitiveType::F64;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+//       *xla_primitive = xla::PrimitiveType::BF16;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64:
+//       *xla_primitive = xla::PrimitiveType::C64;
+//       return iree_ok_status();
+//     case IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128:
+//       *xla_primitive = xla::PrimitiveType::C128;
+//       return iree_ok_status();
+//     default:
+//       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+//                               "conversion from unknown element type 0x%x",
+//                               (int)element_type);
+//   }
+// }
 
 iree_status_t MapBufferTypeToElementType(
     PJRT_Buffer_Type buffer_type, iree_hal_element_type_t* element_type) {
@@ -278,57 +281,59 @@ const std::string& ErrorInstance::message() const {
 
 BufferInstance::~BufferInstance() = default;
 
-iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
-  if (cached_shape_) {
-    *out_shape = &(*cached_shape_);
-    return iree_ok_status();
-  }
+// TODO: Excise.
+// iree_status_t BufferInstance::GetXlaShape(xla::Shape** out_shape) {
+//   if (cached_shape_) {
+//     *out_shape = &(*cached_shape_);
+//     return iree_ok_status();
+//   }
 
-  iree_hal_element_type_t hal_element_type =
-      iree_hal_buffer_view_element_type(buffer_view());
-  xla::PrimitiveType xla_element_type;
-  IREE_RETURN_IF_ERROR(PJRTApiConverter::MapElementTypeToXlaElementType(
-      hal_element_type, &xla_element_type));
+//   iree_hal_element_type_t hal_element_type =
+//       iree_hal_buffer_view_element_type(buffer_view());
+//   xla::PrimitiveType xla_element_type;
+//   IREE_RETURN_IF_ERROR(PJRTApiConverter::MapElementTypeToXlaElementType(
+//       hal_element_type, &xla_element_type));
 
-  size_t rank = iree_hal_buffer_view_shape_rank(buffer_view());
-  const iree_hal_dim_t* dims = iree_hal_buffer_view_shape_dims(buffer_view());
-  std::array<int64_t, 9> xla_dims;
-  if (rank > xla_dims.size()) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "rank > 9 not supported");
-  }
-  for (size_t i = 0; i < rank; ++i) {
-    xla_dims[i] = dims[i];
-  }
+//   size_t rank = iree_hal_buffer_view_shape_rank(buffer_view());
+//   const iree_hal_dim_t* dims =
+//   iree_hal_buffer_view_shape_dims(buffer_view()); std::array<int64_t, 9>
+//   xla_dims; if (rank > xla_dims.size()) {
+//     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+//                             "rank > 9 not supported");
+//   }
+//   for (size_t i = 0; i < rank; ++i) {
+//     xla_dims[i] = dims[i];
+//   }
 
-  cached_shape_ = xla::ShapeUtil::MakeShape(
-      xla_element_type,
-      absl::MakeSpan(xla_dims.begin(), xla_dims.begin() + rank));
-  *out_shape = &(*cached_shape_);
-  return iree_ok_status();
-}
+//   cached_shape_ = xla::ShapeUtil::MakeShape(
+//       xla_element_type,
+//       absl::MakeSpan(xla_dims.begin(), xla_dims.begin() + rank));
+//   *out_shape = &(*cached_shape_);
+//   return iree_ok_status();
+// }
 
-iree_status_t BufferInstance::GetLayoutData(
-    ::pjrt::BufferMemoryLayoutData** out_layout_data) {
-  if (!cached_layout_data_) {
-    xla::Shape* shape;
-    IREE_RETURN_IF_ERROR(GetXlaShape(&shape));
-    if (!shape->has_layout()) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "Buffer shape doesn't have a layout");
-    }
-    xla::StatusOr<::pjrt::BufferMemoryLayoutData> status_or =
-        ::pjrt::ConvertToBufferMemoryLayoutData(shape->layout());
-    if (!status_or.ok()) {
-      return iree_make_status(IREE_STATUS_UNKNOWN,
-                              "Couldn't convert layout: %s",
-                              std::string(status_or.status().message()).data());
-    }
-    cached_layout_data_.emplace(std::move(*status_or));
-  }
-  *out_layout_data = &(*cached_layout_data_);
-  return iree_ok_status();
-}
+// TODO: Excise and convert directly to a C memory layout.
+// iree_status_t BufferInstance::GetLayoutData(
+//     ::pjrt::BufferMemoryLayoutData** out_layout_data) {
+//   if (!cached_layout_data_) {
+//     xla::Shape* shape;
+//     IREE_RETURN_IF_ERROR(GetXlaShape(&shape));
+//     if (!shape->has_layout()) {
+//       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+//                               "Buffer shape doesn't have a layout");
+//     }
+//     xla::StatusOr<::pjrt::BufferMemoryLayoutData> status_or =
+//         ::pjrt::ConvertToBufferMemoryLayoutData(shape->layout());
+//     if (!status_or.ok()) {
+//       return iree_make_status(IREE_STATUS_UNKNOWN,
+//                               "Couldn't convert layout: %s",
+//                               std::string(status_or.status().message()).data());
+//     }
+//     cached_layout_data_.emplace(std::move(*status_or));
+//   }
+//   *out_layout_data = &(*cached_layout_data_);
+//   return iree_ok_status();
+// }
 
 BufferInstance::BufferInstance(
     DeviceInstance& device, iree::vm::ref<iree_hal_buffer_view_t> buffer_view)
@@ -348,31 +353,34 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_ElementType =
       +[](PJRT_Buffer_ElementType_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_ElementType");
-    BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
-    auto impl = [&]() -> iree_status_t {
-      xla::Shape* shape;
-      // TODO: don't use XLA shape at all
-      // https://github.com/openxla/openxla-pjrt-plugin/issues/265
-      IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
-      args->type = static_cast<PJRT_Buffer_Type>(shape->element_type());
-      return nullptr;
-    };
-    return MakeError(impl());
+    // TODO: Excise.
+    // BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+    // auto impl = [&]() -> iree_status_t {
+    //   // xla::Shape* shape;
+    //   // TODO: don't use XLA shape at all
+    //   // https://github.com/openxla/openxla-pjrt-plugin/issues/265
+    //   IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
+    //   args->type = static_cast<PJRT_Buffer_Type>(shape->element_type());
+    // };
+    // return MakeError(impl());
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_ElementType"));
   };
   api->PJRT_Buffer_Dimensions =
       +[](PJRT_Buffer_Dimensions_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_Dimensions");
-    auto impl = [&]() -> iree_status_t {
-      BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
-      xla::Shape* shape;
-      // TODO: don't use XLA shape at all
-      // https://github.com/openxla/openxla-pjrt-plugin/issues/265
-      IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
-      args->dims = shape->dimensions().data();
-      args->num_dims = shape->dimensions().size();
-      return nullptr;
-    };
-    return MakeError(impl());
+    // auto impl = [&]() -> iree_status_t {
+    //   BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+    //   xla::Shape* shape;
+    //   // TODO: don't use XLA shape at all
+    //   // https://github.com/openxla/openxla-pjrt-plugin/issues/265
+    //   IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
+    //   args->dims = shape->dimensions().data();
+    //   args->num_dims = shape->dimensions().size();
+    //   return nullptr;
+    // };
+    return MakeError(
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, "PJRT_Buffer_Dimensions"));
   };
   api->PJRT_Buffer_UnpaddedDimensions =
       +[](PJRT_Buffer_UnpaddedDimensions_Args* args) -> PJRT_Error* {
@@ -389,14 +397,18 @@ void BufferInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Buffer_GetMemoryLayout =
       +[](PJRT_Buffer_GetMemoryLayout_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_GetMemoryLayout");
-    auto impl = [&]() -> iree_status_t {
-      BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
-      ::pjrt::BufferMemoryLayoutData* layout_data;
-      IREE_RETURN_IF_ERROR(buffer->GetLayoutData(&layout_data));
-      args->layout = layout_data->c_layout;
-      return nullptr;
-    };
-    return MakeError(impl());
+    // auto impl = [&]() -> iree_status_t {
+    //   // TODO: Populate the C layout data directly from the buffer
+    //   // instance.
+    //   BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
+    //   ::pjrt::BufferMemoryLayoutData* layout_data;
+    //   IREE_RETURN_IF_ERROR(buffer->GetLayoutData(&layout_data));
+    //   args->layout = layout_data->c_layout;
+    //   return nullptr;
+    // };
+    // return MakeError(impl());
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                      "PJRT_Buffer_GetMemoryLayout"));
   };
   api->PJRT_Buffer_ToHostBuffer =
       +[](PJRT_Buffer_ToHostBuffer_Args* args) -> PJRT_Error* {
@@ -829,23 +841,25 @@ iree_status_t DeviceInstance::HostBufferToDevice(
         "Performing transpose on host. This uses 2x memory and is slower than "
         "doing the transpose on device. See: "
         "https://github.com/openxla/openxla-pjrt-plugin/issues/201");
-    std::vector<int64_t> input_strides(num_dims);
-    std::vector<int64_t> input_dims(num_dims);
-    for (size_t i = 0; i < num_dims; i++) {
-      input_strides[perms[i]] = byte_strides[i];
-      input_dims[i] = input_shape[i];
-    }
-    transposed_data.resize(byte_length);
-    // TODO: use caching to improve performance of plan creation
-    auto transpose =
-        xla::TransposePlan::Create(element_type_byte_size, input_dims, perms,
-                                   xla::TransposePlan::Striding{input_strides});
-    if (!transpose.ok()) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "unable to create transpose plan");
-    }
-    transpose.value()->Execute(data, transposed_data.data());
-    data = transposed_data.data();
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unable to create transpose plan");
+    // std::vector<int64_t> input_strides(num_dims);
+    // std::vector<int64_t> input_dims(num_dims);
+    // for (size_t i = 0; i < num_dims; i++) {
+    //   input_strides[perms[i]] = byte_strides[i];
+    //   input_dims[i] = input_shape[i];
+    // }
+    // transposed_data.resize(byte_length);
+    // // TODO: use caching to improve performance of plan creation
+    // auto transpose =
+    //     xla::TransposePlan::Create(element_type_byte_size, input_dims, perms,
+    //                                xla::TransposePlan::Striding{input_strides});
+    // if (!transpose.ok()) {
+    //   return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+    //                           "unable to create transpose plan");
+    // }
+    // transpose.value()->Execute(data, transposed_data.data());
+    // data = transposed_data.data();
   }
 
   iree::vm::ref<iree_hal_buffer_t> buffer;
@@ -1090,20 +1104,22 @@ void ClientInstance::BindApi(PJRT_Api* api) {
     LoadedExecutableInstance* executable;
 
     // Read compilation options.
-    xla::CompileOptionsProto options_proto;
-    if (!options_proto.ParseFromArray(args->compile_options,
-                                      args->compile_options_size)) {
-      return MakeError(iree_make_status(IREE_STATUS_INTERNAL,
-                                        "could not parse compilation options"));
-    }
-    auto options = xla::CompileOptions::FromProto(options_proto);
-    if (!options.ok()) {
-      return MakeError(
-          iree_make_status(IREE_STATUS_INTERNAL,
-                           std::string(options.status().message()).c_str()));
-    }
+    // TODO: Port CompileOptionsProto into the project or leave ommitted.
+    // xla::CompileOptionsProto options_proto;
+    // if (!options_proto.ParseFromArray(args->compile_options,
+    //                                   args->compile_options_size)) {
+    //   return MakeError(iree_make_status(IREE_STATUS_INTERNAL,
+    //                                     "could not parse compilation
+    //                                     options"));
+    // }
+    // auto options = xla::CompileOptions::FromProto(options_proto);
+    // if (!options.ok()) {
+    //   return MakeError(
+    //       iree_make_status(IREE_STATUS_INTERNAL,
+    //                        std::string(options.status().message()).c_str()));
+    // }
 
-    auto* error = client->Compile(args->program, *options, &executable);
+    auto* error = client->Compile(args->program, /**options,*/ &executable);
     if (error) return error;
     args->executable = *executable;
     return nullptr;
@@ -1188,7 +1204,7 @@ iree_status_t ClientInstance::PopulateDevices() {
 }
 
 PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
-                                    xla::CompileOptions options,
+                                    /*xla::CompileOptions options,*/
                                     LoadedExecutableInstance** out_executable) {
   std::unique_ptr<ArtifactDumper::Transaction> artifact_tx;
   if (platform().artifact_dumper().enabled()) {
@@ -1231,7 +1247,8 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
     }
 
     // Set flags.
-    if (!job->SetFlags(options)) return MakeCompilerError(*job);
+    // TODO: Plumb CompileOptions through.
+    // if (!job->SetFlags(options)) return MakeCompilerError(*job);
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
           /*label=*/"partitioner_flags", /*extension=*/"txt", /*index=*/-1,
@@ -1281,7 +1298,8 @@ PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
     if (!SetDefaultCompilerFlags(job.get())) {
       return MakeCompilerError(*job);
     }
-    if (!job->SetFlags(options)) return MakeCompilerError(*job);
+    // TODO: Plumb CompileOptions through.
+    // if (!job->SetFlags(options)) return MakeCompilerError(*job);
     if (artifact_tx) {
       artifact_tx->WriteArtifact(
           /*label=*/"flags", /*extension=*/"txt", /*index=*/-1,
@@ -1870,7 +1888,6 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
 
 void BindMonomorphicApi(PJRT_Api* api) {
   api->struct_size = PJRT_Api_STRUCT_SIZE;
-  api->priv = nullptr;
 
   // Bind by object types.
   BufferInstance::BindApi(api);

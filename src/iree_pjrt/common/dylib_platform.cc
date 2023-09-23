@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/integrations/pjrt/common/dylib_platform.h"
+#include "iree_pjrt/common/dylib_platform.h"
 
 #include <array>
 #include <optional>
@@ -14,8 +14,8 @@
 #include "iree/base/internal/path.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/loader.h"
-#include "openxla/partitioner/embedding_api.h"
-#include "openxla/partitioner/loader.h"
+#include "iree_pjrt/partitioner_api/embedding_api.h"
+#include "iree_pjrt/partitioner_api/loader.h"
 
 namespace iree::pjrt {
 

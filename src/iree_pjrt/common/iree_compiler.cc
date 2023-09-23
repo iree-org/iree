@@ -9,12 +9,7 @@
 #include <vector>
 
 #include "iree/compiler/embedding_api.h"
-#include "iree/integrations/pjrt/common/compiler.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Allocator.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Process.h"
-#include "llvm/Support/StringSaver.h"
+#include "iree_pjrt/common/compiler.h"
 
 namespace iree::pjrt {
 
@@ -100,26 +95,27 @@ class IREECompilerJob : public CompilerJob {
     return true;
   }
 
-  bool SetFlags(xla::CompileOptions options) override {
-    // Set extra options, overriding env variables if appropriate.
-    for (auto [option, option_override] : options.env_option_overrides) {
-      std::string override_string;
-      if (auto override_val = std::get_if<std::string>(&option_override)) {
-        override_string = *override_val;
-      } else if (auto override_val = std::get_if<bool>(&option_override)) {
-        override_string = *override_val ? "true" : "false";
-      } else if (auto override_val = std::get_if<int64_t>(&option_override)) {
-        override_string = std::to_string(*override_val);
-      } else {
-        assert(false &&
-               "option value should be of type string, bool, or int64");
-      }
-      if (!SetFlag(absl::StrCat("--", option, "=", override_string).c_str())) {
-        return false;
-      }
-    }
-    return true;
-  }
+  // TODO: Excise: Cannot dep on an internal XLA structure.
+  // bool SetFlags(xla::CompileOptions options) override {
+  //   // Set extra options, overriding env variables if appropriate.
+  //   for (auto [option, option_override] : options.env_option_overrides) {
+  //     std::string override_string;
+  //     if (auto override_val = std::get_if<std::string>(&option_override)) {
+  //       override_string = *override_val;
+  //     } else if (auto override_val = std::get_if<bool>(&option_override)) {
+  //       override_string = *override_val ? "true" : "false";
+  //     } else if (auto override_val = std::get_if<int64_t>(&option_override)) {
+  //       override_string = std::to_string(*override_val);
+  //     } else {
+  //       assert(false &&
+  //              "option value should be of type string, bool, or int64");
+  //     }
+  //     if (!SetFlag(absl::StrCat("--", option, "=", override_string).c_str())) {
+  //       return false;
+  //     }
+  //   }
+  //   return true;
+  // }
 
   std::string GetFlags() override {
     std::string flags;
@@ -231,19 +227,20 @@ std::unique_ptr<CompilerJob> IREECompiler::StartJob() {
   }
 
   // Propagate all options set via environment variable.
-  if (std::optional<std::string> env_value = llvm::sys::Process::GetEnv(
-          llvm::StringRef("IREE_COMPILER_OPTIONS"))) {
-    llvm::SmallVector<const char*, 20> new_argv;
-    llvm::BumpPtrAllocator a;
-    llvm::StringSaver saver(a);
+  // TODO: Excise/translate to something that doesn't rely on LLVM.
+  // if (std::optional<std::string> env_value = llvm::sys::Process::GetEnv(
+  //         llvm::StringRef("IREE_COMPILER_OPTIONS"))) {
+  //   llvm::SmallVector<const char*, 20> new_argv;
+  //   llvm::BumpPtrAllocator a;
+  //   llvm::StringSaver saver(a);
 
-    llvm::cl::TokenizeGNUCommandLine(*env_value, saver, new_argv);
-    for (auto arg : new_argv)
-      if (!job->SetFlag(arg)) {
-        error_message_ = job->GetErrorMessage();
-        return nullptr;
-      }
-  }
+  //   llvm::cl::TokenizeGNUCommandLine(*env_value, saver, new_argv);
+  //   for (auto arg : new_argv)
+  //     if (!job->SetFlag(arg)) {
+  //       error_message_ = job->GetErrorMessage();
+  //       return nullptr;
+  //     }
+  // }
 
   return job;
 }

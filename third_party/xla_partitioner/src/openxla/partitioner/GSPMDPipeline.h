@@ -9,7 +9,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "mlir/Pass/PassManager.h"
-#include "openxla/partitioner/Support/OptionUtils.h"
+#include "iree_pjrt/partitioner_api/Support/OptionUtils.h"
 
 namespace openxla::partitioner {
 

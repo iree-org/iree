@@ -10,7 +10,7 @@
 #include <optional>
 #include <string>
 
-#include "iree/integrations/pjrt/common/platform.h"
+#include "iree_pjrt/common/platform.h"
 
 namespace iree::pjrt {
 

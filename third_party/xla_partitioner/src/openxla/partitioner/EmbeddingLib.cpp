@@ -51,8 +51,8 @@
 #include "mlir/Pass/PassInstrumentation.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
-#include "openxla/partitioner/GSPMDPipeline.h"
-#include "openxla/partitioner/embedding_api.h"
+#include "iree_pjrt/partitioner_api/GSPMDPipeline.h"
+#include "iree_pjrt/partitioner_api/embedding_api.h"
 #include "stablehlo/dialect/Register.h"
 
 // Upstream dialect deps.

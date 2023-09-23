@@ -9,21 +9,26 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/integrations/pjrt/common/compiler.h"
-#include "iree/integrations/pjrt/common/platform.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
+#include "iree_pjrt/common/compiler.h"
+#include "iree_pjrt/common/platform.h"
 #include "xla/pjrt/c/pjrt_c_api.h"
-#include "xla/pjrt/c/pjrt_c_api_helpers.h"
-#include "xla/pjrt/pjrt_executable.h"
-#include "xla/shape_util.h"
+// TODO: Excise. Various deep dependencies on XLA internals.
+// #include "xla/pjrt/c/pjrt_c_api_helpers.h"
+// TODO: Excise. Various deep dependencies on XLA internals.
+// #include "xla/pjrt/pjrt_executable.h"
+// TODO: Excise. Various deep dependencies on XLA internals.
+// #include "xla/shape_util.h"
 
 namespace iree::pjrt {
 
@@ -90,8 +95,11 @@ class BufferInstance {
     // the hook to get an unsafe pointer (avoids a copy).
     return false;
   }
-  iree_status_t GetXlaShape(xla::Shape** out_shape);
-  iree_status_t GetLayoutData(::pjrt::BufferMemoryLayoutData** out_layout_data);
+  // TODO: Excise.
+  // iree_status_t GetXlaShape(xla::Shape** out_shape);
+  // TODO: Excise.
+  // iree_status_t GetLayoutData(::pjrt::BufferMemoryLayoutData**
+  // out_layout_data);
 
   // Gets the required host size in bytes to copy to host.
   iree_status_t GetHostSizeInBytes(iree_host_size_t* host_size);
@@ -112,8 +120,9 @@ class BufferInstance {
   iree::vm::ref<iree_hal_buffer_view_t> buffer_view_;
   // Various things require XLA's idea of shapes, layouts, etc.
   // We keep one around for such cases.
-  std::optional<xla::Shape> cached_shape_;
-  std::optional<::pjrt::BufferMemoryLayoutData> cached_layout_data_;
+  // TODO: Excise.
+  // std::optional<xla::Shape> cached_shape_;
+  // std::optional<::pjrt::BufferMemoryLayoutData> cached_layout_data_;
   // When the buffer resource gets freed, this is set to true.
   bool is_deleted_ = false;
   // Fences.
@@ -418,7 +427,7 @@ struct ClientInstance {
 
   // Compiles.
   // See TODOs in PJRT_Client_Compile.
-  PJRT_Error* Compile(PJRT_Program* program, xla::CompileOptions options,
+  PJRT_Error* Compile(PJRT_Program* program, /*xla::CompileOptions options, */
                       LoadedExecutableInstance** executable);
 
   // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "llvm/Support/CommandLine.h"
-#include "openxla/partitioner/embedding_api.h"
+#include "iree_pjrt/partitioner_api/embedding_api.h"
 
 extern "C" {
 OPENXLA_PARTITIONER_EMBED_EXPORTED int openxlaPartitionerMain(int argc,

@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "openxla/partitioner/GSPMDPipeline.h"
+#include "iree_pjrt/partitioner_api/GSPMDPipeline.h"
 
 #include "mhlo/transforms/passes.h"
 #include "mlir/IR/BuiltinOps.h"

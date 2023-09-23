@@ -8,7 +8,7 @@
 #define IREE_PJRT_PLUGIN_PJRT_CUDA_CLIENT_H_
 
 #include "iree/hal/drivers/cuda/api.h"
-#include "iree/integrations/pjrt/common/api_impl.h"
+#include "iree_pjrt/common/api_impl.h"
 
 namespace iree::pjrt::cuda {
 

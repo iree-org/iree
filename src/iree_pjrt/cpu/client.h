@@ -9,7 +9,7 @@
 
 #include "iree/hal/drivers/local_task/task_driver.h"
 #include "iree/hal/local/loaders/registration/init.h"
-#include "iree/integrations/pjrt/common/api_impl.h"
+#include "iree_pjrt/common/api_impl.h"
 
 namespace iree::pjrt::cpu {
 
