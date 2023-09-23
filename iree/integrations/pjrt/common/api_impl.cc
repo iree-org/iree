@@ -23,70 +23,6 @@ const absl::string_view kMlirFormat = "mlir";
 // that is in flight. It is expected that most of this goes away over time.
 namespace PJRTApiConverter {
 namespace {
-// C API adapters copied from pjrt_c_api_wrapper_impl.cc as a stopgap.
-
-// Helper functions for copying data to possibly-inlined C arrays.
-
-// 'Src' and 'Dst' are allowed to be different types to make this usable with
-// memory-identical types, e.g. int64_t and int64_t. This should not be used
-// with types that require a static_cast.
-template <typename Src, typename Dst, typename DstList>
-static void CreateVectorBase(const absl::Span<Src> src, DstList* dst) {
-  dst->size = src.size();
-  if (dst->size > PJRT_C_API_MAX_INLINED) {
-    dst->heap = new Dst[dst->size];
-    std::copy(src.begin(), src.end(), dst->heap);
-  } else {
-    std::copy(src.begin(), src.end(), dst->inlined);
-  }
-}
-
-void CreateVector(const absl::Span<const int64_t> src, PJRT_Int64List* dst) {
-  return CreateVectorBase<const int64_t, int64_t, PJRT_Int64List>(src, dst);
-}
-void CreateVector(const absl::Span<const bool> src, PJRT_BoolList* dst) {
-  return CreateVectorBase<const bool, bool, PJRT_BoolList>(src, dst);
-}
-static void CreateVector(const absl::Span<const xla::DimLevelType> src,
-                         PJRT_IntList* dst) {
-  CreateVectorBase<const xla::DimLevelType, int, PJRT_IntList>(src, dst);
-}
-void CreateVector(const absl::Span<const bool> src, PJRT_IntList* dst) {
-  CreateVectorBase<const bool, int, PJRT_IntList>(src, dst);
-}
-
-void ToC(const xla::Tile& tile, PJRT_XLA_Tile* c_tile) {
-  CreateVector(tile.dimensions(), &c_tile->dimensions);
-}
-
-void CreateVector(const absl::Span<const xla::Tile> src,
-                  PJRT_XLA_TileList* dst) {
-  dst->size = src.size();
-  PJRT_XLA_Tile* c_tiles;
-  if (dst->size > PJRT_C_API_MAX_INLINED) {
-    dst->heap = new PJRT_XLA_Tile[dst->size];
-    c_tiles = dst->heap;
-  } else {
-    c_tiles = dst->inlined;
-  }
-  for (int i = 0; i < dst->size; ++i) {
-    ToC(src[i], &c_tiles[i]);
-  }
-}
-
-void ToC(const xla::Layout& layout, PJRT_XLA_Layout* c_layout) {
-  CreateVector(layout.minor_to_major(), &c_layout->minor_to_major);
-  CreateVector(layout.dim_level_types(), &c_layout->dim_level_types);
-  CreateVector(layout.dim_unique(), &c_layout->dim_unique);
-  CreateVector(layout.dim_ordered(), &c_layout->dim_ordered);
-  c_layout->index_primitive_type = layout.index_primitive_type();
-  c_layout->pointer_primitive_type = layout.pointer_primitive_type();
-  c_layout->element_size_in_bits = layout.element_size_in_bits();
-  c_layout->memory_space = layout.memory_space();
-  c_layout->dynamic_shape_metadata_prefix_bytes =
-      layout.dynamic_shape_metadata_prefix_bytes();
-  CreateVector(layout.tiles(), &c_layout->tiles);
-}
 
 // Enum converter functions
 iree_status_t MapElementTypeToXlaElementType(
@@ -386,7 +322,7 @@ iree_status_t BufferInstance::GetLayoutData(
     if (!status_or.ok()) {
       return iree_make_status(IREE_STATUS_UNKNOWN,
                               "Couldn't convert layout: %s",
-                              status_or.status().error_message().c_str());
+                              std::string(status_or.status().message()).data());
     }
     cached_layout_data_.emplace(std::move(*status_or));
   }
@@ -449,32 +385,6 @@ void BufferInstance::BindApi(PJRT_Api* api) {
     IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_DynamicDimensionIndices");
     return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                       "PJRT_Buffer_DynamicDimensionIndices"));
-  };
-  api->PJRT_Buffer_OnDeviceTrimmedShape =
-      +[](PJRT_Buffer_OnDeviceTrimmedShape_Args* args) -> PJRT_Error* {
-    IREE_TRACE_SCOPE_NAMED("PJRT_Buffer_OnDeviceTrimmedShape");
-    auto impl = [&]() -> iree_status_t {
-      // TODO: This function is terrible and not exposed properly to C.
-      // It is slated to be deleted...
-      // See Google bug b/238999986
-      BufferInstance* buffer = BufferInstance::Unwrap(args->buffer);
-      xla::Shape* shape;
-      IREE_RETURN_IF_ERROR(buffer->GetXlaShape(&shape));
-
-      args->element_type = shape->element_type();
-      PJRTApiConverter::CreateVector(shape->dimensions(), &args->dimensions);
-      PJRTApiConverter::CreateVector(shape->dynamic_dimensions(),
-                                     &args->dynamic_dimensions);
-
-      if (shape->has_layout()) {
-        args->has_layout = true;
-        PJRTApiConverter::ToC(shape->layout(), &args->layout);
-      } else {
-        args->has_layout = false;
-      }
-      return iree_ok_status();
-    };
-    return MakeError(impl());
   };
   api->PJRT_Buffer_GetMemoryLayout =
       +[](PJRT_Buffer_GetMemoryLayout_Args* args) -> PJRT_Error* {

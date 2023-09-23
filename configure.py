@@ -107,6 +107,8 @@ def write_configuration(args):
       add_env("IREE_CUDA_DEPS_DIR", args.cuda_sdk_dir)
     else:
       print("Not enabling CUDA. Pass --cuda-sdk-dir= to enable")
+    # TODO: Undo.
+    env_bazelrc.write(f"build --copt -Wno-error\n")
 
 
 def probe_iree_compiler_dylib() -> str:

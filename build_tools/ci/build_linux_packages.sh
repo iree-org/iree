@@ -56,7 +56,7 @@ function run_on_host() {
   echo "Launching docker image ${manylinux_docker_image}"
 
   if [ -z "${manylinux_docker_image}" ]; then
-    manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:e83893d35be4ce3558c989e9d5ccc4ff88d058bc3e74a83181059cc76e2cf1f8" }')}"
+    manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/nod-ai/manylinux_x86_64:main" }')}"
     if [ -z "${manylinux_docker_image}" ]; then
       echo "ERROR: Could not determine manylinux docker image"
       exit 1
@@ -118,11 +118,13 @@ function run_in_docker() {
       cd $repo_root
       export PATH="${python_dir}/bin:${orig_path}"
       echo ":::: Python version $(python --version)"
+      pip install --upgrade pip
       echo "::: Running from $(pwd)"
       echo "::: Installing CUDA SDK..."
       cuda_sdk_dir="$($repo_root/../iree/third_party/nvidia_sdk_download/fetch_cuda_toolkit.py /tmp/cuda_sdk)"
       echo "CUDA SDK installed at $cuda_sdk_dir"
       echo "::: Installing python dependencies"
+      pip install --upgrade pip
       pip install -r requirements.txt
       echo "::: Configuring bazel"
       python configure.py --cuda-sdk-dir=${cuda_sdk_dir}
@@ -130,6 +132,7 @@ function run_in_docker() {
       declare -a bazel_flags=(
         --compilation_mode=opt
         --remote_cache="https://storage.googleapis.com/openxla-bazel-cache/${cache_key}"
+        --copt=-Wno-error
       )
       if (( write_caches == 1 )); then
         bazel_flags+=(--google_default_credentials)
