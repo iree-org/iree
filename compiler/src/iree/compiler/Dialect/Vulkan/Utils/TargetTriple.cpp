@@ -251,12 +251,12 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
     coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, /*accSat*/ false,
+        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, /*accSat=*/ false,
         /*scope=*/scope));
     coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, /*accSat*/ false,
+        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, /*accSat=*/ false,
         /*scope=*/scope));
   }
     LLVM_FALLTHROUGH;
@@ -386,17 +386,17 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
     coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/8, /*nSize=*/8, /*kSize=*/32, /*aType=*/i8t,
-        /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, /*accSat*/ false,
+        /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, /*accSat=*/false,
         /*scope=*/scope));
     coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, /*accSat*/ false,
+        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, /*accSat=*/false,
         /*scope=*/scope));
     coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, /*accSat*/ false,
+        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, /*accSat=*/false,
         /*scope=*/scope));
   } break;
   case TargetTripleArch::NV_Pascal:
