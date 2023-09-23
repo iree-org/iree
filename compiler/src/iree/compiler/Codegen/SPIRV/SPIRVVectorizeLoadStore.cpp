@@ -37,7 +37,6 @@ constexpr int kMaxVectorNumElements = 4;
 
 namespace mlir {
 namespace iree_compiler {
-namespace {
 
 //===----------------------------------------------------------------------===//
 // Utility Functions
@@ -47,7 +46,8 @@ namespace {
 /// can vectorize, including vector transfer ops and GPU subgroup MMA ops, or
 /// other ops that doesn't care. If so, places all vector transfer or GPU
 /// subgroup MMA ops in `uses` and returns true.
-bool getUsesIfAllTransferOp(Value value, SmallVectorImpl<Operation *> &uses) {
+static bool getUsesIfAllTransferOp(Value value,
+                                   SmallVectorImpl<Operation *> &uses) {
   assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : value.getUsers()) {
     if (isa<memref::DeallocOp, memref::AssumeAlignmentOp>(userOp))
@@ -76,7 +76,7 @@ bool getUsesIfAllTransferOp(Value value, SmallVectorImpl<Operation *> &uses) {
 }
 
 /// Returns the bitwidth of a scalar or vector type.
-std::optional<unsigned> getBitWidth(Type type) {
+static std::optional<unsigned> getBitWidth(Type type) {
   if (type.isIntOrFloat()) {
     return type.getIntOrFloatBitWidth();
   }
@@ -89,7 +89,8 @@ std::optional<unsigned> getBitWidth(Type type) {
 }
 
 // Calculates the vector bit count we want to use based on the memref uses.
-unsigned calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
+static unsigned
+calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
   unsigned minBits = kMaxVectorNumBits;
   for (Operation *op : uses) {
     if (isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp>(op)) {
@@ -140,7 +141,8 @@ unsigned calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
 /// If the memref is vectorizable return the vector bit count we want to use,
 /// otherwise return 0. If it returns a value greater than 0 it also returns the
 /// memref uses.
-unsigned isMemRefVectorizable(Value value, SmallVectorImpl<Operation *> &uses) {
+static unsigned isMemRefVectorizable(Value value,
+                                     SmallVectorImpl<Operation *> &uses) {
   auto memrefType = dyn_cast<MemRefType>(value.getType());
 
   // Require scalar element type
@@ -207,6 +209,7 @@ unsigned isMemRefVectorizable(Value value, SmallVectorImpl<Operation *> &uses) {
   return 0;
 }
 
+namespace {
 //===----------------------------------------------------------------------===//
 // MemRef Usage Analysis
 //===----------------------------------------------------------------------===//
@@ -304,7 +307,7 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     TypeConverter::SignatureConversion signatureConverter(
         funcOp.getFunctionType().getNumInputs());
-    for (const auto &[index, arg] : llvm::enumerate(funcOp.getArguments())) {
+    for (const auto [index, arg] : llvm::enumerate(funcOp.getArguments())) {
       if (memrefUsageAnalysis.shouldVectorizeMemRef(arg)) {
         if (auto memrefType = getVectorizedMemRefType(rewriter, arg)) {
           signatureConverter.addInputs(index, *memrefType);
@@ -900,7 +903,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
   // Prior pass should have unrolled and broken down vectors with rank > 1.
   for (func::FuncOp func : module.getOps<func::FuncOp>()) {
     auto result = func.walk([](VectorTransferOpInterface transferOp) {
-      if (cast<VectorType>(transferOp.vector().getType()).getRank() > 1) {
+      if (cast<VectorType>(transferOp.getVectorType()).getRank() > 1) {
         transferOp.emitOpError(
             "with rank > 1 should be broken down by prior passes");
         return WalkResult::interrupt();
