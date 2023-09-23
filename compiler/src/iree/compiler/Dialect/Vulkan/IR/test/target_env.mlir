@@ -23,31 +23,31 @@
 
 "vk_configure_op"() {
   //      CHECK: #vk.target_env
-  // CHECK-SAME:   VK_NV_cooperative_matrix
-  // CHECK-SAME:   cooperativeMatrixPropertiesNV =
+  // CHECK-SAME:   VK_KHR_cooperative_matrix
+  // CHECK-SAME:   cooperativeMatrixPropertiesKHR =
   // CHECK-SAME:     #vk.coop_matrix_props<mSize = 8, nSize = 8, kSize = 32,
   // CHECK-SAME:       aType = i8, bType = i8, cType = i32, resultType = i32,
-  // CHECK-SAME:       scope = <Subgroup>>
+  // CHECK-SAME:       accSat = false, scope = <Subgroup>>
   // CHECK-SAME:     #vk.coop_matrix_props<mSize = 8, nSize = 8, kSize = 16,
   // CHECK-SAME:       aType = f16, bType = f16, cType = f16, resultType = f16,
-  // CHECK-SAME:       scope = <Subgroup>>
+  // CHECK-SAME:       accSat = false, scope = <Subgroup>>
   target_env =
     #vk.target_env<v1.2, r(133),
-      [VK_KHR_storage_buffer_storage_class, VK_NV_cooperative_matrix],
+      [VK_KHR_storage_buffer_storage_class, VK_KHR_cooperative_matrix],
       NVIDIA:DiscreteGPU,
       #vk.caps<maxComputeSharedMemorySize = 49152,
        maxComputeWorkGroupInvocations = 1024,
        maxComputeWorkGroupSize = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
        subgroupFeatures = 63: i32, subgroupSize = 32,
-       cooperativeMatrixPropertiesNV = [
+       cooperativeMatrixPropertiesKHR = [
          #vk.coop_matrix_props<
            mSize = 8, nSize = 8, kSize = 32,
            aType = i8, bType = i8, cType = i32, resultType = i32,
-           scope = #vk.scope<Subgroup>>,
+           accSat = false, scope = #vk.scope<Subgroup>>,
          #vk.coop_matrix_props<
            mSize = 8, nSize = 8, kSize = 16,
            aType = f16, bType = f16, cType = f16, resultType = f16,
-           scope = #vk.scope<Subgroup>>
+           accSat = false, scope = #vk.scope<Subgroup>>
        ]
       >>
 } : () -> ()
