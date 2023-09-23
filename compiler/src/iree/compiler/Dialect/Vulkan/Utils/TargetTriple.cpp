@@ -251,12 +251,12 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
     coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, /*accSat=*/ false,
+        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, /*accSat=*/false,
         /*scope=*/scope));
     coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, /*accSat=*/ false,
+        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, /*accSat=*/false,
         /*scope=*/scope));
   }
     LLVM_FALLTHROUGH;
