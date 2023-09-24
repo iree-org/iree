@@ -1,7 +1,7 @@
-# OpenXLA PJRT Plugin
+# IREE PJRT Plugin
 
-This repository contains an experimental PJRT plugin library which can bridge
-Jax (and TensorFlow in the future) to OpenXLA/IREE.
+This directory contains an experimental PJRT plugin library which can bridge
+Jax (and TensorFlow in the future) to IREE.
 
 # Developing
 
@@ -11,159 +11,41 @@ there are sharp edges still. The following procedure is being used to develop.
 There are multiple development workflows, ranked from easiest to hardest (but
 most powerful).
 
-## Setup options
+## Install a compatible version of Jax and the IREE compiler
 
-The below presumes that you have a compatible Jax/Jaxlib installed. Since
-PJRT plugin support is moving fast, it is rare that released versions are
-appropriate. **See ["Building Jax from Source"](#building-jax-from-source)
-below.**
+```
+pip install -r requirements.txt
 
-If you are building without CUDA, you may still need to install IREE's CUDA deps
-for the `bazel` build below:
+# Assume that you have the Jax repo checked out at JAX_REPO from
+# https://github.com/google/jax (must be paired with nightly jaxlib).
+pip install -e $JAX_REPO
+```
+
+Verify that your Jax install is functional like:
 
 ```shell
-export IREE_CUDA_DEPS_DIR=${HOME?}/.iree_cuda_deps
-../iree/build_tools/docker/context/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR?}
+python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print(a + a);"
 ```
 
-### Option 0: Pip install (non-dev)
+## Install the plugin of your choice (in this example 'cpu')
+
+pip install -e -v --no-deps python_packages/iree_cpu_plugin
+
+## Verify basic functionality
 
 ```shell
-pip install jax openxla_pjrt_plugin_cpu \
-  -f https://openxla.github.io/openxla-pjrt-plugin/pip-release-links.html \
-  -f https://openxla.github.io/iree/pip-release-links.html
+JAX_PLATFORMS=iree_cpu python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print(a + a);"
 ```
 
-Then one can verify & use simply with
+## Incrementally developing
+
+If you did an editable install (`-e`) above, then you should be able to incrementally
+make changes and build the native component with no further interaction needed.
 
 ```shell
-$ python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print(a + a);"
+cd python_packages/iree_cpu_plugin/build/cmake
+ninja
 ```
-```
-Platform 'iree_cpu' is experimental and not all JAX functionality may be correctly supported!
-[IREE-PJRT] DEBUG: Using IREE compiler binary: /tmp/.venv/lib/python3.11/site-packages/iree/compiler/_mlir_libs/libIREECompiler.so
-[IREE-PJRT] DEBUG: Compiler Version: 20230813.612 @ b56ac23bd85f0b9f4a9939c9e87fe83e629f8566 (API version 1.4)
-[IREE-PJRT] DEBUG: Partitioner was not enabled. The partitioner can be enabled by setting the 'PARTITIONER_LIB_PATH' config var ('IREE_PJRT_PARTITIONER_LIB_PATH' env var)
-[IREE-PJRT] DEBUG: CPU driver created
-[ 2  4  6  8 10 12 14 16 18]
-```
-
-### Option 1: Synchronize to a nightly IREE release
-
-```shell
-python ./sync_deps.py
-python -m pip install -U -r requirements.txt
-python ./configure.py --cc=clang --cxx=clang++ --cuda-sdk-dir=$CUDA_SDK_DIR
-
-# Source environment variables to run interactively.
-# The above generates a .env and .env.sh file with key setup vars.
-source .env.sh
-
-# Build.
-bazel build iree/integrations/pjrt/...
-
-# Run a sample.
-JAX_PLATFORMS=iree_cpu python test/test_simple.py
-JAX_PLATFORMS=iree_cuda python test/test_simple.py
-# When multiple CUDA devices are installed, pick one by setting CUDA_VISIBLE_DEVICES=<n>.
-CUDA_VISIBLE_DEVICES=0 JAX_PLATFORMS=iree_cuda python test/test_simple.py
-
-```
-
-### Option 2: Set up for a full at-head dev rig
-
-```
-mkdir openxla
-cd openxla
-python -m venv .env
-source .env/bin/activate || die "Could not activate venv"
-
-pip install git+https://github.com/openxla/openxla-devtools.git
-openxla-workspace init
-openxla-workspace checkout --sync openxla-pjrt-plugin
-
-cd jax
-pip install build numpy wheel
-python build/build.py \
-    --bazel_options=--override_repository=xla=$PWD/../xla \
-     && pip3 install dist/*.whl --force-reinstall
-pip install -e .
-
-cd ../iree
-cmake -GNinja -B ../iree-build/ -S . \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DIREE_ENABLE_ASSERTIONS=ON \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DIREE_ENABLE_LLD=ON -DIREE_ENABLE_CCACHE=ON
-cd ../iree-build
-ninja libIREECompiler.so
-export DYLIB_PATH=$PWD
-
-cd ../openxla-pjrt-plugin
-python ./configure.py --cc=clang --cxx=clang++ --iree-compiler-dylib=$DYLIB_PATH/lib/libIREECompiler.so
-source .env.sh
-bazel build iree/integrations/pjrt/cpu/...
-
-# Do simple smoke test.
-JAX_PLATFORMS=iree_cpu python test/test_simple.py
-```
-
-## Building Jax from Source
-
-Install Jax with Python sources:
-
-```shell
-# Starting in the openxla-pjrt-plugin repo, download JAX and sync to a
-# compatible commit.
-python ./sync_deps.py
-python -m pip install -e ../jax
-```
-
-Build a compatible jaxlib:
-
-```shell
-cd ../jax
-# NOTE: Try running `bazel clean --expunge` if you run into undeclared inclusion
-# error(s).
-python build/build.py \
-  --bazel_options=--override_repository=xla=$PWD/../xla
-# Install the version of jaxlib you just built.
-python -m pip install dist/*.whl --force-reinstall
-```
-
-## Generating runtime traces
-
-The plugins can be build with tracing enabled by adding the bazel build flag
-`--iree_enable_runtime_tracing`. With this flag, if a profiler is running,
-instrumentation will be sent to it. It can be useful to set the environment
-variable `TRACY_NO_EXIT=1` in order to block termination of one-shot programs
-that exit too quickly to stream all events.
-
-## Generating compile_commands.json
-
-`compile_commands.json` can be generated by the following command.
-
-```
-bazel run @hedron_compile_commands//:refresh_all
-```
-
-
-## ASAN
-
-Developing with ASAN is recommended but requires some special steps because
-we need to arrange for the plugin to be able to link with undefined
-symbols and load the ASAN runtime library.
-
-* Edit out the `"-Wl,--no-undefined"` from `build_defs.bzl`
-* Set env var `LD_PRELOAD=$(clang-12 -print-file-name=libclang_rt.asan-x86_64.so)`
-  (assuming compiling with `clang-12`. See configured.bazelrc in the IREE repo).
-* Set env var `ASAN_OPTIONS=detect_leaks=0` (Python allocates a bunch of stuff
-  that it never frees. TODO: Make this more fine-grained so we can detect leaks in
-  plugin code).
-* `--config=asan`
-
-This can be improved and made more systematic but should work.
 
 ## Running the Jax test suite
 
@@ -195,72 +77,6 @@ CUDA and a larger number can be tolerated for cpu.
 The plugin `openxla_pjrt_artifacts` is in the `ctstools` directory and
 performs additional manipulation of the environment in order to save
 compilation artifacts, reproducers, etc.
-
-## Project Maintenance
-
-This section is a work in progress describing various project maintenance
-tasks.
-
-### Pre-requisite: Install openxla-devtools
-
-```
-pip install git+https://github.com/openxla/openxla-devtools.git
-```
-
-### Sync all deps to pinned versions
-
-This updates the git repositories and upgrades Python packages.
-
-```
-openxla-workspace sync
-python -m pip install -U -r requirements.txt
-```
-
-### Update to latest nightlies
-
-This updates the pinned revisions to track upstream nightlies.
-Note that the roll action will upgrade Python packages implicitly.
-
-```
-# Updates the sync_deps.py metadata.
-openxla-workspace roll nightly
-# Brings all dependencies to pinned versions.
-openxla-workspace sync
-```
-
-### Update just IREE to its latest nightly.
-
-This just updates the IREE compiler and source pins to IREE's latest
-nightly. It is useful for when there is some issue blocking a jax/xla
-upgrade but progress is desired.
-Note that the roll action will upgrade Python packages implicitly.
-
-```
-# Updates the sync_deps.py metadata.
-openxla-workspace roll iree_nightly
-# Brings all dependencies to pinned versions.
-openxla-workspace sync
-```
-
-Alternatively, just the IREE source dep (runtime and APIs) can be pinned
-to head:
-
-```
-# Updates the sync_deps.py metadata.
-openxla-workspace roll iree
-# Brings all dependencies to pinned versions.
-openxla-workspace sync
-```
-
-### Pin current versions of all deps
-
-This can be done if local, cross project changes have been made and landed.
-It snapshots the state of all deps as actually checked out and updates
-the metadata.
-
-```
-openxla-workspace pin
-```
 
 ## Contacts
 
