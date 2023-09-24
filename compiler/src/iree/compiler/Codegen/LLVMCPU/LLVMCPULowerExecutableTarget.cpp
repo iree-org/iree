@@ -238,8 +238,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       });
       bool isByteAligned = walkRes.wasInterrupted();
       bool enableVectorMasking =
-          isByteAligned || isX86(target) || isRISCV(target) ||
-          (isAArch64(target) && hasAnySVEFeature(target));
+          isByteAligned && (isX86(target) || isRISCV(target) ||
+          (isAArch64(target) && hasAnySVEFeature(target)));
 
       bool enableMicrokernels = hasMicrokernels(target);
       bool enableAArch64SSVE = isAArch64(target) && hasAnySVEFeature(target) &&

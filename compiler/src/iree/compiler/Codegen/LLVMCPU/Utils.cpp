@@ -99,9 +99,9 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
 }
 
 bool hasByteAlignedElementTypes(linalg::LinalgOp linalgOp) {
-  return !llvm::any_of(linalgOp->getOperands(), [](Value operand) {
+  return llvm::all_of(linalgOp->getOperands(), [](Value operand) {
     return getElementTypeOrSelf(operand.getType()).getIntOrFloatBitWidth() %
-               8 !=
+               8 ==
            0;
   });
 }
