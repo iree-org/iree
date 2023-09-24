@@ -16,29 +16,10 @@ logger = logging.getLogger(__name__)
 
 def probe_iree_compiler_dylib() -> str:
     """Probes an installed iree.compiler for the compiler dylib."""
-    # TODO: Make this an API on iree.compiler itself.
-    from iree.compiler import _mlir_libs
+    # TODO: Move this out of the ctypes API initialization.
+    from iree.compiler.api import ctypes_dl
 
-    try:
-        from iree.compiler import version
-
-        logger.debug(f"Found installed iree-compiler package {version.VERSION}")
-    except ImportError:
-        logger.debug("Unable to determine iree-compiler version; assuming dev env")
-    dylib_basename = "libIREECompiler.so"
-    system = platform.system()
-    if system == "Darwin":
-        dylib_basename = "libIREECompiler.dylib"
-    elif system == "Windows":
-        dylib_basename = "IREECompiler.dll"
-
-    paths = _mlir_libs.__path__
-    for p in paths:
-        dylib_path = Path(p) / dylib_basename
-        if dylib_path.exists():
-            logger.debug(f"Found --iree-compiler-dylib={dylib_path}")
-            return dylib_path
-    raise ValueError(f"Could not find {dylib_basename} in {paths}")
+    return ctypes_dl._probe_iree_compiler_dylib()
 
 
 def initialize():
