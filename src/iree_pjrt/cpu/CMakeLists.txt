@@ -42,6 +42,7 @@ set(_NATIVE_PYTHON_DIR "${IREE_PJRT_PYTHON_BINARY_DIR}/iree/_pjrt_libs/cpu")
 file(WRITE "${_NATIVE_PYTHON_DIR}/__init__.py" "")
 set_target_properties(iree_pjrt_cpu_dylib
   PROPERTIES
+    PREFIX ""  # Disable "lib" prefix.
     LIBRARY_OUTPUT_NAME pjrt_plugin_iree_cpu
     RUNTIME_OUTPUT_DIRECTORY "${_NATIVE_PYTHON_DIR}"
     LIBRARY_OUTPUT_DIRECTORY "${_NATIVE_PYTHON_DIR}"

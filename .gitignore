@@ -2,6 +2,7 @@ build/
 
 bazel-*
 *.egg-info
+*.whl
 .env
 .env.sh
 env.bazelrc
