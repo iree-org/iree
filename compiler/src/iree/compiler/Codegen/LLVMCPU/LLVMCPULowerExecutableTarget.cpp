@@ -236,7 +236,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           return WalkResult::interrupt();
         return WalkResult::advance();
       });
-      bool isByteAligned = walkRes.wasInterrupted();
+      bool isByteAligned = !walkRes.wasInterrupted();
       bool enableVectorMasking =
           isByteAligned && (isX86(target) || isRISCV(target) ||
                             (isAArch64(target) && hasAnySVEFeature(target)));
