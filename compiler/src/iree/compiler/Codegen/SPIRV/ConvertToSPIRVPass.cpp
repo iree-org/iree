@@ -405,8 +405,14 @@ void ConvertToSPIRVPass::runOnOperation() {
     }
   }
 
-  /// Rewrite exti(bitcast) as a mix of vector.shuffle + bitwise arithmetic to
-  /// help manage sub-byte types.
+  /// Rewrite extui/si(bitcast) as a mix of vector.shuffle + bitwise arithmetic.
+  /// This handles cases like `vector.bitcast i8 to vector<2xi4>` that come from
+  /// narrow load emulation by never materializing the sub-byte values. SPIR-V
+  /// does not have support for arithmetic on sub-byte types so we currently
+  /// rely on this rewrite for the cases seen today.
+  /// TODO: Support general emulation of compute on sub-byte types. This is
+  /// not mutually exclusive with this pattern, but does mean it is no longer
+  /// load bearing.
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     RewritePatternSet narrowingPatterns(context);
     vector::populateVectorNarrowTypeRewritePatterns(narrowingPatterns);
