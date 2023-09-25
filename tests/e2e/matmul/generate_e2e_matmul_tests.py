@@ -46,6 +46,7 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
     LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
     LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
+    SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
     SPIRVVectorizeMali = "SPIRVVectorizeMali"
     SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
 
@@ -239,6 +240,12 @@ def get_test_compilation_infos(
             TileWorkgroupSizePair([[16, 64, 4]], [16, 2, 1]),
             TileWorkgroupSizePair([[1, 128, 8]], [32, 1, 1]),
         ]
+    elif compilation_info_id == CompilationInfoId.SPIRVCooperativeMatrixVectorize:
+        tile_workgroup_size_pairs = [
+            TileWorkgroupSizePair(
+                [[64, 64], [16, 64], [0, 0, 16], [16, 16, 16]], [64, 4, 1]
+            )
+        ]
     elif compilation_info_id == CompilationInfoId.SPIRVVectorizeNVIDIA:
         tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(32)
     elif compilation_info_id == CompilationInfoId.SPIRVVectorizeMali:
@@ -426,6 +433,11 @@ def generate_function(
             == "SPIRVVectorizeMali"
         ):
             dispatch_lowering_pass_pipeline = "SPIRVBaseVectorize"
+        elif (
+            compilation_info.dispatch_lowering_pass_pipeline
+            == "SPIRVCooperativeMatrixVectorize"
+        ):
+            dispatch_lowering_pass_pipeline = "SPIRVCooperativeMatrixVectorize"
         elif compilation_info.dispatch_lowering_pass_pipeline == "SPIRVVectorizeNVIDIA":
             # TODO: change to test SPIRVMatmulPromoteVectorize too
             dispatch_lowering_pass_pipeline = "SPIRVBaseVectorize"
