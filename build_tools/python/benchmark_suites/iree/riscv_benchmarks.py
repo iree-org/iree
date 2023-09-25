@@ -30,11 +30,12 @@ class Linux_RV64_Benchmarks(object):
     MODELS = [
         tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
         tflite_models.DEEPLABV3_FP32,
-        tflite_models.EFFICIENTNET_INT8,
+        # Disabled due to #15038.
+        # tflite_models.EFFICIENTNET_INT8,
+        # tflite_models.MOBILENET_V2_INT8,
         tflite_models.MOBILEBERT_FP32,
         tflite_models.MOBILEBERT_INT8,
         tflite_models.MOBILENET_V1,
-        tflite_models.MOBILENET_V2_INT8,
         tflite_models.PERSON_DETECT_INT8,
         # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
         # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
@@ -79,10 +80,11 @@ class Linux_RV32_Benchmarks(object):
         compile_targets=[RV32_CPU_TARGET],
     )
     MODELS = [
-        tflite_models.EFFICIENTNET_INT8,
+        # Disabled due to #15038.
+        # tflite_models.EFFICIENTNET_INT8,
+        # tflite_models.MOBILENET_V2_INT8,
         tflite_models.MOBILEBERT_INT8,
         tflite_models.PERSON_DETECT_INT8,
-        tflite_models.MOBILENET_V2_INT8,
     ]
 
     def generate(
