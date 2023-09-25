@@ -2012,14 +2012,11 @@ module {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32], [4], [0], [0]]>
-//   CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 0, 0], [4, 0, 0], [0, 0, 0], [0, 4, 4]]>
-//   CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 0, 0], [4, 0, 0], [0, 4, 16], [0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 0, 0], [4, 0, 0], [0, 4, 16], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //       CHECK: hal.executable.export public @i4_dequant_matvec_f32
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.fill
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
-//       CHECK: linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "parallel"]
-//  CHECK-SAME:     lowering_config = #[[CONFIG1]]
 //       CHECK: linalg.generic {{.*}} iterator_types = ["parallel", "reduction", "reduction"]
-//  CHECK-SAME:     lowering_config = #[[CONFIG2]]
+//  CHECK-SAME:     lowering_config = #[[CONFIG1]]
