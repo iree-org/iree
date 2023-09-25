@@ -1,4 +1,4 @@
-// RUN:  iree-opt --iree-stablehlo-stateful-rng-preprocessing %s | FileCheck %s
+// RUN:  iree-opt --iree-stablehlo-preprocessing-stateful-rng %s | FileCheck %s
 
 // CHECK-LABEL:   func.func @main() -> tensor<1x1xi32> {
 // CHECK:           %[[VAL_0:.*]] = ml_program.global_load @global_hlo_rng_state

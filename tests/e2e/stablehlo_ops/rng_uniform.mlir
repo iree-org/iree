@@ -28,7 +28,7 @@ func.func @rng_uniform_3d() {
     %shape = util.unfoldable_constant dense<[2, 2, 2]>  : tensor<3xi32>
     %res = "stablehlo.rng"(%min, %max, %shape) {rng_distribution = #stablehlo<rng_distribution UNIFORM>} : (tensor<f32>, tensor<f32>, tensor<3xi32>) -> tensor<2x2x2xf32>
     check.expect_almost_eq_const(%res, dense<[
-        [[3.04814, 8.18679], [-1.74598, 3.39266]],
-        [[-6.91349, -1.77484], [8.29239, -6.56897]]]> : tensor<2x2x2xf32>) : tensor<2x2x2xf32>
+        [[3.17482, -4.88602], [-6.57512, 8.58719]],
+	[[6.28547, 2.6171], [-3.1734, -1.86021]]]> : tensor<2x2x2xf32>) : tensor<2x2x2xf32>
     return
 }
