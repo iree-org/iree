@@ -53,6 +53,7 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
 // options here, even though it is a layering violation.
 #ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_TORCH_IREE
           "  =tm_tensor     - Legalize a subset of Torch input ops.\n"
+          "  =torch         - Legalize from the 'torch' dialect.\n"
 #endif  // IREE_COMPILER_PLUGIN_HAVE_STATIC_TORCH_IREE
           "  =*             - An extensible input type defined in a plugin."
           // clang-format on
@@ -91,10 +92,6 @@ InputDialectOptions::Type InputDialectOptions::parseInputTypeMnemonic() {
 #ifdef IREE_HAVE_TOSA_INPUT
   } else if (inputTypeMnemonic == "tosa") {
     return Type::tosa;
-#endif
-#ifdef IREE_HAVE_TORCH_INPUT
-  } else if (inputTypeMnemonic == "tm_tensor") {
-    return Type::tm_tensor;
 #endif
   } else {
     return Type::plugin;
