@@ -48,6 +48,10 @@ bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// to the end of the function is the root op.
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 
+/// Returns true if all of the element types involved in the linalg op are byte
+/// aligned.
+bool hasByteAlignedElementTypes(linalg::LinalgOp linalgOp);
+
 } // namespace iree_compiler
 } // namespace mlir
 

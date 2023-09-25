@@ -231,9 +231,15 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
       auto target = variantOp.getTarget();
       bool lowerToAVX2 = hasAVX2Feature(target);
+      auto walkRes = moduleOp.walk([](linalg::LinalgOp linalgOp) {
+        if (!hasByteAlignedElementTypes(linalgOp))
+          return WalkResult::interrupt();
+        return WalkResult::advance();
+      });
+      bool isByteAligned = !walkRes.wasInterrupted();
       bool enableVectorMasking =
-          isX86(target) || isRISCV(target) ||
-          (isAArch64(target) && hasAnySVEFeature(target));
+          isByteAligned && (isX86(target) || isRISCV(target) ||
+                            (isAArch64(target) && hasAnySVEFeature(target)));
 
       bool enableMicrokernels = hasMicrokernels(target);
       bool enableAArch64SSVE = isAArch64(target) && hasAnySVEFeature(target) &&
