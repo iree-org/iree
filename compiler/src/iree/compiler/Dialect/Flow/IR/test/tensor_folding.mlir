@@ -695,3 +695,17 @@ func.func @foldSplatReshapeIntoSplatDynamic(%arg0 : f32, %arg1 : index, %arg2 : 
   %1 = flow.tensor.reshape %0 : tensor<?x4xf32>{%arg1} -> tensor<?x?xf32>{%arg2, %arg3}
   return %1 : tensor<?x?xf32>
 }
+
+// -----
+
+func.func @innermost_unit_dim(%4: !flow.dispatch.tensor<readonly:tensor<3x1x16x257x88xf16>>,
+    %arg0: index, %arg2 : index, %10 : index, %9 : index) -> tensor<?x?x?xf16> {
+  %c16 = arith.constant 16 : index
+  %c1 = arith.constant 1 : index
+  %11 = flow.dispatch.tensor.load %4, offsets = [1, 0, %arg0, %10, %arg2], sizes = [1, 1, %c16, %9, %c1], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x1x16x257x88xf16>> -> tensor<?x?x?xf16>
+  return %11 : tensor<?x?x?xf16>
+}
+// CHECK-LABEL: func @innermost_unit_dim
+//  CHECK-SAME:     %[[DYNAMIC_DIM:[a-zA-Z0-9]+]]: index)
+//       CHECK:   flow.dispatch.tensor.load
+//  CHECK-SAME:       sizes = [1, 1, 16, %[[DYNAMIC_DIM]], 1]

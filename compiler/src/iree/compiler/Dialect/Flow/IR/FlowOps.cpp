@@ -109,10 +109,12 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
                    ArrayRef<OpFoldResult> mixedSizes) {
   ArrayRef<int64_t> resultShape = slicedObjectType.getShape();
   llvm::SmallBitVector droppedDims(mixedSizes.size());
-  if (slicedObjectType.getRank() == mixedSizes.size()) {
+  size_t maxDroppedDims = mixedSizes.size() - resultShape.size();
+  if (maxDroppedDims == 0) {
     return droppedDims;
   }
   unsigned shapePos = 0;
+  int numSet = 0;
   for (const auto &size : llvm::enumerate(mixedSizes)) {
     std::optional<int64_t> sizeVal = getConstantIntValue(size.value());
     // If the size is not 1, or if the current matched dimension of the result
@@ -124,6 +126,10 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
       continue;
     }
     droppedDims.set(size.index());
+    numSet++;
+    if (numSet == maxDroppedDims) {
+      break;
+    }
   }
   return droppedDims;
 }
