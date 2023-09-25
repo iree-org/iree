@@ -22,11 +22,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 
 # All python binaries go into one tree.
 set(IREE_PJRT_PYTHON_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/python")
-
-# NOTE: The IREE source code must be cloned to a directory side-by-side with
-# this project.
-# TODO: Change this when it moves in-tree
-set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../iree)
+set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 
 # Enable LTO if supported.
 option(IREE_PJRT_ENABLE_LTO "Enable LTO (link time optimization) if supported" OFF)
