@@ -1967,58 +1967,56 @@ hal.executable private @non_trivial_program {
   ]>
 ]>
 
-hal.executable @i4_dequant_matvec {
-  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-x86_64", {
-    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-    native_vector_size = 16 : index,
-    target_triple = "x86_64-unknown-linux-gnu"
-  }> {
-    hal.executable.export @i4_dequant_matvec_f32 layout(#pipeline_layout)
-    builtin.module {
-      func.func @i4_dequant_matvec_f32() {
-        %cst = arith.constant 0.000000e+00 : f32
-        %10 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86x128xi4>>
-        %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>>
-        %12 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>>
-        %13 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<86x128xf32>>
-        %14 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
-        %15 = flow.dispatch.tensor.load %10, offsets = [0, 0, 0], sizes = [4096, 86, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x86x128xi4>> -> tensor<4096x86x128xi4>
-        %16 = flow.dispatch.tensor.load %11, offsets = [0, 0], sizes = [4096, 86], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>> -> tensor<4096x86xf32>
-        %17 = flow.dispatch.tensor.load %12, offsets = [0, 0], sizes = [4096, 86], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>> -> tensor<4096x86xf32>
-        %18 = flow.dispatch.tensor.load %13, offsets = [0, 0], sizes = [86, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<86x128xf32>> -> tensor<86x128xf32>
-        %19 = tensor.empty() : tensor<4096xf32>
-        %20 = tensor.empty() : tensor<4096x86x128xf32>
-        %21 = linalg.fill ins(%cst : f32) outs(%19 : tensor<4096xf32>) -> tensor<4096xf32>
-        %22 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%15, %16, %17 : tensor<4096x86x128xi4>, tensor<4096x86xf32>, tensor<4096x86xf32>) outs(%20 : tensor<4096x86x128xf32>) {
-        ^bb0(%in: i4, %in_0: f32, %in_1: f32, %out: f32):
-          %24 = arith.extui %in : i4 to i32
-          %25 = arith.uitofp %24 : i32 to f32
-          %26 = arith.subf %25, %in_1 : f32
-          %27 = arith.mulf %26, %in_0 : f32
-          linalg.yield %27 : f32
-        } -> tensor<4096x86x128xf32>
-        %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%18, %22 : tensor<86x128xf32>, tensor<4096x86x128xf32>) outs(%21 : tensor<4096xf32>) {
-        ^bb0(%in: f32, %in_0: f32, %out: f32):
-          %24 = arith.mulf %in, %in_0 : f32
-          %25 = arith.addf %24, %out : f32
-          linalg.yield %25 : f32
-        } -> tensor<4096xf32>
-        flow.dispatch.tensor.store %23, %14, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
-        return
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"
+}>
+#map = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1, d2) -> (d0)>
+module {
+  hal.executable public @i4_dequant_matvec {
+    hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
+      hal.executable.export public @i4_dequant_matvec_f32 layout(#pipeline_layout)
+      builtin.module {
+        func.func @i4_dequant_matvec_f32() {
+          %cst = arith.constant 0.000000e+00 : f32
+          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86x128xi4>>
+          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>>
+          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>>
+          %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<86x128xf32>>
+          %4 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
+          %5 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4096, 86, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x86x128xi4>> -> tensor<4096x86x128xi4>
+          %6 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [4096, 86], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>> -> tensor<4096x86xf32>
+          %7 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [4096, 86], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>> -> tensor<4096x86xf32>
+          %8 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [86, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<86x128xf32>> -> tensor<86x128xf32>
+          %9 = tensor.empty() : tensor<4096xf32>
+          %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<4096xf32>) -> tensor<4096xf32>
+          %11 = linalg.generic {indexing_maps = [#map, #map1, #map2, #map2, #map3], iterator_types = ["parallel", "reduction", "reduction"]} ins(%8, %5, %6, %7 : tensor<86x128xf32>, tensor<4096x86x128xi4>, tensor<4096x86xf32>, tensor<4096x86xf32>) outs(%10 : tensor<4096xf32>) {
+          ^bb0(%in: f32, %in_0: i4, %in_1: f32, %in_2: f32, %out: f32):
+            %12 = arith.extui %in_0 : i4 to i32
+            %13 = arith.uitofp %12 : i32 to f32
+            %14 = arith.subf %13, %in_2 : f32
+            %15 = arith.mulf %14, %in_1 : f32
+            %16 = arith.mulf %in, %15 : f32
+            %17 = arith.addf %16, %out : f32
+            linalg.yield %17 : f32
+          } -> tensor<4096xf32>
+          flow.dispatch.tensor.store %11, %4, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
+          return
+        }
       }
     }
   }
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32], [4], [0], [0]]>
-//   CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 0, 0], [4, 0, 0], [0, 0, 0], [0, 4, 4]]>
-//   CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 0, 0], [4, 0, 0], [0, 1, 4], [0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 0, 0], [4, 0, 0], [0, 4, 16], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //       CHECK: hal.executable.export public @i4_dequant_matvec_f32
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.fill
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
-//       CHECK: linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "parallel"]
-//  CHECK-SAME:     lowering_config = #[[CONFIG1]]
 //       CHECK: linalg.generic {{.*}} iterator_types = ["parallel", "reduction", "reduction"]
-//  CHECK-SAME:     lowering_config = #[[CONFIG2]]
+//  CHECK-SAME:     lowering_config = #[[CONFIG1]]

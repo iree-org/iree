@@ -41,6 +41,16 @@ struct TorchSession
 
   bool extendCustomInputConversionPassPipeline(
       OpPassManager &passManager, std::string_view typeMnemonic) override {
+    if (typeMnemonic == "torch") {
+      TorchInput::createTorchToIREEPipeline(passManager);
+      passManager.addNestedPass<func::FuncOp>(
+          TorchInput::createConvertTMTensorToLinalgExtPass());
+      return true;
+    }
+    // TODO: Retire the tm_tensor input pipeline once we are fully switched
+    // to the 'torch' pipeline, which handles everything from the 'torch'
+    // dialect down (vs just 'tm_tensor' which was converting a couple of
+    // ops to linalg).
     if (typeMnemonic == "tm_tensor") {
       passManager.addNestedPass<func::FuncOp>(
           TorchInput::createConvertTMTensorToLinalgExtPass());
@@ -51,6 +61,7 @@ struct TorchSession
 
   void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
     typeMnemonics.insert("tm_tensor");
+    typeMnemonics.insert("torch");
   }
 };
 

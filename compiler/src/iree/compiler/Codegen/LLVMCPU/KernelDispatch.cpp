@@ -209,10 +209,11 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
   bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
+  bool isByteAligned = hasByteAlignedElementTypes(linalgOp);
 
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
-    if (isLinalgGeneric) {
+    if (isLinalgGeneric && isByteAligned) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -229,7 +230,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default RISC-V specific strategies.
   if (isRISCV(targetAttr)) {
-    if (isLinalgGeneric) {
+    if (isLinalgGeneric && isByteAligned) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -240,7 +241,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
-    if (hasAnySVEFeature(targetAttr)) {
+    if (hasAnySVEFeature(targetAttr) && isByteAligned) {
       return VectorPreProcStrategy::Masking;
     }
     if ((linalg::isElementwise(linalgOp) || isFullyDynamicOp(linalgOp)) &&
@@ -301,14 +302,6 @@ getMinTilingSizesForEachDim(func::FuncOp entryPointFn, linalg::LinalgOp op,
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op->getOpOperands();
-  std::optional<unsigned> fastestVaryingReductionDim = std::nullopt;
-  auto itTypes = op.getIteratorTypesArray();
-  for (int64_t idx = itTypes.size() - 1, e = 0; idx >= e; --idx) {
-    if (itTypes[idx] == utils::IteratorType::reduction) {
-      fastestVaryingReductionDim = idx;
-      break;
-    }
-  }
 
   for (auto [index, map] : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
@@ -320,17 +313,6 @@ getMinTilingSizesForEachDim(func::FuncOp entryPointFn, linalg::LinalgOp op,
     if (!fastestVaryingDimExpr)
       continue;
     unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
-
-    // If the fastest varying dimension for the operand is broadcasted along a
-    // faster varying reduction dimension, we should prefer a vector size of 1
-    // as the values will splat along the faster varying dim.
-    if (fastestVaryingReductionDim &&
-        itTypes[fastestVaryingDim] == utils::IteratorType::reduction &&
-        fastestVaryingDim < *fastestVaryingReductionDim &&
-        !map.isFunctionOfDim(*fastestVaryingReductionDim)) {
-      minTileSizes[fastestVaryingDim] = 1;
-      continue;
-    }
 
     // If the indexing map has result it has to be a shaped type.
     auto operandType =

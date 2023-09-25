@@ -98,5 +98,13 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   return rootOperation;
 }
 
+bool hasByteAlignedElementTypes(linalg::LinalgOp linalgOp) {
+  return llvm::all_of(linalgOp->getOperands(), [](Value operand) {
+    auto bitwidth =
+        getElementTypeOrSelf(operand.getType()).getIntOrFloatBitWidth();
+    return bitwidth % 8 == 0;
+  });
+}
+
 } // namespace iree_compiler
 } // namespace mlir
