@@ -68,8 +68,8 @@ void linalg::transform::LinalgTransformDialect::initialize() {
 //===---------------------------------------------------------------------===//
 
 void linalg::transform::ScopeOp::getSuccessorRegions(
-    std::optional<unsigned> index, SmallVectorImpl<RegionSuccessor> &regions) {
-  if (index)
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
+  if (!point.isParent())
     regions.emplace_back(getResults());
   else
     regions.emplace_back(&getBody());

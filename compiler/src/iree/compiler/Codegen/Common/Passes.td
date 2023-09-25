@@ -158,6 +158,14 @@ def DecomposePackUnPackOps :
   ];
 }
 
+def ReplaceSlowMinMaxOps
+    : Pass<"iree-codegen-replace-slow-min-max-ops", "func::FuncOp"> {
+  let summary =
+      "Replace slow min/max operations that propagate NaNs and distinguish "
+      "between +/-0.0 with faster min/max operations that ignore them.";
+  let constructor = "mlir::iree_compiler::createReplaceSlowMinMaxOpsPass()";
+}
+
 def EliminateEmptyTensors :
     Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";

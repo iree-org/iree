@@ -45,7 +45,6 @@ DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
 IMAGES_TO_DEPENDENCIES = {
     "base": [],
     "base-arm64": [],
-    "manylinux2014_x86_64-release": [],
     "android": ["base"],
     "emscripten": ["base"],
     "nvidia": ["base"],

@@ -170,7 +170,6 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
                                            bool canonicalize) {
   assert(opsHToFuse.empty() && "No fusion supported yet");
   iree_compiler::TileToScfForAndFuseResult result;
-  // TODO: Replace by transform::TileToScfForOp and deprecate transform::TileOp.
   auto tiletoScfForOp = b.create<transform::TileOp>(rootH, tileSizes);
   result.forLoops = tiletoScfForOp.getLoops();
   result.tiledOpH = tiletoScfForOp.getTiledLinalgOp();
@@ -272,6 +271,7 @@ Value mlir::iree_compiler::buildPad(
     transposeAttrs.push_back(b.getI64ArrayAttr(transp));
   SmallVector<Type> resultTypes;
   resultTypes.push_back(opH.getType());
+  resultTypes.push_back(transform::AnyOpType::get(b.getContext()));
   resultTypes.push_back(transform::AnyOpType::get(b.getContext()));
   return b
       .create<transform::PadOp>(resultTypes, opH, b.getArrayAttr(paddingValues),

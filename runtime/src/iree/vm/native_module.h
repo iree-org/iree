@@ -122,26 +122,26 @@ typedef struct iree_vm_native_module_descriptor_t {
 // Callers may allocate more memory if they need additional storage.
 IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size(void);
 
-// Creates a new native module with the metadata tables in |descriptor|.
+// Creates a new native module with the metadata tables in |module_descriptor|.
 // These tables will be used for reflection and function lookup, and the
 // provided function pointers will be called when state needs to be managed or
 // exported functions need to be called.
 //
-// An implementation |interface| providing functions for state management and
-// function calls can be provided to override default implementations of
+// An implementation |module_interface| providing functions for state management
+// and function calls can be provided to override default implementations of
 // functions. The structure will be copied and the self pointer will be passed
-// to all |interface| functions.
+// to all |module_interface| functions.
 //
-// The provided |descriptor| will be referenced by the created module and must
-// be kept live for the lifetime of the module.
+// The provided |module_descriptor| will be referenced by the created module and
+// must be kept live for the lifetime of the module.
 IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
-    const iree_vm_module_t* interface,
+    const iree_vm_module_t* module_interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_vm_instance_t* instance, iree_allocator_t allocator,
     iree_vm_module_t** out_module);
 
 IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
-    const iree_vm_module_t* interface,
+    const iree_vm_module_t* module_interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_vm_instance_t* instance, iree_allocator_t allocator,
     iree_vm_module_t* module);

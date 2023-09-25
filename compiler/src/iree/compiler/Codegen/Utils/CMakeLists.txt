@@ -31,6 +31,7 @@ iree_cc_library(
     LLVMSupport
     LLVMTargetParser
     MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRFuncDialect

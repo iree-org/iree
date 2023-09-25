@@ -901,7 +901,7 @@ hal.executable private @shared_mem_alloc {
         %3 = tensor.empty() : tensor<3x3xf32>
         %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0 * 2 + d3, d1 * 2 + d4, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%2, %3 : tensor<29x29x480xf32>, tensor<3x3xf32>) outs(%cst : tensor<14x14x480xf32>) {
         ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
-          %5 = arith.maxf %arg2, %arg0 : f32
+          %5 = arith.maximumf %arg2, %arg0 : f32
           linalg.yield %5 : f32
         } -> tensor<14x14x480xf32>
         flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [14, 14, 480], strides = [1, 1, 1] : tensor<14x14x480xf32> -> !flow.dispatch.tensor<writeonly:tensor<14x14x480xf32>>

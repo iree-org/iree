@@ -314,8 +314,12 @@ static iree_status_t iree_hal_task_command_buffer_emit_global_barrier(
   // Reset the tail of the command buffer to the barrier. This leaves us in a
   // consistent state if the recording ends immediate after this (the barrier
   // will be the last task).
-  iree_task_list_initialize(&command_buffer->leaf_tasks);
-  iree_task_list_push_back(&command_buffer->leaf_tasks, &barrier->header);
+  iree_task_list_t* target_task_list =
+      iree_task_list_is_empty(&command_buffer->root_tasks)
+          ? &command_buffer->root_tasks
+          : &command_buffer->leaf_tasks;
+  iree_task_list_initialize(target_task_list);
+  iree_task_list_push_back(target_task_list, &barrier->header);
 
   // NOTE: all new tasks emitted will be executed after this barrier.
   command_buffer->state.open_barrier = barrier;

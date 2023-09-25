@@ -143,7 +143,7 @@ builtin.module {
     %3 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<16x16xf16>, vector<16x16xf16>
     %4 = vector.transfer_read %1[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<8x16xf16>, vector<8x16xf16>
     %5 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %3, %4, %cst : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf16>
-    %6 = vector.multi_reduction <maxf>, %5, %init [1] : vector<16x8xf16> to vector<16xf16>
+    %6 = vector.multi_reduction <maximumf>, %5, %init [1] : vector<16x8xf16> to vector<16xf16>
     %7 = vector.broadcast %6 : vector<16xf16> to vector<8x16xf16>
     %8 = vector.transpose %7, [1, 0] : vector<8x16xf16> to vector<16x8xf16>
     vector.transfer_write %8, %2[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
@@ -261,18 +261,18 @@ builtin.module {
 // CHECK:        %[[SHUFFLERESULT:.+]], %[[VALID:.+]] = gpu.shuffle  xor %[[D67]], %[[C1_I32]], %[[C32_I32]] : i32
 // CHECK:        %[[D68:.+]] = vector.broadcast %[[SHUFFLERESULT]] : i32 to vector<1xi32>
 // CHECK:        %[[D69:.+]] = vector.bitcast %[[D68]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D70:.+]] = arith.maxf %[[D69]], %[[D65]] : vector<2xf16>
+// CHECK:        %[[D70:.+]] = arith.maximumf %[[D69]], %[[D65]] : vector<2xf16>
 // CHECK:        %[[D71:.+]] = vector.bitcast %[[D70]] : vector<2xf16> to vector<1xi32>
 // CHECK:        %[[D72:.+]] = vector.extract %[[D71]][0] : vector<1xi32>
 // CHECK-DAG:    %[[C2_I32:.+]] = arith.constant 2 : i32
 // CHECK:        %[[SHUFFLERESULT_3:.+]], %[[VALID_4:.+]] = gpu.shuffle  xor %[[D72]], %[[C2_I32]], %[[C32_I32]] : i32
 // CHECK:        %[[D73:.+]] = vector.broadcast %[[SHUFFLERESULT_3]] : i32 to vector<1xi32>
 // CHECK:        %[[D74:.+]] = vector.bitcast %[[D73]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D75:.+]] = arith.maxf %[[D74]], %[[D70]] : vector<2xf16>
+// CHECK:        %[[D75:.+]] = arith.maximumf %[[D74]], %[[D70]] : vector<2xf16>
 // CHECK:        %[[D76:.+]] = vector.extract %[[D75]][0] : vector<2xf16>
 // CHECK:        %[[D77:.+]] = vector.extract %[[D75]][1] : vector<2xf16>
-// CHECK:        %[[D78:.+]] = arith.maxf %[[D76]], %[[D77]] : f16
-// CHECK:        %[[D79:.+]] = arith.maxf %[[D78]], %[[D61]] : f16
+// CHECK:        %[[D78:.+]] = arith.maximumf %[[D76]], %[[D77]] : f16
+// CHECK:        %[[D79:.+]] = arith.maximumf %[[D78]], %[[D61]] : f16
 // CHECK:        %[[D80:.+]] = vector.insert %[[D79]], %[[CST]] [0, 0, 0, 0] : f16 into vector<1x1x2x2xf16>
 // CHECK:        %[[D81:.+]] = vector.insert %[[D79]], %[[D80]] [0, 0, 0, 1] : f16 into vector<1x1x2x2xf16>
 // CHECK:        %[[D82:.+]] = vector.extract %[[CST_0]][0, 0, 1, 0] : vector<1x1x2x2xf16>
@@ -285,17 +285,17 @@ builtin.module {
 // CHECK:        %[[SHUFFLERESULT_5:.+]], %[[VALID_6:.+]] = gpu.shuffle  xor %[[D88]], %[[C1_I32]], %[[C32_I32]] : i32
 // CHECK:        %[[D89:.+]] = vector.broadcast %[[SHUFFLERESULT_5]] : i32 to vector<1xi32>
 // CHECK:        %[[D90:.+]] = vector.bitcast %[[D89]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D91:.+]] = arith.maxf %[[D90]], %[[D86]] : vector<2xf16>
+// CHECK:        %[[D91:.+]] = arith.maximumf %[[D90]], %[[D86]] : vector<2xf16>
 // CHECK:        %[[D92:.+]] = vector.bitcast %[[D91]] : vector<2xf16> to vector<1xi32>
 // CHECK:        %[[D93:.+]] = vector.extract %[[D92]][0] : vector<1xi32>
 // CHECK:        %[[SHUFFLERESULT_7:.+]], %[[VALID_8:.+]] = gpu.shuffle  xor %[[D93]], %[[C2_I32]], %[[C32_I32]] : i32
 // CHECK:        %[[D94:.+]] = vector.broadcast %[[SHUFFLERESULT_7]] : i32 to vector<1xi32>
 // CHECK:        %[[D95:.+]] = vector.bitcast %[[D94]] : vector<1xi32> to vector<2xf16>
-// CHECK:        %[[D96:.+]] = arith.maxf %[[D95]], %[[D91]] : vector<2xf16>
+// CHECK:        %[[D96:.+]] = arith.maximumf %[[D95]], %[[D91]] : vector<2xf16>
 // CHECK:        %[[D97:.+]] = vector.extract %[[D96]][0] : vector<2xf16>
 // CHECK:        %[[D98:.+]] = vector.extract %[[D96]][1] : vector<2xf16>
-// CHECK:        %[[D99:.+]] = arith.maxf %[[D97]], %[[D98]] : f16
-// CHECK:        %[[D100:.+]] = arith.maxf %[[D99]], %[[D82]] : f16
+// CHECK:        %[[D99:.+]] = arith.maximumf %[[D97]], %[[D98]] : f16
+// CHECK:        %[[D100:.+]] = arith.maximumf %[[D99]], %[[D82]] : f16
 // CHECK:        %[[D101:.+]] = vector.insert %[[D100]], %[[D81]] [0, 0, 1, 0] : f16 into vector<1x1x2x2xf16>
 // CHECK:        %[[D102:.+]] = vector.insert %[[D100]], %[[D101]] [0, 0, 1, 1] : f16 into vector<1x1x2x2xf16>
 // CHECK:        %[[D103:.+]] = vector.extract %[[D102]][0, 0, 0, 0] : vector<1x1x2x2xf16>
@@ -948,7 +948,7 @@ builtin.module {
     %9 = vector.transfer_read %1[%c0_0, %c0_0], %cst_1 {in_bounds = [true, true], permutation_map = #map1} : memref<16x16xf16>, vector<16x16xf16>
     %10 = vector.contract {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %8, %9, %cst : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf16>
     %11 = vector.transfer_read %2[%7], %cst_1 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
-    %12 = vector.multi_reduction <maxf>, %10, %11 [1] : vector<16x16xf16> to vector<16xf16>
+    %12 = vector.multi_reduction <maximumf>, %10, %11 [1] : vector<16x16xf16> to vector<16xf16>
     %13 = vector.transfer_read %3[%7], %cst_1 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
     %14 = arith.subf %11, %12 : vector<16xf16>
     %15 = math.exp %14 : vector<16xf16>
@@ -1022,7 +1022,7 @@ builtin.module {
 // CHECK-SAME:     vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf16>
 // CHECK:        %[[D11:.+]] = vector.transfer_read %[[D2]][%[[D7]]], %[[CST_0]] {in_bounds = [true]} : memref<16xf16>,
 // CHECK-SAME:     vector<16xf16>
-// CHECK:        %[[D12:.+]] = vector.multi_reduction <maxf>, %[[D10]], %[[D11]] [1] : vector<16x16xf16> to
+// CHECK:        %[[D12:.+]] = vector.multi_reduction <maximumf>, %[[D10]], %[[D11]] [1] : vector<16x16xf16> to
 // CHECK-SAME:     vector<16xf16>
 // CHECK:        %[[D13:.+]] = vector.transfer_read %[[D3]][%[[D7]]], %[[CST_0]] {in_bounds = [true]} : memref<16xf16>,
 // CHECK-SAME:     vector<16xf16>

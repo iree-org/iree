@@ -697,10 +697,9 @@ public:
   /// succeeds as long as the `position` is in bounds. The matcher is executed
   /// if there is a defining operation for the input operand.
   template <typename T>
-  std::enable_if_t<
-      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
-                        Operation *>::value,
-      StructuredOpMatcher &>
+  std::enable_if_t<llvm::is_detected<::mlir::detail::has_compatible_matcher_t,
+                                     T, Operation *>::value,
+                   StructuredOpMatcher &>
   input(int64_t position, T &operandMatcher,
         OptionalMatch optional = OptionalMatch(false)) {
     addInputMatcher(
@@ -711,10 +710,9 @@ public:
     return *this;
   }
   template <typename T>
-  std::enable_if_t<
-      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
-                        Value>::value,
-      StructuredOpMatcher &>
+  std::enable_if_t<llvm::is_detected<::mlir::detail::has_compatible_matcher_t,
+                                     T, Value>::value,
+                   StructuredOpMatcher &>
   input(int64_t position, T &operandMatcher,
         OptionalMatch optional = OptionalMatch(false)) {
     addInputMatcher(
@@ -811,10 +809,9 @@ public:
   /// predicate check succeeds as long as the `position` is in bounds. The
   /// matcher executed if there is a defining operation for the output operand.
   template <typename T>
-  std::enable_if_t<
-      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
-                        Operation *>::value,
-      StructuredOpMatcher &>
+  std::enable_if_t<llvm::is_detected<::mlir::detail::has_compatible_matcher_t,
+                                     T, Operation *>::value,
+                   StructuredOpMatcher &>
   output(int64_t position, T &operandMatcher,
          OptionalMatch optional = OptionalMatch(false)) {
     addOutputMatcher(
@@ -834,10 +831,9 @@ public:
   /// When the match is optional, the predicate check succeeds as long as the
   /// `position` is in bounds, after running the given matcher.
   template <typename T>
-  std::enable_if_t<
-      llvm::is_detected<::mlir::detail::has_operation_or_value_matcher_t, T,
-                        Operation *>::value,
-      StructuredOpMatcher &>
+  std::enable_if_t<llvm::is_detected<::mlir::detail::has_compatible_matcher_t,
+                                     T, Operation *>::value,
+                   StructuredOpMatcher &>
   result(int64_t position, HasAnyUse tag, T &resultUserMatcher,
          OptionalMatch optional = OptionalMatch(false)) {
     addResultMatcher(

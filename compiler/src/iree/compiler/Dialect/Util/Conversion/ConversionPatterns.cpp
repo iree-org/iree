@@ -190,6 +190,19 @@ struct ConvertCondBranchOp
   }
 };
 
+struct ConvertSwitchOp : public OpConversionPattern<mlir::cf::SwitchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::cf::SwitchOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<mlir::cf::SwitchOp>(
+        op, adaptor.getFlag(), op.getDefaultDestination(),
+        adaptor.getDefaultOperands(), op.getCaseValuesAttr(),
+        op.getCaseDestinations(), adaptor.getCaseOperands());
+    return success();
+  }
+};
+
 struct ConvertSelectOp : public OpConversionPattern<mlir::arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -260,13 +273,15 @@ void populateGenericStructuralConversionPatterns(
   addGenericLegalOp<func::ReturnOp>(conversionTarget, typeConverter);
   addGenericLegalOp<cf::BranchOp>(conversionTarget, typeConverter);
   addGenericLegalOp<cf::CondBranchOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<cf::SwitchOp>(conversionTarget, typeConverter);
   addGenericLegalOp<arith::SelectOp>(conversionTarget, typeConverter);
   addGenericLegalOp<scf::IfOp>(conversionTarget, typeConverter);
   addGenericLegalOp<scf::YieldOp>(conversionTarget, typeConverter);
-  patterns.insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
-                  ConvertReturnOp, ConvertBranchOp, ConvertCondBranchOp,
-                  ConvertSelectOp, ConvertIfOp, ConvertYieldOp>(typeConverter,
-                                                                context);
+  patterns
+      .insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
+              ConvertReturnOp, ConvertBranchOp, ConvertCondBranchOp,
+              ConvertSwitchOp, ConvertSelectOp, ConvertIfOp, ConvertYieldOp>(
+          typeConverter, context);
 }
 
 } // namespace iree_compiler

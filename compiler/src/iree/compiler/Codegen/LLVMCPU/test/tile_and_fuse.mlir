@@ -132,8 +132,8 @@ func.func @shared_out_operand() {
     outs(%11 : tensor<391x384xf32>) {
   ^bb0(%in: f32, %in_1: f32, %out: f32):
     %15 = arith.addf %in, %in_1 : f32
-    %16 = arith.minf %15, %cst_0 : f32
-    %17 = arith.maxf %16, %cst : f32
+    %16 = arith.minimumf %15, %cst_0 : f32
+    %17 = arith.maximumf %16, %cst : f32
     linalg.yield %17 : f32
   } -> tensor<391x384xf32>
   flow.dispatch.tensor.store %14, %7, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : tensor<391x384xf32> -> !flow.dispatch.tensor<writeonly:tensor<391x384xf32>>

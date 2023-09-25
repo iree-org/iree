@@ -603,7 +603,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::MaxOp>(
 
   if (!complexTy.isa<ComplexType>())
     return MapStableHloOpToScalarOpImpl<
-        IsFloatType, arith::MaxFOp, IsSignedIntegerType, arith::MaxSIOp,
+        IsFloatType, arith::MaximumFOp, IsSignedIntegerType, arith::MaxSIOp,
         IsUnsignedIntegerType, arith::MaxUIOp>{}(loc, resultTypes, argTypes,
                                                  adaptor.getOperands(), b);
 
@@ -627,7 +627,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::MinOp>(
 
   if (!complexTy.isa<ComplexType>())
     return MapStableHloOpToScalarOpImpl<
-        IsFloatType, arith::MinFOp, IsSignedIntegerType, arith::MinSIOp,
+        IsFloatType, arith::MinimumFOp, IsSignedIntegerType, arith::MinSIOp,
         IsUnsignedIntegerType, arith::MinUIOp>{}(loc, resultTypes, argTypes,
                                                  adaptor.getOperands(), b);
 

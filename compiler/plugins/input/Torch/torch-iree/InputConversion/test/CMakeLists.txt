@@ -1,0 +1,13 @@
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "attention.mlir"
+    "scan.mlir"
+    "scatter.mlir"
+    "sort.mlir"
+    "torch_to_iree.mlir"
+  TOOLS
+    FileCheck
+    iree-opt
+)

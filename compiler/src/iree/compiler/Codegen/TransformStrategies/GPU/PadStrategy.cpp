@@ -114,7 +114,7 @@ void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
 
   // Step 3. Masked vectorization.
   SmallVector<bool> scalableSizes(strategy.vectorSize.size(), false);
-  b.create<transform::MaskedVectorizeOp>(padThreadH, ValueRange(), false,
+  b.create<transform::MaskedVectorizeOp>(padThreadH, ValueRange(), nullptr,
                                          scalableSizes, strategy.vectorSize);
 
   // Step 4. Lower all masked vector transfers at this point, as they make

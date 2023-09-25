@@ -740,6 +740,7 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
+  OpBuilder::InsertionGuard g(builder);
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   MemRefType allocType =

@@ -184,29 +184,38 @@ typedef struct iree_cpuid_regs_t {
   uint32_t edx;
 } iree_cpuid_regs_t;
 
-static inline iree_cpuid_regs_t iree_cpuid_raw(uint32_t eax, uint32_t ecx) {
-  iree_cpuid_regs_t regs;
 #if defined(__GNUC__)
+static iree_cpuid_regs_t iree_cpuid_raw(uint32_t eax, uint32_t ecx) {
+  iree_cpuid_regs_t regs;
   __cpuid_count(eax, ecx, regs.eax, regs.ebx, regs.ecx, regs.edx);
+  return regs;
+}
 #elif defined(_MSC_VER)
+// The noinline is a tentative work-around for what might be a MSVC miscompile.
+// The symptom is that MSVC builds incorrectly report some CPU features as
+// supported. This only happens for CPU feature bits in the EDX output register.
+__declspec(noinline) static iree_cpuid_regs_t
+    iree_cpuid_raw(uint32_t eax, uint32_t ecx) {
+  int eax_int;
+  int ecx_int;
+  memcpy(&eax_int, &eax, sizeof eax);
+  memcpy(&ecx_int, &ecx, sizeof ecx);
   int regs_array[4];
-  __cpuidex(regs_array, (int)eax, (int)ecx);
-  regs.eax = regs_array[0];
-  regs.ebx = regs_array[1];
-  regs.ecx = regs_array[2];
-  regs.edx = regs_array[3];
+  __cpuidex(regs_array, eax_int, ecx_int);
+  iree_cpuid_regs_t regs;
+  memcpy(&regs, regs_array, sizeof regs);
+  return regs;
+}
 #else
 #error What is the __cpuidex built-in for this compiler?
 #endif
-  return regs;
-}
 
 typedef struct iree_cpuid_bounds_t {
   uint32_t max_base_eax;
   uint32_t max_extended_eax;
 } iree_cpuid_bounds_t;
 
-static inline iree_cpuid_bounds_t iree_cpuid_query_bounds() {
+static iree_cpuid_bounds_t iree_cpuid_query_bounds() {
   iree_cpuid_bounds_t bounds;
   bounds.max_base_eax = iree_cpuid_raw(0, 0).eax;
   bounds.max_extended_eax = iree_cpuid_raw(0x80000000u, 0).eax;
@@ -214,8 +223,8 @@ static inline iree_cpuid_bounds_t iree_cpuid_query_bounds() {
   return bounds;
 }
 
-static inline bool iree_cpuid_is_in_range(uint32_t eax, uint32_t ecx,
-                                          iree_cpuid_bounds_t bounds) {
+static bool iree_cpuid_is_in_range(uint32_t eax, uint32_t ecx,
+                                   iree_cpuid_bounds_t bounds) {
   if (eax < 0x80000000u) {
     // EAX is a base function id.
     if (eax > bounds.max_base_eax) return false;
@@ -231,8 +240,8 @@ static inline bool iree_cpuid_is_in_range(uint32_t eax, uint32_t ecx,
   return true;
 }
 
-static inline iree_cpuid_regs_t iree_cpuid_or_zero(uint32_t eax, uint32_t ecx,
-                                                   iree_cpuid_bounds_t bounds) {
+static iree_cpuid_regs_t iree_cpuid_or_zero(uint32_t eax, uint32_t ecx,
+                                            iree_cpuid_bounds_t bounds) {
   if (!iree_cpuid_is_in_range(eax, ecx, bounds)) {
     return (iree_cpuid_regs_t){0, 0, 0, 0};
   }

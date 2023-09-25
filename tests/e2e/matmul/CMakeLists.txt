@@ -57,7 +57,7 @@ iree_generated_trace_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "arm_64:dotprod:+dotprod"
@@ -79,7 +79,7 @@ iree_generated_trace_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -99,7 +99,7 @@ iree_generated_trace_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   LABELS
     "noriscv"
     "noasan"
@@ -125,7 +125,7 @@ iree_generated_trace_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   LABELS
     "noriscv"
     "noasan"
@@ -150,7 +150,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-codegen-mmt4d-use-intrinsics"
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "arm_64:dotprod:+dotprod"
@@ -173,7 +173,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-codegen-mmt4d-use-intrinsics"
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -230,7 +230,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
 )
 
 iree_generated_trace_runner_test(
@@ -249,7 +249,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
 )
 
 iree_generated_trace_runner_test(
@@ -268,7 +268,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
@@ -296,7 +296,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   LABELS
     "noriscv"
     "noasan"
@@ -326,7 +326,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
@@ -351,7 +351,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-enable-microkernels"
-    "--iree-flow-enable-data-tiling"
+    "--iree-opt-data-tiling"
   LABELS
     "noriscv"
     "noasan"

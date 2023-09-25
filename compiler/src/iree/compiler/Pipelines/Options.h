@@ -47,10 +47,6 @@ struct InputDialectOptions {
     // preprocessing, e.g., flattening of tuples.
     stablehlo_xla,
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-    // Legalizes input defined over TMTensor ops.
-    tm_tensor,
-#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
     // Legalizes input defined over TOSA ops.
     tosa,
@@ -82,6 +78,9 @@ struct GlobalOptimizationOptions {
   bool promoteF16ToF32 = false;
   bool promoteBF16ToF32 = false;
   bool demoteI64ToI32 = false;
+
+  // Enables data tiling.
+  bool dataTiling = false;
 
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;

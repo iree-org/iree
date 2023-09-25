@@ -50,6 +50,8 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   tosa::addTosaToLinalgPasses(passManager);
+  passManager.addNestedPass<func::FuncOp>(
+      iree_compiler::createConverti48Toi64());
 
   // Sometimes we generate more TOSA operations during the lowering to linalg.
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToArith());

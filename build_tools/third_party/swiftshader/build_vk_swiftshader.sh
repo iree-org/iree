@@ -47,9 +47,11 @@ set -e
 
 # This isn't an argument so that we can set the swiftshader commit in one place
 # for the whole project.
-SWIFTSHADER_COMMIT=dd7bb92b9a7a813ebc2da9fe3f6484c34cc69363
+SWIFTSHADER_COMMIT=32f9332d1d7aacbdba7c1aa5df894bb1890bb2cc
 SWIFTSHADER_SRC_DIR="$(mktemp --directory --tmpdir swiftshader_src_XXXXXX)"
 SWIFTSHADER_BUILD_DIR="$(mktemp --directory --tmpdir swiftshader_build_XXXXXX)"
+CC=${CC:-clang}
+CXX=${CXX:-clang++}
 
 if [[ -z "${CYGPATH}" ]]; then
   # Anything that isn't Windows.
@@ -72,7 +74,9 @@ git -c advice.detachedHead=false checkout "${SWIFTSHADER_COMMIT}"
 
 # Build in a temporary directory
 cmake -B "${SWIFTSHADER_BUILD_DIR}" \
-    -GNinja \
+      -GNinja \
+      -DCMAKE_C_COMPILER=${CC} \
+      -DCMAKE_CXX_COMPILER=${CXX} \
     -DSWIFTSHADER_BUILD_TESTS=OFF \
     -DSWIFTSHADER_WARNINGS_AS_ERRORS=OFF \
     .

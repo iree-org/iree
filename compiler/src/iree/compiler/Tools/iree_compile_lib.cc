@@ -27,8 +27,9 @@ enum class OutputFormat {
   vm_asm,
   vm_bytecode,
   vm_c,
-  // Non-user exposed output format for use with --compile-mode=hal-executable.
+  // Non-user exposed output formats.
   hal_executable,
+  precompile,
 };
 
 enum class CompileMode {
@@ -41,6 +42,9 @@ enum class CompileMode {
   // target-specific binary form (such as an ELF file or a flatbuffer containing
   // a SPIR-V blob).
   hal_executable,
+  // IREE's precompilation pipeline, which does input preprocessing and
+  // pre-fusion global optimizations.
+  precompile,
 };
 
 struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
@@ -96,7 +100,10 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
               CompileMode::hal_executable, "hal-executable",
               "Compile an MLIR module containing a single hal.executable into "
               "a target-specific binary form (such as an ELF file or a "
-              "flatbuffer containing a SPIR-V blob)")),
+              "flatbuffer containing a SPIR-V blob)"),
+          clEnumValN(CompileMode::precompile, "precompile",
+                     "Precompilation pipeline which does input conversion and "
+                     "global optimizations.")),
       llvm::cl::init(CompileMode::std), llvm::cl::cat(mainOptions));
 
   // Debugging/diagnostics.
@@ -252,6 +259,13 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         return false;
       break;
     }
+    case CompileMode::precompile: {
+      outputFormat = OutputFormat::precompile;
+      if (!ireeCompilerInvocationPipeline(r.inv,
+                                          IREE_COMPILER_PIPELINE_PRECOMPILE))
+        return false;
+      break;
+    }
     default:
       llvm::errs() << "INTERNAL ERROR: unknown compile mode\n";
       return false;
@@ -292,6 +306,10 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 #endif // IREE_HAVE_C_OUTPUT_FORMAT
     case OutputFormat::hal_executable: {
       outputError = ireeCompilerInvocationOutputHALExecutable(r.inv, s.output);
+      break;
+    }
+    case OutputFormat::precompile: {
+      outputError = outputMLIR(r.inv, s.output);
       break;
     }
     default:

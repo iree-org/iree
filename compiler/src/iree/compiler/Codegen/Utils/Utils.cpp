@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -964,6 +965,25 @@ void eraseDeadAllocAndStores(Operation *parentOp) {
   for (Operation *op : opToErase) {
     op->erase();
   }
+}
+
+bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
+  assert(rootOp.getNumDpsInputs() == 2 && "rootOp expected to have two inputs");
+
+  BackwardSliceOptions options;
+  options.inclusive = true;
+
+  // Get the backward slice of each input operand and take the union.
+  SetVector<Operation *> backwardSlice;
+  for (OpOperand *operand : rootOp.getDpsInputOperands()) {
+    SetVector<Operation *> tmpBackwardSlice;
+    getBackwardSlice(operand->get(), &tmpBackwardSlice, options);
+    backwardSlice.set_union(tmpBackwardSlice);
+  }
+
+  return llvm::any_of(backwardSlice, [](Operation *op) {
+    return llvm::isa<linalg::LinalgOp>(op);
+  });
 }
 
 } // namespace iree_compiler

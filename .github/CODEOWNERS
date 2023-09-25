@@ -61,7 +61,7 @@
 # Compiler
 /compiler/src/iree/compiler/ @benvanik
 /compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
-/compiler/src/iree/compiler/Codegen/Common @hanhanW
+/compiler/src/iree/compiler/Codegen/Common @hanhanW @dcaballe
 /compiler/src/iree/compiler/Codegen/LLVMCPU/ @dcaballe @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar

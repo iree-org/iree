@@ -491,21 +491,21 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   if (!strategy.alignedLhs()) {
     MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
     SmallVector<bool> scalableSizes(lhsCopyMapping.tileSizes.size(), false);
-    b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
+    b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), nullptr,
                                            scalableSizes,
                                            lhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRhs()) {
     MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
     SmallVector<bool> scalableSizes(rhsCopyMapping.tileSizes.size(), false);
-    b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), false,
+    b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), nullptr,
                                            scalableSizes,
                                            rhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRes()) {
     MappingInfo resCopyMapping = strategy.resCopyMapping();
     SmallVector<bool> scalableSizes(resCopyMapping.tileSizes.size(), false);
-    b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
+    b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), nullptr,
                                            scalableSizes,
                                            resCopyMapping.tileSizes);
   }

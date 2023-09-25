@@ -170,6 +170,7 @@ static LogicalResult verifyEntryPointTypes(mlir::func::FuncOp entryFuncOp) {
 // Creates an pipeline layout attr from the analysis results.
 static IREE::HAL::PipelineLayoutAttr
 makePipelineLayoutAttr(const PipelineLayout &pipelineLayout,
+                       IREE::HAL::ExecutableTargetAttr targetAttr,
                        OpBuilder &builder) {
   SmallVector<IREE::HAL::DescriptorSetLayoutAttr> setLayoutAttrs;
   for (const auto &setLayout : pipelineLayout.setLayouts) {
@@ -181,8 +182,12 @@ makePipelineLayoutAttr(const PipelineLayout &pipelineLayout,
               ? binding.flags
               : std::optional<IREE::HAL::DescriptorFlags>{}));
     }
+    std::optional<IREE::HAL::DescriptorSetLayoutFlags> flags;
+    if (targetAttr.hasConfigurationAttr("hal.bindings.indirect")) {
+      flags = IREE::HAL::DescriptorSetLayoutFlags::Indirect;
+    }
     setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
-        builder.getContext(), setLayout.ordinal, bindingAttrs));
+        builder.getContext(), setLayout.ordinal, bindingAttrs, flags));
   }
   return IREE::HAL::PipelineLayoutAttr::get(
       builder.getContext(), pipelineLayout.pushConstantCount, setLayoutAttrs);
@@ -312,8 +317,9 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
   OpBuilder executableBuilder(&targetExecutableOp.getBlock().front());
 
   // Build a map of source function definitions to their version with the
-  // updated interface.
-  DenseMap<Operation *, Operation *> targetFuncOps;
+  // updated interface per variant.
+  DenseMap<Operation *, DenseMap<IREE::HAL::ExecutableVariantOp, Operation *>>
+      targetFuncOps;
   int nextOrdinal = 0;
   for (auto exportOp : sourceExecutableOp.getBody()
                            .getOps<IREE::Stream::ExecutableExportOp>()) {
@@ -325,7 +331,6 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
     // Create the interface for this entry point based on the analysis of its
     // usage within the program.
     const auto &pipelineLayout = layoutAnalysis.getPipelineLayout(exportOp);
-    auto layoutAttr = makePipelineLayoutAttr(pipelineLayout, executableBuilder);
 
     // Update all dispatch sites with the binding information required for
     // conversion into the HAL dialect. By doing this here we ensure that the
@@ -338,7 +343,6 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
     // Clone the updated function declaration into each variant.
     int ordinal = nextOrdinal++;
     for (auto variantOp : variantOps) {
-      // Declare the entry point on the target.
       OpBuilder targetBuilder(variantOp.getInnerModule());
       // Check if workgroup size is set externally.
       ArrayAttr workgroupSize;
@@ -356,6 +360,10 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
           break;
         }
       }
+
+      // Declare the entry point on the target.
+      auto layoutAttr = makePipelineLayoutAttr(
+          pipelineLayout, variantOp.getTargetAttr(), targetBuilder);
       auto newExportOp = targetBuilder.create<IREE::HAL::ExecutableExportOp>(
           exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.getFunctionRef()),
@@ -380,38 +388,36 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
         newExportOp.getWorkgroupCount().insertArgument(0u, deviceType,
                                                        newExportOp.getLoc());
       }
-    }
 
-    // Clone the source function and update it to use the new interface.
-    auto targetFuncOp =
-        cloneFuncWithInterface(sourceFuncOp, pipelineLayout, layoutAttr);
-    targetFuncOps[sourceFuncOp] = targetFuncOp;
+      // Clone the source function and update it to use the new interface.
+      auto variantFuncOp =
+          cloneFuncWithInterface(sourceFuncOp, pipelineLayout, layoutAttr);
+      targetFuncOps[sourceFuncOp][variantOp] = variantFuncOp;
+    }
   }
 
   // Clone all of the ops in the source module to each variant.
   // We'll use the exported functions with the updated interfaces in place of
   // the original versions and copy everything else verbatim.
+  // Note that we do this as a cleanup setup because there may be multiple
+  // functions and multiple exports (with an N:M mapping) and in this way we
+  // perform the variant construction in a single pass with deterministic
+  // ordering that preserves the unmodified ops.
   for (auto variantOp : variantOps) {
     auto targetBuilder = OpBuilder::atBlockBegin(
         &variantOp.getInnerModule().getBodyRegion().front());
     for (auto &op : sourceModuleOp.getOps()) {
-      auto targetFuncOp = targetFuncOps.find(&op);
-      if (targetFuncOp != targetFuncOps.end()) {
-        // Clone the updated function instead of the original.
-        targetBuilder.clone(*targetFuncOp->second);
+      auto targetVariantFuncOps = targetFuncOps.find(&op);
+      if (targetVariantFuncOps != targetFuncOps.end()) {
+        // Move the updated function into place.
+        auto variantFuncOp = targetVariantFuncOps->second[variantOp];
+        targetBuilder.insert(variantFuncOp);
       } else {
         // Regular op (globals, external function declarations, etc).
         targetBuilder.clone(op);
       }
     }
   }
-
-  // Drop the temporary target functions. We could avoid an additional clone if
-  // we only had one variant but this is relatively small in cost (once per
-  // variant).
-  for (auto it : targetFuncOps)
-    it.second->erase();
-  targetFuncOps.clear();
 
   return success();
 }

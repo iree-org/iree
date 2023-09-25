@@ -1604,7 +1604,7 @@ func.func @reduction_broadcast_elementwise_unary(%a: tensor<12x16x16xf32>, %b: t
   %38 = linalg.fill ins(%cst_47 : f32) outs(%37 : tensor<12x16xf32>) -> tensor<12x16xf32>
   %39 = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%a : tensor<12x16x16xf32>) outs(%38 : tensor<12x16xf32>) {
     ^bb0(%arg3: f32, %arg4: f32):
-    %780 = arith.maxf %arg3, %arg4 : f32
+    %780 = arith.maximumf %arg3, %arg4 : f32
     linalg.yield %780 : f32
   } -> tensor<12x16xf32>
   %40 = tensor.empty() : tensor<12x16x16xf32>
@@ -1708,7 +1708,7 @@ func.func @reduction_broadcast_elementwise_dynamic(%a: tensor<12x16x?xf32>, %b: 
   %38 = linalg.fill ins(%cst_47 : f32) outs(%37 : tensor<12x16xf32>) -> tensor<12x16xf32>
   %39 = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%a : tensor<12x16x?xf32>) outs(%38 : tensor<12x16xf32>) {
     ^bb0(%arg3: f32, %arg4: f32):
-    %780 = arith.maxf %arg3, %arg4 : f32
+    %780 = arith.maximumf %arg3, %arg4 : f32
     linalg.yield %780 : f32
   } -> tensor<12x16xf32>
   %c2 = arith.constant 2 : index
@@ -1743,7 +1743,7 @@ module {
     %1 = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<12x128xf32>) -> tensor<12x128xf32>
     %2 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0 : tensor<12x128x128xf32>) outs(%1 : tensor<12x128xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
-      %7 = arith.maxf %arg1, %arg2 : f32
+      %7 = arith.maximumf %arg1, %arg2 : f32
       linalg.yield %7 : f32
     } -> tensor<12x128xf32>
     %3 = tensor.empty() : tensor<12x128x128xf32>
@@ -2187,7 +2187,7 @@ func.func @softmax(%source : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
   %2 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<12x128xf32>) -> tensor<12x128xf32>
   %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%source : tensor<12x128x128xf32>) outs(%2 : tensor<12x128xf32>) {
   ^bb0(%in: f32, %out: f32):
-    %9 = arith.maxf %in, %out : f32
+    %9 = arith.maximumf %in, %out : f32
     linalg.yield %9 : f32
   } -> tensor<12x128xf32>
   %4 = tensor.empty() : tensor<12x128x128xf32>

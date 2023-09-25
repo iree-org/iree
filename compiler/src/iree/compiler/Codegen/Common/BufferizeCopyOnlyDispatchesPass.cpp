@@ -58,14 +58,17 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     /// Check if the dispatch has all sources for `flow.dispatch.tensor.store`
     /// operations coming from `flow.dispatch.tensor.load` operations. If so,
     /// this dispatch is just a copy dispatch.
+    bool hasFlowDispatchStore = false;
     auto walkResult = funcOp.walk(
         [&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
+          hasFlowDispatchStore = true;
           return success(isReadOnly(storeOp.getValue()));
         });
     if (walkResult.wasInterrupted())
       continue;
-    // The function is just a copy.
-    copyOnlyFunctions.push_back(funcOp);
+    // The function is just a copy and is not yet bufferized.
+    if (hasFlowDispatchStore)
+      copyOnlyFunctions.push_back(funcOp);
   }
 
   // There are no copy-only functions. So nothing to do.

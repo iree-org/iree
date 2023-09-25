@@ -6,7 +6,7 @@ tags:
 icon: octicons/cpu-16
 ---
 
-# Running on a Bare-Metal Platform
+# Running on a bare-metal platform
 
 IREE supports model execution via CPU on bare-metal platforms. Bare metal
 platforms have no operating system support, and executables are built using

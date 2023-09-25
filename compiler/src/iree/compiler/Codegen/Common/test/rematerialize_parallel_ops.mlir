@@ -58,7 +58,7 @@ func.func @softmax(%7 : tensor<16x32x4096xf32>) -> tensor<16x32x4096xf32> {
     %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<16x32xf32>) -> tensor<16x32xf32>
     %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%7 : tensor<16x32x4096xf32>) outs(%9 : tensor<16x32xf32>) {
     ^bb0(%in: f32, %out: f32):
-      %16 = arith.maxf %in, %out : f32
+      %16 = arith.maximumf %in, %out : f32
       linalg.yield %16 : f32
     } -> tensor<16x32xf32>
     %11 = tensor.empty() : tensor<16x32x4096xf32>

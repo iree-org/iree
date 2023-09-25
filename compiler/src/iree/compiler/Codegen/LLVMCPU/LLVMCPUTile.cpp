@@ -29,17 +29,15 @@ namespace {
 /// Builds a proper tile sizes vector for the op.
 /// scf::tileUsingSCFForOp expects the num of tile sizes = num of loops. This
 /// method returns a proper tile sizes vector for each op during tiling.
-static SmallVector<Value> buildTileSizesForOp(OpBuilder &b, Operation *op,
-                                              ArrayRef<int64_t> tileSizes) {
+static SmallVector<OpFoldResult>
+buildTileSizesForOp(OpBuilder &b, Operation *op, ArrayRef<int64_t> tileSizes) {
   auto tilingOp = cast<TilingInterface>(op);
 
   SmallVector<int64_t> newTileSizes(tileSizes);
   newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
 
   OpBuilder::InsertionGuard guard(b);
-  return llvm::map_to_vector(newTileSizes, [&](int64_t size) -> Value {
-    return b.create<arith::ConstantIndexOp>(tilingOp->getLoc(), size);
-  });
+  return getAsIndexOpFoldResult(b.getContext(), newTileSizes);
 }
 
 /// This pass tiles all the TilingInterface operations. The `tilingLevel` must

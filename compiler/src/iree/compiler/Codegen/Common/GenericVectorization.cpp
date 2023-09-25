@@ -289,6 +289,21 @@ void GenericVectorizationPass::runOnOperation() {
                             vectorizeGatherAccesses);
   };
 
+  {
+    // Canonicalize mask related ops before we lower them.
+    RewritePatternSet maskCanonPatterns(funcOp.getContext());
+    vector::CreateMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
+                                                      funcOp.getContext());
+    vector::ConstantMaskOp::getCanonicalizationPatterns(maskCanonPatterns,
+                                                        funcOp.getContext());
+    vector::MaskOp::getCanonicalizationPatterns(maskCanonPatterns,
+                                                funcOp.getContext());
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(maskCanonPatterns)))) {
+      return signalPassFailure();
+    }
+  }
+
   // TODO: Move this down the pipeline once we have the ODM-based masking
   // representation.
   RewritePatternSet vectorizationPatterns(funcOp.getContext());

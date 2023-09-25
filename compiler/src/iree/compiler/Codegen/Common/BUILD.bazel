@@ -59,6 +59,7 @@ iree_gentbl_cc_library(
         "@llvm-project//mlir:BufferizationOpsTdFiles",
         "@llvm-project//mlir:MemRefOpsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SubsetInsertionOpInterfaceTdFiles",
         "@llvm-project//mlir:TensorOpsTdFiles",
     ],
 )
@@ -183,6 +184,7 @@ iree_compiler_cc_library(
         "PolynomialApproximationPass.cpp",
         "RematerializeParallelOps.cpp",
         "RemoveTrivialLoops.cpp",
+        "ReplaceSlowMinMaxOps.cpp",
         "SplitFullPartialTransferPass.cpp",
         "TestExecutablePreprocessing.cpp",
         "TestPartitionableLoopsInterface.cpp",

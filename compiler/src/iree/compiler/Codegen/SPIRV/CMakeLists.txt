@@ -30,7 +30,6 @@ iree_cc_library(
     ::PassesIncGen
     MLIRLinalgTransforms
     MLIRMemRefDialect
-    MLIRNVGPUDialect
     MLIRPass
     MLIRTransforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect
@@ -68,8 +67,8 @@ iree_cc_library(
     "SPIRVTileAndDistribute.cpp"
     "SPIRVTileAndPromote.cpp"
     "SPIRVTileAndVectorizeToCooperativeOps.cpp"
+    "SPIRVVectorLowering.cpp"
     "SPIRVVectorToGPUSubgroupMMAOps.cpp"
-    "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
     "Verifiers.cpp"

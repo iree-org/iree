@@ -17,6 +17,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -285,6 +286,40 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::func::FuncOp> {
   }
 };
 
+struct ApplyScfIfOp : public UsageRefinementPattern<mlir::scf::IfOp> {
+  using UsageRefinementPattern<mlir::scf::IfOp>::UsageRefinementPattern;
+  LogicalResult matchAndRewrite(mlir::scf::IfOp op,
+                                PatternRewriter &rewriter) const override {
+    bool didChange = this->applyRegionTransitions(op, rewriter);
+    for (unsigned i = 0; i < op->getNumResults(); ++i) {
+      auto result = op->getResult(i);
+      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+        if (this->applyResultTransition(op, result, rewriter))
+          didChange |= true;
+      }
+    }
+
+    return success(didChange);
+  }
+};
+
+struct ApplyScfWhileOp : public UsageRefinementPattern<mlir::scf::WhileOp> {
+  using UsageRefinementPattern<mlir::scf::WhileOp>::UsageRefinementPattern;
+  LogicalResult matchAndRewrite(mlir::scf::WhileOp op,
+                                PatternRewriter &rewriter) const override {
+    bool didChange = this->applyRegionTransitions(op, rewriter);
+    for (unsigned i = 0; i < op->getNumResults(); ++i) {
+      auto result = op->getResult(i);
+      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+        if (this->applyResultTransition(op, result, rewriter))
+          didChange |= true;
+      }
+    }
+
+    return success(didChange);
+  }
+};
+
 // Applies usage analysis results to a generic MLIR op.
 // All resource operands and results including those in nested regions will have
 // their lifetime specified.
@@ -355,10 +390,14 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
                                           RewritePatternSet &patterns) {
   // NOTE: only ops that return values or contain regions need to be handled.
-  patterns.insert<ApplyInitializerOp, ApplyFuncOp>(context, analysis);
+  patterns
+      .insert<ApplyInitializerOp, ApplyFuncOp, ApplyScfIfOp, ApplyScfWhileOp>(
+          context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::OptimizationBarrierOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
                   ApplyGenericOp<mlir::func::CallOp>,
+                  ApplyGenericOp<mlir::scf::ConditionOp>,
+                  ApplyGenericOp<mlir::scf::YieldOp>,
                   ApplyGenericOp<IREE::Stream::TimepointBarrierOp>>(context,
                                                                     analysis);
   patterns.insert<ApplyStreamableOp<IREE::Stream::ResourceAllocOp>,
@@ -395,6 +434,7 @@ public:
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
+    registry.insert<mlir::scf::SCFDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }
