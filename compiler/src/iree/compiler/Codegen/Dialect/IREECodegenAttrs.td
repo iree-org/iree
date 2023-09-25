@@ -163,8 +163,11 @@ def IREECodegen_LoweringConfigTilingLevelAttr :
     ArrayRefParameter<"int64_t",
         "The tile sizes to use for this level of tiling">:$sizes,
     OptionalArrayRefParameter<"int64_t",
-        "The tile interchange to use for this level of tiling">:$interchange);
+        "The tile interchange to use for this level of tiling">:$interchange,
+    OptionalArrayRefParameter<"bool",
+        "The scalable tile flags for this level of tiling">:$scalableFlags);
   let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
 }
 
 def IREECodegen_LoweringConfigTilingLevelsAttr :
