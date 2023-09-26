@@ -237,8 +237,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   Type rhsType = getElementType(op->getOperand(1));
   Type resultType = getElementType(op->getOperand(2));
 
-  auto properties = limits.getCooperativeMatrixPropertiesNv()
-                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  auto properties =
+      limits.getCooperativeMatrixPropertiesKhr()
+          .getAsRange<spirv::CooperativeMatrixPropertiesKHRAttr>();
 
   // Verify that the fourth level tile sizes match cooperative matrix,
   // and subgroup tile sizes should be multiple of cooperative matrix (M, N, K)

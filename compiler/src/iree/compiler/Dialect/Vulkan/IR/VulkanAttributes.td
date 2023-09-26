@@ -17,19 +17,20 @@ class VK_Attr<string attrName, string attrMnemonic>
 
 // Attribute that can be used to specify the configuration of the
 // cooperative matrix multiply instructions supported by the target
-// device. This corresponds to `VkCooperativeMatrixPropertiesNV` structure:
-// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkCooperativeMatrixPropertiesNV.html
-def VK_CooperativeMatrixPropertiesNVAttr :
-  VK_Attr<"CooperativeMatrixPropertiesNV", "coop_matrix_props"> {
+// device. This corresponds to `VkCooperativeMatrixPropertiesKHR` structure:
+// https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkCooperativeMatrixPropertiesKHR.html
+def VK_CooperativeMatrixPropertiesKHRAttr :
+  VK_Attr<"CooperativeMatrixPropertiesKHR", "coop_matrix_props"> {
   let parameters = (ins
-    "int":$mSize,
-    "int":$nSize,
-    "int":$kSize,
+    "uint32_t":$mSize,
+    "uint32_t":$nSize,
+    "uint32_t":$kSize,
     "::mlir::Type":$aType,
     "::mlir::Type":$bType,
     "::mlir::Type":$cType,
     "::mlir::Type":$resultType,
-    "::mlir::iree_compiler::IREE::Vulkan::ScopeNVAttr":$scope
+    "bool":$accSat,
+    "::mlir::iree_compiler::IREE::Vulkan::ScopeKHRAttr":$scope
   );
 }
 
@@ -118,10 +119,10 @@ def VK_CapabilitiesAttr : VK_Attr<"Capabilities", "caps"> {
     OptionalParameter<"::mlir::UnitAttr">:$variablePointersStorageBuffer,
     OptionalParameter<"::mlir::UnitAttr">:$variablePointers,
 
-    // VkCooperativeMatrixPropertiesNV features.
-    // This corresponds to `VkCoooperativeMatrixPropertiesNV` structure:
-    // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkCooperativeMatrixPropertiesNV.html
-    DefaultValuedParameter<"ArrayAttr", "nullptr">:$cooperativeMatrixPropertiesNV
+    // VkCooperativeMatrixPropertiesKHR features.
+    // This corresponds to `VkCoooperativeMatrixPropertiesKHR` structure:
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_cooperative_matrix.html
+    DefaultValuedParameter<"ArrayAttr", "nullptr">:$cooperativeMatrixPropertiesKHR
   );
 }
 
