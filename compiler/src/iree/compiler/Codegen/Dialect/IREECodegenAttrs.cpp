@@ -191,21 +191,33 @@ LogicalResult LoweringConfigTilingLevelAttr::verify(
 // iree_codegen.lowering_config
 //===----------------------------------------------------------------------===//
 
-LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
-                                           TileSizesListTypeRef tileSizes,
-                                           TileSizesListTypeRef tileInterchange,
-                                           ArrayRef<int64_t> nativeVectorSize) {
+LoweringConfigAttr
+LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
+                        ScalableTileFlagsListTypeRef scalableTileFlags,
+                        TileSizesListTypeRef tileInterchange,
+                        ArrayRef<int64_t> nativeVectorSize) {
   SmallVector<LoweringConfigTilingLevelAttr> tilinglevels;
   for (auto [level, sizes] : llvm::enumerate(tileSizes)) {
     ArrayRef<int64_t> interchange = level < tileInterchange.size()
                                         ? tileInterchange[level]
                                         : ArrayRef<int64_t>{};
+    ArrayRef<bool> scalableFlags = level < scalableTileFlags.size()
+                                       ? scalableTileFlags[level]
+                                       : ArrayRef<bool>{};
     tilinglevels.push_back(LoweringConfigTilingLevelAttr::get(
-        context, sizes, interchange, ArrayRef<bool>{}));
+        context, sizes, interchange, scalableFlags));
   }
   return get(context,
              LoweringConfigTilingLevelsAttr::get(context, tilinglevels),
              nativeVectorSize);
+}
+
+LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
+                                           TileSizesListTypeRef tileSizes,
+                                           TileSizesListTypeRef tileInterchange,
+                                           ArrayRef<int64_t> nativeVectorSize) {
+
+  return get(context, tileSizes, {}, tileInterchange, nativeVectorSize);
 }
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() {
@@ -220,6 +232,23 @@ SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) {
   if (level >= levels.size())
     return {};
   return SmallVector<int64_t>(levels[level].getSizes());
+}
+
+ScalableTileFlagsListType LoweringConfigAttr::getScalableTileFlagVals() {
+  ScalableTileFlagsListType scalableFlags;
+  for (auto &level : getTilingLevels())
+    scalableFlags.push_back(SmallVector<bool>(level.getScalableFlags()));
+  return scalableFlags;
+}
+
+SmallVector<bool> LoweringConfigAttr::getScalableTileFlagVals(unsigned level) {
+  auto levels = getTilingLevels();
+  if (level >= levels.size())
+    return {};
+  SmallVector<bool> scalableFlags(levels[level].getScalableFlags());
+  // Extend the scalable flags with `false` to match the length of the sizes.
+  scalableFlags.resize(levels[level].getSizes().size());
+  return scalableFlags;
 }
 
 SmallVector<int64_t>

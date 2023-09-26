@@ -213,3 +213,23 @@ func.func @softmax() {
   return
 }
 // CHECK-LABEL: func @softmax()
+
+// -----
+
+func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32>{
+  // Matrix multiplication (ijk) with scalable tiling in the j-th dimension.
+  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, [32], 1]]>} ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)
+            outs(%C: tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @scalable_matmul(
+//   CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG: %[[C32:.*]] = arith.constant 32 : index
+//       CHECK: %[[VSCALE:.*]] = vector.vscale
+//  CHECK-NEXT: %[[SCALABLE_TILE_SIZE:.*]] = arith.muli %[[VSCALE]], %[[C32]] : index
+//       CHECK: scf.for
+//  CHECK-SAME:     step %[[C1]]
+//       CHECK:   scf.for
+//  CHECK-SAME:       step %[[SCALABLE_TILE_SIZE]]
+//       CHECK:     scf.for
+//  CHECK-SAME:         step %[[C1]]

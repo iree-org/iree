@@ -208,6 +208,10 @@ def IREECodegen_LoweringConfigAttr :
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
         CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
+        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>,
+    AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
+        "ScalableTileFlagsListTypeRef":$scalableTileFlags,
+        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
         CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>
   ];
   let extraClassDeclaration = [{
@@ -216,6 +220,12 @@ def IREECodegen_LoweringConfigAttr :
 
     // Returns the tile sizes for a level set for the op.
     SmallVector<int64_t> getTileSizeVals(unsigned level);
+
+    // Returns the scalable tile flags for all levels set for the op.
+    ScalableTileFlagsListType getScalableTileFlagVals();
+
+    // Returns the scalable tile flags for a level set for the op.
+    SmallVector<bool> getScalableTileFlagVals(unsigned level);
 
     // Returns the tile interchange for a level set for the op.
     SmallVector<int64_t> getTileInterchangeVals(unsigned level);

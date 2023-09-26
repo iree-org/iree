@@ -85,7 +85,8 @@ struct LLVMCPUTileAndFusePass : LLVMCPUTileAndFuseBase<LLVMCPUTileAndFusePass> {
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
-                    linalg::LinalgDialect, scf::SCFDialect>();
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -235,8 +236,10 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   // If `consumerOp` has its own lowering config, we prefer using it. Otherwise,
   // fallback to find a lowering_config from other operations.
   SmallVector<int64_t> tileSizes;
+  SmallVector<bool> tileScalableFlags;
   if (auto loweringConfig = getLoweringConfig(consumerOp)) {
     tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+    tileScalableFlags = loweringConfig.getScalableTileFlagVals(tilingLevel);
   } else {
     FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
         getLoweringConfig(getComputeOps(funcOp));
@@ -246,24 +249,48 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
       return;
     }
     tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
+    tileScalableFlags =
+        maybeLoweringConfig.value().getScalableTileFlagVals(tilingLevel);
   }
 
   IRRewriter rewriter(context);
   int numLoops = consumerOp.getLoopIteratorTypes().size();
   if (numLoops > tileSizes.size()) {
     tileSizes.append(numLoops - tileSizes.size(), 0);
+    tileScalableFlags.append(numLoops - tileSizes.size(), false);
   }
   tileSizes.resize(numLoops);
+  tileScalableFlags.resize(numLoops);
 
   if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
     LLVM_DEBUG(llvm::dbgs() << "----- skip, all zeros -----\n");
     return;
   }
 
-  SmallVector<OpFoldResult> tileSizesOfr =
-      getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
+  auto options = scf::SCFTilingOptions();
+  if (!llvm::is_contained(tileScalableFlags, true)) {
+    SmallVector<OpFoldResult> tileSizesOfr =
+        getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
+    options.setTileSizes(tileSizesOfr);
+  } else {
+    options.setTileSizeComputationFunction(
+        [=](OpBuilder &b, Operation *op) -> SmallVector<OpFoldResult> {
+          auto loc = op->getLoc();
+          return llvm::map_to_vector(
+              llvm::zip(tileSizes, tileScalableFlags),
+              [&](auto pair) -> OpFoldResult {
+                auto [t, isScalable] = pair;
+                Value size = b.create<arith::ConstantIndexOp>(loc, t);
+                if (isScalable) {
+                  Value vscale = b.create<vector::VectorScaleOp>(loc);
+                  size = b.create<arith::MulIOp>(loc, size, vscale);
+                }
+                return size;
+              });
+        });
+  }
+
   DominanceInfo dominanceInfo(funcOp);
-  auto options = scf::SCFTilingOptions().setTileSizes(tileSizesOfr);
   if (failed(applyTileAndFuse(rewriter, consumerOp, dominanceInfo, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
     return signalPassFailure();
