@@ -124,8 +124,8 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
                                                   srcElement, shrVal);
       Value elem =
           rewriter.create<arith::AndIOp>(extractOp.getLoc(), shr, mask);
-      result = rewriter.create<vector::InsertOp>(
-          extractOp.getLoc(), extOp.getType(), elem, result, i);
+      result = rewriter.create<vector::InsertOp>(extractOp.getLoc(), elem,
+                                                 result, i);
       shrSize += midElemBitwidth;
     }
 
