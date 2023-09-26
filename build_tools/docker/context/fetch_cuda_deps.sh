@@ -85,6 +85,10 @@ for component in ${COMPONENTS[@]}; do
     --os "$OS" \
     --arch "$ARCH" \
     --component "$component"
+
+  # Each component comes with a LICENSE file that we need to be able to
+  # overwrite.
+  chmod +w "${SRC_DIR}/LICENSE"
 done
 
 if ! [ -d "$SRC_DIR" ]; then
