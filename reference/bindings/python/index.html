@@ -2473,12 +2473,6 @@ components:</p>
 </table>
 <p>Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.</p>
-<div class="admonition caution">
-<p class="admonition-title">Caution - Operating system support</p>
-<p>Packages are currently only available on Linux and macOS. They are not
-available on Windows yet (see
-<a href="https://github.com/openxla/iree/issues/13484">this issue</a>).</p>
-</div>
 <h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>To use IREE's Python bindings, you will first need to install
 <a href="https://www.python.org/downloads/">Python 3</a> and
@@ -2567,6 +2561,7 @@ page for instructions for building from source.</p>
 <h3 id="run-a-compiled-program">Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p><a href="https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/low_level_invoke_function.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span> <span class="nn">iree</span> <span class="kn">import</span> <span class="n">runtime</span> <span class="k">as</span> <span class="n">ireert</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 
 <span class="c1"># Register the module with a runtime context.</span>
 <span class="c1"># Use the &quot;local-task&quot; CPU driver, which can load the vmvx executable:</span>
