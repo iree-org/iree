@@ -20,7 +20,7 @@ transform.sequence failures(propagate) {
   %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
   %2 = get_parent_op %1 {isolated_from_above} : (!transform.any_op) -> !transform.any_op
-  transform.structured.vectorize %2 { vectorize_padding } : (!transform.any_op) -> !transform.any_op
+  transform.structured.vectorize_children_and_apply_patterns %2 { vectorize_padding } : (!transform.any_op) -> !transform.any_op
   %module_op1 = transform.bufferization.one_shot_bufferize layout{IdentityLayoutMap} %module_op
     {bufferize_function_boundaries = true} : (!transform.any_op) -> !transform.any_op
 

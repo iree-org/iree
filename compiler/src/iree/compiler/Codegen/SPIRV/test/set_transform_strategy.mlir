@@ -47,7 +47,7 @@ hal.executable.variant public @vulkan, target = <"vulkan-spirv", "vulkan-spirv-f
 
 /// The specific vector sizes are tested in the LLVMGPU tests and thus omitted
 /// here. This is just to check that masked vectorization is used.
-// CHECK-COUNT-3: transform.structured.masked_vectorize
+// CHECK-COUNT-3: transform.structured.vectorize
 
 // Verify use of WMMA.
 // CHECK: apply_patterns to %{{.*}} {

@@ -83,11 +83,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [4, 4]
-// CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [4, 4]
-// CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [32, 4]
+// CHECK: transform.structured.vectorize %{{.*}} vector_sizes [4, 4]
+// CHECK: transform.structured.vectorize %{{.*}} vector_sizes [4, 4]
+// CHECK: transform.structured.vectorize %{{.*}} vector_sizes [32, 4]
 // CHECK: transform.apply_patterns.vector.lower_masked_transfers
-// CHECK: transform.structured.vectorize %{{.*}}
+// CHECK: transform.structured.vectorize_children_and_apply_patterns %{{.*}}
 // CHECK: transform.iree.eliminate_empty_tensors %{{.*}}
 // CHECK: transform.iree.bufferize {target_gpu} %{{.*}}
 // CHECK: transform.iree.forall_to_workgroup %{{.*}}
@@ -145,11 +145,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [8, 16] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 1] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // WITH_OPTIONS: transform.structured.tile_to_forall_op %{{.*}}   num_threads [4, 1] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [4, 4]
-// WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [1, 4]
-// WITH_OPTIONS: transform.structured.masked_vectorize %{{.*}} vector_sizes [32, 4]
+// WITH_OPTIONS: transform.structured.vectorize %{{.*}} vector_sizes [4, 4]
+// WITH_OPTIONS: transform.structured.vectorize %{{.*}} vector_sizes [1, 4]
+// WITH_OPTIONS: transform.structured.vectorize %{{.*}} vector_sizes [32, 4]
 // WITH_OPTIONS: transform.apply_patterns.vector.lower_masked_transfers
-// WITH_OPTIONS: transform.structured.vectorize %{{.*}}
+// WITH_OPTIONS: transform.structured.vectorize_children_and_apply_patterns %{{.*}}
 // WITH_OPTIONS: transform.iree.eliminate_empty_tensors %{{.*}}
 // WITH_OPTIONS: transform.iree.bufferize {target_gpu} %{{.*}}
 // WITH_OPTIONS: transform.iree.forall_to_workgroup %{{.*}}
@@ -247,11 +247,11 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.structured.tile_to_forall_op %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // align1
-// CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [16, 1]
+// CHECK: transform.structured.vectorize %{{.*}} vector_sizes [16, 1]
 // align2
-// CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [8, 2]
+// CHECK: transform.structured.vectorize %{{.*}} vector_sizes [8, 2]
 // align2
-// CHECK: transform.structured.masked_vectorize %{{.*}} vector_sizes [64, 2]
+// CHECK: transform.structured.vectorize %{{.*}} vector_sizes [64, 2]
 
 // WITH_OPTIONS_2-LABEL: func @matmul_2
 
@@ -353,9 +353,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK:      transform.iree.apply_cse
 
 // alignLhs
-// CHECK:      transform.structured.masked_vectorize %[[TILED_LHS]] vector_sizes [4, 4]
+// CHECK:      transform.structured.vectorize %[[TILED_LHS]] vector_sizes [4, 4]
 // alignRhs
-// CHECK:      transform.structured.masked_vectorize %[[TILED_RHS]] vector_sizes [4, 4]
+// CHECK:      transform.structured.vectorize %[[TILED_RHS]] vector_sizes [4, 4]
 
 // CHECK:      transform.apply_patterns.vector.lower_masks
 // CHECK:      transform.apply_patterns.vector.materialize_masks

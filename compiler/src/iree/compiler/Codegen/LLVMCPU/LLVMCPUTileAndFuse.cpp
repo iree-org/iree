@@ -130,9 +130,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     }
   } else if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(rootOp)) {
     for (auto [init, iterArg] :
-         llvm::zip_equal(dpsOp.getDpsInitOperands(),
+         llvm::zip_equal(dpsOp.getDpsInits(),
                          tilingResult->loops.back().getRegionIterArgs())) {
-      mapToIterArg[init->get()] = iterArg;
+      mapToIterArg[init] = iterArg;
     }
   }
   tiledOps.append(tilingResult->tiledOps);

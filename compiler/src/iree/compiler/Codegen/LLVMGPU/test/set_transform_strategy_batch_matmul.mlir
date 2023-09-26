@@ -153,15 +153,15 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
-// CHECK:   transform.structured.masked_vectorize
+// CHECK:   transform.structured.vectorize
 // DEFAULT:   vector_sizes [64, 2, 4]
 // OPTIONS:   vector_sizes [128, 1, 4]
-// CHECK:   transform.structured.masked_vectorize
+// CHECK:   transform.structured.vectorize
 // DEFAULT:   vector_sizes [32, 1, 1]
 // OPTIONS:   vector_sizes [128, 4, 4]
 // CHECK:   apply_patterns
 // CHECK:     transform.apply_patterns.vector.lower_masked_transfers
-// CHECK:   transform.structured.vectorize
+// CHECK:   transform.structured.vectorize_children_and_apply_patterns
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
