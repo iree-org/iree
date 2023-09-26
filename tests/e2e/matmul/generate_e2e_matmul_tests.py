@@ -93,7 +93,7 @@ class CompilationInfo:
     # Prints the workgroup size as 'index' types
     def workgroup_size_str(self):
         return (
-            "[" + ", ".join([f"{size} : index" for size in self.workgroup_size]) + "]"
+            "[" + ", ".join([f"{size}" for size in self.workgroup_size]) + "]"
         )
 
 
@@ -435,7 +435,7 @@ def generate_function(
             )
         compilation_info_string = (
             f"#compilation{generate_function.compilation_index} = #iree_codegen.compilation_info<\n"
-            f"  lowering_config = <tile_sizes = {compilation_info.tile_sizes}>,\n"
+            f"  lowering_config = <tiling_levels = {compilation_info.tile_sizes}>,\n"
             f"  translation_info = <{dispatch_lowering_pass_pipeline}\n"
             f"  pipeline_depth = {compilation_info.software_pipeline_depth}>,\n"
             f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n"

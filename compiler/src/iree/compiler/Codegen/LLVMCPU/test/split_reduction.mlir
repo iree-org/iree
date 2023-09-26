@@ -58,7 +58,7 @@ module {
 
 // Do not split operations with indexing semantics
 // See : https://github.com/openxla/iree/issues/14934
-#config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0], [0], [4]]>
 func.func @dont_split_with_indexing_semantics(%arg0 : tensor<4096xf32>, %arg1 : tensor<f32>) -> tensor<f32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
@@ -82,7 +82,7 @@ func.func @dont_split_with_indexing_semantics(%arg0 : tensor<4096xf32>, %arg1 : 
 
 // check usage of result data type for respecting disable-reassociation flag.
 // See https://github.com/openxla/iree/issues/14934#issuecomment-1716552762
-#config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
+#config = #iree_codegen.lowering_config<tiling_levels = [[0], [0], [4]]>
 func.func @dont_reassociate(%arg0 : tensor<4096xi32>, %arg1 : tensor<f32>) -> tensor<f32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],

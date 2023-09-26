@@ -201,18 +201,18 @@ class EmitMatmulCompilationInfo:
         self.matmul_compilation_info_template = """
 // matmul compilation info (tile configuration, translation info, workgroup size)
 #${compilation_info_name} = #iree_codegen.compilation_info<
-  lowering_config = <tile_sizes = [[${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
+  lowering_config = <tiling_levels = [[${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
   translation_info = <${translation_info} pipeline_depth = ${stages}>,
-  workgroup_size = [${block_dim_x} : index, ${block_dim_y} : index, ${block_dim_z} : index]
+  workgroup_size = [${block_dim_x}, ${block_dim_y}, ${block_dim_z}]
 >
 """
         # batch matmul and split-k matmul compilation info template
         self.batch_matmul_compilation_info_template = """
 // batch matmul compilation info (tile configuration, translation info, workgroup size)
 #${compilation_info_name} = #iree_codegen.compilation_info<
-  lowering_config = <tile_sizes = [[1, ${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
+  lowering_config = <tiling_levels = [[1, ${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
   translation_info = <${translation_info} pipeline_depth = ${stages}>,
-  workgroup_size = [${block_dim_x} : index, ${block_dim_y} : index, ${block_dim_z} : index]
+  workgroup_size = [${block_dim_x}, ${block_dim_y}, ${block_dim_z}]
 >
 """
 
