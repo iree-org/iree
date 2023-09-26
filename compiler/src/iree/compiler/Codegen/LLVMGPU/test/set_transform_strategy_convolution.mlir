@@ -56,7 +56,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
 // CHECK: transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
 // CHECK: transform.apply_patterns.vector.cast_away_vector_leading_one_dim
-// CHECK: transform.structured.vectorize %{{.*}} {vectorize_nd_extract}
+// CHECK: transform.structured.vectorize_children_and_apply_patterns %{{.*}} {vectorize_nd_extract}
 // CHECK: transform.iree.eliminate_empty_tensors
 // CHECK: transform.iree.bufferize {target_gpu}
 // CHECK: transform.iree.apply_buffer_optimizations

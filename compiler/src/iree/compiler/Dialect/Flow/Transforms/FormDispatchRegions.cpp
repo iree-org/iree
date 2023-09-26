@@ -547,8 +547,8 @@ isFusableWithConsumer(OpOperand &fusedOperand,
       continue;
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
         !llvm::any_of(
-            consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
-              return canUseInOperandAsInitOperand(inputOperand, initOperand);
+            consumerLinalgOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
+              return canUseInOperandAsInitOperand(inputOperand, &initOperand);
             })) {
       return false;
     }

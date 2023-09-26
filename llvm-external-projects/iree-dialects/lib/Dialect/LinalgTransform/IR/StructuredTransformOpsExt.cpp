@@ -120,12 +120,12 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
                                           linalg::LinalgOp linalgModelOp) {
   // If basic properties do not match, return failure.
   {
-    OpOperandVector opInputs = linalgOp.getDpsInputOperands();
-    OpOperandVector modelInputs = linalgModelOp.getDpsInputOperands();
-    OpOperandVector opOutputs = linalgOp.getDpsInitOperands();
-    OpOperandVector modelOutputs = linalgModelOp.getDpsInitOperands();
-    auto notEqualFn = [](std::tuple<OpOperand *, OpOperand *> in) -> bool {
-      return std::get<0>(in)->get() != std::get<1>(in)->get();
+    SmallVector<Value> opInputs = linalgOp.getDpsInputs();
+    SmallVector<Value> modelInputs = linalgModelOp.getDpsInputs();
+    ValueRange opOutputs = linalgOp.getDpsInits();
+    ValueRange modelOutputs = linalgModelOp.getDpsInits();
+    auto notEqualFn = [](std::tuple<Value, Value> in) -> bool {
+      return std::get<0>(in) != std::get<1>(in);
     };
 
     if (opInputs.size() != modelInputs.size() ||

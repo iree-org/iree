@@ -44,7 +44,7 @@ func.func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
 func.func @scatter_extra_outputs(
     %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
-  // expected-error @+1 {{expected number of outputs to be same as the number of results}}
+  // expected-error @+1 {{expected the number of tensor results (2) to be equal to the number of output tensors (1)}}
   %0, %1 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
       ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
@@ -108,7 +108,7 @@ func.func @scatter_invalid_dim_map_entries(
 func.func @scatter_output_type_mismatch(
     %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<4x?xf32> {
-  // expected-error @+1 {{expected type of `outs` operand #0 'tensor<?x?xf32>' to be same as result type 'tensor<4x?xf32>'}}
+  // expected-error @+1 {{expected type of operand #2 ('tensor<?x?xf32>') to match type of corresponding result ('tensor<4x?xf32>')}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
       ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {

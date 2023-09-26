@@ -8,7 +8,7 @@ hal.executable.variant public @vulkan, target = <"vulkan-spirv", "vulkan-spirv-f
     [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
     #spirv.resource_limits<
       cooperative_matrix_properties_nv = [
-        #spirv.coop_matrix_props<
+        #spirv.coop_matrix_props_nv<
           a_type = f32, b_type = f32, c_type = f32, k_size = 8,
           m_size = 16, n_size = 16, result_type = f32, scope  = <Subgroup>>
       ],
@@ -47,7 +47,7 @@ hal.executable.variant public @vulkan, target = <"vulkan-spirv", "vulkan-spirv-f
 
 /// The specific vector sizes are tested in the LLVMGPU tests and thus omitted
 /// here. This is just to check that masked vectorization is used.
-// CHECK-COUNT-3: transform.structured.masked_vectorize
+// CHECK-COUNT-3: transform.structured.vectorize
 
 // Verify use of WMMA.
 // CHECK: apply_patterns to %{{.*}} {

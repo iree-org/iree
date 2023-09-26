@@ -21,13 +21,13 @@ hal.executable @matmul_f16_32x32x32 {
       [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
             m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
             m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
         ],
@@ -126,13 +126,13 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
       [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
             m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
             m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
         ],
@@ -276,13 +276,13 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
       [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
             m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
             m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
         ],
@@ -395,13 +395,13 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
       [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
             m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
             m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
         ],
@@ -513,7 +513,7 @@ hal.executable @batch_matmul_f16_1x64x128x512 {
       [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
         ],
@@ -621,7 +621,7 @@ hal.executable @matmul_f16_f512x4096x64 {
       [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
         ],
@@ -738,7 +738,7 @@ hal.executable @matmul_f16_f512x4096x64 {
       [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
         ],
@@ -855,7 +855,7 @@ hal.executable @matmul_f16_128x262144x2304 {
       [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+          #spirv.coop_matrix_props_nv<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
         ],

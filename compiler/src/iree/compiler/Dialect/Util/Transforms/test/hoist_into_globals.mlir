@@ -248,3 +248,31 @@ module @do_not_hoist_uses_within_dispatches {
 //       CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[CST]]
 //       CHECK:     flow.return %[[SLICE]]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module @do_not_hoist_uses_within_dispatches {
+  func.func @main() -> tensor<2x2xi32> {
+    %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+    %1 = arith.constant dense<[[6, 7], [8,9]]> : tensor<2x2xi32>
+    %expanded = tensor.expand_shape %0[[0, 1]] : tensor<4xi32> into tensor<2x2xi32>
+    %2 = tensor.empty() : tensor<2x2xi32>
+    %3 = flow.dispatch.region -> (tensor<2x2xi32>) {
+      %4 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%expanded, %1 : tensor<2x2xi32>, tensor<2x2xi32>) outs(%2 : tensor<2x2xi32>) {
+      ^bb0(%in: i32, %in_0: i32, %out: i32):
+        %13 = arith.addi %in, %in_0 : i32
+        linalg.yield %13 : i32
+      } -> tensor<2x2xi32>
+      flow.return %4 : tensor<2x2xi32>
+    }
+    return %3 : tensor<2x2xi32>
+  }
+}
+// CHECK-LABEL: @do_not_hoist_uses_within_dispatches
+//       CHECK:   %[[CST:.+]] = arith.constant
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[CST]]
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:     %[[ADD:.+]] = linalg.generic 
+//  CHECK-SAME:     %[[EXPANDED]]
+//       CHECK:     flow.return %[[ADD]]
+//       CHECK:   return %[[RESULT]]

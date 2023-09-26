@@ -115,11 +115,13 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
                                                 ArrayRef<int64_t> tileSizes) {
   MLIRContext *context = consumerOp.getContext();
   IRRewriter rewriter(context);
+  SmallVector<OpFoldResult> tileSizesOfr =
+      getAsIndexOpFoldResult(context, tileSizes);
   FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
       scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
           rewriter, cast<TilingInterface>(consumerOp.getOperation()),
           scf::SCFTileAndFuseOptions().setTilingOptions(
-              scf::SCFTilingOptions().setTileSizes(tileSizes)));
+              scf::SCFTilingOptions().setTileSizes(tileSizesOfr)));
 
   if (failed(tileAndFuseResult)) {
     return consumerOp.emitOpError("failed tiling and fusing producers");
@@ -240,7 +242,7 @@ static void concretizePadShape(func::FuncOp funcOp) {
 /// Tiles one of the convolution output window dimensions with size 1 to prepare
 /// for downsizing 2-D convolution ops into 1-D ones.
 static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
-                                             ArrayRef<int64_t> tileSizes) {
+                                             ArrayRef<OpFoldResult> tileSizes) {
   SmallVector<linalg::ConvolutionOpInterface, 1> convOps;
   funcOp.walk([&convOps](linalg::ConvolutionOpInterface convOp) {
     convOps.push_back(convOp);
@@ -344,7 +346,8 @@ public:
 
     fusePadIntoConsumer(funcOp);
 
-    SmallVector<int64_t> windowTileSizes = loweringConfig->getTileSizeVals(3);
+    SmallVector<OpFoldResult> windowTileSizes =
+        getAsIndexOpFoldResult(context, loweringConfig->getTileSizeVals(3));
     if (failed(tileAndUnrollConvWindow(funcOp, windowTileSizes))) {
       return signalPassFailure();
     }

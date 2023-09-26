@@ -112,9 +112,9 @@ def SPIRVTileToCooperativeOps : Pass<
     "mlir::iree_compiler::createSPIRVTileToCooperativeOpsPass()";
 }
 
-def SPIRVVectorize : Pass<"iree-spirv-vectorize", "func::FuncOp"> {
+def SPIRVVectorLowering : Pass<"iree-spirv-vector-lowering", "func::FuncOp"> {
   let summary = "Vectorize Linalg ops with buffer semantics";
-  let constructor = "mlir::iree_compiler::createSPIRVVectorizePass()";
+  let constructor = "mlir::iree_compiler::createSPIRVVectorLoweringPass()";
 }
 
 def SPIRVVectorizeLoadStore :

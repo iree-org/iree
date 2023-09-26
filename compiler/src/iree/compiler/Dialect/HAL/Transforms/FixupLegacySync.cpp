@@ -114,12 +114,13 @@ static void insertWaitIfNeeded(Operation *asyncOp,
   // Scan backward to see if the wait fences have been signaled already.
   // Since we walk the regions forward we will likely have a wait from the
   // producer already.
-  auto *precedingAwait = findPrecedingAwait(waitFence[0]);
+  auto *precedingAwait = findPrecedingAwait(waitFence[0].get());
   if (!precedingAwait) {
     builder.create<IREE::HAL::FenceAwaitOp>(
-        loc, builder.getI32Type(), makeInfiniteTimeout(), waitFence[0]);
+        loc, builder.getI32Type(), makeInfiniteTimeout(), waitFence[0].get());
   }
-  if (!isa_and_nonnull<IREE::Util::NullOp>(waitFence[0].getDefiningOp())) {
+  if (!isa_and_nonnull<IREE::Util::NullOp>(
+          waitFence[0].get().getDefiningOp())) {
     // Neuter wait because it's either covered (we found a preceding await) or
     // we just inserted one.
     Value nullFence = builder.create<IREE::Util::NullOp>(

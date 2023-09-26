@@ -77,8 +77,10 @@ public:
     }
 
     // Tile the current op and fuse its immediate input operands.
+    SmallVector<OpFoldResult> tileSizesOfr =
+        getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
     FailureOr<scf::SCFTilingResult> tilingResult =
-        tileConsumerAndFuseInputProducer(rewriter, op, tileSizes);
+        tileConsumerAndFuseInputProducer(rewriter, op, tileSizesOfr);
     if (failed(tilingResult)) {
       return rewriter.notifyMatchFailure(op, "failed to tile consumer");
     }
@@ -94,7 +96,7 @@ private:
   FailureOr<scf::SCFTilingResult>
   tileConsumerAndFuseInputProducer(PatternRewriter &rewriter,
                                    TilingInterface consumer,
-                                   ArrayRef<int64_t> tileSizes) const {
+                                   ArrayRef<OpFoldResult> tileSizes) const {
     // First tile the current op as the consumer op.
     auto tilingOptions = scf::SCFTilingOptions().setTileSizes(tileSizes);
     FailureOr<scf::SCFTilingResult> tilingResult =
@@ -275,7 +277,8 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
   for (linalg::ConvolutionOpInterface convOp : convOps) {
     auto consumerOp = cast<linalg::LinalgOp>(*convOp);
     IRRewriter rewriter(funcOp.getContext());
-    SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 1);
+    SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
+        funcOp.getContext(), getTileSizes(consumerOp, 1));
     if (tileSizes.empty())
       return success();
 

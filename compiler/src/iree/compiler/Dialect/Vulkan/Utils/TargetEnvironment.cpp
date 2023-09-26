@@ -166,12 +166,12 @@ convertResourceLimits(Vulkan::TargetEnvAttr vkTargetEnv) {
   MLIRContext *context = vkTargetEnv.getContext();
   Builder builder(context);
   auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
-  SmallVector<Attribute, 1> spvAttrs;
+  SmallVector<Attribute, 1> nvCoopAttrs;
   if (ArrayAttr attr = vkCapabilities.getCooperativeMatrixPropertiesNV()) {
     for (auto props :
          attr.getAsRange<Vulkan::CooperativeMatrixPropertiesNVAttr>()) {
       auto scope = static_cast<spirv::Scope>(props.getScope().getValue());
-      spvAttrs.push_back(spirv::CooperativeMatrixPropertiesNVAttr::get(
+      nvCoopAttrs.push_back(spirv::CooperativeMatrixPropertiesNVAttr::get(
           context, props.getMSize(), props.getNSize(), props.getKSize(),
           props.getAType(), props.getBType(), props.getCType(),
           props.getResultType(), spirv::ScopeAttr::get(context, scope)));
@@ -186,7 +186,7 @@ convertResourceLimits(Vulkan::TargetEnvAttr vkTargetEnv) {
       vkCapabilities.getMaxComputeWorkGroupInvocations(),
       builder.getI64ArrayAttr(sizes), vkCapabilities.getSubgroupSize(),
       vkCapabilities.getMinSubgroupSize(), vkCapabilities.getMaxSubgroupSize(),
-      ArrayAttr::get(context, spvAttrs));
+      ArrayAttr{}, ArrayAttr::get(context, nvCoopAttrs));
 }
 } // anonymous namespace
 

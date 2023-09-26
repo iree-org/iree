@@ -63,7 +63,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
+  transform.structured.vectorize_children_and_apply_patterns %func : (!transform.any_op) -> !transform.any_op
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
