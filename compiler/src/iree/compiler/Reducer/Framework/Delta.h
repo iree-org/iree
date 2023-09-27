@@ -19,9 +19,7 @@ using DeltaFunc = llvm::function_ref<void(ChunkManager &, WorkItem &)>;
 
 class Delta {
 public:
-  Delta(Oracle &oracle, WorkItem &root,
-        llvm::raw_ostream &debugOs = llvm::nulls())
-      : oracle(oracle), root(root), debugOs(debugOs) {}
+  Delta(Oracle &oracle, WorkItem &root) : oracle(oracle), root(root) {}
 
   void runDeltaPass(DeltaFunc delta, StringRef message);
 
@@ -35,7 +33,6 @@ private:
 
   Oracle &oracle;
   WorkItem &root;
-  llvm::raw_ostream &debugOs;
 };
 
 } // namespace iree_compiler

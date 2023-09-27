@@ -17,8 +17,7 @@ class Operation;
 namespace iree_compiler {
 
 Operation *ireeRunReducingStrategies(OwningOpRef<Operation *> module,
-                                     StringRef testScript,
-                                     llvm::raw_ostream &debugOs);
+                                     StringRef testScript);
 
 } // namespace iree_compiler
 } // namespace mlir

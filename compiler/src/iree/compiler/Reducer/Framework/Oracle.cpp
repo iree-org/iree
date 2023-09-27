@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Reducer/Framework/Oracle.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Program.h"
@@ -12,6 +13,8 @@
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
+
+#define DEBUG_TYPE "iree-reduce-framework"
 
 bool Oracle::isInteresting(WorkItem &workItem) {
   // Print module to a temporary file.
@@ -40,8 +43,8 @@ bool Oracle::isInteresting(WorkItem &workItem) {
   testerArgs.push_back(testScript);
   testerArgs.push_back(filepath);
 
-  debugOs << "Running interestingness test: " << testScript << " " << filepath
-          << "\n";
+  LLVM_DEBUG(llvm::dbgs() << "Running interestingness test: " << testScript
+                          << " " << filepath << "\n");
 
   std::string errMsg;
   int exitCode = llvm::sys::ExecuteAndWait(testScript, testerArgs, std::nullopt,

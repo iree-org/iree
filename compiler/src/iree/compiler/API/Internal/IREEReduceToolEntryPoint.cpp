@@ -60,8 +60,8 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
       llvm::cl::cat(ireeReduceCategory));
 
   static cl::opt<bool> verbose(
-      "v", cl::desc("Output debug output to llvm::errs"), cl::init(false),
-      llvm::cl::cat(ireeReduceCategory));
+      "v", cl::desc("Shorthand for --debug-only=\"iree-reduce-framework\""),
+      cl::init(false), llvm::cl::cat(ireeReduceCategory));
 
   llvm::cl::HideUnrelatedOptions(ireeReduceCategory);
 
@@ -87,9 +87,13 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
     return failure();
   }
 
-  llvm::raw_ostream &debugOs = verbose ? llvm::errs() : llvm::nulls();
+  // Set DEBUG_TYPE="iree-reduce-framework" if verbose is specified.
+  if (verbose) {
+    llvm::setCurrentDebugType("iree-reduce-framework");
+  }
+
   Operation *newModule =
-      ireeRunReducingStrategies(std::move(module), testScript, debugOs);
+      ireeRunReducingStrategies(std::move(module), testScript);
   module = OwningOpRef<Operation *>(newModule);
 
   // Print module to output file.

@@ -28,13 +28,10 @@ bool mlir::iree_compiler::operator<(const Chunk &C1, const Chunk &C2) {
 }
 
 void Chunk::print(raw_ostream &os) const {
-  os << "[" << begin << ", " << end << ")";
+  os << "[" << begin << ", " << end << ")\n";
 }
 
-void Chunk::dump() const {
-  print(llvm::errs());
-  llvm::errs() << "\n";
-}
+void Chunk::dump() const { print(llvm::errs()); }
 
 bool ChunkManager::shouldFeatureBeKept() {
   if (chunksToKeep.empty()) {

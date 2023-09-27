@@ -15,12 +15,11 @@ using namespace llvm;
 
 Operation *
 mlir::iree_compiler::ireeRunReducingStrategies(OwningOpRef<Operation *> module,
-                                               StringRef testScript,
-                                               llvm::raw_ostream &debugOs) {
+                                               StringRef testScript) {
   ModuleOp root = dyn_cast<ModuleOp>(module.release());
   WorkItem workItem(root);
-  Oracle oracle(testScript, debugOs);
-  Delta delta(oracle, workItem, debugOs);
+  Oracle oracle(testScript);
+  Delta delta(oracle, workItem);
 
   delta.runDeltaPass(reduceFlowDispatchOperandToResultDelta,
                      "Dispatch operand to result delta");

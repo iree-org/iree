@@ -5,9 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Reducer/Framework/Delta.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
+
+#define DEBUG_TYPE "iree-reduce-framework"
 
 FailureOr<WorkItem> Delta::checkChunk(Chunk maybeUninterestingChunk,
                                       DeltaFunc deltaFunc,
@@ -20,29 +23,27 @@ FailureOr<WorkItem> Delta::checkChunk(Chunk maybeUninterestingChunk,
                    !uninterestingChunks.count(chunk);
           });
 
-  debugOs << "Checking chunk: \n";
-  maybeUninterestingChunk.dump();
-  debugOs << "Saved chunks: \n";
-  for (Chunk c : currentChunks) {
-    c.dump();
-  }
+  LLVM_DEBUG(llvm::dbgs() << "Checking chunk: \n");
+  LLVM_DEBUG(maybeUninterestingChunk.print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "Saved chunks: \n");
+  LLVM_DEBUG(for (Chunk c : currentChunks) c.print(llvm::dbgs()));
 
   ChunkManager chunker(currentChunks);
   WorkItem clonedProgram = root.clone();
   deltaFunc(chunker, clonedProgram);
 
   if (!oracle.isInteresting(clonedProgram)) {
-    debugOs << "Chunk is uninteresting\n";
+    LLVM_DEBUG(llvm::dbgs() << "Chunk is uninteresting\n");
     clonedProgram.getModule()->erase();
     return failure();
   }
 
-  debugOs << "Chunk is interesting\n";
+  LLVM_DEBUG(llvm::dbgs() << "Chunk is interesting\n");
   return clonedProgram;
 };
 
 bool Delta::increaseGranuality(SmallVector<Chunk> &chunks) {
-  debugOs << "Increasing granularity\n";
+  LLVM_DEBUG(llvm::dbgs() << "Increasing granularity\n");
   SmallVector<Chunk> newChunks;
   bool anyNewSplit = false;
 
@@ -59,11 +60,10 @@ bool Delta::increaseGranuality(SmallVector<Chunk> &chunks) {
 
   if (anyNewSplit) {
     chunks = newChunks;
-    debugOs << "Successfully increased granularity\n";
-    debugOs << "New Chunks:\n";
-    for (Chunk c : chunks) {
-      c.dump();
-    }
+
+    LLVM_DEBUG(llvm::dbgs() << "Successfully increased granularity\n");
+    LLVM_DEBUG(llvm::dbgs() << "New Chunks:\n");
+    LLVM_DEBUG(for (Chunk c : chunks) c.print(llvm::dbgs()));
   }
 
   return anyNewSplit;
@@ -71,7 +71,7 @@ bool Delta::increaseGranuality(SmallVector<Chunk> &chunks) {
 
 void Delta::runDeltaPass(DeltaFunc deltaFunc, StringRef message) {
   assert(root.verify().succeeded() && "Input module does not verify.");
-  debugOs << "=== " << message << " ===\n";
+  LLVM_DEBUG(llvm::dbgs() << "=== " << message << " ===\n");
 
   // Call the delta function with the whole program as the chunk.
   SmallVector<Chunk> chunks = {Chunk(UINT_MAX)};
@@ -85,8 +85,7 @@ void Delta::runDeltaPass(DeltaFunc deltaFunc, StringRef message) {
          "Output module not interesting after counting chunks.");
 
   if (!numTargets) {
-    debugOs << "\nNothing to reduce\n";
-    debugOs << "--------------------------------";
+    LLVM_DEBUG(llvm::dbgs() << "\nNothing to reduce\n");
     return;
   }
 
