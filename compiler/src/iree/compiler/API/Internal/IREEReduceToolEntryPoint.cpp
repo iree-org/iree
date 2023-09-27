@@ -59,10 +59,6 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
       cl::value_desc("filename"), cl::init("-"),
       llvm::cl::cat(ireeReduceCategory));
 
-  static cl::opt<bool> verbose(
-      "v", cl::desc("Shorthand for --debug-only=\"iree-reduce-framework\""),
-      cl::init(false), llvm::cl::cat(ireeReduceCategory));
-
   llvm::cl::HideUnrelatedOptions(ireeReduceCategory);
 
   InitLLVM y(argc, argv);
@@ -85,11 +81,6 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
   if (!output) {
     llvm::errs() << errorMessage << "\n";
     return failure();
-  }
-
-  // Set DEBUG_TYPE="iree-reduce-framework" if verbose is specified.
-  if (verbose) {
-    llvm::setCurrentDebugType("iree-reduce-framework");
   }
 
   Operation *newModule =
