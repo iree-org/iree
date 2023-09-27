@@ -11,10 +11,15 @@ package(default_visibility = ["//visibility:public"])
 # Not all headers are hermetic, so they are just included as textual
 # headers to disable additional validation.
 cc_library(
-    name = "vulkan_headers",
-    hdrs = glob([
-        "include/vulkan/*.h",
-        "include/vulkan/vk_video/*.h",
-    ]),
+    name = "vulkan_video_headers",
+    hdrs = glob(["include/vulkan/vk_video/*.h"]),
     include_prefix = "third_party/vulkan_headers",
+    includes = ["include"],
+)
+
+cc_library(
+    name = "vulkan_headers",
+    hdrs = glob(["include/vulkan/*.h"]),
+    include_prefix = "third_party/vulkan_headers",
+    deps = [":vulkan_video_headers"],
 )
