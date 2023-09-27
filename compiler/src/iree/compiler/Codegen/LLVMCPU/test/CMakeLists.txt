@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "peel.mlir"
     "peel_and_vectorize.mlir"
     "pipeline_tests.mlir"
+    "set_transform_strategy_from_file.mlir"
     "split_reduction.mlir"
     "split_reduction_pipeline_tests.mlir"
     "synchronize_symbol_visibility.mlir"
@@ -63,6 +64,8 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
     iree-opt
+  DATA
+    transform_dialect_dummy_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

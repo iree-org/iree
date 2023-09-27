@@ -47,6 +47,7 @@ iree_lit_test_suite(
             "peel.mlir",
             "peel_and_vectorize.mlir",
             "pipeline_tests.mlir",
+            "set_transform_strategy_from_file.mlir",
             "split_reduction.mlir",
             "split_reduction_pipeline_tests.mlir",
             "synchronize_symbol_visibility.mlir",
@@ -66,8 +67,14 @@ iree_lit_test_suite(
             "verify_linalg_transform_legality.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "transform_dialect_dummy_spec.mlir",
+        ],
     ),
     cfg = "//compiler:lit.cfg.py",
+    data = [
+        "transform_dialect_dummy_spec.mlir",
+    ],
     tools = [
         "//tools:iree-compile",
         "//tools:iree-opt",

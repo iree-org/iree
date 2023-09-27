@@ -90,6 +90,17 @@ extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName;
 extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag;
 extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag;
 
+llvm::cl::opt<std::string> clCPUCodegenSelectTransformDialectConfigFileName(
+    "iree-llvmcpu-transform-dialect-select-strategy",
+    llvm::cl::desc(
+        "MLIR file with transform dialect script used to select a strategy for "
+        "the matched operations. The expectation is for this script to set the "
+        "proper `iree_codegen.compilation_info` attribute with the related "
+        "`TransformDialectCodegen codegen_spec` to select a specific strategy. "
+        "Strategies are expected to live in a library file provided via the "
+        "`--iree-codegen-transform-library-file-name` option."),
+    llvm::cl::init(""));
+
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
@@ -775,6 +786,11 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
     modulePassManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
   }
 
+  // Set config attributes on selected functions.
+  if (clCPUCodegenSelectTransformDialectConfigFileName != "")
+    passManager.addPass(
+        mlir::iree_compiler::createTransformDialectInterpreterPass(
+            clCPUCodegenSelectTransformDialectConfigFileName));
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);

@@ -20,6 +20,8 @@ iree_lit_test_suite(
     "eltwise_reduction_eltwise.mlir"
     "fold_tensor_slice_into_transfer.mlir"
     "matmul.mlir"
+    "select_strategy_matvec4.mlir"
+    "select_strategy_matvec6.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
@@ -31,6 +33,8 @@ iree_lit_test_suite(
     attention_codegen_spec.mlir
     matmul_codegen_custom_dispatch_formation_spec.mlir
     matmul_codegen_default_spec.mlir
+    transform_dialect_dummy_select.mlir
+    transform_dialect_dummy_spec.mlir
   LABELS
     "noasan"
     "nomsan"
