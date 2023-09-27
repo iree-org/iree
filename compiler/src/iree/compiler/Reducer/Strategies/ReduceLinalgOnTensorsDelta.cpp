@@ -23,13 +23,16 @@ void mlir::iree_compiler::reduceLinalgOnTensorsDelta(ChunkManager &chunker,
                                                      WorkItem &workItem) {
   ModuleOp module = workItem.getModule();
 
+  /// TODO(Groverkss): This pass can work for any op producing a tensor result.
+  /// Add support for more dialect operations.
   SmallVector<linalg::LinalgOp> linalgOps;
   SmallVector<linalg::LinalgOp> keepOps;
   module.walk([&](linalg::LinalgOp op) {
     if (!op.hasTensorSemantics())
       return;
-    // Op should have at least on tensor input, otherwise it is not worth
-    // reducing.
+    // Op should have at least one tensor input, otherwise the operation is
+    // already a fill-like operation.
+    // TODO(Groverkss): Explore if we can remove in this case too.
     bool hasAtleastOneTensorInput = false;
     for (auto *input : op.getDpsInputOperands()) {
       if (isa<RankedTensorType>(input->get().getType())) {
@@ -76,7 +79,8 @@ void mlir::iree_compiler::reduceLinalgOnTensorsDelta(ChunkManager &chunker,
     RankedTensorType outType = cast<RankedTensorType>(out.getType());
     Value newOut;
 
-    // TODO: Add support for dynamic shapes using ValueBoundsInterface.
+    // TODO(Groverkss): Add support for dynamic shapes using
+    // ValueBoundsInterface.
     if (outType.hasStaticShape()) {
       for (auto *input : linalgOp.getDpsInputOperands()) {
         auto inType = dyn_cast<RankedTensorType>(input->get().getType());
@@ -88,7 +92,8 @@ void mlir::iree_compiler::reduceLinalgOnTensorsDelta(ChunkManager &chunker,
           newOut = input->get();
           break;
         }
-        // TODO: Add support for different shapes using extract_slice/broadcast.
+        // TODO(Groverkss): Add support for different shapes using
+        // extract_slice/broadcast.
       }
     }
 

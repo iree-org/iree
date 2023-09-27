@@ -20,6 +20,8 @@ public:
   const ModuleOp getModule() { return root; }
   const OpBuilder getBuilder() { return OpBuilder(root); }
 
+  /// TODO(Groverkss): Ownership of module should be conveyed here via
+  /// mlir::OwningOpReference<ModuleOp>.
   void replaceModule(ModuleOp newModule) {
     if (root)
       root->erase();
@@ -29,7 +31,6 @@ public:
   LogicalResult verify() { return root.verify(); }
 
   WorkItem clone();
-  int64_t getComplexityScore();
 
 private:
   ModuleOp root;

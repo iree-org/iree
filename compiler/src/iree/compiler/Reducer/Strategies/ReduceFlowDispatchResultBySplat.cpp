@@ -29,7 +29,7 @@ void mlir::iree_compiler::reduceFlowDispatchResultBySplatDelta(
   module.walk([&](IREE::Flow::DispatchOp dispatchOp) {
     bool shouldReplace = true;
     for (auto result : dispatchOp.getResults()) {
-      // Only replace tensor types.
+      // Only replace ranked tensor types.
       if (!isa<RankedTensorType>(result.getType())) {
         shouldReplace = false;
         break;
