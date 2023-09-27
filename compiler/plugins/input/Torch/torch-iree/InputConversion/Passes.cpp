@@ -33,10 +33,13 @@ void createTorchToIREEPipeline(OpPassManager &pm) {
   // backends. We do this first as it tends to involve pattern-matching against
   // constants, (e.g. dimensions which must be constant in a ranked programming
   // model) and those constants get somewhat obscured by TorchToArith.
-  llvm::ArrayRef<std::string> emptyArrayRef;
+  torch::Torch::TorchLoweringPipelineOptions options;
+  llvm::ArrayRef<std::string> backendLegalOps;
 
-  pm.addNestedPass<func::FuncOp>(
-      torch::Torch::createDecomposeComplexOpsPass(emptyArrayRef));
+  options.backendLegalOps = backendLegalOps;
+  options.decompose = true;
+  torch::Torch::createTorchSimplificationPipeline(pm, options);
+
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTMTensorPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
