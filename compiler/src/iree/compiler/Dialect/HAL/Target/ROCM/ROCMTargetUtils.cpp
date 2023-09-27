@@ -217,7 +217,7 @@ std::string createHsaco(Location loc, const std::string isa, StringRef name) {
 
   // Invoke lld. Expect a true return value from lld.
   // Searching for LLD
-  const SmallVector<std::string> &toolNames{"iree-lld", "lld"};
+  const SmallVector<std::string> &toolNames{"lld"};
   std::string lldProgram = findTool(toolNames);
   if (lldProgram.empty()) {
     mlir::emitError(loc) << "unable to find iree-lld";
