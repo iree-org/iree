@@ -49,6 +49,7 @@ cc_library(
 cc_library(
     name = "spirv_cross_lib",
     hdrs = SPIRV_HEADERS,
+    copts = ["-Wno-error=unqualified-std-cast-call"],
     deps = [":spirv_cross_lib_real"],
     include_prefix = "third_party/spirv_cross",
 )
