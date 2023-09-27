@@ -481,9 +481,7 @@ static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  pm.addPass(createEraseHALDescriptorTypeFromMemRefPass());
+  pm.addPass(createConvertHALDescriptorTypeToGPUAddressSpacePass());
 
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

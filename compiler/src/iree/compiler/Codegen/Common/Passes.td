@@ -192,6 +192,13 @@ def EraseHALDescriptorTypeFromMemRef
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
 }
 
+def ConvertHALDescriptorTypeToGPUAddressSpace
+    : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
+  let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let constructor =
+      "mlir::iree_compiler::createConvertHALDescriptorTypeToGPUAddressSpacePass()";
+}
+
 def ExtractAddressComputation: Pass<"extract-address-computation"> {
   let summary = "Extract address computations from memory accesses";
   let description = [{
