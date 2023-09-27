@@ -55,8 +55,6 @@ iree_cc_library(
 iree_cc_library(
   NAME
     SPIRVToMSL
-  COPTS
-    "-Wno-error=unqualified-std-cast-call"
   HDRS
     "SPIRVToMSL.h"
   SRCS
