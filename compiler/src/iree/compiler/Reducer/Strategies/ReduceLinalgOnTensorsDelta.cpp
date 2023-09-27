@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Reducer/Strategies/DeltaStrategies.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -23,6 +24,7 @@ void mlir::iree_compiler::reduceLinalgOnTensorsDelta(ChunkManager &chunker,
   ModuleOp module = workItem.getModule();
 
   SmallVector<linalg::LinalgOp> linalgOps;
+  SmallVector<linalg::LinalgOp> keepOps;
   module.walk([&](linalg::LinalgOp op) {
     if (!op.hasTensorSemantics())
       return;
@@ -47,6 +49,8 @@ void mlir::iree_compiler::reduceLinalgOnTensorsDelta(ChunkManager &chunker,
 
     if (!chunker.shouldFeatureBeKept()) {
       linalgOps.push_back(op);
+    } else {
+      keepOps.push_back(op);
     }
   });
 
@@ -55,6 +59,16 @@ void mlir::iree_compiler::reduceLinalgOnTensorsDelta(ChunkManager &chunker,
   }
 
   OpBuilder builder = workItem.getBuilder();
+
+  // Insert util.optimization_barrier for results of keep dispatch ops.
+  for (auto linalgOp : keepOps) {
+    builder.setInsertionPointAfter(linalgOp);
+    for (Value result : linalgOp->getResults()) {
+      builder.create<IREE::Util::OptimizationBarrierOp>(linalgOp.getLoc(),
+                                                        result);
+    }
+  }
+
   for (auto linalgOp : linalgOps) {
     builder.setInsertionPoint(linalgOp);
     Value out = linalgOp->getResult(0);
