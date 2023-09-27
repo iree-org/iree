@@ -10,8 +10,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler::Reducer {
 
 class WorkItem {
 public:
@@ -36,7 +35,6 @@ private:
   ModuleOp root;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Reducer
 
 #endif // IREE_COMPILER_REDUCER_WORK_ITEM_H

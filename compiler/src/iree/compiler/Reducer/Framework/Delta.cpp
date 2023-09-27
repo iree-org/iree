@@ -9,6 +9,7 @@
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
+using namespace mlir::iree_compiler::Reducer;
 
 #define DEBUG_TYPE "iree-reduce-framework"
 

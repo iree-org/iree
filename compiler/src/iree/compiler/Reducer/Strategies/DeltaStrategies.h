@@ -9,8 +9,7 @@
 
 #include "iree/compiler/Reducer/Framework/Delta.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler::Reducer {
 
 void reduceLinalgOnTensorsDelta(ChunkManager &chunker, WorkItem &workItem);
 void reduceFlowDispatchOperandToResultDelta(ChunkManager &chunker,
@@ -18,7 +17,6 @@ void reduceFlowDispatchOperandToResultDelta(ChunkManager &chunker,
 void reduceFlowDispatchResultBySplatDelta(ChunkManager &chunker,
                                           WorkItem &workItem);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Reducer
 
 #endif // IREE_COMPILER_REDUCER_DELTA_STRATEGIES_H_

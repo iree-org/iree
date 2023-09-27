@@ -12,8 +12,7 @@
 #include "iree/compiler/Reducer/Framework/WorkItem.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler::Reducer {
 
 using DeltaFunc = llvm::function_ref<void(ChunkManager &, WorkItem &)>;
 
@@ -35,7 +34,6 @@ private:
   WorkItem &root;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Reducer
 
 #endif // IREE_COMPILER_REDUCER_DELTA_H

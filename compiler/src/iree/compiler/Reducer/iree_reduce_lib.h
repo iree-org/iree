@@ -14,12 +14,12 @@ namespace mlir {
 
 class Operation;
 
-namespace iree_compiler {
+namespace iree_compiler::Reducer {
 
 Operation *ireeRunReducingStrategies(OwningOpRef<Operation *> module,
                                      StringRef testScript);
 
-} // namespace iree_compiler
+} // namespace iree_compiler::Reducer
 } // namespace mlir
 
 #endif // IREE_COMPILER_TOOLS_IREE_REDUCER_LIB_H

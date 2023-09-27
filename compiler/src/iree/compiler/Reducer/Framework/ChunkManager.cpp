@@ -9,20 +9,23 @@
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
+using namespace mlir::iree_compiler::Reducer;
 
 bool Chunk::contains(unsigned index) const {
   return index >= getBegin() && index < getEnd();
 }
 
-bool mlir::iree_compiler::operator==(const Chunk &C1, const Chunk &C2) {
+bool mlir::iree_compiler::Reducer::operator==(const Chunk &C1,
+                                              const Chunk &C2) {
   return C1.getRange() == C2.getRange();
 }
 
-bool mlir::iree_compiler::operator!=(const Chunk &C1, const Chunk &C2) {
+bool mlir::iree_compiler::Reducer::operator!=(const Chunk &C1,
+                                              const Chunk &C2) {
   return !(C1 == C2);
 }
 
-bool mlir::iree_compiler::operator<(const Chunk &C1, const Chunk &C2) {
+bool mlir::iree_compiler::Reducer::operator<(const Chunk &C1, const Chunk &C2) {
   return C1.getBegin() < C2.getBegin();
 }
 

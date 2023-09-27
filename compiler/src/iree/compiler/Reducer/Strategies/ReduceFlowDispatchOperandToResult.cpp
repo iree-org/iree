@@ -17,8 +17,9 @@
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
+using namespace mlir::iree_compiler::Reducer;
 
-void mlir::iree_compiler::reduceFlowDispatchOperandToResultDelta(
+void mlir::iree_compiler::Reducer::reduceFlowDispatchOperandToResultDelta(
     ChunkManager &chunker, WorkItem &workItem) {
   ModuleOp module = workItem.getModule();
 

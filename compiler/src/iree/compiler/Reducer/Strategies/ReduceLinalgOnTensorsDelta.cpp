@@ -18,9 +18,10 @@
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
+using namespace mlir::iree_compiler::Reducer;
 
-void mlir::iree_compiler::reduceLinalgOnTensorsDelta(ChunkManager &chunker,
-                                                     WorkItem &workItem) {
+void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
+    ChunkManager &chunker, WorkItem &workItem) {
   ModuleOp module = workItem.getModule();
 
   /// TODO(Groverkss): This pass can work for any op producing a tensor result.

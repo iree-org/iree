@@ -11,8 +11,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler::Reducer {
 
 /// Represents the range: [begin, end).
 class Chunk {
@@ -56,11 +55,10 @@ private:
   ArrayRef<Chunk> chunksToKeep;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Reducer
 
 namespace llvm {
-using Chunk = mlir::iree_compiler::Chunk;
+using Chunk = mlir::iree_compiler::Reducer::Chunk;
 
 template <>
 struct DenseMapInfo<Chunk> {

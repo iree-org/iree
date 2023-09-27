@@ -23,6 +23,7 @@
 using namespace mlir;
 using namespace llvm;
 using namespace mlir::iree_compiler;
+using namespace mlir::iree_compiler::Reducer;
 
 // Parse and verify the input MLIR file. Returns null on error.
 static OwningOpRef<Operation *> loadModule(MLIRContext &context,

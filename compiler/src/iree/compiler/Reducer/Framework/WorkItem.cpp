@@ -8,5 +8,6 @@
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
+using namespace mlir::iree_compiler::Reducer;
 
 WorkItem WorkItem::clone() { return WorkItem(root.clone()); }
