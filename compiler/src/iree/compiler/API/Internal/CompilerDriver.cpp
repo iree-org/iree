@@ -654,7 +654,7 @@ bool Invocation::initializeInvocation() {
         inputTypeMnemonics);
     if (!inputTypeMnemonics.contains(session.inputOptions.inputTypeMnemonic)) {
       auto diag = emitError(UnknownLoc::get(&session.context))
-                  << "unknown custom value for --input-input-type='"
+                  << "unknown custom value for --iree-input-type='"
                   << session.inputOptions.inputTypeMnemonic << "'";
       if (inputTypeMnemonics.empty()) {
         diag << " (none registered)";
