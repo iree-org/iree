@@ -12,7 +12,7 @@ package(default_visibility = ["//visibility:public"])
 # headers to disable additional validation.
 cc_library(
     name = "vulkan_video_headers",
-    hdrs = glob(["include/vulkan/vk_video/*.h"]),
+    hdrs = glob(["include/vk_video/*.h"]),
     include_prefix = "third_party/vulkan_headers",
     includes = ["include"],
 )
