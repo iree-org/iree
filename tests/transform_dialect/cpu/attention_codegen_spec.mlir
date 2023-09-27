@@ -7,8 +7,8 @@ transform.sequence failures(propagate) {
 
     // Tile and distribute to workgroups
     // ==========================================
-    %forall_grid, %tiled_attention =
-    transform.structured.tile_to_forall_op %attention num_threads [1]
+    %tiled_attention, %forall_grid =
+    transform.structured.tile_using_forall %attention num_threads [1]
       ( mapping = [#gpu.block<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid

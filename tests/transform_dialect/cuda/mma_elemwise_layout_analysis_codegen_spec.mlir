@@ -11,8 +11,8 @@ transform.sequence failures(propagate) {
 
   // Step 2. Tile the generic and fuse the fill and matmul
   // ===========================================================================
-  %forall_grid, %grid_reduction =
-  transform.structured.tile_to_forall_op %generic tile_sizes [16] ( mapping = [#gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %grid_reduction, %forall_grid =
+  transform.structured.tile_using_forall %generic tile_sizes [16] ( mapping = [#gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
 
   transform.structured.fuse_into_containing_op %matmul into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)

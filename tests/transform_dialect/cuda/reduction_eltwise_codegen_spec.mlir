@@ -31,7 +31,7 @@ transform.sequence failures(propagate) {
   // Step 2. First level of tiling + fusion parallelizes to blocks. Tile the
   // trailing elementwise the same way we want to tile the reduction.
   // ===========================================================================
-  %grid_loop, %eltwise_grid_op = transform.structured.tile_to_forall_op %eltwise
+  %eltwise_grid_op, %grid_loop = transform.structured.tile_using_forall %eltwise
     tile_sizes [1] (mapping = [#gpu.block<x>])
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %grid_loop : (!transform.any_op) -> ()
@@ -53,8 +53,8 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op
     : (!transform.any_op) -> !transform.any_op
-  %eltwise_block_loop, %eltwise_block_op =
-    transform.structured.tile_to_forall_op %eltwise_grid_op tile_sizes [1]
+  %eltwise_block_op, %eltwise_block_loop =
+    transform.structured.tile_using_forall %eltwise_grid_op tile_sizes [1]
     ( mapping = [#gpu.thread<z>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   %block_combiner_op = transform.structured.match ops{["linalg.generic"]}
@@ -78,8 +78,8 @@ transform.sequence failures(propagate) {
   %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op
       : (!transform.any_op) -> !transform.any_op
-  %forall_block_more_parallel_op, %block_more_parallel_op =
-    transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1]
+  %block_more_parallel_op, %forall_block_more_parallel_op =
+    transform.structured.tile_using_forall %grid_more_parallel_op tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
