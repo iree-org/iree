@@ -105,6 +105,7 @@ int ireeReduceRunMain(int argc, char **argv) {
   mlir::iree_compiler::registerAllDialects(registry);
 
   MLIRContext context(registry);
+  context.loadAllAvailableDialects();
 
   if (ireeReduceMainFromCL(argc, argv, context).failed()) {
     return 1;
