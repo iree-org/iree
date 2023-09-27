@@ -1,5 +1,3 @@
-// RUN: iree-reduce interesting.py softmax.mlir
-
 !tmp_tensor_t = tensor<16x128xf32>
 !in_tensor_t = tensor<16x128x128xf32>
 !out_tensor_t = tensor<16x128x128xf32>
