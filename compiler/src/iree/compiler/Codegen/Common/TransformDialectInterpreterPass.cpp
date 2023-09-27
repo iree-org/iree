@@ -130,6 +130,9 @@ public:
                                          : clTransformLibraryFileName;
     this->debugPayloadRootTag = debugPayloadRootTag.str();
     this->debugTransformRootTag = debugTransformRootTag.str();
+    // Disable expensive checks until
+    // https://github.com/llvm/llvm-project/pull/67437 gets merged.
+    this->options.enableExpensiveChecks(false);
   }
   TransformDialectInterpreterPass(const TransformDialectInterpreterPass &pass) =
       default;
