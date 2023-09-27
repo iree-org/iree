@@ -572,7 +572,8 @@ void addGPUTransformDialectPasses(OpPassManager &passManager,
                            : codegenSpecFileName.getValue();
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(
-          fileName, clGPUCodegenTransformDialectDebugPayloadTag,
+          fileName, /*transformLibraryFileName=*/StringRef(),
+          clGPUCodegenTransformDialectDebugPayloadTag,
           clGPUCodegenTransformDialectDebugTransformTag));
 
   // Dropping the schedule is needed:

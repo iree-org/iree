@@ -672,7 +672,8 @@ void addTransformDialectPasses(OpPassManager &passManager,
                            : codegenSpecFileName.getValue();
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(
-          fileName, clCPUCodegenTransformDialectDebugPayloadTag,
+          fileName, /*transformLibraryFileName=*/StringRef(),
+          clCPUCodegenTransformDialectDebugPayloadTag,
           clCPUCodegenTransformDialectDebugTransformTag));
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
