@@ -56,8 +56,6 @@ iree_compiler_cc_library(
         "SPIRVToMSL.cpp",
     ],
     hdrs = ["SPIRVToMSL.h"],
-    # Required because of spirv-cross headers.
-    copts = ["-Wno-error=unqualified-std-cast-call"],
     deps = [
         ":MetalTargetPlatform",
         "@llvm-project//llvm:Support",
