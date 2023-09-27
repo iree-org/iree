@@ -1,33 +1,13 @@
-// RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
-// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
-// RUN: iree-run-module --module=- --function=softmax --device=cuda | \
-// RUN: FileCheck %s
-
+// RUN: iree-reduce interesting.py softmax.mlir
 
 !tmp_tensor_t = tensor<16x128xf32>
 !in_tensor_t = tensor<16x128x128xf32>
 !out_tensor_t = tensor<16x128x128xf32>
 
-// Compilation checks that shuffles are produced.
-// CHECK-SHUFFLE: vector.reduction <maxf>
-// CHECK-SHUFFLE-COUNT-5: gpu.shuffle  xor
-// CHECK-SHUFFLE: vector.reduction <add>
-// CHECK-SHUFFLE-COUNT-5: gpu.shuffle  xor
-
-// Execution only checks that @softmax runs.
-//      CHECK: EXEC @softmax
-//      CHECK: 16x128x128xf32=[
-// CHECK-SAME:                [0.0078125 0.0078125 0.0078125 0.0078125
-
-func.func @softmax() -> !out_tensor_t {
+func.func @softmax(%input : !out_tensor_t) -> !out_tensor_t {
   %cst_0 = arith.constant 0.0 : f32
   %cst_1 = arith.constant 1.0 : f32
   %cst_min = arith.constant -3.40282347E+38 : f32
-  %input = arith.constant dense<5.000000e+00> : !out_tensor_t
-  util.optimization_barrier %input : !in_tensor_t
 
   %input_max_empty = tensor.empty() : !tmp_tensor_t
   %input_max_filled = linalg.fill ins(%cst_min : f32)
@@ -39,11 +19,10 @@ func.func @softmax() -> !out_tensor_t {
      ins(%input : !in_tensor_t)
     outs(%input_max_filled : !tmp_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32):
-        %max = arith.maxf %arg0, %arg1 : f32
+        %max = arith.maximumf %arg0, %arg1 : f32
         linalg.yield %max : f32
       } -> !tmp_tensor_t
 
-  // This has been fused manually to avoid the fusion on tensors pass and reduce noise atm.
   %exps_empty = tensor.empty() : !out_tensor_t
   %exps_sum_empty = tensor.empty() : !tmp_tensor_t
   %exps_sum_filled = linalg.fill ins(%cst_0 : f32)
@@ -81,9 +60,7 @@ func.func @softmax() -> !out_tensor_t {
      ins(%exps, %exps_sum : !out_tensor_t, !tmp_tensor_t)
     outs(%res_empty : !out_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
-        // %10 = arith.divf %cst_1, %arg1 : f32
-        // %11 = arith.mulf %arg0, %10 : f32
-        %div = arith.divf %arg0, %arg1 : f32
+        %div = arith.addf %arg0, %arg1 : f32
         linalg.yield %div : f32
       } -> !out_tensor_t
 
