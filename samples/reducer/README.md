@@ -7,7 +7,7 @@ already.
 The sample can be ran by:
 
 ```
-iree-reduce test/interesting.py test/softmax.mlir
+iree-reduce test/interesting.py test/reduce.mlir
 ```
 
 Getting these samples into the CI is being worked on.
