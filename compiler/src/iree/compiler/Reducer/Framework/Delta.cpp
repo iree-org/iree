@@ -12,6 +12,9 @@ using namespace mlir::iree_compiler;
 
 #define DEBUG_TYPE "iree-reduce-framework"
 
+/// Checks if the program is still interesting after removing the
+/// `maybeUninterestingChunk`. If it is still interesting, returns the
+/// reduced program. Otherwise, returns a failure.
 FailureOr<WorkItem> Delta::checkChunk(Chunk maybeUninterestingChunk,
                                       DeltaFunc deltaFunc,
                                       ArrayRef<Chunk> maybeInterestingChunks,

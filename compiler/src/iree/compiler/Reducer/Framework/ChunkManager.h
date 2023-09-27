@@ -17,11 +17,12 @@ namespace iree_compiler {
 /// Represents the range: [begin, end).
 class Chunk {
 public:
-  Chunk(unsigned begin, unsigned end) : begin(begin), end(end){};
+  Chunk(unsigned begin, unsigned end) : range({begin, end}){};
   Chunk(unsigned numTargets) : Chunk(0, numTargets){};
 
-  unsigned getBegin() const { return begin; }
-  unsigned getEnd() const { return end; }
+  unsigned getBegin() const { return range.first; }
+  unsigned getEnd() const { return range.second; }
+  std::pair<unsigned, unsigned> getRange() const { return range; }
 
   bool contains(unsigned index) const;
 
@@ -29,8 +30,7 @@ public:
   void dump() const;
 
 private:
-  unsigned begin;
-  unsigned end;
+  std::pair<unsigned, unsigned> range;
 };
 
 bool operator==(const Chunk &C1, const Chunk &C2);
@@ -51,7 +51,7 @@ public:
 
 private:
   // The index of the feature being processed.
-  unsigned featureIndex = 0;
+  int64_t featureIndex = 0;
 
   ArrayRef<Chunk> chunksToKeep;
 };

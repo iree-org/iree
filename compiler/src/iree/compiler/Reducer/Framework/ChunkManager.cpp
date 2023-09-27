@@ -11,11 +11,11 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 
 bool Chunk::contains(unsigned index) const {
-  return index >= begin && index < getEnd();
+  return index >= getBegin() && index < getEnd();
 }
 
 bool mlir::iree_compiler::operator==(const Chunk &C1, const Chunk &C2) {
-  return C1.getBegin() == C2.getBegin() && C1.getEnd() == C2.getEnd();
+  return C1.getRange() == C2.getRange();
 }
 
 bool mlir::iree_compiler::operator!=(const Chunk &C1, const Chunk &C2) {
@@ -23,19 +23,18 @@ bool mlir::iree_compiler::operator!=(const Chunk &C1, const Chunk &C2) {
 }
 
 bool mlir::iree_compiler::operator<(const Chunk &C1, const Chunk &C2) {
-  return std::make_pair(C1.getBegin(), C1.getEnd()) <
-         std::make_pair(C2.getBegin(), C2.getEnd());
+  return C1.getBegin() < C2.getBegin();
 }
 
 void Chunk::print(raw_ostream &os) const {
-  os << "[" << begin << ", " << end << ")\n";
+  os << "[" << getBegin() << ", " << getEnd() << ")\n";
 }
 
 void Chunk::dump() const { print(llvm::errs()); }
 
 bool ChunkManager::shouldFeatureBeKept() {
   if (chunksToKeep.empty()) {
-    featureIndex++;
+    ++featureIndex;
     return false;
   }
 
