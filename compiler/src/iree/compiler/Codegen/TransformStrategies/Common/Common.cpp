@@ -41,7 +41,7 @@ using transform::PrintOp;
 using transform::SequenceOp;
 using transform::SplitHandleOp;
 using transform::SplitReductionOp;
-using transform::TileToForallOp;
+using transform::TileUsingForallOp;
 using transform::VectorizeChildrenAndApplyPatternsOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::TakeFirstOp;
@@ -170,7 +170,7 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
                                            bool canonicalize) {
   assert(opsHToFuse.empty() && "No fusion supported yet");
   iree_compiler::TileToScfForAndFuseResult result;
-  auto tiletoScfForOp = b.create<transform::TileOp>(rootH, tileSizes);
+  auto tiletoScfForOp = b.create<transform::TileUsingForOp>(rootH, tileSizes);
   result.forLoops = tiletoScfForOp.getLoops();
   result.tiledOpH = tiletoScfForOp.getTiledLinalgOp();
 
@@ -213,7 +213,7 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b, Value variantH,
                                   ArrayRef<OpFoldResult> tileSizesOrNumThreads,
                                   ArrayAttr threadDimMapping) {
   iree_compiler::TileToForallAndFuseAndDistributeResult result;
-  auto tileToForeachOp = b.create<TileToForallOp>(
+  auto tileToForeachOp = b.create<TileUsingForallOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
 
   result.forallH = tileToForeachOp.getForallOp();

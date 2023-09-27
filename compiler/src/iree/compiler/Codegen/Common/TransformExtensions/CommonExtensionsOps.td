@@ -387,7 +387,7 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
     This region may require arbitrary computations and cannot magically match
     what the `stream.cmd.dispatch` has already imposed on us at a distance.
     For now we must specify the number of values properly when applying the
-    topLevel tile_to_forall_op.
+    topLevel tile_using_forall.
 
     If the unique topLevel scf.forall operation contained within the
     FuncOp referred to by the `target` transform handle lowers to workgroup
