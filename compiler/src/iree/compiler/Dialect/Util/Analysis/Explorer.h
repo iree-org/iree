@@ -234,7 +234,9 @@ public:
   // enumerated if there is recursion.
   TraversalResult walkIncomingBranchOperands(
       Block *targetBlock,
-      std::function<WalkResult(Block *sourceBlock, OperandRange operands)> fn);
+      std::function<WalkResult(Block *sourceBlock, OperandRange operands,
+                               size_t offset)>
+          fn);
 
   // Walks all predecessor blocks providing values for |blockArg|.
   TraversalResult walkIncomingBlockArgument(

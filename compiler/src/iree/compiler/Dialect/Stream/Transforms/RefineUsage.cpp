@@ -303,6 +303,23 @@ struct ApplyScfIfOp : public UsageRefinementPattern<mlir::scf::IfOp> {
   }
 };
 
+struct ApplyScfForOp : public UsageRefinementPattern<mlir::scf::ForOp> {
+  using UsageRefinementPattern<mlir::scf::ForOp>::UsageRefinementPattern;
+  LogicalResult matchAndRewrite(mlir::scf::ForOp op,
+                                PatternRewriter &rewriter) const override {
+    bool didChange = this->applyRegionTransitions(op, rewriter);
+    for (unsigned i = 0; i < op->getNumResults(); ++i) {
+      auto result = op->getResult(i);
+      if (llvm::isa<IREE::Stream::ResourceType>(result.getType())) {
+        if (this->applyResultTransition(op, result, rewriter))
+          didChange |= true;
+      }
+    }
+
+    return success(didChange);
+  }
+};
+
 struct ApplyScfWhileOp : public UsageRefinementPattern<mlir::scf::WhileOp> {
   using UsageRefinementPattern<mlir::scf::WhileOp>::UsageRefinementPattern;
   LogicalResult matchAndRewrite(mlir::scf::WhileOp op,
@@ -390,9 +407,8 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
                                           RewritePatternSet &patterns) {
   // NOTE: only ops that return values or contain regions need to be handled.
-  patterns
-      .insert<ApplyInitializerOp, ApplyFuncOp, ApplyScfIfOp, ApplyScfWhileOp>(
-          context, analysis);
+  patterns.insert<ApplyInitializerOp, ApplyFuncOp, ApplyScfForOp, ApplyScfIfOp,
+                  ApplyScfWhileOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::OptimizationBarrierOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
                   ApplyGenericOp<mlir::func::CallOp>,

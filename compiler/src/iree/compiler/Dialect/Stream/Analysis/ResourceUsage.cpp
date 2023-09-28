@@ -512,6 +512,19 @@ private:
                 return WalkResult::advance();
               });
         })
+        .Case([&](mlir::scf::ForOp op) {
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getOperand(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= operandUsage.getState();
+          int64_t blockIdx = operandIdx > 0 ? operandIdx - 2 : operandIdx;
+          if (blockIdx >= 0) {
+            auto &beforeUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(op.getBody()->getArgument(blockIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= beforeUsage.getState();
+          }
+        })
         .Case([&](mlir::scf::WhileOp op) {
           auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op->getOperand(operandIdx)),
@@ -562,6 +575,19 @@ private:
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
+          }
+
+          if (auto forOp = dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
+            auto value = Position::forValue(
+                forOp.getRegion().front().getArgument(operandIdx + 1));
+            auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, value, DFX::Resolution::REQUIRED);
+            getState() ^= valueUsage.getState();
+
+            auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(forOp->getResult(operandIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= parentUsage.getState();
           }
         })
         .Case([&](mlir::func::ReturnOp op) {
@@ -809,6 +835,7 @@ ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
     : explorer(rootOp, TraversalAction::SHALLOW), solver(explorer, allocator) {
   explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
+  explorer.setOpAction<mlir::scf::ForOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::scf::WhileOp>(TraversalAction::RECURSE);
   explorer.setDialectAction<IREE::Stream::StreamDialect>(
