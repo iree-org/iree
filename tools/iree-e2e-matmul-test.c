@@ -666,22 +666,14 @@ static bool matmul_result_elements_agree(iree_e2e_test_value_t expected,
     // expected values. Inexact results are only permitted when the
     // `require_exact_results` flag is set to `false`.
     case IREE_E2E_TEST_VALUE_TYPE_F16:
-      if (actual.f16_u16 == expected.f16_u16) {
-        return true;
-      }
-      if (FLAG_require_exact_results) {
-        return false;
-      }
+      if (actual.f16_u16 == expected.f16_u16) return true;
+      if (FLAG_require_exact_results) return false;
       return fabsf(iree_math_f16_to_f32(actual.f16_u16) -
                    iree_math_f16_to_f32(expected.f16_u16)) <
              FLAG_acceptable_fp_delta;
     case IREE_E2E_TEST_VALUE_TYPE_F32:
-      if (actual.f32 == expected.f32) {
-        return true;
-      }
-      if (FLAG_require_exact_results) {
-        return false;
-      }
+      if (actual.f32 == expected.f32) return true;
+      if (FLAG_require_exact_results) return false;
       return fabsf(actual.f32 - expected.f32) < FLAG_acceptable_fp_delta;
     default:
       iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
