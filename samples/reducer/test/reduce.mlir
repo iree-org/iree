@@ -1,8 +1,18 @@
+// This file contains a file that compiles down to VM dialect.
+//
+// The contents of this file do not matter, it is simply used to show the
+// reduction in the size of the test case. The assumed bug in this file is that
+// when the file is lowered to VM dialect, it produces the operation "vm.add",
+// which is assumed to have a bug. The interesting.py script simply greps for
+// "vm.add" in the output of the compilation.
+// 
+// The expected reduced test case output can be seen in output.mlir file.
+
 !tmp_tensor_t = tensor<16x128xf32>
 !in_tensor_t = tensor<16x128x128xf32>
 !out_tensor_t = tensor<16x128x128xf32>
 
-func.func @softmax(%input : !out_tensor_t) -> !out_tensor_t {
+func.func @func(%input : !out_tensor_t) -> !out_tensor_t {
   %cst_0 = arith.constant 0.0 : f32
   %cst_1 = arith.constant 1.0 : f32
   %cst_min = arith.constant -3.40282347E+38 : f32
