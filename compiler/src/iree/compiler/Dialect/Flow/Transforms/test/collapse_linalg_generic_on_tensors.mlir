@@ -576,3 +576,22 @@ module {
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   return %[[DISPATCH]]
+
+// -----
+
+module {
+  func.func @catch_invalid_collapse(%arg0 : tensor<10x20x30xf32>) -> tensor<10x30x40xf32> {
+    %0 = tensor.empty() : tensor<10x30x40xf32>
+    %1 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+        ins(%arg0 : tensor<10x20x30xf32>) outs(%0 : tensor<10x30x40xf32>) {
+      ^bb0(%b0 : f32, %b1 : f32):
+        linalg.yield %b0 : f32
+    } -> tensor<10x30x40xf32>
+    return %1 : tensor<10x30x40xf32>
+  }
+}
+// CHECK-LABEL: func @catch_invalid_collapse
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel"]

@@ -66,8 +66,10 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
   rDimsSet.insert(rDims.begin(), rDims.end());
 
   auto hasAllMapsSameSequence = [&](AffineExpr preExpr, AffineExpr nextExpr) {
-    // Either both `preExpr` and `nextExpr` are contiguous, or are missing in
-    // all the maps.
+    // Check that all indexing maps of the `genericOp`
+    // - Either both `preExpr` and `nextExpr` contiguous, or
+    // - are missing in
+    // Then `preExpr` and `nextExpr` can be collapsed.
     for (AffineMap map : genericOp.getIndexingMapsArray()) {
       // If map has no results, no need to check.
       if (map.getNumResults() == 0) {
@@ -84,9 +86,17 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
             return false;
           }
         }
-        // If we find nextExpr at the beginning, then return false.
-        if (index == 0 && resultExpr == nextExpr) {
-          return false;
+        // If we find nextExpr the previous one should be `prevExpr`.
+        // This is redundant check for the most part, but is cheap enough, so
+        // #YOLO
+        if (resultExpr == nextExpr) {
+          if (index == 0) {
+            // match at beginning of the list. Return false;
+            return false;
+          }
+          if (map.getResult(index - 1) != preExpr) {
+            return false;
+          }
         }
       }
     }
@@ -101,6 +111,17 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
 
   ReassociationIndices range;
   AffineExpr preExpr;
+  // Find the largest sequence of dimensions that are
+  // - Either preserved in all maps, or
+  // - are completely absent
+  // This sequence can be collapsed. To find the sequence,
+  // 1) Take the result expressions of one of the indexing maps
+  // 2) Find a sequence of 2 that is found in all maps
+  // 3) Then take last element of this sequence and the next
+  //    result expression, and check if this sequence of 2 is
+  //    found in all maps. If so, add to sequence (to get a sequence of 3)
+  //    and repeat till the last element of sequence and the next result
+  //    expression is not found as a sequence in all maps.
   for (auto nextExpr : genericOp.getIndexingMapsArray().front().getResults()) {
     if (!range.empty()) {
       if (!hasAllMapsSameSequence(preExpr, nextExpr) ||
