@@ -25,7 +25,7 @@
 IREE_FLAG(bool, require_exact_results, true,
           "Requires floating point result elements to match exactly.");
 IREE_FLAG(
-    double, acceptable_fp_delta, 1e-5,
+    float, acceptable_fp_delta, 1e-5,
     "Maximum absolute difference allowed with inexact floating point results.");
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
