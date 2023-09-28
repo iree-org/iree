@@ -227,6 +227,17 @@ static LogicalResult serializeRawData(Location loc,
   return success();
 }
 
+// Serializes the raw data of the given |resourceElementsAttr| to |os|.
+// Assumes that the caller knows what they are doing; the raw data must be in
+// the expected endianness and be densely packed.
+static LogicalResult serializeResourceRawData(Location loc,
+                                      DenseResourceElementsAttr resourceElementsAttr,
+                                      llvm::raw_ostream &os) {
+  auto rawData = resourceElementsAttr.getRawHandle().getBlob()->getData();
+  os.write(rawData.data(), rawData.size());
+  return success();
+}
+
 // Stream writer that supports bit packing.
 // In the initial state the writer starts at a byte-aligned offset 0 and as new
 // values of |logicalBitWidth| are written they will be appended in
@@ -425,6 +436,47 @@ serializeGenericElementData(Location loc, DenseElementsAttr elementsAttr,
     }
   }
   return emitError(loc) << "unhandled constant type " << elementsAttr.getType();
+}
+
+// Performs slow generic serialization of all of the elements in |resourceElementsAttr|.
+// Respects the target |endian| setting, performing byte swaps if required.
+static LogicalResult
+serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr resourceElementsAttr,
+                            llvm::support::endianness endian,
+                            llvm::raw_ostream &os) {
+  llvm::outs() << "SERIALIZE GENERIC RESOURCE ELEMENT DATA\n";
+  bool isDenseIntegerResource = isa<DenseBoolResourceElementsAttr,
+                                    DenseI8ResourceElementsAttr,
+                                    DenseI16ResourceElementsAttr,
+                                    DenseI32ResourceElementsAttr,
+                                    DenseI64ResourceElementsAttr>(resourceElementsAttr);
+  if (isDenseIntegerResource) {
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+    case 1:
+      llvm::outs() << "HERE 1\n";
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 8:
+      llvm::outs() << "HERE 8\n";
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 16:
+      llvm::outs() << "HERE 16\n";
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 32:
+      llvm::outs() << "HERE 32\n";
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 64:
+      llvm::outs() << "HERE 64\n";
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    default:
+      return emitError(loc)
+             << "unhandled integer element bit width " << bitWidth
+             << " for type " << resourceElementsAttr.getType();
+    }
+  }
+  return emitError(loc) << "unhandled constant type " << resourceElementsAttr.getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -755,6 +807,9 @@ struct SerializableDenseResourceElementsAttrModel
       }
       os.write_zeros(getStorageSize(baseAttr));
       return success();
+    } else {
+      os.reserveExtraSpace(getStorageSize(baseAttr));
+      return serializeGenericResourceElementData(loc, attr, endian, os);
     }
 
     return mlir::emitError(loc)
