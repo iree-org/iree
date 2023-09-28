@@ -43,8 +43,16 @@ static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
     regionOp = maybeRegionOp.value();
   }
 
-  FailureOr<DispatchRegionOp> maybeFusedRegionOp =
-      movePrecedingOpsIntoDispatchRegion(rewriter, dequant, regionOp);
+  FailureOr<DispatchRegionOp> maybeFusedRegionOp;
+  if (dequant->hasOneUse()) {
+    maybeFusedRegionOp =
+        movePrecedingOpsIntoDispatchRegion(rewriter, dequant, regionOp);
+  } else {
+    // Clone the dequant operation if there are multiple uses of dequant.
+    maybeFusedRegionOp =
+        clonePrecedingOpIntoDispatchRegion(rewriter, dequant, regionOp);
+  }
+
   if (failed(maybeFusedRegionOp))
     return failure();
 

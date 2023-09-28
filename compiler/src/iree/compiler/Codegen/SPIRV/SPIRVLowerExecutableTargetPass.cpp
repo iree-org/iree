@@ -175,6 +175,9 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
     case CodeGenPipeline::SPIRVBaseVectorize:
       addSPIRVBaseVectorizePassPipeline(pipeline);
       break;
+    case CodeGenPipeline::SPIRVSubgroupReduce:
+      addSPIRVSubgroupReducePassPipeline(pipeline);
+      break;
     case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
       addSPIRVCooperativeMatrixVectorizePassPipeline(
           pipeline, translationInfo.value().getSoftwarePipelineDepth(),
@@ -184,9 +187,6 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       addSPIRVMatmulPromoteVectorizePassPipeline(
           pipeline, translationInfo.value().getSoftwarePipelineDepth(),
           translationInfo.value().getSoftwarePipelineStoreStage());
-      break;
-    case CodeGenPipeline::SPIRVSubgroupReduce:
-      addSPIRVSubgroupReducePassPipeline(pipeline);
       break;
     case CodeGenPipeline::SPIRVWinogradVectorize:
       addSPIRVWinogradVectorizePassPipeline(pipeline);

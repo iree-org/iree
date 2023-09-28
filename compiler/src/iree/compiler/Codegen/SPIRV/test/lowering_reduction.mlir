@@ -1,9 +1,11 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-spirv-lower-executable-target-pass)))' \
+// RUN:   %s | FileCheck %s
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
     [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, Unknown:Unknown,
-    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32, cooperative_matrix_properties_nv = []>>}>
+    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32, cooperative_matrix_properties_khr = []>>}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 

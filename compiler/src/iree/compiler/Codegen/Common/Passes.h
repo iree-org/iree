@@ -36,8 +36,6 @@ void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
-        std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 std::unique_ptr<OperationPass<LLVM::LLVMFuncOp>> createAddFastMathFlagsPass();
@@ -173,8 +171,6 @@ createHoistStaticallyBoundAllocationsPass();
 /// striding) and default memory space.
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
-        std::nullopt,
-    std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
         std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 

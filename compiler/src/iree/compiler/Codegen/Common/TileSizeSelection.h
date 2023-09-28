@@ -30,7 +30,7 @@ public:
 
   /// Returns the number of tiling levels of the configuration.
   unsigned getNumTilingLevels() {
-    return loweringConfig.getTileSizes().size();
+    return loweringConfig.getTilingLevels().size();
   };
 
   /// Returns the number of dimensions of the configuration. All the tiling
@@ -104,7 +104,6 @@ public:
   SmallVector<int64_t> getFusableLevels();
 
   // TODO(dcaballe): Revisit if these features are ever used.
-  ArrayAttr getTileInterchange() { return loweringConfig.getTileInterchange(); }
   SmallVector<int64_t> getTileInterchangeSizes(unsigned level) {
     return loweringConfig.getTileInterchangeVals(level);
   }

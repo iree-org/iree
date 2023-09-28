@@ -350,7 +350,7 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
         if (attr.getValue().isa<IREE::Codegen::ExportConfigAttr>()) {
           workgroupSize = attr.getValue()
                               .cast<IREE::Codegen::ExportConfigAttr>()
-                              .getWorkgroupSize();
+                              .getWorkgroupSizeIndexArray();
           if (workgroupSize.size() < 3) {
             SmallVector<Attribute> workgroupSizeVals =
                 llvm::to_vector(workgroupSize);

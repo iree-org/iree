@@ -112,11 +112,6 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
-static LogicalResult cpuDeallocationFn(OpBuilder &builder, Location loc,
-                                       Value allocation) {
-  return success();
-}
-
 static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   createLinalgCopyOp(builder, loc, from, to);
@@ -125,10 +120,8 @@ static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
 
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = cpuAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn = cpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
 }
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
@@ -228,17 +221,14 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   }
 
   // Verify interchange
-  if (!tilingConfig.getTileInterchange().empty()) {
-    for (auto level : llvm::seq<unsigned>(
-             0,
-             static_cast<unsigned>(tilingConfig.getTileInterchange().size()))) {
-      auto tileSizes = tilingConfig.getTileSizes()[level];
-      auto interchange = tilingConfig.getTileInterchangeSizes(level);
-      if (!isValidInterchange(interchange, tileSizes.size())) {
-        return op->emitOpError("expected [0, ")
-               << tileSizes.size()
-               << ") to be set exactly once in interchange #" << level;
-      }
+  auto tileSizesForLevel = tilingConfig.getTileSizes();
+  for (int level = 0; level < tilingConfig.getNumTilingLevels(); level++) {
+    auto interchange = tilingConfig.getTileInterchangeSizes(level);
+    auto &tileSizes = tileSizesForLevel[level];
+    if (!isValidInterchange(interchange, tileSizes.size())) {
+      return op->emitOpError("expected [0, ")
+             << tileSizes.size() << ") to be set exactly once in interchange #"
+             << level;
     }
   }
 

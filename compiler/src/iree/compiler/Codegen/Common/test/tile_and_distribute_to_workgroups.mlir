@@ -1698,7 +1698,7 @@ hal.executable private @rank_reduced_slice {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 0], [8, 32, 0], [0, 0, 16]], tile_interchange = [[1, 0, 2], [], []]>
+#config = #iree_codegen.lowering_config<tile_sizes = [{sizes=[32, 64, 0], interchange=[1, 0, 2]}, [8, 32, 0], [0, 0, 16]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
