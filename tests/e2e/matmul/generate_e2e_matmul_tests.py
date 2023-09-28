@@ -91,11 +91,9 @@ class CompilationInfo:
     # Compilation info
     workgroup_size: typing.List[int]
 
-    # Prints the workgroup size as 'index' types
+    # Prints the workgroup size
     def workgroup_size_str(self):
-        return (
-            "[" + ", ".join([f"{size} : index" for size in self.workgroup_size]) + "]"
-        )
+        return "[" + ", ".join(map(str, self.workgroup_size)) + "]"
 
 
 # Returns the list of TestShape's to use for the collection of shapes

@@ -22,11 +22,11 @@ module {
 
 module {
   func.func @test() attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [10]], tile_interchange = [[], []], native_vector_size = [32, 32]>} {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [10]], native_vector_size = [32, 32]>} {
     return
   }
 }
-// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [10]{{\]}}, tile_interchange = {{\[}}[], []], native_vector_size = [32, 32]>
+// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [10]{{\]}}, native_vector_size = [32, 32]>
 
 // -----
 
@@ -34,8 +34,7 @@ module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
          lowering_config = <tile_sizes = []>,
-         translation_info = <CPUDefault>,
-         workgroup_size = []>} {
+         translation_info = <CPUDefault>>} {
     return
   }
 }
@@ -64,9 +63,9 @@ module {
 
 module {
   func.func @test() attributes {
-    export_config = #iree_codegen.export_config<workgroup_size = [4: index, 1: index]>
+    export_config = #iree_codegen.export_config<workgroup_size = [4, 1]>
   } {
     return
   }
 }
-// CHECK: #iree_codegen.export_config<workgroup_size = [4 : index, 1 : index]
+// CHECK: #iree_codegen.export_config<workgroup_size = [4, 1]

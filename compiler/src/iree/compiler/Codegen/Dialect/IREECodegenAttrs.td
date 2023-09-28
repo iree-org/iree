@@ -155,6 +155,24 @@ def IREECodegen_TranslationInfoAttr :
   let genVerifyDecl = 1;
 }
 
+def IREECodegen_LoweringConfigTilingLevelAttr :
+  AttrDef<IREECodegen_Dialect, "LoweringConfigTilingLevel", []>
+{
+  let mnemonic = "lowering_config_level";
+  let parameters = (ins
+    ArrayRefParameter<"int64_t",
+        "The tile sizes to use for this level of tiling">:$sizes,
+    OptionalArrayRefParameter<"int64_t",
+        "The tile interchange to use for this level of tiling">:$interchange);
+  let hasCustomAssemblyFormat = 1;
+}
+
+def IREECodegen_LoweringConfigTilingLevelsAttr :
+  ArrayOfAttr<IREECodegen_Dialect, "LoweringConfigTilingLevels",
+    "lowering_config_levels", "LoweringConfigTilingLevelAttr", []>
+{
+}
+
 def IREECodegen_LoweringConfigAttr :
     AttrDef<IREECodegen_Dialect, "LoweringConfig", []> {
   let mnemonic = "lowering_config";
@@ -171,21 +189,17 @@ def IREECodegen_LoweringConfigAttr :
     implementation. In future, each pass pipeline could verify that
     the lowering configuration has all the necessary attributes for
     the pipeline.
-
   }];
 
   let assemblyFormat = [{
-    `<` `tile_sizes` `=` $tileSizes
-      (`,` `tile_interchange` `=` $tileInterchange^)?
-      (`,` `native_vector_size` `=` $nativeVectorSize^)? `>`
+    `<` `tile_sizes` `=` $tilingLevels
+      (`,` `native_vector_size` `=` `[` $nativeVectorSize^ `]`)? `>`
   }];
 
   let parameters = (ins
-    AttrParameter<"ArrayAttr",
-        "The tile sizes to use for different levels of tiling">:$tileSizes,
-    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
-        "The tile interchange to use for different levels of tiling">:$tileInterchange,
-    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
+    AttrParameter<"LoweringConfigTilingLevelsAttr",
+        "The lowering config at different levels">:$tilingLevels,
+    OptionalArrayRefParameter<"int64_t",
         "The native vector size to use for the given operation">:$nativeVectorSize
   );
   let builders = [
@@ -204,8 +218,11 @@ def IREECodegen_LoweringConfigAttr :
     SmallVector<int64_t> getTileInterchangeVals(unsigned level);
 
     // Returns the native vector size to use.
-    SmallVector<int64_t> getNativeVectorSizeVals();
+    SmallVector<int64_t> getNativeVectorSizeVals() {
+      return SmallVector<int64_t>(getNativeVectorSize());
+    }
   }];
+
   let genVerifyDecl = 1;
 }
 
@@ -233,28 +250,21 @@ def IREECodegen_CompilationInfoAttr :
   let parameters = (ins
     AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
-    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
-        "The workgroup size to use during translation.">:$workgroupSize,
+    OptionalArrayRefParameter<"int64_t", "The workgroup size to use during translation.">:$workgroupSize,
     OptionalParameter<"std::optional<int64_t>",
         "The subgroup size to use during translation.">:$subgroupSize
   );
 
   let assemblyFormat = [{
     `<` `lowering_config` `=` $loweringConfig `,` `translation_info` `=` $translationInfo
-    (`,` `workgroup_size` `=` $workgroupSize^)?
+    (`,` `workgroup_size` `=` `[` $workgroupSize^ `]`)?
     (`,` `subgroup_size` `=` $subgroupSize^)? `>`
   }];
 
-  // The builder is externally for auto-tuner to generate the attributes.
-  let builders = [
-    AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
-      "TranslationInfoAttr":$translationInfo,
-      "ArrayRef<int64_t>":$workgroupSize,
-      "std::optional<int64_t>":$subgroupSize
-      )>,
-  ];
   let extraClassDeclaration = [{
-    SmallVector<int64_t> getWorkgroupSizeVals();
+    SmallVector<int64_t> getWorkgroupSizeVals() {
+      return SmallVector<int64_t>(getWorkgroupSize());
+    }
   }];
   let genVerifyDecl = 1;
 }
@@ -266,10 +276,13 @@ def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> 
     Allows setting workgroup size for pre-formed dispatches.
   }];
   let parameters = (ins
-    AttrParameter<"ArrayAttr", "Workgroup Size to use">:$workgroup_size
+    ArrayRefParameter<"int64_t", "Workgroup Size to use">:$workgroup_size
   );
   let assemblyFormat = [{
-    `<` `workgroup_size` `=` $workgroup_size `>`
+    `<` `workgroup_size` `=` `[` $workgroup_size `]` `>`
+  }];
+  let extraClassDeclaration = [{
+    ArrayAttr getWorkgroupSizeIndexArray();
   }];
   let genVerifyDecl = 1;
 }

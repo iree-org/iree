@@ -223,17 +223,14 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   }
 
   // Verify interchange
-  if (!tilingConfig.getTileInterchange().empty()) {
-    for (auto level : llvm::seq<unsigned>(
-             0,
-             static_cast<unsigned>(tilingConfig.getTileInterchange().size()))) {
-      auto tileSizes = tilingConfig.getTileSizes()[level];
-      auto interchange = tilingConfig.getTileInterchangeSizes(level);
-      if (!isValidInterchange(interchange, tileSizes.size())) {
-        return op->emitOpError("expected [0, ")
-               << tileSizes.size()
-               << ") to be set exactly once in interchange #" << level;
-      }
+  auto tileSizesForLevel = tilingConfig.getTileSizes();
+  for (int level = 0; level < tilingConfig.getNumTilingLevels(); level++) {
+    auto interchange = tilingConfig.getTileInterchangeSizes(level);
+    auto &tileSizes = tileSizesForLevel[level];
+    if (!isValidInterchange(interchange, tileSizes.size())) {
+      return op->emitOpError("expected [0, ")
+             << tileSizes.size() << ") to be set exactly once in interchange #"
+             << level;
     }
   }
 

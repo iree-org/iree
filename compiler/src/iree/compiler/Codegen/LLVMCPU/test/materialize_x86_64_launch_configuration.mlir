@@ -328,8 +328,7 @@ hal.executable private @add_static {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingPadExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1902,7 +1901,7 @@ hal.executable private @no_compute_ops {
     }
   }
 }
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault> 
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @no_compute_ops
 //      CHECK:   hal.executable.export public @test
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
