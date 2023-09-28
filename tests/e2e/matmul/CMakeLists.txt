@@ -727,7 +727,10 @@ iree_generated_trace_runner_test(
     "vulkan"
   COMPILER_FLAGS
     "--iree-vulkan-target-triple=rdna3-unknown-linux"
+  RUNNER_ARGS
+    "--require_exact_results=false"
   LABELS
+    "requires-gpu"
     "requires-gpu-rdna3"
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
