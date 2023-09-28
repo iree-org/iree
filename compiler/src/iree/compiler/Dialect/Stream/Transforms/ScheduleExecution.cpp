@@ -16,6 +16,7 @@
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -217,6 +218,101 @@ static SmallVector<Block *, 8> sortBlocksInDominanceOrder(Region &region) {
   return orderedBlocks;
 }
 
+LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
+                            const PartitioningConfigAttr &configAttr) {
+  for (auto *block : sortBlocksInDominanceOrder(region)) {
+    // Compute a set of partitions covering all of the streamable ops in the
+    // block.
+    auto partitionSet = partitionStreamableOps(configAttr, block);
+    if (partitionSet.empty())
+      continue;
+    if (failed(partitionSet.verify(loc))) {
+      return failure();
+    }
+
+    // Create partition builders for each partition.
+    // We'll clone ops into each and insert them into the block at the
+    // appropriate position (first use... probably).
+    IRMapping mapping;
+    SmallVector<ExecutePartitionBuilder> partitionBuilders;
+    partitionBuilders.reserve(partitionSet.size());
+    for (auto partition : llvm::enumerate(partitionSet.partitions)) {
+      partitionBuilders.push_back(ExecutePartitionBuilder(
+          block, partition.index(), &partition.value(), mapping, context));
+    }
+
+    // Walk over each op in the original block and find those that need to be
+    // partitioned. Each partition builder may clone the op into itself. The
+    // op will always be left in the original block and we'll rely on DCE to
+    // remove the ones no longer required. This is not a good approach as it
+    // creates a lot of new IR (up to O(op*partitions)).
+    SetVector<Operation *> deadOps;
+    for (auto &op : *block) {
+      if (op.hasTrait<OpTrait::IsTerminator>())
+        continue;
+      for (auto &partitionBuilder : partitionBuilders) {
+        partitionBuilder.visit(&op);
+      }
+      if (isa<IREE::Stream::StreamableOpInterface>(op)) {
+        deadOps.insert(&op);
+      }
+    }
+
+    // Apply remapping for values captured/escaping partitions.
+    // We must do this per block as we'll be updating dominated block values.
+    for (auto &partitionBuilder : partitionBuilders) {
+      // Finish construction and insert the yield.
+      auto executeOp = partitionBuilder.finish();
+
+      OpBuilder builder(executeOp);
+      builder.setInsertionPointAfter(executeOp);
+      for (auto [oldResult, newResult, newResultSize] : llvm::zip_equal(
+               partitionBuilder.partition->outs, executeOp.getResults(),
+               executeOp.getResultSizes())) {
+        // Insert one await per result. We could batch them all but that would
+        // prematurely tie their lifetimes together. By having unique awaits
+        // we allow propagation to move the waits further to where the values
+        // are used (including right into other execution regions).
+        auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
+            executeOp.getLoc(), newResult, newResultSize,
+            executeOp.getResultTimepoint());
+        if (executeOp.getAffinity().has_value()) {
+          awaitOp.setAffinityAttr(executeOp.getAffinityAttr());
+        }
+
+        oldResult.replaceAllUsesWith(awaitOp.getResults().front());
+        deadOps.insert(oldResult.getDefiningOp());
+      }
+
+      // Sort the ops in the execution region. This is safe because we are
+      // still unaliased and SSA values imply ordering.
+      mlir::sortTopologically(block);
+    }
+    for (auto *deadOp : llvm::reverse(deadOps)) {
+      deadOp->erase();
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\nPartitions constructed:\n";
+      block->dump();
+    });
+  }
+
+  for (auto *block : sortBlocksInDominanceOrder(region)) {
+    for (auto &op : *block) {
+      if (isa<scf::SCFDialect>(op.getDialect())) {
+        for (auto &subregion : op.getRegions()) {
+          llvm::errs() << "Recursing into: " << op.getName() << "\n";
+          if (failed(processRegion(loc, context, subregion, configAttr)))
+            return failure();
+        }
+      }
+    }
+  }
+
+  return success();
+}
+
 class ScheduleExecutionPass
     : public ScheduleExecutionBase<ScheduleExecutionPass> {
 public:
@@ -242,83 +338,8 @@ public:
     // order so that we are sure if we replace values that dominate other blocks
     // they see the correct values.
     auto &region = *parentOp.getCallableRegion();
-    for (auto *block : sortBlocksInDominanceOrder(region)) {
-      // Compute a set of partitions covering all of the streamable ops in the
-      // block.
-      auto partitionSet = partitionStreamableOps(configAttr, block);
-      if (partitionSet.empty())
-        continue;
-      if (failed(partitionSet.verify(parentOp.getLoc()))) {
-        return signalPassFailure();
-      }
-
-      // Create partition builders for each partition.
-      // We'll clone ops into each and insert them into the block at the
-      // appropriate position (first use... probably).
-      IRMapping mapping;
-      SmallVector<ExecutePartitionBuilder> partitionBuilders;
-      partitionBuilders.reserve(partitionSet.size());
-      for (auto partition : llvm::enumerate(partitionSet.partitions)) {
-        partitionBuilders.push_back(ExecutePartitionBuilder(
-            block, partition.index(), &partition.value(), mapping, context));
-      }
-
-      // Walk over each op in the original block and find those that need to be
-      // partitioned. Each partition builder may clone the op into itself. The
-      // op will always be left in the original block and we'll rely on DCE to
-      // remove the ones no longer required. This is not a good approach as it
-      // creates a lot of new IR (up to O(op*partitions)).
-      SetVector<Operation *> deadOps;
-      for (auto &op : *block) {
-        if (op.hasTrait<OpTrait::IsTerminator>())
-          continue;
-        for (auto &partitionBuilder : partitionBuilders) {
-          partitionBuilder.visit(&op);
-        }
-        if (isa<IREE::Stream::StreamableOpInterface>(op)) {
-          deadOps.insert(&op);
-        }
-      }
-
-      // Apply remapping for values captured/escaping partitions.
-      // We must do this per block as we'll be updating dominated block values.
-      for (auto &partitionBuilder : partitionBuilders) {
-        // Finish construction and insert the yield.
-        auto executeOp = partitionBuilder.finish();
-
-        OpBuilder builder(executeOp);
-        builder.setInsertionPointAfter(executeOp);
-        for (auto [oldResult, newResult, newResultSize] : llvm::zip_equal(
-                 partitionBuilder.partition->outs, executeOp.getResults(),
-                 executeOp.getResultSizes())) {
-          // Insert one await per result. We could batch them all but that would
-          // prematurely tie their lifetimes together. By having unique awaits
-          // we allow propagation to move the waits further to where the values
-          // are used (including right into other execution regions).
-          auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
-              executeOp.getLoc(), newResult, newResultSize,
-              executeOp.getResultTimepoint());
-          if (executeOp.getAffinity().has_value()) {
-            awaitOp.setAffinityAttr(executeOp.getAffinityAttr());
-          }
-
-          oldResult.replaceAllUsesWith(awaitOp.getResults().front());
-          deadOps.insert(oldResult.getDefiningOp());
-        }
-
-        // Sort the ops in the execution region. This is safe because we are
-        // still unaliased and SSA values imply ordering.
-        mlir::sortTopologically(block);
-      }
-      for (auto *deadOp : llvm::reverse(deadOps)) {
-        deadOp->erase();
-      }
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "\nPartitions constructed:\n";
-        block->dump();
-      });
-    }
+    if (failed(processRegion(parentOp.getLoc(), context, region, configAttr)))
+      return signalPassFailure();
 
     // Cleanup the dead ops.
     // TODO(benvanik): less work here - maybe no patterns to just force folding?

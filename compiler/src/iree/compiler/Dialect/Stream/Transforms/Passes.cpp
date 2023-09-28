@@ -146,10 +146,6 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
 
-  // Cleanup patterns currently fail on SCF operations.
-  passManager.addNestedPass<func::FuncOp>(
-      IREE::Flow::createTopLevelSCFToCFGPass());
-
   addCleanupPatterns(passManager);
 
   // Verify all stream.async.* op access ranges that we can by taking advantage
