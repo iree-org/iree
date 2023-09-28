@@ -222,6 +222,9 @@ iree_hal_vulkan_populate_enabled_device_extensions(
     } else if (strcmp(extension_name,
                       VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME) == 0) {
       extensions.shader_float16_int8 = true;
+    } else if (strcmp(extension_name,
+                      VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME) == 0) {
+      extensions.cooperative_matrix = true;
     }
   }
   return extensions;
