@@ -17,7 +17,7 @@ transform.sequence failures(propagate) {
   // Step 2. Split the reduction to get meatier parallelism.
   // ===========================================================================
   %forall, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
-    transform.structured.tile_reduction_using_scf %grid_reduction by tile_sizes = [0, 128]
+    transform.structured.tile_reduction_using_for %grid_reduction by tile_sizes = [0, 128]
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
   %_1:2 =
     transform.structured.tile_using_forall %block_more_parallel_op_2 num_threads [0, 32]
