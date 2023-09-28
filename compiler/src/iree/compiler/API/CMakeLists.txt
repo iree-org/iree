@@ -36,6 +36,7 @@ iree_cc_library(
     iree::compiler::API::Internal::IREECompileToolEntryPoint
     iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API::Internal::IREEOptToolEntryPoint
+    iree::compiler::API::Internal::IREEReduceToolEntryPoint
     iree::compiler::API::Internal::LLDToolEntryPoint
   PUBLIC
 )
@@ -82,6 +83,7 @@ set(_EXPORT_OBJECT_LIBS
   iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
   iree_compiler_API_Internal_IREEMLIRLSPServerToolEntryPoint.objects
   iree_compiler_API_Internal_IREEOptToolEntryPoint.objects
+  iree_compiler_API_Internal_IREEReduceToolEntryPoint.objects
   iree_compiler_API_Internal_LLDToolEntryPoint.objects
 )
 
