@@ -865,7 +865,7 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 ]>
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tiling_levels = [[1, 64, 64], [1, 16, 64], [0, 0, 0, 16], [1, 16, 16, 16]]>,
+    lowering_config  = <tile_sizes = [[1, 64, 64], [1, 16, 64], [0, 0, 0, 16], [1, 16, 16, 16]]>,
     translation_info = <SPIRVCooperativeMatrixVectorize>,
     workgroup_size = [32, 4, 1], subgroup_size = 32>
 

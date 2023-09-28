@@ -192,7 +192,7 @@ def IREECodegen_LoweringConfigAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `tiling_levels` `=` $tilingLevels
+    `<` `tile_sizes` `=` $tilingLevels
       (`,` `native_vector_size` `=` `[` $nativeVectorSize^ `]`)? `>`
   }];
 

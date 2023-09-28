@@ -12,33 +12,33 @@ module {
 
 module {
   func.func @test() attributes {
-      lowering_config = #iree_codegen.lowering_config<tiling_levels = []>} {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = []>} {
     return
   }
 }
-// CHECK: #config = #iree_codegen.lowering_config<tiling_levels = []>
+// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
 
 // -----
 
 module {
   func.func @test() attributes {
-      lowering_config = #iree_codegen.lowering_config<tiling_levels = [[], [10]], native_vector_size = [32, 32]>} {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [10]], native_vector_size = [32, 32]>} {
     return
   }
 }
-// CHECK: #config = #iree_codegen.lowering_config<tiling_levels = {{\[}}[], [10]{{\]}}, native_vector_size = [32, 32]>
+// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [10]{{\]}}, native_vector_size = [32, 32]>
 
 // -----
 
 module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
-         lowering_config = <tiling_levels = []>,
+         lowering_config = <tile_sizes = []>,
          translation_info = <CPUDefault>>} {
     return
   }
 }
-// CHECK: #config = #iree_codegen.lowering_config<tiling_levels = []>
+// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
 // CHECK: #translation = #iree_codegen.translation_info<CPUDefault>
 // CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 
@@ -48,14 +48,14 @@ module {
 module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
-         lowering_config = <tiling_levels = []>,
+         lowering_config = <tile_sizes = []>,
          translation_info = <CPUDefault>,
          workgroup_size = [16, 4, 1],
          subgroup_size = 32>} {
     return
   }
 }
-// CHECK: #config = #iree_codegen.lowering_config<tiling_levels = []>
+// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = []>
 // CHECK: #translation = #iree_codegen.translation_info<CPUDefault>
 // CHECK: #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation, workgroup_size = [16, 4, 1], subgroup_size = 32>
 
