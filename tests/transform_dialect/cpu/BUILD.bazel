@@ -23,7 +23,7 @@ iree_lit_test_suite(
         "fold_tensor_slice_into_transfer.mlir",
         "matmul.mlir",
         "select_strategy_matvec4.mlir",
-        "select_strategy_matvec6.mlir"
+        "select_strategy_matvec6.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,
