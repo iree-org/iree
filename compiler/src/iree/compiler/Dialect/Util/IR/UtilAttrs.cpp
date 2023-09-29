@@ -356,6 +356,66 @@ serializeGenericFloatElements(DenseFPElementsAttr attr,
   return success();
 }
 
+template <typename elementType>
+static void serializeGenericIntegerResourcElementsAPInt(std::optional<ArrayRef<elementType>> attrData,
+                                                        unsigned numBits,
+                                                        llvm::support::endianness endian,
+                                                        llvm::raw_ostream &os) {
+  for (int i = 0; i < attrData->size(); i++) {
+    auto val = (*attrData)[i];
+    APInt newVal(numBits, val);
+    elementType rawValue = llvm::support::endian::byte_swap<elementType>(
+        newVal.extractBitsAsZExtValue(numBits, 0), endian);
+    os.write((const char *)&rawValue, sizeof(rawValue));
+  }
+}
+
+template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
+static LogicalResult
+serializeGenericIntegerResourceElements(Location loc,
+                                DenseResourceElementsAttr attr,
+                                llvm::support::endianness endian,
+                                llvm::raw_ostream &os) {
+  unsigned bitWidth = attr.getType().getElementTypeBitWidth();
+  switch (bitWidth) {
+    case 16:
+      {
+        llvm::outs() << "APINT 16\n";
+        auto denseI16ResourceAttr = dyn_cast<DenseI16ResourceElementsAttr>(attr);
+        std::optional<ArrayRef<int16_t>> attrData =
+          denseI16ResourceAttr.tryGetAsArrayRef();
+        serializeGenericIntegerResourcElementsAPInt<int16_t>(attrData, numBits, endian, os);
+        llvm::outs() << "SERIALIZE 16\n";
+        break;
+      }
+    case 32:
+      {
+        llvm::outs() << "APINT 32\n";
+        auto denseI32ResourceAttr = dyn_cast<DenseI32ResourceElementsAttr>(attr);
+        std::optional<ArrayRef<int32_t>> attrData =
+          denseI32ResourceAttr.tryGetAsArrayRef();
+        serializeGenericIntegerResourcElementsAPInt<int32_t>(attrData, numBits, endian, os);
+        llvm::outs() << "SERIALIZE 32\n";
+        break;
+      }
+    case 64:
+      {
+        llvm::outs() << "APINT 64\n";
+        auto denseI64ResourceAttr = dyn_cast<DenseI64ResourceElementsAttr>(attr);
+        std::optional<ArrayRef<int64_t>> attrData =
+          denseI64ResourceAttr.tryGetAsArrayRef();
+        serializeGenericIntegerResourcElementsAPInt<int64_t>(attrData, numBits, endian, os);
+        llvm::outs() << "SERIALIZE 64\n";
+        break;
+      }
+    default:
+      return emitError(loc)
+             << "unhandled integer element bit width " << bitWidth
+             << " for type " << attr.getType();
+  }
+  return success();
+}
+
 // Expands 8-values per byte raw data from DenseIntElementsAttr to 0/1 byte
 // values in the output.
 static LogicalResult serializeBitIntegerValuesAsBytes(DenseIntElementsAttr attr,
@@ -463,13 +523,13 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
       return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 16:
       llvm::outs() << "HERE 16\n";
-      return serializeResourceRawData(loc, resourceElementsAttr, os);
+      return serializeGenericIntegerResourceElements<uint16_t>(loc, resourceElementsAttr, endian, os);
     case 32:
       llvm::outs() << "HERE 32\n";
-      return serializeResourceRawData(loc, resourceElementsAttr, os);
+      return serializeGenericIntegerResourceElements<uint32_t>(loc, resourceElementsAttr, endian, os);
     case 64:
       llvm::outs() << "HERE 64\n";
-      return serializeResourceRawData(loc, resourceElementsAttr, os);
+      return serializeGenericIntegerResourceElements<uint64_t>(loc, resourceElementsAttr, endian, os);
     default:
       return emitError(loc)
              << "unhandled integer element bit width " << bitWidth
@@ -794,6 +854,8 @@ struct SerializableDenseResourceElementsAttrModel
                                   llvm::raw_ostream &os) const {
     auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
     auto handle = attr.getRawHandle();
+    auto test = attr.isSplat();
+    llvm::outs() << "TEST ISSPLAT: " << test << "\n";
 
     // Special testing path for elided attributes. We want this to be an
     // error in normal circumstances as the output will produce garbage
