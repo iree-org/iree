@@ -206,7 +206,7 @@ static TargetInfo getRocmTargetInfo(func::FuncOp entryPoint) {
   // If no target name is set assume all the features are off.
   if (targetName == "")
     return info;
-  if (!StringRef(targetName).starts_with("gfx")) {
+  if (!targetName.starts_with("gfx")) {
     entryPoint.emitError("unknown target name ") << targetName;
     return info;
   }
