@@ -9,12 +9,11 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
-#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -1007,8 +1006,23 @@ static SmallVector<int64_t> getMatmulVectorSizes(func::FuncOp entryPointFn,
                      matmulTileSizes.end());
   }
 
-  LLVM_DEBUG(KD_DBGS() << "Matmul vector sizes: " << tileSizes << "\n");
+  // For proper 2-D or higher order matmuls, make sure we don't use a tile size
+  // greater than the static dim size for dims that are only unrolled, i.e., N
+  // and batch dims.
+  SmallVector<int64_t> staticShape = op.getStaticLoopRanges();
+  if (numLoops >= 3) {
+    for (int i = 0; i < (numLoops - 2); ++i) {
+      int64_t dimSize = staticShape[i];
+      int64_t tileSize = tileSizes[i];
+      if (tileSize == 0 || ShapedType::isDynamic(dimSize)) {
+        continue;
+      }
 
+      tileSizes[i] = std::min<int64_t>(tileSize, dimSize);
+    }
+  }
+
+  LLVM_DEBUG(KD_DBGS() << "Matmul vector sizes: " << tileSizes << "\n");
   return tileSizes;
 }
 
@@ -2183,12 +2197,23 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
 static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                                            ArrayRef<Operation *> computeOps,
                                            Operation *rootOperation) {
-  auto ctx = entryPointFn.getContext();
-  auto rootLoweringConfig = getLoweringConfig(rootOperation);
-  auto distTileSizes = rootLoweringConfig.getTileSizeVals(0);
-  auto tileAndFuseSizes = rootLoweringConfig.getTileSizeVals(1);
+  if (isa<linalg::ConvolutionOpInterface>(rootOperation)) {
+    // TODO(dcaballe): We don't know yet how to properly propagate the lowering
+    // config of a convolution.
+    return;
+  }
 
-  // multi-lowering config works only if all the operations can share the same
+  auto ctx = entryPointFn.getContext();
+  TilingConfig tilingConfig(getLoweringConfig(rootOperation));
+  SmallVector<int64_t> distTileSizes, tileAndFuseSizes;
+  if (tilingConfig.getNumTilingLevels() > 0) {
+    distTileSizes = tilingConfig.getDistributionTileSizes();
+  }
+  if (tilingConfig.getNumTilingLevels() > 1) {
+    tileAndFuseSizes = tilingConfig.getVectorCommonParallelSizes();
+  }
+
+  // Multi-lowering config works only if all the operations can share the same
   // distribution and TileAndFuse tile sizes.
   for (auto op : computeOps) {
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
@@ -2233,8 +2258,8 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
 
           SmallVector<int64_t> vecTileSizes =
               getPackVectorTileSizes(entryPointFn, packOp);
-          tileSizesList.push_back(zeros); // tensor.pack op does not have
-                                          // reduction loops.
+          // tensor.pack op does not have reduction loops.
+          tileSizesList.push_back(zeros);
           tileSizesList.push_back(vecTileSizes);
         })
         .Case<linalg::GenericOp>([&](auto genericOp) {
@@ -2258,18 +2283,12 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
           // inefficient loop and only apply masking on generic op, which hurts
           // performance a lot. Thus, we do not tile it again, so they have
           // consistent vector tile sizes.
-          // On RISC-V side, we prefer tiling it because unrolling is a big
-          // factor, especially for quantized models. A common case is a matmul
-          // on f32 types, followed by a elementwise op on i8 types. We want to
-          // limit unroll factors.
-          if (!isRISCV(targetAttr)) {
-            for (auto i :
-                 llvm::seq<int64_t>(0, std::min(tileAndFuseSizes.size(),
-                                                vecTileSizes.size()))) {
-              if (tileAndFuseSizes[i])
-                vecTileSizes[i] = 0;
-            }
+          for (auto i : llvm::seq<int64_t>(
+                   0, std::min(tileAndFuseSizes.size(), vecTileSizes.size()))) {
+            if (tileAndFuseSizes[i])
+              vecTileSizes[i] = 0;
           }
+
           SmallVector<int64_t> reductionTiles;
           splitParallelAndReductionTiles(genericOp, vecTileSizes,
                                          reductionTiles);

@@ -116,6 +116,7 @@ iree_cc_library(
     "EncodingInfo.h"
     "ExtractAddressComputation.h"
     "Passes.h"
+    "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
   SRCS
@@ -164,6 +165,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorizePad.cpp"
