@@ -177,10 +177,12 @@ target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
 
 # If not using sanitizers, ask linkers to error on undefined symbols.
 # For shared libraries, using sanitizers implies undefined symbols on Unix-like.
+# Also disabled on Apple (unsupported in XCode 15 default linker).
 if(NOT IREE_ENABLE_ASAN
     AND NOT IREE_ENABLE_MSAN
     AND NOT IREE_ENABLE_TSAN
-    AND NOT IREE_ENABLE_UBSAN)
+    AND NOT IREE_ENABLE_UBSAN
+    AND NOT APPLE)
   target_link_options(iree_compiler_API_SharedImpl PRIVATE
     $<$<PLATFORM_ID:Linux>:-Wl,--no-undefined>
     $<$<PLATFORM_ID:Darwin>:-Wl,-undefined,error>
