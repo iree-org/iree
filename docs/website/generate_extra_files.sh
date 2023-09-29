@@ -48,7 +48,6 @@ cp -r "${BUILD_DOCS_DIALECTS_ORIGINAL_DIR}/." "${BUILD_DOCS_PROCESSED_DIR}"
 # Delete any dialect docs we don't want to publish (yet?).
 rm "${BUILD_DOCS_PROCESSED_DIR}/SimpleIODialect.md" # Sample dialect, just ignore
 rm "${BUILD_DOCS_PROCESSED_DIR}/StructuredTransformOpsExt.md" # Dialect extensions
-rm "${BUILD_DOCS_PROCESSED_DIR}/LinalgTransformOps.md" # Small dialect, unknown state
 
 # Trim "Dialect" suffix from file names, e.g. FlowDialect.md -> Flow.md.
 for f in ${BUILD_DOCS_PROCESSED_DIR}/*Dialect.md; do
@@ -58,7 +57,6 @@ done
 # Rename iree-dialect files.
 mv "${BUILD_DOCS_PROCESSED_DIR}/InputOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEInput.md"
 mv "${BUILD_DOCS_PROCESSED_DIR}/LinalgExtOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREELinalgExt.md"
-# mv "${BUILD_DOCS_PROCESSED_DIR}/LinalgTransformOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREELinalgTransform.md"
 # mv "${BUILD_DOCS_PROCESSED_DIR}/StructuredTransformOpsExt.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEStructuredTransformExt.md"
 
 # Postprocess the dialect docs (e.g. making tweaks to the markdown source).
