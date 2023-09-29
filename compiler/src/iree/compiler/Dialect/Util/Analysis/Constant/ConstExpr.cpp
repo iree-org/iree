@@ -309,6 +309,32 @@ void ConstExprHoistingPolicy::initialize() {
   }
 }
 
+static bool doesHoistingIncreaseSizeSignificantly(
+    const ConstExprAnalysis::ConstValueInfo *info) {
+
+  int64_t inSizeBits = 0;
+  for (Value root : info->roots) {
+    // TODO: Are there any other types we care about here?
+    if (auto type = dyn_cast<ShapedType>(root.getType())) {
+      inSizeBits += type.getNumElements() * type.getElementTypeBitWidth();
+    }
+  }
+
+  int64_t outSizeBits = 0;
+  if (auto type = dyn_cast<ShapedType>(info->constValue.getType())) {
+    outSizeBits = type.getNumElements() * type.getElementTypeBitWidth();
+  }
+
+  // Anything smaller than 1MB is okay to hoist.
+  const int64_t kThresholdVerySmall = 1024 * 1024 * 8;
+
+  if (outSizeBits < kThresholdVerySmall) {
+    return false;
+  }
+
+  return outSizeBits > inSizeBits;
+}
+
 void ConstExprHoistingPolicy::makeInvariantDecision(
     const ConstExprAnalysis::ConstValueInfo *info, Decision *decision) {
   // Check 1: Is it not const-expr.
@@ -323,6 +349,12 @@ void ConstExprHoistingPolicy::makeInvariantDecision(
 
   // Check 3: Is the op itself a valid "leaf" that can become a global.
   if (!isHoistableConstExprLeaf(info)) {
+    return decision->disableHoist();
+  }
+
+  // Check 4: Does hoisting this value significantly increase the size of the
+  // module?
+  if (doesHoistingIncreaseSizeSignificantly(info)) {
     return decision->disableHoist();
   }
 }
