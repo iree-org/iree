@@ -1202,12 +1202,13 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   // Make sure reduction dimensions are the innermost ones.
-  for (int i = 0; i < reductionDims.size(); ++i) {
-    if (reductionDims[reductionDims.size() - 1 - i] !=
-        op.getNumLoops() - 1 - i) {
-      return failure();
-    }
+  int64_t numParallelDims = op.getNumParallelLoops();
+  if (llvm::any_of(reductionDims, [&](int64_t reductionDim) {
+        return reductionDim < numParallelDims;
+      })) {
+    return failure();
   }
+
   if (op.getRegionOutputArgs().size() != 1)
     return failure();
 

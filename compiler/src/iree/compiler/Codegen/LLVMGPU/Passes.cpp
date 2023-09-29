@@ -374,6 +374,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -581,8 +583,6 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
-  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createRematerializeParallelOpsPass());
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//

@@ -39,7 +39,6 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 }
 }
 
-#map = affine_map<()[s0] -> (s0 * 4)>
 //         CHECK:  #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //   CHECK-LABEL:  func.func @warp_reduction_dispatch
 //     CHECK-DAG:    %[[C0I:.+]] = arith.constant 0 : i32
