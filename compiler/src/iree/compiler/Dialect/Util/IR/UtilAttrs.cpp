@@ -380,32 +380,26 @@ serializeGenericIntegerResourceElements(Location loc,
   switch (bitWidth) {
     case 16:
       {
-        llvm::outs() << "APINT 16\n";
         auto denseI16ResourceAttr = dyn_cast<DenseI16ResourceElementsAttr>(attr);
         std::optional<ArrayRef<int16_t>> attrData =
           denseI16ResourceAttr.tryGetAsArrayRef();
         serializeGenericIntegerResourcElementsAPInt<int16_t>(attrData, numBits, endian, os);
-        llvm::outs() << "SERIALIZE 16\n";
         break;
       }
     case 32:
       {
-        llvm::outs() << "APINT 32\n";
         auto denseI32ResourceAttr = dyn_cast<DenseI32ResourceElementsAttr>(attr);
         std::optional<ArrayRef<int32_t>> attrData =
           denseI32ResourceAttr.tryGetAsArrayRef();
         serializeGenericIntegerResourcElementsAPInt<int32_t>(attrData, numBits, endian, os);
-        llvm::outs() << "SERIALIZE 32\n";
         break;
       }
     case 64:
       {
-        llvm::outs() << "APINT 64\n";
         auto denseI64ResourceAttr = dyn_cast<DenseI64ResourceElementsAttr>(attr);
         std::optional<ArrayRef<int64_t>> attrData =
           denseI64ResourceAttr.tryGetAsArrayRef();
         serializeGenericIntegerResourcElementsAPInt<int64_t>(attrData, numBits, endian, os);
-        llvm::outs() << "SERIALIZE 64\n";
         break;
       }
     default:
@@ -504,7 +498,6 @@ static LogicalResult
 serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr resourceElementsAttr,
                             llvm::support::endianness endian,
                             llvm::raw_ostream &os) {
-  llvm::outs() << "SERIALIZE GENERIC RESOURCE ELEMENT DATA\n";
   bool isDenseIntegerResource = isa<DenseBoolResourceElementsAttr,
                                     DenseI8ResourceElementsAttr,
                                     DenseI16ResourceElementsAttr,
@@ -516,19 +509,14 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
     unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
     case 1:
-      llvm::outs() << "HERE 1\n";
       return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 8:
-      llvm::outs() << "HERE 8\n";
       return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 16:
-      llvm::outs() << "HERE 16\n";
       return serializeGenericIntegerResourceElements<uint16_t>(loc, resourceElementsAttr, endian, os);
     case 32:
-      llvm::outs() << "HERE 32\n";
       return serializeGenericIntegerResourceElements<uint32_t>(loc, resourceElementsAttr, endian, os);
     case 64:
-      llvm::outs() << "HERE 64\n";
       return serializeGenericIntegerResourceElements<uint64_t>(loc, resourceElementsAttr, endian, os);
     default:
       return emitError(loc)
@@ -854,8 +842,7 @@ struct SerializableDenseResourceElementsAttrModel
                                   llvm::raw_ostream &os) const {
     auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
     auto handle = attr.getRawHandle();
-    auto test = attr.isSplat();
-    llvm::outs() << "TEST ISSPLAT: " << test << "\n";
+    //auto test = attr.isSplat();
 
     // Special testing path for elided attributes. We want this to be an
     // error in normal circumstances as the output will produce garbage
