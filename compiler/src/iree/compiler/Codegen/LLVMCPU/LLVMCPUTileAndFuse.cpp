@@ -134,7 +134,7 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     for (auto [init, iterArg] : llvm::zip_equal(
              dpsOp.getDpsInits(),
              cast<scf::ForOp>(forLoops.back()).getRegionIterArgs())) {
-      mapToIterArg[init->get()] = iterArg;
+      mapToIterArg[init] = iterArg;
     }
   }
   tiledOps.append(tilingResult->tiledOps);
