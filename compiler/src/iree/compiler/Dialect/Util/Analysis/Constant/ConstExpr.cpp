@@ -340,7 +340,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
   if (auto type = dyn_cast<ShapedType>(info->constValue.getType())) {
     int64_t elementCount = 1;
     for (int64_t dim : type.getShape()) {
-      if (dim != ShapedType::kDynamic) {
+      if (dim == ShapedType::kDynamic) {
         // Dynamic values can lead to an unbounded increase in size, treat this
         // as a significant increase.
         return true;
