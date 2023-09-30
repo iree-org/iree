@@ -331,7 +331,8 @@ static bool doesHoistingIncreaseSizeSignificantly(
           elementCount *= dim;
         }
       }
-      inSize += elementCount * getRoundedPhysicalStorageSize(type);
+      inSize +=
+          getRoundedPhysicalStorageSize(elementCount, type.getElementType());
     }
   }
 
@@ -346,7 +347,8 @@ static bool doesHoistingIncreaseSizeSignificantly(
       }
       elementCount *= dim;
     }
-    outSize = elementCount * type.getElementTypeBitWidth();
+    outSize =
+        getRoundedPhysicalStorageSize(elementCount, type.getElementType());
   }
 
   return outSize > inSize + clConstExprMaxSizeIncreaseThreshold.getValue();
