@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
@@ -20,6 +21,12 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Util {
+
+static llvm::cl::opt<int64_t> clConstExprMaxSizeIncreaseThreshold(
+    "iree-util-const-expr-max-size-increase-threshold",
+    llvm::cl::desc("Maximum byte size increase allowed for constant expr "
+                   "hoisting policy to allow hoisting."),
+    llvm::cl::init(1024 * 1024));
 
 //===----------------------------------------------------------------------===//
 // ConstExprAnalysis
@@ -309,6 +316,44 @@ void ConstExprHoistingPolicy::initialize() {
   }
 }
 
+static bool doesHoistingIncreaseSizeSignificantly(
+    const ConstExprAnalysis::ConstValueInfo *info) {
+
+  int64_t inSize = 0;
+  for (Value root : info->roots) {
+    // TODO: Are there any other types we care about here?
+    if (auto type = dyn_cast<ShapedType>(root.getType())) {
+      int64_t elementCount = 1;
+      for (int64_t dim : type.getShape()) {
+        // Conservatively treat dynamic values as 1, to find a lower bound on
+        // input size.
+        if (dim != ShapedType::kDynamic) {
+          elementCount *= dim;
+        }
+      }
+      inSize +=
+          getRoundedPhysicalStorageSize(elementCount, type.getElementType());
+    }
+  }
+
+  int64_t outSize = 0;
+  if (auto type = dyn_cast<ShapedType>(info->constValue.getType())) {
+    int64_t elementCount = 1;
+    for (int64_t dim : type.getShape()) {
+      if (dim == ShapedType::kDynamic) {
+        // Dynamic values can lead to an unbounded increase in size, treat this
+        // as a significant increase.
+        return true;
+      }
+      elementCount *= dim;
+    }
+    outSize =
+        getRoundedPhysicalStorageSize(elementCount, type.getElementType());
+  }
+
+  return outSize > inSize + clConstExprMaxSizeIncreaseThreshold.getValue();
+}
+
 void ConstExprHoistingPolicy::makeInvariantDecision(
     const ConstExprAnalysis::ConstValueInfo *info, Decision *decision) {
   // Check 1: Is it not const-expr.
@@ -323,6 +368,12 @@ void ConstExprHoistingPolicy::makeInvariantDecision(
 
   // Check 3: Is the op itself a valid "leaf" that can become a global.
   if (!isHoistableConstExprLeaf(info)) {
+    return decision->disableHoist();
+  }
+
+  // Check 4: Does hoisting this value significantly increase the size of the
+  // module?
+  if (doesHoistingIncreaseSizeSignificantly(info)) {
     return decision->disableHoist();
   }
 }
