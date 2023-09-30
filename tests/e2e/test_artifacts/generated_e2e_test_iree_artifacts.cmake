@@ -305,6 +305,58 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen64_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen64.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen64_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen64(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen128_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen128.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen128_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen128(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_/module.vmfb"
@@ -530,6 +582,36 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-BertLargeTFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargeTFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
@@ -643,6 +725,71 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
   FRIENDLY_NAME "T5LargeTFBatch32(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen256_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen256.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen256_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen256(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen512_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen512.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen512_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen512(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1024_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1024.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1024_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1024(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen2048_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen2048.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen2048_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen2048(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen4096_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen4096.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen4096_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen4096(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -1081,6 +1228,30 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_/module.vmfb"
@@ -1137,6 +1308,34 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_dotprod_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_dotprod_/module.vmfb"
@@ -1188,6 +1387,30 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=adreno-unknown-android31"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [qualcomm-adreno-vulkan_android31-vulkan_spirv][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=adreno-unknown-android31"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [qualcomm-adreno-vulkan_android31-vulkan_spirv][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_/module.vmfb"
@@ -1227,6 +1450,32 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=adreno-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [qualcomm-adreno-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=adreno-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [qualcomm-adreno-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
@@ -1259,6 +1508,30 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags]"
   PUBLIC
 )
 
@@ -1326,6 +1599,34 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-stream-partitioning-favor=max-concurrency"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-stream-partitioning-favor=max-concurrency"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-stream-partitioning-favor=max-concurrency"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency]"
   PUBLIC
 )
 
@@ -1400,6 +1701,36 @@ iree_bytecode_module(
     "--iree-stream-partitioning-favor=max-concurrency"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-stream-partitioning-favor=max-concurrency"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-stream-partitioning-favor=max-concurrency"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel]"
   PUBLIC
 )
 
@@ -1763,6 +2094,74 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen64_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen64.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen64_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen64_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen64(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen128_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen128.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen128_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen128_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen128(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/module.vmfb"
@@ -2048,6 +2447,44 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-BertLargeTFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertLargeTFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
@@ -2197,6 +2634,91 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_T5LargeTFBatch32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "T5LargeTFBatch32(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen256_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen256.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen256_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen256_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen256(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen512_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen512.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen512_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen512_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen512(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1024_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1024.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1024_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1024_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1024(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen2048_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen2048.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen2048_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen2048_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen2048(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen4096_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen4096.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen4096_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvmcpu-target-cpu=cascadelake"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen4096_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen4096(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -2759,6 +3281,38 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/module.vmfb"
@@ -2831,6 +3385,42 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=none"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_dotprod_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_dotprod_compile-stats_/module.vmfb"
@@ -2898,6 +3488,38 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=adreno-unknown-android31"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [qualcomm-adreno-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=adreno-unknown-android31"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [qualcomm-adreno-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/module.vmfb"
@@ -2949,6 +3571,40 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=adreno-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [qualcomm-adreno-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=adreno-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [qualcomm-adreno-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
@@ -2993,6 +3649,38 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3080,6 +3768,42 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-stream-partitioning-favor=max-concurrency"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-stream-partitioning-favor=max-concurrency"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,compile-stats]"
   PUBLIC
 )
 
@@ -3178,6 +3902,44 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-stream-partitioning-favor=max-concurrency"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen1(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=none"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-stream-partitioning-favor=max-concurrency"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Llama1PrefillFp32PTSeqLen8(linalg) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_demote-f32-to-f16_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp16_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_demote-f32-to-f16_compile-stats_/module.vmfb"
@@ -3264,6 +4026,10 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_model-EfficientNetV2STF
   ${PACKAGE_NAME}_model-GPT2_117M_TF_1X1XI32
   ${PACKAGE_NAME}_model-GPT2_117M_TF_1X4XI32
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen1
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen128
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen64
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen8
   ${PACKAGE_NAME}_model-MiniLML12H384Uncased
   ${PACKAGE_NAME}_model-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default
   ${PACKAGE_NAME}_model-matmul_128x256x8192_f16t_tile_config_default
@@ -3281,6 +4047,11 @@ add_dependencies(iree-benchmark-import-models-large
   ${PACKAGE_NAME}_model-BertLargeTFBatch1
   ${PACKAGE_NAME}_model-BertLargeTFBatch32
   ${PACKAGE_NAME}_model-BertLargeTFBatch64
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen1024
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen2048
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen256
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen4096
+  ${PACKAGE_NAME}_model-Llama1PrefillFp32PTSeqLen512
   ${PACKAGE_NAME}_model-Resnet50TFBatch1
   ${PACKAGE_NAME}_model-Resnet50TFBatch128
   ${PACKAGE_NAME}_model-Resnet50TFBatch64
@@ -3296,6 +4067,10 @@ add_dependencies(iree-benchmark-suites-android-cpu
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
@@ -3315,6 +4090,16 @@ add_dependencies(iree-benchmark-suites-android-gpu
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_demote-f32-to-f16_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_demote-f32-to-f16_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_demote-f32-to-f16_
@@ -3364,6 +4149,26 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen128_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen64_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
@@ -3427,6 +4232,11 @@ add_dependencies(iree-benchmark-suites-comp-stats-large
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch64_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1024_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen2048_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen256_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen4096_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen512_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch128_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch64_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
@@ -3488,6 +4298,26 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen128_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen64_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
@@ -3551,6 +4381,11 @@ add_dependencies(iree-benchmark-suites-large
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch64_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1024_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen2048_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen256_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen4096_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen512_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch128_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch64_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
@@ -3588,6 +4423,12 @@ add_dependencies(iree-benchmark-suites-x86_64
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen128_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen64_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen8_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
@@ -3614,6 +4455,11 @@ add_dependencies(iree-benchmark-suites-x86_64-large
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTFBatch64_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen1024_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen2048_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen256_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen4096_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
+  ${PACKAGE_NAME}_iree-module-Llama1PrefillFp32PTSeqLen512_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch128_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch1_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-Resnet50TFBatch64_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_

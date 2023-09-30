@@ -54,3 +54,43 @@ def generate_batch_models(
         )
 
     return model_map
+
+
+def generate_input_sequence_models(
+    id_template: string.Template,
+    name_template: string.Template,
+    tags: Sequence[str],
+    source_type: common_definitions.ModelSourceType,
+    # Assumes single model with dynamic inputs.
+    source_url: str,
+    entry_function: str,
+    input_type_templates: Sequence[string.Template],
+    input_sequence_lengths: Sequence[int],
+) -> Dict[int, common_definitions.Model]:
+    """Generate model definitions for different input sequences by substituting
+    ${seq_length}` in the template strings.
+
+    Only `*_template` parameters will be treated as templates and substituted. A
+    `seqlen-<sequence length>` tag will be appended to the tags in each returned
+    model.
+
+    Returns:
+      Map of batch size to model.
+    """
+    model_map = {}
+    for input_sequence in input_sequence_lengths:
+        substituted_input_types = [
+            input_type.substitute(seq_length=input_sequence)
+            for input_type in input_type_templates
+        ]
+        model_map[input_sequence] = common_definitions.Model(
+            id=id_template.substitute(seq_length=input_sequence),
+            name=name_template.substitute(seq_length=input_sequence),
+            tags=list(tags) + [f"seqlen-{input_sequence}"],
+            source_type=source_type,
+            source_url=source_url,
+            entry_function=entry_function,
+            input_types=substituted_input_types,
+        )
+
+    return model_map

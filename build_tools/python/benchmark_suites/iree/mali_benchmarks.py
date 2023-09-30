@@ -10,7 +10,7 @@ from typing import List, Sequence
 from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.models import tflite_models, tf_models
+from e2e_test_framework.models import tflite_models, tf_models, torch_models
 from e2e_test_framework.device_specs import device_collections
 
 
@@ -62,6 +62,8 @@ class Android_Mali_Benchmarks(object):
         tflite_models.MOBILEBERT_FP32,
         tf_models.GPT2_117M_1x4_FP32_TF,
         tf_models.GPT2_117M_1x1_FP32_TF,
+        torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[1],
+        torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[8],
     ]
     FP16_MODELS = [tflite_models.MOBILEBERT_FP16]
     QUANT_MODELS = [

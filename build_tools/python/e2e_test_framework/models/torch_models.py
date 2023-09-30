@@ -116,3 +116,23 @@ BERT_LARGE_384_FP32_TORCH_BATCHES = model_utils.generate_batch_models(
     ],
     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
 )
+
+# Llama1 Models.
+LLAMA1_PREFILL_ID_FORMAT = string.Template("${model_id}-seq-${seq_length}")
+LLAMA1_PREFILL_NAME_FORMAT = string.Template("${name}SeqLen${seq_length}")
+LLAMA1_PREFILL_SOURCE_URL = "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+
+LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES = model_utils.generate_input_sequence_models(
+    id_template=model_utils.partial_template_substitute(
+        LLAMA1_PREFILL_ID_FORMAT, model_id=unique_ids.MODEL_LLAMA1_PREFILL_FP32_TORCH
+    ),
+    name_template=model_utils.partial_template_substitute(
+        LLAMA1_PREFILL_NAME_FORMAT, name="Llama1PrefillFp32PT"
+    ),
+    tags=["fp32", "llama", "prefill"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url=LLAMA1_PREFILL_SOURCE_URL,
+    entry_function="forward",
+    input_type_templates=[string.Template("1x${seq_length}xi64")],
+    input_sequence_lengths=[1, 8, 64, 128, 256, 512, 1024, 2048, 4096],
+)

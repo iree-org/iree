@@ -79,6 +79,18 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
     ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[1], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[8], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[64], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[128], threads=[8]
+    ),
 ]
 
 # A subset of `x86_64_MODELS_AND_THREADS`.
@@ -132,6 +144,18 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
     ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[1], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[8], threads=[8]
+    ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[64], threads=[8]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[128], threads=[8]
+    # ),
 ]
 
 X86_64_BENCHMARK_CONFIG_LONG = [
@@ -161,6 +185,21 @@ X86_64_BENCHMARK_CONFIG_LONG = [
     ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.T5_LARGE_512_FP32_TF_BATCHES[32], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[256], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[512], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[1024], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[2048], threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.LLAMA1_PREFILL_FP32_TORCH_INPUT_SEQUENCES[4096], threads=[8]
     ),
 ]
 

@@ -125,6 +125,34 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen1"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen8.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen64"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen64.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen128"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen128.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-BertLargeTFBatch1"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975/BERT_LARGE_FP32_TF_384XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1.mlirbc"
@@ -184,6 +212,41 @@ iree_fetch_artifact(
   NAME "model-T5LargeTFBatch32"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975/T5_LARGE_FP32_TF_512XI32_BATCH32/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5LargeTFBatch32.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen256"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen256.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen512"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen512.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen1024"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen1024.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen2048"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen2048.mlir"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Llama1PrefillFp32PTSeqLen4096"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/llama1_prefill_linalg_dynamic_zeroed_weights_1696101737.mlir"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Llama1PrefillFp32PTSeqLen4096.mlir"
   UNPACK
 )
 

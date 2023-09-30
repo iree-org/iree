@@ -105,6 +105,7 @@ jobs:
   run_benchmarks:
     needs: [generate_matrix]
     if: needs.generate_matrix.outputs.benchmark-matrix != '[]'
+    timeout-minutes: 1440
     strategy:
       # Don't kill other benchmark jobs if one of them failed.
       fail-fast: false
