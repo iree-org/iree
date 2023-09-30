@@ -222,12 +222,12 @@ that converts environment variables into ctest filters:
 
 ``` shell
 # Run default tests
-./build_tools/cmake/ctest_all.sh
+./build_tools/cmake/ctest_all.sh ../iree-build
 
 # Run tests, turning CUDA on and Vulkan off
 export IREE_CUDA_DISABLE=0
 export IREE_VULKAN_DISABLE=1
-./build_tools/cmake/ctest_all.sh
+./build_tools/cmake/ctest_all.sh ../iree-build
 ```
 
 ### Running samples
