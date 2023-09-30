@@ -129,11 +129,6 @@ public:
     }
   };
 
-  // Expands the frontier to include all results of a given op in an UNKNOWN
-  // state. This also checks that all of its operands are known, adding
-  // them recusrively if not.
-  void expandToOp(Operation *op);
-
   // Define an iterator over the second value of constInfoMap.
   using ConstValueMapT = llvm::DenseMap<Value, ConstValueInfo *>;
   class ConstValueIterator final
@@ -157,6 +152,11 @@ public:
   ConstValueIterator end() const { return constInfoMap.end(); }
 
 private:
+  // Expands the frontier to include all results of a given op in an UNKNOWN
+  // state. This also checks that all of its operands are known, adding
+  // them recusrively if not.
+  void expandToOp(Operation *op);
+
   // Add a new info record for a value to analyze for const-ness.
   ConstValueInfo *addInfo(Value constValue);
 
