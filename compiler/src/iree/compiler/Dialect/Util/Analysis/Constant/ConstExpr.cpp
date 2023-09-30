@@ -11,11 +11,14 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
 #define DEBUG_TYPE "iree-constexpr"
 
 using llvm::dbgs;
+
+using namespace mlir::iree_compiler::IREE::Util;
 
 namespace mlir {
 namespace iree_compiler {
@@ -417,7 +420,57 @@ void ConstExprHoistingPolicy::makeDecision(
   decision->enableHoist();
 }
 
+void ConstExprHoistingPolicy::printDotGraph(raw_ostream &os) const {
+  WriteGraph(os, this);
+}
+
+void ConstExprHoistingPolicy::dumpDotGraph() const {
+  printDotGraph(llvm::errs());
+}
+
 } // namespace Util
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
+
+namespace llvm {
+template <>
+struct DOTGraphTraits<const ConstExprHoistingPolicy *>
+    : public DefaultDOTGraphTraits {
+  explicit DOTGraphTraits(bool isSimple = false)
+      : DefaultDOTGraphTraits(isSimple) {}
+
+  std::string getNodeLabel(const ConstExprAnalysis::ConstValueInfo *Node,
+                           const ConstExprHoistingPolicy *g) {
+    std::string label;
+    llvm::raw_string_ostream os(label);
+    os << Node->constValue.getType();
+    return label;
+  }
+
+  static bool isNodeHidden(const ConstExprAnalysis::ConstValueInfo *Node,
+                           const ConstExprHoistingPolicy *g) {
+    // Only display nodes that the analysis has determined to be const-expr.
+    return !Node->isConstExpr();
+  }
+
+  static std::string
+  getNodeAttributes(const ConstExprAnalysis::ConstValueInfo *Node,
+                    const ConstExprHoistingPolicy *g) {
+    // Roots are colored red.
+    if (Node->isRoot)
+      return "fillcolor=red,style=filled";
+
+    // Hoisted values are colored green.
+    ConstExprHoistingPolicy::Outcome outcome = g->getOutcome(Node);
+    if (outcome == ConstExprHoistingPolicy::Outcome::ENABLE_HOIST)
+      return "fillcolor=green,style=filled";
+
+    return "";
+  }
+
+  static void
+  addCustomGraphFeatures(const ConstExprHoistingPolicy *g,
+                         GraphWriter<const ConstExprHoistingPolicy *> &GW) {}
+};
+}; // namespace llvm
