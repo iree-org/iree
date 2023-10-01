@@ -121,8 +121,12 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
   }
 
   PassManager pm(module.getContext());
-  pm.addPass(createCanonicalizerPass());
+  // Dead code eliminate.
   pm.addPass(createCSEPass());
+  // De-duplicate identical fills.
+  pm.addPass(createCanonicalizerPass());
+  // Remove dead globals.
+  pm.addPass(createSymbolDCEPass());
   if (failed(pm.run(module)))
     return;
 }

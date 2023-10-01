@@ -80,4 +80,17 @@ void mlir::iree_compiler::Reducer::reduceFlowDispatchResultBySplatDelta(
     // Erase the dispatch.
     dispatch.erase();
   }
+
+  PassManager pm(module.getContext());
+  // Dead code eliminate the dispatch ops.
+  pm.addPass(createCSEPass());
+  // Dead code eliminate globals.
+  pm.addPass(createSymbolDCEPass());
+  // Canonicalize so that the splats are fused with reshapes.
+  pm.addPass(createCanonicalizerPass());
+  // CSE again to de-duplicate splats.
+  pm.addPass(createCSEPass());
+  if (failed(pm.run(module))) {
+    return;
+  }
 }
