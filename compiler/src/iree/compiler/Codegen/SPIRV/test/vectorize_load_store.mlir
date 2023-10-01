@@ -193,11 +193,11 @@ func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) 
   // CHECK: %[[V1:.+]] = vector.insert %[[ELEM1]], %[[V0]] [1] : f32 into vector<3xf32>
   // CHECK: %[[ELEM2:.+]] = memref.load %{{.+}}[%[[INDEX2]]]
   // CHECK: %[[V2:.+]] = vector.insert %[[ELEM2]], %[[V1]] [2] : f32 into vector<3xf32>
-  // CHECK: %[[EXT_0:.+]] = vector.extract %{{.*}}[0] : vector<3xf32>
+  // CHECK: %[[EXT_0:.+]] = vector.extract %{{.*}}[0] : f32 from vector<3xf32>
   // CHECK: memref.store %[[EXT_0]], %{{.*}}[%[[INDEX0]]] : memref<20xf32>
-  // CHECK: %[[EXT_1:.+]] = vector.extract %{{.*}}[1] : vector<3xf32>
+  // CHECK: %[[EXT_1:.+]] = vector.extract %{{.*}}[1] : f32 from vector<3xf32>
   // CHECK: memref.store %[[EXT_1]], %{{.*}}[%[[INDEX1]]] : memref<20xf32>
-  // CHECK: %[[EXT_2:.+]] = vector.extract %{{.*}}[2] : vector<3xf32>
+  // CHECK: %[[EXT_2:.+]] = vector.extract %{{.*}}[2] : f32 from vector<3xf32>
   // CHECK: memref.store %[[EXT_2]], %{{.*}}[%[[INDEX2]]] : memref<20xf32>
   // CHECK: return %[[V2]] : vector<3xf32>
   %3 = vector.transfer_read %0[%c3], %f0 : memref<20xf32>, vector<3xf32>
@@ -244,16 +244,16 @@ func.func @scalarize_non_minor_identity_transfer_write(%value: vector<4xf32>, %i
 
 // CHECK: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[BUFFER:.+]] = hal.interface.binding.subspan
-// CHECK: %[[E0:.+]] = vector.extract %[[VALUE]][0] : vector<4xf32>
+// CHECK: %[[E0:.+]] = vector.extract %[[VALUE]][0] : f32 from vector<4xf32>
 // CHECK: memref.store %[[E0]], %[[BUFFER]][%[[C0]], %[[I1]], %[[I2]], %[[C0]]]
 // CHECK: %[[PLUS1:.+]] = affine.apply affine_map<()[s0] -> (s0 + 1)>()[%[[I2]]]
-// CHECK: %[[E1:.+]] = vector.extract %[[VALUE]][1] : vector<4xf32>
+// CHECK: %[[E1:.+]] = vector.extract %[[VALUE]][1] : f32 from vector<4xf32>
 // CHECK: memref.store %[[E1]], %[[BUFFER]][%[[C0]], %[[I1]], %[[PLUS1]], %[[C0]]]
 // CHECK: %[[PLUS2:.+]] = affine.apply affine_map<()[s0] -> (s0 + 2)>()[%[[I2]]]
-// CHECK: %[[E2:.+]] = vector.extract %[[VALUE]][2] : vector<4xf32>
+// CHECK: %[[E2:.+]] = vector.extract %[[VALUE]][2] : f32 from vector<4xf32>
 // CHECK: memref.store %[[E2]], %[[BUFFER]][%[[C0]], %[[I1]], %[[PLUS2]], %[[C0]]]
 // CHECK: %[[PLUS3:.+]] = affine.apply affine_map<()[s0] -> (s0 + 3)>()[%[[I2]]]
-// CHECK: %[[E3:.+]] = vector.extract %[[VALUE]][3] : vector<4xf32>
+// CHECK: %[[E3:.+]] = vector.extract %[[VALUE]][3] : f32 from vector<4xf32>
 // CHECK: memref.store %[[E3]], %[[BUFFER]][%[[C0]], %[[I1]], %[[PLUS3]], %[[C0]]]
 
 // -----

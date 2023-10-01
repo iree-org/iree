@@ -59,12 +59,12 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:    %[[TID4:.+]] = affine.apply #[[$MAP]]()[%[[TID]]]
 //         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[TID4]] to %[[C10240]] step %[[C1024]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<1xf32>) {
 //         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//         CHECK:      %[[E:.+]] = vector.extract %[[A0]][0] : vector<1xf32>
+//         CHECK:      %[[E:.+]] = vector.extract %[[A0]][0] : f32 from vector<1xf32>
 //         CHECK:      %[[RL:.+]] = vector.reduction <add>, %[[V]], %[[E]] : vector<4xf32> into f32
 //         CHECK:      %[[B:.+]] = vector.broadcast %[[RL:.*]] : f32 to vector<1xf32>
 //         CHECK:      scf.yield %[[B]] : vector<1xf32>
 //         CHECK:    }
-//         CHECK:    %[[R1:.+]] = vector.extract %[[R0]][0] : vector<1xf32>
+//         CHECK:    %[[R1:.+]] = vector.extract %[[R0]][0] : f32 from vector<1xf32>
 //         CHECK:    %[[S0:.+]], %{{.*}} = gpu.shuffle  xor %[[R1]], %[[C1]], %[[C32]] : f32
 //         CHECK:    %[[R2:.+]] = arith.addf %[[R1]], %[[S0]] : f32
 //         CHECK:    %[[S1:.+]], %{{.*}} = gpu.shuffle  xor %[[R2]], %[[C2]], %[[C32]] : f32
