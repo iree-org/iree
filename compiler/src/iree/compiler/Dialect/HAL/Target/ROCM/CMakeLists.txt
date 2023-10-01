@@ -11,6 +11,8 @@
 if(NOT IREE_TARGET_BACKEND_ROCM)
   return()
 endif()
+# Query for list of device libs to build.
+get_directory_property(AMDGCN_LIB_LIST DIRECTORY ${IREE_SOURCE_DIR}/third_party/ROCm-Device-Libs DEFINITION AMDGCN_LIB_LIST)
 
 iree_add_all_subdirs()
 
@@ -22,6 +24,8 @@ iree_cc_library(
   SRCS
     "ROCMTarget.cpp"
     "ROCMTargetUtils.cpp"
+  DATA
+    ${AMDGCN_LIB_LIST}
   DEPS
     LLVMAMDGPUCodeGen
     LLVMCore

@@ -107,7 +107,7 @@ std::string findToolFromExecutableDir(SmallVector<std::string> toolNames) {
   return "";
 }
 
-static std::string getCurrentDylibPath() {
+std::string getCurrentDylibPath() {
 #if __linux__ || __APPLE__
   Dl_info dlInfo;
   if (dladdr((void *)getCurrentDylibPath, &dlInfo) == 0)

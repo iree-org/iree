@@ -40,6 +40,8 @@ std::string findToolInEnvironment(SmallVector<std::string> toolNames);
 std::string findTool(SmallVector<std::string> toolNames);
 std::string findTool(std::string toolName);
 
+std::string getCurrentDylibPath();
+
 } // namespace iree_compiler
 } // namespace mlir
 
