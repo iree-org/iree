@@ -23,6 +23,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Reducer/Framework:ReducerFramework",
         "//compiler/src/iree/compiler/Reducer/Strategies:DeltaStrategies",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Support",
     ],
