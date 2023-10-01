@@ -24,7 +24,11 @@ Operation *mlir::iree_compiler::Reducer::ireeRunReducingStrategies(
                      "Dispatch operand to result delta");
   delta.runDeltaPass(reduceFlowDispatchResultBySplatDelta,
                      "Dispatch result to splat delta");
+  delta.runDeltaPass(reduceOptimizationBarriersDelta,
+                     "Optimization barriers delta");
   delta.runDeltaPass(reduceLinalgOnTensorsDelta, "Linalg on tensors delta");
+  delta.runDeltaPass(reduceOptimizationBarriersDelta,
+                     "Optimization barriers delta");
 
   return workItem.getModule();
 }
