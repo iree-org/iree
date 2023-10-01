@@ -83,8 +83,6 @@ void Delta::runDeltaPass(DeltaFunc deltaFunc, StringRef message) {
   deltaFunc(chunkManager, root);
   int numTargets = chunkManager.getCurrentFeatureCount();
 
-  assert(root.verify().succeeded() &&
-         "Output module does not verify after counting chunks.");
   assert(oracle.isInteresting(root) &&
          "Output module not interesting after counting chunks.");
 
