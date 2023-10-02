@@ -44,7 +44,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 
 // CHECK-LABEL: func @pad
-//       CHECK:   transform.sequence  failures(propagate) {
+//       CHECK:   transform.named_sequence
 //       CHECK:   transform.iree.register_match_callbacks
 //       CHECK:   {{.*}} = transform.iree.match_callback failures(propagate) "pad"({{.*}}) : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.structured.tile_using_forall {{.*}}   num_threads [] tile_sizes [64, 64](mapping = [#gpu.block<y>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)

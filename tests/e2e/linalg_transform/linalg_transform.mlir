@@ -1,15 +1,7 @@
-// R-UN: iree-run-mlir --Xcompiler,iree-hal-target-backends=llvm-cpu \
-/// Specify the dispatch region formation with the transform dialect.
-// R-UN:   --iree-flow-dispatch-use-transform-dialect=%p/transform_dialect_dispatch_spec.mlir \
-/// Specify the codegen strategy with the transform dialect.
-// R-UN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/transform_dialect_codegen_spec.mlir \
-// R-UN: %s | FileCheck %s
-
-
 // RUN: iree-opt %s \
 // RUN:   --iree-abi-transformation-pipeline \
 // RUN:   --iree-flow-transformation-pipeline \
-// RUN:   --iree-flow-dispatch-use-transform-dialect=%p/transform_dialect_dispatch_spec.mlir
+// RUN:   --iree-preloaded-transforms=%p/transform_spec.mlir
 
 func.func @matmul_static() -> tensor<5x5xf32> {
   %res = flow.tensor.constant dense<[
@@ -36,10 +28,3 @@ func.func @matmul_static() -> tensor<5x5xf32> {
 
   return %matmul_res : tensor<5x5xf32>
 }
-
-//      CHECK: 5x5xf32=
-// CHECK-SAME: [430 388 346 304 262]
-// CHECK-SAME: [340 307 274 241 208]
-// CHECK-SAME: [250 226 202 178 154]
-// CHECK-SAME: [160 145 130 115 100]
-// CHECK-SAME: [70 64 58 52 46]

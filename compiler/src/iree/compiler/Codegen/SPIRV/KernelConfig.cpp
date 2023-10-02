@@ -25,6 +25,8 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -43,12 +45,6 @@ constexpr int kMaxVectorNumBits = 128;
 
 namespace mlir {
 namespace iree_compiler {
-
-llvm::cl::opt<std::string> clSPIRVTransformDialectFileName(
-    "iree-spirv-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
 
 llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
     "iree-spirv-enable-transform-dialect-jit",
@@ -1620,17 +1616,27 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult
 setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
                           const spirv::TargetEnv &targetEnv) {
-  if (!clSPIRVEnableTransformDialectJit &&
-      clSPIRVTransformDialectFileName.empty()) {
-    return failure();
+  ModuleOp transformModule =
+      transform::detail::getPreloadedTransformModule(entryPoint.getContext());
+  bool xOr = static_cast<bool>(transformModule) xor
+             static_cast<bool>(clSPIRVEnableTransformDialectJit);
+  if (!xOr) {
+    return clSPIRVEnableTransformDialectJit
+               ? entryPoint.emitError()
+                     << "option clash in transform dialect lowering config: a "
+                        "preloaded transform library cannot be provided when "
+                        "the jit option is set."
+               :
+               // If none is provided, cannot set the transform config at all.
+               failure();
   }
 
   MLIRContext *context = entryPoint.getContext();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       context, CodeGenPipeline::TransformDialectCodegen);
 
-  // Prefer a transform script file if provided.
-  if (!clSPIRVTransformDialectFileName.empty()) {
+  // Prefer a transform library if provided.
+  if (transformModule) {
     LLVM_DEBUG(llvm::dbgs() << "using user specified transform dialect...\n");
     return setTranslationInfo(entryPoint, translationInfo);
   }

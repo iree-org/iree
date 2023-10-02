@@ -27,7 +27,6 @@ iree_lit_test_suite(
     "dispatch_linalg_on_tensors.mlir"
     "dispatch_linalg_on_tensors_default.mlir"
     "dispatch_linalg_on_tensors_fusion_with_transpose.mlir"
-    "dispatch_linalg_transform_dialect.mlir"
     "expand_tensor_shapes.mlir"
     "export_benchmark_funcs.mlir"
     "fold_unit_dims.mlir"
@@ -54,13 +53,10 @@ iree_lit_test_suite(
     "strip_signedness.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"
     "top_level_scf_to_cfg.mlir"
-    "transform_dispatch_region_formation.mlir"
     "verify_input_ir.mlir"
   TOOLS
     FileCheck
     iree-opt
-  DATA
-    transform_dialect_dispatch_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

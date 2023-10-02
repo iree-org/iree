@@ -234,10 +234,7 @@ createTileAndDistributeToWorkgroupsPass(
 
 /// Create an IREE-specific Transform dialect interpreter pass with all
 /// registrations necessary for IREE.
-std::unique_ptr<Pass> createTransformDialectInterpreterPass(
-    llvm::StringRef transformFileName = llvm::StringRef(),
-    llvm::StringRef debugPayloadRootTag = llvm::StringRef(),
-    llvm::StringRef debugTransformRootTag = llvm::StringRef());
+std::unique_ptr<Pass> createTransformDialectInterpreterPass();
 
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();

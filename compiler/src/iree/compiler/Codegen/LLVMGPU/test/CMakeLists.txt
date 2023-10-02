@@ -27,7 +27,6 @@ iree_lit_test_suite(
     "illegal_configuration.mlir"
     "layout_analysis_and_distribution.mlir"
     "legalize.mlir"
-    "linalg_transform.mlir"
     "nvvm_extract_address_computation.mlir"
     "nvvm_mma_sync_pipeline_test.mlir"
     "nvvm_pipeline_test.mlir"
@@ -45,12 +44,10 @@ iree_lit_test_suite(
     "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"
     "transform_dialect_bufferize.mlir"
-    "transform_dialect_eliminate_gpu_barriers.mlir"
     "transform_dialect_hoist_allocs.mlir"
     "transform_dialect_pack_shared_memory_alloc.mlir"
     "transform_dialect_promote_operands.mlir"
     "transform_dialect_vector_distribution.mlir"
-    "transform_distribute_forall.mlir"
     "transform_gpu_pipelining.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
@@ -61,7 +58,7 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
-    transform_dialect_codegen_bufferize_spec.mlir
+    attention_transform_spec.mlir
     transform_dialect_codegen_foreach_to_gpu_spec.mlir
     transform_dialect_codegen_vector_distribution_spec.mlir
     transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir

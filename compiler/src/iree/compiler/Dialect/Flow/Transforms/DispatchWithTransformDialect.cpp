@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -17,9 +16,12 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,8 +33,8 @@ namespace Flow {
 /// formation. This needs to be its own pass because the registration mechanism
 /// and ops available are different than for other interpreters.
 class DispatchWithTransformDialect
-    : public mlir::transform::TransformInterpreterPassBase<
-          DispatchWithTransformDialect, DispatchWithTransformDialectBase> {
+    : public DispatchWithTransformDialectBase<DispatchWithTransformDialect> {
+public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
@@ -49,34 +51,25 @@ class DispatchWithTransformDialect
     // clang-format on
   }
 
-public:
-  DispatchWithTransformDialect(StringRef transformFileName,
-                               StringRef debugPayloadRootTag = StringRef(),
-                               StringRef debugTransformRootTag = StringRef()) {
-    this->transformFileName = transformFileName.str();
-    this->debugPayloadRootTag = debugPayloadRootTag.str();
-    this->debugTransformRootTag = debugTransformRootTag.str();
-  }
-  DispatchWithTransformDialect(const DispatchWithTransformDialect &pass)
-      : TransformInterpreterPassBase(pass) {
-    this->transformFileName = pass.transformFileName;
-    this->debugPayloadRootTag = pass.debugPayloadRootTag;
-    this->debugTransformRootTag = pass.debugTransformRootTag;
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    ModuleOp transformModule =
+        transform::detail::getPreloadedTransformModule(context);
+    if (failed(transform::applyTransformNamedSequence(
+            getOperation(), transformModule,
+            options.enableExpensiveChecks(true), entryPoint)))
+      return signalPassFailure();
   }
 
 private:
-  Statistic numDispatches{this, "number of dispatches",
-                          "Number of Flow dispatches created"};
+  /// Transform interpreter options.
+  transform::TransformOptions options;
 };
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchWithTransformDialect(StringRef transformFileName,
-                                   StringRef debugPayloadRootTag,
-                                   StringRef debugTransformRootTag) {
-  return std::make_unique<DispatchWithTransformDialect>(
-      transformFileName, debugPayloadRootTag, debugTransformRootTag);
+/// Create a Transform dialect interpreter pass.
+std::unique_ptr<Pass> createDispatchWithTransformDialect() {
+  return std::make_unique<DispatchWithTransformDialect>();
 }
-
 } // namespace Flow
 } // namespace IREE
 } // namespace iree_compiler

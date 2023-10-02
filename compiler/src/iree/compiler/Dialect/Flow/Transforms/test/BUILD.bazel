@@ -4,8 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -29,7 +29,6 @@ iree_lit_test_suite(
             "collapse_linalg_generic_on_tensors.mlir",
             "dispatch_linalg_on_tensors_default.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
-            "dispatch_linalg_transform_dialect.mlir",
             "expand_tensor_shapes.mlir",
             "export_benchmark_funcs.mlir",
             "fold_unit_dims.mlir",
@@ -56,18 +55,11 @@ iree_lit_test_suite(
             "strip_signedness.mlir",
             "tensor_pad_to_tensor_insert_slice.mlir",
             "top_level_scf_to_cfg.mlir",
-            "transform_dispatch_region_formation.mlir",
             "verify_input_ir.mlir",
         ],
         include = ["*.mlir"],
-        # transform_dialect_dispatch_spec is a an MLIR file that specifies a
-        # transformation, it needs to be included as data.
-        exclude = [
-            "transform_dialect_dispatch_spec.mlir",
-        ],
     ),
     cfg = "//compiler:lit.cfg.py",
-    data = ["transform_dialect_dispatch_spec.mlir"],
     tools = [
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",

@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-transform.sequence failures(propagate) {
+transform.named_sequence @__transform_main(%root: !transform.any_op {transform.consumed}) {
 ^bb1(%variant_op: !transform.any_op):
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
     : (!transform.any_op) -> !transform.any_op

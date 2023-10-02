@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Transform/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/FileUtilities.h"
@@ -94,17 +95,17 @@ static llvm::cl::opt<std::string> clDumpDispatchGraphOutputFile(
     llvm::cl::desc("Output file name for a dispatch graph dump."),
     llvm::cl::init("dispatch.dot"));
 
-static llvm::cl::opt<std::string> clDispatchTransformFileName(
-    "iree-flow-dispatch-use-transform-dialect",
-    llvm::cl::desc("MLIR file containing a top-level module that specifies "
-                   "the transformations to apply to form dispatch regions."),
-    llvm::cl::init(""));
-
 static llvm::cl::opt<bool> clZeroFillEmptyTensors(
     "iree-flow-zero-fill-empty-tensors",
     llvm::cl::desc(
         "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
+
+llvm::cl::opt<std::string> transformFilename(
+    "iree-preloaded-transforms",
+    llvm::cl::desc(
+        "transform dialect file name containing preloaded strategies that can "
+        "be applied on demand to complement the IREE compiler"));
 
 namespace mlir {
 namespace iree_compiler {
@@ -114,9 +115,16 @@ namespace Flow {
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
-                                    const TransformOptions &transformOptions) {
+                                    const TransformOptions &transformOptions) {  
   // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
+
+  // Early on, if needed add the transform preloader pass.
+  if (!transformFilename.empty()) {
+    transform::PreloadLibraryPassOptions options;
+    options.transformLibraryPaths = transformFilename;
+    passManager.addPass(transform::createPreloadLibraryPass(options));
+  }
 
   // Transform pad operations into linalg.fill + tensor.insert_slice.
   // This is a WAR for not having native pad handling.
@@ -151,11 +159,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                          createInterchangeTransposeGenericOpsPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
-      .addPredicatedPass(!clDispatchTransformFileName.empty(),
-                         [&]() {
-                           return createDispatchWithTransformDialect(
-                               clDispatchTransformFileName);
-                         })
+      .addPredicatedPass(!transformFilename.empty(),
+                         [&]() { return createDispatchWithTransformDialect(/*entryPoint=default*/); })
 
       .addPass(createFormScalarDispatchesPass)
       // Only want use the transform dialect for some dispatch regions and let

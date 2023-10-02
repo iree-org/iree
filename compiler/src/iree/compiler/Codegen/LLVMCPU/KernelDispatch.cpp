@@ -28,6 +28,8 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
@@ -89,11 +91,6 @@ static llvm::cl::opt<bool>
                         llvm::cl::init(true));
 
 // Non-static options are used in other places.
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
-    "iree-codegen-llvmcpu-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
 llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
     "iree-codegen-llvmcpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
@@ -2450,6 +2447,15 @@ setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
 }
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
+  ModuleOp transformModule =
+      transform::detail::getPreloadedTransformModule(moduleOp.getContext());
+  if (transformModule && clCPUEnableTransformDialectJit) {
+    return moduleOp.emitError()
+           << "option clash in transform dialect lowering config: a preloaded "
+              "transform library cannot be provided when the jit option is "
+              "set.";
+  }
+
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
@@ -2459,10 +2465,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (getTranslationInfo(exportOp))
       continue;
 
-    // If using the transform dialect with a script file, intercept early.
-    if (!clCPUCodegenTransformDialectFileName.empty()) {
-      assert(!clCPUEnableTransformDialectJit &&
-             "Can't use both transform dialect interpreted and jitted modes");
+    if (transformModule) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(),
           IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);

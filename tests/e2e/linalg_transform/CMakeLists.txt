@@ -21,8 +21,7 @@ iree_lit_test_suite(
     iree-opt
     iree-run-mlir
   DATA
-    iree::tests::e2e::linalg_transform::transform_dialect_codegen_spec.mlir
-    iree::tests::e2e::linalg_transform::transform_dialect_dispatch_spec.mlir
+    iree::tests::e2e::linalg_transform::transform_spec.mlir
   LABELS
     "hostonly"
 )

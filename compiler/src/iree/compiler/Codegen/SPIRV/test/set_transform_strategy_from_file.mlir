@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass)))" --iree-spirv-use-transform-dialect=%p/transform_dialect_dummy_spec.mlir | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(transform-preload-library{transform-library-paths=%p/transform_dialect_dummy_spec.mlir},iree-spirv-lower-executable-target-pass)))" | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

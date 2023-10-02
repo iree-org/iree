@@ -7,8 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
 
-#include <functional>
-
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -187,14 +185,9 @@ std::unique_ptr<Pass> createFuseDequantizationMatmulPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchWorkgroupsPass(bool generateWorkloadRegion = true);
 
-// Pass to perform dispatch of Linalg on tensor ops by using the transform
-// dialect. Dispatch regions are created as specified by the transform module
-// that is parsed from `transformFileName`.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchWithTransformDialect(
-    llvm::StringRef transformFileName = llvm::StringRef(),
-    llvm::StringRef debugPayloadRootTag = llvm::StringRef(),
-    llvm::StringRef debugTransformRootTag = llvm::StringRef());
+// Pass to perform dispatch of Linalg on tensor ops by using preloaded
+// strategies specified using the transform dialect.
+std::unique_ptr<Pass> createDispatchWithTransformDialect();
 
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();

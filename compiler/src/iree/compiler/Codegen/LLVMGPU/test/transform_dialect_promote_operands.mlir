@@ -27,17 +27,18 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       return %6: tensor<250x1020xf32>
     }
   }
+}
 
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
-    %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %matmul = transform.structured.match ops{["linalg.matmul"]} in %root
       : (!transform.any_op) -> !transform.any_op
     %promoted_matmul, %alloc_0, %alloc_1 =
       transform.iree.promote_operands %matmul [0, 1] 
         : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
     // Late canonicalizations to cleanup and pass the checks.
-    %func_op = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %func_op = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func_op {
       transform.apply_patterns.iree.fold_fill_into_pad
       transform.apply_patterns.linalg.tiling_canonicalization
@@ -46,6 +47,6 @@ hal.executable private @pad_matmul_static_dispatch_0  {
     } : !transform.any_op
     transform.iree.apply_licm %func_op : !transform.any_op
     transform.iree.apply_cse %func_op : !transform.any_op
+    transform.yield 
   }
-}
-
+} // module

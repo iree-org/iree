@@ -21,6 +21,8 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
@@ -33,28 +35,10 @@ static constexpr StringLiteral kCudaTarget = "cuda";
 static constexpr StringLiteral kRocmTarget = "rocm";
 namespace mlir {
 namespace iree_compiler {
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
-    "iree-codegen-llvmgpu-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
-
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(true));
-
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
-    "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
-    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
-                   "payload root operation"),
-    llvm::cl::init(""));
-
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
-    "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
-    llvm::cl::desc(
-        "tag attribute value for the transform dialect transform op container"),
-    llvm::cl::init(""));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -721,23 +705,25 @@ static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
 static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
                                                Operation *op,
                                                const TargetInfo &targetInfo) {
-  if (!clGPUCodegenTransformDialectFileName.empty() &&
-      clGPUEnableTransformDialectJit) {
-    return entryPoint.emitError()
-           << "option clash in transform dialect lowering config: the filename "
-              "cannot be provided when the jit option is set";
+  ModuleOp transformModule =
+      transform::detail::getPreloadedTransformModule(entryPoint.getContext());
+  bool xOr = static_cast<bool>(transformModule) xor
+             static_cast<bool>(clGPUEnableTransformDialectJit);
+  if (!xOr) {
+    return clGPUEnableTransformDialectJit
+               ? entryPoint.emitError()
+                     << "option clash in transform dialect lowering config: a "
+                        "preloaded transform library cannot be provided when "
+                        "the jit option is set."
+               :
+               // If none is provided, cannot set the transform config at all.
+               failure();
   }
 
-  if (!clGPUEnableTransformDialectJit &&
-      clGPUCodegenTransformDialectFileName.empty()) {
-    return failure();
-  }
-
-  // Transform script file provided, use it.
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPoint.getContext(),
-      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-  if (!clGPUCodegenTransformDialectFileName.empty()) {
+  if (transformModule) {
+    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        entryPoint.getContext(),
+        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
     return setTranslationInfo(entryPoint, translationInfo);
   }
 
@@ -774,6 +760,12 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
   if (failed(iree_compiler::gpu::matchAndSetTransformStrategy(entryPoint, op,
                                                               gpuModel)))
     return failure();
+
+  // If we found a match, set the translation info to apply the transform
+  // dialect and return.
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPoint.getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
   return setTranslationInfo(entryPoint, translationInfo);
 }
 
@@ -1196,10 +1188,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   }
 
   // If using the transform dialect, call the proper pipeline.
-  assert((clGPUCodegenTransformDialectFileName.empty() ||
-          !clGPUEnableTransformDialectJit) &&
-         "Can't use both transform dialect interpreted and jitted modes");
-  if (clGPUCodegenTransformDialectFileName.size() > 0) {
+  ModuleOp transformModule =
+      transform::detail::getPreloadedTransformModule(entryPointFn.getContext());
+  assert(!(transformModule && clGPUEnableTransformDialectJit) &&
+         "Can't use both transform dialect library and jitted modes");
+  if (transformModule) {
     auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
         entryPointFn.getContext(),
         IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);

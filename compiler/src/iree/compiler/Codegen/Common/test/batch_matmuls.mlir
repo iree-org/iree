@@ -1,4 +1,7 @@
-// RUN: iree-opt %s --iree-transform-dialect-interpreter='transform-file-name=%p/batch_matmul_match_spec.mlir' --split-input-file --verify-diagnostics
+// RUN: iree-opt %s \
+// RUN: --transform-preload-library=transform-library-paths='%p/batch_matmul_match_spec.mlir' \
+// RUN: --iree-transform-dialect-interpreter \
+// RUN: --split-input-file --verify-diagnostics
 
 !lhs = tensor<128x80x32xf32>
 !rhs = tensor<128x32x320xf32>

@@ -39,24 +39,21 @@
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Pass/Pass.h"
 
-using namespace mlir;
-
-namespace {
+namespace mlir {
+namespace iree_compiler {
 
 /// Pass declaration.
 /// Interpreter pass that applies transform dialect ops for codegen.
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
 class TransformDialectInterpreterPass
-    : public mlir::transform::TransformInterpreterPassBase<
-          TransformDialectInterpreterPass,
-          iree_compiler::TransformDialectInterpreterBase> {
+    : public TransformDialectInterpreterBase<TransformDialectInterpreterPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // TODO: this is only necessary to make registry subset happy when running
@@ -94,6 +91,9 @@ public:
     tensor::registerFindPayloadReplacementOpInterfaceExternalModels(registry);
     vector::registerBufferizableOpInterfaceExternalModels(registry);
 
+    // TODO: Remove this dependency once the transform dialect extensions
+    // have a better registration mechanism.
+    // TODO: when warranted, move to its own file.
     registry.addExtensions<
         mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension,
         transform_ext::StructuredTransformOpsExtension>();
@@ -111,28 +111,24 @@ public:
     vector::registerTransformDialectExtension(registry);
   }
 
-  TransformDialectInterpreterPass(
-      StringRef transformFileName = StringRef(),
-      StringRef debugPayloadRootTag = StringRef(),
-      StringRef debugTransformRootTag = StringRef()) {
-    this->transformFileName = transformFileName.str();
-    this->debugPayloadRootTag = debugPayloadRootTag.str();
-    this->debugTransformRootTag = debugTransformRootTag.str();
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    ModuleOp transformModule =
+        transform::detail::getPreloadedTransformModule(context);
+    if (failed(transform::applyTransformNamedSequence(
+            getOperation(), transformModule,
+            options.enableExpensiveChecks(true), entryPoint)))
+      return signalPassFailure();
   }
-  TransformDialectInterpreterPass(const TransformDialectInterpreterPass &pass) =
-      default;
-};
-} // namespace
 
-namespace mlir {
-namespace iree_compiler {
+private:
+  /// Transform interpreter options.
+  transform::TransformOptions options;
+};
+
 /// Create a Transform dialect interpreter pass.
-std::unique_ptr<Pass>
-createTransformDialectInterpreterPass(llvm::StringRef transformFileName,
-                                      llvm::StringRef debugPayloadRootTag,
-                                      llvm::StringRef debugTransformRootTag) {
-  return std::make_unique<TransformDialectInterpreterPass>(
-      transformFileName, debugPayloadRootTag, debugTransformRootTag);
+std::unique_ptr<Pass> createTransformDialectInterpreterPass() {
+  return std::make_unique<TransformDialectInterpreterPass>();
 }
 } // namespace iree_compiler
 } // namespace mlir

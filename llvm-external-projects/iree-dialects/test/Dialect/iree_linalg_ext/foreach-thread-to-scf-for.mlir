@@ -41,7 +41,7 @@ func.func @static_tile_buffers(%arg0: index, %arg1: memref<?xf32>, %arg2: memref
   return
 }
 
-transform.sequence failures(propagate) {
+transform.named_sequence @__transform_main(%root: !transform.any_op {transform.consumed}) {
 ^bb1(%module_op: !transform.any_op):
   %0 = transform.structured.match ops{["scf.forall"]} in %module_op : (!transform.any_op) -> !transform.any_op
   %1 = forall_to_scf_for %0 : (!transform.any_op) -> !transform.any_op

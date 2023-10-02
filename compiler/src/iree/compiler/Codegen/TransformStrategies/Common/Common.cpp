@@ -15,6 +15,7 @@
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
@@ -37,8 +38,8 @@ using transform::HoistRedundantTensorSubsetsOp;
 using transform::MatchOp;
 using transform::MemRefEraseDeadAllocAndStoresOp;
 using transform::MergeHandlesOp;
+using transform::NamedSequenceOp;
 using transform::PrintOp;
-using transform::SequenceOp;
 using transform::SplitHandleOp;
 using transform::SplitReductionOp;
 using transform::TileUsingForallOp;
@@ -96,16 +97,20 @@ void mlir::iree_compiler::createTransformRegion(
   OpBuilder b(ctx);
   b.setInsertionPointAfter(entryPoint);
   auto topLevelTransformModule = b.create<ModuleOp>(loc);
+  topLevelTransformModule->setAttr(transform::TransformDialect::kWithNamedSequenceAttrName, b.getUnitAttr());
   Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
   b.setInsertionPointToStart(&topLevelTransformRegion.front());
   auto anyOpType = transform::AnyOpType::get(b.getContext());
-  auto sequence = b.create<transform::SequenceOp>(
-      loc, TypeRange{}, transform::FailurePropagationMode::Propagate, anyOpType,
-      [&](OpBuilder &b, Location loc, Value variantH) {
+  auto sequence = b.create<transform::NamedSequenceOp>(
+      loc,
+      /*symName=*/"__transform_main", /*rootType*/ anyOpType,
+      /*resultTypes=*/TypeRange{},
+      /*bodyBuilder=*/[&](OpBuilder &b, Location loc, Value variantH) {
         ImplicitLocOpBuilder ib(loc, b);
         buildStrategy(ib, variantH);
         b.create<transform::YieldOp>(loc);
       });
+
   (void)sequence;
   LDBG("transformation script:\n");
   LDBG("verification: " << sequence.verify().succeeded() << "\n");

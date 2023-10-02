@@ -23,6 +23,7 @@
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Dialect/Transform/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
@@ -82,6 +83,9 @@ inline void registerMlirPasses() {
 
   // Arm SME
   arm_sme::registerArmSMEPasses();
+
+  // Transform dialect
+  transform::registerTransformPasses();
 }
 
 } // namespace mlir

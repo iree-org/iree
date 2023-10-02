@@ -45,7 +45,7 @@ hal.executable.variant public @vulkan, target = <"vulkan-spirv", "vulkan-spirv-f
 
 // CHECK-LABEL: func @matmul
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 
 /// The specific vector sizes are tested in the LLVMGPU tests and thus omitted
 /// here. This is just to check that masked vectorization is used.

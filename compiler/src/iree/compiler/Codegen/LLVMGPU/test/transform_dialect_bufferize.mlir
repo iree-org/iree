@@ -1,5 +1,6 @@
 // RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
 
+builtin.module attributes { transform.with_named_sequence } {
 hal.executable private @pad_matmul_static_dispatch_0  {
   builtin.module {
     func.func @pad_matmul_static_dispatch_0() {
@@ -27,11 +28,12 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       return 
     }
   }
+}
 
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.consumed}) {
     transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
     %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op: (!transform.any_op) -> !transform.any_op
     %func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    transform.yield 
   }
-}
+} // module

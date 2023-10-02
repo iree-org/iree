@@ -1,5 +1,7 @@
 // RUN: iree-opt --split-input-file -iree-transform-dialect-interpreter -transform-dialect-drop-schedule %s | FileCheck %s
 
+#map = affine_map<(d0) -> (d0, 16)>
+
 func.func @non_entry_bb_allocs() {
   cf.br ^bb1
  ^bb1() :
@@ -14,16 +16,6 @@ func.func @non_entry_bb_allocs() {
 //  CHECK-NEXT:   ^bb1:
 //  CHECK-NEXT:   return
 
-transform.sequence failures(propagate) {
-^bb1(%module: !transform.any_op):
-    %func = transform.structured.match ops{["func.func"]} in %module
-      : (!transform.any_op) -> !transform.op<"func.func">
-    transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
-}
-
-// -----
-
-#map = affine_map<(d0) -> (d0, 16)>
 func.func @nested_op_alloc_subview_use_static(%arg0 : index, %o0 : index, %o1 : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -45,16 +37,6 @@ func.func @nested_op_alloc_subview_use_static(%arg0 : index, %o0 : index, %o1 : 
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   memref.dealloc %[[ALLOC]] : memref<16x16xi32>
 
-transform.sequence failures(propagate) {
-^bb1(%module: !transform.any_op):
-    %func = transform.structured.match ops{["func.func"]} in %module
-      : (!transform.any_op) -> !transform.op<"func.func">
-    transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
-}
-
-// -----
-
-#map = affine_map<(d0) -> (d0, 16)>
 func.func @nested_op_alloc_subview_use_dynamic(%arg0 : index, %o0 : index, %o1 : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -77,9 +59,12 @@ func.func @nested_op_alloc_subview_use_dynamic(%arg0 : index, %o0 : index, %o1 :
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   memref.dealloc %[[ALLOC]] : memref<16x16xi32>
 
-transform.sequence failures(propagate) {
-^bb1(%module: !transform.any_op):
-    %func = transform.structured.match ops{["func.func"]} in %module
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root
       : (!transform.any_op) -> !transform.op<"func.func">
     transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
-}
+    transform.yield 
+  }
+} // module

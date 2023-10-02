@@ -2,26 +2,49 @@
 
 module attributes { transform.with_named_sequence } {
 
-  transform.named_sequence @codegen(%variant_op: !transform.any_op {transform.consumed}) {
+  // Dispatch.
+  transform.named_sequence @dispatch(
+      %graph: !transform.any_op {transform.readonly}) {
+    %ops = transform.structured.match ops{["linalg.fill", "linalg.matmul"]}
+      in %graph : (!transform.any_op) -> !transform.any_op
+
+    %fill0, %matmul0, %fill1, %matmul1 =
+      transform.split_handle %ops
+        : (!transform.any_op) -> (!transform.any_op, !transform.any_op,
+                              !transform.any_op, !transform.any_op)
+
+    %region_op = transform.iree.wrap_in_dispatch_region %matmul1 { generateWorkload = false } : (!transform.any_op) -> !transform.any_op
+
+    %non_matmul1 = transform.merge_handles %fill0, %matmul0, %fill1 : !transform.any_op
+    %region_op_2 = transform.iree.move_preceding_op_into_dispatch_region %non_matmul1 into %region_op : (!transform.any_op, !transform.any_op) -> !transform.any_op
+
+    %empty = transform.structured.match ops{["tensor.empty"]} in %graph : (!transform.any_op) -> !transform.any_op
+    %region_op_3 = transform.iree.move_preceding_op_into_dispatch_region %empty into %region_op_2 : (!transform.any_op, !transform.any_op) -> !transform.any_op
+    transform.iree.region_to_workgroups %region_op_3 : (!transform.any_op) -> !transform.any_op
+
+    transform.yield
+  } // @dispatch
+
+  // Codegen.
+  transform.named_sequence @codegen(
+      %variant_op: !transform.any_op {transform.consumed}) {
+
     // Step 1. Find the fill and matmul ops
     // ===========================================================================
     %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %fill0, %fill1 = transform.split_handle %fill : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %matmul0, %matmul1 = transform.split_handle %matmul : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Step 2. Tile the matmul and fuse the fill
     // ===========================================================================
     %grid_reduction, %forall_grid =
-    transform.structured.tile_using_forall %matmul tile_sizes [16] ( mapping = [#gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.structured.tile_using_forall %matmul1 tile_sizes [16] ( mapping = [#gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
 
-    transform.structured.fuse_into_containing_op %fill into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-
-    // Promote operands in order to test loading from shared memory.
-    %matmul_2 = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %promoted_matmul, %alloc_0, %alloc_1 =
-      transform.iree.promote_operands %matmul_2 [0, 1] 
-        : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
-
+    transform.structured.fuse_into_containing_op %fill1 into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.structured.fuse_into_containing_op %matmul0 into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.structured.fuse_into_containing_op %fill0 into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     // Step 3. Vectorize
     // ===========================================================================
@@ -63,8 +86,7 @@ module attributes { transform.with_named_sequence } {
     // ===========================================================================
     %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
-    transform.iree.map_nested_forall_to_gpu_threads %func_7
-        workgroup_dims = [4, 8, 1] : (!transform.any_op) -> ()
+    transform.iree.map_nested_forall_to_gpu_threads %func_7 workgroup_dims = [4, 8, 1] : (!transform.any_op) -> ()
 
     // Step 7. Do layout analysis and lower to mma
     // ===========================================================================
@@ -72,7 +94,17 @@ module attributes { transform.with_named_sequence } {
     %func_11 = transform.iree.layout_analysis_and_distribution %func_10 : (!transform.any_op) -> (!transform.any_op)
 
     transform.yield
-  } // codegen
+  } // @codegen
+
+  // Match `func.func`s that are not nested under a `hal.executable.variant` and 
+  // only those for codegen.
+  transform.named_sequence @match_func_for_dispatch(%root: !transform.any_op {transform.readonly}) 
+    -> !transform.any_op {
+    transform.match.operation_name %root ["func.func"] : !transform.any_op
+    %variant = transform.get_parent_op %root { allow_empty_results, op_name = "hal.executable.variant" } : (!transform.any_op) -> (!transform.any_op)
+    transform.match.operation_empty %variant : !transform.any_op
+    transform.yield %root : !transform.any_op
+  }
 
   // Find `hal.executable.variant`.
   transform.named_sequence @match_variant_for_codegen(%root: !transform.any_op {transform.readonly}) 
@@ -84,7 +116,8 @@ module attributes { transform.with_named_sequence } {
   // Transform entry-point
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.consumed}) {
     transform.foreach_match in %root
-        @match_variant_for_codegen -> @codegen
+        @match_variant_for_codegen -> @codegen,
+        @match_func_for_dispatch -> @dispatch
       : (!transform.any_op) -> (!transform.any_op)
     transform.yield 
   }

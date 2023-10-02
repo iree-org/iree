@@ -1,5 +1,15 @@
-// RUN: iree-opt %s --iree-transform-dialect-interpreter='transform-file-name=%p/reductions_codegen_spec.mlir' --split-input-file | FileCheck %s
-// RUN: iree-opt %s --iree-transform-dialect-interpreter='transform-file-name=%p/reductions_match_spec.mlir' --split-input-file --verify-diagnostics
+// RUN: iree-opt %s \
+// RUN: --transform-preload-library=transform-library-paths='%p/reductions_codegen_spec.mlir' \
+// RUN: --iree-transform-dialect-interpreter \
+// RUN: --split-input-file | \
+// RUN: FileCheck %s
+
+// RUN: iree-opt %s \
+// RUN: --transform-preload-library=transform-library-paths='%p/reductions_match_spec.mlir' \
+// RUN: --iree-transform-dialect-interpreter \
+// RUN: --split-input-file --verify-diagnostics
+
+
 
 // Check that the same transform script applies to reductions with optional
 // leading and trailing elementwise operations, potentially reordered
