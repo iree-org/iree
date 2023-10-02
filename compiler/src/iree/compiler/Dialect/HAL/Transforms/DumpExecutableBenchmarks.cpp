@@ -79,8 +79,11 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       for (auto workloadValue : workloadValues) {
         APInt workloadConstValue;
         if (!matchPattern(workloadValue, m_ConstantInt(&workloadConstValue))) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Skipping dispatch (non-constant workload)\n");
+          LLVM_DEBUG({
+            auto firstEntryPoint = *dispatchOp.getEntryPointRefs().begin();
+            llvm::dbgs() << "Skipping dispatch of entry point `"
+                         << firstEntryPoint << "` (non-constant workload)\n";
+          });
           return;
         }
         workload.push_back(workloadConstValue.getSExtValue());
@@ -92,8 +95,12 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
                dispatchOp.getResourceLengths())) {
         APInt resourceLengthInt;
         if (!matchPattern(resourceLength, m_ConstantInt(&resourceLengthInt))) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Skipping dispatch (non-constant resource length)\n");
+          LLVM_DEBUG({
+            auto firstEntryPoint = *dispatchOp.getEntryPointRefs().begin();
+            llvm::dbgs() << "Skipping dispatch of entry point `"
+                         << firstEntryPoint
+                         << "` (non-constant resource length)\n";
+          });
           return;
         }
         bindings.push_back({(unsigned)bindingAttr.getSet(),
@@ -105,11 +112,14 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       for (auto operand : dispatchOp.getUniformOperands()) {
         TypedAttr uniformOperand;
         if (!matchPattern(operand, m_Constant(&uniformOperand))) {
-          // Non-constant uniform operand; skip the dispatch.
           // TODO(benvanik): extract information from the executable annotations
           // or allow the dynamic value to be passed in as an additional arg.
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Skipping dispatch (non-constant uniform operand)\n");
+          LLVM_DEBUG({
+            auto firstEntryPoint = *dispatchOp.getEntryPointRefs().begin();
+            llvm::dbgs() << "Skipping dispatch of entry point `"
+                         << firstEntryPoint
+                         << "` (non-constant uniform operand)\n";
+          });
           return;
         }
         uniformOperands.push_back(uniformOperand);
@@ -471,7 +481,7 @@ public:
     // currently support.
     auto dispatchParamsMap = gatherDispatchParams(moduleOp);
     if (dispatchParamsMap.empty()) {
-      llvm::dbgs()
+      mlir::emitRemark(moduleOp.getLoc())
           << "Executable benchmarks were requested but none were generated. "
              "Run with --debug-only=iree-dump-executable-benchmarks for more "
              "details.\n";
