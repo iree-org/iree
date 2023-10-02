@@ -2681,12 +2681,12 @@ cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build<span c
 <a href="https://github.com/openxla/iree/blob/main/build_tools/cmake/ctest_all.sh">helper script</a>
 that converts environment variables into ctest filters:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Run default tests</span>
-./build_tools/cmake/ctest_all.sh
+./build_tools/cmake/ctest_all.sh<span class="w"> </span>../iree-build
 
 <span class="c1"># Run tests, turning CUDA on and Vulkan off</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">IREE_CUDA_DISABLE</span><span class="o">=</span><span class="m">0</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">IREE_VULKAN_DISABLE</span><span class="o">=</span><span class="m">1</span>
-./build_tools/cmake/ctest_all.sh
+./build_tools/cmake/ctest_all.sh<span class="w"> </span>../iree-build
 </code></pre></div>
 <h3 id="running-samples">Running samples<a class="headerlink" href="#running-samples" title="Permanent link">link</a></h3>
 <div class="highlight"><pre><span></span><code><span class="c1"># Build</span>
