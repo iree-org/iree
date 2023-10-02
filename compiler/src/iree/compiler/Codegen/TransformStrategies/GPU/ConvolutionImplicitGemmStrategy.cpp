@@ -57,7 +57,7 @@ using iree_compiler::IREE::transform_dialect::
 using transform::ConvertConv2DToImg2ColOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
-using transform::TileOp;
+using transform::TileUsingForOp;
 using transform_ext::RegisterMatchCallbacksOp;
 
 /// Options to set the default values of the matmul strategy.
@@ -265,7 +265,7 @@ buildTileFuseToSingleScfFor(ImplicitLocOpBuilder &b, Value isolatedParentOpH,
                             ArrayRef<int64_t> tileSizes) {
   iree_compiler::TileToScfForAndFuseResult result;
   Type rootType = rootH.getType();
-  auto tiletoScfForOp = b.create<TileOp>(rootType, rootH, tileSizes);
+  auto tiletoScfForOp = b.create<TileUsingForOp>(rootType, rootH, tileSizes);
   result.forLoops = tiletoScfForOp.getLoops();
   result.tiledOpH = tiletoScfForOp.getTiledLinalgOp();
 

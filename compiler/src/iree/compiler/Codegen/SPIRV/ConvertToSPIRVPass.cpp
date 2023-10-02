@@ -447,9 +447,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
-  typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
-    return convertMMAToSPIRVCoopMatrixType(type);
-  });
+  populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter);
   RewritePatternSet patterns(&getContext());
   ScfToSPIRVContext scfToSPIRVContext;
 

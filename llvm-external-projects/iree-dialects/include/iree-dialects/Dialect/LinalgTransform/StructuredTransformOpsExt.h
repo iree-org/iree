@@ -70,8 +70,9 @@ public:
   }
 
 private:
-  void notifyPayloadReplacementNotFound(Operation *op,
-                                        ValueRange values) override;
+  void
+  notifyPayloadReplacementNotFound(Operation *op, ValueRange values,
+                                   DiagnosedSilenceableFailure &&diag) override;
 
   /// The error state of this listener. "Success" indicates that no error
   /// happened so far. Otherwise, the status contains the most recent error.

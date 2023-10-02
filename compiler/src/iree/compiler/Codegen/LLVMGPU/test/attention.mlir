@@ -38,15 +38,15 @@ transform.sequence failures(propagate) {
 
   // Tile and distribute to workgroups
   // ==========================================
-  %forall_grid, %tiled_attention =
-  transform.structured.tile_to_forall_op %attention tile_sizes [1, 128]
+  %tiled_attention, %forall_grid =
+  transform.structured.tile_using_forall %attention tile_sizes [1, 128]
     ( mapping = [#gpu.block<x>, #gpu.block<y>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
 
   // Tile batch dimensions of attention
   // ==========================================
   %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %batch_tiled_attn, %loop = transform.structured.tile %attention2 [1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %batch_tiled_attn, %loop = transform.structured.tile_using_for %attention2 [1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   transform.apply_patterns to %top_level_func {
     transform.apply_patterns.canonicalization
@@ -76,7 +76,7 @@ transform.sequence failures(propagate) {
 
   // Tile and fuse attention ops
   // ==========================================
-  %forall, %tiled_matmul = transform.structured.tile_to_forall_op %promoted_second_matmul tile_sizes [32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_matmul, %forall = transform.structured.tile_using_forall %promoted_second_matmul tile_sizes [32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   %f0, %loop0 = transform.structured.fuse_into_containing_op %scale_acc into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
   %f1, %loop1 = transform.structured.fuse_into_containing_op %truncate into %loop0 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -101,7 +101,7 @@ transform.sequence failures(propagate) {
   // Distribute fills and last truncate
   // ==========================================
   %fills = transform.merge_handles %acc_fill, %max_fill, %sum_fill, %last_truncate : !transform.any_op
-  %fill_grid, %tiled_fill = transform.structured.tile_to_forall_op %fills tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_fill, %fill_grid = transform.structured.tile_using_forall %fills tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Vectorize function
   // ==========================================

@@ -349,12 +349,18 @@ mlir::transform_ext::StructuredTransformOpsExtension::
 //===----------------------------------------------------------------------===//
 
 void ErrorCheckingTrackingListener::notifyPayloadReplacementNotFound(
-    Operation *op, ValueRange values) {
+    Operation *op, ValueRange values, DiagnosedSilenceableFailure &&diag) {
   // Certain ops can dropped safely.
   if (isa<scf::ForOp>(op)) {
     LLVM_DEBUG(DBGS() << "Silently dropping scf.for op mapping\n");
     return;
   }
+
+  SmallVector<Diagnostic> diags;
+  diag.takeDiagnostics(diags);
+  if (!status.succeeded())
+    status.takeDiagnostics(diags);
+  status = DiagnosedSilenceableFailure::silenceableFailure(std::move(diags));
 
   status = emitSilenceableFailure(
       getTransformOp(), "!!! tracking listener failed to find replacement op");

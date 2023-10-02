@@ -136,10 +136,10 @@ func.func @matmul_broadcast_add(%init: tensor<1x8xf32>, %a: tensor<1x8xf32>, %b:
 //      CHECK-NOT:   vector.transpose
 
 //          CHECK:   %[[READ:.+]] = vector.transfer_read %[[BIAS]]
-//          CHECK:   %[[EXT0:.+]] = vector.extract %[[READ]][0] : vector<1xf32>
+//          CHECK:   %[[EXT0:.+]] = vector.extract %[[READ]][0] : f32 from vector<1xf32>
 //          CHECK:   %[[BCST0:.+]] = vector.splat %[[EXT0]] : vector<4xf32>
 //          CHECK:   %[[ADD0:.+]] = arith.addf %{{.+}}, %[[BCST0]] : vector<4xf32>
-//          CHECK:   %[[EXT1:.+]] = vector.extract %[[READ]][0] : vector<1xf32>
+//          CHECK:   %[[EXT1:.+]] = vector.extract %[[READ]][0] : f32 from vector<1xf32>
 //          CHECK:   %[[BCST1:.+]] = vector.splat %[[EXT1]] : vector<4xf32>
 //          CHECK:   %[[ADD1:.+]] = arith.addf %{{.+}}, %[[BCST1]] : vector<4xf32>
 //          CHECK:   %[[WRITE0:.+]] = vector.transfer_write %[[ADD0]], %[[INIT]][%[[C0]], %[[C0]]]

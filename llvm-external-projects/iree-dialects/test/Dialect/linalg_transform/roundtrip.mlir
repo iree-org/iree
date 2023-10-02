@@ -5,11 +5,11 @@ transform.sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   // CHECK: %[[OPS:.*]] = pdl_match @match1 in %{{.*}}
   %0 = pdl_match @match1 in %arg0 : (!pdl.operation) -> !pdl.operation
-  // CHECK: %[[TILED:.*]], %{{.*}}:3 = transform.structured.tile %[[OPS]][4, 4, 4]
-  %1, %loops1:3 = transform.structured.tile %0 [4, 4, 4]
+  // CHECK: %[[TILED:.*]], %{{.*}}:3 = transform.structured.tile_using_for %[[OPS]][4, 4, 4]
+  %1, %loops1:3 = transform.structured.tile_using_for %0 [4, 4, 4]
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
-  // CHECK: %[[TILED2:.*]], %{{.*}}:3 = transform.structured.tile %[[TILED]]
-  %2, %loops2:3  = transform.structured.tile %1 [2, 2, 2]
+  // CHECK: %[[TILED2:.*]], %{{.*}}:3 = transform.structured.tile_using_for %[[TILED]]
+  %2, %loops2:3  = transform.structured.tile_using_for %1 [2, 2, 2]
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   // CHECK: %[[PADDED:.*]], %{{.*}}, %{{.*}} = transform.structured.pad %[[TILED2]] {pack_paddings = [1, 1, 0]}
   %3, %pad, %copy_back = transform.structured.pad %2 {pack_paddings = [1, 1, 0]} : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation)

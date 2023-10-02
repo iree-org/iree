@@ -113,6 +113,8 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   if (failed(tilingResult)) {
     return failure();
   }
+  auto forLoops = llvm::to_vector(llvm::map_range(
+      tilingResult->loops, [](Operation *op) { return cast<scf::ForOp>(op); }));
   yieldedValuesToOrigValues.append(rootOp->result_begin(),
                                    rootOp->result_end());
   // A map from untiled value to scf.for iter_arg. The iter_arg is used for DPS
@@ -129,9 +131,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
       tilingResult->tiledOps[0] = replacementTiledOp.value();
     }
   } else if (auto dpsOp = dyn_cast<DestinationStyleOpInterface>(rootOp)) {
-    for (auto [init, iterArg] :
-         llvm::zip_equal(dpsOp.getDpsInits(),
-                         tilingResult->loops.back().getRegionIterArgs())) {
+    for (auto [init, iterArg] : llvm::zip_equal(
+             dpsOp.getDpsInits(),
+             cast<scf::ForOp>(forLoops.back()).getRegionIterArgs())) {
       mapToIterArg[init] = iterArg;
     }
   }
@@ -174,8 +176,7 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
 
     // Materialize the slice of the producer in place.
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedProducer =
-        tileAndFuseProducerOfSlice(rewriter, candidateSliceOp,
-                                   tilingResult->loops);
+        tileAndFuseProducerOfSlice(rewriter, candidateSliceOp, forLoops);
     if (!fusedProducer)
       continue;
 
@@ -183,11 +184,10 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     // to be yielded from within the tiled loop.
     OpResult untiledProducer = fusedProducer->origProducer;
     if (llvm::any_of(untiledProducer.getUsers(), [&](Operation *user) {
-          return !isIgnoredUser(user, tilingResult->loops.front());
+          return !isIgnoredUser(user, forLoops.front());
         })) {
       yieldReplacementForFusedProducer(rewriter, candidateSliceOp,
-                                       fusedProducer.value(),
-                                       tilingResult->loops);
+                                       fusedProducer.value(), forLoops);
       yieldedValuesToOrigValues.push_back(untiledProducer);
     }
 
@@ -198,7 +198,7 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     }
   }
 
-  scf::ForOp outermostLoop = tilingResult->loops.front();
+  scf::ForOp outermostLoop = forLoops.front();
   for (auto [index, origVal] : llvm::enumerate(yieldedValuesToOrigValues)) {
     Value replacement = outermostLoop.getResult(index);
     rewriter.replaceUsesWithIf(origVal, replacement, [&](OpOperand &use) {
