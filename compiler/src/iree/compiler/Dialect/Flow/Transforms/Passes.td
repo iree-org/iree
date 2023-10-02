@@ -26,6 +26,12 @@ def CleanupNumericNarrowing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createCleanupNumericNarrowingPass()";
 }
 
+def CollapseDims :
+    Pass<"iree-flow-collapse-dims", ""> {
+  let summary = "Collapse reduction dimensions when possible.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimsPass()";
+}
+
 def Convert1X1FilterConv2DToMatmul:
     Pass<"iree-flow-convert-1x1-filter-conv2d-to-matmul", ""> {
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
