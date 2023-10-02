@@ -2590,11 +2590,13 @@ cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </s
 <span class="w">    </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_ENABLE_SPLIT_DWARF<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-DIREE_ENABLE_THIN_ARCHIVES<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-DIREE_ENABLE_LLD<span class="o">=</span>ON
 </code></pre></div>
+<p>It is also possible to add <code>-DIREE_ENABLE_THIN_ARCHIVES=ON</code> if the
+<code>CMAKE_AR</code> variable is defined and points to the path of either the GNU
+binutils or LLVM <code>ar</code> program, overriding the default Apple <code>ar</code>.</p>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="c1"># Recommended development options:</span>
