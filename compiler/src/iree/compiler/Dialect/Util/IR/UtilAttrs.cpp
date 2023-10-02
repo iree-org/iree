@@ -370,6 +370,20 @@ static void serializeGenericIntegerResourcElementsAPInt(std::optional<ArrayRef<e
   }
 }
 
+template <typename elementType>
+static void serializeGenericFloatResourcElementsAPFloat(std::optional<ArrayRef<elementType>> attrData,
+                                                        unsigned numBits,
+                                                        llvm::support::endianness endian,
+                                                        llvm::raw_ostream &os) {
+  for (int i = 0; i < attrData->size(); i++) {
+    auto val = (*attrData)[i];
+    APFloat newVal(numBits, val);
+    elementType rawValue = llvm::support::endian::byte_swap<elementType>(
+        newVal.bitcastToAPInt().extractBitsAsZExtValue(numBits, 0), endian);
+    os.write((const char *)&rawValue, sizeof(rawValue));
+  }
+}
+
 template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
 static LogicalResult
 serializeGenericIntegerResourceElements(Location loc,
@@ -400,6 +414,30 @@ serializeGenericIntegerResourceElements(Location loc,
         std::optional<ArrayRef<int64_t>> attrData =
           denseI64ResourceAttr.tryGetAsArrayRef();
         serializeGenericIntegerResourcElementsAPInt<int64_t>(attrData, numBits, endian, os);
+        break;
+      }
+    default:
+      return emitError(loc)
+             << "unhandled integer element bit width " << bitWidth
+             << " for type " << attr.getType();
+  }
+  return success();
+}
+
+template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
+static LogicalResult
+serializeGenericFloatResourceElements(Location loc,
+                                DenseResourceElementsAttr attr,
+                                llvm::support::endianness endian,
+                                llvm::raw_ostream &os) {
+  unsigned bitWidth = attr.getType().getElementTypeBitWidth();
+  switch (bitWidth) {
+    case 32:
+      {
+        auto denseF32ResourceAttr = dyn_cast<DenseF32ResourceElementsAttr>(attr);
+        std::optional<ArrayRef<float>> attrData =
+          denseF32ResourceAttr.tryGetAsArrayRef();
+        serializeGenericFloatResourcElementsAPFloat<float>(attrData, numBits, endian, os);
         break;
       }
     default:
@@ -503,6 +541,7 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
                                     DenseI16ResourceElementsAttr,
                                     DenseI32ResourceElementsAttr,
                                     DenseI64ResourceElementsAttr>(resourceElementsAttr);
+  bool isDenseFloatResource = isa<DenseF32ResourceElementsAttr, DenseF64ResourceElementsAttr>(resourceElementsAttr);
   if (isDenseIntegerResource) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
@@ -522,6 +561,17 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
       return emitError(loc)
              << "unhandled integer element bit width " << bitWidth
              << " for type " << resourceElementsAttr.getType();
+    }
+  }
+  if (isDenseFloatResource) {
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+      case 32:
+        return serializeResourceRawData(loc, resourceElementsAttr, os);
+      case 64:
+        return serializeResourceRawData(loc, resourceElementsAttr, os);
     }
   }
   return emitError(loc) << "unhandled constant type " << resourceElementsAttr.getType();
