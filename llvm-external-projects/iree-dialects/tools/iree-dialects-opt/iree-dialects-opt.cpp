@@ -82,6 +82,7 @@ int main(int argc, char **argv) {
   registerSCFPasses();
   // Local dialect passes.
   mlir::iree_compiler::IREE::LinalgExt::registerPasses();
+  mlir::linalg::transform::registerTransformDialectInterpreterPass();
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
   mlir::test_ext::registerTestListenerPasses();
