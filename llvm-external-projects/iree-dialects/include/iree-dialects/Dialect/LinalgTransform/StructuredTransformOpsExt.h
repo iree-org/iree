@@ -19,9 +19,6 @@ namespace mlir {
 namespace linalg {
 class LinalgOp;
 } // namespace linalg
-namespace pdl {
-class FoOperationTyperOp;
-} // namespace pdl
 namespace scf {
 class ForOp;
 } // namespace scf
