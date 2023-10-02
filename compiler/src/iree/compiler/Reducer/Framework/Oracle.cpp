@@ -18,6 +18,14 @@ using namespace mlir::iree_compiler::Reducer;
 #define DEBUG_TYPE "iree-reduce-framework"
 
 bool Oracle::isInteresting(WorkItem &workItem) {
+  // Check if the module verifies before running the interestingness script.
+  // iree-reduce expects a verifiable program at start, so if the program does
+  // not verify anymore, it is not interesting.
+  if (failed(workItem.verify())) {
+    LLVM_DEBUG(llvm::dbgs() << "Module does not verify\n");
+    return false;
+  }
+
   // Print module to a temporary file.
   SmallString<128> filepath;
   int fd;
