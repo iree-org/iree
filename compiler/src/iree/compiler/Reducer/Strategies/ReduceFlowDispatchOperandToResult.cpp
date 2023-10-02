@@ -42,16 +42,18 @@ void mlir::iree_compiler::Reducer::reduceFlowDispatchOperandToResultDelta(
     return;
   }
 
-  // Replace all dispatch ops with random inputs.
+  // Replace all dispatch ops with the chosen operand.
   for (auto [result, operand] : resultToOperand) {
     result.replaceAllUsesWith(operand);
   }
 
-  // Simplify.
   PassManager pm(module.getContext());
-  pm.addPass(createCanonicalizerPass());
+  // Dead code eliminate the dispatch ops.
   pm.addPass(createCSEPass());
+  // Dead code eliminate the weights.
   pm.addPass(createSymbolDCEPass());
+  // Canonicalize the module.
+  pm.addPass(createCanonicalizerPass());
   if (failed(pm.run(module))) {
     return;
   }
