@@ -19,7 +19,7 @@ BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-runtime}}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
+# Note: not using ccache since the runtime build should be fast already.
 
 declare -a args
 args=(

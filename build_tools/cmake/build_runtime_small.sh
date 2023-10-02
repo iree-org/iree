@@ -14,7 +14,7 @@ set -xeuo pipefail
 BUILD_DIR="${1:-${IREE_RUNTIME_SMALL_BUILD_DIR:-build-runtime-small}}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
+# Note: not using ccache since the runtime build should be fast already.
 
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \
   -G Ninja . \
