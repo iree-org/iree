@@ -24,7 +24,3 @@ source build_tools/cmake/setup_build.sh
   -DIREE_SIZE_OPTIMIZED=ON \
   -DIREE_BUILD_COMPILER=OFF
 "${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
-
-if (( IREE_USE_CCACHE == 1 )); then
-  ccache --show-stats
-fi

@@ -73,7 +73,3 @@ case "${BUILD_PRESET}" in
     exit 1
     ;;
 esac
-
-if (( IREE_USE_CCACHE == 1 )); then
-  ccache --show-stats
-fi
