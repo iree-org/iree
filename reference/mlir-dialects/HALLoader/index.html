@@ -1592,34 +1592,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop" class="md-nav__link">
-    hal_loader.executable.dispatch.symbol (HAL::Loader::ExecutableDispatchSymbolOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hal_loaderexecutableload-halloaderexecutableloadop" class="md-nav__link">
-    hal_loader.executable.load (HAL::Loader::ExecutableLoadOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" class="md-nav__link">
-    hal_loader.executable.lookup (HAL::Loader::ExecutableLookupOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" class="md-nav__link">
-    hal_loader.executable.query_support (HAL::Loader::ExecutableQuerySupportOp)
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2334,34 +2306,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop" class="md-nav__link">
-    hal_loader.executable.dispatch.symbol (HAL::Loader::ExecutableDispatchSymbolOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hal_loaderexecutableload-halloaderexecutableloadop" class="md-nav__link">
-    hal_loader.executable.load (HAL::Loader::ExecutableLoadOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" class="md-nav__link">
-    hal_loader.executable.lookup (HAL::Loader::ExecutableLookupOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" class="md-nav__link">
-    hal_loader.executable.query_support (HAL::Loader::ExecutableQuerySupportOp)
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2406,10 +2350,6 @@ restrictions.</p>
 <li><a href="#operation-definition">Operation definition</a><ul>
 <li><a href="#executable-ops">Executable ops</a><ul>
 <li><a href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop">hal_loader.executable.dispatch (HAL::Loader::ExecutableDispatchOp)</a></li>
-<li><a href="#hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop">hal_loader.executable.dispatch.symbol (HAL::Loader::ExecutableDispatchSymbolOp)</a></li>
-<li><a href="#hal_loaderexecutableload-halloaderexecutableloadop">hal_loader.executable.load (HAL::Loader::ExecutableLoadOp)</a></li>
-<li><a href="#hal_loaderexecutablelookup-halloaderexecutablelookupop">hal_loader.executable.lookup (HAL::Loader::ExecutableLookupOp)</a></li>
-<li><a href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop">hal_loader.executable.query_support (HAL::Loader::ExecutableQuerySupportOp)</a></li>
 </ul>
 </li>
 </ul>
@@ -2444,67 +2384,30 @@ restrictions.</p>
 <p>Traits: AttrSizedOperandSegments</p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>entry_point</code></td>
-<td style="text-align: center;">::mlir::IntegerAttr</td>
-<td>size_t</td>
-</tr>
-</tbody>
-</table>
-<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>entry_point</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>executable</code></td>
-<td>executable</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>workgroup_x</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>workgroup_y</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>workgroup_z</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>push_constants</code></td>
-<td>32-bit signless integer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>binding_buffers</code></td>
-<td>a reference counted byte buffer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>binding_offsets</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>binding_lengths</code></td>
-<td>index</td>
-</tr>
-</tbody>
-</table>
-<h4 id="hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop"><code>hal_loader.executable.dispatch.symbol</code> (HAL::Loader::ExecutableDispatchSymbolOp)<a class="headerlink" href="#hal_loaderexecutabledispatchsymbol-halloaderexecutabledispatchsymbolop" title="Permanent link">link</a></h4>
-<p><em>Inline executable dispatch operation</em></p>
-<p>Syntax:</p>
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `executable` | executable
+| `workgroup_x` | index
+| `workgroup_y` | index
+| `workgroup_z` | index
+| `push_constants` | 32-bit signless integer
+| `binding_buffers` | a reference counted byte buffer
+| `binding_offsets` | index
+| `binding_lengths` | index
+
+#### `hal_loader.executable.dispatch.symbol` (HAL::Loader::ExecutableDispatchSymbolOp)
+
+_Inline executable dispatch operation_
+
+
+Syntax:
+
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.dispatch.symbol` `executable` `(` $executable `:` type($executable) `)`
               `target` `(` $entry_point `)`
               `workgroups` `(` `[`
@@ -2521,225 +2424,147 @@ restrictions.</p>
               `]` `)`
               attr-dict-with-keyword
 </code></pre></div>
-<p>Dispatches execution to an executable entry point with the given parameters.
-The entry point is a symbolic reference to an exported entry point.</p>
-<p>Traits: AttrSizedOperandSegments</p>
-<p>Interfaces: SymbolUserOpInterface</p>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+
+Dispatches execution to an executable entry point with the given parameters.
+The entry point is a symbolic reference to an exported entry point.
+
+Traits: AttrSizedOperandSegments
+
+Interfaces: SymbolUserOpInterface
+
+##### Attributes:
+
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>entry_point</code></td>
-<td style="text-align: center;">::mlir::SymbolRefAttr</td>
-<td>symbol reference attribute</td>
-</tr>
-</tbody>
-</table>
-<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>entry_point</code></td><td>::mlir::SymbolRefAttr</td><td>symbol reference attribute</td></tr>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>executable</code></td>
-<td>executable</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>workgroup_x</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>workgroup_y</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>workgroup_z</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>push_constants</code></td>
-<td>32-bit signless integer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>binding_buffers</code></td>
-<td>a reference counted byte buffer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>binding_offsets</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>binding_lengths</code></td>
-<td>index</td>
-</tr>
-</tbody>
-</table>
-<h4 id="hal_loaderexecutableload-halloaderexecutableloadop"><code>hal_loader.executable.load</code> (HAL::Loader::ExecutableLoadOp)<a class="headerlink" href="#hal_loaderexecutableload-halloaderexecutableloadop" title="Permanent link">link</a></h4>
-<p><em>Dynamically loads an executable</em></p>
-<p>Syntax:</p>
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `executable` | executable
+| `workgroup_x` | index
+| `workgroup_y` | index
+| `workgroup_z` | index
+| `push_constants` | 32-bit signless integer
+| `binding_buffers` | a reference counted byte buffer
+| `binding_offsets` | index
+| `binding_lengths` | index
+
+#### `hal_loader.executable.load` (HAL::Loader::ExecutableLoadOp)
+
+_Dynamically loads an executable_
+
+
+Syntax:
+
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.load` `format` `(` $format `)`
               `data` `(` $data `)`
               (`constants` `(` `[` $constants^ `]` `)`)?
               `:` type($result)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Creates, loads, and dynamically links an executable.</p>
-<p>Optional constants provide for specialization of the executable based on
-runtime-derived parameters.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+
+Creates, loads, and dynamically links an executable.
+
+Optional constants provide for specialization of the executable based on
+runtime-derived parameters.
+
+Traits: AlwaysSpeculatableImplTrait
+
+Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface
+
+Effects: MemoryEffects::Effect{}
+
+##### Attributes:
+
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>format</code></td>
-<td style="text-align: center;">::mlir::StringAttr</td>
-<td>string attribute</td>
-</tr>
-</tbody>
-</table>
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>format</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>data</code></td>
-<td>a reference counted byte buffer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>constants</code></td>
-<td>32-bit signless integer</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>executable</td>
-</tr>
-</tbody>
-</table>
-<h4 id="hal_loaderexecutablelookup-halloaderexecutablelookupop"><code>hal_loader.executable.lookup</code> (HAL::Loader::ExecutableLookupOp)<a class="headerlink" href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" title="Permanent link">link</a></h4>
-<p><em>Executable cache lookup pseudo-op</em></p>
-<p>Syntax:</p>
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `data` | a reference counted byte buffer
+| `constants` | 32-bit signless integer
+
+##### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `result` | executable
+
+#### `hal_loader.executable.lookup` (HAL::Loader::ExecutableLookupOp)
+
+_Executable cache lookup pseudo-op_
+
+
+Syntax:
+
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.lookup` `executable` `(` $executable `)`
               `:` type($result)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Used during conversion to provide a placeholder for a globally cached and
-possibly lazy-initialized executable.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SymbolUserOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+
+Used during conversion to provide a placeholder for a globally cached and
+possibly lazy-initialized executable.
+
+Traits: AlwaysSpeculatableImplTrait
+
+Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SymbolUserOpInterface
+
+Effects: MemoryEffects::Effect{}
+
+##### Attributes:
+
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>executable</code></td>
-<td style="text-align: center;">::mlir::FlatSymbolRefAttr</td>
-<td>flat symbol reference attribute</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>executable</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>executable</td>
-</tr>
-</tbody>
-</table>
-<h4 id="hal_loaderexecutablequery_support-halloaderexecutablequerysupportop"><code>hal_loader.executable.query_support</code> (HAL::Loader::ExecutableQuerySupportOp)<a class="headerlink" href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop" title="Permanent link">link</a></h4>
-<p><em>Queries whether an executable format is supported</em></p>
-<p>Syntax:</p>
+
+##### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `result` | executable
+
+#### `hal_loader.executable.query_support` (HAL::Loader::ExecutableQuerySupportOp)
+
+_Queries whether an executable format is supported_
+
+
+Syntax:
+
 <div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.query_support` `format` `(` $executable_format `)`
               `:` type($supported)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Returns true if the given format is supported by the device loader. This
+
+Returns true if the given format is supported by the device loader. This
 does not guarantee that loading will succeed as the executable may require
-functionality that cannot be met my the hosting runtime environment.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
+functionality that cannot be met my the hosting runtime environment.
+
+Traits: AlwaysSpeculatableImplTrait
+
+Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface
+
+Effects: MemoryEffects::Effect{}
+
+##### Attributes:
+
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>executable_format</code></td>
-<td style="text-align: center;">::mlir::StringAttr</td>
-<td>string attribute</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>executable_format</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>supported</code></td>
-<td>1-bit signless integer</td>
-</tr>
-</tbody>
-</table>
+
+##### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `supported` | 1-bit signless integer
 
 
 

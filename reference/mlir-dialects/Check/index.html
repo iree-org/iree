@@ -1518,34 +1518,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#checkexpect_eq-checkexpecteqop" class="md-nav__link">
-    check.expect_eq (Check::ExpectEqOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#checkexpect_eq_const-checkexpecteqconstop" class="md-nav__link">
-    check.expect_eq_const (Check::ExpectEqConstOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#checkexpect_false-checkexpectfalseop" class="md-nav__link">
-    check.expect_false (Check::ExpectFalseOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#checkexpect_true-checkexpecttrueop" class="md-nav__link">
-    check.expect_true (Check::ExpectTrueOp)
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2341,34 +2313,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#checkexpect_eq-checkexpecteqop" class="md-nav__link">
-    check.expect_eq (Check::ExpectEqOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#checkexpect_eq_const-checkexpecteqconstop" class="md-nav__link">
-    check.expect_eq_const (Check::ExpectEqConstOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#checkexpect_false-checkexpectfalseop" class="md-nav__link">
-    check.expect_false (Check::ExpectFalseOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#checkexpect_true-checkexpecttrueop" class="md-nav__link">
-    check.expect_true (Check::ExpectTrueOp)
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2402,10 +2346,6 @@
 <li><a href="#checkexpect_all_true-checkexpectalltrueop">check.expect_all_true (Check::ExpectAllTrueOp)</a></li>
 <li><a href="#checkexpect_almost_eq-checkexpectalmosteqop">check.expect_almost_eq (Check::ExpectAlmostEqOp)</a></li>
 <li><a href="#checkexpect_almost_eq_const-checkexpectalmosteqconstop">check.expect_almost_eq_const (Check::ExpectAlmostEqConstOp)</a></li>
-<li><a href="#checkexpect_eq-checkexpecteqop">check.expect_eq (Check::ExpectEqOp)</a></li>
-<li><a href="#checkexpect_eq_const-checkexpecteqconstop">check.expect_eq_const (Check::ExpectEqConstOp)</a></li>
-<li><a href="#checkexpect_false-checkexpectfalseop">check.expect_false (Check::ExpectFalseOp)</a></li>
-<li><a href="#checkexpect_true-checkexpecttrueop">check.expect_true (Check::ExpectTrueOp)</a></li>
 </ul>
 </li>
 </ul>
@@ -2482,157 +2422,125 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 </code></pre></div>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>value</code></td>
-<td style="text-align: center;">::mlir::ElementsAttr</td>
-<td>constant vector/tensor attribute</td>
-</tr>
-</tbody>
-</table>
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>value</code></td><td>::mlir::ElementsAttr</td><td>constant vector/tensor attribute</td></tr>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>lhs</code></td>
-<td>tensor of floating-point values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="checkexpect_eq-checkexpecteqop"><code>check.expect_eq</code> (Check::ExpectEqOp)<a class="headerlink" href="#checkexpect_eq-checkexpecteqop" title="Permanent link">link</a></h3>
-<p><em>Checks that the tensor or buffer view operands are equal</em></p>
-<p>Syntax:</p>
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `lhs` | tensor of floating-point values
+
+
+### `check.expect_eq` (Check::ExpectEqOp)
+
+_Checks that the tensor or buffer view operands are equal_
+
+
+Syntax:
+
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
 </code></pre></div>
-<p>Verifies that the operands are exactly equal.</p>
-<p>Issues a non-fatal failure if the verification fails.</p>
+
+Verifies that the operands are exactly equal.
+
+Issues a non-fatal failure if the verification fails.
+
 <div class="highlight"><pre><span></span><code>check.expect_eq(%arg0, %arg1) : tensor&lt;5xi32&gt;
 </code></pre></div>
-<p>Traits: SameTypeOperands</p>
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>lhs</code></td>
-<td>buffer_view or tensor of any type values</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>rhs</code></td>
-<td>buffer_view or tensor of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="checkexpect_eq_const-checkexpecteqconstop"><code>check.expect_eq_const</code> (Check::ExpectEqConstOp)<a class="headerlink" href="#checkexpect_eq_const-checkexpecteqconstop" title="Permanent link">link</a></h3>
-<p><em>Checks that the tensor operand is equal to some constant</em></p>
-<p>Syntax:</p>
+
+Traits: SameTypeOperands
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `lhs` | buffer_view or tensor of any type values
+| `rhs` | buffer_view or tensor of any type values
+
+
+### `check.expect_eq_const` (Check::ExpectEqConstOp)
+
+_Checks that the tensor operand is equal to some constant_
+
+
+Syntax:
+
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
 </code></pre></div>
-<p>Verifies that the tensor operand is exactly equal to a constant attribute.</p>
-<p>Issues a non-fatal failure if the verification fails.</p>
-<p>This op is just a convenience wrapper around the expect_eq op.</p>
+
+Verifies that the tensor operand is exactly equal to a constant attribute.
+
+Issues a non-fatal failure if the verification fails.
+
+This op is just a convenience wrapper around the expect_eq op.
+
 <div class="highlight"><pre><span></span><code>check.expect_eq_const(%arg0, dense&lt;[1, 2]&gt; : tensor&lt;2xi32&gt;) : tensor&lt;2xi32&gt;
 </code></pre></div>
-<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
+
+##### Attributes:
+
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Attribute</th>
-<th style="text-align: center;">MLIR Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>value</code></td>
-<td style="text-align: center;">::mlir::ElementsAttr</td>
-<td>constant vector/tensor attribute</td>
-</tr>
-</tbody>
-</table>
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>value</code></td><td>::mlir::ElementsAttr</td><td>constant vector/tensor attribute</td></tr>
 <table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>lhs</code></td>
-<td>tensor of any type values</td>
-</tr>
-</tbody>
-</table>
-<h3 id="checkexpect_false-checkexpectfalseop"><code>check.expect_false</code> (Check::ExpectFalseOp)<a class="headerlink" href="#checkexpect_false-checkexpectfalseop" title="Permanent link">link</a></h3>
-<p><em>Checks that the operand is false</em></p>
-<p>Syntax:</p>
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `lhs` | tensor of any type values
+
+
+### `check.expect_false` (Check::ExpectFalseOp)
+
+_Checks that the operand is false_
+
+
+Syntax:
+
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_false` `(` $operand `)` attr-dict `:` type($operand)
 </code></pre></div>
-<p>Verifies that the operand contains a false value, which is represented by
-zero.</p>
-<p>Issues a non-fatal failure if the verification fails.</p>
+
+Verifies that the operand contains a false value, which is represented by
+zero.
+
+Issues a non-fatal failure if the verification fails.
+
 <div class="highlight"><pre><span></span><code>check.expect_false(%arg0) : i32
 </code></pre></div>
-<h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>operand</code></td>
-<td>signless integer</td>
-</tr>
-</tbody>
-</table>
-<h3 id="checkexpect_true-checkexpecttrueop"><code>check.expect_true</code> (Check::ExpectTrueOp)<a class="headerlink" href="#checkexpect_true-checkexpecttrueop" title="Permanent link">link</a></h3>
-<p><em>Checks that the operand is true</em></p>
-<p>Syntax:</p>
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `operand` | signless integer
+
+
+### `check.expect_true` (Check::ExpectTrueOp)
+
+_Checks that the operand is true_
+
+
+Syntax:
+
 <div class="highlight"><pre><span></span><code>operation ::= `check.expect_true` `(` $operand `)` attr-dict `:` type($operand)
 </code></pre></div>
-<p>Verifies that the operand contains a true value, which is represented by
-any non-zero integer.</p>
-<p>Issues a non-fatal failure if the verification fails.</p>
+
+Verifies that the operand contains a true value, which is represented by
+any non-zero integer.
+
+Issues a non-fatal failure if the verification fails.
+
 <div class="highlight"><pre><span></span><code>check.expect_true(%arg0) : i32
 </code></pre></div>
-<h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>operand</code></td>
-<td>signless integer</td>
-</tr>
-</tbody>
-</table>
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `operand` | signless integer
 
 
 
