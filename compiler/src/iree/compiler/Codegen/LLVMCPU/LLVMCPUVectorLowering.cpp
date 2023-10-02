@@ -77,6 +77,25 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
           .setVectorTransformsOptions(vectorContractLowering)
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
+
+  {
+    // Special-case vector.contract codegen paths. This needs to happen
+    // just before the generic vector ops lowerings.
+    RewritePatternSet patterns(ctx);
+    auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    populateVectorContractCustomKernelsPatterns(target, patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs()
+        << "\n--- After custom kernel lowering for vector.contract ops ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   // Lower high level vector operations like contract or multidim reduce ops
   // to lower level vector ops.
   {

@@ -25,6 +25,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "iree-vector-contract-custom-kernels"
+#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -86,6 +90,73 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   return true;
 }
 
+static bool isVectorTimesMatrixTransposed(vector::ContractionOp contractionOp,
+                                          int64_t splitSize) {
+  // Check that the reduction is additive.
+  if (contractionOp.getKind() != vector::CombiningKind::ADD) {
+    return false;
+  }
+  // Check that there are 1 parallel and 1 reduction iterators.
+  unsigned numIters = splitSize ? 3 : 2;
+  auto iteratorTypes = contractionOp.getIteratorTypes().getValue();
+  if (iteratorTypes.size() != numIters) {
+    return false;
+  }
+  SmallVector<int, 3> parallelIterators;
+  SmallVector<int, 3> reductionIterators;
+  for (int i = 0; i < numIters; i++) {
+    if (vector::isParallelIterator(iteratorTypes[i])) {
+      parallelIterators.push_back(i);
+    } else if (vector::isReductionIterator(iteratorTypes[i])) {
+      reductionIterators.push_back(i);
+    } else {
+      return false;
+    }
+  }
+  if (parallelIterators.size() != numIters - 1 ||
+      reductionIterators.size() != 1) {
+    return false;
+  }
+  // Give the found iterators some idiomatic names.
+  const int NIter = parallelIterators[0];
+  const int KIter = reductionIterators[0];
+  const int SplitIter = splitSize ? parallelIterators[1] : 0;
+  // Check that there are 3 indexing maps.
+  auto indexingMaps = contractionOp.getIndexingMapsArray();
+  if (indexingMaps.size() != 3) {
+    return false;
+  }
+  // Check that the indexing maps have the expected form.
+  SmallVector<SmallVector<int>> expectedMapResults;
+  if (splitSize) {
+    SmallVector<SmallVector<int>> res = {
+        {KIter, SplitIter}, {NIter, KIter, SplitIter}, {NIter, SplitIter}};
+    expectedMapResults = res;
+    numIters = 3;
+  } else {
+    SmallVector<SmallVector<int>> res = {{KIter}, {NIter, KIter}, {NIter}};
+    expectedMapResults = res;
+    numIters = 2;
+  }
+  for (int m = 0; m < 3; ++m) {
+    auto map = indexingMaps[m];
+    auto expectedResults = expectedMapResults[m];
+    if (map.getNumDims() != numIters ||
+        map.getNumResults() != expectedResults.size()) {
+      return false;
+    }
+    for (int r = 0; r < expectedResults.size(); ++r) {
+      int actualMapResult =
+          map.getResults()[r].cast<AffineDimExpr>().getPosition();
+      if (actualMapResult != expectedMapResults[m][r]) {
+        return false;
+      }
+    }
+  }
+  LDBG("passed isVectorTimesMatrixTransposed");
+  return true;
+}
+
 // Returns true if `contractionOp` is of the form
 //   matrix * transposed_matrix
 // where matrix is a vector<{mSize}x{kSize}xType>, and
@@ -132,6 +203,31 @@ static bool matchMMT(vector::ContractionOp contractionOp, int64_t mSize,
   return false;
 }
 
+static bool matchVMT(vector::ContractionOp contractionOp, int64_t mSize,
+                     int64_t kSize, int64_t nSize, int splitSize,
+                     bool *transpose = nullptr) {
+  if (mSize != 1) {
+    return false;
+  }
+  if (!isVectorTimesMatrixTransposed(contractionOp, splitSize)) {
+    return false;
+  }
+  VectorType lhsType = llvm::cast<VectorType>(contractionOp.getLhs().getType());
+  VectorType rhsType = llvm::cast<VectorType>(contractionOp.getRhs().getType());
+  auto lhsShape = lhsType.getShape();
+  auto rhsShape = rhsType.getShape();
+  if (splitSize && (lhsShape[1] != splitSize || rhsShape[2] != splitSize)) {
+    return false;
+  }
+  if (lhsShape[0] != kSize || rhsShape[1] != kSize) {
+    return false;
+  }
+  if (rhsShape[0] == nSize) {
+    return true;
+  }
+  return false;
+}
+
 // `promotedResult` is required to be a Vector.
 // If its VectorType does not have `promotedType` as its element type, or
 // the operand to the type-promotion op is not `unpromotedType` returns a null
@@ -143,8 +239,9 @@ static bool matchMMT(vector::ContractionOp contractionOp, int64_t mSize,
 // Note that this only looks at the immediately defining operation, so we likely
 // want to have earlier passes that sink widening operations as far down as
 // possible, which is probably just good regardless.
-static Value getUnpromotedInput(Type unpromotedType, Type promotedType,
-                                Value promotedResult) {
+static Value getUnpromotedInput(PatternRewriter &rewriter, Type unpromotedType,
+                                Type promotedType, Value promotedResult,
+                                bool promoteSmallTypes = false) {
   VectorType promotedResultVectorType =
       llvm::cast<VectorType>(promotedResult.getType());
   if (promotedResultVectorType.getElementType() != promotedType) {
@@ -156,13 +253,29 @@ static Value getUnpromotedInput(Type unpromotedType, Type promotedType,
   // TODO: handle promotion of floating point types. Not doing it for now as
   // it wouldn't be exercised.
   auto extSIOp = promotedResult.getDefiningOp<arith::ExtSIOp>();
-  if (!extSIOp) {
+  auto extUIOp = promotedResult.getDefiningOp<arith::ExtUIOp>();
+  if (!extSIOp && !extUIOp) {
     return nullptr;
   }
-  Value extInput = extSIOp.getIn();
+  Value extInput = extSIOp ? extSIOp.getIn() : extUIOp.getIn();
   if (llvm::cast<VectorType>(extInput.getType()).getElementType() !=
       unpromotedType) {
-    return nullptr;
+    if (promoteSmallTypes) {
+      VectorType unpromotedVectorType =
+          VectorType::get(llvm::cast<VectorType>(extInput.getType()).getShape(),
+                          unpromotedType);
+      return extSIOp
+                 ? rewriter
+                       .create<arith::ExtSIOp>(extInput.getLoc(),
+                                               unpromotedVectorType, extInput)
+                       .getResult()
+                 : rewriter
+                       .create<arith::ExtUIOp>(extInput.getLoc(),
+                                               unpromotedVectorType, extInput)
+                       .getResult();
+    } else {
+      return nullptr;
+    }
   }
   return extInput;
 }
@@ -170,12 +283,28 @@ static Value getUnpromotedInput(Type unpromotedType, Type promotedType,
 // Helper to create a 1D, contiguous slice of a 1D vector.
 static Value extract1DSlice(PatternRewriter &rewriter, Location loc,
                             VectorType dstVecType, Value input, int position) {
-  assert(input.getType().cast<VectorType>().getRank() == 1);
   assert(dstVecType.getRank() == 1);
-  std::array<int64_t, 1> offsets{position};
-  std::array<int64_t, 1> strides{1};
-  return rewriter.create<vector::ExtractStridedSliceOp>(
-      loc, input, offsets, dstVecType.getShape(), strides);
+  if (input.getType().cast<VectorType>().getRank() == 1) {
+    SmallVector<int64_t> offsets({position});
+    SmallVector<int64_t> strides({1});
+    SmallVector<int64_t> sizes(dstVecType.getShape());
+    return rewriter.create<vector::ExtractStridedSliceOp>(loc, input, offsets,
+                                                          sizes, strides);
+  } else {
+    SmallVector<int64_t> inputShape(
+        llvm::cast<VectorType>(input.getType()).getShape());
+    assert(inputShape.back() == dstVecType.getNumElements());
+    std::reverse(inputShape.begin(), inputShape.end());
+    int currentPos = position;
+    SmallVector<int64_t> indices;
+    for (auto size : inputShape) {
+      indices.push_back(currentPos % size);
+      currentPos = currentPos / size;
+    }
+    std::reverse(indices.begin(), indices.end());
+    return rewriter.create<vector::ExtractOp>(
+        loc, input, SmallVector<int64_t>(indices.begin(), indices.end() - 1));
+  }
 }
 
 // Helper to extract an element of a 1D vector.
@@ -189,8 +318,12 @@ static Value extract(PatternRewriter &rewriter, Location loc, Value input,
 }
 
 // Helper to flatten a N-dimensional vector to a 1D vector.
-static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
+static Value flattenImperfectSize(PatternRewriter &rewriter, Location loc,
+                                  Value vector, VectorType regVectorType) {
   VectorType inputVecType = llvm::cast<VectorType>(vector.getType());
+  if (regVectorType.getNumElements() == inputVecType.getShape().back()) {
+    return vector;
+  }
   VectorType dstType = VectorType::get(inputVecType.getNumElements(),
                                        inputVecType.getElementType());
   return rewriter.create<vector::ShapeCastOp>(loc, dstType, vector);
@@ -207,20 +340,32 @@ static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
 // (2) Be explicit about the size of the vectors involved in the kernel's
 //         "calling convention".
 struct MMTKernel {
-  enum class ScalarType : int8_t { None, I8, I32, F32 };
+  enum class ScalarType : int8_t { None, I4, I8, I16, I32, F32 };
   // Element type of the LHS vectors.
   ScalarType lhsType = ScalarType::None;
   // Element type of the RHS vectors.
   ScalarType rhsType = ScalarType::None;
   // Element type of the Accumulator and output vectors.
   ScalarType accType = ScalarType::None;
+  // User defined constraint code for LHS registers
+  std::optional<SmallVector<std::string>> lhsCode = std::nullopt;
+  // User defined constraint code for RHS registers
+  std::optional<SmallVector<std::string>> rhsCode = std::nullopt;
+  // User defined constraint code for Accumulator and output registers
+  std::optional<SmallVector<std::string>> accCode = std::nullopt;
+  // This flag indicates whether or not to promote inputs that have a smaller
+  // bitwidth than lhsType, rhsType, or accType, to the appropriate bitwidth
+  bool promoteSmallTypes = false;
   // Number of rows of the LHS and Accumulator tile.
-  int8_t m0 = 0;
+  int16_t m0 = 0;
   // Reduction dimension, i.e. number of columns of the LHS.
-  int8_t k0 = 0;
+  int16_t k0 = 0;
   // Number of rows of the RHS (note that the operation being targeted, MMT,
   // is matrix multiplication with a *transposed* RHS)
-  int8_t n0 = 0;
+  int16_t n0 = 0;
+  // Size of the added parallel dimension when the vector.contract op has been
+  // split with splitReduction
+  int16_t split0 = 0;
   // Number of LHS elements in the type of register to be used for the LHS.
   // This is > 1 if SIMD registers are to be used.
   // Note: LHS/RHS/Accumulator may use registers of different sizes.
@@ -236,6 +381,8 @@ struct MMTKernel {
   int8_t rhsRegs = 0;
   // Number of registers needed to hold the Accumulator.
   int8_t accRegs = 0;
+  // Indicates whether to use Intel or AT&T syntax
+  bool useIntel = false;
   // If not null, points to the inline asm code template for this kernel.
   // Register operands for the LHS, RHS and Accumulator are to be referenced as
   // $(lhs:<i>), $(rhs:<i>), $(acc:<i>) respectively, where i is a decimal
@@ -250,9 +397,15 @@ struct MMTKernel {
   const char *asmClobbers = nullptr;
 
   void validate() const {
-    assert(m0 * k0 == lhsRegSize * lhsRegs); // number of elements of LHS
-    assert(n0 * k0 == rhsRegSize * rhsRegs); // number of elements of RHS
-    assert(m0 * n0 == accRegSize * accRegs); // number of elements of Accum
+    assert(m0 * k0 == lhsRegSize * lhsRegs ||
+           m0 * k0 * split0 ==
+               lhsRegSize * lhsRegs); // number of elements of LHS
+    assert(n0 * k0 == rhsRegSize * rhsRegs ||
+           n0 * k0 * split0 ==
+               rhsRegSize * rhsRegs); // number of elements of RHS
+    assert(m0 * n0 == accRegSize * accRegs ||
+           m0 * n0 * split0 ==
+               accRegSize * accRegs); // number of elements of Accum
     assert(lhsType != ScalarType::None);
     assert(rhsType != ScalarType::None);
     assert(accType != ScalarType::None);
@@ -674,13 +827,49 @@ MMTKernel MMTKernel_8x1x1_f32f32f32_Aarch64_Baseline_InlineAsm() {
   return kernel;
 }
 
+MMTKernel MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512VNNI_InlineAsm() {
+  MMTKernel kernel;
+  kernel.lhsType = MMTKernel::ScalarType::I16;
+  kernel.rhsType = MMTKernel::ScalarType::I16;
+  kernel.accType = MMTKernel::ScalarType::I32;
+  kernel.lhsCode = SmallVector<std::string>({"{zmm8}"});
+  kernel.rhsCode =
+      SmallVector<std::string>({"{zmm9}", "{zmm10}", "{zmm11}", "{zmm12}"});
+  kernel.accCode =
+      SmallVector<std::string>({"{zmm17}", "{zmm18}", "{zmm19}", "{zmm20}"});
+  kernel.promoteSmallTypes = true;
+  kernel.useIntel = true;
+  kernel.m0 = 1;
+  kernel.k0 = 2;
+  kernel.n0 = 4;
+  kernel.split0 = 16;
+  kernel.lhsRegSize = 32;
+  kernel.rhsRegSize = 32;
+  kernel.accRegSize = 16;
+  kernel.lhsRegs = 1;
+  kernel.rhsRegs = 4;
+  kernel.accRegs = 4;
+  kernel.asmImpl = R"ASM(
+      vpdpwssd $(acc:0), $(rhs:0), $(lhs:0)
+      vpdpwssd $(acc:1), $(rhs:1), $(lhs:0)
+      vpdpwssd $(acc:2), $(rhs:2), $(lhs:0)
+      vpdpwssd $(acc:3), $(rhs:3), $(lhs:0)
+    )ASM";
+  kernel.asmClobbers = "";
+  return kernel;
+}
+
 // Constructs the mlir::Type corresponding to a scalar type.
 Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
   switch (t) {
   case MMTKernel::ScalarType::None:
     break;
+  case MMTKernel::ScalarType::I4:
+    return IntegerType::get(context, 4, IntegerType::Signless);
   case MMTKernel::ScalarType::I8:
     return IntegerType::get(context, 8, IntegerType::Signless);
+  case MMTKernel::ScalarType::I16:
+    return IntegerType::get(context, 16, IntegerType::Signless);
   case MMTKernel::ScalarType::I32:
     return IntegerType::get(context, 32, IntegerType::Signless);
   case MMTKernel::ScalarType::F32:
@@ -705,7 +894,7 @@ public:
                               ArrayRef<Value> acc) {
     validateOperands(lhs, rhs, acc);
     if (kernel.asmImpl) {
-      return generateAsm(rewriter, loc, lhs, rhs, acc);
+      return generateAsm(rewriter, loc, lhs, rhs, acc, kernel.useIntel);
     }
     // In the future we may have alternate generator paths, e.g. 1D intrinsics
     // or other asm paths with a different interface, e.g. handling also
@@ -755,9 +944,16 @@ private:
     validate(acc, kernel.accRegs, getAccRegVectorType());
   }
   // Helper for generateAsmCodeAndConstraints
-  std::string getConstraintCode() const {
+  std::string
+  getConstraintCode(std::optional<std::string> kernelConstraintCode) const {
+    if (kernelConstraintCode) {
+      return std::string(*kernelConstraintCode);
+    }
     if (isAArch64(target)) {
       return "w";
+    }
+    if (isX86(target)) {
+      return "x";
     }
     assert(false && "what constraint code to use on this arch?");
     return {};
@@ -820,31 +1016,39 @@ private:
     // processedIdx is the index of a register in the processed asm.
     // Example:   $5   =>   processedIdx == 5
     int processedIdx = 0;
-    auto processOperands = [&](Constraints::Kind constraintKind,
-                               const char *name, int count) {
-      const std::string &constraintCode = getConstraintCode();
-      // unprocessedIdx is the index of a register in the unprocessed asm.
-      // Example:   $(lhs:1)   =>   unprocessedIdx == 1
-      for (int unprocessedIdx = 0; unprocessedIdx < count;
-           ++unprocessedIdx, ++processedIdx) {
-        constraints.add(constraintKind, constraintCode);
-        // Perform the code replacement for the operand.
-        // Example:   $(lhs:1)   =>   $5
-        replaceAllSubstrsInPlace(
-            code, llvm::formatv("$({0}:{1})", name, unprocessedIdx),
-            llvm::formatv("${0}", processedIdx));
-      }
-    };
-    processOperands(Constraints::Kind::InputOutput, "acc", kernel.accRegs);
-    processOperands(Constraints::Kind::Input, "lhs", kernel.lhsRegs);
-    processOperands(Constraints::Kind::Input, "rhs", kernel.rhsRegs);
+    auto processOperands =
+        [&](Constraints::Kind constraintKind, const char *name, int count,
+            std::optional<SmallVector<std::string>> kernelCodes) {
+          const std::string &constraintCode = getConstraintCode(std::nullopt);
+          // unprocessedIdx is the index of a register in the unprocessed asm.
+          // Example:   $(lhs:1)   =>   unprocessedIdx == 1
+          for (int unprocessedIdx = 0; unprocessedIdx < count;
+               ++unprocessedIdx, ++processedIdx) {
+            if (kernelCodes) {
+              constraints.add(constraintKind, (*kernelCodes)[unprocessedIdx]);
+            } else {
+              constraints.add(constraintKind, constraintCode);
+            }
+            // Perform the code replacement for the operand.
+            // Example:   $(lhs:1)   =>   $5
+            replaceAllSubstrsInPlace(
+                code, llvm::formatv("$({0}:{1})", name, unprocessedIdx),
+                llvm::formatv("${0}", processedIdx));
+          }
+        };
+    processOperands(Constraints::Kind::InputOutput, "acc", kernel.accRegs,
+                    kernel.accCode);
+    processOperands(Constraints::Kind::Input, "lhs", kernel.lhsRegs,
+                    kernel.lhsCode);
+    processOperands(Constraints::Kind::Input, "rhs", kernel.rhsRegs,
+                    kernel.rhsCode);
     constraints.setClobbers(kernel.asmClobbers);
     constraintsString = constraints.toString();
   }
   // Helper for generate(). Implements the asm path.
   SmallVector<Value> generateAsm(PatternRewriter &rewriter, Location loc,
                                  ArrayRef<Value> lhs, ArrayRef<Value> rhs,
-                                 ArrayRef<Value> acc) {
+                                 ArrayRef<Value> acc, bool useIntel) {
     SmallVector<Value> inputs;
     // First the input operands. Then the input-output operands, which, as far
     // as input constraints are concerned, are *tied* inputs, i.e. refer to
@@ -864,9 +1068,13 @@ private:
     SmallVector<Type> outputOperandTypes(
         llvm::map_range(acc, [](Value v) { return v.getType(); }));
     auto returnType =
-        LLVM::LLVMStructType::getLiteral(context, outputOperandTypes);
+        outputOperandTypes.size() == 1
+            ? outputOperandTypes[0]
+            : LLVM::LLVMStructType::getLiteral(context, outputOperandTypes);
     auto dialectAttr =
-        LLVM::AsmDialectAttr::get(context, LLVM::AsmDialect::AD_ATT);
+        useIntel
+            ? LLVM::AsmDialectAttr::get(context, LLVM::AsmDialect::AD_Intel)
+            : LLVM::AsmDialectAttr::get(context, LLVM::AsmDialect::AD_ATT);
     std::string code;
     std::string constraints;
     generateAsmCodeAndConstraints(code, constraints);
@@ -876,10 +1084,14 @@ private:
         /*operand_attrs=*/ArrayAttr());
     // Extract result vectors from the asm op.
     SmallVector<Value> resVec;
-    for (int i = 0; i < kernel.accRegs; ++i) {
-      SmallVector<int64_t, 1> position = {i};
-      resVec.push_back(
-          rewriter.create<LLVM::ExtractValueOp>(loc, asmOp.getRes(), position));
+    if (outputOperandTypes.size() == 1) {
+      resVec.push_back(asmOp.getRes());
+    } else {
+      for (int i = 0; i < kernel.accRegs; ++i) {
+        SmallVector<int64_t, 1> position = {i};
+        resVec.push_back(rewriter.create<LLVM::ExtractValueOp>(
+            loc, asmOp.getRes(), position));
+      }
     }
     return resVec;
   }
@@ -914,7 +1126,9 @@ public:
     // Check if `contractionOp` matches, and obtain the (un-promoted) input
     // LHS and RHS vectors.
     bool transposeKernel = false;
-    if (!matchMMT(contractionOp, kernel.m0, kernel.k0, kernel.n0,
+    if (!matchVMT(contractionOp, kernel.m0, kernel.k0, kernel.n0, kernel.split0,
+                  &transposeKernel) &&
+        !matchMMT(contractionOp, kernel.m0, kernel.k0, kernel.n0,
                   &transposeKernel)) {
       return failure();
     }
@@ -929,9 +1143,11 @@ public:
       return failure();
     }
     Value unpromotedLhs =
-        getUnpromotedInput(lhsElemType, accElemType, contractionOp.getLhs());
+        getUnpromotedInput(rewriter, lhsElemType, accElemType,
+                           contractionOp.getLhs(), kernel.promoteSmallTypes);
     Value unpromotedRhs =
-        getUnpromotedInput(rhsElemType, accElemType, contractionOp.getRhs());
+        getUnpromotedInput(rewriter, rhsElemType, accElemType,
+                           contractionOp.getRhs(), kernel.promoteSmallTypes);
     if (!unpromotedLhs || !unpromotedRhs) {
       return failure();
     }
@@ -953,9 +1169,23 @@ public:
     // `contractionOp` matches, start rewriting it.
     Location loc = contractionOp.getLoc();
     // Flatten the inputs to 1D vectors.
-    Value flatLhs = flatten(rewriter, loc, unpromotedLhs);
-    Value flatRhs = flatten(rewriter, loc, unpromotedRhs);
-    Value flatAcc = flatten(rewriter, loc, contractionOp.getAcc());
+    VectorType lhsRegVectorType = generator.getLhsRegVectorType();
+    VectorType rhsRegVectorType = generator.getRhsRegVectorType();
+    VectorType accRegVectorType = generator.getAccRegVectorType();
+    Value lhs, rhs;
+    if (transposeKernel) {
+      lhs =
+          flattenImperfectSize(rewriter, loc, unpromotedLhs, rhsRegVectorType);
+      rhs =
+          flattenImperfectSize(rewriter, loc, unpromotedRhs, lhsRegVectorType);
+    } else {
+      lhs =
+          flattenImperfectSize(rewriter, loc, unpromotedLhs, lhsRegVectorType);
+      rhs =
+          flattenImperfectSize(rewriter, loc, unpromotedRhs, rhsRegVectorType);
+    }
+    Value acc = flattenImperfectSize(rewriter, loc, contractionOp.getAcc(),
+                                     accRegVectorType);
     // Slice into SIMD-register-sized 1D input vectors ready to feed to the
     // target SIMD instructions.
     auto sliceIntoRegVectors = [&](int regsCount, VectorType regVectorType,
@@ -968,17 +1198,14 @@ public:
       }
       return regVectors;
     };
-    VectorType lhsRegVectorType = generator.getLhsRegVectorType();
-    VectorType rhsRegVectorType = generator.getRhsRegVectorType();
-    VectorType accRegVectorType = generator.getAccRegVectorType();
-    Value flatLhsForKernel = transposeKernel ? flatRhs : flatLhs;
-    Value flatRhsForKernel = transposeKernel ? flatLhs : flatRhs;
+    Value lhsForKernel = transposeKernel ? rhs : lhs;
+    Value rhsForKernel = transposeKernel ? lhs : rhs;
     SmallVector<Value> lhsRegVectors =
-        sliceIntoRegVectors(kernel.lhsRegs, lhsRegVectorType, flatLhsForKernel);
+        sliceIntoRegVectors(kernel.lhsRegs, lhsRegVectorType, lhsForKernel);
     SmallVector<Value> rhsRegVectors =
-        sliceIntoRegVectors(kernel.rhsRegs, rhsRegVectorType, flatRhsForKernel);
+        sliceIntoRegVectors(kernel.rhsRegs, rhsRegVectorType, rhsForKernel);
     SmallVector<Value> accRegVectors =
-        sliceIntoRegVectors(kernel.accRegs, accRegVectorType, flatAcc);
+        sliceIntoRegVectors(kernel.accRegs, accRegVectorType, acc);
     // Generate the kernel!
     SmallVector<Value> resRegVectors = generator.generate(
         rewriter, loc, lhsRegVectors, rhsRegVectors, accRegVectors);
@@ -1037,8 +1264,8 @@ public:
       return failure();
     }
 
-    Value inLhs = getUnpromotedInput(I8Type, I32Type, lhs);
-    Value inRhs = getUnpromotedInput(I8Type, I32Type, rhs);
+    Value inLhs = getUnpromotedInput(rewriter, I8Type, I32Type, lhs);
+    Value inRhs = getUnpromotedInput(rewriter, I8Type, I32Type, rhs);
 
     if (!inLhs || !inRhs)
       return failure();
@@ -1170,6 +1397,12 @@ void populateVectorContractCustomKernelsPatterns(
     if (hasFeature(target, "+i8mm")) {
       patterns.add<MMTCustomKernelPattern>(
           context, MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm());
+    }
+  } else if (isX86(target)) {
+    if (hasFeature(target, "+avx512vnni")) {
+      patterns.add<MMTCustomKernelPattern>(
+          context,
+          MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512VNNI_InlineAsm());
     }
   }
 }
