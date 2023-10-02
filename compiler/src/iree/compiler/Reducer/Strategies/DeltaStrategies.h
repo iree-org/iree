@@ -16,6 +16,7 @@ void reduceFlowDispatchOperandToResultDelta(ChunkManager &chunker,
                                             WorkItem &workItem);
 void reduceFlowDispatchResultBySplatDelta(ChunkManager &chunker,
                                           WorkItem &workItem);
+void reduceOptimizationBarriersDelta(ChunkManager &chunker, WorkItem &workItem);
 
 } // namespace mlir::iree_compiler::Reducer
 

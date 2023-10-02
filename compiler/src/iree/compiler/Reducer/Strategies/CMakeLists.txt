@@ -19,6 +19,7 @@ iree_cc_library(
     "ReduceFlowDispatchOperandToResult.cpp"
     "ReduceFlowDispatchResultBySplat.cpp"
     "ReduceLinalgOnTensorsDelta.cpp"
+    "ReduceOptimizationBarriersDelta.cpp"
   DEPS
     LLVMSupport
     MLIRArithDialect
