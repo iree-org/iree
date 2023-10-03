@@ -412,7 +412,10 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// rely on this rewrite for the cases seen today.
   /// TODO: Support general emulation of compute on sub-byte types. This is
   /// not mutually exclusive with this pattern, but does mean it is no longer
-  /// load bearing.
+  /// load bearing.  Also these patterns are already run during
+  /// `EmulateNarrotType` pass but dont trigger there due to missing support for
+  /// emulation of `vector.transfer_read` in the emulation path. Remove the
+  /// patterns from here after that is done.
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     RewritePatternSet narrowingPatterns(context);
     vector::populateVectorNarrowTypeRewritePatterns(narrowingPatterns);
