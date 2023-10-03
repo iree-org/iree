@@ -242,7 +242,7 @@ public:
 
     iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
-    iree_hal_rocm_ExecutableDef_shared_memory_size_add(
+    iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(
         builder, workgroupLocalMemoriesRef);
     iree_hal_rocm_ExecutableDef_hsaco_image_add(builder, hsacoRef);
     iree_hal_rocm_ExecutableDef_end_as_root(builder);

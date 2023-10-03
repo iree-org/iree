@@ -62,7 +62,7 @@ iree_status_t iree_hal_rocm_native_executable_create(
   iree_hal_rocm_BlockSizeDef_vec_t block_sizes_vec =
       iree_hal_rocm_ExecutableDef_block_sizes_get(executable_def);
   flatbuffers_uint32_vec_t shared_memory_sizes =
-      iree_hal_rocm_ExecutableDef_shared_memory_size_get(executable_def);
+      iree_hal_rocm_ExecutableDef_shared_memory_sizes_get(executable_def);
   iree_host_size_t entry_count = flatbuffers_string_vec_len(entry_points_vec);
 
   // Calculate the total number of characters across all entry point names. This

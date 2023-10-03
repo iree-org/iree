@@ -27,7 +27,7 @@ table ExecutableDef {
   block_sizes:[BlockSizeDef];
 
   // Size of dynamic shared memory.
-  shared_memory_size:[uint32];
+  shared_memory_sizes:[uint32];
 
   // HSACO string of the module.
   hsaco_image:string;
