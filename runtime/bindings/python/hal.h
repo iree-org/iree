@@ -119,6 +119,7 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
 
   void BeginProfiling(std::optional<std::string> mode,
                       std::optional<std::string> file_path);
+  void FlushProfiling();
   void EndProfiling();
   HalSemaphore CreateSemaphore(uint64_t initial_value);
   HalBuffer QueueAlloca(uint64_t allocation_size, py::handle wait_semaphores,
