@@ -13,6 +13,49 @@ if(NOT IREE_TARGET_BACKEND_ROCM)
 endif()
 # Query for list of device libs to build.
 get_directory_property(AMDGCN_LIB_LIST DIRECTORY ${IREE_SOURCE_DIR}/third_party/ROCm-Device-Libs DEFINITION AMDGCN_LIB_LIST)
+set (BC_EXT .bc)
+set (IREE_AMDGCN_LIB_LIST)
+set (IREE_DEVICE_LIB_FILES)
+foreach (device_lib ${AMDGCN_LIB_LIST})
+  get_target_property(device_bc_name ${device_lib} ARCHIVE_OUTPUT_NAME)
+  get_target_property(device_bc_path ${device_lib} OUTPUT_NAME)
+  set(OUTPUT_DEVICE_BC_PATH ${PROJECT_BINARY_DIR}/lib/_platform_libs/rocm/${device_bc_name}${BC_EXT})
+  set(IREE_DEVICE_LIB "IREE_${device_lib}")
+  add_custom_target(${IREE_DEVICE_LIB})
+  add_custom_command(
+    TARGET ${IREE_DEVICE_LIB}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${device_bc_path}
+        ${OUTPUT_DEVICE_BC_PATH}
+  )
+  list(APPEND IREE_AMDGCN_LIB_LIST ${IREE_DEVICE_LIB})
+  list(APPEND IREE_DEVICE_LIB_FILES ${OUTPUT_DEVICE_BC_PATH})
+endforeach()
+
+# Setting up install directory.
+if (WIN32 OR MSVC)
+  # On Windows, DLLs go to the runtime directory and import
+  # libraries go to the lib directory.
+  # TODO: We should really be dumping binaries into bin/ not
+  # tools/. This must line up with binaries built this way because
+  # DLLs must be in the same directory as the binary.
+  # See: https://github.com/openxla/iree/issues/11297
+  install(FILES ${IREE_DEVICE_LIB_FILES} DESTINATION "tools/_platform_libs/rocm")
+elseif (UNIX)
+  install(FILES ${IREE_DEVICE_LIB_FILES} DESTINATION "lib/_platform_libs/rocm")
+endif()
+
+# Setting up installation in python.
+set(_PYTHON_BUILD_PREFIX "${IREE_BINARY_DIR}/compiler/bindings/python")
+set(_PYTHON_INSTALL_PREFIX "python_packages/iree_compiler")
+if (IREE_BUILD_PYTHON_BINDINGS AND UNIX)
+  install(FILES ${IREE_DEVICE_LIB_FILES} DESTINATION "${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs/_platform_libs/rocm")
+endif()
+
+if (IREE_BUILD_PYTHON_BINDINGS AND WIN32)
+  install(FILES ${IREE_DEVICE_LIB_FILES} DESTINATION "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs/_platform_libs/rocm")
+endif()
 
 iree_add_all_subdirs()
 
@@ -25,7 +68,7 @@ iree_cc_library(
     "ROCMTarget.cpp"
     "ROCMTargetUtils.cpp"
   DATA
-    ${AMDGCN_LIB_LIST}
+    ${IREE_AMDGCN_LIB_LIST}
   DEPS
     LLVMAMDGPUCodeGen
     LLVMCore
