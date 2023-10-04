@@ -67,20 +67,21 @@ class file_test : public CtsTestBase {
                                                 (void**)&file_contents));
     memset(file_contents, pattern, file_size);
 
-    iree_hal_external_file_t external_file;
-    memset(&external_file, 0, sizeof(external_file));
-    external_file.type = IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION;
-    external_file.flags = 0;
-    external_file.handle.host_allocation =
-        iree_make_byte_span(file_contents, file_size);
-    iree_hal_file_release_callback_t release_callback = {
-        +[](void* user_data) {
+    iree_io_file_handle_release_callback_t release_callback = {
+        +[](void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
           iree_allocator_free_aligned(iree_allocator_system(), user_data);
         },
-        file_contents};
-    IREE_CHECK_OK(iree_hal_file_import(device_, IREE_HAL_QUEUE_AFFINITY_ANY,
-                                       access, &external_file, release_callback,
-                                       out_file));
+        file_contents,
+    };
+    iree_io_file_handle_t* handle = NULL;
+    IREE_CHECK_OK(iree_io_file_handle_wrap_host_allocation(
+        IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
+        iree_make_byte_span(file_contents, file_size), release_callback,
+        iree_allocator_system(), &handle));
+    IREE_CHECK_OK(iree_hal_file_import(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, access, handle,
+        IREE_HAL_EXTERNAL_FILE_FLAG_NONE, out_file));
+    iree_io_file_handle_release(handle);
   }
 };
 

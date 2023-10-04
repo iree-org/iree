@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/io/file_handle.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,10 +25,8 @@ extern "C" {
 // will be used to do so.
 IREE_API_EXPORT iree_status_t iree_hal_memory_file_wrap(
     iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_access_t access,
-    iree_byte_span_t contents,
-    iree_hal_file_release_callback_t release_callback,
-    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
-    iree_hal_file_t** out_file);
+    iree_io_file_handle_t* handle, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_file_t** out_file);
 
 //===----------------------------------------------------------------------===//
 // EXPERIMENTAL: synchronous file read/write API
