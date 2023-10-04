@@ -143,6 +143,12 @@ endforeach()
 # UNCOMMENT TO DEBUG WHAT IS GOING ON.
 # file(GENERATE OUTPUT export_objects_debug.txt CONTENT "OBJECTS:${_EXPORT_OBJECT_SRCS}\n\nDEPS:${_EXPORT_OBJECT_DEPS}")
 
+# Disable .so.0 style naming/linking. In order to be consistent across platforms
+# and bindings, we will embed a major version in the library name when it is time.
+# OS packagers can re-enable this or take other steps to get canonical shared
+# library structures.
+set(CMAKE_PLATFORM_NO_VERSIONED_SONAME ON)
+
 iree_cc_library(
   SHARED
   NAME
@@ -201,12 +207,7 @@ set_target_properties(
 # generator expression. But since this is used in places where target
 # dependent generator expressions are not legal, we guesstimate it with
 # platform specific logic.
-set(_target_linker_file_name "libIREECompiler.so")
-if(WIN32)
-  set(_target_linker_file_name "IREECompiler.dll")
-elseif(APPLE)
-  set(_target_linker_file_name "libIREECompiler.dylib")
-endif()
+set(_target_linker_file_name "${CMAKE_SHARED_LIBRARY_PREFIX}IREECompiler${CMAKE_SHARED_LIBRARY_SUFFIX}")
 set_property(GLOBAL APPEND PROPERTY 
   IREE_COMPILER_DYLIB_RELPATHS "${_target_linker_file_name}")
 
