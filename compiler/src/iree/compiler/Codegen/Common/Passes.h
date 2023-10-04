@@ -108,6 +108,8 @@ createEraseDeadAllocAndStoresPass();
 
 std::unique_ptr<Pass> createEraseHALDescriptorTypeFromMemRefPass();
 
+std::unique_ptr<Pass> createConvertHALDescriptorTypeToGPUAddressSpacePass();
+
 // Extract address computations into their own separate instructions.
 std::unique_ptr<Pass> createExtractAddressComputationPass();
 
@@ -243,9 +245,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
-
-/// Erases #hal.descriptor_type as MemRef memory space.
-LogicalResult eraseHALDescriptorTypeFromMemRef(Operation *op);
 
 /// Populates patterns with patterns to concretize tensor.pad op's result
 /// shape. `numWorkgroups`, if not empty, will be used as bounds for simplifying
