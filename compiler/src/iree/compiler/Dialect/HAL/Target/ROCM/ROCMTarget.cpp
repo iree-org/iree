@@ -12,11 +12,14 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -37,10 +40,9 @@ static llvm::cl::opt<bool>
                  llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
                  llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
-    clROCMBitcodeDir("iree-rocm-bc-dir",
-                     llvm::cl::desc("Directory of ROCM Bitcode"),
-                     llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
+static llvm::cl::opt<std::string> clROCMBitcodeDir(
+    "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
+    llvm::cl::init(mlir::iree_compiler::findPlatformLibDirectory("rocm")));
 
 namespace mlir {
 namespace iree_compiler {
@@ -205,9 +207,15 @@ public:
     iree_hal_rocm_ExecutableDef_start_as_root(builder);
 
     // Link module to Device Library
+    std::string rocmBitcodeDir = clROCMBitcodeDir;
     if (clROCMLinkBC) {
-      linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip,
-                           clROCMBitcodeDir);
+      if (clROCMBitcodeDir.empty()) {
+        return variantOp.emitError()
+               << "cannot find ROCM bitcode files. Check your installation "
+                  "consistency and in the worst case, set --iree-rocm-bc-dir= "
+                  "to an explicit location on your system.";
+      }
+      linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip, rocmBitcodeDir);
     }
 
     // Serialize hsaco kernel into the binary that we will embed in the
