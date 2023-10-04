@@ -207,8 +207,7 @@ public:
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set --iree-rocm-bc-dir= "
-                  "to "
-                  "an explicit location on your system.";
+                  "to an explicit location on your system.";
       }
       linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip, rocmBitcodeDir);
     }
