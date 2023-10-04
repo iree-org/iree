@@ -39,9 +39,9 @@ if(IREE_BUILD_COMPILER)
     configure_file(setup.py setup.py @ONLY)
     add_subdirectory(bindings/python)
   endif()
-endif()
 
-# Post processing.
-get_property(_iree_compiler_dylib_depends GLOBAL PROPERTY IREE_COMPILER_DYLIB_DEPENDS)
-add_dependencies(iree_compiler_API_SharedImpl ${_iree_compiler_dylib_depends})
+  # Post processing.
+  get_property(_iree_compiler_dylib_depends GLOBAL PROPERTY IREE_COMPILER_DYLIB_DEPENDS)
+  add_dependencies(iree_compiler_API_SharedImpl ${_iree_compiler_dylib_depends})
+endif()
 
