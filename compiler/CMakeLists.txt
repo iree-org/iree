@@ -42,6 +42,8 @@ if(IREE_BUILD_COMPILER)
 
   # Post processing.
   get_property(_iree_compiler_dylib_depends GLOBAL PROPERTY IREE_COMPILER_DYLIB_DEPENDS)
-  add_dependencies(iree_compiler_API_SharedImpl ${_iree_compiler_dylib_depends})
+  if(_iree_compiler_dylib_depends)
+    add_dependencies(iree_compiler_API_SharedImpl ${_iree_compiler_dylib_depends})
+  endif()
 endif()
 
