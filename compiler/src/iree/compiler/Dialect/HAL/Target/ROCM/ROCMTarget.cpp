@@ -40,10 +40,9 @@ static llvm::cl::opt<bool>
                  llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
                  llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
-    clROCMBitcodeDir("iree-rocm-bc-dir",
-                     llvm::cl::desc("Directory of ROCM Bitcode"),
-                     llvm::cl::init(""));
+static llvm::cl::opt<std::string> clROCMBitcodeDir(
+    "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
+    llvm::cl::init(mlir::iree_compiler::findPlatformLibDirectory("rocm")));
 
 namespace mlir {
 namespace iree_compiler {
@@ -203,18 +202,15 @@ public:
 
     // Link module to Device Library
     std::string rocmBitcodeDir = clROCMBitcodeDir;
-    if (clROCMBitcodeDir.empty()) {
-      const std::string kPlatformSuffix =  "/_platform_libs/rocm";
-      const std::string kRocmSysPath = "/opt/rocm/amdgcn/bitcode";
-      std::string dylibPath = getCurrentDylibPath();
-      SmallString<256> dylibDir(dylibPath);
-      llvm::sys::path::remove_filename(dylibDir);
-      dylibPath = std::string(dylibDir);
-      rocmBitcodeDir = dylibPath.empty() ? kRocmSysPath : dylibPath.append(kPlatformSuffix);
-    }
     if (clROCMLinkBC) {
-      linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip,
-                           rocmBitcodeDir);
+      if (clROCMBitcodeDir.empty()) {
+        return variantOp.emitError()
+               << "cannot find ROCM bitcode files. Check your installation "
+                  "consistency and in the worst case, set --iree-rocm-bc-dir= "
+                  "to "
+                  "an explicit location on your system.";
+      }
+      linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip, rocmBitcodeDir);
     }
 
     // Serialize hsaco kernel into the binary that we will embed in the
