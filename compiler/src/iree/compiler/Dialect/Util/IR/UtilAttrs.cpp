@@ -570,8 +570,6 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
     switch (bitWidth) {
       case 32:
         return serializeResourceRawData(loc, resourceElementsAttr, os);
-      case 64:
-        return serializeResourceRawData(loc, resourceElementsAttr, os);
     }
   }
   return emitError(loc) << "unhandled constant type " << resourceElementsAttr.getType();
