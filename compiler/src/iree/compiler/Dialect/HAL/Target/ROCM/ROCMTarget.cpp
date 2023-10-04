@@ -149,6 +149,7 @@ public:
       exportOps[op.getSymName()] = op;
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
+    SmallVector<uint32_t> workgroupLocalMemories;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       int32_t flatWgSize = 1;
       auto *llvmFunc = llvmModule->getFunction(func.getName());
@@ -166,6 +167,11 @@ public:
         workgroupSize = {1, 1, 1};
       }
       workgroupSizes.push_back(workgroupSize);
+      uint32_t workgroupLocalMemory = 0;
+      if (auto workgroupLocalMemoryAttr = exportOp.getWorkgroupLocalMemory()) {
+        workgroupLocalMemory = workgroupLocalMemoryAttr->getSExtValue();
+      }
+      workgroupLocalMemories.push_back(workgroupLocalMemory);
       // For GPU kernels,
       // 1. Insert AMDGPU_KERNEL calling convention.
       // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
@@ -230,10 +236,14 @@ public:
           builder, (*blockSizes)[0], (*blockSizes)[1], (*blockSizes)[2]);
       ++blockSizes;
     }
+    auto workgroupLocalMemoriesRef =
+        builder.createInt32Vec(workgroupLocalMemories);
     auto blockSizesRef = iree_hal_rocm_BlockSizeDef_vec_end(builder);
 
     iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
+    iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(
+        builder, workgroupLocalMemoriesRef);
     iree_hal_rocm_ExecutableDef_hsaco_image_add(builder, hsacoRef);
     iree_hal_rocm_ExecutableDef_end_as_root(builder);
 
