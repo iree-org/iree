@@ -25,6 +25,10 @@ using namespace llvm;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::Reducer;
 
+#if defined(_MSC_VER)
+#define fileno _fileno
+#endif // _MSC_VER
+
 // Parse and verify the input MLIR file. Returns null on error.
 static OwningOpRef<Operation *> loadModule(MLIRContext &context,
                                            StringRef inputFilename) {
