@@ -104,9 +104,7 @@ class ProducedArtifact(Artifact):
     def start(self) -> "ProducedArtifact":
         if not self.always_produce and self.stamp_path.exists():
             if self.path.exists():
-                print(
-                    f"Not producing {self} because it has already been produced"
-                )
+                print(f"Not producing {self} because it has already been produced")
                 return self
             self.stamp_path.unlink()
         self.callback(self)
@@ -139,9 +137,7 @@ class FetchedArtifact(ProducedArtifact):
             miniters=1,
             desc=str(self.path),
         ) as t:
-            urllib.request.urlretrieve(
-                self.url, self.path, reporthook=show_progress(t)
-            )
+            urllib.request.urlretrieve(self.url, self.path, reporthook=show_progress(t))
         print(f": Retrieved {self.path.stat().st_size} bytes")
 
 
