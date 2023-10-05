@@ -26,7 +26,8 @@ namespace {
 #include "torch-iree/InputConversion/Passes.h.inc" // IWYU pragma: export
 } // namespace
 
-void createTorchToIREEPipeline(OpPassManager &pm) {
+void createTorchToIREEPipeline(
+    OpPassManager &pm, const TorchToIREELoweringPipelineOptions &options) {
   // This pipeline adapted from
   // createTorchBackendToLinalgOnTensorsBackendPipeline. Keep in sync with
   // additions there. Lower to linalg + guards which is the input to codegen
@@ -34,6 +35,13 @@ void createTorchToIREEPipeline(OpPassManager &pm) {
   // constants, (e.g. dimensions which must be constant in a ranked programming
   // model) and those constants get somewhat obscured by TorchToArith.
   llvm::ArrayRef<std::string> emptyArrayRef;
+
+  if (options.strictSymbolicShapes) {
+    pm.addNestedPass<func::FuncOp>(createSetStrictSymbolicShapesPass());
+    // Run canonicalization in case any previously non-strict dynamic code can
+    // now be simplified.
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  }
 
   pm.addNestedPass<func::FuncOp>(
       torch::Torch::createDecomposeComplexOpsPass(emptyArrayRef));
@@ -68,7 +76,7 @@ void registerTMTensorConversionPasses() {
   // Generated.
   registerPasses();
 
-  mlir::PassPipelineRegistration<>(
+  mlir::PassPipelineRegistration<TorchToIREELoweringPipelineOptions>(
       "torch-to-iree",
       "Pipeline to lower from the Torch backend contract to legal IREE input.",
       createTorchToIREEPipeline);

@@ -18,7 +18,14 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct TorchOptions {
-  void bindOptions(OptionsBinder &binder) {}
+  bool strictSymbolicShapes = true;
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("Torch Input");
+    binder.opt<bool>(
+        "iree-torch-use-strict-symbolic-shapes", strictSymbolicShapes,
+        llvm::cl::cat(category),
+        llvm::cl::desc("Forces dynamic shapes to be treated as strict"));
+  }
 };
 
 // The shark-turbine plugin provides dialects, passes and opt-in options.
@@ -42,7 +49,9 @@ struct TorchSession
   bool extendCustomInputConversionPassPipeline(
       OpPassManager &passManager, std::string_view typeMnemonic) override {
     if (typeMnemonic == "torch") {
-      TorchInput::createTorchToIREEPipeline(passManager);
+      TorchInput::TorchToIREELoweringPipelineOptions torchOptions;
+      torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
+      TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
       passManager.addNestedPass<func::FuncOp>(
           TorchInput::createConvertTMTensorToLinalgExtPass());
       return true;

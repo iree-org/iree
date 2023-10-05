@@ -14,13 +14,24 @@ namespace mlir {
 namespace iree_compiler {
 namespace TorchInput {
 
+struct TorchToIREELoweringPipelineOptions
+    : public PassPipelineOptions<TorchToIREELoweringPipelineOptions> {
+  Option<bool> strictSymbolicShapes{
+      *this, "strict-symbolic-shapes",
+      llvm::cl::desc("Use strict symbolic shapes."), llvm::cl::init(true)};
+};
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertTMTensorToLinalgExtPass();
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSetStrictSymbolicShapesPass();
 
 // Creates a pipeline that lowers from the torch backend contract to IREE.
 // This is based on the torch-backend-to-linalg-on-tensors-backend-pipeline
 // pipeline in torch-mlir but includes IREE specific lowerings.
-void createTorchToIREEPipeline(OpPassManager &pm);
+void createTorchToIREEPipeline(
+    OpPassManager &pm, const TorchToIREELoweringPipelineOptions &options);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
