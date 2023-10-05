@@ -15,4 +15,10 @@ def ConvertTMTensorToLinalgExt :
   let constructor = "mlir::iree_compiler::TorchInput::createConvertTMTensorToLinalgExtPass()";
 }
 
+def SetStrictSymbolicShapesPass :
+    Pass<"torch-iree-set-strict-symbolic-shapes", "func::FuncOp"> {
+  let summary = "Adds the attribute indicating strict symbolic shapes in Torch IR";
+  let constructor = "mlir::iree_compiler::TorchInput::createSetStrictSymbolicShapesPass()";
+}
+
 #endif // TORCH_IREE_INPUTCONVERSION_PASSES

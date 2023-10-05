@@ -36,6 +36,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "ConvertTMTensorToLinalgExt.cpp"
+    "SetStrictSymbolicShapes.cpp"
     "Passes.cpp"
   DEPS
     ::PassHeaders
