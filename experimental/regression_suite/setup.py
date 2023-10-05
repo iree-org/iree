@@ -19,6 +19,7 @@ setup(
         "pytest",
         "pytest-xdist",
         "PyYAML",
+        "tqdm",
     ],
     extras_require={},
 )
