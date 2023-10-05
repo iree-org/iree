@@ -24,6 +24,12 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+// Note: This is shared with iree-llvmcpu-tile.
+void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
+                     SmallVector<int64_t> tileSizes,
+                     SmallVector<bool> tileScalableFlags);
+
 namespace {
 
 /// Starting from `op` walk all operands backwards to find all
@@ -253,43 +259,16 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
         maybeLoweringConfig.value().getScalableTileFlagVals(tilingLevel);
   }
 
-  IRRewriter rewriter(context);
-  int numLoops = consumerOp.getLoopIteratorTypes().size();
-  if (numLoops > tileSizes.size()) {
-    tileSizes.append(numLoops - tileSizes.size(), 0);
-    tileScalableFlags.append(numLoops - tileSizes.size(), false);
-  }
-  tileSizes.resize(numLoops);
-  tileScalableFlags.resize(numLoops);
-
   if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
     LLVM_DEBUG(llvm::dbgs() << "----- skip, all zeros -----\n");
     return;
   }
 
-  auto options = scf::SCFTilingOptions();
-  if (!llvm::is_contained(tileScalableFlags, true)) {
-    SmallVector<OpFoldResult> tileSizesOfr =
-        getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
-    options.setTileSizes(tileSizesOfr);
-  } else {
-    options.setTileSizeComputationFunction(
-        [=](OpBuilder &b, Operation *op) -> SmallVector<OpFoldResult> {
-          auto loc = op->getLoc();
-          return llvm::map_to_vector(
-              llvm::zip(tileSizes, tileScalableFlags),
-              [&](auto pair) -> OpFoldResult {
-                auto [t, isScalable] = pair;
-                Value size = b.create<arith::ConstantIndexOp>(loc, t);
-                if (isScalable) {
-                  Value vscale = b.create<vector::VectorScaleOp>(loc);
-                  size = b.create<arith::MulIOp>(loc, size, vscale);
-                }
-                return size;
-              });
-        });
-  }
+  scf::SCFTilingOptions options{};
+  setSCFTileSizes(options, consumerOp, std::move(tileSizes),
+                  std::move(tileScalableFlags));
 
+  IRRewriter rewriter(context);
   DominanceInfo dominanceInfo(funcOp);
   if (failed(applyTileAndFuse(rewriter, consumerOp, dominanceInfo, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");

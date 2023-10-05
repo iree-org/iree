@@ -24,21 +24,40 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace {
 
-/// Builds a proper tile sizes vector for the op.
-/// scf::tileUsingSCFForOp expects the num of tile sizes = num of loops. This
-/// method returns a proper tile sizes vector for each op during tiling.
-static SmallVector<OpFoldResult>
-buildTileSizesForOp(OpBuilder &b, Operation *op, ArrayRef<int64_t> tileSizes) {
-  auto tilingOp = cast<TilingInterface>(op);
-
-  SmallVector<int64_t> newTileSizes(tileSizes);
-  newTileSizes.resize(tilingOp.getLoopIteratorTypes().size(), /*default=*/0);
-
-  OpBuilder::InsertionGuard guard(b);
-  return getAsIndexOpFoldResult(b.getContext(), newTileSizes);
+// Note: This is shared with iree-llvmcpu-tile-and-fuse.
+void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
+                     SmallVector<int64_t> tileSizes,
+                     SmallVector<bool> tileScalableFlags) {
+  // scf::tileUsingSCFForOp expects the num of tile sizes = num of loops.
+  int numLoops = consumerOp.getLoopIteratorTypes().size();
+  tileSizes.resize(numLoops, /*default=*/0);
+  tileScalableFlags.resize(numLoops, /*default=*/false);
+  if (!llvm::is_contained(tileSizes, true)) {
+    // Non-scalable case: All constant tile sizes.
+    options.setTileSizes(
+        getAsIndexOpFoldResult(consumerOp.getContext(), tileSizes));
+  } else {
+    // Scalable case: Multiply scalable tile sizes by vscale.
+    options.setTileSizeComputationFunction(
+        [=](OpBuilder &b, Operation *op) -> SmallVector<OpFoldResult> {
+          auto loc = op->getLoc();
+          return llvm::map_to_vector(
+              llvm::zip(tileSizes, tileScalableFlags),
+              [&](auto pair) -> OpFoldResult {
+                auto [t, isScalable] = pair;
+                Value size = b.create<arith::ConstantIndexOp>(loc, t);
+                if (isScalable) {
+                  Value vscale = b.create<vector::VectorScaleOp>(loc);
+                  size = b.create<arith::MulIOp>(loc, size, vscale);
+                }
+                return size;
+              });
+        });
+  }
 }
+
+namespace {
 
 /// This pass tiles all the TilingInterface operations. The `tilingLevel` must
 /// be specified. It picks the `tilingLevel`-th list as tiling sizes from
@@ -49,7 +68,8 @@ struct LLVMCPUTilePass : LLVMCPUTileBase<LLVMCPUTilePass> {
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
-                    linalg::LinalgDialect, scf::SCFDialect>();
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -85,10 +105,14 @@ void LLVMCPUTilePass::runOnOperation() {
 
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     SmallVector<int64_t> tileSizes;
+    SmallVector<bool> tileScalableFlags;
     if (auto loweringConfig = getLoweringConfig(op)) {
       tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+      tileScalableFlags = loweringConfig.getScalableTileFlagVals(tilingLevel);
     } else {
       tileSizes = rootLoweringConfig.value().getTileSizeVals(tilingLevel);
+      tileScalableFlags =
+          rootLoweringConfig.value().getScalableTileFlagVals(tilingLevel);
     }
 
     if (llvm::all_of(tileSizes, [](int64_t v) { return v == 0; })) {
@@ -97,10 +121,9 @@ void LLVMCPUTilePass::runOnOperation() {
     }
 
     IRRewriter rewriter(context);
-    auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
-        [tileSizes](OpBuilder &b, Operation *op) {
-          return buildTileSizesForOp(b, op, tileSizes);
-        });
+    scf::SCFTilingOptions options{};
+    setSCFTileSizes(options, op, std::move(tileSizes),
+                    std::move(tileScalableFlags));
     FailureOr<scf::SCFTilingResult> tiledResults =
         scf::tileUsingSCFForOp(rewriter, op, options);
     if (failed(tiledResults))
