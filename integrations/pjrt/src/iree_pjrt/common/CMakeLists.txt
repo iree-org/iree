@@ -11,10 +11,12 @@ iree_cc_library(
     "api_impl.h"
     "dylib_entry_point.cc.inc"
     "iree_helpers.h"
+    "layout_utils.h"
     "platform.h"
     "tensor_utils.h"
   SRCS
     "api_impl.cc"
+    "layout_utils.cc"
     "platform.cc"
     "tensor_utils.cc"
   DEPS

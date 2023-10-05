@@ -10,6 +10,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -21,14 +22,9 @@
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
 #include "iree_pjrt/common/compiler.h"
+#include "iree_pjrt/common/layout_utils.h"
 #include "iree_pjrt/common/platform.h"
 #include "xla/pjrt/c/pjrt_c_api.h"
-// TODO: Excise. Various deep dependencies on XLA internals.
-// #include "xla/pjrt/c/pjrt_c_api_helpers.h"
-// TODO: Excise. Various deep dependencies on XLA internals.
-// #include "xla/pjrt/pjrt_executable.h"
-// TODO: Excise. Various deep dependencies on XLA internals.
-// #include "xla/shape_util.h"
 
 namespace iree::pjrt {
 
@@ -95,11 +91,6 @@ class BufferInstance {
     // the hook to get an unsafe pointer (avoids a copy).
     return false;
   }
-  // TODO: Excise.
-  // iree_status_t GetXlaShape(xla::Shape** out_shape);
-  // TODO: Excise.
-  // iree_status_t GetLayoutData(::pjrt::BufferMemoryLayoutData**
-  // out_layout_data);
 
   // Gets the required host size in bytes to copy to host.
   iree_status_t GetHostSizeInBytes(iree_host_size_t* host_size);
@@ -115,14 +106,25 @@ class BufferInstance {
   iree_hal_fence_t* ready_fence() { return ready_fence_.get(); }
   iree_hal_fence_t* done_fence() { return done_fence_.get(); }
 
+  const int64_t* dims() { return dims_.data(); }
+  size_t num_dims() { return dims_.size(); }
+  std::optional<PJRT_Buffer_Type> element_type();
+  const PJRT_Buffer_MemoryLayout* layout() {
+    if (!layout_.is_valid()) {
+      ComputeLayout();
+    }
+    if (layout_.is_valid()) {
+      return &layout_.c_layout();
+    } else {
+      return nullptr;
+    }
+  }
+
  private:
+  void ComputeLayout();
+
   DeviceInstance& device_;
   iree::vm::ref<iree_hal_buffer_view_t> buffer_view_;
-  // Various things require XLA's idea of shapes, layouts, etc.
-  // We keep one around for such cases.
-  // TODO: Excise.
-  // std::optional<xla::Shape> cached_shape_;
-  // std::optional<::pjrt::BufferMemoryLayoutData> cached_layout_data_;
   // When the buffer resource gets freed, this is set to true.
   bool is_deleted_ = false;
   // Fences.
@@ -132,6 +134,10 @@ class BufferInstance {
   //   Consumers should advance this fence when using it.
   iree::vm::ref<iree_hal_fence_t> ready_fence_;
   iree::vm::ref<iree_hal_fence_t> done_fence_;
+
+  // API elements that must have the same lifetime as BufferInstance.
+  std::vector<int64_t> dims_;
+  ApiMemoryLayout layout_;
 };
 
 //===----------------------------------------------------------------------===//
