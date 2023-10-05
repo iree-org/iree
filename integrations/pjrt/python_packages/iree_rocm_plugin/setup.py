@@ -18,7 +18,7 @@ import iree_pjrt_setup
 from setuptools import setup, find_namespace_packages
 
 README = r"""
-OpenXLA PJRT Plugin for CUDA
+OpenXLA PJRT Plugin for ROCM
 """
 
 # Setup and get version information.
@@ -32,7 +32,7 @@ class CMakeBuildPy(iree_pjrt_setup.BaseCMakeBuildPy):
         print("*****************************", file=sys.stderr)
         self.build_configuration(
             os.path.join(THIS_DIR, "build", "cmake"),
-            extra_cmake_args=("-DIREE_HAL_DRIVER_CUDA=ON",),
+            extra_cmake_args=("-DIREE_EXTERNAL_HAL_DRIVERS=ROCM",),
         )
         print("Target populated.", file=sys.stderr)
 
@@ -43,18 +43,18 @@ iree_pjrt_setup.populate_built_package(
         "python",
         "iree",
         "_pjrt_libs",
-        "cuda",
+        "rocm",
     )
 )
 
 
 setup(
-    name=f"iree-pjrt-plugin-cuda{iree_pjrt_setup.PACKAGE_SUFFIX}",
+    name=f"iree-pjrt-plugin-rocm{iree_pjrt_setup.PACKAGE_SUFFIX}",
     version=f"{iree_pjrt_setup.PACKAGE_VERSION}",
     author="The IREE Team",
     author_email="iree-discuss@googlegroups.com",
     license="Apache-2.0",
-    description="IREE PJRT Plugin for CUDA (generic)",
+    description="IREE PJRT Plugin for ROCM (generic)",
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/openxla/iree",
@@ -64,15 +64,15 @@ setup(
         "Programming Language :: Python :: 3",
     ],
     packages=[
-        "jax_plugins.iree_cuda",
-        "iree._pjrt_libs.cuda",
+        "jax_plugins.iree_rocm",
+        "iree._pjrt_libs.rocm",
     ],
     package_dir={
-        "jax_plugins.iree_cuda": "jax_plugins/iree_cuda",
-        "iree._pjrt_libs.cuda": "build/cmake/python/iree/_pjrt_libs/cuda",
+        "jax_plugins.iree_rocm": "jax_plugins/iree_rocm",
+        "iree._pjrt_libs.rocm": "build/cmake/python/iree/_pjrt_libs/rocm",
     },
     package_data={
-        "iree._pjrt_libs.cuda": ["pjrt_plugin_iree_cuda.*"],
+        "iree._pjrt_libs.rocm": ["pjrt_plugin_iree_rocm.*"],
     },
     cmdclass={
         "build": iree_pjrt_setup.PjrtPluginBuild,
@@ -86,7 +86,7 @@ setup(
         # plugins. This augments the path based scanning that Jax does, which
         # is not always robust to all packaging circumstances.
         "jax_plugins": [
-            "iree-cuda = jax_plugins.iree_cuda",
+            "iree-rocm = jax_plugins.iree_rocm",
         ],
     },
     install_requires=iree_pjrt_setup.install_requires,

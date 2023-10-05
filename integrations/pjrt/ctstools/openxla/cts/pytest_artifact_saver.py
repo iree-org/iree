@@ -14,9 +14,11 @@ TEST_DIR_KEY = pytest.StashKey[Path]()
 
 
 def pytest_addoption(parser, pluginmanager) -> None:
-    parser.addoption("--openxla-pjrt-artifact-dir",
-                     dest="OPENXLA_PJRT_ARTIFACT_DIR",
-                     help="Saves OpenXLA PJRT compilation artifacts")
+    parser.addoption(
+        "--openxla-pjrt-artifact-dir",
+        dest="OPENXLA_PJRT_ARTIFACT_DIR",
+        help="Saves OpenXLA PJRT compilation artifacts",
+    )
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
@@ -26,10 +28,11 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
     artifact_dir = item.session.stash[ARTIFACT_DIR_KEY]
-    if artifact_dir is None: return
-    sanitized_name = (item.nodeid.replace(".py::",
-                                          "::").replace("/", "_").replace(
-                                              "::", "__"))
+    if artifact_dir is None:
+        return
+    sanitized_name = (
+        item.nodeid.replace(".py::", "::").replace("/", "_").replace("::", "__")
+    )
     test_dir = artifact_dir / sanitized_name
     shutil.rmtree(test_dir, ignore_errors=True)
     test_dir.mkdir(parents=True, exist_ok=True)
@@ -43,11 +46,12 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 def pytest_runtest_makereport(item, call) -> None:
     outcome = yield
     test_dir = item.stash[TEST_DIR_KEY]
-    if test_dir is None: return
+    if test_dir is None:
+        return
 
     result = outcome.get_result()
 
-    if call.when == 'call' and result.failed:
+    if call.when == "call" and result.failed:
         with open(test_dir / "error.txt", "wt") as f:
             f.write(result.longreprtext)
             f.write("\n\nSTDERR:\n-------\n")
@@ -60,7 +64,8 @@ def pytest_runtest_makereport(item, call) -> None:
 
 def pytest_runtest_teardown(item: pytest.Item) -> None:
     test_dir = item.stash[TEST_DIR_KEY]
-    if test_dir is None: return
+    if test_dir is None:
+        return
     dir_entries = list(test_dir.iterdir())
     crash_marker = test_dir / "CRASH_MARKER"
     if crash_marker.is_file():
@@ -68,4 +73,3 @@ def pytest_runtest_teardown(item: pytest.Item) -> None:
     if not dir_entries:
         # Remove empty directories on success.
         test_dir.rmdir()
-

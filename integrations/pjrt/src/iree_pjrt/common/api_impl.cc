@@ -945,6 +945,8 @@ iree_status_t DeviceInstance::GetHalDevice(iree_hal_device_t** out_device) {
 ClientInstance::ClientInstance(std::unique_ptr<Platform> platform)
     : platform_(std::move(platform)) {
   host_allocator_ = iree_allocator_system();
+  IREE_CHECK_OK(
+      iree_hal_driver_registry_allocate(host_allocator_, &driver_registry_));
   cached_platform_version_ = "git";  // TODO: Plumb through version info.
 }
 
@@ -959,6 +961,7 @@ ClientInstance::~ClientInstance() {
   // ordering (bad shutdown ordering of the driver is a frequent cause of
   // bugs).
   iree_hal_driver_release(driver_);
+  iree_hal_driver_registry_free(driver_registry_);
 }
 
 void ClientInstance::BindApi(PJRT_Api* api) {
