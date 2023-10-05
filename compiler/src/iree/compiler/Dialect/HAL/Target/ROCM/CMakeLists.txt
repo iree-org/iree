@@ -89,7 +89,11 @@ add_custom_command(
     ${_all_device_bc_copy_commands}
 )
 add_custom_target(iree_compiler_Dialect_HAL_Target_ROCM_GenDeviceLibs
-  DEPENDS ${_all_device_bc_files}
+  DEPENDS
+    # Must depend on both the targets and the bc files in order for the
+    # transitive dep to work.
+    ${AMD_DEVICE_LIBS}
+    ${_all_device_bc_files}
 )
 
 # Ensure that the device libs are built when the compiler dylib is built.
