@@ -28,6 +28,10 @@ namespace Flow {
 
 namespace {
 
+//===----------------------------------------------------------------------===//
+// Generic to Named Op Conversions
+//===----------------------------------------------------------------------===//
+
 // Method to match a transpose operation on the two most minor dimensions of the
 // specified rank.
 static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
@@ -124,6 +128,10 @@ std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
   }
   return std::nullopt;
 }
+
+//===----------------------------------------------------------------------===//
+// Slice Raising
+//===----------------------------------------------------------------------===//
 
 /// Matches a linalg.generic operation reading data from a tensor `source` using
 /// tensor.extract, and raises the `source` tensor to an input of the linalg
@@ -351,6 +359,179 @@ static FailureOr<Operation *> tryRaiseToView(linalg::GenericOp linalgOp,
                                 output, linalgOp, rewriter);
 }
 
+//===----------------------------------------------------------------------===//
+// Partial negation and inner slice reverse
+//===----------------------------------------------------------------------===//
+
+static bool isUnaryNegate(linalg::GenericOp op) {
+  auto block = op.getBlock();
+
+  if (block->empty() ||
+      !block->back().mightHaveTrait<OpTrait::IsTerminator>()) {
+    return false;
+  }
+
+  if (block->getNumArguments() != 2) {
+    return false;
+  }
+
+  Operation *terminator = block->getTerminator();
+  if (terminator->getNumOperands() != 1) {
+    return false;
+  }
+
+  auto yielded = terminator->getOperand(0).getDefiningOp<arith::NegFOp>();
+  if (!yielded) {
+    return false;
+  }
+
+  if (yielded->getOperand(0) != block->getArgument(0)) {
+    return false;
+  }
+
+  return true;
+}
+
+// This aims to match a partial negation and reverse of a tensor and rewrite
+// it as a single linalg generic. For example, this will match sequences like
+// the following:
+//
+// clang-format off
+//
+//   %extracted_slice = tensor.extract_slice %0[0, ..., 0] [..., 64] [1, ..., 1] : tensor<...x128xf16> to tensor<...x64xf16>
+//   %extracted_slice_0 = tensor.extract_slice %0[0, ..., 64] [..., 64] [1, ..., 1] : tensor<...x128xf16> to tensor<...x64xf16>
+//   %3 = linalg.generic {
+//         indexing_maps = [affine_map<(d0, ..., dn-1) -> (d0, ..., dn-1)>, affine_map<(d0, ..., dn-1) -> (d0, ..., dn-1)>],
+//         iterator_types = [n-1 x "parallel"]}
+//      ins(%extracted_slice_0 : tensor<...x64xf16>) outs(%2 : tensor<...x64xf16>) {
+//   ^bb0(%in: f16, %out: f16):
+//     %5 = arith.negf %in : f16
+//     linalg.yield %5 : f16 
+//   } -> tensor<...x64xf16>
+//   %inserted_slice = tensor.insert_slice %3 into %1[0, ..., 0] [..., 64] [1, ..., 1] : tensor<...x64xf16> into tensor<...x128xf16>
+//   %inserted_slice_1 = tensor.insert_slice %extracted_slice into %inserted_slice[0, ..., 64] [..., 64] [1, ..., 1] : tensor<...x64xf16> into tensor<...x128xf16>
+//
+// clang-format on
+//
+// Where the input tensor is broken down along the inner most dimension, then
+// the bottom elements are negated and the tensor is reconstructed, reversing
+// the order of the slices. This is then rewritten as
+//
+// clang-format off
+//
+//   %expanded = tensor.expand_shape %0 [[0], ..., [n-1, n]] : tensor<...x128xf16> into tensor<...x2x64xf16>
+//   %2 = linalg.generic {
+//         indexing_maps = [affine_map<(d0, ..., dn-1, dn) -> (d0, ..., dn-1, dn)>],
+//         iterator_types = [n x "parallel"]
+//      } outs(%output : tensor<...x2x64xf16>) {
+//   ^bb0(%out: f16):
+//     %i0 = linalg.index 0 : index
+//     ...
+//     %in-1 = linalg.index n-1 : index
+//     %in   = linalg.index n : index
+//     %rev = arith.subi %c1, %in-1 : index
+//     %extracted = tensor.extract %expanded[%i0, ..., %rev, %in] : tensor<...x2x64xf16>
+//     %neg = arith.negf %extracted : f16
+//     %cmp = arith.cmpi eq, %in-1, %c1 : index
+//     %sel = arith.select %cmp, %neg, %extracted : f16
+//     linalg.yield %sel : f16
+//   } -> tensor<...x2x64xf16>
+//   %collapsed = tensor.collapse_shape %2 [[0], ..., [n-1, n]] : tensor<...x2x64xf16> into tensor<...x128xf16>
+//
+// clang-format on
+static std::optional<Value>
+matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
+  /// First match against the desired op chain.
+  auto topHalf = insertOp.getSource().getDefiningOp<tensor::ExtractSliceOp>();
+  if (!topHalf || !topHalf->hasOneUse()) {
+    return std::nullopt;
+  }
+  auto dest = insertOp.getDest().getDefiningOp<tensor::InsertSliceOp>();
+  if (!dest || !dest->hasOneUse()) {
+    return std::nullopt;
+  }
+  auto outEmpty = dest.getDest().getDefiningOp<tensor::EmptyOp>();
+  if (!outEmpty) {
+    return std::nullopt;
+  }
+
+  /// TODO: This could be extended to other unary (or in general, elementwise
+  /// operations) if the need arises.
+  auto negate = dest.getSource().getDefiningOp<linalg::GenericOp>();
+  if (!negate || !isUnaryNegate(negate)) {
+    return std::nullopt;
+  }
+
+  auto bottomHalf =
+      negate.getDpsInputs()[0].getDefiningOp<tensor::ExtractSliceOp>();
+  if (!bottomHalf || !bottomHalf->hasOneUse()) {
+    return std::nullopt;
+  }
+  Value source = topHalf.getSource();
+  if (source != bottomHalf.getSource()) {
+    return std::nullopt;
+  }
+
+  /// Require that the overall operation isn't changing the tensor shape.
+  if (source.getType() != outEmpty.getType()) {
+    return std::nullopt;
+  }
+
+  auto sourceType = source.getType().dyn_cast<RankedTensorType>();
+  if (!sourceType) {
+    return std::nullopt;
+  }
+
+  /// Here we are verifying that the slice sequence inserts and extracts in the
+  /// same order. In other words, the offsets, sizes, and strides for the nth
+  /// extract slice match the nth insert slice.
+  /// TODO: We could relax this condition if we see cases where the elementwise
+  /// unary operation happens on a different slices of the tensor, but for now
+  /// don't engineer for cases that don't exist.
+  auto isSame = [](OpFoldResult a, OpFoldResult b) { return a == b; };
+  if (!insertOp.isSameAs(bottomHalf, isSame) ||
+      !dest.isSameAs(topHalf, isSame)) {
+    return std::nullopt;
+  }
+
+  /// All slices need unit stride and the initial slice should have a zero
+  /// offset.
+  if (!insertOp.hasUnitStride() || !dest.hasUnitStride() ||
+      !dest.hasZeroOffset()) {
+    return std::nullopt;
+  }
+
+  /// Verify all slice sizes are the same.
+  for (auto [bottom, top] :
+       llvm::zip_equal(insertOp.getMixedSizes(), dest.getMixedSizes())) {
+    if (bottom != top) {
+      return std::nullopt;
+    }
+  }
+
+  /// Note that we already verified all offsets, sizes, and strides are the same
+  /// for the final insert and bottom extract, so this checks both.
+  SmallVector<OpFoldResult> insertOffsets = insertOp.getMixedOffsets();
+  for (int i = 0, e = insertOffsets.size() - 1; i < e; ++i) {
+    if (getConstantIntValue(insertOffsets[i]) != static_cast<int64_t>(0)) {
+      return std::nullopt;
+    }
+  }
+
+  /// Finally verify that the inner most offset == the inner most slice size,
+  /// and because we verified all slice sizes are the same, this necessarily
+  /// is slicing exactly half of the inner most dimension.
+  if (insertOffsets.back() != insertOp.getMixedSizes().back()) {
+    return std::nullopt;
+  }
+
+  return source;
+}
+
+//===----------------------------------------------------------------------===//
+// Pass Implementation
+//===----------------------------------------------------------------------===//
+
 struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
@@ -412,6 +593,17 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       }
     });
 
+    SmallVector<std::pair<tensor::InsertSliceOp, Value>> catNegateAndSliceRoots;
+    getOperation()->walk([&](tensor::InsertSliceOp op) {
+      {
+        if (std::optional<Value> catNegateAndSliceRoot =
+                matchCatNegateAndSlice(op)) {
+          catNegateAndSliceRoots.push_back(
+              std::make_pair(op, catNegateAndSliceRoot.value()));
+        }
+      }
+    });
+
     for (std::pair<linalg::LinalgOp, Value> softmax : softmaxRoots) {
       linalg::LinalgOp op = softmax.first;
       Value src = softmax.second;
@@ -450,6 +642,86 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       SmallVector<NamedAttribute> attrs = getPrunedAttributeList(genericOp);
       rewriter.replaceOpWithNewOp<linalg::FillOp>(
           genericOp, ValueRange{fillInput}, ValueRange{init}, attrs);
+    }
+    for (std::pair<tensor::InsertSliceOp, Value> catNegateAndSlice :
+         catNegateAndSliceRoots) {
+      auto sliceOp = catNegateAndSlice.first;
+      rewriter.setInsertionPoint(sliceOp);
+      Value source = catNegateAndSlice.second;
+      Location loc = source.getLoc();
+      auto sourceType = dyn_cast<RankedTensorType>(source.getType());
+      if (!sourceType || sourceType.getRank() == 0) {
+        continue;
+      }
+
+      SmallVector<int64_t> targetShape(sourceType.getShape());
+      SmallVector<ReassociationIndices> reassoc;
+      for (int i = 0, e = targetShape.size(); i < e; i++) {
+        reassoc.push_back(ReassociationIndices{i});
+      }
+      reassoc.back().push_back(targetShape.size());
+
+      /// Note that because we've verified the pair of slices is exactly half
+      /// of the whole inner most extent, the sliceSize is necessarily
+      /// divisible by 2.
+      int64_t sliceSize = targetShape.back();
+      targetShape[targetShape.size() - 1] = 2;
+      targetShape.push_back(sliceSize == ShapedType::kDynamic ? sliceSize
+                                                              : sliceSize / 2);
+      Type expandedType =
+          RankedTensorType::get(targetShape, sourceType.getElementType());
+      Value expanded = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
+                                                              source, reassoc);
+
+      Value outTensor =
+          sliceOp.getDest().getDefiningOp<tensor::InsertSliceOp>().getDest();
+      outTensor = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
+                                                         outTensor, reassoc);
+
+      SmallVector<AffineMap> indexingMaps = {
+          rewriter.getMultiDimIdentityMap(targetShape.size())};
+      SmallVector<utils::IteratorType> iteratorTypes(
+          targetShape.size(), utils::IteratorType::parallel);
+
+      Value result =
+          rewriter
+              .create<linalg::GenericOp>(
+                  loc, outTensor.getType(), ValueRange(), outTensor,
+                  indexingMaps, iteratorTypes,
+                  [&](OpBuilder &b, Location loc, ValueRange args) {
+                    SmallVector<Value> extractionIndices;
+                    for (size_t i = 0, e = targetShape.size(); i < e; ++i) {
+                      extractionIndices.push_back(
+                          b.create<linalg::IndexOp>(loc, i));
+                    }
+
+                    Value c1 = rewriter.create<arith::ConstantOp>(
+                        loc, rewriter.getIndexAttr(1));
+
+                    // Take the reverse of the second to last iterator.
+                    // Because we statically guaranteed it to be 2 it just
+                    // becomes `1 - iters[-2]`.
+                    Value reverseSplitIdx = rewriter.create<arith::SubIOp>(
+                        loc, c1, extractionIndices[targetShape.size() - 2]);
+                    extractionIndices[targetShape.size() - 2] = reverseSplitIdx;
+
+                    // Extract the value from input tensor and negate the top
+                    // top half of the result slice (lower half of the input
+                    // slice).
+                    Value inputVal = b.create<tensor::ExtractOp>(
+                        loc, expanded, extractionIndices);
+                    Value maybeNegate = b.create<arith::NegFOp>(loc, inputVal);
+
+                    Value isEqual = b.create<arith::CmpIOp>(
+                        loc, arith::CmpIPredicate::eq, reverseSplitIdx, c1);
+                    Value select = rewriter.create<arith::SelectOp>(
+                        loc, isEqual, maybeNegate, inputVal);
+                    b.create<linalg::YieldOp>(loc, select);
+                  })
+              .getResult(0);
+
+      rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
+          sliceOp, sliceOp.getType(), result, reassoc);
     }
   }
 };
