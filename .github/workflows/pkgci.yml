@@ -39,3 +39,8 @@ jobs:
     name: Regression Test AMDGPU
     uses: ./.github/workflows/pkgci_regression_test_amdgpu.yml
     needs: [build_packages]
+
+  regression_test_a100:
+    name: Regression Test A100
+    uses: ./.github/workflows/pkgci_regression_test_a100.yml
+    needs: [build_packages]
