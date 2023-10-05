@@ -64,16 +64,18 @@ SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
   auto [parallelInnerSizes, parallelInnerScalableFlags] =
       getVectorInnerParallelSizes();
   for (int i = 0; i < numDims; ++i) {
-    unsigned nonZeroCnt =
-        llvm::count(ArrayRef<bool>{!!parallelCommonSizes[i], !!reductionSizes[i],
-                                   !!parallelInnerSizes[i]},
-                    true);
+    unsigned nonZeroCnt = llvm::count(
+        ArrayRef<bool>{
+            !!parallelCommonSizes[i] || parallelCommonScalableFlags[i],
+            !!reductionSizes[i] || reductionScalableFlags[i],
+            !!parallelInnerSizes[i] || parallelInnerScalableFlags[i]},
+        true);
     assert(nonZeroCnt <= 1 && "expected one tile size at most to be non-zero");
     (void)nonZeroCnt;
     vectorSizes[i] =
         parallelCommonSizes[i] ^ reductionSizes[i] ^ parallelInnerSizes[i];
-    scalableFlags[i] = parallelCommonScalableFlags[i] |
-                       reductionScalableFlags[i] |
+    scalableFlags[i] = parallelCommonScalableFlags[i] ||
+                       reductionScalableFlags[i] ||
                        parallelInnerScalableFlags[i];
   }
 
