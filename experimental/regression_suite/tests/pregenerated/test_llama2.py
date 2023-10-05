@@ -18,16 +18,21 @@ COMMON_FLAGS = [
     "--iree-stream-resource-max-allocation-size=3221225472",
 ]
 
-llama2_7b_f16qi4_source = fetch_source_fixture(
+llama2_7b_f16qi4_stripped_source = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/llama_regression/09152023/llama2_7b_int4_stripped.mlir",
+    group="llama2_7b_f16qi4_stripped",
+)
+
+llama2_7b_f16qi4_source = fetch_source_fixture(
+    "https://storage.googleapis.com/shark_tank/llama_regression/llama2_7b_int4.mlir",
     group="llama2_7b_f16qi4",
 )
 
 
 @pytest.fixture
-def llama2_7b_f16qi4_rdna3_vulkan_vmfb(llama2_7b_f16qi4_source):
+def llama2_7b_f16qi4_stripped_rdna3_vulkan_vmfb(llama2_7b_f16qi4_stripped_source):
     return iree_compile(
-        llama2_7b_f16qi4_source,
+        llama2_7b_f16qi4_stripped_source,
         "rdna3_vulkan",
         flags=COMMON_FLAGS
         + [
@@ -38,9 +43,9 @@ def llama2_7b_f16qi4_rdna3_vulkan_vmfb(llama2_7b_f16qi4_source):
 
 
 @pytest.fixture
-def llama2_7b_f16qi4_host_cpu_vmfb(llama2_7b_f16qi4_source):
+def llama2_7b_f16qi4_stripped_host_cpu_vmfb(llama2_7b_f16qi4_stripped_source):
     return iree_compile(
-        llama2_7b_f16qi4_source,
+        llama2_7b_f16qi4_stripped_source,
         "host_cpu",
         flags=COMMON_FLAGS
         + [
@@ -51,9 +56,9 @@ def llama2_7b_f16qi4_host_cpu_vmfb(llama2_7b_f16qi4_source):
 
 
 @pytest.fixture
-def llama2_7b_f16qi4_a100_vulkan_vmfb(llama2_7b_f16qi4_source):
+def llama2_7b_f16qi4_a100_vulkan_vmfb(llama2_7b_f16qi4_stripped_source):
     return iree_compile(
-        llama2_7b_f16qi4_source,
+        llama2_7b_f16qi4_stripped_source,
         "a100_vulkan",
         flags=COMMON_FLAGS
         + [
@@ -64,14 +69,27 @@ def llama2_7b_f16qi4_a100_vulkan_vmfb(llama2_7b_f16qi4_source):
 
 
 @pytest.fixture
-def llama2_7b_f16qi4_sm80_cuda_vmfb(llama2_7b_f16qi4_source):
+def llama2_7b_f16qi4_stripped_sm80_cuda_vmfb(llama2_7b_f16qi4_stripped_source):
     return iree_compile(
-        llama2_7b_f16qi4_source,
+        llama2_7b_f16qi4_stripped_source,
         "sm80_cuda",
         flags=COMMON_FLAGS
         + [
             "--iree-hal-target-backends=cuda",
             f"--iree-hal-cuda-llvm-target-arch=sm_80",
+        ],
+    )
+
+
+@pytest.fixture
+def llama2_7b_f16qi4_sm80_cuda_vmfb(llama2_7b_f16qi4_source):
+    return iree_compile(
+        llama2_7b_f16qi4_source,
+        "sm70_cuda",
+        flags=COMMON_FLAGS
+        + [
+            "--iree-hal-target-backends=cuda",
+            f"--iree-hal-cuda-llvm-target-arch=sm_70",
         ],
     )
 
@@ -84,9 +102,9 @@ def llama2_7b_f16qi4_sm80_cuda_vmfb(llama2_7b_f16qi4_source):
 @pytest.mark.presubmit
 @pytest.mark.unstable_linalg
 @pytest.mark.plat_rdna3_vulkan
-def test_step_rdna3_vulkan_stripped(llama2_7b_f16qi4_rdna3_vulkan_vmfb):
+def test_step_rdna3_vulkan_stripped(llama2_7b_f16qi4_stripped_rdna3_vulkan_vmfb):
     iree_benchmark_module(
-        llama2_7b_f16qi4_rdna3_vulkan_vmfb,
+        llama2_7b_f16qi4_stripped_rdna3_vulkan_vmfb,
         device="vulkan",
         function="first_vicuna_forward",
         args=[
@@ -94,7 +112,7 @@ def test_step_rdna3_vulkan_stripped(llama2_7b_f16qi4_rdna3_vulkan_vmfb):
         ],
     )
     iree_benchmark_module(
-        llama2_7b_f16qi4_rdna3_vulkan_vmfb,
+        llama2_7b_f16qi4_stripped_rdna3_vulkan_vmfb,
         device="vulkan",
         function="second_vicuna_forward",
         args=[
@@ -107,9 +125,9 @@ def test_step_rdna3_vulkan_stripped(llama2_7b_f16qi4_rdna3_vulkan_vmfb):
 @pytest.mark.presubmit
 @pytest.mark.unstable_linalg
 @pytest.mark.plat_host_cpu
-def test_step_host_cpu_stripped(llama2_7b_f16qi4_host_cpu_vmfb):
+def test_step_host_cpu_stripped(llama2_7b_f16qi4_stripped_host_cpu_vmfb):
     iree_benchmark_module(
-        llama2_7b_f16qi4_host_cpu_vmfb,
+        llama2_7b_f16qi4_stripped_host_cpu_vmfb,
         device="local-task",
         function="first_vicuna_forward",
         args=[
@@ -117,7 +135,7 @@ def test_step_host_cpu_stripped(llama2_7b_f16qi4_host_cpu_vmfb):
         ],
     )
     iree_benchmark_module(
-        llama2_7b_f16qi4_host_cpu_vmfb,
+        llama2_7b_f16qi4_stripped_host_cpu_vmfb,
         device="local-task",
         function="second_vicuna_forward",
         args=[
@@ -130,9 +148,9 @@ def test_step_host_cpu_stripped(llama2_7b_f16qi4_host_cpu_vmfb):
 @pytest.mark.presubmit
 @pytest.mark.unstable_linalg
 @pytest.mark.plat_nvidia_a100
-def test_step_sm80_cuda_stripped(llama2_7b_f16qi4_sm80_cuda_vmfb):
+def test_step_sm80_cuda_stripped(llama2_7b_f16qi4_stripped_sm80_cuda_vmfb):
     iree_benchmark_module(
-        llama2_7b_f16qi4_sm80_cuda_vmfb,
+        llama2_7b_f16qi4_stripped_sm80_cuda_vmfb,
         device="cuda",
         function="first_vicuna_forward",
         args=[
@@ -140,7 +158,7 @@ def test_step_sm80_cuda_stripped(llama2_7b_f16qi4_sm80_cuda_vmfb):
         ],
     )
     iree_benchmark_module(
-        llama2_7b_f16qi4_sm80_cuda_vmfb,
+        llama2_7b_f16qi4_stripped_sm80_cuda_vmfb,
         device="cuda",
         function="second_vicuna_forward",
         args=[
@@ -170,4 +188,55 @@ def test_step_a100_vulkan_stripped(llama2_7b_f16qi4_a100_vulkan_vmfb):
             "--input=1x1xi64",
         ]
         + (["--input=1x32x1x128xf16"] * 64),
+    )
+
+
+llama2_7b_f16qi4_first_input_cuda = fetch_source_fixture(
+    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cuda/first_vicuna_forward_input.npy",
+    group="llama2_7b_f16qi4_first_input_cuda",
+)
+
+llama2_7b_f16qi4_first_output_cuda = fetch_source_fixture(
+    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cuda/first_vicuna_forward_output.npy",
+    group="llama2_7b_f16qi4_first_output_cuda",
+)
+
+llama2_7b_f16qi4_second_input_cuda = fetch_source_fixture(
+    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cuda/second_vicuna_forward_input.npy",
+    group="llama2_7b_f16qi4_second_input_cuda",
+)
+
+llama2_7b_f16qi4_second_output_cuda = fetch_source_fixture(
+    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cuda/second_vicuna_forward_output.npy",
+    group="llama2_7b_f16qi4_second_output_cuda",
+)
+
+
+@pytest.mark.postsubmit
+@pytest.mark.unstable_linalg
+@pytest.mark.plat_nvidia_a100
+def test_correctness_sm80_cuda(
+    llama2_7b_f16qi4_sm80_cuda_vmfb,
+    llama2_7b_f16qi4_first_input_cuda,
+    llama2_7b_f16qi4_first_output_cuda,
+    llama2_7b_f16qi4_second_input_cuda,
+    llama2_7b_f16qi4_second_output_cuda,
+):
+    iree_run_module(
+        llama2_7b_f16qi4_sm80_cuda_vmfb,
+        device="cuda",
+        function="first_vicuna_forward",
+        args=[
+            f"--input=@{llama2_7b_f16qi4_first_input_cuda.path}",
+            f"--expected_output=@{llama2_7b_f16qi4_first_output_cuda.path}",
+        ],
+    )
+    iree_run_module(
+        llama2_7b_f16qi4_sm80_cuda_vmfb,
+        device="cuda",
+        function="second_vicuna_forward",
+        args=[
+            f"--input=@{llama2_7b_f16qi4_second_input_cuda.path}",
+            f"--expected_output=@{llama2_7b_f16qi4_second_output_cuda.path}",
+        ],
     )
