@@ -4,7 +4,7 @@
 
 import jax
 
-ones_splat =  jax.numpy.ones((3, 4))
+ones_splat = jax.numpy.ones((3, 4))
 print(ones_splat)
 
 twos = ones_splat + ones_splat

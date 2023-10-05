@@ -9,6 +9,8 @@ from setuptools import setup
 setup(
     name="openxla_pjrt_ctstools",
     packages=["openxla.cts"],
-    entry_points={"pytest11": ["openxla_pjrt_artifacts = openxla.cts.pytest_artifact_saver"]},
+    entry_points={
+        "pytest11": ["openxla_pjrt_artifacts = openxla.cts.pytest_artifact_saver"]
+    },
     classifiers=["Framework :: Pytest"],
 )
