@@ -15,10 +15,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "torch-iree/InputConversion/PassDetail.h"
 #include "torch-iree/InputConversion/Passes.h"
-// #include "mlir/IR/BuiltinAttributes.h"
-// #include "mlir/Pass/Pass.h"
 
-// TODO: This should be set and imported from upstream.
 static const llvm::StringLiteral kStrictSymbolsMarker =
     "torch.assume_strict_symbolic_shapes";
 
