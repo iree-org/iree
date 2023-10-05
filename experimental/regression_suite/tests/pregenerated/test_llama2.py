@@ -50,6 +50,32 @@ def llama2_7b_f16qi4_host_cpu_vmfb(llama2_7b_f16qi4_source):
     )
 
 
+@pytest.fixture
+def llama2_7b_f16qi4_a100_vulkan_vmfb(llama2_7b_f16qi4_source):
+    return iree_compile(
+        llama2_7b_f16qi4_source,
+        "a100_vulkan",
+        flags=COMMON_FLAGS
+        + [
+            "--iree-hal-target-backends=vulkan",
+            f"--iree-vulkan-target-triple=ampere-a100-linux",
+        ],
+    )
+
+
+@pytest.fixture
+def llama2_7b_f16qi4_sm80_cuda_vmfb(llama2_7b_f16qi4_source):
+    return iree_compile(
+        llama2_7b_f16qi4_source,
+        "sm80_cuda",
+        flags=COMMON_FLAGS
+        + [
+            "--iree-hal-target-backends=cuda",
+            f"--iree-hal-cuda-llvm-target-arch=sm_80",
+        ],
+    )
+
+
 ###############################################################################
 # Tests
 ###############################################################################
@@ -93,6 +119,52 @@ def test_step_host_cpu_stripped(llama2_7b_f16qi4_host_cpu_vmfb):
     iree_benchmark_module(
         llama2_7b_f16qi4_host_cpu_vmfb,
         device="local-task",
+        function="second_vicuna_forward",
+        args=[
+            "--input=1x1xi64",
+        ]
+        + (["--input=1x32x1x128xf16"] * 64),
+    )
+
+
+@pytest.mark.presubmit
+@pytest.mark.unstable_linalg
+@pytest.mark.plat_nvidia_a100
+def test_step_sm80_cuda_stripped(llama2_7b_f16qi4_sm80_cuda_vmfb):
+    iree_benchmark_module(
+        llama2_7b_f16qi4_sm80_cuda_vmfb,
+        device="cuda",
+        function="first_vicuna_forward",
+        args=[
+            "--input=1x1xi64",
+        ],
+    )
+    iree_benchmark_module(
+        llama2_7b_f16qi4_sm80_cuda_vmfb,
+        device="cuda",
+        function="second_vicuna_forward",
+        args=[
+            "--input=1x1xi64",
+        ]
+        + (["--input=1x32x1x128xf16"] * 64),
+    )
+
+
+@pytest.mark.presubmit
+@pytest.mark.unstable_linalg
+@pytest.mark.plat_nvidia_a100
+def test_step_a100_vulkan_stripped(llama2_7b_f16qi4_a100_vulkan_vmfb):
+    iree_benchmark_module(
+        llama2_7b_f16qi4_a100_vulkan_vmfb,
+        device="vulkan",
+        function="first_vicuna_forward",
+        args=[
+            "--input=1x1xi64",
+        ],
+    )
+    iree_benchmark_module(
+        llama2_7b_f16qi4_a100_vulkan_vmfb,
+        device="vulkan",
         function="second_vicuna_forward",
         args=[
             "--input=1x1xi64",
