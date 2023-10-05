@@ -402,7 +402,7 @@ class LoadedExecutableInstance {
 // created against an API.
 //===----------------------------------------------------------------------===//
 
-struct ClientInstance {
+class ClientInstance {
  public:
   ClientInstance(std::unique_ptr<Platform> platform);
   virtual ~ClientInstance();
@@ -461,6 +461,7 @@ struct ClientInstance {
 
  protected:
   iree_allocator_t host_allocator_;
+  iree_hal_driver_registry_t* driver_registry_ = nullptr;
   std::string cached_platform_name_;
   std::string cached_platform_version_;
 
