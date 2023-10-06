@@ -26,6 +26,22 @@ typedef struct iree_hal_allocator_t iree_hal_allocator_t;
 // Whole length of the underlying buffer.
 #define IREE_WHOLE_BUFFER ((iree_device_size_t)(-1))
 
+// A bitmap indicating logical device queue affinity.
+// Used to direct submissions to specific device queues or locate memory nearby
+// where it will be used. The meaning of the bits in the bitmap is
+// implementation-specific: a bit may represent a logical queue in an underlying
+// API such as a VkQueue or a physical queue such as a discrete virtual device.
+//
+// Bitwise operations can be performed on affinities; for example AND'ing two
+// affinities will produce the intersection and OR'ing will produce the union.
+// This enables just-in-time selection as a command buffer could be made
+// available to some set of queues when recorded and then AND'ed with an actual
+// set of queues to execute on during submission.
+typedef uint64_t iree_hal_queue_affinity_t;
+
+// Specifies that any queue may be selected.
+#define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))
+
 // A bitfield specifying properties for a memory type.
 enum iree_hal_memory_type_bits_t {
   IREE_HAL_MEMORY_TYPE_NONE = 0u,
@@ -797,6 +813,37 @@ IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
     iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_deferred_buffer_t
+//===----------------------------------------------------------------------===//
+
+// Creates a buffer with the given properties that has no backing storage.
+// The buffer can be passed around/retained/etc with just the reservation and
+// committed/decommitted on demand. All usage of the buffer beyond metadata
+// queries requires that it be committed.
+//
+// WARNING: commit/decommit are thread-compatible. Callers must ensure that no
+// threads try to use the buffer contents before a commit has completed and that
+// no threads still have access to the buffer contents prior to a decommit.
+IREE_API_EXPORT iree_status_t iree_hal_deferred_buffer_create_reserved(
+    iree_hal_allocator_t* device_allocator, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_queue_affinity_t queue_affinity, iree_device_size_t min_alignment,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+
+// Commits the backing storage of the |buffer| from its device allocator.
+// Ignored if the buffer is already committed.
+IREE_API_EXPORT iree_status_t
+iree_hal_deferred_buffer_commit(iree_hal_buffer_t* buffer);
+
+// Decommits the backing storage of the |buffer| and returns it to a
+// metadata-only state. No other threads must still have access to the buffer
+// contents.
+IREE_API_EXPORT void iree_hal_deferred_buffer_decommit(
+    iree_hal_buffer_t* buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_heap_buffer_t

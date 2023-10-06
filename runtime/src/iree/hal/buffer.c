@@ -151,6 +151,7 @@ IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocated_buffer);
   IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_buffer_t* buffer = NULL;
@@ -185,6 +186,10 @@ static iree_status_t iree_hal_subspan_buffer_map_range(
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
+  if (!buffer->allocated_buffer) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "buffer does not have committed storage");
+  }
   return _VTABLE_DISPATCH(buffer->allocated_buffer, map_range)(
       buffer->allocated_buffer, mapping_mode, memory_access, local_byte_offset,
       local_byte_length, mapping);
@@ -193,7 +198,10 @@ static iree_status_t iree_hal_subspan_buffer_map_range(
 static iree_status_t iree_hal_subspan_buffer_unmap_range(
     iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
-  if (!buffer->allocated_buffer) return iree_ok_status();
+  if (!buffer->allocated_buffer) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "buffer does not have committed storage");
+  }
   return _VTABLE_DISPATCH(buffer->allocated_buffer, unmap_range)(
       buffer->allocated_buffer, local_byte_offset, local_byte_length, mapping);
 }
@@ -201,6 +209,10 @@ static iree_status_t iree_hal_subspan_buffer_unmap_range(
 static iree_status_t iree_hal_subspan_buffer_invalidate_range(
     iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
+  if (!buffer->allocated_buffer) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "buffer does not have committed storage");
+  }
   return _VTABLE_DISPATCH(buffer->allocated_buffer, invalidate_range)(
       buffer->allocated_buffer, local_byte_offset, local_byte_length);
 }
@@ -208,6 +220,10 @@ static iree_status_t iree_hal_subspan_buffer_invalidate_range(
 static iree_status_t iree_hal_subspan_buffer_flush_range(
     iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
+  if (!buffer->allocated_buffer) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "buffer does not have committed storage");
+  }
   return _VTABLE_DISPATCH(buffer->allocated_buffer, flush_range)(
       buffer->allocated_buffer, local_byte_offset, local_byte_length);
 }
@@ -220,6 +236,72 @@ static const iree_hal_buffer_vtable_t iree_hal_subspan_buffer_vtable = {
     .invalidate_range = iree_hal_subspan_buffer_invalidate_range,
     .flush_range = iree_hal_subspan_buffer_flush_range,
 };
+
+//===----------------------------------------------------------------------===//
+// Deferred commit buffer
+//===----------------------------------------------------------------------===//
+
+typedef struct iree_hal_deferred_buffer_t {
+  iree_hal_buffer_t base;
+  iree_hal_queue_affinity_t queue_affinity;
+  iree_device_size_t min_alignment;
+} iree_hal_deferred_buffer_t;
+
+IREE_API_EXPORT iree_status_t iree_hal_deferred_buffer_create_reserved(
+    iree_hal_allocator_t* device_allocator, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_queue_affinity_t queue_affinity, iree_device_size_t min_alignment,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_deferred_buffer_t* buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer));
+  iree_hal_buffer_initialize(host_allocator, device_allocator, NULL,
+                             allocation_size, byte_offset, byte_length,
+                             memory_type, allowed_access, allowed_usage,
+                             &iree_hal_subspan_buffer_vtable, &buffer->base);
+  buffer->queue_affinity = queue_affinity;
+  buffer->min_alignment = min_alignment;
+  *out_buffer = &buffer->base;
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_deferred_buffer_commit(iree_hal_buffer_t* base_buffer) {
+  iree_hal_deferred_buffer_t* buffer = (iree_hal_deferred_buffer_t*)base_buffer;
+  if (IREE_UNLIKELY(base_buffer->allocated_buffer)) return iree_ok_status();
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_buffer_params_t params = {
+      .usage = base_buffer->allowed_usage,
+      .access = base_buffer->allowed_access,
+      .type = base_buffer->memory_type,
+      .queue_affinity = buffer->queue_affinity,
+      .min_alignment = buffer->min_alignment,
+  };
+  iree_status_t status = iree_hal_allocator_allocate_buffer(
+      base_buffer->device_allocator, params, base_buffer->allocation_size,
+      &base_buffer->allocated_buffer);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT void iree_hal_deferred_buffer_decommit(
+    iree_hal_buffer_t* buffer) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  if (IREE_LIKELY(buffer->allocated_buffer)) {
+    iree_hal_buffer_release(buffer->allocated_buffer);
+    buffer->allocated_buffer = NULL;
+  }
+  IREE_TRACE_ZONE_END(z0);
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_t
