@@ -465,13 +465,20 @@ static iree_status_t iree_hal_task_device_queue_execute(
   // NOTE: today we are not discriminating queues based on command type.
   iree_host_size_t queue_index = iree_hal_task_device_select_queue(
       device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  if (command_buffer_count == 0) {
+    // Fast-path for barriers (fork/join/sequence).
+    return iree_hal_task_queue_submit_barrier(&device->queues[queue_index],
+                                              wait_semaphore_list,
+                                              signal_semaphore_list);
+  }
   iree_hal_submission_batch_t batch = {
       .wait_semaphores = wait_semaphore_list,
       .signal_semaphores = signal_semaphore_list,
       .command_buffer_count = command_buffer_count,
       .command_buffers = command_buffers,
   };
-  return iree_hal_task_queue_submit(&device->queues[queue_index], 1, &batch);
+  return iree_hal_task_queue_submit_commands(&device->queues[queue_index], 1,
+                                             &batch);
 }
 
 static iree_status_t iree_hal_task_device_queue_flush(
