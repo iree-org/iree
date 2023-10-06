@@ -384,6 +384,13 @@ iree_hal_task_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL;
 }
 
+static iree_status_t iree_hal_task_device_issue_alloca(
+    void* user_context, iree_task_t* task,
+    iree_task_submission_t* pending_submission) {
+  iree_hal_buffer_t* buffer = (iree_hal_buffer_t*)user_context;
+  return iree_hal_deferred_buffer_commit(buffer);
+}
+
 static iree_status_t iree_hal_task_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -391,13 +398,70 @@ static iree_status_t iree_hal_task_device_queue_alloca(
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
-                                                    iree_infinite_timeout()));
-  IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(base_device),
-                                         params, allocation_size, out_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+
+  // Get the buffer parameters from the allocator. We need to do this now as
+  // once we return the buffer to the caller they may want to query the metadata
+  // and cannot wait until it's fully committed. We can also use this to quickly
+  // error out if the buffer can't be allocated for any reason other than memory
+  // availability (which we can't know until we try to commit).
+  iree_hal_buffer_params_t compat_params;
+  iree_hal_buffer_compatibility_t compatibility =
+      iree_hal_allocator_query_buffer_compatibility(
+          iree_hal_device_allocator(base_device), params, allocation_size,
+          &compat_params, &allocation_size);
+  if (!iree_all_bits_set(compatibility,
+                         IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)) {
+#if IREE_STATUS_MODE
+    iree_bitfield_string_temp_t temp0, temp1, temp2;
+    iree_string_view_t memory_type_str =
+        iree_hal_memory_type_format(params.type, &temp0);
+    iree_string_view_t usage_str =
+        iree_hal_buffer_usage_format(params.usage, &temp1);
+    iree_string_view_t compatibility_str =
+        iree_hal_buffer_compatibility_format(compatibility, &temp2);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "allocator cannot allocate a buffer with the given parameters; "
+        "memory_type=%.*s, usage=%.*s, compatibility=%.*s",
+        (int)memory_type_str.size, memory_type_str.data, (int)usage_str.size,
+        usage_str.data, (int)compatibility_str.size, compatibility_str.data);
+#else
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "allocator cannot allocate a buffer with the given parameters");
+#endif  // IREE_STATUS_MODE
+  }
+
+  // Synchronously reserve buffer metadata. Does not commit the memory.
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_deferred_buffer_create_reserved(
+      iree_hal_device_allocator(base_device), allocation_size, 0,
+      allocation_size, compat_params.type, compat_params.access,
+      compat_params.usage, compat_params.queue_affinity,
+      compat_params.min_alignment, device->host_allocator, &buffer));
+
+  // Enqueue commit of the buffer memory.
+  iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  iree_status_t status = iree_hal_task_queue_submit_callback(
+      &device->queues[queue_index], wait_semaphore_list, signal_semaphore_list,
+      1, (iree_hal_resource_t* const*)&buffer,
+      iree_task_make_call_closure(iree_hal_task_device_issue_alloca, buffer));
+
+  if (iree_status_is_ok(status)) {
+    *out_buffer = buffer;
+  } else {
+    iree_hal_buffer_release(buffer);
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_task_device_issue_dealloca(
+    void* user_context, iree_task_t* task,
+    iree_task_submission_t* pending_submission) {
+  iree_hal_buffer_t* buffer = (iree_hal_buffer_t*)user_context;
+  iree_hal_deferred_buffer_decommit(buffer);
   return iree_ok_status();
 }
 
@@ -406,10 +470,13 @@ static iree_status_t iree_hal_task_device_queue_dealloca(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_buffer_t* buffer) {
-  // TODO(benvanik): queue-ordered allocations.
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
-      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list));
-  return iree_ok_status();
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  iree_host_size_t queue_index = iree_hal_task_device_select_queue(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  return iree_hal_task_queue_submit_callback(
+      &device->queues[queue_index], wait_semaphore_list, signal_semaphore_list,
+      1, (iree_hal_resource_t* const*)&buffer,
+      iree_task_make_call_closure(iree_hal_task_device_issue_dealloca, buffer));
 }
 
 static iree_status_t iree_hal_task_device_queue_read(
