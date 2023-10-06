@@ -1300,7 +1300,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   // Current warp reduction pattern is a two step butterfly warp reduce.
   // First, do warp reductions along multiple subgroups.
   // Second, reduce results from multiple subgroups using single warp reduce.
-  // The final warp reduce requires subgroup count > subgroup size to work.
+  // The final warp reduce requires subgroup count <= subgroup size to work.
   if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
 

@@ -895,6 +895,13 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     *parallelSize /= 2;
   }
 
+  // Current warp reduction pattern is a two step butterfly warp reduce.
+  // First, do warp reductions along multiple subgroups.
+  // Second, reduce results from multiple subgroups using single warp reduce.
+  // The final warp reduce requires subgroup count <= subgroup size to work.
+  if ((groupSize / cudaWarpSize) > cudaWarpSize)
+    return failure();
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
