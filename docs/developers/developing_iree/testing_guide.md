@@ -392,11 +392,3 @@ our `CMakeLists.txt` file by
 There are other test targets that generate tests based on template configuraton
 and platform detection, such as `iree_static_linker_test`. Those targets are
 not supported by Bazel rules at this point.
-
-## Binding Tests
-
-TODO(laurenzo): Explain binding test setup.
-
-## Integration Tests
-
-TODO(silvasean): Explain integration test setup.
