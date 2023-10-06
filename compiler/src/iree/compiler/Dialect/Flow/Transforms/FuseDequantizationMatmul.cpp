@@ -68,7 +68,6 @@ static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
     }
     if (failed(maybeFusedFillRegionOp))
       return failure();
-    (*maybeFusedFillRegionOp)->getParentOp()->dump();
   }
 
   return success();
