@@ -1,5 +1,4 @@
 ---
-status: new
 icon: material/lightbulb-on
 ---
 

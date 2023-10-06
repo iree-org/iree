@@ -70,7 +70,7 @@ extra:
       name: IREE Discuss Google Group
 
   status:
-    new: Recently added
+    new: Recently updated
 
 extra_css:
   - assets/stylesheets/extra.css
