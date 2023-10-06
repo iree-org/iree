@@ -390,32 +390,35 @@ static bool isUnaryNegate(linalg::GenericOp op) {
 // it as a single linalg generic. For example, this will match sequences like
 // the following:
 //
-// clang-format off
-//
-//   %extracted_slice = tensor.extract_slice %0[0, ..., 0] [..., 64] [1, ..., 1] : tensor<...x128xf16> to tensor<...x64xf16>
-//   %extracted_slice_0 = tensor.extract_slice %0[0, ..., 64] [..., 64] [1, ..., 1] : tensor<...x128xf16> to tensor<...x64xf16>
+//   %slice_0 = tensor.extract_slice %0[0, ..., 0] [..., 64] [1, ..., 1]
+//                           : tensor<...x128xf16> to tensor<...x64xf16>
+//   %slice_1 = tensor.extract_slice %0[0, ..., 64] [..., 64] [1, ..., 1]
+//                            : tensor<...x128xf16> to tensor<...x64xf16>
 //   %3 = linalg.generic {
-//         indexing_maps = [affine_map<(d0, ..., dn-1) -> (d0, ..., dn-1)>, affine_map<(d0, ..., dn-1) -> (d0, ..., dn-1)>],
+//         indexing_maps = [affine_map<(d0, ..., dn-1) -> (d0, ..., dn-1)>,
+//                          affine_map<(d0, ..., dn-1) -> (d0, ..., dn-1)>],
 //         iterator_types = [n-1 x "parallel"]}
-//      ins(%extracted_slice_0 : tensor<...x64xf16>) outs(%2 : tensor<...x64xf16>) {
+//      ins(%slice_1 : tensor<...x64xf16>) outs(%2 : tensor<...x64xf16>) {
 //   ^bb0(%in: f16, %out: f16):
 //     %5 = arith.negf %in : f16
-//     linalg.yield %5 : f16 
+//     linalg.yield %5 : f16
 //   } -> tensor<...x64xf16>
-//   %inserted_slice = tensor.insert_slice %3 into %1[0, ..., 0] [..., 64] [1, ..., 1] : tensor<...x64xf16> into tensor<...x128xf16>
-//   %inserted_slice_1 = tensor.insert_slice %extracted_slice into %inserted_slice[0, ..., 64] [..., 64] [1, ..., 1] : tensor<...x64xf16> into tensor<...x128xf16>
-//
-// clang-format on
+//   %in_slice_0 = tensor.insert_slice %3 into
+//                    %1[0, ..., 0] [..., 64] [1, ..., 1]
+//                    : tensor<...x64xf16> into tensor<...x128xf16>
+//   %in_slice_1 = tensor.insert_slice %slice_0 into
+//                    %in_slice_0[0, ..., 64] [..., 64] [1, ..., 1]
+//                    : tensor<...x64xf16> into tensor<...x128xf16>
 //
 // Where the input tensor is broken down along the inner most dimension, then
 // the bottom elements are negated and the tensor is reconstructed, reversing
 // the order of the slices. This is then rewritten as
 //
-// clang-format off
-//
-//   %expanded = tensor.expand_shape %0 [[0], ..., [n-1, n]] : tensor<...x128xf16> into tensor<...x2x64xf16>
+//   %expanded = tensor.expand_shape %0 [[0], ..., [n-1, n]]
+//                      : tensor<...x128xf16> into tensor<...x2x64xf16>
 //   %2 = linalg.generic {
-//         indexing_maps = [affine_map<(d0, ..., dn-1, dn) -> (d0, ..., dn-1, dn)>],
+//         indexing_maps = [
+//                     affine_map<(d0, ..., dn-1, dn) -> (d0, ..., dn-1, dn)>],
 //         iterator_types = [n x "parallel"]
 //      } outs(%output : tensor<...x2x64xf16>) {
 //   ^bb0(%out: f16):
@@ -424,15 +427,15 @@ static bool isUnaryNegate(linalg::GenericOp op) {
 //     %in-1 = linalg.index n-1 : index
 //     %in   = linalg.index n : index
 //     %rev = arith.subi %c1, %in-1 : index
-//     %extracted = tensor.extract %expanded[%i0, ..., %rev, %in] : tensor<...x2x64xf16>
+//     %extracted = tensor.extract %expanded[%i0, ..., %rev, %in]
+//                                         : tensor<...x2x64xf16>
 //     %neg = arith.negf %extracted : f16
 //     %cmp = arith.cmpi eq, %in-1, %c1 : index
 //     %sel = arith.select %cmp, %neg, %extracted : f16
 //     linalg.yield %sel : f16
 //   } -> tensor<...x2x64xf16>
-//   %collapsed = tensor.collapse_shape %2 [[0], ..., [n-1, n]] : tensor<...x2x64xf16> into tensor<...x128xf16>
-//
-// clang-format on
+//   %collapsed = tensor.collapse_shape %2 [[0], ..., [n-1, n]]
+//              : tensor<...x2x64xf16> into tensor<...x128xf16>
 static std::optional<Value>
 matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
   /// First match against the desired op chain.
@@ -468,7 +471,7 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
   }
 
   auto sourceType = source.getType().dyn_cast<RankedTensorType>();
-  if (!sourceType) {
+  if (!sourceType || sourceType.getRank() == 0) {
     return std::nullopt;
   }
 
@@ -518,15 +521,13 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
   return source;
 }
 
-static void rewriteCatNegateAndSlice(RewriterBase &rewriter,
-                                     tensor::InsertSliceOp sliceOp,
-                                     Value source) {
+static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
+                                      tensor::InsertSliceOp sliceOp,
+                                      Value source) {
   rewriter.setInsertionPoint(sliceOp);
   Location loc = source.getLoc();
-  auto sourceType = dyn_cast<RankedTensorType>(source.getType());
-  if (!sourceType || sourceType.getRank() == 0) {
-    return;
-  }
+  /// The matcher checks that this cast is valid.
+  auto sourceType = cast<RankedTensorType>(source.getType());
 
   SmallVector<int64_t> targetShape(sourceType.getShape());
   SmallVector<ReassociationIndices> reassoc;
@@ -557,45 +558,42 @@ static void rewriteCatNegateAndSlice(RewriterBase &rewriter,
   SmallVector<utils::IteratorType> iteratorTypes(targetShape.size(),
                                                  utils::IteratorType::parallel);
 
-  Value result =
-      rewriter
-          .create<linalg::GenericOp>(
-              loc, outTensor.getType(), ValueRange(), outTensor, indexingMaps,
-              iteratorTypes,
-              [&](OpBuilder &b, Location loc, ValueRange args) {
-                SmallVector<Value> extractionIndices;
-                for (size_t i = 0, e = targetShape.size(); i < e; ++i) {
-                  extractionIndices.push_back(
-                      b.create<linalg::IndexOp>(loc, i));
-                }
+  auto bodyBuilder = [&](OpBuilder &b, Location loc, ValueRange args) {
+    SmallVector<Value> extractionIndices;
+    for (size_t i = 0, e = targetShape.size(); i < e; ++i) {
+      extractionIndices.push_back(b.create<linalg::IndexOp>(loc, i));
+    }
 
-                Value c1 = rewriter.create<arith::ConstantOp>(
-                    loc, rewriter.getIndexAttr(1));
+    Value c1 =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(1));
 
-                // Take the reverse of the second to last iterator.
-                // Because we statically guaranteed it to be 2 it just
-                // becomes `1 - iters[-2]`.
-                Value reverseSplitIdx = rewriter.create<arith::SubIOp>(
-                    loc, c1, extractionIndices[targetShape.size() - 2]);
-                extractionIndices[targetShape.size() - 2] = reverseSplitIdx;
+    // Take the reverse of the second to last iterator. Because we statically
+    // guaranteed it to be 2 it just becomes `1 - iters[-2]`.
+    Value reverseSplitIdx = rewriter.create<arith::SubIOp>(
+        loc, c1, extractionIndices[targetShape.size() - 2]);
+    extractionIndices[targetShape.size() - 2] = reverseSplitIdx;
 
-                // Extract the value from input tensor and negate the top
-                // top half of the result slice (lower half of the input
-                // slice).
-                Value inputVal = b.create<tensor::ExtractOp>(loc, expanded,
-                                                             extractionIndices);
-                Value maybeNegate = b.create<arith::NegFOp>(loc, inputVal);
+    // Extract the value from input tensor and negate the top half of the result
+    // slice (lower half of the input slice).
+    Value inputVal =
+        b.create<tensor::ExtractOp>(loc, expanded, extractionIndices);
+    Value maybeNegate = b.create<arith::NegFOp>(loc, inputVal);
 
-                Value isEqual = b.create<arith::CmpIOp>(
-                    loc, arith::CmpIPredicate::eq, reverseSplitIdx, c1);
-                Value select = rewriter.create<arith::SelectOp>(
-                    loc, isEqual, maybeNegate, inputVal);
-                b.create<linalg::YieldOp>(loc, select);
-              })
-          .getResult(0);
+    Value isEqual = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                            reverseSplitIdx, c1);
+    Value select =
+        rewriter.create<arith::SelectOp>(loc, isEqual, maybeNegate, inputVal);
+    b.create<linalg::YieldOp>(loc, select);
+  };
 
-  rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
-      sliceOp, sliceOp.getType(), result, reassoc);
+  Value result = rewriter
+                     .create<linalg::GenericOp>(
+                         loc, outTensor.getType(), ValueRange(), outTensor,
+                         indexingMaps, iteratorTypes, bodyBuilder)
+                     .getResult(0);
+
+  return rewriter.create<tensor::CollapseShapeOp>(loc, sliceOp.getType(),
+                                                  result, reassoc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -665,12 +663,10 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
 
     SmallVector<std::pair<tensor::InsertSliceOp, Value>> catNegateAndSliceRoots;
     getOperation()->walk([&](tensor::InsertSliceOp op) {
-      {
-        if (std::optional<Value> catNegateAndSliceRoot =
-                matchCatNegateAndSlice(op)) {
-          catNegateAndSliceRoots.push_back(
-              std::make_pair(op, catNegateAndSliceRoot.value()));
-        }
+      if (std::optional<Value> catNegateAndSliceRoot =
+              matchCatNegateAndSlice(op)) {
+        catNegateAndSliceRoots.push_back(
+            std::make_pair(op, catNegateAndSliceRoot.value()));
       }
     });
 
@@ -715,8 +711,10 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
     }
     for (std::pair<tensor::InsertSliceOp, Value> catNegateAndSlice :
          catNegateAndSliceRoots) {
-      rewriteCatNegateAndSlice(rewriter, catNegateAndSlice.first,
-                               catNegateAndSlice.second);
+      auto sliceOp = catNegateAndSlice.first;
+      Value res =
+          rewriteCatNegateAndSlice(rewriter, sliceOp, catNegateAndSlice.second);
+      rewriter.replaceOp(sliceOp, res);
     }
   }
 };
