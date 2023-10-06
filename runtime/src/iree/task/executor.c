@@ -173,6 +173,10 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
 
     iree_task_affinity_set_t worker_mask =
         iree_task_affinity_set_ones(worker_count);
+    iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
+                                        worker_mask, iree_memory_order_release);
+    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
+                                        worker_mask, iree_memory_order_release);
 
     for (iree_host_size_t i = 0; i < worker_count; ++i) {
       const iree_task_topology_group_t* group =
@@ -187,11 +191,6 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
       worker_local_memory += worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
-
-    iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
-                                        worker_mask, iree_memory_order_release);
-    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
-                                        worker_mask, iree_memory_order_release);
   }
 
   if (!iree_status_is_ok(status)) {
