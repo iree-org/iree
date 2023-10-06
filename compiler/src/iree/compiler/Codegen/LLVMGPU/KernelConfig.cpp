@@ -785,31 +785,24 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   if (!isa<linalg::GenericOp>(op))
     return failure();
-  // TODO: Enable dynamic shape.
-  auto walkResult = entryPoint.walk([](linalg::LinalgOp op) {
-    using utils::IteratorType;
-    SmallVector<IteratorType, 4> kinds = op.getIteratorTypesArray();
-    SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-    for (auto [kind, bound] : llvm::zip_equal(kinds, bounds)) {
-      if (kind == IteratorType::reduction && ShapedType::isDynamic(bound))
-        return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  if (walkResult.wasInterrupted()) {
-    return failure();
-  }
+
+  SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+
   if (reductionDims.empty())
     return failure();
 
-  // Make sure reduction dimensions are the innermost ones.
-  int64_t numParallelDims = op.getNumParallelLoops();
-  if (llvm::any_of(reductionDims, [&](int64_t reductionDim) {
-        return reductionDim < numParallelDims;
-      })) {
-    return failure();
+  // Make sure reduction dimensions are static and innermost ones.
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim]))
+      return failure();
+    if (dim < numParallelDims)
+      return failure();
   }
 
   if (op.getRegionOutputArgs().size() != 1)
@@ -817,7 +810,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
 
   // Only support projected permutation, this could be extended to projected
   // permutated with broadcast.
-
   if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
         return !op.getMatchingIndexingMap(input).isProjectedPermutation();
       }))
@@ -840,11 +832,10 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if (!foundSingleReductionOutput)
     return failure();
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-  int64_t dimSize = 1;
+  int64_t reductionSize = 1;
   for (int64_t dim : reductionDims)
-    dimSize *= bounds[dim];
-  if (dimSize % cudaWarpSize != 0)
+    reductionSize *= bounds[dim];
+  if (reductionSize % cudaWarpSize != 0)
     return failure();
 
   const Type elementType =
@@ -859,17 +850,58 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
 
   const unsigned largestLoadSizeInBits = 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
-  while ((dimSize / vectorSize) % cudaWarpSize != 0)
+  while ((reductionSize / vectorSize) % cudaWarpSize != 0)
     vectorSize /= 2;
 
-  // TODO: Add reduction tiling to handle larger reductions.
+  // Deduce the workgroup size we should use for reduction. Currently a
+  // workgroup processes all elements in reduction dimensions. Need to make sure
+  // the workgroup size we use can divide the total reduction size, and it's
+  // also within hardware limitations.
   const int64_t maxWorkgroupSize = 1024;
-  int64_t groupSize = dimSize / vectorSize;
+  int64_t groupSize = reductionSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
   }
+
+  // Then we need to strike a balance--
+  // 1) parallel dimensions are distributed to workgroups. If there are many
+  //    workgroups dispatched, we'd want to have each GPU core hosting multiple
+  //    of them for occupancy.
+  // 2) we want each thread to read quite a few 128-bit vectors for better
+  //    memory cache behavior.
+  // Both means we cannot use a too large workgroup size.
+
+  std::optional<int64_t> parallelSize = 1;
+  for (int64_t dim : parallelDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      parallelSize = std::nullopt;
+      break;
+    }
+    *parallelSize *= bounds[dim];
+  }
+  // Total parallel size that can fill the GPU with enough workgorups.
+  // TODO: query from the target device; roughly 2x hardware compute unit.
+  int parallelThreshold = 256;
+  // How many 128-bit vectors each thread should at least read.
+  const int targetVectorCount = 8;
+  while (parallelSize && *parallelSize > parallelThreshold &&
+         (groupSize / 2) % cudaWarpSize == 0 &&
+         reductionSize / (groupSize * vectorSize) < targetVectorCount) {
+    // Use less subgroups per workgroup..
+    groupSize /= 2;
+    // in order to host more workgroups per hardware compute unit.
+    *parallelSize /= 2;
+  }
+
+  // Current warp reduction pattern is a two step butterfly warp reduce.
+  // First, do warp reductions along multiple subgroups.
+  // Second, reduce results from multiple subgroups using single warp reduce.
+  // The final warp reduce requires subgroup count <= subgroup size to work.
+  if ((groupSize / cudaWarpSize) > cudaWarpSize)
+    return failure();
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
