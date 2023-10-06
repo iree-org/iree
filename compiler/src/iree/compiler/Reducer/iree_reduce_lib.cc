@@ -17,7 +17,7 @@ Operation *mlir::iree_compiler::Reducer::ireeRunReducingStrategies(
     OwningOpRef<Operation *> module, ReducerConfig &config) {
   ModuleOp root = dyn_cast<ModuleOp>(module.release());
   WorkItem workItem(root);
-  Oracle oracle(config.testScript, config.useByteCode);
+  Oracle oracle(config.testScript, config.useBytecode);
   Delta delta(oracle, workItem);
 
   delta.runDeltaPass(reduceFlowDispatchOperandToResultDelta,

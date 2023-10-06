@@ -30,7 +30,7 @@ bool Oracle::isInteresting(WorkItem &workItem) {
   // Print module to a temporary file.
   SmallString<128> filepath;
   int fd;
-  std::string extension = useByteCode ? "mlirbc" : "mlir";
+  std::string extension = useBytecode ? "mlirbc" : "mlir";
   std::error_code ec =
       llvm::sys::fs::createTemporaryFile("oracle", extension, fd, filepath);
 
@@ -41,7 +41,7 @@ bool Oracle::isInteresting(WorkItem &workItem) {
 
   llvm::ToolOutputFile output(filepath, fd);
 
-  if (useByteCode) {
+  if (useBytecode) {
     // Write bytecode to file.
     BytecodeWriterConfig config;
     LogicalResult result =

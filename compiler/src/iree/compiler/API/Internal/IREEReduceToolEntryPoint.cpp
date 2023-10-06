@@ -65,12 +65,12 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
       cl::value_desc("filename"), cl::init("-"),
       llvm::cl::cat(ireeReduceCategory));
 
-  cl::opt<bool> useByteCodeForTesting(
+  cl::opt<bool> useBytecodeForTesting(
       "use-bytecode",
       cl::desc("Use bytecode as input to the interesting script."),
       cl::init(false), llvm::cl::cat(ireeReduceCategory));
 
-  cl::opt<bool> outputAsByteCode(
+  cl::opt<bool> outputAsBytecode(
       "output-bytecode", cl::desc("Output the final output as bytecode."),
       cl::init(false), llvm::cl::cat(ireeReduceCategory));
 
@@ -98,11 +98,11 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
     return failure();
   }
 
-  ReducerConfig config(testScript, useByteCodeForTesting);
+  ReducerConfig config(testScript, useBytecodeForTesting);
   Operation *newModule = ireeRunReducingStrategies(std::move(module), config);
   module = OwningOpRef<Operation *>(newModule);
 
-  if (outputAsByteCode) {
+  if (outputAsBytecode) {
     // Write bytecode to output file.
     BytecodeWriterConfig config;
     LogicalResult result =
