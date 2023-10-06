@@ -365,12 +365,6 @@ static FailureOr<Operation *> tryRaiseToView(linalg::GenericOp linalgOp,
 
 static bool isUnaryNegate(linalg::GenericOp op) {
   auto block = op.getBlock();
-
-  if (block->empty() ||
-      !block->back().mightHaveTrait<OpTrait::IsTerminator>()) {
-    return false;
-  }
-
   if (block->getNumArguments() != 2) {
     return false;
   }
@@ -443,15 +437,11 @@ static std::optional<Value>
 matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
   /// First match against the desired op chain.
   auto topHalf = insertOp.getSource().getDefiningOp<tensor::ExtractSliceOp>();
-  if (!topHalf || !topHalf->hasOneUse()) {
+  if (!topHalf) {
     return std::nullopt;
   }
   auto dest = insertOp.getDest().getDefiningOp<tensor::InsertSliceOp>();
-  if (!dest || !dest->hasOneUse()) {
-    return std::nullopt;
-  }
-  auto outEmpty = dest.getDest().getDefiningOp<tensor::EmptyOp>();
-  if (!outEmpty) {
+  if (!dest) {
     return std::nullopt;
   }
 
@@ -464,7 +454,7 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
 
   auto bottomHalf =
       negate.getDpsInputs()[0].getDefiningOp<tensor::ExtractSliceOp>();
-  if (!bottomHalf || !bottomHalf->hasOneUse()) {
+  if (!bottomHalf) {
     return std::nullopt;
   }
   Value source = topHalf.getSource();
@@ -473,7 +463,7 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
   }
 
   /// Require that the overall operation isn't changing the tensor shape.
-  if (source.getType() != outEmpty.getType()) {
+  if (source.getType() != dest.getType()) {
     return std::nullopt;
   }
 
@@ -509,11 +499,11 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
     }
   }
 
-  /// Note that we already verified all offsets, sizes, and strides are the same
-  /// for the final insert and bottom extract, so this checks both.
+  /// Verify that the final InsertSlice has zero offsets for all except the
+  /// inner most dim.
   SmallVector<OpFoldResult> insertOffsets = insertOp.getMixedOffsets();
   for (int i = 0, e = insertOffsets.size() - 1; i < e; ++i) {
-    if (getConstantIntValue(insertOffsets[i]) != static_cast<int64_t>(0)) {
+    if (!isConstantIntValue(insertOffsets[i], 0)) {
       return std::nullopt;
     }
   }
@@ -526,6 +516,86 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
   }
 
   return source;
+}
+
+static void rewriteCatNegateAndSlice(RewriterBase &rewriter,
+                                     tensor::InsertSliceOp sliceOp,
+                                     Value source) {
+  rewriter.setInsertionPoint(sliceOp);
+  Location loc = source.getLoc();
+  auto sourceType = dyn_cast<RankedTensorType>(source.getType());
+  if (!sourceType || sourceType.getRank() == 0) {
+    return;
+  }
+
+  SmallVector<int64_t> targetShape(sourceType.getShape());
+  SmallVector<ReassociationIndices> reassoc;
+  for (int i = 0, e = targetShape.size(); i < e; i++) {
+    reassoc.push_back(ReassociationIndices{i});
+  }
+  reassoc.back().push_back(targetShape.size());
+
+  /// Note that because we've verified the pair of slices is exactly half
+  /// of the whole inner most extent, the sliceSize is necessarily
+  /// divisible by 2.
+  int64_t sliceSize = targetShape.back();
+  targetShape[targetShape.size() - 1] = 2;
+  targetShape.push_back(sliceSize == ShapedType::kDynamic ? sliceSize
+                                                          : sliceSize / 2);
+  Type expandedType =
+      RankedTensorType::get(targetShape, sourceType.getElementType());
+  Value expanded = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
+                                                          source, reassoc);
+
+  Value outTensor =
+      sliceOp.getDest().getDefiningOp<tensor::InsertSliceOp>().getDest();
+  outTensor = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
+                                                     outTensor, reassoc);
+
+  SmallVector<AffineMap> indexingMaps = {
+      rewriter.getMultiDimIdentityMap(targetShape.size())};
+  SmallVector<utils::IteratorType> iteratorTypes(targetShape.size(),
+                                                 utils::IteratorType::parallel);
+
+  Value result =
+      rewriter
+          .create<linalg::GenericOp>(
+              loc, outTensor.getType(), ValueRange(), outTensor, indexingMaps,
+              iteratorTypes,
+              [&](OpBuilder &b, Location loc, ValueRange args) {
+                SmallVector<Value> extractionIndices;
+                for (size_t i = 0, e = targetShape.size(); i < e; ++i) {
+                  extractionIndices.push_back(
+                      b.create<linalg::IndexOp>(loc, i));
+                }
+
+                Value c1 = rewriter.create<arith::ConstantOp>(
+                    loc, rewriter.getIndexAttr(1));
+
+                // Take the reverse of the second to last iterator.
+                // Because we statically guaranteed it to be 2 it just
+                // becomes `1 - iters[-2]`.
+                Value reverseSplitIdx = rewriter.create<arith::SubIOp>(
+                    loc, c1, extractionIndices[targetShape.size() - 2]);
+                extractionIndices[targetShape.size() - 2] = reverseSplitIdx;
+
+                // Extract the value from input tensor and negate the top
+                // top half of the result slice (lower half of the input
+                // slice).
+                Value inputVal = b.create<tensor::ExtractOp>(loc, expanded,
+                                                             extractionIndices);
+                Value maybeNegate = b.create<arith::NegFOp>(loc, inputVal);
+
+                Value isEqual = b.create<arith::CmpIOp>(
+                    loc, arith::CmpIPredicate::eq, reverseSplitIdx, c1);
+                Value select = rewriter.create<arith::SelectOp>(
+                    loc, isEqual, maybeNegate, inputVal);
+                b.create<linalg::YieldOp>(loc, select);
+              })
+          .getResult(0);
+
+  rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
+      sliceOp, sliceOp.getType(), result, reassoc);
 }
 
 //===----------------------------------------------------------------------===//
@@ -645,83 +715,8 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
     }
     for (std::pair<tensor::InsertSliceOp, Value> catNegateAndSlice :
          catNegateAndSliceRoots) {
-      auto sliceOp = catNegateAndSlice.first;
-      rewriter.setInsertionPoint(sliceOp);
-      Value source = catNegateAndSlice.second;
-      Location loc = source.getLoc();
-      auto sourceType = dyn_cast<RankedTensorType>(source.getType());
-      if (!sourceType || sourceType.getRank() == 0) {
-        continue;
-      }
-
-      SmallVector<int64_t> targetShape(sourceType.getShape());
-      SmallVector<ReassociationIndices> reassoc;
-      for (int i = 0, e = targetShape.size(); i < e; i++) {
-        reassoc.push_back(ReassociationIndices{i});
-      }
-      reassoc.back().push_back(targetShape.size());
-
-      /// Note that because we've verified the pair of slices is exactly half
-      /// of the whole inner most extent, the sliceSize is necessarily
-      /// divisible by 2.
-      int64_t sliceSize = targetShape.back();
-      targetShape[targetShape.size() - 1] = 2;
-      targetShape.push_back(sliceSize == ShapedType::kDynamic ? sliceSize
-                                                              : sliceSize / 2);
-      Type expandedType =
-          RankedTensorType::get(targetShape, sourceType.getElementType());
-      Value expanded = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
-                                                              source, reassoc);
-
-      Value outTensor =
-          sliceOp.getDest().getDefiningOp<tensor::InsertSliceOp>().getDest();
-      outTensor = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
-                                                         outTensor, reassoc);
-
-      SmallVector<AffineMap> indexingMaps = {
-          rewriter.getMultiDimIdentityMap(targetShape.size())};
-      SmallVector<utils::IteratorType> iteratorTypes(
-          targetShape.size(), utils::IteratorType::parallel);
-
-      Value result =
-          rewriter
-              .create<linalg::GenericOp>(
-                  loc, outTensor.getType(), ValueRange(), outTensor,
-                  indexingMaps, iteratorTypes,
-                  [&](OpBuilder &b, Location loc, ValueRange args) {
-                    SmallVector<Value> extractionIndices;
-                    for (size_t i = 0, e = targetShape.size(); i < e; ++i) {
-                      extractionIndices.push_back(
-                          b.create<linalg::IndexOp>(loc, i));
-                    }
-
-                    Value c1 = rewriter.create<arith::ConstantOp>(
-                        loc, rewriter.getIndexAttr(1));
-
-                    // Take the reverse of the second to last iterator.
-                    // Because we statically guaranteed it to be 2 it just
-                    // becomes `1 - iters[-2]`.
-                    Value reverseSplitIdx = rewriter.create<arith::SubIOp>(
-                        loc, c1, extractionIndices[targetShape.size() - 2]);
-                    extractionIndices[targetShape.size() - 2] = reverseSplitIdx;
-
-                    // Extract the value from input tensor and negate the top
-                    // top half of the result slice (lower half of the input
-                    // slice).
-                    Value inputVal = b.create<tensor::ExtractOp>(
-                        loc, expanded, extractionIndices);
-                    Value maybeNegate = b.create<arith::NegFOp>(loc, inputVal);
-
-                    Value isEqual = b.create<arith::CmpIOp>(
-                        loc, arith::CmpIPredicate::eq, reverseSplitIdx, c1);
-                    Value select = rewriter.create<arith::SelectOp>(
-                        loc, isEqual, maybeNegate, inputVal);
-                    b.create<linalg::YieldOp>(loc, select);
-                  })
-              .getResult(0);
-
-      rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
-          sliceOp, sliceOp.getType(), result, reassoc);
+      rewriteCatNegateAndSlice(rewriter, catNegateAndSlice.first,
+                               catNegateAndSlice.second);
     }
   }
 };
