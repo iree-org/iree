@@ -92,12 +92,12 @@ struct LLVMCPUTileAndFusePass : LLVMCPUTileAndFuseBase<LLVMCPUTileAndFusePass> {
 };
 
 LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
+                               DominanceInfo &dominanceInfo,
                                scf::SCFTilingOptions options) {
   llvm::SmallDenseSet<Operation *> origTiledAndFusedOps;
   collectTiledAndFusedOps(rootOp, origTiledAndFusedOps);
   auto isIgnoredUser = [&](Operation *user, scf::ForOp outerMostTiledLoop) {
-    return origTiledAndFusedOps.count(user) || isa<tensor::DimOp>(user) ||
-           outerMostTiledLoop->isAncestor(user);
+    return origTiledAndFusedOps.count(user) || isa<tensor::DimOp>(user);
   };
 
   // The rest of this method is similar to
@@ -184,7 +184,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     // to be yielded from within the tiled loop.
     OpResult untiledProducer = fusedProducer->origProducer;
     if (llvm::any_of(untiledProducer.getUsers(), [&](Operation *user) {
-          return !isIgnoredUser(user, forLoops.front());
+          return !isIgnoredUser(user, forLoops.front()) &&
+                 !forLoops.front()->isAncestor(user);
+          ;
         })) {
       yieldReplacementForFusedProducer(rewriter, candidateSliceOp,
                                        fusedProducer.value(), forLoops);
@@ -202,7 +204,8 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   for (auto [index, origVal] : llvm::enumerate(yieldedValuesToOrigValues)) {
     Value replacement = outermostLoop.getResult(index);
     rewriter.replaceUsesWithIf(origVal, replacement, [&](OpOperand &use) {
-      return !isIgnoredUser(use.getOwner(), outermostLoop);
+      return !isIgnoredUser(use.getOwner(), outermostLoop) &&
+             dominanceInfo.properlyDominates(outermostLoop, use.getOwner());
     });
   }
 
@@ -259,8 +262,9 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
 
   SmallVector<OpFoldResult> tileSizesOfr =
       getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
+  DominanceInfo dominanceInfo(funcOp);
   auto options = scf::SCFTilingOptions().setTileSizes(tileSizesOfr);
-  if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
+  if (failed(applyTileAndFuse(rewriter, consumerOp, dominanceInfo, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
     return signalPassFailure();
   }
