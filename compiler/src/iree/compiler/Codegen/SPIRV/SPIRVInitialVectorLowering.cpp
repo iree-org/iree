@@ -4,29 +4,23 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- SPIRVVectorLoweringPass.cpp
-//-------------------------------------------------===//
+//===- SPIRVInitialVectorLowering.cpp -------------------------------------===//
 //
-// This pass vectorizes Linalg ops with buffer semantics.
+// This pass hosts initial steps towards lowering vectors ops to meet SPIR-V
+// requirements--it applies vector lowering patterns to unroll large n-D vectors
+// to 1-D ones that are directly in SPIR-V.
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -35,18 +29,23 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-spirv-vector-lowering"
+#define DEBUG_TYPE "iree-spirv-initial-vector-lowering"
 
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
+void debugPrint(func::FuncOp funcOp, const char *message) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- " << message << " ---//\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+}
 
 int getComputeVectorSize(int64_t size) {
   for (int i : {4, 3, 2}) {
@@ -286,13 +285,9 @@ bool supportsIntegerDotProductOps(func::FuncOp fn) {
   return true;
 }
 
-/// Vectorizes Linalg ops on buffer semantics.
-class SPIRVVectorLoweringPass
-    : public SPIRVVectorLoweringBase<SPIRVVectorLoweringPass> {
+class SPIRVInitialLoweringPass
+    : public SPIRVInitialVectorLoweringBase<SPIRVInitialLoweringPass> {
 public:
-  SPIRVVectorLoweringPass() = default;
-  SPIRVVectorLoweringPass(const SPIRVVectorLoweringPass &pass) = default;
-
   void getDependentDialects(DialectRegistry &registry) const override {
     // vector.gather lowering patterns target scf ops.
     registry.insert<linalg::LinalgDialect, vector::VectorDialect,
@@ -316,11 +311,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After IREE tensor.pad vectorization ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after vectorizing tensor.pad");
 
     // Special peephole optimizations to clean up IR before further processing.
     {
@@ -342,11 +333,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After peephole optimization ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after peephole optimization");
 
     // High dimension contraction can appear after vectorizing ops like 1-D
     // convolution. Those 1-D convolution ops typically have a leading unit
@@ -362,11 +349,7 @@ public:
       (void)vector::castAwayContractionLeadingOneDim(op, rewriter);
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After trimming contract leading unit dims ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after trimming contract leading unit dims");
 
     // Fold tensor.extract_slice/insert_slice ops into transfer ops. This helps
     // to remove those tensor slice ops so that we can enable further vector op
@@ -382,11 +365,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After folding tensor extract/insert slice ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after folding tensor extract/insert slice ops");
 
     // Lower vector.multi_dimension early if any operand is a transpose op.
     // The lowering itself generates transpose ops. This helps to cancel
@@ -411,11 +390,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering multi_reduction ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after lowering multi reduction ops");
 
     // Prepare for SPIR-V integer dot product lowering.
     if (emitIntegerDotProdOps) {
@@ -426,12 +401,7 @@ public:
         return signalPassFailure();
       }
 
-      LLVM_DEBUG({
-        llvm::dbgs()
-            << "--- After prepare for SPIR-V dot product lowering ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
+      debugPrint(funcOp, "after preparing for SPIR-V dot product lowering");
     }
 
     // Then unroll vectors to native vector size. We try to use 128-bit
@@ -444,11 +414,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After unrolling vector ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after unrolling vector ops");
 
     // Lower reduction-unrolled vector contract ops. Such contract ops have
     // their reduction dimensions all be one, so we can convert them into
@@ -470,11 +436,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering size-1 reduction contract ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after lowering size-1 reduction contract ops");
 
     // Now lower vector transpose given we have handled vector patterns that may
     // generate transpose ops in previous steps. This converts transpose ops
@@ -491,11 +453,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering transpose ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after lowering transpose ops");
 
     // Next run canonicalization to cast away leading size-1 dimensions. They
     // can be generated from vector unrolling and generally cause issues to
@@ -531,11 +489,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After trimming leading unit dims ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after trimming leading unit dims");
 
     // Lower vector reduction to SPIR-V integer dot product.
     if (emitIntegerDotProdOps) {
@@ -545,89 +499,16 @@ public:
         return signalPassFailure();
       }
 
-      LLVM_DEBUG({
-        llvm::dbgs() << "--- After lowering to SPIR-V dot product ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
-    }
-
-    // Next perform hoisting. This would analyze transfer read/write ops into
-    // tensors and hoist them out of loop nests. So after it we have
-    // loop-carried vectors, not loop-carried tensors anymore.
-    linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
-    linalg::hoistRedundantVectorTransfers(funcOp);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After hoisting transfers ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
-    // Lower vector transfer permutation map.
-    {
-      RewritePatternSet patterns(context);
-      vector::ExtractStridedSliceOp::getCanonicalizationPatterns(patterns,
-                                                                 context);
-      vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering transfer ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
-    // Lower vector broadcast/transpose and contraction.
-    {
-      RewritePatternSet patterns(context);
-      auto options = vector::VectorTransformsOptions()
-                         .setVectorTransformsOptions(
-                             vector::VectorContractLowering::OuterProduct)
-                         .setVectorTransposeLowering(
-                             vector::VectorTransposeLowering::EltWise);
-      vector::populateVectorBroadcastLoweringPatterns(patterns);
-      vector::populateVectorContractLoweringPatterns(patterns, options);
-      vector::populateVectorMultiReductionLoweringPatterns(
-          patterns, vector::VectorMultiReductionLowering::InnerParallel);
-      vector::populateVectorTransposeLoweringPatterns(patterns, options);
-      vector::populateVectorGatherLoweringPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After lowering various vector ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
-    // Run all sorts of canonicalization patterns to clean up again.
-    {
-      RewritePatternSet patterns(context);
-      vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-      vector::InsertOp::getCanonicalizationPatterns(patterns, context);
-      vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
-      vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
-      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
-      populateVectorTransferTensorSliceTransforms(patterns);
-      vector::ReductionOp::getCanonicalizationPatterns(patterns, context);
-      scf::IfOp::getCanonicalizationPatterns(patterns, context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
+      debugPrint(funcOp, "after lowering to SPIR-V dot product");
     }
   }
 };
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorLoweringPass() {
-  return std::make_unique<SPIRVVectorLoweringPass>();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVInitialVectorLoweringPass() {
+  return std::make_unique<SPIRVInitialLoweringPass>();
 }
 
 } // namespace iree_compiler

@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization,iree-spirv-vector-lowering))' \
+// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization,iree-spirv-initial-vector-lowering,iree-codegen-hoist-redundant-vector-transfers,iree-spirv-final-vector-lowering))' \
 // RUN:   %s | FileCheck %s
 
 func.func @reduce_outmost_dim(%input: tensor<4x1x4xf32>, %init: tensor<1x4xf32>) -> tensor<1x4xf32> {
