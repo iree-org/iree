@@ -899,6 +899,26 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
     iree_hal_buffer_mapping_t* out_buffer_mapping) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_buffer_mapping);
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_prepare_map_range(
+      buffer, mapping_mode, memory_access, byte_offset, byte_length,
+      out_buffer_mapping));
+  iree_status_t status = iree_hal_buffer_commit_map_range(
+      buffer, mapping_mode, memory_access, out_buffer_mapping);
+  if (!iree_status_is_ok(status)) {
+    // Scoped mappings retain the buffer until unmapped.
+    if (!out_buffer_mapping->impl.is_persistent) iree_hal_buffer_retain(buffer);
+    memset(out_buffer_mapping, 0, sizeof(*out_buffer_mapping));
+  }
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_buffer_prepare_map_range(
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length,
+    iree_hal_buffer_mapping_t* out_buffer_mapping) {
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(out_buffer_mapping);
   IREE_TRACE_ZONE_BEGIN(z0);
   memset(out_buffer_mapping, 0, sizeof(*out_buffer_mapping));
 
@@ -934,20 +954,24 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
   out_buffer_mapping->impl.allowed_access = memory_access;
   out_buffer_mapping->impl.is_persistent = is_persistent ? 1 : 0;
   out_buffer_mapping->impl.byte_offset = local_byte_offset;
+  out_buffer_mapping->contents = iree_make_byte_span(NULL, local_byte_length);
 
-  iree_status_t status = _VTABLE_DISPATCH(buffer, map_range)(
-      buffer, mapping_mode, memory_access, out_buffer_mapping->impl.byte_offset,
-      local_byte_length, out_buffer_mapping);
-
-  if (iree_status_is_ok(status)) {
-    // Scoped mappings retain the buffer until unmapped.
-    if (!is_persistent) iree_hal_buffer_retain(buffer);
-  } else {
-    memset(out_buffer_mapping, 0, sizeof(*out_buffer_mapping));
-  }
+  // Scoped mappings retain the buffer until unmapped.
+  if (!is_persistent) iree_hal_buffer_retain(buffer);
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_buffer_commit_map_range(
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access,
+    iree_hal_buffer_mapping_t* buffer_mapping) {
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(buffer_mapping);
+  return _VTABLE_DISPATCH(buffer, map_range)(
+      buffer, mapping_mode, memory_access, buffer_mapping->impl.byte_offset,
+      buffer_mapping->contents.data_length, buffer_mapping);
 }
 
 IREE_API_EXPORT iree_status_t
@@ -957,9 +981,12 @@ iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* buffer_mapping) {
   if (!buffer) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status = _VTABLE_DISPATCH(buffer, unmap_range)(
-      buffer, buffer_mapping->impl.byte_offset,
-      buffer_mapping->contents.data_length, buffer_mapping);
+  iree_status_t status = iree_ok_status();
+  if (buffer_mapping->contents.data != NULL) {
+    status = _VTABLE_DISPATCH(buffer, unmap_range)(
+        buffer, buffer_mapping->impl.byte_offset,
+        buffer_mapping->contents.data_length, buffer_mapping);
+  }
 
   if (!buffer_mapping->impl.is_persistent) {
     iree_hal_buffer_release(buffer);
