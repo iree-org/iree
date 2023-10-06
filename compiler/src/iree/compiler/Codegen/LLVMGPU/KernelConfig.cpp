@@ -887,7 +887,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
   while (parallelSize && *parallelSize > parallelThreshold &&
-         groupSize > cudaWarpSize &&
+         (groupSize / 2) % cudaWarpSize == 0 &&
          reductionSize / (groupSize * vectorSize) < targetVectorCount) {
     // Use less subgroups per workgroup..
     groupSize /= 2;

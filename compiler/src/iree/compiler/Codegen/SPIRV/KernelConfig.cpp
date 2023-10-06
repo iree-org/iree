@@ -1289,7 +1289,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
   while (parallelSize && *parallelSize > parallelThreshold &&
-         groupSize > subgroupSize &&
+         (groupSize / 2) % subgroupSize == 0 &&
          reductionSize / (groupSize * vectorSize) < targetVectorCount) {
     // Use less subgroups per workgroup..
     groupSize /= 2;
