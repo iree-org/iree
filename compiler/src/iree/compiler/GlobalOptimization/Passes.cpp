@@ -62,6 +62,10 @@ void buildGlobalOptimizationPassPipeline(
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
+      // RaiseSpecialOps, by virtue of implementing various peephole
+      // optimizations, is sensitive to surrounding IR structure. Thus we run
+      // this pass both before unit dim folding + consteval, as well as after.
+      .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
       // Enable data tiling after they are in a canonical form.
