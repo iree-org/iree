@@ -10,6 +10,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -29,8 +30,9 @@ bool Oracle::isInteresting(WorkItem &workItem) {
   // Print module to a temporary file.
   SmallString<128> filepath;
   int fd;
+  std::string extension = useBytecode ? "mlirbc" : "mlir";
   std::error_code ec =
-      llvm::sys::fs::createTemporaryFile("oracle", "mlir", fd, filepath);
+      llvm::sys::fs::createTemporaryFile("oracle", extension, fd, filepath);
 
   if (ec) {
     llvm::report_fatal_error(llvm::Twine("Failed to create temporary file: ") +
@@ -38,7 +40,21 @@ bool Oracle::isInteresting(WorkItem &workItem) {
   }
 
   llvm::ToolOutputFile output(filepath, fd);
-  workItem.getModule()->print(output.os());
+
+  if (useBytecode) {
+    // Write bytecode to file.
+    BytecodeWriterConfig config;
+    LogicalResult result =
+        writeBytecodeToFile(workItem.getModule(), output.os(), config);
+    if (failed(result)) {
+      llvm::report_fatal_error(
+          llvm::Twine("Failed to write bytecode to file: ") + filepath);
+    }
+  } else {
+    // Write MLIR to file.
+    workItem.getModule()->print(output.os());
+  }
+
   output.os().close();
 
   if (output.os().has_error()) {

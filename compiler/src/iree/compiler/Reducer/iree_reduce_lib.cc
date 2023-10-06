@@ -14,10 +14,10 @@ using namespace mlir;
 using namespace llvm;
 
 Operation *mlir::iree_compiler::Reducer::ireeRunReducingStrategies(
-    OwningOpRef<Operation *> module, StringRef testScript) {
+    OwningOpRef<Operation *> module, ReducerConfig &config) {
   ModuleOp root = dyn_cast<ModuleOp>(module.release());
   WorkItem workItem(root);
-  Oracle oracle(testScript);
+  Oracle oracle(config.testScript, config.useBytecode);
   Delta delta(oracle, workItem);
 
   delta.runDeltaPass(reduceFlowDispatchOperandToResultDelta,

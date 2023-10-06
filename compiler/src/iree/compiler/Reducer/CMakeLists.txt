@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "iree_reduce_lib.cc"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRSupport
     iree::compiler::Reducer::Framework::ReducerFramework

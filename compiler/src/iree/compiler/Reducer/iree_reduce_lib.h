@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_TOOLS_IREE_REDUCER_LIB_H
 #define IREE_COMPILER_TOOLS_IREE_REDUCER_LIB_H
 
+#include "llvm/ADT/StringRef.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/Support/LLVM.h"
 
@@ -16,8 +17,20 @@ class Operation;
 
 namespace iree_compiler::Reducer {
 
+struct ReducerConfig {
+  ReducerConfig() = delete;
+
+  explicit ReducerConfig(StringRef testScript, bool useBytecode)
+      : testScript(testScript), useBytecode(useBytecode) {}
+
+  // Path to the test script to run on the reduced program.
+  StringRef testScript;
+  // Flag to indicate whether the test script can use bytecode or not.
+  bool useBytecode;
+};
+
 Operation *ireeRunReducingStrategies(OwningOpRef<Operation *> module,
-                                     StringRef testScript);
+                                     ReducerConfig &config);
 
 } // namespace iree_compiler::Reducer
 } // namespace mlir
