@@ -48,7 +48,7 @@ static llvm::cl::opt<bool> clUseFastMinMaxOps(
     "iree-llvmcpu-use-fast-min-max-ops",
     llvm::cl::desc(
         "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 // TODO(#10820): Delete the flag. This should be a nop pass to default pipeline
 // while tensor.pad op is lowered to fill + insert_slice before Codegen.
