@@ -81,13 +81,9 @@ typedef struct iree_hal_task_command_buffer_t {
     // A flattened list of all available descriptor set bindings.
     // As descriptor sets are pushed/bound the bindings will be updated to
     // represent the fully-translated binding data pointer.
-    // TODO(benvanik): support proper mapping semantics and track the
-    // iree_hal_buffer_mapping_t and map/unmap where appropriate.
-    void* bindings[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
-                   IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
-    iree_device_size_t
-        binding_lengths[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
-                        IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
+    iree_hal_buffer_mapping_t
+        bindings[IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT *
+                 IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT];
 
     // All available push constants updated each time push_constants is called.
     // Reset only with the command buffer and otherwise will maintain its values
@@ -789,16 +785,11 @@ static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
         command_buffer->resource_set, 1, &bindings[i].buffer));
 
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
     if (bindings[i].buffer) {
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_prepare_map_range(
           bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
           IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
-          &buffer_mapping));
-      command_buffer->state.bindings[binding_ordinal] =
-          buffer_mapping.contents.data;
-      command_buffer->state.binding_lengths[binding_ordinal] =
-          buffer_mapping.contents.data_length;
+          &command_buffer->state.bindings[binding_ordinal]));
     } else {
       // TODO(#10144): stash indirect binding reference in the state table.
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
