@@ -427,22 +427,8 @@ public:
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
 
-    // First we need to discover the CodeGen lowering configuration. It was
-    // decided earlier and attached to a linalg op as an attribute.
-
-    linalg::LinalgOp rootOp;
-    funcOp.walk([&](linalg::LinalgOp linalgOp) {
-      if (isMatmulOrBatchMatmul(linalgOp) && getLoweringConfig(linalgOp)) {
-        rootOp = linalgOp;
-        return WalkResult::interrupt();
-      }
-      return WalkResult::advance();
-    });
-    if (!rootOp) {
-      funcOp.emitError("expected lowering confg on a (batch) matmul op");
-      return signalPassFailure();
-    }
-
+    // First discover the chosen cooperative matrix shape. It was decided
+    // earlier and attached to the export op as an attribute.
     ArrayRef<int64_t> cooperativeOpSize =
         getSPIRVCooperativeMatrixShape(funcOp);
     if (cooperativeOpSize.empty()) {
@@ -451,56 +437,40 @@ public:
       return signalPassFailure();
     }
 
-    // Now vectorize and unroll to native cooperative sizes.
+    // Now prepare and unroll to native cooperative sizes.
 
     {
-      RewritePatternSet vectorizationPatterns(context);
-      populateVectorizationPatterns(context, vectorizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorizationPatterns)))) {
-        return signalPassFailure();
-      }
-
-      RewritePatternSet canonicalizationPatterns(context);
-      vector::ContractionOp::getCanonicalizationPatterns(
-          canonicalizationPatterns, context);
-      populateCombineVectorTransferReadBroadcastPatterns(
-          canonicalizationPatterns);
-      populatePrepareVectorToMMAPatterns(canonicalizationPatterns,
+      RewritePatternSet patterns(context);
+      vector::ContractionOp::getCanonicalizationPatterns(patterns, context);
+      populateCombineVectorTransferReadBroadcastPatterns(patterns);
+      populatePrepareVectorToMMAPatterns(patterns,
                                          /*useNvGPU=*/false);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
-    debugPrint(funcOp, "after vectorization");
+    debugPrint(funcOp, "after preparing vector ops");
 
     {
-      RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(cooperativeOpSize, vectorUnrollPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorUnrollPatterns)))) {
+      RewritePatternSet patterns(context);
+      populateVectorUnrollPatterns(cooperativeOpSize, patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
     debugPrint(funcOp, "after unrolling vector ops");
 
-    // At the last perform various canonicalization and cleanups.
-
-    linalg::hoistRedundantVectorTransfers(funcOp);
-
-    debugPrint(funcOp, "after hoisting vector transfer ops");
-
     // When using cooperative matrix we don't want to lower the contract,
     // instead we want to merge contract and transpose so that they can be
     // converted to cooperative matrix matmul op.
-    RewritePatternSet combineTransposePatterns(context);
-    combineTransposePatterns.add<CombineContractTranspose>(context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(combineTransposePatterns)))) {
-      return signalPassFailure();
+    {
+      RewritePatternSet patterns(context);
+      patterns.add<CombineContractTranspose>(context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
 
     debugPrint(funcOp, "after combining transpose ops");
