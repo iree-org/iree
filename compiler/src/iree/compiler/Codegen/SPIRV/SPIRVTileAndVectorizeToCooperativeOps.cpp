@@ -78,7 +78,6 @@ static constexpr char coopMatShapeAttrName[] = "iree.spirv.coop_mat_shape";
 /// hal.executable.export op for the given `funcOp`.
 void setSPIRVCooperativeMatrixShape(func::FuncOp funcOp,
                                     ArrayRef<int64_t> shape) {
-  assert(shape.size() == 3);
   auto moduleOp = funcOp->getParentOfType<ModuleOp>();
   auto exportOp = getAllEntryPoints(moduleOp).lookup(funcOp.getName());
 
