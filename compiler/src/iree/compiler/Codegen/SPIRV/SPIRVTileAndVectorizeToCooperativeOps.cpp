@@ -54,8 +54,16 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+void debugPrint(func::FuncOp funcOp, const char *message) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- " << message << " ---//\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+}
+
 //===----------------------------------------------------------------------===//
-// Subgroup tiling patterns
+// Cooperative matrix shape utilities
 //===----------------------------------------------------------------------===//
 
 /// Gets the chosen hardware cooperative op size attached to the given `op`
@@ -63,6 +71,36 @@ namespace {
 static SmallVector<int64_t> getTargetCooperativeOpSize(linalg::LinalgOp op) {
   return getTileSizes(op, 3); // For native vector sizes
 }
+
+static constexpr char coopMatShapeAttrName[] = "iree.spirv.coop_mat_shape";
+
+/// Sets the chosen cooperative matrix shape for CodeGen onto the
+/// hal.executable.export op for the given `funcOp`.
+void setSPIRVCooperativeMatrixShape(func::FuncOp funcOp,
+                                    ArrayRef<int64_t> shape) {
+  assert(shape.size() == 3);
+  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
+  auto exportOp = getAllEntryPoints(moduleOp).lookup(funcOp.getName());
+
+  Builder b(funcOp.getContext());
+  exportOp->setAttr(coopMatShapeAttrName, b.getDenseI64ArrayAttr(shape));
+}
+
+/// Returns the chosen cooperative matrix shape for CodeGen from the
+/// hal.executable.export op for the given `funcOp`. Returns an empty
+/// ArrayRef if cannot query.
+ArrayRef<int64_t> getSPIRVCooperativeMatrixShape(func::FuncOp funcOp) {
+  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
+  auto exportOp = getAllEntryPoints(moduleOp).lookup(funcOp.getName());
+  auto attr = exportOp->getAttrOfType<DenseI64ArrayAttr>(coopMatShapeAttrName);
+  if (!attr)
+    return {};
+  return attr.asArrayRef();
+}
+
+//===----------------------------------------------------------------------===//
+// Subgroup tiling patterns
+//===----------------------------------------------------------------------===//
 
 /// Deduces required subgroup counts along all workgroup tiled dimensions.
 ///
@@ -335,7 +373,12 @@ public:
       return signalPassFailure();
     }
 
+    // Transfer the cooperative matrix shape to an attribute on the export op,
+    // given that after tiling and vectorization we won't have the root Linalg
+    // op anymore.
     SmallVector<int64_t> cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
+    setSPIRVCooperativeMatrixShape(funcOp, cooperativeOpSize);
+
     SmallVector<int64_t> subgroupCounts = deduceSubgroupCounts(rootOp);
 
     // Then tile and distribute to subgroups.
@@ -367,11 +410,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After tiling to subgroups ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after tiling to subgroups");
   }
 };
 
@@ -404,8 +443,13 @@ public:
       return signalPassFailure();
     }
 
-    SmallVector<int64_t> cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
-    SmallVector<int64_t> subgroupCounts = deduceSubgroupCounts(rootOp);
+    ArrayRef<int64_t> cooperativeOpSize =
+        getSPIRVCooperativeMatrixShape(funcOp);
+    if (cooperativeOpSize.empty()) {
+      funcOp->emitError(
+          "expected attribute for chosen cooperative matrix shape");
+      return signalPassFailure();
+    }
 
     // Now vectorize and unroll to native cooperative sizes.
 
@@ -430,11 +474,7 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After vectorization ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after vectorization");
 
     {
       RewritePatternSet vectorUnrollPatterns(context);
@@ -445,21 +485,13 @@ public:
       }
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After unrolling vector ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after unrolling vector ops");
 
     // At the last perform various canonicalization and cleanups.
 
     linalg::hoistRedundantVectorTransfers(funcOp);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After hoisting vector transfers ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after hoisting vector transfer ops");
 
     // When using cooperative matrix we don't want to lower the contract,
     // instead we want to merge contract and transpose so that they can be
@@ -471,11 +503,7 @@ public:
       return signalPassFailure();
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After handling transposes ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after combining transpose ops");
   }
 };
 
