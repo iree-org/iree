@@ -1,5 +1,8 @@
 # IREE Invocation Execution Model
 
+> [!NOTE]
+> Authored June, 2022
+
 This documents the behavior of the user-visible invocation mechanism IREE uses
 to schedule program execution. Internally IREE uses a very similar modeling for
 tracking its internal workloads and in kind carries that down to target APIs

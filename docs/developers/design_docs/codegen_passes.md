@@ -1,5 +1,8 @@
 # IREE CPU/GPU Code Generation Pipeline
 
+> [!NOTE]
+> Authored July, 2020
+
 This document is intended to provide an overview of the codegen pipeline within
 IREE used to generate CPU/GPU code. It intends to give an overview of the main
 passes used, the objective of the pass, the current implementation, and what it

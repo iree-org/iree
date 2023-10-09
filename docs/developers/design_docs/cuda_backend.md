@@ -1,5 +1,8 @@
 # IREE CUDA backend
 
+> [!NOTE]
+> Authored March, 2021
+
 This document is intended to provide an overview of the design choices made to support CUDA within IREE. It describes both the HAL runtime and the NVVM codegen side.
 
 ## CUDA HAL Driver

@@ -1,5 +1,8 @@
 # HAL Driver Features
 
+> [!NOTE]
+> Authored August, 2020
+
 Heterogeneity is one of IREE's core design principles. IREE aims to support
 various accelerators for compute, ranging from general purpose CPUs, GPUs, to
 other special purpose accelerators. IREE provides a
