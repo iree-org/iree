@@ -99,7 +99,7 @@ brew install capstone
 Install other dependencies:
 
 ```shell
-brew install pkg-config glfw freetype tbb
+brew install glfw freetype
 ```
 
 ## Build the Tracy tools
