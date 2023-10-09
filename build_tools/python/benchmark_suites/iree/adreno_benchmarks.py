@@ -45,12 +45,7 @@ class Android_Adreno_Benchmarks(object):
         self,
     ) -> List[iree_definitions.E2EModelRunConfig]:
         default_models = [
-            tflite_models.DEEPLABV3_FP32,
-            tflite_models.MOBILESSD_FP32,
-            tflite_models.POSENET_FP32,
             tflite_models.MOBILEBERT_FP32,
-            tflite_models.MOBILENET_V2,
-            tflite_models.MOBILENET_V3SMALL,
         ]
         default_gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
@@ -65,18 +60,6 @@ class Android_Adreno_Benchmarks(object):
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
             for model in default_models
-        ]
-        fuse_padding_repeated_kernel_gen_configs = [
-            iree_definitions.ModuleGenerationConfig.build(
-                compile_config=self.FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG,
-                imported_model=iree_definitions.ImportedModel.from_model(model),
-            )
-            for model in [
-                tflite_models.MOBILESSD_FP32,
-                tflite_models.POSENET_FP32,
-                tflite_models.MOBILENET_V2,
-                tflite_models.MOBILENET_V3SMALL,
-            ]
         ]
 
         adreno_devices = (
@@ -94,14 +77,6 @@ class Android_Adreno_Benchmarks(object):
         run_configs += utils.generate_e2e_model_run_configs(
             module_generation_configs=fuse_padding_gen_configs,
             module_execution_configs=[module_execution_configs.VULKAN_CONFIG],
-            device_specs=adreno_devices,
-            presets=[benchmark_presets.ANDROID_GPU],
-        )
-        run_configs += utils.generate_e2e_model_run_configs(
-            module_generation_configs=fuse_padding_repeated_kernel_gen_configs,
-            module_execution_configs=[
-                module_execution_configs.VULKAN_BATCH_SIZE_16_CONFIG
-            ],
             device_specs=adreno_devices,
             presets=[benchmark_presets.ANDROID_GPU],
         )
