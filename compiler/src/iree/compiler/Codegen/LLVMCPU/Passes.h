@@ -59,8 +59,9 @@ createLLVMCPUMmt4dVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
 
 /// Pass to perform SplitReduction transformations of `LinalgOp`s.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = false);
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUSplitReductionPass(
+    bool enableReassociateFpReductions = false,
+    bool enableQuantizedMatmulReassociation = false);
 
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -86,6 +87,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
 struct LLVMCPUVectorLoweringPassOptions {
   std::string splitVectorTransfersTo = "";
   bool lowerVectorTransposeToAVX2 = false;
+  bool enableQuantizedMatmulReassociation = false;
 };
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(

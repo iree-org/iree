@@ -119,6 +119,9 @@ def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp">
     Option<"enableFpReductionReordering", "enable-fp-reduction-reordering",
       "bool", /*default=*/"false",
       "Flag to enable reduction reordering on floating points.">,
+    Option<"enableQuantizedMatmulReassociation", "enable-quantized-matmul-reassociation",
+      "bool", /*default=*/"false",
+      "Flag to enable optimizations for reassociated quantized matmuls.">,
   ];
 }
 
@@ -178,6 +181,9 @@ def LLVMCPUVectorLowering :
     Option<"lowerVectorTransposeToAVX2", "lower-vector-transpose-to-avx2", "bool",
       /*default=*/"false",
       "Add specific transpose to avx2 lowering patterns.">,
+    Option<"enableQuantizedMatmulReassociation", "enable-quantized-matmul-reassociation", "bool",
+      /*default=*/"false",
+      "Add specific patterns for optimizing reassociated quantized matmuls.">,
   ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUVectorLoweringPass()";
