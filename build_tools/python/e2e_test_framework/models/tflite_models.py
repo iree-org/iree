@@ -140,3 +140,43 @@ MOBILENET_V2_INT8 = common_definitions.Model(
     entry_function="main",
     input_types=["1x224x224x3xui8"],
 )
+
+BERT_LARGE_FP32_BATCH1 = common_definitions.Model(
+    name="BertLarge_Fp32_Batch1",
+    id=unique_ids.MODEL_BERT_LARGE_TFLITE_FP32_BATCH1,
+    tags=["fp32", "batch-1"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230829_1696537918/BERT_LARGE_FP32_TF_384XI32_BATCH1/model_fp32.tflite",
+    entry_function="main",
+    input_types=["1x384xi32", "1x384xi32"],
+)
+
+BERT_LARGE_FP32_BATCH16 = common_definitions.Model(
+    name="BertLarge_Fp32_Batch16",
+    id=unique_ids.MODEL_BERT_LARGE_TFLITE_FP32_BATCH16,
+    tags=["fp32", "batch-16"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230829_1696537918/BERT_LARGE_FP32_TF_384XI32_BATCH16/model_fp32.tflite",
+    entry_function="main",
+    input_types=["16x384xi32", "16x384xi32"],
+)
+
+BERT_LARGE_FP32_BATCH24 = common_definitions.Model(
+    name="BertLarge_Fp32_Batch24",
+    id=unique_ids.MODEL_BERT_LARGE_TFLITE_FP32_BATCH24,
+    tags=["fp32", "batch-24"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230829_1696537918/BERT_LARGE_FP32_TF_384XI32_BATCH24/model_fp32.tflite",
+    entry_function="main",
+    input_types=["24x384xi32", "24x384xi32"],
+)
+
+BERT_LARGE_FP32_BATCH32 = common_definitions.Model(
+    name="BertLarge_Fp32_Batch32",
+    id=unique_ids.MODEL_BERT_LARGE_TFLITE_FP32_BATCH32,
+    tags=["fp32", "batch-32"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230829_1696537918/BERT_LARGE_FP32_TF_384XI32_BATCH32/model_fp32.tflite",
+    entry_function="main",
+    input_types=["32x384xi32", "32x384xi32"],
+)

@@ -6,13 +6,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-MobileNetV3Small_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallStaticBatch.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV3Small_fp32.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-DeepLabV3_fp32"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_DeepLabV3_fp32.tflite"
@@ -34,79 +27,30 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-MobileNetV2_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_fp32.0_224.tflite"
+  NAME "model-BertLarge_Fp32_Batch1"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230829_1696537918/BERT_LARGE_FP32_TF_384XI32_BATCH1/model_fp32.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLarge_Fp32_Batch1.tflite"
   UNPACK
 )
 
 iree_fetch_artifact(
-  NAME "model-MobileNetV2_int8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_int8.0_224_quantized.tflite"
+  NAME "model-BertLarge_Fp32_Batch16"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230829_1696537918/BERT_LARGE_FP32_TF_384XI32_BATCH16/model_fp32.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLarge_Fp32_Batch16.tflite"
   UNPACK
 )
 
 iree_fetch_artifact(
-  NAME "model-MobileSSD_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobile_ssd_v2_float_coco.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileSSD_fp32.tflite"
+  NAME "model-BertLarge_Fp32_Batch24"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230829_1696537918/BERT_LARGE_FP32_TF_384XI32_BATCH24/model_fp32.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLarge_Fp32_Batch24.tflite"
   UNPACK
 )
 
 iree_fetch_artifact(
-  NAME "model-PoseNet_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/posenet.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_PoseNet_fp32.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-MobileBertSquad_fp16"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebertsquad.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp16.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-MobileBertSquad_fp32"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-float.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp32.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-MobileBertSquad_int8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_int8.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-EfficientNetV2STF"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/EfficientNetV2STF_2023-05-07.timestamp_1683504734.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF.timestamp_1683504734.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-MiniLML12H384Uncased"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/MiniLML12H384Uncased_2023-05-07.timestamp_1683504734.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.timestamp_1683504734.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BertForMaskedLMTF"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertForMaskedLMTF_2023-05-07.timestamp_1683504734.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BertLargeTF"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertLargeTF_2023-05-07.timestamp_1683504734.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF.timestamp_1683504734.mlirbc"
+  NAME "model-BertLarge_Fp32_Batch32"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230829_1696537918/BERT_LARGE_FP32_TF_384XI32_BATCH32/model_fp32.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLarge_Fp32_Batch32.tflite"
   UNPACK
 )
 
@@ -170,6 +114,34 @@ iree_fetch_artifact(
   NAME "model-T5LargeTFBatch32"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975/T5_LARGE_FP32_TF_512XI32_BATCH32/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5LargeTFBatch32.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-EfficientNetV2STF"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/EfficientNetV2STF_2023-05-07.timestamp_1683504734.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF.timestamp_1683504734.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MiniLML12H384Uncased"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/MiniLML12H384Uncased_2023-05-07.timestamp_1683504734.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.timestamp_1683504734.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-BertForMaskedLMTF"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertForMaskedLMTF_2023-05-07.timestamp_1683504734.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-BertLargeTF"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertLargeTF_2023-05-07.timestamp_1683504734.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF.timestamp_1683504734.mlirbc"
   UNPACK
 )
 
@@ -380,5 +352,61 @@ iree_fetch_artifact(
   NAME "model-T5_LARGE_FP32_JAX_512XI32_BATCH32"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.14_1691969180/T5_LARGE_FP32_JAX_512XI32_BATCH32/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_LARGE_FP32_JAX_512XI32_BATCH32.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileBertSquad_fp32"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-float.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp32.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileBertSquad_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_int8.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileNetV2_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_int8.0_224_quantized.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileSSD_fp32"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobile_ssd_v2_float_coco.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileSSD_fp32.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-PoseNet_fp32"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/posenet.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_PoseNet_fp32.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileNetV2_fp32"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_fp32.0_224.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileNetV3Small_fp32"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallStaticBatch.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV3Small_fp32.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileBertSquad_fp16"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebertsquad.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp16.tflite"
   UNPACK
 )

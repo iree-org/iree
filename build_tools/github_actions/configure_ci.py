@@ -143,7 +143,7 @@ DEFAULT_BENCHMARK_PRESET_GROUP = [
     "comp-stats",
 ]
 DEFAULT_BENCHMARK_PRESET = "default"
-LARGE_BENCHMARK_PRESET_GROUP = ["cuda-large", "x86_64-large"]
+LARGE_BENCHMARK_PRESET_GROUP = ["cuda-large", "x86_64-large", "android-cpu-large"]
 # All available benchmark preset options including experimental presets.
 BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESET_GROUP + LARGE_BENCHMARK_PRESET_GROUP
 BENCHMARK_LABEL_PREFIX = "benchmarks"

@@ -10,6 +10,8 @@ To put a benchmark into a preset, add the preset to its `presets` field.
 
 # Default Android CPU execution benchmarks.
 ANDROID_CPU = "android-cpu"
+# Large Android CPU execution benchmarks.
+ANDROID_CPU_LARGE = "android-cpu-large"
 # Default Android GPU execution benchmarks.
 ANDROID_GPU = "android-gpu"
 # Default CUDA execution benchmarks.
@@ -43,6 +45,7 @@ DEFAULT_PRESETS = [
 LARGE_PRESETS = [
     CUDA_LARGE,
     X86_64_LARGE,
+    ANDROID_CPU_LARGE,
 ]
 
 ALL_EXECUTION_PRESETS = DEFAULT_PRESETS + LARGE_PRESETS

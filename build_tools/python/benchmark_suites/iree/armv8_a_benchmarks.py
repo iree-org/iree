@@ -18,12 +18,16 @@ class Android_ARMv8_A_Benchmarks(object):
     """Benchmarks on ARMv8-A Android devices."""
 
     NONQUANT_MODELS = [
-        tflite_models.DEEPLABV3_FP32,
-        tflite_models.MOBILESSD_FP32,
-        tflite_models.POSENET_FP32,
-        tflite_models.MOBILEBERT_FP32,
-        tflite_models.MOBILENET_V2,
-        tflite_models.MOBILENET_V3SMALL,
+        # tflite_models.DEEPLABV3_FP32,
+        # tflite_models.MOBILESSD_FP32,
+        # tflite_models.POSENET_FP32,
+        # tflite_models.MOBILEBERT_FP32,
+        # tflite_models.MOBILENET_V2,
+        # tflite_models.MOBILENET_V3SMALL,
+        tflite_models.BERT_LARGE_FP32_BATCH1,
+        tflite_models.BERT_LARGE_FP32_BATCH16,
+        tflite_models.BERT_LARGE_FP32_BATCH24,
+        tflite_models.BERT_LARGE_FP32_BATCH32,
     ]
     QUANT_MODELS = [tflite_models.MOBILEBERT_INT8]
 
@@ -68,7 +72,9 @@ class Android_ARMv8_A_Benchmarks(object):
             module_execution_configs.get_elf_system_scheduling_local_task_config(
                 thread_num
             )
-            for thread_num in [1, 4]
+            for thread_num in [
+                4,
+            ]
         ]
 
         default_gen_confings = [
@@ -76,20 +82,29 @@ class Android_ARMv8_A_Benchmarks(object):
                 compile_config=self.DEFAULT_COMPILE_CONFIG,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
-            for model in self.NONQUANT_MODELS + self.QUANT_MODELS
+            for model in [
+                tflite_models.DEEPLABV3_FP32,
+            ]
         ]
+        # experimental_gen_confings = [
+        #     iree_definitions.ModuleGenerationConfig.build(
+        #         compile_config=self.DATA_TILING_COMPILE_CONFIG,
+        #         imported_model=iree_definitions.ImportedModel.from_model(model),
+        #     )
+        #     for model in self.NONQUANT_MODELS
+        # ] + [
+        #     iree_definitions.ModuleGenerationConfig.build(
+        #         compile_config=self.DATA_TILING_AND_DOTPROD_COMPILE_CONFIG,
+        #         imported_model=iree_definitions.ImportedModel.from_model(model),
+        #     )
+        #     for model in self.QUANT_MODELS
+        # ]
         experimental_gen_confings = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=self.DATA_TILING_COMPILE_CONFIG,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
             for model in self.NONQUANT_MODELS
-        ] + [
-            iree_definitions.ModuleGenerationConfig.build(
-                compile_config=self.DATA_TILING_AND_DOTPROD_COMPILE_CONFIG,
-                imported_model=iree_definitions.ImportedModel.from_model(model),
-            )
-            for model in self.QUANT_MODELS
         ]
 
         all_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
@@ -103,24 +118,30 @@ class Android_ARMv8_A_Benchmarks(object):
                 device_parameters={"big-cores"},
             )
         )
+        # run_configs = utils.generate_e2e_model_run_configs(
+        #     module_generation_configs=default_gen_confings,
+        #     module_execution_configs=local_sync_execution_configs
+        #     + local_task_execution_configs,
+        #     device_specs=all_devices,
+        #     presets=[benchmark_presets.ANDROID_CPU],
+        # )
+        # run_configs += utils.generate_e2e_model_run_configs(
+        #     module_generation_configs=experimental_gen_confings,
+        #     module_execution_configs=local_sync_execution_configs,
+        #     device_specs=all_devices,
+        #     presets=[benchmark_presets.ANDROID_CPU],
+        # )
         run_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=default_gen_confings,
-            module_execution_configs=local_sync_execution_configs
-            + local_task_execution_configs,
-            device_specs=all_devices,
-            presets=[benchmark_presets.ANDROID_CPU],
-        )
-        run_configs += utils.generate_e2e_model_run_configs(
-            module_generation_configs=experimental_gen_confings,
-            module_execution_configs=local_sync_execution_configs,
-            device_specs=all_devices,
+            module_execution_configs=local_task_execution_configs,
+            device_specs=big_cores_devices,
             presets=[benchmark_presets.ANDROID_CPU],
         )
         run_configs += utils.generate_e2e_model_run_configs(
             module_generation_configs=experimental_gen_confings,
             module_execution_configs=local_task_execution_configs,
             device_specs=big_cores_devices,
-            presets=[benchmark_presets.ANDROID_CPU],
+            presets=[benchmark_presets.ANDROID_CPU_LARGE],
         )
 
         return run_configs
