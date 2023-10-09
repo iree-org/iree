@@ -44,6 +44,12 @@ static llvm::cl::opt<bool> clCheckLinalgVectorization(
         "Runs the pass to check if all the Linalg ops are vectorized"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clUseFastMinMaxOps(
+    "iree-llvmcpu-use-fast-min-max-ops",
+    llvm::cl::desc(
+        "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
+    llvm::cl::init(false));
+
 // TODO(#10820): Delete the flag. This should be a nop pass to default pipeline
 // while tensor.pad op is lowered to fill + insert_slice before Codegen.
 // However, it causes regressions in terms of compilation time. Skip the passes
@@ -709,6 +715,11 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   passManager.addNestedPass<func::FuncOp>(
       createHoistStaticallyBoundAllocationsPass());
+
+  // Use `arith.minf/maxf` instead of `arith.minimumf/maximumf`.
+  if (clUseFastMinMaxOps) {
+    passManager.addNestedPass<func::FuncOp>(createReplaceSlowMinMaxOpsPass());
+  }
 
   // Resolve get_buffer_descriptor ops. All structural buffer manipulations
   // must conclude before this point.
