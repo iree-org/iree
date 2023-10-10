@@ -415,10 +415,10 @@ static iree_status_t iree_hal_metal_driver_create_device_by_path(
 
   // Try parsing as a device ID.
   uint64_t device_registry_id = 0;
-  if (iree_string_view_atoi_uint64(device_path, &device_registry_id)) {
-    return iree_hal_metal_driver_create_device_by_registry_id(
-        base_driver, driver_name, *(uint64_t*)device_registry_id, param_count, params,
-        host_allocator, out_device);
+  if (iree_string_view_atoi_uint64_base(device_path, 16, &device_registry_id)) {
+    return iree_hal_metal_driver_create_device_by_registry_id(base_driver, driver_name,
+                                                              device_registry_id, param_count,
+                                                              params, host_allocator, out_device);
   }
 
   // Fallback and try to parse as a device index.
