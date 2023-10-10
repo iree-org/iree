@@ -54,24 +54,32 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
 
 /// Returns the tile sizes of all the vector dimensions, including parallel
 /// and reduction dimensions.
-SmallVector<int64_t> TilingConfig::getVectorTileSizes() {
+SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
   unsigned numDims = getNumDimensions();
   SmallVector<int64_t> vectorSizes(numDims, 0);
-  SmallVector<int64_t> parallelCommonSizes = getVectorCommonParallelSizes();
-  SmallVector<int64_t> reductionSizes = getVectorReductionSizes();
-  SmallVector<int64_t> parallelInnerSizes = getVectorInnerParallelSizes();
+  SmallVector<bool> scalableFlags(numDims, false);
+  auto [parallelCommonSizes, parallelCommonScalableFlags] =
+      getVectorCommonParallelSizes();
+  auto [reductionSizes, reductionScalableFlags] = getVectorReductionSizes();
+  auto [parallelInnerSizes, parallelInnerScalableFlags] =
+      getVectorInnerParallelSizes();
   for (int i = 0; i < numDims; ++i) {
-    unsigned nonZeroCnt = llvm::count_if(
-        ArrayRef<int64_t>{parallelCommonSizes[i], reductionSizes[i],
-                          parallelInnerSizes[i]},
-        [](auto v) { return v != 0; });
+    unsigned nonZeroCnt = llvm::count(
+        ArrayRef<bool>{
+            !!parallelCommonSizes[i] || parallelCommonScalableFlags[i],
+            !!reductionSizes[i] || reductionScalableFlags[i],
+            !!parallelInnerSizes[i] || parallelInnerScalableFlags[i]},
+        true);
     assert(nonZeroCnt <= 1 && "expected one tile size at most to be non-zero");
     (void)nonZeroCnt;
     vectorSizes[i] =
         parallelCommonSizes[i] ^ reductionSizes[i] ^ parallelInnerSizes[i];
+    scalableFlags[i] = parallelCommonScalableFlags[i] ||
+                       reductionScalableFlags[i] ||
+                       parallelInnerScalableFlags[i];
   }
 
-  return vectorSizes;
+  return std::make_pair(vectorSizes, scalableFlags);
 }
 
 /// Returns a list with the tiling levels that can be fused for this

@@ -203,7 +203,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       }
     }
 
-    SmallVector<int64_t> secondLevelTileSizes =
+    SmallVector<int64_t> secondLevelTileSizes;
+    std::tie(secondLevelTileSizes, std::ignore) =
         tilingConfig.getVectorCommonParallelSizes();
     for (auto [index, tileSize] : llvm::enumerate(secondLevelTileSizes)) {
       if (tileSize != 0 && !pLoopsSet.contains(index)) {
@@ -214,7 +215,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       }
     }
 
-    SmallVector<int64_t> thirdLevelTileSizes =
+    SmallVector<int64_t> thirdLevelTileSizes;
+    std::tie(thirdLevelTileSizes, std::ignore) =
         tilingConfig.getVectorReductionSizes();
     for (auto [index, tileSize] : llvm::enumerate(thirdLevelTileSizes)) {
       if (tileSize != 0 && pLoopsSet.contains(index)) {
