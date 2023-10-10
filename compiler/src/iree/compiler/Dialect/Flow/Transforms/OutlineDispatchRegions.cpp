@@ -238,8 +238,23 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
           // No cost estimation implemented, skip.
         });
   });
-  if (!bestOp)
-    return "";
+
+  if (!bestOp) {
+    // Check if this is a slow memcpy. This is the case if a store directly
+    // reads a load result.
+    std::string ret = "";
+    regionOp.getWorkgroupBody().walk(
+        [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+          Value input = storeOp.getValue();
+          if (auto loadOp =
+                  input.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+            ret = "slow_memcpy";
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
+    return ret;
+  }
 
   std::string bestSummary = "";
   TypeSwitch<Operation *>(bestOp)
