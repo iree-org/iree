@@ -373,8 +373,9 @@ static iree_status_t iree_hal_metal_driver_create_device_by_id(iree_hal_driver_t
 }
 
 static iree_status_t iree_hal_metal_driver_create_device_by_registry_id(
-    iree_hal_driver_t* base_driver, iree_string_view_t driver_name, uint64_t device_registry_id,
-    iree_host_size_t param_count, const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
+    iree_string_view_t device_registry_id, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   iree_hal_metal_driver_t* driver = iree_hal_metal_driver_cast(base_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -383,7 +384,9 @@ static iree_status_t iree_hal_metal_driver_create_device_by_registry_id(
   NSArray<id<MTLDevice>>* devices = driver->devices;
   id<MTLDevice> found_device = nil;
   for (iree_host_size_t i = 0, e = devices.count; i < e; ++i) {
-    if (device_registry_id == devices[i].registryID) {
+    char device_path[16 + 1] = {0};
+    snprintf(device_path, sizeof(device_path), "%016" PRIx64, devices[i].registryID);
+    if (iree_string_view_equal(iree_make_string_view(device_path, 16), device_registry_id)) {
       found_device = devices[i];
       break;
     }
@@ -392,8 +395,8 @@ static iree_status_t iree_hal_metal_driver_create_device_by_registry_id(
   if (!found_device) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_NOT_FOUND,
-                            "Metal device with device registry ID %016" PRIx64 " not found",
-                            device_registry_id);
+                            "Metal device with device registry ID %.*s not found",
+                            (int)device_registry_id.size, device_registry_id.data);
   }
 
   iree_status_t status = iree_hal_metal_driver_create_device_by_id(
@@ -414,11 +417,9 @@ static iree_status_t iree_hal_metal_driver_create_device_by_path(
   }
 
   // Try parsing as a device ID.
-  uint64_t device_registry_id = 0;
-  if (iree_string_view_atoi_uint64(device_path, &device_registry_id)) {
+  if (device_path.size == 16) {
     return iree_hal_metal_driver_create_device_by_registry_id(
-        base_driver, driver_name, *(uint64_t*)device_registry_id, param_count, params,
-        host_allocator, out_device);
+        base_driver, driver_name, device_path, param_count, params, host_allocator, out_device);
   }
 
   // Fallback and try to parse as a device index.
