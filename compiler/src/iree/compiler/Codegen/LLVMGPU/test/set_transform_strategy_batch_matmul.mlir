@@ -172,7 +172,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.eliminate_empty_tensors
 
 // CHECK:   transform.iree.bufferize {target_gpu}
-// CHECK:   transform.iree.apply_buffer_optimizations
+// CHECK:   transform.memref.erase_dead_alloc_and_stores
 // CHECK:   transform.iree.forall_to_workgroup
 // CHECK:   transform.iree.map_nested_forall_to_gpu_threads
 // DEFAULT:  workgroup_dims = [64, 2, 1]
@@ -198,7 +198,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
-// CHECK:   transform.iree.apply_buffer_optimizations
+// CHECK:   transform.memref.erase_dead_alloc_and_stores
 // CHECK:   transform.iree.eliminate_gpu_barriers
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm

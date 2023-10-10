@@ -105,7 +105,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: transform.structured.match ops{["scf.for"]} in %{{.*}} 
 // CHECK: transform.iree.synchronize_loop %{{.*}}
 // CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}}
-// CHECK: transform.iree.apply_buffer_optimizations %{{.*}}
+// CHECK: transform.memref.erase_dead_alloc_and_stores %{{.*}}
 // CHECK: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_mma_sync}
 // CHECK: transform.iree.eliminate_gpu_barriers
 // CHECK: apply_patterns to %{{.*}} {
@@ -171,7 +171,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: transform.structured.match ops{["scf.for"]} in %{{.*}} 
 // WITH_OPTIONS: transform.iree.synchronize_loop %{{.*}}
 // WITH_OPTIONS: transform.structured.hoist_redundant_vector_transfers %{{.*}}
-// WITH_OPTIONS: transform.iree.apply_buffer_optimizations %{{.*}}
+// WITH_OPTIONS: transform.memref.erase_dead_alloc_and_stores %{{.*}}
 // The attribute should match td-matmul-use-mma-sync.
 // WITH_OPTIONS: transform.iree.vector.vector_to_mma_conversion %{{.*}} {use_mma_sync}
 // WITH_OPTIONS: transform.iree.eliminate_gpu_barriers
