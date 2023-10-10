@@ -72,7 +72,7 @@ static SmallVector<int64_t> getTargetCooperativeOpSize(linalg::LinalgOp op) {
   return getTileSizes(op, 3); // For native vector sizes
 }
 
-static constexpr char coopMatShapeAttrName[] = "iree.spirv.coop_mat_shape";
+constexpr char coopMatShapeAttrName[] = "iree.spirv.coop_mat_shape";
 
 /// Sets the chosen cooperative matrix shape for CodeGen onto the
 /// hal.executable.export op for the given `funcOp`.
