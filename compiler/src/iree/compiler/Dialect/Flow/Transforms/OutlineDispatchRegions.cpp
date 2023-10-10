@@ -240,9 +240,10 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
   });
 
   if (!bestOp) {
-    // Check if this is a slow memcpy. This is the case if a store directly
-    // reads a load result.
     std::string ret = "";
+    // Check if there is a possible slow memory copy as a dispatch. The current
+    // hueristic is to check if a dispatch.tensor.store stores a tensor that is
+    // directly loaded from a dispatch.tensor.load.
     regionOp.getWorkgroupBody().walk(
         [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
           Value input = storeOp.getValue();
