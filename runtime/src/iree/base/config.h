@@ -120,6 +120,11 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #endif  // NDEBUG
 #endif  // !IREE_STATUS_MODE
 
+#if !defined(IREE_STATUS_MAX_STACK_TRACE_FRAMES)
+// Maximum number of stack frames captured when enabled.
+#define IREE_STATUS_MAX_STACK_TRACE_FRAMES 16
+#endif  // IREE_STATUS_MAX_STACK_TRACE_FRAMES
+
 //===----------------------------------------------------------------------===//
 // Synchronization and threading
 //===----------------------------------------------------------------------===//
