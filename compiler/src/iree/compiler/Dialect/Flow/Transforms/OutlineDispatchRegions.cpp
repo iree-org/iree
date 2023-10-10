@@ -238,8 +238,24 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
           // No cost estimation implemented, skip.
         });
   });
-  if (!bestOp)
-    return "";
+
+  if (!bestOp) {
+    std::string bestSummary = "";
+    // Check if there is a possible slow memory copy as a dispatch. The current
+    // heuristic is to check if a dispatch.tensor.store stores a tensor that is
+    // directly loaded from a dispatch.tensor.load.
+    regionOp.getWorkgroupBody().walk(
+        [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+          Value input = storeOp.getValue();
+          if (auto loadOp =
+                  input.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>()) {
+            bestSummary = "slow_memcpy";
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
+    return bestSummary;
+  }
 
   std::string bestSummary = "";
   TypeSwitch<Operation *>(bestOp)
