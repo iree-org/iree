@@ -760,6 +760,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   passManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  if (clEnableQuantizedMatmulReassociation) {
+    passManager.addPass(createLLVMCPUFoldMemRefAliasOpsPass());
+  }
   passManager.addPass(createEmulateNarrowTypePass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());

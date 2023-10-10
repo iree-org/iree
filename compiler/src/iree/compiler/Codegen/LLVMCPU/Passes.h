@@ -105,6 +105,8 @@ createVerifyLinalgTransformLegalityPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUFoldVectorContractUnitDimsPass();
 
+std::unique_ptr<Pass> createLLVMCPUFoldMemRefAliasOpsPass();
+
 //------------------------------------------------------------------------------
 // LLVMCPU Codegen specific patterns.
 //------------------------------------------------------------------------------

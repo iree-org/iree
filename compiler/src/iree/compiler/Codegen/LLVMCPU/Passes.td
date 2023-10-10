@@ -70,6 +70,13 @@ def LLVMCPUFoldVectorContractUnitDims :
       "mlir::iree_compiler::createLLVMCPUFoldVectorContractUnitDimsPass()";
 }
 
+def LLVMCPUFoldMemRefAliasOps :
+    Pass<"iree-llvmcpu-fold-memref-alias-ops", ""> {
+  let summary = "Fold combinations of memref ops";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUFoldMemRefAliasOpsPass()";
+}
+
 def LLVMCPULinkExecutables :
     Pass<"iree-llvmcpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMCPU HAL executables within the top-level program module.";
