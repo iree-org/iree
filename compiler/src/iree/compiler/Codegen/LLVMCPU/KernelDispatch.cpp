@@ -2139,8 +2139,8 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
       if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
         continue;
       tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
-      (KD_DBGS() << "Align # " << pos << " tile size to " << tileSizes[pos]
-                 << "\n");
+      LLVM_DEBUG(KD_DBGS() << "Align # " << pos << " tile size to "
+                           << tileSizes[pos] << "\n");
     }
 
     // Pack op has special requirements on vector tile sizes to achieve good
