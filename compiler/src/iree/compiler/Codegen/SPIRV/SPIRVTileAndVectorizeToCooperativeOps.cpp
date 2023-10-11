@@ -269,61 +269,6 @@ void populateVectorUnrollPatterns(ArrayRef<int64_t> cooperativeOpSize,
   vector::populateVectorUnrollPatterns(patterns, options);
 }
 
-/// Fuses vector.transpose into consumer vector.contract.
-///
-/// This is a workaround for SPIR-V backend limitations. SPIR-V vetorization
-/// pass relies on unrolling to reduce instructions to a vector size we can
-/// convert to SPIR-V. When vectorization creates transpose those block
-/// unrolling and result in large vector we currently cannot lower. For now we
-/// always merge the transpose into the contract op so that it can be unrolled.
-//
-// TODO(thomasraoux): Make transpose work with the current unrolling mechanism
-// or replace unrolling.
-class CombineContractTranspose final
-    : public OpRewritePattern<vector::ContractionOp> {
-public:
-  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(vector::ContractionOp op,
-                                PatternRewriter &rewriter) const override {
-    // Perform lhs + rhs transpositions to conform to matmul row-major
-    // semantics. Bail out if the contraction cannot be put in this form.
-    MLIRContext *ctx = op.getContext();
-    Location loc = op.getLoc();
-    bool foundTranspose = false;
-    std::array<Value, 3> sources = {op.getLhs(), op.getRhs(), op.getAcc()};
-    SmallVector<AffineMap> newMaps;
-    SmallVector<Value> newSources;
-    for (auto [srcIdx, source] : llvm::enumerate(sources)) {
-      auto map = op.getIndexingMapsArray()[srcIdx];
-      auto tranposeOp = source.getDefiningOp<vector::TransposeOp>();
-      if (!tranposeOp) {
-        newSources.push_back(source);
-        newMaps.push_back(map);
-        continue;
-      }
-      SmallVector<int64_t, 3> perm;
-      tranposeOp.getTransp(perm);
-      SmallVector<AffineExpr> exprs(perm.size());
-      for (auto [remapIdx, remap] : llvm::enumerate(perm)) {
-        exprs[remap] = map.getResult(remapIdx);
-      }
-      newMaps.push_back(
-          AffineMap::get(map.getNumDims(), map.getNumSymbols(), exprs, ctx));
-      newSources.push_back(tranposeOp.getVector());
-      foundTranspose = true;
-    }
-    if (!foundTranspose)
-      return failure();
-
-    Value res = rewriter.create<vector::ContractionOp>(
-        loc, newSources[0], newSources[1], newSources[2],
-        rewriter.getAffineMapArrayAttr(newMaps), op.getIteratorTypes());
-    rewriter.replaceOp(op, res);
-    return success();
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // Main pass
 //===----------------------------------------------------------------------===//
@@ -444,19 +389,6 @@ public:
     }
 
     debugPrint(funcOp, "after unrolling vector ops");
-
-    // When using cooperative matrix we don't want to lower the contract,
-    // instead we want to merge contract and transpose so that they can be
-    // converted to cooperative matrix matmul op.
-    {
-      RewritePatternSet patterns(context);
-      patterns.add<CombineContractTranspose>(context);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    debugPrint(funcOp, "after combining transpose ops");
   }
 };
 
