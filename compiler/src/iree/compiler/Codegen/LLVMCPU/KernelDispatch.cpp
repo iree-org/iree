@@ -2123,23 +2123,39 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     hasChanged = true;
     LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n");
 
-    // Only adjust tile sizes for distribution and TileAndFuse, which are the
-    // first two tile lists.
+    SmallVector<int64_t> zeros(linalgOp.getNumLoops(), 0);
+    for (int i = tileSizesList.size(); i < 2; ++i) {
+      tileSizesList.push_back(zeros);
+    }
+
+    ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+    ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+
     // Align the tile sizes of the root op to the pack op's inner tile sizes, so
     // we can derive the outer tile sizes for pack ops later in
     // setLoweringConfigForComputeOps by dividing with inner tile sizes.
-    for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e; ++i) {
-      auto &tileSizes = tileSizesList[i];
-      ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
-      ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
-      for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-        if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
-          continue;
-        tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
-        LLVM_DEBUG(KD_DBGS() << "Align # " << pos << " tile size to "
-                             << tileSizes[pos] << "\n");
-      }
+    auto &tileSizes = tileSizesList[0];
+    for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+      if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
+        continue;
+      tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
+      (KD_DBGS() << "Align # " << pos << " tile size to " << tileSizes[pos]
+                 << "\n");
     }
+
+    // Pack op has special requirements on vector tile sizes to achieve good
+    // performance. Override the vector tile sizes with pack op's ones.
+    SmallVector<int64_t> vecTileSizes =
+        getPackVectorTileSizes(entryPointFn, packOp);
+    auto outerDimsPerm = packOp.getOuterDimsPerm();
+    if (!outerDimsPerm.empty())
+      applyPermutationToVector(vecTileSizes,
+                               invertPermutationVector(outerDimsPerm));
+    for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+      // Scale the vector tile sizes by pack op's inner tile sizes.
+      vecTileSizes[pos] *= size;
+    }
+    tileSizesList[1] = vecTileSizes;
 
     return WalkResult::advance();
   });
@@ -2320,11 +2336,9 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
               applyPermutationToVector(tileSizes, outerDimsPerm);
           }
 
-          SmallVector<int64_t> vecTileSizes =
-              getPackVectorTileSizes(entryPointFn, packOp);
           // tensor.pack op does not have reduction loops.
           tileSizesList.push_back(zeros);
-          tileSizesList.push_back(vecTileSizes);
+          tileSizesList.push_back(zeros);
         })
         .Case<linalg::GenericOp>([&](auto genericOp) {
           auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
