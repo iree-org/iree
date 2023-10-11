@@ -15,6 +15,8 @@ NOTEBOOKS_TO_SKIP = [
     # tflite_runtime requires some deps ("version `GLIBC_2.29' not found") that
     # samples.Dockerfile does not currently include.
     "tflite_text_classification.ipynb",
+    # Requires Python 3.10+ in our Docker image.
+    "pytorch_jit.ipynb",
 ]
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
