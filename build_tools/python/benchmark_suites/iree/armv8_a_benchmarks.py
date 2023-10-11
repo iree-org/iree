@@ -19,11 +19,7 @@ class Android_ARMv8_A_Benchmarks(object):
 
     NONQUANT_MODELS = [
         tflite_models.DEEPLABV3_FP32,
-        tflite_models.MOBILESSD_FP32,
-        tflite_models.POSENET_FP32,
         tflite_models.MOBILEBERT_FP32,
-        tflite_models.MOBILENET_V2,
-        tflite_models.MOBILENET_V3SMALL,
     ]
     QUANT_MODELS = [tflite_models.MOBILEBERT_INT8]
 
