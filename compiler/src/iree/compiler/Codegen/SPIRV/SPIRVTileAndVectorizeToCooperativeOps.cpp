@@ -44,9 +44,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
-using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile-and-vectorize-to-cooperative-ops"
 
@@ -173,20 +171,6 @@ static void populateTilingToSubgroupPatterns(
 //===----------------------------------------------------------------------===//
 // Vectorization patterns
 //===----------------------------------------------------------------------===//
-
-/// Adds patterns to vectorize Linalg ops with vectorization markers.
-void populateVectorizationPatterns(MLIRContext *context,
-                                   RewritePatternSet &patterns) {
-  IREE::LinalgExt::LinalgTransformationFilter f(
-      StringAttr::get(context, getVectorizeMarker()));
-  IREE::LinalgExt::LinalgVectorizationOptions opts;
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
-                                                                   opts, f);
-  patterns.add<LinalgVectorizationPattern>(
-      context, opts, f.addOpFilter<linalg::ContractionOpInterface>());
-  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVectorReductionToContractPatterns(patterns);
-}
 
 template <typename ExtOpTy>
 std::optional<SmallVector<int64_t>>

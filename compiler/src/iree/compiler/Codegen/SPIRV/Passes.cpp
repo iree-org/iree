@@ -645,8 +645,8 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
 void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
   addSPIRVTransformDialectPasses(pm);
 
-  // Run SPIRVVectorize pass additionally to convert vectors into forms needed
-  // for SPIR-V.
+  // Run GenericVectorization pass additionally to convert vectors into forms
+  // needed for SPIR-V.
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
   addSPIRVVectorLoweringPasses(nestedModulePM);
