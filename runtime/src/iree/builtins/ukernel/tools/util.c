@@ -212,6 +212,10 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
     out_cpu_data_fields[0] = avx512_base | IREE_CPU_DATA0_X86_64_AVX512VNNI;
     return;
   }
+  if (!strcmp(cpu_features, "avx512_bf16")) {
+    out_cpu_data_fields[0] = avx512_base | IREE_CPU_DATA0_X86_64_AVX512BF16;
+    return;
+  }
 #endif  // defined(IREE_ARCH_X86_64)
 
   // Fall back to interpreting cpu_features as a comma-separated list of LLVM
