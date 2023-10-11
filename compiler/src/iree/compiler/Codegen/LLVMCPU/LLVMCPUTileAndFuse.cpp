@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -24,11 +25,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-// Note: This is shared with iree-llvmcpu-tile.
-void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
-                     SmallVector<int64_t> tileSizes,
-                     SmallVector<bool> tileScalableFlags);
 
 namespace {
 

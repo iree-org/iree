@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -24,38 +25,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-// Note: This is shared with iree-llvmcpu-tile-and-fuse.
-void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
-                     SmallVector<int64_t> tileSizes,
-                     SmallVector<bool> tileScalableFlags) {
-  // scf::tileUsingSCFForOp expects the num of tile sizes = num of loops.
-  int numLoops = consumerOp.getLoopIteratorTypes().size();
-  tileSizes.resize(numLoops, /*default=*/0);
-  tileScalableFlags.resize(numLoops, /*default=*/false);
-  if (!llvm::is_contained(tileSizes, true)) {
-    // Non-scalable case: All constant tile sizes.
-    options.setTileSizes(
-        getAsIndexOpFoldResult(consumerOp.getContext(), tileSizes));
-  } else {
-    // Scalable case: Multiply scalable tile sizes by vscale.
-    options.setTileSizeComputationFunction(
-        [=](OpBuilder &b, Operation *op) -> SmallVector<OpFoldResult> {
-          auto loc = op->getLoc();
-          return llvm::map_to_vector(
-              llvm::zip(tileSizes, tileScalableFlags),
-              [&](auto pair) -> OpFoldResult {
-                auto [t, isScalable] = pair;
-                Value size = b.create<arith::ConstantIndexOp>(loc, t);
-                if (isScalable) {
-                  Value vscale = b.create<vector::VectorScaleOp>(loc);
-                  size = b.create<arith::MulIOp>(loc, size, vscale);
-                }
-                return size;
-              });
-        });
-  }
-}
 
 namespace {
 
