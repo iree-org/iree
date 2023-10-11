@@ -347,11 +347,10 @@ struct MMTKernel {
   ScalarType rhsType = ScalarType::None;
   // Element type of the Accumulator and output vectors.
   ScalarType accType = ScalarType::None;
-  // User defined constraint code for LHS registers
+  // Optional user defined constrained codes for input and output registers.
+  // This is useful when the constraint code is not the same for all operands.
   std::optional<SmallVector<std::string>> lhsCode = std::nullopt;
-  // User defined constraint code for RHS registers
   std::optional<SmallVector<std::string>> rhsCode = std::nullopt;
-  // User defined constraint code for Accumulator and output registers
   std::optional<SmallVector<std::string>> accCode = std::nullopt;
   // This flag indicates whether or not to promote inputs that have a smaller
   // bitwidth than lhsType, rhsType, or accType, to the appropriate bitwidth
@@ -832,11 +831,6 @@ MMTKernel MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512VNNI_InlineAsm() {
   kernel.lhsType = MMTKernel::ScalarType::I16;
   kernel.rhsType = MMTKernel::ScalarType::I16;
   kernel.accType = MMTKernel::ScalarType::I32;
-  kernel.lhsCode = SmallVector<std::string>({"{zmm8}"});
-  kernel.rhsCode =
-      SmallVector<std::string>({"{zmm9}", "{zmm10}", "{zmm11}", "{zmm12}"});
-  kernel.accCode =
-      SmallVector<std::string>({"{zmm17}", "{zmm18}", "{zmm19}", "{zmm20}"});
   kernel.promoteSmallTypes = true;
   kernel.useIntel = true;
   kernel.m0 = 1;
@@ -856,6 +850,37 @@ MMTKernel MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512VNNI_InlineAsm() {
       vpdpwssd $(acc:3), $(rhs:3), $(lhs:0)
     )ASM";
   kernel.asmClobbers = "";
+  return kernel;
+}
+
+MMTKernel MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512_InlineAsm() {
+  MMTKernel kernel;
+  kernel.lhsType = MMTKernel::ScalarType::I16;
+  kernel.rhsType = MMTKernel::ScalarType::I16;
+  kernel.accType = MMTKernel::ScalarType::I32;
+  kernel.promoteSmallTypes = true;
+  kernel.useIntel = true;
+  kernel.m0 = 1;
+  kernel.k0 = 2;
+  kernel.n0 = 4;
+  kernel.split0 = 16;
+  kernel.lhsRegSize = 32;
+  kernel.rhsRegSize = 32;
+  kernel.accRegSize = 16;
+  kernel.lhsRegs = 1;
+  kernel.rhsRegs = 4;
+  kernel.accRegs = 4;
+  kernel.asmImpl = R"ASM(
+      vpmaddwd zmm17, $(rhs:0), $(lhs:0)
+      vpmaddwd zmm18, $(rhs:1), $(lhs:0)
+      vpmaddwd zmm19, $(rhs:2), $(lhs:0)
+      vpmaddwd zmm20, $(rhs:3), $(lhs:0)
+      vpaddw $(acc:0), $(acc:0), zmm17
+      vpaddw $(acc:1), $(acc:1), zmm18
+      vpaddw $(acc:2), $(acc:2), zmm19
+      vpaddw $(acc:3), $(acc:3), zmm20
+    )ASM";
+  kernel.asmClobbers = "zmm17,zmm18,zmm19,zmm20";
   return kernel;
 }
 
@@ -953,7 +978,7 @@ private:
       return "w";
     }
     if (isX86(target)) {
-      return "x";
+      return "v";
     }
     assert(false && "what constraint code to use on this arch?");
     return {};
@@ -1403,6 +1428,9 @@ void populateVectorContractCustomKernelsPatterns(
       patterns.add<MMTCustomKernelPattern>(
           context,
           MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512VNNI_InlineAsm());
+    } else if (hasFeature(target, "+avx512bw")) {
+      patterns.add<MMTCustomKernelPattern>(
+          context, MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512_InlineAsm());
     }
   }
 }
