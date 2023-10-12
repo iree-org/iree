@@ -194,8 +194,12 @@ option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OF
 # it can be automatically downloaded on certain host architectures.
 #-------------------------------------------------------------------------------
 
+set(CUDAToolkit_INCLUDE_DIR "/usr/local/cuda/include")
+set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 set(IREE_CUDA_AVAILABLE OFF)
 find_package(CUDAToolkit)
+message("lj1"  ${CUDAToolkit})
+message("lj1"  ${CUDAToolkit_FOUND})
 if(CUDAToolkit_FOUND)
   set(IREE_CUDA_AVAILABLE ON)
 else()
