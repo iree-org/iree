@@ -210,6 +210,9 @@ IREE_API_EXPORT bool iree_string_view_atoi_uint32(iree_string_view_t value,
                                                   uint32_t* out_value);
 IREE_API_EXPORT bool iree_string_view_atoi_int64(iree_string_view_t value,
                                                  int64_t* out_value);
+IREE_API_EXPORT bool iree_string_view_atoi_uint64_base(iree_string_view_t value,
+                                                       int base,
+                                                       uint64_t* out_value);
 IREE_API_EXPORT bool iree_string_view_atoi_uint64(iree_string_view_t value,
                                                   uint64_t* out_value);
 IREE_API_EXPORT bool iree_string_view_atof(iree_string_view_t value,
