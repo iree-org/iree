@@ -88,6 +88,12 @@ static int64_t estimateLinalgExtOpCost(Operation *op) {
   return cost;
 }
 
+// Estimates the evaluation cost of a Linalg::Softmax op using a heuristic cost
+// model similar to LinalgExt ops.
+static int64_t estimateLinalgSoftmaxOpCost(Operation *op) {
+  return estimateLinalgExtOpCost(op);
+}
+
 // Returns a string like "512xDx128" representing loop ranges.
 static std::string loopRangesToString(ArrayRef<int64_t> loopRanges) {
   std::string outputString;
@@ -167,7 +173,9 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
 
 static std::string summarizeLinalgExtOp(Operation *op) {
   auto opName = op->getName().getStringRef();
-  if (!opName.consume_front("iree_linalg_ext."))
+  // Currently, this utility is also invoked by Linalg::SoftmaxOp.
+  if (!(opName.consume_front("iree_linalg_ext.") ||
+        opName.consume_front("linalg.")))
     return "";
   std::string suffix = "";
   if (TensorType mainTensor = getMainTensorForLinalgExtOp(op)) {
@@ -203,6 +211,15 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
   int64_t bestEstimatedCost = kMinEstimatedCost;
   regionOp.getWorkgroupBody().walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
+        .Case<linalg::SoftmaxOp>([&](auto op) {
+          int64_t estimatedCost = estimateLinalgSoftmaxOpCost(op);
+          if (estimatedCost < bestEstimatedCost)
+            return;
+          bestEstimatedCost = estimatedCost;
+          bestOp = op;
+          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
+                                  << "', cost: " << bestEstimatedCost << "\n");
+        })
         .Case<linalg::LinalgOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgOpCost(op);
           if (estimatedCost < bestEstimatedCost)
@@ -259,6 +276,8 @@ summarizeDispatchWorkgroupsOp(DispatchWorkgroupsOp regionOp) {
 
   std::string bestSummary = "";
   TypeSwitch<Operation *>(bestOp)
+      .Case<linalg::SoftmaxOp>(
+          [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
       .Case<linalg::LinalgOp>(
           [&](auto op) { bestSummary = summarizeLinalgOp(op); })
       .Case<IREE::LinalgExt::SetEncodingOp>([&](auto op) {

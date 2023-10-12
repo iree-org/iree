@@ -674,8 +674,9 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       linalg::LinalgOp op = softmax.first;
       Value src = softmax.second;
       rewriter.setInsertionPoint(softmax.first);
-      rewriter.replaceOpWithNewOp<IREE::LinalgExt::SoftmaxOp>(
-          op, src, op.getDpsInitOperand(0)->get(), op.getNumLoops() - 1);
+      rewriter.replaceOpWithNewOp<linalg::SoftmaxOp>(
+          op, op->getResultTypes(), src, op.getDpsInitOperand(0)->get(),
+          op.getNumLoops() - 1);
     }
 
     for (std::pair<linalg::MatmulOp, Value> aTransposeBMatmul :

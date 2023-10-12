@@ -3,7 +3,7 @@
 // CHECK-LABEL: @softmax
 //  CHECK-SAME: %[[ARG:.+]]: tensor<?x?x?xf32>
 //       CHECK:   %[[E:.+]] = tensor.empty(%{{.*}}, %{{.*}}, %{{.*}}) : tensor<?x?x?xf32>
-//       CHECK:   %[[S:.+]] = iree_linalg_ext.softmax dimension(2) ins(%[[ARG]] : tensor<?x?x?xf32>) outs(%[[E]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+//       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<?x?x?xf32>) outs(%[[E]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
 //       CHECK:   return %[[S]] : tensor<?x?x?xf32>
 
 func.func @softmax(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
@@ -56,7 +56,7 @@ func.func @softmax(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
 // CHECK-LABEL: @softmax_no_rcp
 //  CHECK-SAME: %[[ARG:.+]]: tensor<10x4096x4096xf16>
 //       CHECK:   %[[E:.+]] = tensor.empty() : tensor<10x4096x4096xf16>
-//       CHECK:   %[[S:.+]] = iree_linalg_ext.softmax dimension(2) ins(%[[ARG]] : tensor<10x4096x4096xf16>) outs(%[[E]] : tensor<10x4096x4096xf16>) -> tensor<10x4096x4096xf16>
+//       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<10x4096x4096xf16>) outs(%[[E]] : tensor<10x4096x4096xf16>) -> tensor<10x4096x4096xf16>
 //       CHECK:   return %[[S]] : tensor<10x4096x4096xf16>
 func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x4096xf16>) {
   %cst_158 = arith.constant -6.550400e+04 : f16
@@ -113,7 +113,7 @@ func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x40
 // CHECK-LABEL: @softmax_broadcast
 //  CHECK-SAME: %[[ARG:.+]]: tensor<12x128x128xf32>
 //       CHECK:   %[[E:.+]] = tensor.empty() : tensor<12x128x128xf32>
-//       CHECK:   %[[S:.+]] = iree_linalg_ext.softmax dimension(2) ins(%[[ARG]] : tensor<12x128x128xf32>) outs(%[[E]] : tensor<12x128x128xf32>) -> tensor<12x128x128xf32>
+//       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<12x128x128xf32>) outs(%[[E]] : tensor<12x128x128xf32>) -> tensor<12x128x128xf32>
 //       CHECK:   return %[[S]] : tensor<12x128x128xf32>
 func.func @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x128x128xf32>) {
   %cst_16 = arith.constant 0xFF800000 : f32

@@ -339,7 +339,7 @@ func.func @main(%arg0: tensor<7xf32>) -> tensor<7xf32> {
       (%arg1: !flow.dispatch.tensor<readonly:tensor<7xf32>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<7xf32>>) {
     %1 = flow.dispatch.tensor.load %arg1, offsets = [0], sizes = [7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<7xf32>> -> tensor<7xf32>
     %2 = tensor.empty() : tensor<7xf32>
-    %3 = iree_linalg_ext.softmax dimension(0) ins(%1 : tensor<7xf32>) outs(%2 : tensor<7xf32>) -> tensor<7xf32>
+    %3 = linalg.softmax dimension(0) ins(%1 : tensor<7xf32>) outs(%2 : tensor<7xf32>) -> tensor<7xf32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [0], sizes = [7], strides = [1] : tensor<7xf32> -> !flow.dispatch.tensor<writeonly:tensor<7xf32>>
     flow.return
   } count(%arg1: index) -> (index, index, index) {
