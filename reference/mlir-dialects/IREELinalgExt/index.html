@@ -2836,50 +2836,6 @@ Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInter
 | :----: | ----------- |
 | `results` | ranked tensor of any type values
 
-#### `iree_linalg_ext.softmax` (LinalgExt::SoftmaxOp)
-
-_Softmax operator_
-
-
-Syntax:
-
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.softmax` attr-dict
-              `dimension` `(` $dimension `)`
-              `ins` `(` $inputs `:` type($inputs) `)`
-              `outs` `(` $outputs `:` type($outputs) `)`
-              (`-&gt;` type($result)^)?
-</code></pre></div>
-
-This op computes a numerically stable version of softmax for a given tensor.
-For a given input tensor x and specified dimension d,
-we first compute the max along that dimension (m). We then compute
-f(x) = exp(x - m). Then, we sum f(x) along dimension d to get l(x). Finally,
-we compute the softmax as f(x) / l(x).
-
-Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator<::mlir::iree_compiler::IREE::LinalgExt::YieldOp>
-
-Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface
-
-##### Attributes:
-
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
-<table>
-
-##### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-| `inputs` | shaped of any type values
-| `outputs` | shaped of any type values
-
-##### Results:
-
-| Result | Description |
-| :----: | ----------- |
-| `result` | ranked tensor of any type values
-
 #### `iree_linalg_ext.sort` (LinalgExt::SortOp)
 
 _Sort operator_
