@@ -107,6 +107,9 @@ createLLVMCPUFoldVectorContractUnitDimsPass();
 
 std::unique_ptr<Pass> createLLVMCPUFoldMemRefAliasOpsPass();
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSetSpecialTilingConfigsPass();
+
 //------------------------------------------------------------------------------
 // LLVMCPU Codegen specific patterns.
 //------------------------------------------------------------------------------
@@ -119,7 +122,8 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 void populateVectorContractCustomKernelsPatterns(
     IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns);
 
-void populateLLVMCPUBreakDownSubbyteExtendPatterns(RewritePatternSet &patterns);
+void populateLLVMCPUBreakDownSubbyteExtendPatterns(
+    IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns);
 
 void populateFoldVectorContractUnitDimsPass(RewritePatternSet &patterns,
                                             MLIRContext *context);

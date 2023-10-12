@@ -93,54 +93,6 @@ getParallelAndReductionIterators(unsigned nLoops, unsigned nReduction) {
   return res;
 }
 
-// We set the tile sizes of the integer matmul result from the reassociated
-// op sequence here to target a specific VectorContractCustomKernel and optimize
-// performance on x86 with AVX512VNNI
-static LogicalResult setTileSizes(linalg::GenericOp intMatmul,
-                                  linalg::GenericOp reassociation,
-                                  func::FuncOp entryPointFn) {
-
-  SmallVector<int64_t> distTileSizes_mm = {128, 0, 0};
-  SmallVector<int64_t> parallelTileSizes_mm = {4, 0, 0};
-  SmallVector<int64_t> reductionTileSizes_mm = {4, 1, 16};
-  SmallVector<int64_t> lastTileSizes_mm = {0, 0, 0};
-
-  TileSizesListType tileSizes_mm;
-  tileSizes_mm.push_back(distTileSizes_mm);
-  tileSizes_mm.push_back(parallelTileSizes_mm);
-  tileSizes_mm.push_back(reductionTileSizes_mm);
-  tileSizes_mm.push_back(lastTileSizes_mm);
-
-  SmallVector<int64_t> distTileSizes_re = {128, 0};
-  SmallVector<int64_t> parallelTileSizes_re = {4, 0};
-  SmallVector<int64_t> reductionTileSizes_re = {0, 0};
-  SmallVector<int64_t> lastTileSizes_re = {0, 0};
-
-  TileSizesListType tileSizes_re;
-  tileSizes_re.push_back(distTileSizes_re);
-  tileSizes_re.push_back(parallelTileSizes_re);
-  tileSizes_re.push_back(reductionTileSizes_re);
-  tileSizes_re.push_back(lastTileSizes_re);
-
-  Codegen::DispatchLoweringPassPipeline passPipeline =
-      Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-
-  MLIRContext *context = entryPointFn.getContext();
-  auto config_mm = Codegen::LoweringConfigAttr::get(context, tileSizes_mm);
-  intMatmul->setAttr("lowering_config", config_mm);
-
-  auto config_re = Codegen::LoweringConfigAttr::get(context, tileSizes_re);
-  auto translationInfo_re = Codegen::TranslationInfoAttr::get(
-      entryPointFn.getContext(), passPipeline, 0, 1);
-  auto compilationInfo_re =
-      Codegen::CompilationInfoAttr::get(context, config_re, translationInfo_re,
-                                        ArrayRef<int64_t>({}), std::nullopt);
-
-  reassociation->setAttr("compilation_info", compilationInfo_re);
-
-  return success();
-}
-
 // Takes as input the dequantization `linalg.generic` op and the matmul
 // `linalg.generic` op, and returns the scales, zero points, quantized
 // input matrix, unquantizaed input matrix, and dequantized result
@@ -624,12 +576,6 @@ static LogicalResult ReassociateAndFuseDequantMatmul(
   Value dequantizedMatmul = dequantizedMatmulOp.getResult(0);
 
   rewriter.replaceOp(matmul, dequantizedMatmul);
-
-  // Set tile sizes for dequantization + matmul ops
-  if (failed(
-          setTileSizes(integerMatmulOp, dequantizedMatmulOp, entryPointFn))) {
-    return failure();
-  }
 
   // Fuse dequantization + matmul ops into a single dispatch region
   SmallVector<Operation *> dequantMatmulOps(

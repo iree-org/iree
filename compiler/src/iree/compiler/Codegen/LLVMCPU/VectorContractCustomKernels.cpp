@@ -884,6 +884,37 @@ MMTKernel MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512_InlineAsm() {
   return kernel;
 }
 
+MMTKernel MMTKernel_1x2x4_split8_i16i16i32_x86_AVX2_InlineAsm() {
+  MMTKernel kernel;
+  kernel.lhsType = MMTKernel::ScalarType::I16;
+  kernel.rhsType = MMTKernel::ScalarType::I16;
+  kernel.accType = MMTKernel::ScalarType::I32;
+  kernel.promoteSmallTypes = true;
+  kernel.useIntel = true;
+  kernel.m0 = 1;
+  kernel.k0 = 2;
+  kernel.n0 = 4;
+  kernel.split0 = 8;
+  kernel.lhsRegSize = 16;
+  kernel.rhsRegSize = 16;
+  kernel.accRegSize = 8;
+  kernel.lhsRegs = 1;
+  kernel.rhsRegs = 4;
+  kernel.accRegs = 4;
+  kernel.asmImpl = R"ASM(
+      vpmaddwd ymm12, $(rhs:0), $(lhs:0)
+      vpmaddwd ymm13, $(rhs:1), $(lhs:0)
+      vpmaddwd ymm14, $(rhs:2), $(lhs:0)
+      vpmaddwd ymm15, $(rhs:3), $(lhs:0)
+      vpaddw $(acc:0), $(acc:0), ymm12
+      vpaddw $(acc:1), $(acc:1), ymm13
+      vpaddw $(acc:2), $(acc:2), ymm14
+      vpaddw $(acc:3), $(acc:3), ymm15
+    )ASM";
+  kernel.asmClobbers = "ymm12,ymm13,ymm14,ymm15";
+  return kernel;
+}
+
 // Constructs the mlir::Type corresponding to a scalar type.
 Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
   switch (t) {
@@ -1431,6 +1462,9 @@ void populateVectorContractCustomKernelsPatterns(
     } else if (hasFeature(target, "+avx512bw")) {
       patterns.add<MMTCustomKernelPattern>(
           context, MMTKernel_1x2x4_split16_i16i16i32_x86_AVX512_InlineAsm());
+    } else if (hasFeature(target, "+avx2")) {
+      patterns.add<MMTCustomKernelPattern>(
+          context, MMTKernel_1x2x4_split8_i16i16i32_x86_AVX2_InlineAsm());
     }
   }
 }

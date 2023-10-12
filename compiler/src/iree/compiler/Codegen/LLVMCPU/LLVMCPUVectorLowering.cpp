@@ -185,7 +185,8 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   {
     if (enableQuantizedMatmulReassociation) {
       RewritePatternSet patterns(&getContext());
-      populateLLVMCPUBreakDownSubbyteExtendPatterns(patterns);
+      auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+      populateLLVMCPUBreakDownSubbyteExtendPatterns(target, patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }

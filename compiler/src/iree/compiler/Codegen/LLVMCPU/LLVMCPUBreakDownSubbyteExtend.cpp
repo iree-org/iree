@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -20,6 +21,15 @@
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
+static int64_t getVectorSize(IREE::HAL::ExecutableTargetAttr target) {
+  int64_t vectorSize = 0;
+  auto vectorSizeAttr = getConfigIntegerAttr(target, "native_vector_size");
+  if (vectorSizeAttr) {
+    vectorSize = vectorSizeAttr->getInt();
+  }
+  return vectorSize;
+}
 
 template <typename T>
 static Value shuffleMaskShift(PatternRewriter &rewriter, Location loc,
@@ -110,6 +120,9 @@ getLoadsForExtend(arith::ExtUIOp extOp) {
 
 struct BreakDownSubbyteExtend final : OpRewritePattern<arith::ExtUIOp> {
   using OpRewritePattern::OpRewritePattern;
+  BreakDownSubbyteExtend(MLIRContext *context, int64_t vecSizeBits)
+      : OpRewritePattern(context), vecSizeBits(vecSizeBits) {}
+
   LogicalResult matchAndRewrite(arith::ExtUIOp extOp,
                                 PatternRewriter &rewriter) const override {
     VectorType extuiSrcType =
@@ -134,7 +147,10 @@ struct BreakDownSubbyteExtend final : OpRewritePattern<arith::ExtUIOp> {
       return failure();
     }
 
-    int64_t vectorSizeBits = 512;
+    int64_t vectorSizeBits = vecSizeBits;
+    if (!vectorSizeBits) {
+      vectorSizeBits = 512;
+    }
     int64_t vectorSize = vectorSizeBits / dstElemBitwidth;
     int64_t shuffleInputSizeBits = vectorSize * srcElemBitwidth;
     int64_t shuffleInputSize = shuffleInputSizeBits / dstElemBitwidth;
@@ -231,6 +247,8 @@ struct BreakDownSubbyteExtend final : OpRewritePattern<arith::ExtUIOp> {
 
     return success();
   }
+
+  int64_t vecSizeBits;
 };
 
 struct BreakDownSubbyteExtendFlatten final : OpRewritePattern<arith::ExtUIOp> {
@@ -349,25 +367,18 @@ struct LLVMCPUBreakDownSubbyteExtendPass final
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     {
+      int64_t vectorSize = 0;
+      auto target = IREE::HAL::ExecutableTargetAttr::lookup(getOperation());
+      if (target) {
+        vectorSize = getVectorSize(target);
+      }
       RewritePatternSet patterns(context);
-      patterns.add<BreakDownSubbyteExtend>(context);
+      patterns.add<BreakDownSubbyteExtend>(context, vectorSize);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {
         return signalPassFailure();
       }
     }
-
-    // For the case when the innermost dimension of the src type is too small to
-    // fill a single element of the dst type.
-    // {
-    //   RewritePatternSet patterns(context);
-    //   patterns.add<BreakDownSubbyteExtendFlatten>(context);
-    //   vector::populateVectorShapeCastLoweringPatterns(patterns);
-    //   if (failed(applyPatternsAndFoldGreedily(getOperation(),
-    //                                           std::move(patterns)))) {
-    //     return signalPassFailure();
-    //   }
-    // }
   }
 };
 
@@ -379,8 +390,9 @@ createLLVMCPUBreakDownSubbyteExtendPass() {
 }
 
 void populateLLVMCPUBreakDownSubbyteExtendPatterns(
-    RewritePatternSet &patterns) {
-  patterns.add<BreakDownSubbyteExtend>(patterns.getContext());
+    IREE::HAL::ExecutableTargetAttr target, RewritePatternSet &patterns) {
+  int64_t vectorSize = getVectorSize(target);
+  patterns.add<BreakDownSubbyteExtend>(patterns.getContext(), vectorSize);
 }
 
 } // namespace iree_compiler
