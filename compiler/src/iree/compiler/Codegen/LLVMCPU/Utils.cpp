@@ -120,7 +120,7 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
     options.setTileSizes(
         getAsIndexOpFoldResult(consumerOp.getContext(), tileSizes));
   } else {
-    // Scalable case: Multiply scalable tile sizes by vscale.
+    // Scalable case: Multiply scalable tile sizes by a vector.vscale op.
     options.setTileSizeComputationFunction(
         [=](OpBuilder &b, Operation *op) -> SmallVector<OpFoldResult> {
           auto loc = op->getLoc();

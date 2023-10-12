@@ -58,7 +58,8 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 bool hasByteAlignedElementTypes(linalg::LinalgOp linalgOp);
 
 /// Sets the tile sizes of the SCFTilingOptions. If `tileScalableFlags` are
-/// provided the corresponding tile size will be multiplied by `vector.vscale`.
+/// provided the corresponding tile size will be multiplied by a vector.vscale
+/// op.
 void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
                      SmallVector<int64_t> tileSizes,
                      SmallVector<bool> tileScalableFlags);
