@@ -2123,6 +2123,16 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     hasChanged = true;
     LLVM_DEBUG(KD_DBGS() << "Find pack op candidate: " << packOp << "\n");
 
+    SmallVector<int64_t> distTileSizes, tileAndFuseSizes;
+    if (tilingConfig.getNumTilingLevels() > 0) {
+      distTileSizes = tilingConfig.getDistributionTileSizes();
+    }
+    if (tilingConfig.getNumTilingLevels() > 1) {
+      // TODO: Handle scalable tiles.
+      std::tie(tileAndFuseSizes, std::ignore) =
+          tilingConfig.getVectorCommonParallelSizes();
+    }
+
     SmallVector<int64_t> zeros(linalgOp.getNumLoops(), 0);
     for (int i = tileSizesList.size(); i < 2; ++i) {
       tileSizesList.push_back(zeros);
@@ -2134,13 +2144,12 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
     // Align the tile sizes of the root op to the pack op's inner tile sizes, so
     // we can derive the outer tile sizes for pack ops later in
     // setLoweringConfigForComputeOps by dividing with inner tile sizes.
-    auto &tileSizes = tileSizesList[0];
     for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-      if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
+      if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size))
         continue;
-      tileSizes[pos] = llvm::alignTo(tileSizes[pos], size);
+      distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
       LLVM_DEBUG(KD_DBGS() << "Align # " << pos << " tile size to "
-                           << tileSizes[pos] << "\n");
+                           << distTileSizes[pos] << "\n");
     }
 
     // Pack op has special requirements on vector tile sizes to achieve good
@@ -2155,6 +2164,7 @@ static LogicalResult adjustTileSizesForPackOp(func::FuncOp entryPointFn,
       // Scale the vector tile sizes by pack op's inner tile sizes.
       vecTileSizes[pos] *= size;
     }
+    for (int i = 0; i < vecTileSizes.)
     tileSizesList[1] = vecTileSizes;
 
     return WalkResult::advance();
