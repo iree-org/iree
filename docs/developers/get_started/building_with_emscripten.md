@@ -16,9 +16,9 @@ work is needed for this to be generally supported.
 
 ## Prerequisites
 
-Read https://emscripten.org/docs/getting_started/downloads.html and run
+Read <https://emscripten.org/docs/getting_started/downloads.html> and run
 
-```
+```shell
 ./emsdk install latest
 ./emsdk activate latest
 source ./emsdk_env.sh
@@ -53,7 +53,7 @@ $ emcmake cmake -G Ninja -B ../iree-build-emscripten/ \
 
 Build:
 
-```
+```shell
 cmake --build ../iree-build-emscripten/ \
   --target iree_samples_simple_embedding_simple_embedding_vmvx_sync
 ```
@@ -62,5 +62,5 @@ cmake --build ../iree-build-emscripten/ \
 
 Copy the outputs from the build process (e.g. `simple_embedding_vmvx_sync.js`
 and `simple_embedding_vmvx_sync.wasm`) into your application and follow
-instructions at either https://webassembly.org/getting-started/developers-guide/
-or https://developer.mozilla.org/en-US/docs/WebAssembly/Loading_and_running.
+instructions at either <https://webassembly.org/getting-started/developers-guide/>
+or <https://developer.mozilla.org/en-US/docs/WebAssembly/Loading_and_running>.

@@ -21,9 +21,9 @@ PR from there.
 
 ### Setup
 
-1.  Create a fork of the main repository.
+1. Create a fork of the main repository.
 
-2.  Create a local git repository with remotes `upstream` (the main repository)
+2. Create a local git repository with remotes `upstream` (the main repository)
     and `origin` (your personal fork). To list your current remotes
     `git remote -v`.
 
@@ -56,7 +56,7 @@ PR from there.
     command like
     [git-sudo](https://gist.github.com/GMNGeoffrey/42dd9a9792390094a43bdb69659320c0).
 
-3.  Use a script like
+3. Use a script like
     [git_update.sh](/build_tools/scripts/git/git_update.sh)
     to easily synchronize `main` with `upstream`. Submodules make this is a
     little trickier than it should be. You can also turn this into a git command
@@ -107,11 +107,11 @@ workflow
 
 ## Useful Tools
 
-*   GitHub CLI (https://github.com/cli/cli). A CLI for interacting with GitHub.
+* GitHub CLI (<https://github.com/cli/cli>). A CLI for interacting with GitHub.
     Most importantly, it allows scripting the creation of pull requests.
-*   Refined GitHub Chrome and Firefox Extension:
-    https://github.com/sindresorhus/refined-github. Nice extension that adds a
+* Refined GitHub Chrome and Firefox Extension:
+    <https://github.com/sindresorhus/refined-github>. Nice extension that adds a
     bunch of features to the GitHub UI.
-*   VSCode: https://code.visualstudio.com/. The most commonly used IDE amongst
+* VSCode: <https://code.visualstudio.com/>. The most commonly used IDE amongst
     IREE developers.
-*   [ccache](./ccache.md)
+* [ccache](./ccache.md)

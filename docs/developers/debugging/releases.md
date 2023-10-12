@@ -35,7 +35,6 @@ ones:
 export PATH=/opt/python/cp39-cp39/bin:$PATH
 ```
 
-
 Build core installation:
 
 ```shell

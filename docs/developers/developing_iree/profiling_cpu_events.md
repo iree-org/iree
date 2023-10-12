@@ -10,6 +10,7 @@ that access to be slower than it could otherwise be.
 
 Querying and analyzing this data can be useful, but is hard in two distinct
 ways:
+
 * Depending on the CPU and on the OS, both hardware and software limitations can
   get in the way of obtaining accurate data.
 * This data tends to be inherently difficult to interpret, even when it is
@@ -49,6 +50,7 @@ export IREE_PRESERVE_DYLIB_TEMP_FILES=1
 On desktop Linux we can use
 [`perf`](https://perf.wiki.kernel.org/index.php/Main_Page). It is provided on
 most Linux distributions, for instance on Debian-based distributions do:
+
 ```shell
 sudo apt install linux-perf
 ```
@@ -89,7 +91,7 @@ different than what could be viewed in other profilers such as
 profile was recording a specific event type, as in the above `-e
 L1-dcache-load-misses` example:
 
-```
+``` shell
 perf report -i /tmp/perf.data
 
 Samples: 6K of event 'L1-dcache-load-misses', Event count (approx.): 362571861
@@ -108,7 +110,7 @@ could be viewed in Tracy, and the real motivation to use `perf` is when
 profiling by specific event types as in the above `-e L1-dcache-load-misses`
 example:
 
-```
+``` shell
 perf annotate -i perf.data
 
 Samples: 6K of event 'L1-dcache-load-misses', 4000 Hz, Event count (approx.): 362571861
@@ -146,6 +148,7 @@ Unfortunately, `perf` is difficult to build for Android. Fortunately,
 images, and it is part of the Android NDK.
 
 First, we record on the device:
+
 ```shell
 adb shell \
   simpleperf record -e raw-l1d-cache-refill -o /data/local/tmp/perf.data \
@@ -156,6 +159,7 @@ adb shell \
 
 Then pull the recorded data from the device, and analyze on the desktop. We
 assume that `${ANDROID_NDK}` points to the local copy of the Android NDK.
+
 ```shell
 adb pull /data/local/tmp/perf.data /tmp/perf.data
 ${ANDROID_NDK}/simpleperf/report.py -i /tmp/perf.data
@@ -177,6 +181,7 @@ of
 of achieving the same thing.
 
 However:
+
 * The common case of annotating by time, as opposed to annotating by CPU event,
   is supported by [Tracy](profiling_with_tracy.md).
 * Annotating by CPU event is inherently not working due to hardware limitations
@@ -209,6 +214,7 @@ CPUs.
 
 For example, take the "L2 data cache refill". On ARM, with `simpleperf`, that
 would be `raw-l2d-cache-refill`. Questions:
+
 * Is “L2” [inclusive](https://en.wikipedia.org/wiki/Cache_inclusion_policy) of
   “L1”?
 * How many bytes are transferred per “refill”?
@@ -231,12 +237,13 @@ have any access to true hardware counts.
 
 Here is a workflow pattern that allows to make significant use of CPU event
 counts, despite all the problems noted above:
+
 * Hypothesize that some code diff might help performance, and might help
   reducing the number of CPU events of a certain type, and that the two might be
   related.
 * Benchmark with and without the code diff, on the same device, everything else
   being equal.
-  * Let your benchmark perform a fixed number of iterations, or, if using a
+    * Let your benchmark perform a fixed number of iterations, or, if using a
     benchmark termination condition of the form "run until at least N seconds
     have elapsed", carefully divide event counts by the actual number of
     iterations that were run.
@@ -244,6 +251,7 @@ counts, despite all the problems noted above:
   that your code diff probably helps with that aspect of CPU behavior.
 
 Some things NOT to be done:
+
 * Don’t try to compare different metrics, not even when it seems obvious that
   they should satisfy a simple relationship, not even on the same CPU (e.g. “L1
   accesses should be greater than L2 accesses”).

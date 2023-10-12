@@ -61,7 +61,7 @@ generally build an optimized build (`-c opt` in Bazel) and
 [disable CPU scaling](#cpu-configuration).
 
 ```shell
-$ bazel build -c opt //tools:iree-benchmark-module
+bazel build -c opt //tools:iree-benchmark-module
 ```
 
 Another thing to consider is that depending on where you are running the
@@ -156,8 +156,8 @@ model execution. So its performance is of crucial importance. We strive to
 introduce as little overhead as possible and have several benchmark binaries
 dedicated for evaluating the VM's performance. These benchmark binaries are
 named as `*_benchmark` in the
-[`iree/vm/`](https://github.com/openxla/iree/tree/main/runtime/src/iree/vm) directory. They
-also use the Google Benchmark library as the above.
+[`iree/vm/`](https://github.com/openxla/iree/tree/main/runtime/src/iree/vm)
+directory. They also use the Google Benchmark library as the above.
 
 ## CPU Configuration
 
@@ -183,35 +183,35 @@ more advanced configurations should ignore these messages.
 Turn off CPU scaling before benchmarking.
 
 ```shell
-$ sudo cpupower frequency-set --governor performance
+sudo cpupower frequency-set --governor performance
 ```
 
 Restore CPU scaling after benchmarking:
 
 ```shell
-$ sudo cpupower frequency-set --governor powersave
+sudo cpupower frequency-set --governor powersave
 ```
 
 To learn more about different quota
 governor settings, see
-https://www.kernel.org/doc/Documentation/cpu-freq/governors.txt. To restrict
+<https://www.kernel.org/doc/Documentation/cpu-freq/governors.txt>. To restrict
 which CPUs you run on, use the `taskset` command which takes a hexadecimal mask.
 
 To only run on the lowest-numbered CPU you can run
 
 ```shell
-$ taskset 1 sleep 20 &
+taskset 1 sleep 20 &
 ```
 
 You can confirm that the process is running on the given CPU:
 
 ```shell
-$ ps -o psr $!
+ps -o psr $!
 ```
 
 Note that `$!` indicates the process ID of the last executed background command,
 so you can only use this shorthand if you didn't run any commands after the
-sleep. For more info on taskset, see https://linux.die.net/man/1/taskset.
+sleep. For more info on taskset, see <https://linux.die.net/man/1/taskset>.
 
 ### Android
 
@@ -296,8 +296,8 @@ above. Now to run a command specifically on cpu7, use `taskset 80`
 (hex for 10000000):
 
 ```shell
-$ taskset 80 sleep 20 &
-$ ps -o psr $!
+taskset 80 sleep 20 &
+ps -o psr $!
 ```
 
 Remember to cleanup when you're done! Here we'll set the scaling governor back
@@ -315,23 +315,30 @@ done
 
 We provide a few scripts to set clockspeeds on Android (under
 `build_tools/benchmarks`). These are somewhat device-specific:
+
 * The `set_android_scaling_governor.sh` work on all CPUs, but the default
   governor name may be different across devices.
 * The `set_*_gpu_scaling_policy.sh` script used should match the actual GPU on
   your device.
 
 Sample configuration steps for Pixel 6:
+
 1. Copy all scripts to the device:
+
    ```shell
    adb push build_tools/benchmarks/*.sh /data/local/tmp
    ```
+
 1. Launch interactive adb shell as super user:
+
    ```shell
    adb shell
    oriole:/ # su
    oriole:/ # cd /data/local/tmp
    ```
+
 1. Pin frequencies (high clockspeeds):
+
    ```shell
    oriole:/ # ./set_android_scaling_governor.sh
     CPU info (before changing governor):
@@ -368,7 +375,9 @@ Sample configuration steps for Pixel 6:
     --------------------------------------------------------------
     coarse_demand adaptive [always_on]      848000  151000  848000
    ```
+
 1. Restore default frequencies:
+
    ```shell
    oriole:/ # ./set_android_scaling_governor.sh sched_pixel
    ...

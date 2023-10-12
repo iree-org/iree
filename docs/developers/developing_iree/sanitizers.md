@@ -19,6 +19,7 @@ MSan   | Uninitialized memory reads | Non-deterministic results | 3x | ? | Yes
 TSan   | Data races | Many bugs in multi-thread code | 5x-15x | 5x-10x | [No](https://github.com/android/ndk/issues/1171)
 
 Notes:
+
 * (*) See [this
   documentation](https://clang.llvm.org/docs/AddressSanitizer.html#memory-leak-detection)
   on leak detection. It is only enabled by default on some platforms.
@@ -30,7 +31,7 @@ Notes:
 Enabling ASan in the IREE build is a simple matter of setting the
 `IREE_ENABLE_ASAN` CMake option:
 
-```
+```shell
 cmake -DIREE_ENABLE_ASAN=ON ...
 ```
 
@@ -38,7 +39,7 @@ cmake -DIREE_ENABLE_ASAN=ON ...
 
 To enable TSan, at the moment, the following 3 CMake options must be set:
 
-```
+```shell
 cmake \
   -DIREE_ENABLE_TSAN=ON \
   -DIREE_BYTECODE_MODULE_ENABLE_TSAN=ON \
@@ -68,16 +69,16 @@ At the moment, CMake logic heavy-handedly enforces that whenever
 That ensures that all tests succeed: no test is expected to fail with TSan.
 
 If you know what you're doing (i.e. if you are not building targets that
-internally involve a LLVM/CPU `iree_bytecode_module`), feel free to locally comment out
-the CMake error and only set `IREE_ENABLE_TSAN`. Also see a
-[past attempt]((https://github.com/openxla/iree/pull/8966) to relax that CMake
+internally involve a LLVM/CPU `iree_bytecode_module`), feel free to locally
+comment out the CMake error and only set `IREE_ENABLE_TSAN`. Also see a
+[past attempt]((<https://github.com/openxla/iree/pull/8966>) to relax that CMake
 validation.
 
 ### MSan (MemorySanitizer)
 
 In theory that should be a simple matter of
 
-```
+```shell
 -DIREE_ENABLE_MSAN=ON
 ```
 
@@ -94,7 +95,7 @@ instrumentation in the NVIDIA Vulkan driver).
 Enabling UBSan in the IREE build is a simple matter of setting the
 `IREE_ENABLE_UBSAN` CMake option:
 
-```
+```shell
 cmake -DIREE_ENABLE_UBSAN=ON ...
 ```
 
@@ -115,8 +116,8 @@ On Android it's more complicated due to
 [this](https://github.com/android/ndk/issues/753) Android NDK issue.
 Fortunately, we have a script to perform the symbolization. Copy the raw output
 from the sanitizer and feed it into the `stdin` of the
-`build_tools/scripts/android_symbolize.sh` script, with the `ANDROID_NDK` environment
-variable pointing to the NDK root directory, like this:
+`build_tools/scripts/android_symbolize.sh` script, with the `ANDROID_NDK`
+environment variable pointing to the NDK root directory, like this:
 
 ```shell
 ANDROID_NDK=~/android-ndk-r21d ./build_tools/scripts/android_symbolize.sh < /tmp/asan.txt

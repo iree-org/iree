@@ -3,18 +3,18 @@
 This guide provides an overview of IREE's project structure and main tools for
 developers.
 
-** Note: project layout is evolving at the moment, see
-   https://github.com/openxla/iree/issues/8955 **
+**Note: project layout is evolving at the moment, see
+<https://github.com/openxla/iree/issues/8955>**
 
 ## Project Code Layout
 
 * [/compiler/](https://github.com/openxla/iree/blob/main/compiler/):
   MLIR dialects, LLVM compiler passes, module translation code, etc.
-  * [bindings/](https://github.com/openxla/iree/blob/main/compiler/bindings/):
+    * [bindings/](https://github.com/openxla/iree/blob/main/compiler/bindings/):
     Python and other language bindings
 * [/runtime/](https://github.com/openxla/iree/tree/main/runtime/):
   Standalone runtime code including the VM and HAL drivers
-  * [bindings/](https://github.com/openxla/iree/tree/main/runtime/bindings/):
+    * [bindings/](https://github.com/openxla/iree/tree/main/runtime/bindings/):
     Python and other language bindings
 * [/integrations/](https://github.com/openxla/iree/blob/main/integrations/):
   Integrations between IREE and other frameworks, such as TensorFlow
@@ -23,7 +23,7 @@ developers.
 * [/tools/](https://github.com/openxla/iree/blob/main/tools/):
   Developer tools (`iree-compile`, `iree-run-module`, etc.)
 * [/samples/](https://github.com/openxla/iree/blob/main/samples/): Also see the
-  separate https://github.com/iree-org/iree-samples repository
+  separate <https://github.com/iree-org/iree-samples> repository
 
 ## IREE Compiler Code Layout
 
@@ -184,7 +184,7 @@ file.
 For example, to inspect the module translated above:
 
 ```shell
-$ ../iree-build/tools/iree-dump-module /tmp/simple_abs_vmvx.vmfb
+../iree-build/tools/iree-dump-module /tmp/simple_abs_vmvx.vmfb
 ```
 
 ### Useful generic flags
@@ -199,7 +199,7 @@ inputs are expected to be newline-separated. Each input should be either a
 scalar or a buffer. Scalars should be in the format `type=value` and buffers
 should be in the format `[shape]xtype=[value]`. For example:
 
-```
+``` text
 1x5xf32=1,-2,-3,4,-5
 1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1
 ```

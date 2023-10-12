@@ -7,6 +7,7 @@ e.g.
 ```shell
 ccache clang foo.c -c -o foo.o
 ```
+
 takes care of executing `clang` with these arguments and caches the output file
 `foo.o`. The next invocation then skips executing `clang` altogether.
 
@@ -15,6 +16,7 @@ essentially free. However, `ccache` only caches compilation,
 [not linking](https://stackoverflow.com/a/29828811).
 
 Here a few scenarios where `ccache` helps:
+
 * Incremental rebuilds. While `cmake` always tries to avoid unnecessary work in
   incremental rebuilds, it can only make simple decisions based on file
   timestamps. `ccache` sees deeper: if the raw source code isn't readily
@@ -25,7 +27,6 @@ Here a few scenarios where `ccache` helps:
   of a cold build. Thankfully `ccache` keeps its cache outside of any `cmake`
   build directory, so the first build in the new clean build directory may be
   very fast.
-
 
 ## Installing and setting up `ccache`
 
@@ -58,6 +59,7 @@ by setting `CMAKE_C_COMPILER_LAUNCHER=ccache` and
 `CMAKE_CXX_COMPILER_LAUNCHER=ccache` in your
 
 Notes:
+
 * This approach only works with the `Ninja` and `Makefile` generators
   (`cmake -G` flag). When using other generators, another approach is needed,
   based on wrapping the compiler in a script that prepends `ccache`. See this

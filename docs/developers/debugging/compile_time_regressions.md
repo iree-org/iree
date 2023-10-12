@@ -44,7 +44,8 @@ Building the compiler from source and using
 specific commits in IREE, though it typically won't let you step through changes
 in submodules (e.g. MLIR updates in `third_party/llvm-project/`).
 
-__Tip__: [Configure ccache](../developing_iree/ccache.md) if you'll be rebuilding the compiler while bisecting
+**Tip**: [Configure ccache](../developing_iree/ccache.md) if you'll be
+rebuilding the compiler while bisecting
 
 A manual workflow with `git bisect` looks like this:
 
@@ -82,7 +83,7 @@ git bisect run run_bisect.sh
 
 Other sample scripts:
 
-<details><summary>Compile executable sources individually with a timeout:</summary>
+#### Compile executable sources individually with a timeout
 
 ```bash
 #!/bin/bash
@@ -153,8 +154,6 @@ for SOURCE in "${SOURCES[@]}"; do
 done
 ```
 
-</details>
-
 ## Profiling and tracing
 
 If you want to understand _why_ the compiler is fast or slow, or if you want to
@@ -166,6 +165,7 @@ options.
 The `-mlir-timing` flag enables
 [Pass Timing](https://mlir.llvm.org/docs/PassManagement/#pass-timing)
 instrumentation. Once the compiler finishes running, this prints a report like
+
 ```shell
 ===-------------------------------------------------------------------------===
                       ... Pass execution timing report ...
@@ -194,10 +194,10 @@ are outlier passes that take significantly longer to run than others.
 
 Here are some previous analyses for inspiration:
 
-* https://github.com/openxla/iree/issues/12033
-* https://github.com/openxla/iree/issues/12035
-* https://github.com/openxla/iree/issues/12183
-* https://github.com/openxla/iree/issues/13189
+* <https://github.com/openxla/iree/issues/12033>
+* <https://github.com/openxla/iree/issues/12035>
+* <https://github.com/openxla/iree/issues/12183>
+* <https://github.com/openxla/iree/issues/13189>
 
 Example slow trace:
 
@@ -218,6 +218,7 @@ point. For compile time regressions, it helps to snapshot the IR at a few key
 phases and look for differences between fast compilation and slow compilation.
 
 Here is one useful flag combination:
+
 ```shell
 --mlir-disable-threading \
 --mlir-elide-elementsattrs-if-larger=8 \

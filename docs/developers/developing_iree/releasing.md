@@ -13,7 +13,6 @@ on GitHub. We also push the Python packages for this release to PyPI.
 
 The criteria for selecting this candidate is a bit more involved.
 
-
 ## Coupling to the Google Integrate
 
 The Google team that manages these stable releases at the moment is also
@@ -44,7 +43,6 @@ store it elsewhere with appropriate ACLs.
 At the point where others want to engage in the release process, we can easily
 remove any coupling to any Google processes.
 
-
 ## Picking a Candidate to Promote
 
 When selecting a candidate we use the following criteria:
@@ -65,16 +63,15 @@ progress). When you've identified a potential candidate, email the iree-discuss
 list with the proposal and solicit feedback. People may point out known
 regressions or request that some feature make the cut.
 
-
 ## Releasing
 
 1. (Googlers only) Integrate into Google's monorepo, following
-   http://go/iree-g3-integrate-playbook. If OSS-relevant cherry-picks were
+   <http://go/iree-g3-integrate-playbook>. If OSS-relevant cherry-picks were
    required to complete this, STOP: do not promote the candidate.
 
 2. (Googlers only) Push to PyPI using
    [pypi_deploy.sh](/build_tools/python_deploy/pypi_deploy.sh) and the
-   password stored at http://go/iree-pypi-password.
+   password stored at <http://go/iree-pypi-password>.
 
 3. Open the release on GitHub. Rename the release from “candidate" to “stable",
    uncheck the option for “pre-release”, and check the option for "latest".

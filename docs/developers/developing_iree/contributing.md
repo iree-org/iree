@@ -58,7 +58,7 @@ customize which jobs run using
 [git trailers](https://git-scm.com/docs/git-interpret-trailers) in the PR
 description. The available options are
 
-```
+``` text
 ci-skip: jobs,to,skip
 ci-extra: extra,jobs,to,run
 ci-exactly: exact,set,of,jobs,to,run
