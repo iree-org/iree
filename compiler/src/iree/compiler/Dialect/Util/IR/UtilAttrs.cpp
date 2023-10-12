@@ -430,6 +430,7 @@ serializeGenericFloatResourceElements(Location loc,
                                 DenseResourceElementsAttr attr,
                                 llvm::support::endianness endian,
                                 llvm::raw_ostream &os) {
+  //TODO for float64 support
   unsigned bitWidth = attr.getType().getElementTypeBitWidth();
   switch (bitWidth) {
     case 32:
@@ -563,9 +564,10 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
              << " for type " << resourceElementsAttr.getType();
     }
   }
-  if (isDenseFloatResource) {
+  else if (isDenseFloatResource) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
+    // TODO for float64 support
     unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
       case 32:
