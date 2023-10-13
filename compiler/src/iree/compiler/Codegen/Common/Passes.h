@@ -163,6 +163,9 @@ createHoistRedundantVectorTransfersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createHoistUnrolledVectorExtractInsertSlicePass();
+
 /// Pass to perform linalg on tensor bufferization. The function passed into
 /// the pass through the `allocationFn` argument is invoked whenever a new
 /// buffer is to be created. The callback will be passed the Values for the

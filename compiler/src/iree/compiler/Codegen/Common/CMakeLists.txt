@@ -147,6 +147,7 @@ iree_cc_library(
     "GenericVectorization.cpp"
     "HoistRedundantVectorTransfers.cpp"
     "HoistStaticallyBoundAllocations.cpp"
+    "HoistUnrolledVectorExtractInsertSlice.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
     "InstrumentMemoryAccesses.cpp"
@@ -194,6 +195,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
+    MLIRLoopLikeInterface
     MLIRMathDialect
     MLIRMathTransforms
     MLIRMemRefDialect

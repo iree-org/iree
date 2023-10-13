@@ -283,6 +283,12 @@ def HoistRedundantVectorTransfers :
   let constructor = "mlir::iree_compiler::createHoistRedundantVectorTransfersPass()";
 }
 
+def HoistUnrolledVectorExtractInsertSlice :
+    Pass<"iree-codegen-hoist-vector-extract-insert-slice", "func::FuncOp"> {
+  let summary = "Hoist unrolled vector (extract, insert) pairs out of scf.for op";
+  let constructor =  "mlir::iree_compiler::createHoistUnrolledVectorExtractInsertSlicePass()";
+}
+
 def HoistStaticallyBoundAllocations :
     Pass<"iree-hoist-statically-bound-allocations", "func::FuncOp"> {
   let summary = "Hoist statically bound alloca ops to the entry block of functions";
