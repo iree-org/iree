@@ -176,9 +176,8 @@ static FailureOr<func::CallOp> lowerUKernelGenericToFunctionCall(
                             callResultTypes, callOperands, fnDefAttrs);
 }
 
-std::pair<int64_t, int64_t> UKernelGenericOp::getDpsInitsPositionRange() {
-  auto [pos, size] = getODSOperandIndexAndLength(1);
-  return {static_cast<int64_t>(pos), static_cast<int64_t>(pos + size)};
+MutableOperandRange UKernelGenericOp::getDpsInitsMutable() {
+  return getOutputsMutable();
 }
 
 FailureOr<func::CallOp>
@@ -236,9 +235,9 @@ struct UKernelOpsBufferizationInterface
 
     auto bufferOp = rewriter.create<OpTy>(op->getLoc(), resultTypes,
                                           bufferOpOperands, op->getAttrs());
-    SmallVector<Value> dpsInits =
+    ValueRange dpsInits =
         cast<DestinationStyleOpInterface>(bufferOp.getOperation())
-            .getDpsInitOperands();
+            .getDpsInits();
     bufferization::replaceOpWithBufferizedValues(rewriter, op, dpsInits);
     return success();
   }

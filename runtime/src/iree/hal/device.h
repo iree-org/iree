@@ -594,10 +594,8 @@ typedef struct iree_hal_device_vtable_t {
 
   iree_status_t(IREE_API_PTR* import_file)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
-      iree_hal_memory_access_t access,
-      iree_hal_external_file_t* IREE_RESTRICT external_file,
-      iree_hal_file_release_callback_t release_callback,
-      iree_hal_file_t** out_file);
+      iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
+      iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file);
 
   iree_status_t(IREE_API_PTR* create_pipeline_layout)(
       iree_hal_device_t* device, iree_host_size_t push_constants,

@@ -69,32 +69,6 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyBufferOptimizationsOp
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  // Apply store to load forwarding and dead store elimination.
-  vector::transferOpflowOpt(rewriter, target);
-  eraseDeadAllocAndStores(target);
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
-}
-
-void transform_dialect::ApplyBufferOptimizationsOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
-  result.addOperands(target);
-}
-
-//===---------------------------------------------------------------------===//
 // ApplyIreeLinalgElementwiseGreedyFusionPatternsOp
 //===---------------------------------------------------------------------===//
 
@@ -103,7 +77,7 @@ static void addOperands(Operation *op, SetVector<Value> &operandSet) {
     return;
   TypeSwitch<Operation *, void>(op)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-        SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
+        SmallVector<Value> inputOperands = linalgOp.getDpsInputs();
         operandSet.insert(inputOperands.begin(), inputOperands.end());
       })
       .Default([&](Operation *operation) {
@@ -719,12 +693,6 @@ static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
       .getResult();
 }
 
-static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
-  return success();
-}
-
 static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
@@ -740,6 +708,7 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
+  OpBuilder::InsertionGuard g(builder);
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   MemRefType allocType =
@@ -749,13 +718,6 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
       .create<memref::AllocOp>(loc, allocType, dynamicSizes,
                                builder.getI64IntegerAttr(alignment))
       .getResult();
-}
-
-static LogicalResult gpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
-  builder.create<memref::DeallocOp>(loc, allocation);
-  return success();
 }
 
 static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
@@ -846,12 +808,9 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   using mlir::bufferization::BufferizationOptions;
   BufferizationOptions::AllocationFn allocationFn =
       cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
   BufferizationOptions::MemCpyFn memCpyFn = cpuComprehensiveBufferizeCopyFn;
   if (getTargetGpu()) {
     allocationFn = gpuComprehensiveBufferizeAllocationFn;
-    deallocationFn = gpuComprehensiveBufferizeDeallocationFn;
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
@@ -883,7 +842,6 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   //   2. Run one-shot-bufferize, without the pass baggage.
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();

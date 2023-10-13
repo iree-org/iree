@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "hal_executable.mlir"
     "inline_dynamic_hal_executable.mlir"
     "inline_static_hal_executable.mlir"
+    "precompile.mlir"
     "preprocessing_flags.mlir"
     "smoketest.mlir"
     "streams.mlir"

@@ -24,6 +24,8 @@
 // NOTE: redundant bindings will result in unique buffer locations during the
 // benchmark and will impact caching behavior.
 
+#define DEBUG_TYPE "iree-dump-executable-benchmarks"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -77,7 +79,11 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       for (auto workloadValue : workloadValues) {
         APInt workloadConstValue;
         if (!matchPattern(workloadValue, m_ConstantInt(&workloadConstValue))) {
-          // Non-constant workload; skip this dispatch.
+          LLVM_DEBUG({
+            auto firstEntryPoint = *dispatchOp.getEntryPointRefs().begin();
+            llvm::dbgs() << "Skipping dispatch of entry point `"
+                         << firstEntryPoint << "` (non-constant workload)\n";
+          });
           return;
         }
         workload.push_back(workloadConstValue.getSExtValue());
@@ -89,7 +95,12 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
                dispatchOp.getResourceLengths())) {
         APInt resourceLengthInt;
         if (!matchPattern(resourceLength, m_ConstantInt(&resourceLengthInt))) {
-          // Non-constant resource length; skip this dispatch.
+          LLVM_DEBUG({
+            auto firstEntryPoint = *dispatchOp.getEntryPointRefs().begin();
+            llvm::dbgs() << "Skipping dispatch of entry point `"
+                         << firstEntryPoint
+                         << "` (non-constant resource length)\n";
+          });
           return;
         }
         bindings.push_back({(unsigned)bindingAttr.getSet(),
@@ -101,9 +112,14 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
       for (auto operand : dispatchOp.getUniformOperands()) {
         TypedAttr uniformOperand;
         if (!matchPattern(operand, m_Constant(&uniformOperand))) {
-          // Non-constant uniform operand; skip the dispatch.
           // TODO(benvanik): extract information from the executable annotations
           // or allow the dynamic value to be passed in as an additional arg.
+          LLVM_DEBUG({
+            auto firstEntryPoint = *dispatchOp.getEntryPointRefs().begin();
+            llvm::dbgs() << "Skipping dispatch of entry point `"
+                         << firstEntryPoint
+                         << "` (non-constant uniform operand)\n";
+          });
           return;
         }
         uniformOperands.push_back(uniformOperand);
@@ -464,8 +480,13 @@ public:
     // filtering out dispatches that have dynamic parameters we don't
     // currently support.
     auto dispatchParamsMap = gatherDispatchParams(moduleOp);
-    if (dispatchParamsMap.empty())
+    if (dispatchParamsMap.empty()) {
+      mlir::emitRemark(moduleOp.getLoc())
+          << "Executable benchmarks were requested but none were generated. "
+             "Run with --debug-only=iree-dump-executable-benchmarks for more "
+             "details.\n";
       return;
+    }
 
     // Help people out and mkdir if needed.
     if (!path.empty() && path != "-") {

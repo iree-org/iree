@@ -89,7 +89,7 @@ static bool canUseRawData(DenseElementsAttr attr,
   } else if (bitWidth % 8 != 0) {
     // Any non-byte aligned bit width is stored byte aligned.
     return false;
-  } else if (endian != llvm::support::endian::system_endianness()) {
+  } else if (endian != llvm::endianness::native) {
     // Can't use raw data if the endianness of the system doesn't match the
     // endianness of the target.
     return false;

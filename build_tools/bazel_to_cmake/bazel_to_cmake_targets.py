@@ -86,10 +86,6 @@ class TargetConverter:
                 "@nccl//:headers": [
                     "nccl::headers",
                 ],
-                # Torch-MLIR.
-                "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
-                    "TorchMLIRTMTensorDialect"
-                ],
                 # Tracy.
                 "@tracy_client//:runtime": ["tracy_client::runtime"],
                 # Vulkan
@@ -103,9 +99,6 @@ class TargetConverter:
                 "@com_google_googletest//:gtest": ["gmock", "gtest"],
                 "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
                 "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
-                "@vulkan_memory_allocator//:impl_header_only": [
-                    "vulkan_memory_allocator"
-                ],
                 "@webgpu_headers": [],
             }
         )

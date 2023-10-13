@@ -3,7 +3,7 @@ transform.sequence failures(propagate) {
   // Step 1. Find three linalg.generics and tile to GPU thread blocks.
   // ===========================================================================
   %generics = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %forall_grid, %_ = transform.structured.tile_to_forall_op %generics 
+  %_, %forall_grid = transform.structured.tile_using_forall %generics 
                   tile_sizes [5, 3] ( mapping = [#gpu.block<z>, #gpu.block<x>])
                   : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()

@@ -49,7 +49,7 @@ func.func @bitcast_extract_extend_0(%input: vector<1xi32>) -> vector<4xi32> {
 //   CHECK-DAG:   %[[OFF1:.+]] = arith.constant 4 : i32
 //   CHECK-DAG:   %[[OFF2:.+]] = arith.constant 8 : i32
 //   CHECK-DAG:   %[[OFF3:.+]] = arith.constant 12 : i32
-//       CHECK:   %[[BASE:.+]] = vector.extract %[[INPUT]][0] : vector<1xi32>
+//       CHECK:   %[[BASE:.+]] = vector.extract %[[INPUT]][0] : i32 from vector<1xi32>
 //       CHECK:   %[[AND0:.+]] = arith.andi %[[BASE]], %[[MASK]] : i32
 //       CHECK:   %[[INS0:.+]] = vector.insert %[[AND0]], %[[ZERO]] [0]
 //       CHECK:   %[[SHR1:.+]] = arith.shrui %[[BASE]], %[[OFF1]] : i32
@@ -81,7 +81,7 @@ func.func @bitcast_extract_extend_1(%input: vector<4xi32>) -> vector<4xi32> {
 //   CHECK-DAG:   %[[OFF1:.+]] = arith.constant 20 : i32
 //   CHECK-DAG:   %[[OFF2:.+]] = arith.constant 24 : i32
 //   CHECK-DAG:   %[[OFF3:.+]] = arith.constant 28 : i32
-//       CHECK:   %[[BASE:.+]] = vector.extract %[[INPUT]][2] : vector<4xi32>
+//       CHECK:   %[[BASE:.+]] = vector.extract %[[INPUT]][2] : i32 from vector<4xi32>
 //       CHECK:   %[[SHR0:.+]] = arith.shrui %[[BASE]], %[[OFF0]] : i32
 //       CHECK:   %[[AND0:.+]] = arith.andi %[[SHR0]], %[[MASK]] : i32
 //       CHECK:   %[[INS0:.+]] = vector.insert %[[AND0]], %[[ZERO]] [0]

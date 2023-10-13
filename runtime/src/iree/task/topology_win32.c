@@ -89,6 +89,192 @@ static void iree_task_topology_assign_constructive_sharing(
   }
 }
 
+// Assigns constructive sharing masks to each topology group. These indicate
+// which other topology groups share L3 caches (if any).
+static void
+iree_task_topology_fixup_constructive_sharing_masks_from_relationships(
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* relationships,
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* relationships_end,
+    iree_task_topology_t* topology) {
+  for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = relationships;
+       p < relationships_end;
+       p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)p + p->Size)) {
+    if (p->Relationship == RelationCache) {
+      if (p->Cache.Level == 3 &&
+          (p->Cache.Type == CacheUnified || p->Cache.Type == CacheData)) {
+        if (p->Cache.GroupCount == 0) {
+          iree_task_topology_assign_constructive_sharing(topology,
+                                                         p->Cache.GroupMask);
+        } else {
+          for (WORD i = 0; i < p->Cache.GroupCount; ++i) {
+            iree_task_topology_assign_constructive_sharing(
+                topology, p->Cache.GroupMasks[i]);
+          }
+        }
+      }
+    }
+  }
+}
+
+iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
+    iree_task_topology_t* topology) {
+  // Query the total size required for just cache information and allocate
+  // storage for it on the stack - it's generally just a few KB.
+  DWORD cache_relationships_size = 0;
+  if (!GetLogicalProcessorInformationEx(RelationCache, NULL,
+                                        &cache_relationships_size) &&
+      GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+    return iree_make_status(
+        iree_status_code_from_win32_error(GetLastError()),
+        "failed to query logical processor information size (%08X)",
+        GetLastError());
+  }
+  if (cache_relationships_size > 64 * 1024) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "logical processor information size overflow (got "
+                            "%u which is large for a stack alloc)",
+                            cache_relationships_size);
+  }
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* cache_relationships =
+      (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)iree_alloca(
+          cache_relationships_size);
+
+  // Query again to populate the storage with cache relationship information.
+  if (!GetLogicalProcessorInformationEx(RelationCache, cache_relationships,
+                                        &cache_relationships_size)) {
+    return iree_make_status(
+        iree_status_code_from_win32_error(GetLastError()),
+        "failed to query logical processor information (%08X)", GetLastError());
+  }
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* cache_relationships_end =
+      (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)
+                                                     cache_relationships +
+                                                 cache_relationships_size);
+
+  // Perform the assignment.
+  iree_task_topology_fixup_constructive_sharing_masks_from_relationships(
+      cache_relationships, cache_relationships_end, topology);
+  return iree_ok_status();
+}
+
+iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
+    iree_host_size_t cpu_count, const uint32_t* cpu_ids,
+    iree_task_topology_t* out_topology) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)cpu_count);
+
+  iree_task_topology_initialize(out_topology);
+
+  // Query the total size required for all information and allocate storage for
+  // it on the stack - it's generally just a few KB.
+  DWORD all_relationships_size = 0;
+  if (!GetLogicalProcessorInformationEx(RelationAll, NULL,
+                                        &all_relationships_size) &&
+      GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        iree_status_code_from_win32_error(GetLastError()),
+        "failed to query logical processor information size (%08X)",
+        GetLastError());
+  }
+  if (all_relationships_size > 64 * 1024) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "logical processor information size overflow (got "
+                            "%u which is large for a stack alloc)",
+                            all_relationships_size);
+  }
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* all_relationships =
+      (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)iree_alloca(
+          all_relationships_size);
+
+  // Query again to populate the storage with all relationship information.
+  if (!GetLogicalProcessorInformationEx(RelationAll, all_relationships,
+                                        &all_relationships_size)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        iree_status_code_from_win32_error(GetLastError()),
+        "failed to query logical processor information (%08X)", GetLastError());
+  }
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* all_relationships_end =
+      (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)all_relationships +
+                                                 all_relationships_size);
+
+  // Count up the total number of logical processors (bits in each core group).
+  uint32_t total_processor_count = 0;
+  for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = all_relationships;
+       p < all_relationships_end;
+       p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)p + p->Size)) {
+    if (p->Relationship == RelationProcessorCore) {
+      assert(p->Processor.GroupCount == 1);
+      total_processor_count +=
+          iree_task_count_kaffinity_bits(p->Processor.GroupMask[0].Mask);
+    }
+  }
+
+  // Validate the CPU IDs provided and build a lookup table of processors we
+  // have selected. This could be a bitmap but it's not worth the code today.
+  uint8_t* included_processors =
+      (uint8_t*)iree_alloca(total_processor_count * sizeof(uint8_t));
+  memset(included_processors, 0, total_processor_count * sizeof(uint8_t));
+  for (iree_host_size_t i = 0; i < cpu_count; ++i) {
+    if (cpu_ids[i] >= total_processor_count) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "cpu_ids[%" PRIhsz
+          "] %u out of bounds, only %u logical processors available",
+          i, cpu_ids[i], total_processor_count);
+    }
+    included_processors[cpu_ids[i]] = 1;
+  }
+
+  // Build an on-stack table for random access into all logical processors.
+  // This isn't strictly required but makes it easier to walk the CPU table.
+  PROCESSOR_RELATIONSHIP** all_processors =
+      iree_alloca(sizeof(PROCESSOR_RELATIONSHIP*) * total_processor_count);
+  iree_host_size_t global_processor_count = 0;
+  for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = all_relationships;
+       p < all_relationships_end;
+       p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)p + p->Size)) {
+    if (p->Relationship != RelationProcessorCore) continue;
+    assert(p->Processor.GroupCount == 1);
+    KAFFINITY mask = p->Processor.GroupMask[0].Mask;
+    int group_offset = 0;
+    while (mask) {
+      int bit_offset = iree_task_count_trailing_zeros_kaffinity(mask);
+      mask = mask >> (bit_offset + 1);
+      iree_host_size_t global_processor_index = global_processor_count++;
+      if (included_processors[global_processor_index]) {
+        // Setup the group for the processor.
+        uint8_t group_index = (uint8_t)out_topology->group_count++;
+        iree_task_topology_group_t* group = &out_topology->groups[group_index];
+        iree_task_topology_group_initialize(group_index, group);
+        group->processor_index = (uint32_t)global_processor_index;
+        group->constructive_sharing_mask = 0;  // set below
+
+        // Pin group to the processor.
+        iree_thread_affinity_t* affinity = &group->ideal_thread_affinity;
+        memset(affinity, 0, sizeof(*affinity));
+        affinity->specified = 1;
+        affinity->smt = (p->Processor.Flags & LTP_PC_SMT) == LTP_PC_SMT;
+        affinity->group = p->Processor.GroupMask[0].Group;
+        affinity->id = group_offset + bit_offset;
+      }
+      group_offset += bit_offset + 1;
+      if (out_topology->group_count >= cpu_count) break;
+    }
+    if (out_topology->group_count >= cpu_count) break;
+  }
+
+  // Assign constructive sharing masks to each topology group.
+  iree_task_topology_fixup_constructive_sharing_masks_from_relationships(
+      all_relationships, all_relationships_end, out_topology);
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
     iree_task_topology_t* out_topology) {
@@ -258,26 +444,9 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
         all_cores[adjusted_core_index], &group->ideal_thread_affinity);
   }
 
-  // Assign constructive sharing masks to each topology group. These indicate
-  // which other topology groups share L3 caches (if any).
-  for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = all_relationships;
-       p < all_relationships_end;
-       p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)p + p->Size)) {
-    if (p->Relationship == RelationCache) {
-      if (p->Cache.Level == 3 &&
-          (p->Cache.Type == CacheUnified || p->Cache.Type == CacheData)) {
-        if (p->Cache.GroupCount == 0) {
-          iree_task_topology_assign_constructive_sharing(out_topology,
-                                                         p->Cache.GroupMask);
-        } else {
-          for (WORD i = 0; i < p->Cache.GroupCount; ++i) {
-            iree_task_topology_assign_constructive_sharing(
-                out_topology, p->Cache.GroupMasks[i]);
-          }
-        }
-      }
-    }
-  }
+  // Assign constructive sharing masks to each topology group.
+  iree_task_topology_fixup_constructive_sharing_masks_from_relationships(
+      all_relationships, all_relationships_end, out_topology);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

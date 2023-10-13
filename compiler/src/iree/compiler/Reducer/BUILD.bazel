@@ -1,0 +1,30 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_cc_library(
+    name = "iree_reduce_lib",
+    srcs = [
+        "iree_reduce_lib.cc",
+    ],
+    hdrs = [
+        "iree_reduce_lib.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Reducer/Framework:ReducerFramework",
+        "//compiler/src/iree/compiler/Reducer/Strategies:DeltaStrategies",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+    ],
+)

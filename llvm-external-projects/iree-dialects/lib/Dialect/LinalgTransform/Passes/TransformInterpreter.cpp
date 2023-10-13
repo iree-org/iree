@@ -6,7 +6,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -60,15 +59,14 @@ public:
                     bufferization::BufferizationDialect,
                     func::FuncDialect,
                     linalg::LinalgDialect,
-                    linalg::transform::LinalgTransformDialect,
                     LLVM::LLVMDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
                     scf::SCFDialect,
                     tensor::TensorDialect,
                     vector::VectorDialect
-        // clang-format on
-        >();
+                    // clang-format on
+                    >();
 
     // TODO: these should be registered by the extension instead, but there is
     // no support for it in core currently.

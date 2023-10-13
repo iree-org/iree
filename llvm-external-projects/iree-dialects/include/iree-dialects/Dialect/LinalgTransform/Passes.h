@@ -12,7 +12,6 @@ namespace linalg {
 namespace transform {
 
 void registerTransformDialectInterpreterPass();
-void registerLinalgTransformExpertExpansionPass();
 void registerDropSchedulePass();
 
 } // namespace transform

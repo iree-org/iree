@@ -118,11 +118,14 @@ settings can improve compile and link times substantially.
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DIREE_ENABLE_ASSERTIONS=ON \
         -DIREE_ENABLE_SPLIT_DWARF=ON \
-        -DIREE_ENABLE_THIN_ARCHIVES=ON \
         -DCMAKE_C_COMPILER=clang \
         -DCMAKE_CXX_COMPILER=clang++ \
         -DIREE_ENABLE_LLD=ON
     ```
+
+    It is also possible to add `-DIREE_ENABLE_THIN_ARCHIVES=ON` if the
+    `CMAKE_AR` variable is defined and points to the path of either the GNU
+    binutils or LLVM `ar` program, overriding the default Apple `ar`.
 
 === "Windows"
 
@@ -222,12 +225,12 @@ that converts environment variables into ctest filters:
 
 ``` shell
 # Run default tests
-./build_tools/cmake/ctest_all.sh
+./build_tools/cmake/ctest_all.sh ../iree-build
 
 # Run tests, turning CUDA on and Vulkan off
 export IREE_CUDA_DISABLE=0
 export IREE_VULKAN_DISABLE=1
-./build_tools/cmake/ctest_all.sh
+./build_tools/cmake/ctest_all.sh ../iree-build
 ```
 
 ### Running samples

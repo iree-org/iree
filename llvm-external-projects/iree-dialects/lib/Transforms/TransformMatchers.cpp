@@ -934,8 +934,8 @@ transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(AllOperands tag, IsPermutation) {
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have permutation maps");
-    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isPermutation())
+    for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
+      if (!linalgOp.getMatchingIndexingMap(&operand).isPermutation())
         return false;
     }
     return true;
@@ -947,8 +947,8 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag,
                                            IsProjectedPermutation) {
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have projected permutation maps");
-    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isProjectedPermutation())
+    for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
+      if (!linalgOp.getMatchingIndexingMap(&operand).isProjectedPermutation())
         return false;
     }
     return true;
@@ -963,8 +963,9 @@ transform_ext::StructuredOpMatcher::output(AllOperands tag, IsProjected dim) {
     if (!makeValidPositiveIndex(updatedDim, linalgOp.getNumLoops()))
       return false;
     // all_of with a lambda requires const-casting dance, so using a loop.
-    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (!isProjectedMap(linalgOp.getMatchingIndexingMap(operand), updatedDim))
+    for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
+      if (!isProjectedMap(linalgOp.getMatchingIndexingMap(&operand),
+                          updatedDim))
         return false;
     }
     return true;
@@ -975,8 +976,8 @@ transform_ext::StructuredOpMatcher &
 transform_ext::StructuredOpMatcher::output(AllOperands tag, IsIdentity) {
   return addPredicate([=](linalg::LinalgOp linalgOp) -> bool {
     LLVM_DEBUG(DBGS() << "all output operands have identity permutation maps");
-    for (OpOperand *operand : linalgOp.getDpsInitOperands()) {
-      if (!linalgOp.getMatchingIndexingMap(operand).isIdentity())
+    for (OpOperand &operand : linalgOp.getDpsInitsMutable()) {
+      if (!linalgOp.getMatchingIndexingMap(&operand).isIdentity())
         return false;
     }
     return true;
@@ -1630,7 +1631,7 @@ void transform_ext::makeSoftmaxMatcher(
                            .input(0, ConstantFloatMinOrMinusInf());
   auto &maxReduction =
       transform_ext::m_StructuredOp<linalg::GenericOp>(matcherContext)
-          .singleOpWithCanonicaleArgs<arith::MaxFOp>(/*commutative=*/true)
+          .singleOpWithCanonicaleArgs<arith::MaximumFOp>(/*commutative=*/true)
           // Only handle most inner reduction for now.
           .dim(-1, utils::IteratorType::reduction)
           .dim(AllDimsExcept({-1}), utils::IteratorType::parallel)

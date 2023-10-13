@@ -12,8 +12,8 @@ transform.sequence failures(propagate) {
   %red = transform.structured.match interface{LinalgOp}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!transform.any_op) -> !transform.any_op
   %not_root = merge_handles %fill, %red : !transform.any_op
-  %forall, %tiled_generic =
-    transform.structured.tile_to_forall_op %root tile_sizes [1, 4]
+  %tiled_generic, %forall =
+    transform.structured.tile_using_forall %root tile_sizes [1, 4]
     ( mapping = [#gpu.block<x>, #gpu.block<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!transform.any_op) -> ()
@@ -26,8 +26,8 @@ transform.sequence failures(propagate) {
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op : (!transform.any_op) -> !transform.any_op
   %parallel_linalg = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %forall_reduction, %tiled_reduction_generic =
-    transform.structured.tile_to_forall_op %reduction_linalg tile_sizes [1, 1]
+  %tiled_reduction_generic, %forall_reduction =
+    transform.structured.tile_using_forall %reduction_linalg tile_sizes [1, 1]
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   // TODO: this fusion currently does not happen properly, this is related to the clone
@@ -35,7 +35,7 @@ transform.sequence failures(propagate) {
   // Once fixed we'll be able to fuse.
   // Fusion will save us one roundtrip to memory.
   // transform.structured.fuse_into_containing_op %fill_linalg into %forall_reduction
-  transform.structured.tile_to_forall_op %parallel_linalg num_threads [1, 4, 32]
+  transform.structured.tile_using_forall %parallel_linalg num_threads [1, 4, 32]
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
@@ -63,7 +63,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
+  transform.structured.vectorize_children_and_apply_patterns %func : (!transform.any_op) -> !transform.any_op
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================

@@ -23,11 +23,6 @@ struct IREEOneShotBufferizationOptions
 // Register all interfaces needed for bufferization.
 void registerBufferizationInterfaces(DialectRegistry &registry);
 
-// Eliminate tensor.empty ops that are anchored on flow store ops.
-LogicalResult storeTensorOpAnchoredEmptyTensorEliminationStep(
-    RewriterBase &rewriter, Operation *op,
-    bufferization::OneShotAnalysisState &state);
-
 } // namespace iree_compiler
 } // namespace mlir
 

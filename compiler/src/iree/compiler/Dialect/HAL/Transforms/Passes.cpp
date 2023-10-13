@@ -227,8 +227,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     // Executable translation
     //----------------------------------------------------------------------------
 
-    FunctionLikeNest(passManager)
-        .addPass(createCPUMaterializeUpperBoundTileSizePass);
+    FunctionLikeNest(passManager).addPass([]() {
+      return createCPUMaterializeUpperBoundTileSizePass();
+    });
 
     // Preprocess executables using an external tool. The tool may mutate one or
     // more variants and even insert or remove variants.

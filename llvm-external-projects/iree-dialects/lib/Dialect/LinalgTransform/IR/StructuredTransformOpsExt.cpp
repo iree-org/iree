@@ -7,8 +7,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
-#include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -21,6 +19,7 @@
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -119,12 +118,12 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
                                           linalg::LinalgOp linalgModelOp) {
   // If basic properties do not match, return failure.
   {
-    OpOperandVector opInputs = linalgOp.getDpsInputOperands();
-    OpOperandVector modelInputs = linalgModelOp.getDpsInputOperands();
-    OpOperandVector opOutputs = linalgOp.getDpsInitOperands();
-    OpOperandVector modelOutputs = linalgModelOp.getDpsInitOperands();
-    auto notEqualFn = [](std::tuple<OpOperand *, OpOperand *> in) -> bool {
-      return std::get<0>(in)->get() != std::get<1>(in)->get();
+    SmallVector<Value> opInputs = linalgOp.getDpsInputs();
+    SmallVector<Value> modelInputs = linalgModelOp.getDpsInputs();
+    ValueRange opOutputs = linalgOp.getDpsInits();
+    ValueRange modelOutputs = linalgModelOp.getDpsInits();
+    auto notEqualFn = [](std::tuple<Value, Value> in) -> bool {
+      return std::get<0>(in) != std::get<1>(in);
     };
 
     if (opInputs.size() != modelInputs.size() ||
@@ -348,124 +347,24 @@ mlir::transform_ext::StructuredTransformOpsExtension::
 //===----------------------------------------------------------------------===//
 
 void ErrorCheckingTrackingListener::notifyPayloadReplacementNotFound(
-    Operation *op, ValueRange values) {
+    Operation *op, ValueRange values, DiagnosedSilenceableFailure &&diag) {
   // Certain ops can dropped safely.
   if (isa<scf::ForOp>(op)) {
     LLVM_DEBUG(DBGS() << "Silently dropping scf.for op mapping\n");
     return;
   }
 
+  SmallVector<Diagnostic> diags;
+  diag.takeDiagnostics(diags);
+  if (!status.succeeded())
+    status.takeDiagnostics(diags);
+  status = DiagnosedSilenceableFailure::silenceableFailure(std::move(diags));
+
   status = emitSilenceableFailure(
       getTransformOp(), "!!! tracking listener failed to find replacement op");
   status.attachNote(op->getLoc()) << "replaced op";
   for (Value v : values)
     status.attachNote(v.getLoc()) << "replacement value";
-}
-
-//===----------------------------------------------------------------------===//
-// TODO: WILL MIGRATE
-//===----------------------------------------------------------------------===//
-
-using namespace mlir::linalg;
-
-//===---------------------------------------------------------------------===//
-// LowerToLLVMOp
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure transform_ext::LowerToLLVMOp::apply(
-    mlir::transform::TransformRewriter &rewriter,
-    mlir::transform::TransformResults &result,
-    mlir::transform::TransformState &state) {
-  auto payloadOps = state.getPayloadOps(getTarget());
-  if (!llvm::hasSingleElement(payloadOps) ||
-      !isa<ModuleOp>(*payloadOps.begin()))
-    return emitSilenceableError() << "expected single module target";
-  ModuleOp moduleOp = cast<ModuleOp>(*payloadOps.begin());
-
-  //===------------------------------------------------------------------===//
-  // BEGIN: Copied from upstream, this needs to be retired once we have a
-  // proper upstream transform op.
-  //===------------------------------------------------------------------===//
-
-  // TODO: it is feasible to scope lowering at arbitrary level and introduce
-  // unrealized casts, but there needs to be the final module-wise cleanup in
-  // the end. Keep module-level for now.
-  PassManager pm(getContext());
-
-  auto enableOpaquePointers = [](auto options) {
-    options.useOpaquePointers = true;
-    return options;
-  };
-
-  // Blanket-convert any remaining high-level vector ops to loops if any remain.
-  pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
-  // Blanket-convert any remaining linalg ops to loops if any remain.
-  pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
-  if (getEnableAsync()) {
-    pm.addPass(createAsyncToAsyncRuntimePass());
-    pm.addPass(createAsyncRuntimeRefCountingPass());
-    pm.addPass(createAsyncRuntimeRefCountingOptPass());
-  }
-  pm.addPass(createCanonicalizerPass());
-  // Blanket-convert any remaining affine ops if any remain.
-  pm.addPass(createLowerAffinePass());
-  // Convert SCF to CF (always needed).
-  pm.addPass(createConvertSCFToCFPass());
-  // Sprinkle some cleanups.
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-  {
-    auto options = ConvertVectorToLLVMPassOptions();
-    options.reassociateFPReductions = getReassociateFpReductions();
-    options.force32BitVectorIndices = getEnableIndexOptimizations();
-    options.armNeon = getEnableArmNeon();
-    options.armSVE = getEnableArmSve();
-    options.amx = getEnableAmx();
-    options.x86Vector = getEnableX86vector();
-    options.useOpaquePointers = true;
-    pm.addPass(createConvertVectorToLLVMPass(options));
-  }
-  // Convert Math to LLVM (always needed).
-  pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
-  // Expand complicated MemRef operations before lowering them.
-  pm.addPass(memref::createExpandStridedMetadataPass());
-  // The expansion may create affine expressions. Get rid of them.
-  pm.addPass(createLowerAffinePass());
-  // Convert MemRef to LLVM (always needed).
-  pm.addPass(createFinalizeMemRefToLLVMConversionPass(
-      enableOpaquePointers(FinalizeMemRefToLLVMConversionPassOptions{})));
-  if (getEnableAsync())
-    pm.addPass(createConvertAsyncToLLVMPass());
-  // Convert Func to LLVM (always needed).
-  pm.addPass(createConvertFuncToLLVMPass(
-      enableOpaquePointers(ConvertFuncToLLVMPassOptions{})));
-  // Convert Index to LLVM (always needed).
-  pm.addPass(createConvertIndexToLLVMPass());
-  // Convert remaining unrealized_casts (always needed).
-  pm.addPass(createReconcileUnrealizedCastsPass());
-
-  if (failed(pm.run(moduleOp)))
-    return DiagnosedSilenceableFailure::definiteFailure();
-
-  //===------------------------------------------------------------------===//
-  // END: Copied from upstream, this needs to be retired once we have a
-  // proper upstream transform op.
-  //===------------------------------------------------------------------===//
-
-  // Make all arguments noalias for now.
-  // FIXME: this is a terrible hack!
-  moduleOp->walk([](LLVM::LLVMFuncOp funcOp) {
-    for (int64_t i = 0; i < funcOp.getNumArguments(); ++i) {
-      if (!funcOp.getFunctionType()
-               .getParamType(i)
-               .isa<LLVM::LLVMPointerType>())
-        continue;
-      funcOp.setArgAttr(i, "llvm.noalias", UnitAttr::get(funcOp.getContext()));
-    }
-  });
-
-  result.set(getTransformed().cast<OpResult>(), payloadOps);
-  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//

@@ -36,8 +36,6 @@ void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
-        std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 std::unique_ptr<OperationPass<LLVM::LLVMFuncOp>> createAddFastMathFlagsPass();
@@ -110,6 +108,8 @@ createEraseDeadAllocAndStoresPass();
 
 std::unique_ptr<Pass> createEraseHALDescriptorTypeFromMemRefPass();
 
+std::unique_ptr<Pass> createConvertHALDescriptorTypeToGPUAddressSpacePass();
+
 // Extract address computations into their own separate instructions.
 std::unique_ptr<Pass> createExtractAddressComputationPass();
 
@@ -174,8 +174,6 @@ createHoistStaticallyBoundAllocationsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
-        std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
 /// Pass to resolve `memref.expand_strided_metadata` operations.
@@ -209,6 +207,9 @@ createRematerializeParallelOpsPass();
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createRemoveSingleIterationLoopPass();
+
+/// Create a pass that replaces maximumf/minimumf with minumf/maxnumf ops.
+std::unique_ptr<OperationPass<func::FuncOp>> createReplaceSlowMinMaxOpsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write. See Passes.td for
 /// `option` details.
@@ -244,9 +245,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
-
-/// Erases #hal.descriptor_type as MemRef memory space.
-LogicalResult eraseHALDescriptorTypeFromMemRef(Operation *op);
 
 /// Populates patterns with patterns to concretize tensor.pad op's result
 /// shape. `numWorkgroups`, if not empty, will be used as bounds for simplifying

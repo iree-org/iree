@@ -36,6 +36,7 @@ iree_cc_library(
     iree::compiler::API::Internal::IREECompileToolEntryPoint
     iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
     iree::compiler::API::Internal::IREEOptToolEntryPoint
+    iree::compiler::API::Internal::IREEReduceToolEntryPoint
     iree::compiler::API::Internal::LLDToolEntryPoint
   PUBLIC
 )
@@ -82,6 +83,7 @@ set(_EXPORT_OBJECT_LIBS
   iree_compiler_API_Internal_IREECompileToolEntryPoint.objects
   iree_compiler_API_Internal_IREEMLIRLSPServerToolEntryPoint.objects
   iree_compiler_API_Internal_IREEOptToolEntryPoint.objects
+  iree_compiler_API_Internal_IREEReduceToolEntryPoint.objects
   iree_compiler_API_Internal_LLDToolEntryPoint.objects
 )
 
@@ -137,12 +139,16 @@ foreach(_object_lib ${_EXPORT_OBJECT_LIBS})
   # another level of fix upstream if you like pain.
   list(APPEND _EXPORT_OBJECT_DEPS "$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<GENEX_EVAL:$<TARGET_PROPERTY:${_object_lib},LINK_LIBRARIES>>>>>")
 endforeach()
-if(NOT GENERATOR_IS_MULTI_CONFIG)
-  # NOTE: multi-config generators (xcode, visual studio, ninja in multi-config
-  # mode, etc) don't support writing files with fixed names with contents that
-  # differ based on the available variants.
-  file(GENERATE OUTPUT export_objects_debug.txt CONTENT "OBJECTS:${_EXPORT_OBJECT_SRCS}\n\nDEPS:${_EXPORT_OBJECT_DEPS}")
-endif()
+
+# UNCOMMENT TO DEBUG WHAT IS GOING ON.
+# file(GENERATE OUTPUT export_objects_debug.txt CONTENT "OBJECTS:${_EXPORT_OBJECT_SRCS}\n\nDEPS:${_EXPORT_OBJECT_DEPS}")
+
+# Disable .so.0 style naming/linking. In order to be consistent across platforms
+# and bindings, we will embed a major version in the library name when it is time.
+# OS packagers can re-enable this or take other steps to get canonical shared
+# library structures.
+set(CMAKE_PLATFORM_NO_VERSIONED_SONAME ON)
+
 iree_cc_library(
   SHARED
   NAME
@@ -175,10 +181,12 @@ target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
 
 # If not using sanitizers, ask linkers to error on undefined symbols.
 # For shared libraries, using sanitizers implies undefined symbols on Unix-like.
+# Also disabled on Apple (unsupported in XCode 15 default linker).
 if(NOT IREE_ENABLE_ASAN
     AND NOT IREE_ENABLE_MSAN
     AND NOT IREE_ENABLE_TSAN
-    AND NOT IREE_ENABLE_UBSAN)
+    AND NOT IREE_ENABLE_UBSAN
+    AND NOT APPLE)
   target_link_options(iree_compiler_API_SharedImpl PRIVATE
     $<$<PLATFORM_ID:Linux>:-Wl,--no-undefined>
     $<$<PLATFORM_ID:Darwin>:-Wl,-undefined,error>
@@ -191,17 +199,17 @@ set_target_properties(
     OUTPUT_NAME "IREECompiler"
     VERSION "0"
     SOVERSION "0"
-
-    LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib"
-    # On Windows, DLLs go to the runtime directory and import
-    # libraries go to the lib directory.
-    # TODO: We should really be dumping binaries into bin/ not
-    # tools/. This must line up with binaries built this way because
-    # DLLs must be in the same directory as the binary.
-    # See: https://github.com/openxla/iree/issues/11297
-    RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/tools"
-    ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib"
 )
+
+# Signal the main shared library/dll as part of the bundle of files that
+# must be included with compiler dylibs.
+# What we really want to be using here is the TARGET_LINKER_FILE_NAME
+# generator expression. But since this is used in places where target
+# dependent generator expressions are not legal, we guesstimate it with
+# platform specific logic.
+set(_target_linker_file_name "${CMAKE_SHARED_LIBRARY_PREFIX}IREECompiler${CMAKE_SHARED_LIBRARY_SUFFIX}")
+set_property(GLOBAL APPEND PROPERTY 
+  IREE_COMPILER_DYLIB_RELPATHS "${_target_linker_file_name}")
 
 install(
   TARGETS iree_compiler_API_SharedImpl

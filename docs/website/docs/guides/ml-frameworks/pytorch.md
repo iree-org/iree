@@ -7,7 +7,7 @@ tags:
 icon: simple/pytorch
 ---
 
-# PyTorch Integration
+# PyTorch integration
 
 IREE supports compiling and running PyTorch programs represented as
 `nn.Module` [classes](https://pytorch.org/docs/stable/generated/torch.nn.Module.html)

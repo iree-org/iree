@@ -95,7 +95,6 @@ iree_compiler_cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//compiler/src/iree/compiler/InputConversion/StableHLO",
-        "//compiler/src/iree/compiler/InputConversion/TMTensor",
         "//compiler/src/iree/compiler/InputConversion/TOSA",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
@@ -105,7 +104,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:Transforms",
         "@stablehlo//:stablehlo_ops",
-        "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
 )
 

@@ -91,13 +91,13 @@ static MaskResult getMask(Operation *op) {
           ? maybeExtractOp.getVector().getDefiningOp<vector::CreateMaskOp>()
           : transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
   if (maybeExtractOp) {
-    if (maybeExtractOp.getPosition().size() + 1 !=
+    if (maybeExtractOp.getStaticPosition().size() + 1 !=
         llvm::cast<VectorType>(maskOp->getResultTypes().front()).getRank()) {
       LDBG("----mask through extract unexpected position size -> Skip: "
            << maybeExtractOp);
       return MaskResult{};
     }
-    if (maybeExtractOp.getPosition().size() != 1) {
+    if (maybeExtractOp.getStaticPosition().size() != 1) {
       LDBG("----only mask through 2-D -> 1-D extract supported atm -> Skip: "
            << maybeExtractOp);
       return MaskResult{};
@@ -114,8 +114,9 @@ static Value getMaskValue(RewriterBase &rewriter, Operation *op) {
   Value count = maskResult.maskOp->getOperands().back();
   vector::ExtractOp maybeExtractOp = maskResult.maybeExtractOp;
   if (maybeExtractOp) {
-    assert(maybeExtractOp.getPosition().size() == 1 && "expected single pos");
-    int64_t sliceNum = maybeExtractOp.getPosition()[0];
+    assert(maybeExtractOp.getStaticPosition().size() == 1 &&
+           "expected single pos");
+    int64_t sliceNum = maybeExtractOp.getStaticPosition()[0];
     // TODO: to support >2-D mask + extract, and all the cmp.
     Location loc = op->getLoc();
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);

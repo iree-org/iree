@@ -78,7 +78,7 @@ Value calculateStorageElementCountInBytes(Location loc,
     unsigned byteElements = 8 / elementBits;
     // Perform some basic sanity check to make sure the total count is byte
     // aligned for fully static shapes.
-    if (dynamicDims.empty() && staticCount * byteElements % 8 != 0) {
+    if (dynamicDims.empty() && (staticCount * elementBits) % 8 != 0) {
       return nullptr;
     }
     auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);

@@ -283,6 +283,20 @@ if(IREE_BUILD_COMPILER)
 
   iree_cc_binary(
     NAME
+      iree-reduce
+    SRCS
+      "iree-reduce.cc"
+    DEPS
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
+    DATA
+      ${IREE_LLD_TARGET}
+    HOSTONLY
+    SETUP_INSTALL_RPATH
+  )
+
+  iree_cc_binary(
+    NAME
       iree-opt
     SRCS
       "iree-opt-main.cc"

@@ -5,13 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -51,7 +50,6 @@ public:
                     IREE::LinalgExt::IREELinalgExtDialect,
                     bufferization::BufferizationDialect,
                     linalg::LinalgDialect,
-                    linalg::transform::LinalgTransformDialect,
                     LLVM::LLVMDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
@@ -231,9 +229,15 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
       auto target = variantOp.getTarget();
       bool lowerToAVX2 = hasAVX2Feature(target);
+      auto walkRes = moduleOp.walk([](linalg::LinalgOp linalgOp) {
+        if (!hasByteAlignedElementTypes(linalgOp))
+          return WalkResult::interrupt();
+        return WalkResult::advance();
+      });
+      bool isByteAligned = !walkRes.wasInterrupted();
       bool enableVectorMasking =
-          isX86(target) || isRISCV(target) ||
-          (isAArch64(target) && hasAnySVEFeature(target));
+          isByteAligned && (isX86(target) || isRISCV(target) ||
+                            (isAArch64(target) && hasAnySVEFeature(target)));
 
       bool enableMicrokernels = hasMicrokernels(target);
       bool enableAArch64SSVE = isAArch64(target) && hasAnySVEFeature(target) &&

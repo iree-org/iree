@@ -23,7 +23,6 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -31,6 +30,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -109,10 +109,12 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
                    ArrayRef<OpFoldResult> mixedSizes) {
   ArrayRef<int64_t> resultShape = slicedObjectType.getShape();
   llvm::SmallBitVector droppedDims(mixedSizes.size());
-  if (slicedObjectType.getRank() == mixedSizes.size()) {
+  size_t maxDroppedDims = mixedSizes.size() - resultShape.size();
+  if (maxDroppedDims == 0) {
     return droppedDims;
   }
   unsigned shapePos = 0;
+  int numSet = 0;
   for (const auto &size : llvm::enumerate(mixedSizes)) {
     std::optional<int64_t> sizeVal = getConstantIntValue(size.value());
     // If the size is not 1, or if the current matched dimension of the result
@@ -124,6 +126,10 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
       continue;
     }
     droppedDims.set(size.index());
+    numSet++;
+    if (numSet == maxDroppedDims) {
+      break;
+    }
   }
   return droppedDims;
 }

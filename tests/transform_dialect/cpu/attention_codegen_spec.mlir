@@ -7,8 +7,8 @@ transform.sequence failures(propagate) {
 
     // Tile and distribute to workgroups
     // ==========================================
-    %forall_grid, %tiled_attention =
-    transform.structured.tile_to_forall_op %attention num_threads [1]
+    %tiled_attention, %forall_grid =
+    transform.structured.tile_using_forall %attention num_threads [1]
       ( mapping = [#gpu.block<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid
@@ -29,7 +29,7 @@ transform.sequence failures(propagate) {
       transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
       transform.apply_patterns.vector.cast_away_vector_leading_one_dim
     } : !transform.any_op
-    %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
+    %func_3 = transform.structured.vectorize_children_and_apply_patterns %func : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func_3 {
       transform.apply_patterns.iree.fold_fill_into_pad
       transform.apply_patterns.linalg.tiling_canonicalization
@@ -57,5 +57,5 @@ transform.sequence failures(propagate) {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_cse %func_8 : !transform.any_op
-    transform.iree.apply_buffer_optimizations %func_8 : (!transform.any_op) -> ()
+    transform.memref.erase_dead_alloc_and_stores %func_8 : (!transform.any_op) -> ()
 }

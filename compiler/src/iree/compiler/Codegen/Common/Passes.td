@@ -158,6 +158,14 @@ def DecomposePackUnPackOps :
   ];
 }
 
+def ReplaceSlowMinMaxOps
+    : Pass<"iree-codegen-replace-slow-min-max-ops", "func::FuncOp"> {
+  let summary =
+      "Replace slow min/max operations that propagate NaNs and distinguish "
+      "between +/-0.0 with faster min/max operations that ignore them.";
+  let constructor = "mlir::iree_compiler::createReplaceSlowMinMaxOpsPass()";
+}
+
 def EliminateEmptyTensors :
     Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
@@ -182,6 +190,13 @@ def EraseHALDescriptorTypeFromMemRef
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
   let constructor =
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
+}
+
+def ConvertHALDescriptorTypeToGPUAddressSpace
+    : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
+  let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let constructor =
+      "mlir::iree_compiler::createConvertHALDescriptorTypeToGPUAddressSpacePass()";
 }
 
 def ExtractAddressComputation: Pass<"extract-address-computation"> {

@@ -264,7 +264,7 @@ static std::string translateModuleToISA(llvm::Module &module,
     llvm::buffer_ostream pstream(stream);
     llvm::legacy::PassManager codegenPasses;
     targetMachine.addPassesToEmitFile(codegenPasses, pstream, nullptr,
-                                      llvm::CGFT_AssemblyFile);
+                                      llvm::CodeGenFileType::AssemblyFile);
     codegenPasses.run(module);
   }
   return targetISA;
@@ -291,8 +291,8 @@ static LogicalResult linkObjects(Location loc, llvm::Module &module,
   // Link user modules and libdevice (if required).
   // Note that linking order matters:
   llvm::Linker linker(module);
-  if (failed(linkCmdlineBitcodeFile(loc, linker, llvm::Linker::OverrideFromSrc,
-                                    targetMachine, module.getContext()))) {
+  if (failed(linkCmdlineBitcodeFiles(loc, linker, llvm::Linker::OverrideFromSrc,
+                                     targetMachine, module.getContext()))) {
     return failure();
   }
 

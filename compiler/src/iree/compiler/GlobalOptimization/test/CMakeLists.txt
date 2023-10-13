@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "materialize_homogeneous_encodings.mlir"
     "transformation_pipeline.mlir"
   TOOLS
     FileCheck

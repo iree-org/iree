@@ -6,7 +6,7 @@ tags:
 icon: octicons/cpu-16
 ---
 
-# CPU Deployment
+# CPU deployment
 
 IREE supports efficient program execution on CPU devices by using
 [LLVM](https://llvm.org/) to compile all dense computations in each program into

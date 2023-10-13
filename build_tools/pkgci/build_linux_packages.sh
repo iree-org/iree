@@ -237,6 +237,7 @@ function install_native_deps() {
     yum update -y
     # Required for Tracy
     yum install -y capstone-devel tbb-devel libzstd-devel
+    yum install -y clang lld
   elif [[ "$uname_m" == "x86_64" ]]; then
     # Check if the output is x86_64
     echo "Running on an architecture which has deps in docker image."

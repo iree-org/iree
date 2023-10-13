@@ -10,7 +10,6 @@
 #include <unordered_set>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -179,7 +178,6 @@ public:
     // clang-format off
     registry.insert<IREE::Codegen::IREECodegenDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
-                    linalg::transform::LinalgTransformDialect,
                     mlir::transform::TransformDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
@@ -438,9 +436,9 @@ public:
     llvm::Linker moduleLinker(*llvmModule);
 
     // Link any bitcode files specified on the command line.
-    if (failed(linkCmdlineBitcodeFile(variantOp.getLoc(), moduleLinker,
-                                      llvm::Linker::OverrideFromSrc,
-                                      *targetMachine, context))) {
+    if (failed(linkCmdlineBitcodeFiles(variantOp.getLoc(), moduleLinker,
+                                       llvm::Linker::OverrideFromSrc,
+                                       *targetMachine, context))) {
       return failure();
     }
 
@@ -659,7 +657,8 @@ public:
       // object file per library).
       std::string objectData;
       if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
-                                      llvm::CGFT_ObjectFile, &objectData))) {
+                                      llvm::CodeGenFileType::ObjectFile,
+                                      &objectData))) {
         return variantOp.emitError()
                << "failed to compile LLVM-IR module to an object file";
       }
@@ -676,7 +675,8 @@ public:
     if (!options.dumpIntermediatesPath.empty()) {
       std::string asmData;
       if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
-                                      llvm::CGFT_AssemblyFile, &asmData))) {
+                                      llvm::CodeGenFileType::AssemblyFile,
+                                      &asmData))) {
         return variantOp.emitError()
                << "failed to compile LLVM-IR module to an assembly file";
       }

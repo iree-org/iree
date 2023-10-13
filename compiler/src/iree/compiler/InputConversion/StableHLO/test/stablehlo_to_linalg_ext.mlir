@@ -614,3 +614,29 @@ func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tens
 // CHECK:        %[[D7:.+]] = arith.cmpf ogt, %[[ARG1]], %[[ARG2]] : f32
 // CHECK:        iree_linalg_ext.yield %[[D7]] : i1
 // CHECK:        return %[[D6]]#0, %[[D6]]#1
+
+// -----
+
+// CHECK-LABEL: @prefix
+// CHECK-SAME: %[[ARG0:.+]]: tensor<7x5xi32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<i32>
+func.func @prefix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32> {
+  %reduce = "stablehlo.reduce_window"(%arg0, %arg1) ({
+    ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
+    %787 = "stablehlo.add"(%arg2, %arg3) : (tensor<i32>, tensor<i32>) -> tensor<i32>
+    "stablehlo.return"(%787) : (tensor<i32>) -> ()
+  }) {base_dilations = dense<1> : tensor<2xi64>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>, window_dilations = dense<1> : tensor<2xi64>, window_dimensions = dense<[1, 5]> : tensor<2xi64>, window_strides = dense<1> : tensor<2xi64>} : (tensor<7x5xi32>, tensor<i32>) -> tensor<7x5xi32>
+  return %reduce : tensor<7x5xi32>
+}
+// CHECK:       %extracted = tensor.extract %[[ARG1]][] : tensor<i32>
+// CHECK:       %[[OUT0:.+]] = tensor.empty() : tensor<7x5xi32>
+// CHECK:       %[[OUT1:.+]] = tensor.empty() : tensor<7xi32>
+// CHECK:       %[[FILL:.+]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%[[ARG1]] : tensor<i32>) outs(%[[OUT1]] : tensor<7xi32>)
+// CHECK:       ^bb0(%[[IN:.+]]: i32, %[[OUT:.+]]: i32):
+// CHECK:         linalg.yield %[[IN]]
+// CHECK:       %[[SCAN:.+]]:2 = iree_linalg_ext.scan dimension(1) inclusive(true) ins(%[[ARG0]] : tensor<7x5xi32>) outs(%[[OUT0]], %[[FILL]] : tensor<7x5xi32>, tensor<7xi32>)
+// CHECK:       ^bb0(%[[ARG2:.+]]: i32, %[[ARG3:.+]]: i32):
+// CHECK:         %[[ADD:.+]] = arith.addi %[[ARG2]], %[[ARG3]] : i32
+// CHECK:         iree_linalg_ext.yield %[[ADD]]
+// CHECK:       } -> tensor<7x5xi32>, tensor<7xi32>
+// CHECK:       return %[[SCAN]]#0 : tensor<7x5xi32>

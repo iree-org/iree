@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG
-#define IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG
+#ifndef IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
+#define IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
 
 include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
 include "mlir/IR/EnumAttr.td"
@@ -28,58 +28,75 @@ def CPU_BufferOpsTileAndVectorize
 def CPU_DataTiling
     : I32EnumAttrCase<"CPUDataTiling", 7>;
 
-def LLVMGPU_Default : I32EnumAttrCase<"LLVMGPUDefault", 8>;
-def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 9>;
-def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 10>;
-def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 11>;
-def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
-def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 13>;
-def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
-def LLVMGPU_PackUnPack : I32EnumAttrCase<"LLVMGPUPackUnPack", 15>;
-def LLVMGPU_MatmulTensorCoreMmaSync : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 16>;
+def LLVMGPU_Default
+    : I32EnumAttrCase<"LLVMGPUDefault", 100>;
+def LLVMGPU_SimpleDistribute
+    : I32EnumAttrCase<"LLVMGPUDistribute", 101>;
+def LLVMGPU_Vectorize
+    : I32EnumAttrCase<"LLVMGPUVectorize", 102>;
+def LLVMGPU_MatmulSimt
+    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 103>;
+def LLVMGPU_MatmulTensorCore
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 104>;
+def LLVMGPU_TransposeSharedMem
+    : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 105>;
+def LLVMGPU_WarpReduction
+    : I32EnumAttrCase<"LLVMGPUWarpReduction", 106>;
+def LLVMGPU_PackUnPack
+    : I32EnumAttrCase<"LLVMGPUPackUnPack", 107>;
+def LLVMGPU_MatmulTensorCoreMmaSync
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 108>;
 
 def SPIRV_BaseLowering
-    : I32EnumAttrCase<"SPIRVBaseLowering", 17>;
+    : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
 def SPIRV_BaseDistribute
-    : I32EnumAttrCase<"SPIRVBaseDistribute", 18>;
+    : I32EnumAttrCase<"SPIRVBaseDistribute", 201>;
 def SPIRV_BaseVectorize
-    : I32EnumAttrCase<"SPIRVBaseVectorize", 19>;
-def SPIRV_MatmulPromoteVectorize
-    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 20>;
-def SPIRV_CooperativeMatrixVectorize
-    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 21>;
+    : I32EnumAttrCase<"SPIRVBaseVectorize", 202>;
 def SPIRV_SubgroupReduce
-    : I32EnumAttrCase<"SPIRVSubgroupReduce", 22>;
+    : I32EnumAttrCase<"SPIRVSubgroupReduce", 203>;
+def SPIRV_MatmulPromoteVectorize
+    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 204>;
+def SPIRV_CooperativeMatrixVectorize
+    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 205>;
 def SPIRV_WinogradVectorize
-    : I32EnumAttrCase<"SPIRVWinogradVectorize", 23>;
+    : I32EnumAttrCase<"SPIRVWinogradVectorize", 206>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 24>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 300>;
 
 
 def Linalg_TransformDialectCodegen
-    : I32EnumAttrCase<"TransformDialectCodegen", 100>;
+    : I32EnumAttrCase<"TransformDialectCodegen", 1000>;
 
-def None : I32EnumAttrCase<"None", 0xff>;
+def None : I32EnumAttrCase<"None", 0xffff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
-def DispatchLoweringPassPipelineEnum
-    : I32EnumAttr<
-          "DispatchLoweringPassPipeline",
-          "identifier for pass pipeline use to lower dispatch region", [
-            CPU_Default, CPU_DoubleTilingExpert, CPU_DoubleTilingPadExpert,
-            CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
-            CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
-            CPU_DataTiling, LLVMGPU_Default, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
-            LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
-            LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-            LLVMGPU_PackUnPack, LLVMGPU_MatmulTensorCoreMmaSync,
-            SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
-            SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
-            SPIRV_SubgroupReduce, SPIRV_WinogradVectorize, VMVX_Default,
-            // Transform dialect based codegen
-            Linalg_TransformDialectCodegen, None
-          ]> {
+def DispatchLoweringPassPipelineEnum : I32EnumAttr<
+  "DispatchLoweringPassPipeline",
+  "identifier for pass pipeline use to lower dispatch region", [
+    // CPU CodeGen pipelines
+    CPU_Default, CPU_DoubleTilingExpert, CPU_DoubleTilingPadExpert,
+    CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
+    CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
+    CPU_DataTiling,
+
+    // LLVMGPU CodeGen pipelines
+    LLVMGPU_Default, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
+    LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
+    LLVMGPU_PackUnPack, LLVMGPU_MatmulTensorCoreMmaSync,
+
+    // SPIR-V CodeGen pipelines
+    SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
+    SPIRV_SubgroupReduce, SPIRV_MatmulPromoteVectorize,
+    SPIRV_CooperativeMatrixVectorize, SPIRV_WinogradVectorize,
+
+    VMVX_Default,
+
+    // Transform dialect based codegen
+    Linalg_TransformDialectCodegen, None
+  ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
   let genSpecializedAttr = 0;
@@ -138,6 +155,27 @@ def IREECodegen_TranslationInfoAttr :
   let genVerifyDecl = 1;
 }
 
+def IREECodegen_LoweringConfigTilingLevelAttr :
+  AttrDef<IREECodegen_Dialect, "LoweringConfigTilingLevel", []>
+{
+  let mnemonic = "lowering_config_level";
+  let parameters = (ins
+    ArrayRefParameter<"int64_t",
+        "The tile sizes to use for this level of tiling">:$sizes,
+    OptionalArrayRefParameter<"int64_t",
+        "The tile interchange to use for this level of tiling">:$interchange,
+    OptionalArrayRefParameter<"bool",
+        "The scalable tile flags for this level of tiling">:$scalableFlags);
+  let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
+}
+
+def IREECodegen_LoweringConfigTilingLevelsAttr :
+  ArrayOfAttr<IREECodegen_Dialect, "LoweringConfigTilingLevels",
+    "lowering_config_levels", "LoweringConfigTilingLevelAttr", []>
+{
+}
+
 def IREECodegen_LoweringConfigAttr :
     AttrDef<IREECodegen_Dialect, "LoweringConfig", []> {
   let mnemonic = "lowering_config";
@@ -154,25 +192,25 @@ def IREECodegen_LoweringConfigAttr :
     implementation. In future, each pass pipeline could verify that
     the lowering configuration has all the necessary attributes for
     the pipeline.
-
   }];
 
   let assemblyFormat = [{
-    `<` `tile_sizes` `=` $tileSizes
-      (`,` `tile_interchange` `=` $tileInterchange^)?
-      (`,` `native_vector_size` `=` $nativeVectorSize^)? `>`
+    `<` `tile_sizes` `=` $tilingLevels
+      (`,` `native_vector_size` `=` `[` $nativeVectorSize^ `]`)? `>`
   }];
 
   let parameters = (ins
-    AttrParameter<"ArrayAttr",
-        "The tile sizes to use for different levels of tiling">:$tileSizes,
-    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
-        "The tile interchange to use for different levels of tiling">:$tileInterchange,
-    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
+    AttrParameter<"LoweringConfigTilingLevelsAttr",
+        "The lowering config at different levels">:$tilingLevels,
+    OptionalArrayRefParameter<"int64_t",
         "The native vector size to use for the given operation">:$nativeVectorSize
   );
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
+        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
+        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>,
+    AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
+        "ScalableTileFlagsListTypeRef":$scalableTileFlags,
         CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
         CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>
   ];
@@ -183,12 +221,21 @@ def IREECodegen_LoweringConfigAttr :
     // Returns the tile sizes for a level set for the op.
     SmallVector<int64_t> getTileSizeVals(unsigned level);
 
+    // Returns the scalable tile flags for all levels set for the op.
+    ScalableTileFlagsListType getScalableTileFlagVals();
+
+    // Returns the scalable tile flags for a level set for the op.
+    SmallVector<bool> getScalableTileFlagVals(unsigned level);
+
     // Returns the tile interchange for a level set for the op.
     SmallVector<int64_t> getTileInterchangeVals(unsigned level);
 
     // Returns the native vector size to use.
-    SmallVector<int64_t> getNativeVectorSizeVals();
+    SmallVector<int64_t> getNativeVectorSizeVals() {
+      return SmallVector<int64_t>(getNativeVectorSize());
+    }
   }];
+
   let genVerifyDecl = 1;
 }
 
@@ -216,28 +263,21 @@ def IREECodegen_CompilationInfoAttr :
   let parameters = (ins
     AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
-    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
-        "The workgroup size to use during translation.">:$workgroupSize,
+    OptionalArrayRefParameter<"int64_t", "The workgroup size to use during translation.">:$workgroupSize,
     OptionalParameter<"std::optional<int64_t>",
         "The subgroup size to use during translation.">:$subgroupSize
   );
 
   let assemblyFormat = [{
     `<` `lowering_config` `=` $loweringConfig `,` `translation_info` `=` $translationInfo
-    (`,` `workgroup_size` `=` $workgroupSize^)?
+    (`,` `workgroup_size` `=` `[` $workgroupSize^ `]`)?
     (`,` `subgroup_size` `=` $subgroupSize^)? `>`
   }];
 
-  // The builder is externally for auto-tuner to generate the attributes.
-  let builders = [
-    AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
-      "TranslationInfoAttr":$translationInfo,
-      "ArrayRef<int64_t>":$workgroupSize,
-      "std::optional<int64_t>":$subgroupSize
-      )>,
-  ];
   let extraClassDeclaration = [{
-    SmallVector<int64_t> getWorkgroupSizeVals();
+    SmallVector<int64_t> getWorkgroupSizeVals() {
+      return SmallVector<int64_t>(getWorkgroupSize());
+    }
   }];
   let genVerifyDecl = 1;
 }
@@ -249,12 +289,15 @@ def IREECodegen_ExportConfig : AttrDef<IREECodegen_Dialect, "ExportConfig", []> 
     Allows setting workgroup size for pre-formed dispatches.
   }];
   let parameters = (ins
-    AttrParameter<"ArrayAttr", "Workgroup Size to use">:$workgroup_size
+    ArrayRefParameter<"int64_t", "Workgroup Size to use">:$workgroup_size
   );
   let assemblyFormat = [{
-    `<` `workgroup_size` `=` $workgroup_size `>`
+    `<` `workgroup_size` `=` `[` $workgroup_size `]` `>`
+  }];
+  let extraClassDeclaration = [{
+    ArrayAttr getWorkgroupSizeIndexArray();
   }];
   let genVerifyDecl = 1;
 }
 
-#endif // IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG
+#endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

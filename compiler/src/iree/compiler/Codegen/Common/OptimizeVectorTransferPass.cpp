@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/PatternMatch.h"
@@ -115,7 +116,7 @@ struct OptimizeVectorTransferPass
     }
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
-    eraseDeadAllocAndStores(funcOp);
+    memref::eraseDeadAllocAndStores(rewriter, funcOp);
   }
 
   LogicalResult initializeOptions(StringRef options) override {

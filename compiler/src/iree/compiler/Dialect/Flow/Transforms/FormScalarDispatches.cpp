@@ -62,7 +62,7 @@ static bool isComputeOperation(Operation *op) {
   }
   if (op->getDialect() == context->getLoadedDialect<tensor::TensorDialect>()) {
     return !isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::EmptyOp,
-                tensor::ExpandShapeOp>(op);
+                tensor::ExpandShapeOp, tensor::PackOp, tensor::UnPackOp>(op);
   }
   return false;
 }

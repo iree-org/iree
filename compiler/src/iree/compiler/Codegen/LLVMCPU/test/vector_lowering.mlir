@@ -44,8 +44,8 @@ func.func @matmul_391x384x384_f32() {
       %10 = vector.transfer_read %subview_3[%arg1], %cst {in_bounds = [true]} : memref<128xf32, strided<[1], offset: ?>>, vector<32xf32>
       %11 = vector.broadcast %10 : vector<32xf32> to vector<8x32xf32>
       %12 = arith.addf %11, %9 : vector<8x32xf32>
-      %13 = arith.minf %12, %cst_1 : vector<8x32xf32>
-      %14 = arith.maxf %13, %cst_0 : vector<8x32xf32>
+      %13 = arith.minimumf %12, %cst_1 : vector<8x32xf32>
+      %14 = arith.maximumf %13, %cst_0 : vector<8x32xf32>
       %subview_7 = memref.subview %subview_2[%arg0, %arg1] [%7, 32] [1, 1] : memref<?x128xf32, strided<[384, 1], offset: ?>> to memref<?x32xf32, strided<[384, 1], offset: ?>>
       vector.transfer_write %14, %subview_7[%c0, %c0] {in_bounds = [false, true]} : vector<8x32xf32>, memref<?x32xf32, strided<[384, 1], offset: ?>>
     }

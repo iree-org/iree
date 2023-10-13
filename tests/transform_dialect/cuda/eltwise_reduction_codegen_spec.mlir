@@ -15,8 +15,8 @@ transform.sequence failures(propagate) {
 
   // Step 2. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
-  %forall_grid, %grid_combiner_op =
-    transform.structured.tile_to_forall_op %combiner_op tile_sizes [1]
+  %grid_combiner_op, %forall_grid =
+    transform.structured.tile_using_forall %combiner_op tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
@@ -45,7 +45,7 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op : (!transform.any_op) -> !transform.any_op
   %forall_block_combiner_op, %block_combiner_op =
-    transform.structured.tile_to_forall_op %combiner_2 tile_sizes [1]
+    transform.structured.tile_using_forall %combiner_2 tile_sizes [1]
     ( mapping = [#gpu.thread<z>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -56,7 +56,7 @@ transform.sequence failures(propagate) {
   %grid_eltwise_op = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op : (!transform.any_op) -> !transform.any_op
   %forall_block_more_parallel_op, %block_more_parallel_op =
-    transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1]
+    transform.structured.tile_using_forall %grid_more_parallel_op tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -70,7 +70,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  %func_3 = transform.structured.vectorize %func_1 : (!transform.any_op) -> !transform.any_op
+  %func_3 = transform.structured.vectorize_children_and_apply_patterns %func_1 : (!transform.any_op) -> !transform.any_op
 
   // Step 5. Bufferize and drop HAL decriptor from memref ops.
   // ===========================================================================

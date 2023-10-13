@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "iree/compiler/Pipelines/Options.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -35,6 +36,11 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 // distinction to keep that as an option.
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions);
+
+// Materializes logical encodings to physical encodings if there is a single
+// device target.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createMaterializeHomogeneousEncodingsPass();
 
 void registerGlobalOptimizationPipeline();
 

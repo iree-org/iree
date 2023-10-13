@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -27,7 +28,8 @@ public:
 
 void EraseDeadAllocAndStoresPass::runOnOperation() {
   auto funcOp = getOperation();
-  eraseDeadAllocAndStores(funcOp);
+  IRRewriter rewriter(&getContext());
+  memref::eraseDeadAllocAndStores(rewriter, funcOp);
 }
 } // namespace
 

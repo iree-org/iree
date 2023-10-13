@@ -182,8 +182,8 @@ static bool checkShapeIsDataDependant(Operation *op) {
       return true;
     };
     llvm::SetVector<Operation *> slice;
-    for (OpOperand *initOperand : linalgOp.getDpsInitOperands()) {
-      mlir::getBackwardSlice(initOperand->get(), &slice, options);
+    for (Value initOperand : linalgOp.getDpsInits()) {
+      mlir::getBackwardSlice(initOperand, &slice, options);
     }
     return llvm::any_of(
         slice, [](Operation *op) { return isa<tensor::ExtractOp>(op); });

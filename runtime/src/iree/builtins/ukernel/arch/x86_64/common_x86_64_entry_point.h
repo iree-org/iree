@@ -43,4 +43,10 @@ static inline bool iree_uk_cpu_supports_avx512_vnni(
          iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_X86_64_AVX512VNNI);
 }
 
+static inline bool iree_uk_cpu_supports_avx512_bf16(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_cpu_supports_avx512_base(cpu_data) &&
+         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_X86_64_AVX512BF16);
+}
+
 #endif  // IREE_BUILTINS_UKERNEL_ARCH_X86_64_COMMON_X86_64_ENTRY_POINT_H_

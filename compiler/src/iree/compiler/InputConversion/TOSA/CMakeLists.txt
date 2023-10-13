@@ -44,6 +44,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "Converti48Toi64.cpp"
     "Passes.cpp"
     "TosaToLinalgExt.cpp"
     "VerifyCompilerTOSAInputLegality.cpp"

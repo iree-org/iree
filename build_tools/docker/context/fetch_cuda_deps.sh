@@ -44,7 +44,7 @@ DOWNLOAD_SCRIPT_PATH="$DOWNLOAD_DIR/parse_redist.py"
 # Parameters to the download script.
 # Look for an appropriate redistrib_*.json here to verify:
 #   https://developer.download.nvidia.com/compute/cuda/redist/
-VERSION="12.1.1"
+VERSION="12.2.1"
 PRODUCT="cuda"
 OS="linux"
 ARCH="x86_64"
@@ -85,6 +85,10 @@ for component in ${COMPONENTS[@]}; do
     --os "$OS" \
     --arch "$ARCH" \
     --component "$component"
+
+  # Each component comes with a LICENSE file that we need to be able to
+  # overwrite.
+  chmod +w "${SRC_DIR}/LICENSE"
 done
 
 if ! [ -d "$SRC_DIR" ]; then

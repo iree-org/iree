@@ -9,12 +9,8 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 
-#include "iree/base/api.h"
-#include "iree/hal/api.h"
 #include "iree/modules/hal/utils/buffer_diagnostics.h"
-#include "iree/vm/api.h"
 
 //===----------------------------------------------------------------------===//
 // Limits imposed by the module (and not the HAL)
@@ -43,7 +39,6 @@ typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
   iree_hal_module_flags_t flags;
   iree_hal_device_t* shared_device;
-  // TODO(benvanik): types.
 } iree_hal_module_t;
 
 #define IREE_HAL_MODULE_CAST(module) \
@@ -162,7 +157,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device,  //
   return iree_ok_status();
 }
 
-static void iree_hal_module_file_buffer_release(void* user_data) {
+static void iree_hal_module_file_buffer_release(
+    void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
   iree_vm_buffer_t* backing_buffer = (iree_vm_buffer_t*)user_data;
   iree_vm_buffer_release(backing_buffer);
 }
@@ -194,30 +190,32 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_file_from_memory,  //
   IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(buffer, offset, length, 1, &span));
 
   // Retain the buffer until the file is destroyed.
-  iree_hal_file_release_callback_t release_callback = {
+  iree_io_file_handle_release_callback_t release_callback = {
       .fn = iree_hal_module_file_buffer_release,
       .user_data = buffer,
   };
   iree_vm_buffer_retain(buffer);
 
-  // Attempt to import the memory as a file.
-  // Memory files are always supported (even if via emulation) so this should
-  // always succeed.
-  iree_hal_external_file_t external_file = {
-      .type = IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION,
-      .flags = flags,
-      .handle =
-          {
-              .host_allocation =
-                  iree_make_byte_span((void*)span.data, span.data_length),
-          },
-  };
-  iree_hal_file_t* file = NULL;
-  iree_status_t status = iree_hal_file_import(
-      device, queue_affinity, access, &external_file, release_callback, &file);
+  // Wrap the memory in a file handle.
+  iree_io_file_handle_t* handle = NULL;
+  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
+      IREE_IO_FILE_ACCESS_READ,
+      iree_make_byte_span((void*)span.data, span.data_length), release_callback,
+      iree_hal_device_host_allocator(device), &handle);
   if (!iree_status_is_ok(status)) {
     iree_vm_buffer_release(buffer);
   }
+
+  // Attempt to import the memory as a file.
+  // Memory files are always supported (even if via emulation) so this should
+  // always succeed.
+  iree_hal_file_t* file = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_file_import(device, queue_affinity, access, handle, flags,
+                                  &file);
+  }
+
+  iree_io_file_handle_release(handle);
 
   rets->r0 = iree_hal_file_move_ref(file);
   return status;

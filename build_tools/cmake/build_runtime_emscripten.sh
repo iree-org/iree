@@ -25,7 +25,7 @@ BUILD_DIR="build-emscripten"
 IREE_HOST_BIN_DIR="$(realpath ${IREE_HOST_BIN_DIR})"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
+# Note: not using ccache since the runtime build should be fast already.
 
 cd "${BUILD_DIR}"
 
@@ -49,7 +49,3 @@ echo "------------------------"
 echo "Building test deps"
 echo "------------------"
 "${CMAKE_BIN?}" --build . --target iree-test-deps -- -k 0
-
-if (( IREE_USE_CCACHE == 1 )); then
-  ccache --show-stats
-fi

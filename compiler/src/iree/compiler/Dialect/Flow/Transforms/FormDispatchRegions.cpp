@@ -9,7 +9,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -28,11 +27,10 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
-#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/TypeRange.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -549,8 +547,8 @@ isFusableWithConsumer(OpOperand &fusedOperand,
       continue;
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
         !llvm::any_of(
-            consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
-              return canUseInOperandAsInitOperand(inputOperand, initOperand);
+            consumerLinalgOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
+              return canUseInOperandAsInitOperand(inputOperand, &initOperand);
             })) {
       return false;
     }
@@ -706,13 +704,12 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
 /// very simple heuristic is used below, but the mechanism should be general
 /// enough to capture any heuristic.
 static unsigned
-decideFusableLinalgOps(FunctionOpInterface funcOp,
-                       DominanceInfo const &dominanceInfo,
-                       FormDispatchRegionsOptions const &options) {
-  unsigned numRootOps = 0;
-  MLIRContext *context = funcOp->getContext();
+decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
+                       FormDispatchRegionsOptions const &options,
+                       unsigned numRootOps = 0) {
+  MLIRContext *context = region.getContext();
   OpBuilder builder(context);
-  for (Block &block : funcOp.getFunctionBody()) {
+  for (Block &block : region) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
     // So procedure here is to
@@ -720,6 +717,14 @@ decideFusableLinalgOps(FunctionOpInterface funcOp,
     // - To fuse with consumers make the consumer the root.
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
+      if (isa<scf::SCFDialect>(op.getDialect())) {
+        for (auto &region : op.getRegions()) {
+          numRootOps = decideFusableLinalgOps(region, dominanceInfo, options,
+                                              numRootOps);
+        }
+        continue;
+      }
+
       // Start with a root operation and fuse its producers.
       if (hasFusionGroupsAttribute(&op) || !isRootOp(&op))
         continue;
@@ -735,7 +740,7 @@ decideFusableLinalgOps(FunctionOpInterface funcOp,
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
   // into their own dispatches.
-  for (Block &block : funcOp.getFunctionBody()) {
+  for (Block &block : region) {
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
@@ -775,7 +780,8 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    FormDispatchRegionsOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
-  unsigned numRoots = decideFusableLinalgOps(funcOp, dominanceInfo, options);
+  unsigned numRoots =
+      decideFusableLinalgOps(funcOp.getFunctionBody(), dominanceInfo, options);
   SmallVector<Operation *> roots(numRoots, nullptr);
   DenseMap<unsigned, SmallVector<Operation *>> producers;
 

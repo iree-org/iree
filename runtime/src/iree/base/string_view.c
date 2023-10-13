@@ -375,8 +375,9 @@ IREE_API_EXPORT bool iree_string_view_atoi_int64(iree_string_view_t value,
   return parsed_value != 0 || errno == 0;
 }
 
-IREE_API_EXPORT bool iree_string_view_atoi_uint64(iree_string_view_t value,
-                                                  uint64_t* out_value) {
+IREE_API_EXPORT bool iree_string_view_atoi_uint64_base(iree_string_view_t value,
+                                                       int base,
+                                                       uint64_t* out_value) {
   // Copy to scratch memory with a NUL terminator.
   char temp[32] = {0};
   if (value.size >= IREE_ARRAYSIZE(temp)) return false;
@@ -385,11 +386,16 @@ IREE_API_EXPORT bool iree_string_view_atoi_uint64(iree_string_view_t value,
   // Attempt to parse.
   errno = 0;
   char* end = NULL;
-  unsigned long long parsed_value = strtoull(temp, &end, 0);
+  unsigned long long parsed_value = strtoull(temp, &end, base);
   if (temp == end) return false;
   if (parsed_value == ULLONG_MAX && errno == ERANGE) return false;
   *out_value = (uint64_t)parsed_value;
   return parsed_value != 0 || errno == 0;
+}
+
+IREE_API_EXPORT bool iree_string_view_atoi_uint64(iree_string_view_t value,
+                                                  uint64_t* out_value) {
+  return iree_string_view_atoi_uint64_base(value, 0, out_value);
 }
 
 IREE_API_EXPORT bool iree_string_view_atof(iree_string_view_t value,

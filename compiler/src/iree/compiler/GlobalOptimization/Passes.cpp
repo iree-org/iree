@@ -62,10 +62,18 @@ void buildGlobalOptimizationPassPipeline(
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
-      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
+      // RaiseSpecialOps, by virtue of implementing various peephole
+      // optimizations, is sensitive to surrounding IR structure. Thus we run
+      // this pass both before unit dim folding + consteval, as well as after.
+      .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
+      // Enable data tiling after they are in a canonical form.
+      .addPredicatedPass(transformOptions.options.dataTiling,
+                         IREE::Flow::createSetEncodingPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
+  mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
@@ -73,8 +81,8 @@ void buildGlobalOptimizationPassPipeline(
       // region formation as redundant store-loads are removed.
       .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
-  // Module level cleanup and canonicalization of util.global (and other util
-  // ops).
+  // Module level cleanup and canonicalization of util.global (and other
+  // util ops).
   pipeline.addPass(IREE::Util::createApplyPatternsPass());
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
   pipeline.addPass(IREE::Util::createIPOPass());
@@ -109,7 +117,14 @@ void buildGlobalOptimizationPassPipeline(
   }
 }
 
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/GlobalOptimization/Passes.h.inc" // IWYU pragma: export
+} // namespace
+
 void registerGlobalOptimizationPipeline() {
+  registerPasses();
+
   PassPipelineRegistration<TransformOptions>
       globalOptimizationTransformPassPipeline(
           "iree-global-optimization-transformation-pipeline",

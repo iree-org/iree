@@ -52,8 +52,8 @@ transform.sequence failures(propagate) {
   %original_matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
     : (!transform.any_op) -> !transform.any_op
 
-  %forall, %matmul =
-    transform.structured.tile_to_forall_op %original_matmul num_threads [32]
+  %matmul, %forall =
+    transform.structured.tile_using_forall %original_matmul num_threads [32]
       ( mapping = [#gpu.block<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
@@ -113,7 +113,7 @@ hal.executable private @matmul_static_dispatch_0 {
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !transform.any_op):
   %1 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %forall_op, %tiled_op = transform.structured.tile_to_forall_op %1   num_threads [] tile_sizes [1, 1, 1](mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>]): (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_op, %forall_op = transform.structured.tile_using_forall %1   num_threads [] tile_sizes [1, 1, 1](mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>]): (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_op : (!transform.any_op) -> ()
 }
 
@@ -163,6 +163,6 @@ hal.executable private @matmul_static_dispatch_0 {
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !transform.any_op):
   %1 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %forall_op, %tiled_op = transform.structured.tile_to_forall_op %1   num_threads [] tile_sizes [5, 3](mapping = [#gpu.block<z>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_op, %forall_op = transform.structured.tile_using_forall %1   num_threads [] tile_sizes [5, 3](mapping = [#gpu.block<z>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_op : (!transform.any_op) -> ()
 }

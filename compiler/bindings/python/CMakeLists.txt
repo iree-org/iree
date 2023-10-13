@@ -214,42 +214,56 @@ if(TARGET lld)
   )
 endif()
 
-# Install shared libraries that the extension depends on. This uses
-# CMake's defer feature to evaluate the install directive once everything
-# has been evaluated (because there is no guarantee that this file evaluates
-# before the API libraries are defined). While deferred calls are generally
-# fragile, this install is purely a leaf feature (with no other calls
-# depending on its sequencing), so this use is okay.
-# We defer it to the compiler/ directory so that cmake_install.cmake targets
-# are all self contained to the compiler, which is the most common spanning
-# parent.
-cmake_language(EVAL CODE "
-cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}/compiler\"
-  CALL install
-  TARGETS
-    iree_compiler_API_SharedImpl
-  DESTINATION \"${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs\"
-)
-")
+################################################################################
+# libIREECompiler.so dylib tree
+# We copy the compiler shared library and its related files to both the build
+# and install tree for consistency. Note that on Windows, this is load bearing
+# since the DLL must be colocated in the same directory. On Unix, CMake's
+# automatic RPATH handling in the build tree will cause binaries to resolve
+# against the project level library, so this is just cosmetic, but it does
+# have the side effect of making the Python build tree relocatable and making
+# logic that expects to find the compiler libraries in a consistent place
+# simple. Since a symlink is used on Unix and it is not the versioned dylib, 
+# the realpath will still be the build-tree wide shared library. This also means
+# that any tools or files that must be colocated with the dylib will come from
+# the project-wide location.
+################################################################################
 
-# On Windows, the IREECompiler.dll must be physically adjacent to the python
-# extensions. This is only an issue for the build tree (the install tree
-# places things appropriately). There is a lot of unavoidable fragility
-# here. Most notably, the actual name of the DLL must be static and computed
-# the same as where it is built.
-if(WIN32)
-  set(_local_dll_copy
-    "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs/IREECompiler.dll")
-  add_custom_command(
-    OUTPUT "${_local_dll_copy}"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-      "$<TARGET_FILE:iree_compiler_API_SharedImpl>"
-      "${_local_dll_copy}"
-    DEPENDS iree_compiler_API_SharedImpl
+# Copy compiler dylib files into the python _mlir_libs tree so that the
+# binaries can find them with a relative rpath.
+get_property(_dylib_relpaths GLOBAL PROPERTY IREE_COMPILER_DYLIB_RELPATHS)
+set(_dylib_copy_commands)
+set(_dylib_target_files)
+set(_dylib_src_files)
+foreach (_dylib_relpath ${_dylib_relpaths})
+  set(_dylib_srcpath "${IREE_COMPILER_DYLIB_DIR}/${_dylib_relpath}")
+  set(_dylib_outputpath "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs/${_dylib_relpath}")
+  cmake_path(GET _dylib_outputpath PARENT_PATH _parent_dir)
+  file(MAKE_DIRECTORY "${_parent_dir}")
+  list(APPEND _dylib_copy_commands
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+      "${_dylib_srcpath}" "${_dylib_outputpath}"
   )
-  add_custom_target(IREEPythonCopyDLL ALL
-    DEPENDS "${_local_dll_copy}")
-endif()
+  list(APPEND _dylib_target_files "${_dylib_outputpath}")
+  list(APPEND _dylib_src_files "${_dylib_srcpath}")
+  cmake_path(GET _dylib_relpath PARENT_PATH _dylib_install_destination)
+  install(FILES "${_dylib_srcpath}"
+    DESTINATION "${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs/${_dylib_install_destination}"
+  )
+endforeach()
+
+add_custom_command(
+  OUTPUT ${_dylib_target_files}
+  DEPENDS ${_dylib_src_files}
+  POST_BUILD
+    ${_dylib_copy_commands}
+)
+
+add_custom_target(IREECompilerPythonDylibFiles
+  DEPENDS ${_dylib_target_files}
+)
+
+add_dependencies(IREECompilerPythonModules IREECompilerPythonDylibFiles)
 
 ################################################################################
 # Subdirectories

@@ -770,7 +770,7 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
   for (int64_t index : indices) {
     if ((index >= 0) && (index < numOperands)) {
       FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-          rewriter, loc, target->getOperand(index), false, options, true);
+          rewriter, loc, target->getOperand(index), options);
       if (failed(ret)) {
         return emitDefaultDefiniteFailure(target)
                << "failed to promote operand";

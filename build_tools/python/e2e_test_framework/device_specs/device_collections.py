@@ -55,9 +55,11 @@ ALL_DEVICE_SPECS = [
     # Pixel 4
     pixel_4_specs.LITTLE_CORES,
     pixel_4_specs.BIG_CORES,
+    pixel_4_specs.ALL_CORES,
     # Pixel 6 Pro
     pixel_6_pro_specs.LITTLE_CORES,
     pixel_6_pro_specs.BIG_CORES,
+    pixel_6_pro_specs.ALL_CORES,
     pixel_6_pro_specs.GPU,
     # Moto Edge X30
     moto_edge_x30_specs.GPU,

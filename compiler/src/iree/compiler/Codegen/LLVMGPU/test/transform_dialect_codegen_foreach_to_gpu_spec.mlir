@@ -1,12 +1,12 @@
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !transform.any_op):
   %0 = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %forall, %tiled_fill = transform.structured.tile_to_forall_op %0 num_threads [5, 1] 
+  %forall, %tiled_fill = transform.structured.tile_using_forall %0 num_threads [5, 1] 
   ( mapping = [#gpu.thread<y>, #gpu.thread<x>] )
   : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   %1 = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %forall_2, %tiled_matmul = transform.structured.tile_to_forall_op %1 num_threads [7, 9]
+  %forall_2, %tiled_matmul = transform.structured.tile_using_forall %1 num_threads [7, 9]
   ( mapping = [#gpu.thread<x>, #gpu.thread<y>] )
   : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
