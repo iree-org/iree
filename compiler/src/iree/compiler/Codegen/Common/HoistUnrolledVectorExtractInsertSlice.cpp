@@ -137,7 +137,7 @@ static scf::ForOp hoistVectorExtractInsertSlice(
   // 2. Rewrite `loop` with an additional yield. This is the quantity that is
   // computed iteratively but whose storage has become loop-invariant.
   NewYieldValuesFn yieldFn = [&](OpBuilder &b, Location loc,
-                                ArrayRef<BlockArgument> newBBArgs) {
+                                 ArrayRef<BlockArgument> newBBArgs) {
     return llvm::map_to_vector(insertOps,
                                [](auto v) -> Value { return v.getSource(); });
   };
