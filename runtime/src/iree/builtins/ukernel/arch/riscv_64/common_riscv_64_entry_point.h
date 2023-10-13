@@ -18,4 +18,4 @@
 #include "iree/builtins/ukernel/arch/riscv_64/config_riscv_64.h"
 #endif
 
-#endif // IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_COMMON_RISCV_64_ENTRY_POINT_H_
+#endif  // IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_COMMON_RISCV_64_ENTRY_POINT_H_

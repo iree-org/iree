@@ -246,7 +246,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
         case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
         case IREE::Codegen::DispatchLoweringPassPipeline::None:
-          addCPUDefaultPassPipeline(executableLoweringPipeline, enableMicrokernels);
+          addCPUDefaultPassPipeline(executableLoweringPipeline,
+                                    enableMicrokernels);
           break;
         case IREE::Codegen::DispatchLoweringPassPipeline::
             CPUBufferOpsTileAndVectorize: {

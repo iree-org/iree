@@ -128,7 +128,8 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
 /// Populates the passes to lower to scalars operations for linalg based
 /// code-generation. This pipeline does not vectorize, but instead just
 /// converts to memrefs
-void addCPUDefaultPassPipeline(OpPassManager &passManager, bool enableMicrokernels);
+void addCPUDefaultPassPipeline(OpPassManager &passManager,
+                               bool enableMicrokernels);
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
                                                TilingConfig &tilingConfig,

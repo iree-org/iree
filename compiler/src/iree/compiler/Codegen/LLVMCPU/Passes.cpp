@@ -661,14 +661,16 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   }
 }
 
-void addCPUDefaultPassPipeline(OpPassManager &passManager, bool enableMicrokernels) {
+void addCPUDefaultPassPipeline(OpPassManager &passManager,
+                               bool enableMicrokernels) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   if (enableMicrokernels) {
     nestedModulePM.addPass(
-          createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+        createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
-  nestedModulePM.addNestedPass<func::FuncOp>(IREE::LinalgExt::createDecomposeSoftmaxPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
   addBufferizePasses(nestedModulePM);
 }
 

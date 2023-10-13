@@ -10,7 +10,7 @@
 #include "iree/builtins/ukernel/mmt4d.h"
 #include "iree/builtins/ukernel/pack.h"
 #include "iree/builtins/ukernel/query_tile_sizes.h"
-#include "iree/builtins/ukernel/unpack.h"
 #include "iree/builtins/ukernel/softmax.h"
+#include "iree/builtins/ukernel/unpack.h"
 
 #endif  // IREE_BUILTINS_UKERNEL_API_H_

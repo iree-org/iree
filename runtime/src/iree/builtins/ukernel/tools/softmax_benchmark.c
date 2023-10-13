@@ -17,7 +17,8 @@ static iree_status_t iree_uk_benchmark_softmax(
     const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
   const iree_uk_benchmark_user_data_t* user_data = benchmark_def->user_data;
-  const iree_uk_softmax_params_t* src_params = iree_uk_benchmark_params(user_data);
+  const iree_uk_softmax_params_t* src_params =
+      iree_uk_benchmark_params(user_data);
   iree_uk_softmax_params_t params;
   memcpy(&params, src_params, sizeof params);
   params.cpu_data = iree_uk_benchmark_cpu_data(user_data);
@@ -26,8 +27,8 @@ static iree_status_t iree_uk_benchmark_softmax(
   iree_uk_int32_t N = params.N;
   iree_uk_softmax_type_t softmax_type = iree_uk_softmax_type(params.flags);
   iree_uk_index_t buffer_size = iree_uk_2d_buffer_length(softmax_type, M, N);
-  void *src_buffer = malloc(buffer_size);
-  void *dst_buffer = malloc(buffer_size);
+  void* src_buffer = malloc(buffer_size);
+  void* dst_buffer = malloc(buffer_size);
   iree_uk_random_engine_t* engine = iree_uk_benchmark_random_engine(user_data);
   // It's just about plausible that on some platform, for some number type,
   // performance might be different on zero buffers vs random buffers. But it
@@ -48,25 +49,23 @@ static iree_status_t iree_uk_benchmark_softmax(
   }
 
   iree_benchmark_set_bytes_processed(benchmark_state,
-                                    total_iterations * buffer_size);
+                                     total_iterations * buffer_size);
 
   free(src_buffer);
   free(dst_buffer);
   return iree_ok_status();
 }
 
-static void iree_uk_benchmark_register_softmax(iree_uk_uint32_t flags,
-                                            int M, int N,
-                                            const char* cpu_features) {
+static void iree_uk_benchmark_register_softmax(iree_uk_uint32_t flags, int M,
+                                               int N,
+                                               const char* cpu_features) {
   iree_uk_softmax_type_t type = iree_uk_softmax_type(flags);
   char type_str[32];
   iree_uk_type_str(type_str, sizeof type_str, type);
-  iree_uk_softmax_params_t params = {.M = M,
-                                  .N = N};
+  iree_uk_softmax_params_t params = {.M = M, .N = N};
 
   char name[128];
-  snprintf(name, sizeof name, "softmax_%s_tile_%dx%d", type_str,
-           M, N);
+  snprintf(name, sizeof name, "softmax_%s_tile_%dx%d", type_str, M, N);
   params.flags = flags;
   iree_uk_benchmark_register(name, iree_uk_benchmark_softmax, &params,
                              sizeof params, cpu_features);

@@ -316,10 +316,10 @@ static void iree_cpu_initialize_from_platform_x86_64(uint64_t* out_fields) {
 #define IREE_RISCV_64_ISA_SEARCH_START 4
 
 static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
-  char *line;
+  char* line;
   char isa[1024];
-  char *cpuinfo_path = "/proc/cpuinfo";
-  FILE *fp;
+  char* cpuinfo_path = "/proc/cpuinfo";
+  FILE* fp;
   size_t len = 0;
   ssize_t nread;
 
@@ -331,30 +331,29 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
   while ((nread = getline(&line, &len, fp)) != -1) {
     if (sscanf(line, "isa : %s\n", &isa[0])) {
       // First 4 characters are "rv32" or "rv64"
-      // We search th character 'v' from the 4th character to '_' occur or string end.
-      char *first = strchr(&isa[0], '_');
+      // We search th character 'v' from the 4th character to '_' occur or
+      // string end.
+      char* first = strchr(&isa[0], '_');
 
       // Can't find '_', search 'v' in the whole isa string.
       if (!first) {
         if (strchr(&isa[IREE_RISCV_64_ISA_SEARCH_START], 'v')) {
-          IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1,
-                 1 << 0);
+          IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1, 1 << 0);
         }
         break;
       } else {
         // search 'v' to the first '_' occur.
         int search_len = first - &isa[IREE_RISCV_64_ISA_SEARCH_START];
         if (memchr(&isa[IREE_RISCV_64_ISA_SEARCH_START], 'v', search_len)) {
-          IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1,
-                 1 << 0);
+          IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1, 1 << 0);
           break;
         }
       }
 
       // No 'v' before the first '_', search for "zve".
-      char *start = first;
-      char *end = &isa[0] + len;
-      char *next;
+      char* start = first;
+      char* end = &isa[0] + len;
+      char* next;
 
       while (start < end) {
         next = strchr(start, '_');
@@ -363,8 +362,7 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
         }
 
         if (strncmp("zve", start, 3) == 0) {
-          IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1,
-               1 << 0);
+          IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, 1, 1 << 0);
           break;
         }
         // Next search start from the char after '_'
@@ -378,8 +376,8 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
   fclose(fp);
 }
 
-#endif // IREE_PLATFORM_*
-#endif // defined(IREE_ARCH_ARM_64)
+#endif  // IREE_PLATFORM_*
+#endif  // defined(IREE_ARCH_ARM_64)
 
 static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
                                               uint64_t* out_fields) {

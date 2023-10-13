@@ -42,7 +42,7 @@ static int iree_uk_plugin_unpack(void* params_ptr, void* context,
 }
 
 static int iree_uk_plugin_softmax(void* params_ptr, void* context,
-                                 void* reserved) {
+                                  void* reserved) {
   iree_uk_softmax((const iree_uk_softmax_params_t*)params_ptr);
   return 0;
 }

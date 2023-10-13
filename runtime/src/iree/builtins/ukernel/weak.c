@@ -7,8 +7,8 @@
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 #include "iree/builtins/ukernel/pack_internal.h"
 #include "iree/builtins/ukernel/query_tile_sizes_internal.h"
-#include "iree/builtins/ukernel/unpack_internal.h"
 #include "iree/builtins/ukernel/softmax_internal.h"
+#include "iree/builtins/ukernel/unpack_internal.h"
 
 #if defined(IREE_UK_HAVE_WEAK)
 

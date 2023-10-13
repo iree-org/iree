@@ -659,7 +659,8 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(IREE::LinalgExt::createDecomposeSoftmaxPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeSoftmaxPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVGeneralizeNamedOpsPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());

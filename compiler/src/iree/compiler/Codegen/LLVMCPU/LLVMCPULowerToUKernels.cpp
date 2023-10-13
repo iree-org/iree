@@ -455,9 +455,9 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
       genericMicroKernelOp.getOperation());
 }
 
-static FailureOr<IREE::Codegen::UKernelOpInterface>
-matchDAGForUKernel(RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
-                   bool /*skipIntermediateRoundings*/) {
+static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
+    RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
+    bool /*skipIntermediateRoundings*/) {
   Location loc = op.getLoc();
   auto input = op.input();
   auto output = op.output();
@@ -471,7 +471,8 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
   uint32_t flags = 0;
 
   if (!outputElemType.isF32()) {
-    return rewriter.notifyMatchFailure(op, "unsupported softmax data type for ukernel");
+    return rewriter.notifyMatchFailure(
+        op, "unsupported softmax data type for ukernel");
   }
   flags |= IREE_UK_FLAG_SOFTMAX_TYPE_F32;
 
@@ -480,11 +481,14 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
   }
 
   if (dim != output_rank - 1) {
-    return rewriter.notifyMatchFailure(op, "unsupported softmax dim for ukernel");
+    return rewriter.notifyMatchFailure(op,
+                                       "unsupported softmax dim for ukernel");
   }
 
-  Value m = rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(flattened_dim));
-  Value n = rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(last_dim));
+  Value m = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI32IntegerAttr(flattened_dim));
+  Value n = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getI32IntegerAttr(last_dim));
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
 
@@ -492,15 +496,8 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
   auto fn = getFnNameAndDefAttrs("softmax", rewriter, targetAttr);
 
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc,
-      outputType,
-      fn.name,
-      input,
-      output,
-      ValueRange{m, n, flagsVal},
-      rewriter.getDictionaryAttr(fn.defAttrs),
-      rewriter.getIndexAttr(1)
-      );
+      loc, outputType, fn.name, input, output, ValueRange{m, n, flagsVal},
+      rewriter.getDictionaryAttr(fn.defAttrs), rewriter.getIndexAttr(1));
 
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
@@ -572,7 +569,8 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
       context, isVMVXBackend);
   // These patterns are used on LLVMCPU and VMVX. Only for riscv target.
-  patterns.insert<LowerToUKernelPattern<IREE::LinalgExt::SoftmaxOp>>(context, isRISCV);
+  patterns.insert<LowerToUKernelPattern<IREE::LinalgExt::SoftmaxOp>>(context,
+                                                                     isRISCV);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
