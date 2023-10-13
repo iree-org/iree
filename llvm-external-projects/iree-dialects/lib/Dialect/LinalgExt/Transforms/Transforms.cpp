@@ -100,32 +100,6 @@ LinalgTilingPattern::returningMatchAndRewrite(linalg::LinalgOp op,
   return res;
 }
 
-LinalgVectorizationPattern::LinalgVectorizationPattern(
-    MLIRContext *context, LinalgVectorizationOptions opts,
-    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
-    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-      options(std::move(opts)), filter(std::move(f)) {}
-
-LinalgVectorizationPattern::LinalgVectorizationPattern(
-    StringRef opName, MLIRContext *context, LinalgVectorizationOptions opts,
-    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
-    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-      options(std::move(opts)), filter(f.addOpNameFilter(opName)) {}
-
-LogicalResult
-LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
-                                            PatternRewriter &rewriter) const {
-  if (failed(filter.checkAndNotify(rewriter, linalgOp)))
-    return failure();
-  SmallVector<int64_t> vectorSizes;
-  if (options.enableVectorMasking)
-    vectorSizes.append(options.vectorSizeComputationFunction(
-        linalgOp, options.canonicalVectorSizes));
-  SmallVector<bool> scalableVecDims(vectorSizes.size(), false);
-  return vectorize(rewriter, linalgOp, vectorSizes, scalableVecDims,
-                   options.vectorizeGatherAccesses);
-}
-
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

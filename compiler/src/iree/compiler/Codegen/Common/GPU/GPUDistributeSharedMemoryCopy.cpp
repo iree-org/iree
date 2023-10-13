@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
@@ -28,9 +27,6 @@
 #include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-distribute-shared-memory-copy"
-
-using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
-using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 /// Prints the given `funcOp` after a leading `step` comment header.
 void debugPrint(mlir::func::FuncOp funcOp, const char *step) {
@@ -274,14 +270,17 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
           StringAttr::get(patterns.getContext(), kCopyDistributed)));
 }
 
-static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  VectorizationPatterns<linalg::GenericOp>::insert(
-      patterns, IREE::LinalgExt::LinalgVectorizationOptions(),
-      IREE::LinalgExt::LinalgTransformationFilter(
-          {StringAttr::get(patterns.getContext(),
-                           getCopyToWorkgroupMemoryMarker()),
-           StringAttr::get(patterns.getContext(), kCopyDistributed)},
-          std::nullopt));
+static void vectorizeDistributedCopies(func::FuncOp funcOp) {
+  IRRewriter rewriter(funcOp.getContext());
+  SmallVector<linalg::GenericOp> candidates;
+  funcOp.walk([&](linalg::GenericOp op) { candidates.push_back(op); });
+  for (auto op : candidates) {
+    SmallVector<int64_t> vectorSizes;
+    SmallVector<bool> scalableVecDims;
+    scalableVecDims.resize(vectorSizes.size());
+    (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
+                            /*vectorizeGatherAccesses=*/true);
+  };
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.
@@ -436,12 +435,7 @@ class GPUDistributeSharedMemoryCopyPass
       debugPrint(funcOp, "After step 2: thread distribution");
 
       // Step 3. Vectorize the distributed copies.
-      RewritePatternSet vectorizationPatterns(context);
-      populateVectorizationPatterns(vectorizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorizationPatterns)))) {
-        return signalPassFailure();
-      }
+      vectorizeDistributedCopies(funcOp);
       debugPrint(funcOp, "After step 3: vectorization");
 
       // Step4. Finally unroll all the loop created
