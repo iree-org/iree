@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals --allow-unregistered-dialect --iree-util-const-expr-max-size-increase-threshold=64 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals="max-size-increase-threshold=64" --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @hoist_simple_const_expr
 module @hoist_simple_const_expr {

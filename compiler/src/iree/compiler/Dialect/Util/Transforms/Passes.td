@@ -105,6 +105,11 @@ def HoistIntoGlobals : Pass<"iree-util-hoist-into-globals", "mlir::ModuleOp"> {
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createHoistIntoGlobalsPass()
   }];
+  let options = [
+    Option<"maxSizeIncreaseThreshold", "max-size-increase-threshold", "int64_t",
+      /*default=*/"2147483647",
+      "Maximum byte size increase allowed for constant expr hoisting policy to allow hoisting.">
+  ];
 }
 
 def SimplifyGlobalAccesses :

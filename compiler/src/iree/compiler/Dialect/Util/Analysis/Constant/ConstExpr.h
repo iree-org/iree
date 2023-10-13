@@ -219,7 +219,7 @@ public:
 
   const ConstExprAnalysis &getAnalysis() const { return analysis; }
 
-  ConstExprHoistingPolicy(const ConstExprAnalysis &analysis);
+  ConstExprHoistingPolicy(const ConstExprAnalysis &analysis, int64_t threshold);
   void initialize();
   Decision *getDecision(const ConstExprAnalysis::ConstValueInfo *info) {
     return &decisions[info];
@@ -243,6 +243,8 @@ private:
                     Decision *decision);
 
   const ConstExprAnalysis &analysis;
+
+  int64_t constExprMaxSizeIncreaseThreshold;
 
   // Map of ConstValueInfo * to decision structs. All are allocated at
   // initialization and then the structure is not changed.

@@ -88,7 +88,8 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(IREE::Util::createIPOPass());
 
   if (transformOptions.options.constExprHoisting) {
-    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());
+    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass(
+        transformOptions.options.constExprMaxSizeIncreaseThreshold));
   }
 
   if (transformOptions.buildConstEvalPassPipeline) {

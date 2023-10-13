@@ -47,12 +47,16 @@ public:
     registerConstExprDependentDialects(registry);
   }
 
+  HoistIntoGlobalsPass(int64_t threshold) {
+    this->maxSizeIncreaseThreshold.setValue(threshold);
+  }
+
   void runOnOperation() override {
     SymbolTable moduleSymbols(getOperation());
     const auto &constExprs = getAnalysis<ConstExprAnalysis>();
     LLVM_DEBUG(dbgs() << constExprs);
     LLVM_DEBUG(dbgs() << "\n\n");
-    ConstExprHoistingPolicy policy(constExprs);
+    ConstExprHoistingPolicy policy(constExprs, this->maxSizeIncreaseThreshold);
     policy.initialize();
 
     // Print analysis dot graph if requested.
@@ -252,8 +256,9 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass() {
-  return std::make_unique<HoistIntoGlobalsPass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createHoistIntoGlobalsPass(int64_t maxSizeIncreaseThreshold) {
+  return std::make_unique<HoistIntoGlobalsPass>(maxSizeIncreaseThreshold);
 }
 
 } // namespace Util
