@@ -54,10 +54,60 @@ findAllDispatchSites(Operation *rootOp) {
   return dispatchMap;
 }
 
+// Assumes an explicit layout as specified on an export.
+static PipelineLayout
+assumeExportLayout(IREE::Stream::ExecutableExportOp exportOp,
+                   IREE::HAL::PipelineLayoutAttr layoutAttr) {
+  PipelineLayout pipelineLayout;
+  pipelineLayout.pushConstantCount = layoutAttr.getPushConstants();
+
+  auto setLayoutAttrs = layoutAttr.getSetLayouts();
+  int64_t bindingCount = 0;
+  for (auto setLayoutAttr : setLayoutAttrs) {
+    bindingCount += setLayoutAttr.getBindings().size();
+  }
+
+  pipelineLayout.setLayouts.resize(setLayoutAttrs.size());
+  pipelineLayout.resourceMap.resize(bindingCount);
+  for (auto setLayoutAttr : setLayoutAttrs) {
+    DescriptorSetLayout setLayout;
+    setLayout.ordinal = setLayoutAttr.getOrdinal();
+    setLayout.flags = setLayoutAttr.getFlags().value_or(
+        IREE::HAL::DescriptorSetLayoutFlags::None);
+    auto bindingAttrs = setLayoutAttr.getBindings();
+    setLayout.bindings.resize(bindingAttrs.size());
+    for (auto bindingAttr : bindingAttrs) {
+      DescriptorSetLayoutBinding setBinding;
+      setBinding.ordinal = bindingAttr.getOrdinal();
+      setBinding.type = bindingAttr.getType();
+      setBinding.flags =
+          bindingAttr.getFlags().value_or(IREE::HAL::DescriptorFlags::None);
+      setLayout.bindings[setBinding.ordinal] = setBinding;
+      pipelineLayout.resourceMap.emplace_back(setLayout.ordinal,
+                                              setBinding.ordinal);
+    }
+    pipelineLayout.setLayouts[setLayout.ordinal] = setLayout;
+  }
+
+  LLVM_DEBUG({
+    auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
+    llvm::dbgs() << "assumeExportLayout(@" << executableOp.getSymName() << "::@"
+                 << exportOp.getSymName() << "):\n";
+    pipelineLayout.print(llvm::dbgs());
+  });
+
+  return pipelineLayout;
+}
+
 // Derives an pipeline layout from all of the dispatches to |exportOp|.
 static PipelineLayout
 deriveExportLayout(IREE::Stream::ExecutableExportOp exportOp,
                    SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
+  if (auto layoutAttr = exportOp->getAttrOfType<IREE::HAL::PipelineLayoutAttr>(
+          "hal.interface.layout")) {
+    return assumeExportLayout(exportOp, layoutAttr);
+  }
+
   auto funcOp = exportOp.lookupFunctionRef();
   assert(funcOp && "export target not found");
 

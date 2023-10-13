@@ -481,6 +481,8 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
   // Operands/resources on the func are in an arbitrary order; get maps that
   // lets us go from dispatch site operand/resource to function argument.
   auto funcOp = exportOp.lookupFunctionRef();
+  if (!funcOp)
+    return;
   auto operandToArgMap =
       IREE::Stream::CmdDispatchOp::makeOperandToArgMap(funcOp);
   auto resourceToArgMap =

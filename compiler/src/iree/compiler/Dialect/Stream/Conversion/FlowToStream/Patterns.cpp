@@ -785,47 +785,50 @@ struct ConvertExecutableOp
     }
 
     // Move the original nested module body into the new executable directly.
-    auto moduleOp = rewriter.cloneWithoutRegions(flowOp.getInnerModule());
-    streamOp.getInnerModule().getBodyRegion().takeBody(
-        flowOp.getInnerModule().getBodyRegion());
+    if (auto innerModuleOp = flowOp.getInnerModule()) {
+      auto moduleOp = rewriter.cloneWithoutRegions(innerModuleOp);
+      streamOp.getInnerModule().getBodyRegion().takeBody(
+          flowOp.getInnerModule().getBodyRegion());
 
-    // Update the entry point signatures in the module.
-    // Dispatch tensor arguments become bindings and all others are preserved as
-    // adaptor. Note that we only touch public (exported) functions.
-    for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
-      if (!funcOp.isPublic())
-        continue;
+      // Update the entry point signatures in the module.
+      // Dispatch tensor arguments become bindings and all others are preserved
+      // as adaptor. Note that we only touch public (exported) functions.
+      for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
+        if (!funcOp.isPublic())
+          continue;
 
-      SmallVector<Type> newTypes;
-      newTypes.reserve(funcOp.getNumArguments());
-      assert(funcOp.getNumResults() == 0 && "flow dispatches have no results");
+        SmallVector<Type> newTypes;
+        newTypes.reserve(funcOp.getNumArguments());
+        assert(funcOp.getNumResults() == 0 &&
+               "flow dispatches have no results");
 
-      rewriter.setInsertionPointToStart(&funcOp.front());
-      auto zero = rewriter.create<arith::ConstantIndexOp>(funcOp.getLoc(), 0);
-      for (auto arg : funcOp.front().getArguments()) {
-        auto oldType = arg.getType();
-        if (auto tensorType =
-                llvm::dyn_cast<IREE::Flow::DispatchTensorType>(oldType)) {
-          // Now a binding - insert the stream.binding.subspan op to slice it.
-          auto newType = rewriter.getType<IREE::Stream::BindingType>();
-          newTypes.push_back(newType);
-          if (!insertBindingOp(arg, tensorType, zero, rewriter)) {
-            return rewriter.notifyMatchFailure(
-                flowOp, "failed to query dynamic dimensions");
+        rewriter.setInsertionPointToStart(&funcOp.front());
+        auto zero = rewriter.create<arith::ConstantIndexOp>(funcOp.getLoc(), 0);
+        for (auto arg : funcOp.front().getArguments()) {
+          auto oldType = arg.getType();
+          if (auto tensorType =
+                  llvm::dyn_cast<IREE::Flow::DispatchTensorType>(oldType)) {
+            // Now a binding - insert the stream.binding.subspan op to slice it.
+            auto newType = rewriter.getType<IREE::Stream::BindingType>();
+            newTypes.push_back(newType);
+            if (!insertBindingOp(arg, tensorType, zero, rewriter)) {
+              return rewriter.notifyMatchFailure(
+                  flowOp, "failed to query dynamic dimensions");
+            }
+            arg.setType(newType);
+          } else {
+            // Preserved - will eventually be a push constants.
+            newTypes.push_back(oldType);
           }
-          arg.setType(newType);
-        } else {
-          // Preserved - will eventually be a push constants.
-          newTypes.push_back(oldType);
         }
+
+        // Strip any shape ties now that we've extracted the information.
+        funcOp.walk([&](IREE::Flow::DispatchTieShapeOp tieOp) {
+          rewriter.replaceOp(tieOp, tieOp.getOperand());
+        });
+
+        funcOp.setType(rewriter.getFunctionType(newTypes, {}));
       }
-
-      // Strip any shape ties now that we've extracted the information.
-      funcOp.walk([&](IREE::Flow::DispatchTieShapeOp tieOp) {
-        rewriter.replaceOp(tieOp, tieOp.getOperand());
-      });
-
-      funcOp.setType(rewriter.getFunctionType(newTypes, {}));
     }
 
     rewriter.eraseOp(flowOp);

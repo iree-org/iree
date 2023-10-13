@@ -450,6 +450,8 @@ public:
     MemoizedCmdZeros memoizedZeros;
     for (auto executableOp :
          getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
+      if (!executableOp.getInnerModule())
+        continue;
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         fuseDispatchBindings(executableOp, exportOp, entryDispatchMap[exportOp],

@@ -284,6 +284,8 @@ public:
     // Optimize each dispatch op.
     for (auto executableOp :
          getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
+      if (!executableOp.getInnerModule())
+        continue;
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         auto &dispatchOps = entryDispatchMap[exportOp];

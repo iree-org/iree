@@ -1,5 +1,27 @@
 // RUN: iree-opt --split-input-file --iree-stream-annotate-dispatch-arguments %s | FileCheck %s
 
+// Tests that external executables don't get annotated
+
+// CHECK-LABEL: @skipExternExecutablesEx
+stream.executable private @skipExternExecutablesEx {
+  // CHECK: stream.executable.export public @dispatch
+  stream.executable.export public @dispatch
+}
+func.func @skipExternExecutables(%arg0: i32) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c0_i32 = arith.constant 0 : i32
+  %alloc = stream.resource.alloc uninitialized : !stream.resource<transient>{%c1}
+  %result_timepoint = stream.cmd.execute with(%alloc as %capture: !stream.resource<transient>{%c1}) {
+    stream.cmd.dispatch @annotatePotentialValuesEx::@dispatch[%c1, %c1, %c1](%c0_i32 : i32) {
+      rw %capture[%c0 for %c1] : !stream.resource<transient>{%c1}
+    }
+  } => !stream.timepoint
+  return
+}
+
+// -----
+
 // Tests that operands are annotated with their potential values.
 // %arg0: cannot be annotated because it comes from outside the program.
 // %arg1: all values known, gets alignment being an index.
