@@ -8,10 +8,10 @@
 
 FROM gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33 AS install-riscv
 WORKDIR /install-riscv
-RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/toolchain_iree_20231009.tar.gz"
-RUN tar -xf "toolchain_iree_20231009.tar.gz" -C /usr/src/
-RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/toolchain_iree_rv32imf_20231009.tar.gz"
-RUN tar -xf "toolchain_iree_rv32imf_20231009.tar.gz" -C /usr/src/
+RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/toolchain_iree_manylinux_2_28_20231012.tar.gz"
+RUN tar -xf "toolchain_iree_manylinux_2_28_20231012.tar.gz" -C /usr/src/
+RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/toolchain_iree_rv32imf_manylinux_2_28_20231012.tar.gz"
+RUN tar -xf "toolchain_iree_rv32imf_manylinux_2_28_20231012.tar.gz" -C /usr/src/
 RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/qemu-riscv.tar.gz"
 RUN tar -xf "qemu-riscv.tar.gz" -C /usr/src/
 
