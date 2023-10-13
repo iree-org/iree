@@ -29,6 +29,7 @@ iree_cc_library(
     "Passes.h.inc"
     "RegionOpUtils.h"
   SRCS
+    "AnnotateDispatches.cpp"
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
     "CleanupTensorShapes.cpp"

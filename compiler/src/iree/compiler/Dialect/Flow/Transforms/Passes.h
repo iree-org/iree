@@ -203,6 +203,9 @@ std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createOutlineDispatchRegionsPass();
 
+// Annotates executable dispatches based on their contents.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateDispatchesPass();
+
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createInjectDispatchTracingPass();
