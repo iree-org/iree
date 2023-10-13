@@ -1,7 +1,7 @@
 # Requirements for running TF tests
 # Temporarily pinning to nightly to make sure we have the newest feature
 # in the TFLite to TOSA importer.
-tf-nightly==2.15.0.dev20230824
+tf-nightly==2.16.0.dev20231013
 keras>=2.7.0
 Pillow>=9.2.0
 
