@@ -2302,54 +2302,60 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     if (op == rootOperation)
       continue;
 
-    TypeSwitch<Operation *>(op)
-        .Case<tensor::PackOp>([&](auto packOp) {
+    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    SmallVector<int64_t> zeros(numLoops, 0);
+    TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+      auto linalgOpInfo = LinalgOpInfo(genericOp);
+      int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
+      SmallVector<int64_t> vecTileSizes = getMinTilingSizesForEachDim(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+      for (auto &vecTileSize : vecTileSizes) {
+        vecTileSize =
+            roundUpToPow2(std::min(vecTileSize, vecSize),
+                          vecPreProcStrategy == VectorPreProcStrategy::Masking);
+      }
 
-        })
-        .Case<linalg::GenericOp>([&](auto genericOp) {
-          auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
-          auto linalgOpInfo = LinalgOpInfo(genericOp);
-          int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
-          SmallVector<int64_t> vecTileSizes = getMinTilingSizesForEachDim(
-              entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-          for (auto &vecTileSize : vecTileSizes) {
-            vecTileSize = roundUpToPow2(std::min(vecTileSize, vecSize),
-                                        vecPreProcStrategy ==
-                                            VectorPreProcStrategy::Masking);
-          }
+      // If the dimension is already tiled, we don't tile it again. This
+      // prevents the mismatch common vector sizes between producer and
+      // consumers. E.g., the convolution vectorization does not support
+      // masking yet, while the strategy for generic op could use masking.
+      // This introduces odd behavior like convolution takes 12 as tile size
+      // while generic op takes 8 as tile size. It would introduce an
+      // inefficient loop and only apply masking on generic op, which hurts
+      // performance a lot. Thus, we do not tile it again, so they have
+      // consistent vector tile sizes.
+      for (auto i : llvm::seq<int64_t>(
+               0, std::min(tileAndFuseSizes.size(), vecTileSizes.size()))) {
+        if (tileAndFuseSizes[i])
+          vecTileSizes[i] = 0;
+      }
 
-          // If the dimension is already tiled, we don't tile it again. This
-          // prevents the mismatch common vector sizes between producer and
-          // consumers. E.g., the convolution vectorization does not support
-          // masking yet, while the strategy for generic op could use masking.
-          // This introduces odd behavior like convolution takes 12 as tile size
-          // while generic op takes 8 as tile size. It would introduce an
-          // inefficient loop and only apply masking on generic op, which hurts
-          // performance a lot. Thus, we do not tile it again, so they have
-          // consistent vector tile sizes.
-          for (auto i : llvm::seq<int64_t>(
-                   0, std::min(tileAndFuseSizes.size(), vecTileSizes.size()))) {
-            if (tileAndFuseSizes[i])
-              vecTileSizes[i] = 0;
-          }
+      SmallVector<int64_t> reductionTiles;
+      splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTiles);
+      setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
+                                     vecTileSizes, reductionTiles);
+      for (auto [pos, tileSize] : llvm::enumerate(vecTileSizes)) {
+        if (tileSize == 0)
+          continue;
+        assert((vecInnerTileSizes[pos] == 0 ||
+                vecInnerTileSizes[pos] == tileSize) &&
+               "Incompatible vector inner tile sizes");
+        vecInnerTileSizes[pos] = tileSize;
+      }
 
-          SmallVector<int64_t> reductionTiles;
-          splitParallelAndReductionTiles(genericOp, vecTileSizes,
-                                         reductionTiles);
-          setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
-                                         vecTileSizes, reductionTiles);
-          for (auto [pos, tileSize] : llvm::enumerate(vecTileSizes)) {
-            if (tileSize == 0)
-              continue;
-            assert((vecInnerTileSizes[pos] == 0 ||
-                    vecInnerTileSizes[pos] == tileSize) &&
-                   "Incompatible vector inner tile sizes");
-            vecInnerTileSizes[pos] = tileSize;
-          }
-        })
-        .Default([&](auto) {
-
-        });
+      tileSizesList.push_back(reductionTiles);
+      tileSizesList.push_back(vecTileSizes);
+    } else if (!isa<tensor::PackOp>(op)) {
+      // Do nothing for unknown ops.
+      tileSizesList.push_back(zeros);
+      tileSizesList.push_back(zeros);
+    }
+    for (auto &ts : tileSizesList)
+      ts.resize(numLoops, 0);
+    auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
+    setLoweringConfig(op, config);
   }
 
   for (auto op : computeOps) {
@@ -2357,78 +2363,40 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     if (op == rootOperation)
       continue;
 
-    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
-    SmallVector<int64_t> zeros(numLoops, 0);
-    TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes};
-    TypeSwitch<Operation *>(op)
-        .Case<tensor::PackOp>([&](auto packOp) {
-          ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
-          ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
-          auto outerDimsPerm = packOp.getOuterDimsPerm();
-          // Scale the outer dim tiles for pack op.
-          for (int i = 0, e = std::min<int>(tileSizesList.size(), 2); i < e;
-               ++i) {
-            auto &tileSizes = tileSizesList[i];
-            for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-              if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
-                continue;
-              tileSizes[pos] = tileSizes[pos] / size;
-            }
-            if (!outerDimsPerm.empty())
-              applyPermutationToVector(tileSizes, outerDimsPerm);
-          }
+    if (auto packOp = dyn_cast<tensor::PackOp>(op)) {
+      int numLoops = packOp.getSourceRank();
+      TileSizesListType tileSizesList = {distTileSizes, tileAndFuseSizes,
+                                         SmallVector<int64_t>(numLoops, 0),
+                                         vecInnerTileSizes};
 
-          SmallVector<int64_t> vecTileSizes =
-              getPackVectorTileSizes(entryPointFn, packOp);
-          // tensor.pack op does not have reduction loops.
-          tileSizesList.push_back(zeros);
-          tileSizesList.push_back(vecTileSizes);
-        })
-        .Case<linalg::GenericOp>([&](auto genericOp) {
-          auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
-          auto linalgOpInfo = LinalgOpInfo(genericOp);
-          int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
-          SmallVector<int64_t> vecTileSizes = getMinTilingSizesForEachDim(
-              entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-          for (auto &i : vecTileSizes) {
-            i = roundUpToPow2(std::min(i, vecSize),
-                              vecPreProcStrategy ==
-                                  VectorPreProcStrategy::Masking);
-          }
+      ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+      ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+      auto outerDimsPerm = packOp.getOuterDimsPerm();
+      // Scale and permutate the outer dim tiles for pack op.
+      for (auto &tileSizes : tileSizesList) {
+        tileSizes.resize(numLoops);
 
-          // If the dimension is already tiled, we don't tile it again. This
-          // prevents the mismatch common vector sizes between producer and
-          // consumers. E.g., the convolution vectorization does not support
-          // masking yet, while the strategy for generic op could use masking.
-          // This introduces odd behavior like convolution takes 12 as tile size
-          // while generic op takes 8 as tile size. It would introduce an
-          // inefficient loop and only apply masking on generic op, which hurts
-          // performance a lot. Thus, we do not tile it again, so they have
-          // consistent vector tile sizes.
-          for (auto i : llvm::seq<int64_t>(
-                   0, std::min(tileAndFuseSizes.size(), vecTileSizes.size()))) {
-            if (tileAndFuseSizes[i])
-              vecTileSizes[i] = 0;
-          }
+        for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+          if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
+            continue;
+          tileSizes[pos] = tileSizes[pos] / size;
+        }
+        if (!outerDimsPerm.empty())
+          applyPermutationToVector(tileSizes, outerDimsPerm);
+      }
 
-          SmallVector<int64_t> reductionTiles;
-          splitParallelAndReductionTiles(genericOp, vecTileSizes,
-                                         reductionTiles);
-          setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
-                                         vecTileSizes, reductionTiles);
+      SmallVector<int64_t> vecTileSizes =
+          getPackVectorTileSizes(entryPointFn, packOp);
+      // Set default pack op vector tile sizes if they are missing.
+      for (auto [commonTileSize, innerTileSize, vecTileSize] :
+           llvm::zip_equal(tileSizesList[1], tileSizesList[3], vecTileSizes)) {
+        if (commonTileSize == 0 && innerTileSize == 0)
+          innerTileSize = vecTileSize;
+      }
 
-          tileSizesList.push_back(reductionTiles);
-          tileSizesList.push_back(vecTileSizes);
-        })
-        .Default([&](auto) {
-          // Do nothing for unknown ops.
-          tileSizesList.push_back(zeros);
-          tileSizesList.push_back(zeros);
-        });
-    for (auto &ts : tileSizesList)
-      ts.resize(numLoops, 0);
-    auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
-    setLoweringConfig(op, config);
+      auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList);
+      setLoweringConfig(op, config);
+    }
   }
 }
 
