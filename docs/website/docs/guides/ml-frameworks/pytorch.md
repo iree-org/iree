@@ -8,11 +8,16 @@ icon: simple/pytorch
 status: new
 ---
 
-# PyTorch + IREE = ?
+# PyTorch + IREE = :octicons-heart-16:
 
-!!! note "Note - under development"
-    The PyTorch ecosystem is evolving rapidly. APIs and workflows are expected
-    to change.
+!!! caution "Caution - under development"
+    We are still validating and fixing specific models. Between bug fixes in
+    flight and releases running behind, we don't expect that you will be able
+    to do a lot of advanced things without using nightly releases or working
+    with us.
+
+    Stay tuned and join the discussion in our
+    [Discord server](https://discord.gg/26P4xW4)'s `#pytorch` channel.
 
 ## :octicons-book-16: Overview
 
