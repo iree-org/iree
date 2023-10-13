@@ -7,11 +7,13 @@
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -134,16 +136,16 @@ static scf::ForOp hoistVectorExtractInsertSlice(
 
   // 2. Rewrite `loop` with an additional yield. This is the quantity that is
   // computed iteratively but whose storage has become loop-invariant.
-  NewYieldValueFn yieldFn = [&](OpBuilder &b, Location loc,
+  NewYieldValuesFn yieldFn = [&](OpBuilder &b, Location loc,
                                 ArrayRef<BlockArgument> newBBArgs) {
     return llvm::map_to_vector(insertOps,
                                [](auto v) -> Value { return v.getSource(); });
   };
   SmallVector<Value> extractResults = llvm::map_to_vector(
       extractOps, [](auto v) -> Value { return v.getResult(); });
-  auto newForOp =
-      replaceLoopWithNewYields(rewriter, forOp, extractResults, yieldFn);
-  rewriter.eraseOp(forOp);
+  auto newForOp = cast<scf::ForOp>(*forOp.replaceWithAdditionalYields(
+      rewriter, extractResults, /*replaceInitOperandUsesInLoop=*/true,
+      yieldFn));
 
   // 3. Update the yield. Invariant: initArgNumber is the destination tensor.
   auto yieldOp =
