@@ -43,7 +43,7 @@ iree_lit_test_suite(
     "set_transform_strategy_matmul.mlir"
     "set_transform_strategy_pad.mlir"
     "tensor_pad.mlir"
-    "tensorcore_vectorization.mlir"
+    "tensorcore_preparation.mlir"
     "transform_dialect_bufferize.mlir"
     "transform_dialect_eliminate_gpu_barriers.mlir"
     "transform_dialect_hoist_allocs.mlir"

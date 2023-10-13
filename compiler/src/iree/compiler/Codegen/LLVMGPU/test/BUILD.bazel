@@ -47,7 +47,7 @@ iree_lit_test_suite(
             "pack_pipeline_test.mlir",
             "pack_shared_memory_alloc.mlir",
             "tensor_pad.mlir",
-            "tensorcore_vectorization.mlir",
+            "tensorcore_preparation.mlir",
             "transform_dialect_hoist_allocs.mlir",
             "transform_dialect_vector_distribution.mlir",
             "transform_dialect_bufferize.mlir",
