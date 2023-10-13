@@ -29,3 +29,9 @@ test -f "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt" \
 
 experimental/web/sample_static/build_sample.sh
 experimental/web/sample_dynamic/build_sample.sh
+
+# Clear the cache again before building the webgpu sample.
+test -f "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt" \
+  && rm "${IREE_EMPSCRIPTEN_BUILD_DIR}/CMakeCache.txt"
+
+experimental/web/sample_webgpu/build_sample.sh

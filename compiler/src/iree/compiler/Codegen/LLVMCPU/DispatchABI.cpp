@@ -73,7 +73,7 @@ static unsigned getDITypeSizeInBits(LLVM::DITypeAttr typeAttr) {
   }
 }
 
-ExecutableLibraryDI::ExecutableLibraryDI(LLVMTypeConverter *typeConverter)
+ExecutableLibraryDI::ExecutableLibraryDI(const LLVMTypeConverter *typeConverter)
     : typeConverter(typeConverter), builder(&typeConverter->getContext()) {
   auto *context = builder.getContext();
   fileAttr = LLVM::DIFileAttr::get(
@@ -315,7 +315,7 @@ llvm::sys::Mutex HALDispatchABI::sMutex;
 // static
 LLVM::LLVMStructType
 HALDispatchABI::getProcessorType(MLIRContext *context,
-                                 LLVMTypeConverter *typeConverter) {
+                                 const LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType =
       LLVM::LLVMStructType::getIdentified(context, "iree_hal_processor_v0_t");
@@ -340,7 +340,7 @@ HALDispatchABI::getProcessorType(MLIRContext *context,
 // static
 LLVM::LLVMStructType
 HALDispatchABI::getEnvironmentType(MLIRContext *context,
-                                   LLVMTypeConverter *typeConverter,
+                                   const LLVMTypeConverter *typeConverter,
                                    LLVM::LLVMStructType processorType) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
@@ -378,7 +378,7 @@ HALDispatchABI::getEnvironmentType(MLIRContext *context,
 // static
 LLVM::LLVMStructType
 HALDispatchABI::getDispatchStateType(MLIRContext *context,
-                                     LLVMTypeConverter *typeConverter) {
+                                     const LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_dispatch_state_v0_t");
@@ -432,7 +432,7 @@ HALDispatchABI::getDispatchStateType(MLIRContext *context,
 // static
 LLVM::LLVMStructType
 HALDispatchABI::getWorkgroupStateType(MLIRContext *context,
-                                      LLVMTypeConverter *typeConverter) {
+                                      const LLVMTypeConverter *typeConverter) {
   llvm::sys::ScopedLock lock(sMutex);
   auto structType = LLVM::LLVMStructType::getIdentified(
       context, "iree_hal_executable_workgroup_state_v0_t");
@@ -473,7 +473,7 @@ HALDispatchABI::getWorkgroupStateType(MLIRContext *context,
 // static
 SmallVector<Type, 5>
 HALDispatchABI::getInputTypes(MLIRContext *context,
-                              LLVMTypeConverter *typeConverter) {
+                              const LLVMTypeConverter *typeConverter) {
   return SmallVector<Type, 5>{
       // const iree_hal_executable_environment_v0_t* IREE_RESTRICT
       //   environment
@@ -490,7 +490,7 @@ HALDispatchABI::getInputTypes(MLIRContext *context,
 // static
 LLVM::DISubprogramAttr
 HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
-                               LLVMTypeConverter *typeConverter) {
+                               const LLVMTypeConverter *typeConverter) {
   auto *context = &typeConverter->getContext();
   Builder builder(context);
 
@@ -785,12 +785,15 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
       // The offset in the subspan is byteoffset. It is converted to element
       // offset here. It is assumed that the byte offset is a multiple of
       // the element type byte width.
-      int32_t elementWidth =
-          IREE::Util::getRoundedElementByteWidth(memRefType.getElementType());
+      int32_t elementBitWidth =
+          IREE::Util::getTypeBitWidth(memRefType.getElementType());
       Value elementWidthVal =
-          builder.create<LLVM::ConstantOp>(loc, llvmIndexType, elementWidth);
+          builder.create<LLVM::ConstantOp>(loc, llvmIndexType, elementBitWidth);
+      Value eight = builder.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
+      Value bitOffset =
+          builder.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
       Value elementOffsetVal =
-          builder.create<LLVM::UDivOp>(loc, baseOffsetValue, elementWidthVal);
+          builder.create<LLVM::UDivOp>(loc, bitOffset, elementWidthVal);
       desc.setOffset(builder, loc, elementOffsetVal);
     } else {
       desc.setConstantOffset(builder, loc, offset);
@@ -1079,7 +1082,7 @@ Value HALDispatchABI::isImportFuncAvailable(Operation *forOp,
       loadImportOrdinal(forOp, importName, /*weak=*/true, builder);
   auto importFunc = loadImportFunc(forOp, importOrdinal, builder);
   Value nullPtrValue =
-      builder.create<LLVM::NullOp>(loc, importFunc.first.getType());
+      builder.create<LLVM::ZeroOp>(loc, importFunc.first.getType());
   return builder.create<LLVM::ICmpOp>(loc, builder.getI1Type(),
                                       LLVM::ICmpPredicate::ne, importFunc.first,
                                       nullPtrValue);
@@ -1098,7 +1101,7 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
   // null as in isImportFuncAvailable but we'll need to make the control flow.
   assert(!weak && "calls to weak imports not yet implemented");
 
-  Value nullPtrValue = builder.create<LLVM::NullOp>(
+  Value nullPtrValue = builder.create<LLVM::ZeroOp>(
       loc, LLVM::LLVMPointerType::get(builder.getContext()));
   auto callOp =
       builder.create<LLVM::CallOp>(loc, TypeRange{builder.getI32Type()},

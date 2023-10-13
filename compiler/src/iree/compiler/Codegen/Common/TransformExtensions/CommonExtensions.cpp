@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
@@ -33,7 +34,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/IndexingUtils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -68,66 +68,6 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
       mlir::iree_compiler::IREE::transform_dialect::CommonExtensions>();
 }
 
-// Return true if all the uses of op are either Store/transfer_write.
-// There can be SubviewOp users as long as all its users are also
-// StoreOp/transfer_write. If return true it also fills out the uses, if it
-// returns false uses is unchanged.
-static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
-  std::vector<Operation *> opUses;
-  for (OpOperand &use : op->getUses()) {
-    Operation *useOp = use.getOwner();
-    if (isa<memref::DeallocOp, vector::TransferWriteOp, memref::StoreOp>(
-            useOp) ||
-        (isa<memref::SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
-      opUses.push_back(useOp);
-      continue;
-    }
-    return false;
-  }
-  uses.insert(uses.end(), opUses.begin(), opUses.end());
-  return true;
-}
-
-// Track temporary allocations that are never read from. If this is the case
-// it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(RewriterBase &rewriter,
-                                    Operation *parentOp) {
-  std::vector<Operation *> opToErase;
-  parentOp->walk([&](memref::AllocOp op) {
-    if (allUsesAreStores(op, opToErase)) {
-      opToErase.push_back(op.getOperation());
-    }
-  });
-  for (Operation *op : opToErase)
-    rewriter.eraseOp(op);
-}
-
-//===---------------------------------------------------------------------===//
-// ApplyBufferOptimizationsOp
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform_dialect::ApplyBufferOptimizationsOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  // Apply store to load forwarding and dead store elimination.
-  vector::transferOpflowOpt(rewriter, target);
-  eraseDeadAllocAndStores(rewriter, target);
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_dialect::ApplyBufferOptimizationsOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
-}
-
-void transform_dialect::ApplyBufferOptimizationsOp::build(
-    OpBuilder &builder, OperationState &result, Value target) {
-  result.addOperands(target);
-}
-
 //===---------------------------------------------------------------------===//
 // ApplyIreeLinalgElementwiseGreedyFusionPatternsOp
 //===---------------------------------------------------------------------===//
@@ -137,7 +77,7 @@ static void addOperands(Operation *op, SetVector<Value> &operandSet) {
     return;
   TypeSwitch<Operation *, void>(op)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-        SmallVector<Value> inputOperands{linalgOp.getDpsInputOperands()};
+        SmallVector<Value> inputOperands = linalgOp.getDpsInputs();
         operandSet.insert(inputOperands.begin(), inputOperands.end());
       })
       .Default([&](Operation *operation) {
@@ -206,8 +146,8 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
 
     Location loc = padOp.getLoc();
     auto emptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, resultType,
-        linalg::createDynamicDimensions(rewriter, loc, padOp.getResult()));
+        loc, tensor::getMixedSizes(rewriter, loc, padOp),
+        resultType.getElementType());
     rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
                                                 emptyOp.getResult());
 
@@ -294,6 +234,11 @@ void transform_dialect::ApplyFoldReshapeIntoTensorHalInterfacePatternsOp::
   populateReshapeToInterfaceTensorPatterns(patterns);
 }
 
+void transform_dialect::ApplyFoldTensorSliceIntoTransferPatternsOp::
+    populatePatterns(RewritePatternSet &patterns) {
+  populateVectorTransferTensorSliceTransforms(patterns);
+}
+
 void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   populatePrepareVectorToMMAPatterns(patterns, getUseNvGpu());
@@ -353,17 +298,23 @@ transform_dialect::ApplyLoopIndependentCodeMotionOp::applyToOne(
     // This assumes LICM never removes operations so we don't need tracking.
     // TODO: confirm / revisit this assumption and plumb a rewriter through
     // upstream moveLoopInvariantCode if necessary.
-    funcOp->walk(
-        [](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
+    funcOp->walk([](LoopLikeOpInterface loopLike) {
+      // Do not hoist from scf.forall ops. These capture isolated computations
+      // that will be mapped to a certain level in the GPU hierarchy (e.g.,
+      // GPU blocks), so hoisting is not desired.
+      if (!isa<scf::ForallOp>(loopLike.getOperation()))
+        moveLoopInvariantCode(loopLike);
+    });
     // For now, put single loop promotion as part of licm. Underlying
     // implementations perform splice operations which shouldn't need
     // tracking.
     // TODO: confirm / revisit this assumption and plumb a rewriter through
     // upstream moveLoopInvariantCode if necessary.
-    funcOp->walk([](Operation *op) {
+    funcOp->walk([&](Operation *op) {
       (void)llvm::TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<affine::AffineForOp, scf::ForOp>(
-              [](auto loop) { return promoteIfSingleIteration(loop); })
+          .Case<affine::AffineForOp, scf::ForOp>([&](auto loop) {
+            return loop.promoteIfSingleIteration(rewriter);
+          })
           .Default([](Operation *) { return success(); });
     });
   });
@@ -481,9 +432,9 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   MLIRContext *ctx = forallOp->getContext();
   Location loc = forallOp->getLoc();
   // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
-  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimX);
-  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimY);
-  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
+  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimX);
+  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimY);
+  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::MappingId::DimZ);
   if (forallOp.getNumResults() > 0)
     return forallOp->emitError(
         "only bufferized scf.forall lowers to workgroup");
@@ -742,12 +693,6 @@ static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
       .getResult();
 }
 
-static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
-  return success();
-}
-
 static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
                                                      Location loc, Value from,
                                                      Value to) {
@@ -763,6 +708,7 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
     ValueRange dynamicSizes, unsigned alignment) {
+  OpBuilder::InsertionGuard g(builder);
   auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
       builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
   MemRefType allocType =
@@ -772,13 +718,6 @@ static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
       .create<memref::AllocOp>(loc, allocType, dynamicSizes,
                                builder.getI64IntegerAttr(alignment))
       .getResult();
-}
-
-static LogicalResult gpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
-  builder.create<memref::DeallocOp>(loc, allocation);
-  return success();
 }
 
 static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
@@ -869,12 +808,9 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   using mlir::bufferization::BufferizationOptions;
   BufferizationOptions::AllocationFn allocationFn =
       cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
   BufferizationOptions::MemCpyFn memCpyFn = cpuComprehensiveBufferizeCopyFn;
   if (getTargetGpu()) {
     allocationFn = gpuComprehensiveBufferizeAllocationFn;
-    deallocationFn = gpuComprehensiveBufferizeDeallocationFn;
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
@@ -906,7 +842,6 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   //   2. Run one-shot-bufferize, without the pass baggage.
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
@@ -963,31 +898,19 @@ void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
-//===---------------------------------------------------------------------===//
-// EraseHALDescriptorTypeFromMemRef
-//===---------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+// WorkgroupSwizzleOp
+//===----------------------------------------------------------------------===//
 
-DiagnosedSilenceableFailure
-transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::applyToOne(
-    transform::TransformRewriter &rewriter, ::mlir::Operation *target,
-    ::mlir::transform::ApplyToEachResultList &results,
-    ::mlir::transform::TransformState &state) {
-  if (!isa<func::FuncOp>(target)) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "expects a func::FuncOp as the target op");
-  }
-  auto funcOp = cast<func::FuncOp>(target);
-
-  if (failed(eraseHALDescriptorTypeFromMemRef(funcOp))) {
-    return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "failed to erase #hal.descriptor_type as MemRef memory space");
-  }
-
+DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  (void)swizzleWorkgroupsInFunc(target, getLogTile());
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::IREEEraseHALDescriptorTypeFromMemRefOp::getEffects(
+void transform_dialect::WorkgroupSwizzleOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);

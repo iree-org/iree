@@ -187,8 +187,9 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
     // loading we can do that now before processing subsequent events.
     if (!have_parsed_inputs && replay.device) {
       status = iree_tooling_parse_into_variant_list(
-          iree_hal_device_allocator(replay.device), FLAG_input_list().values,
-          FLAG_input_list().count, replay.host_allocator, replay.inputs);
+          replay.device, iree_hal_device_allocator(replay.device),
+          FLAG_input_list().values, FLAG_input_list().count,
+          replay.host_allocator, replay.inputs);
       have_parsed_inputs = true;
     }
     if (!iree_status_is_ok(status)) break;
@@ -260,6 +261,7 @@ int main(int argc, char** argv) {
       "module:\n"
       "  type: bytecode\n"
       "  path: ../build/some_module.vmfb\n"
+      "  mmap: true\n"
       "---\n"
       "type: call\n"
       "function: module.mul\n"

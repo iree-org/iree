@@ -7,7 +7,7 @@
 import pathlib
 import unittest
 
-from e2e_test_artifacts import model_artifacts
+from e2e_test_artifacts import model_artifacts, utils
 from e2e_test_artifacts.cmake_generator import model_rule_generator
 from e2e_test_framework.definitions import common_definitions
 
@@ -39,12 +39,18 @@ class CommonGeneratorsTest(unittest.TestCase):
         )
 
         self.assertEqual(list(rule_map.keys()), [model_a.id, model_b.id])
-        self.assertEqual(rule_map[model_a.id].target_name, f"model-{model_a.id}")
+        self.assertEqual(
+            rule_map[model_a.id].target_name,
+            utils.get_safe_name(f"model-{model_a.name}"),
+        )
         self.assertEqual(
             rule_map[model_a.id].file_path,
             model_artifacts.get_model_path(model=model_a, root_path=root_path),
         )
-        self.assertEqual(rule_map[model_b.id].target_name, f"model-{model_b.id}")
+        self.assertEqual(
+            rule_map[model_b.id].target_name,
+            utils.get_safe_name(f"model-{model_b.name}"),
+        )
         self.assertEqual(
             rule_map[model_b.id].file_path,
             model_artifacts.get_model_path(model=model_b, root_path=root_path),

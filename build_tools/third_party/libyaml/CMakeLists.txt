@@ -41,4 +41,7 @@ external_cc_library(
 
 if(MSVC)
   target_compile_options(yaml_yaml PRIVATE /wd4996)
+elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  # TODO(libyaml#210): Remove this option.
+  target_compile_options(yaml_yaml PRIVATE "-Wno-unused-value")
 endif()

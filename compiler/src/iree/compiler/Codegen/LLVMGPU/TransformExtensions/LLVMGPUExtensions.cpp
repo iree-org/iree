@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -48,6 +49,7 @@ using llvm::dbgs;
 #define DBGS_VECTOR_TO_MMA() (dbgs() << '[' << DEBUG_VECTOR_TO_MMA << "] ")
 
 using namespace mlir;
+using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
 iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
@@ -78,37 +80,28 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     transform::TransformRewriter &rewriter, func::FuncOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    state.getTopLevel()->emitOpError(
-        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp "
-        "toplevel to "
-        "attach the workgroup size information to a nested "
-        "ExecutableExportOp");
-    return emitDefaultDefiniteFailure(target);
-  }
-
-  IREE::HAL::ExecutableExportOp exportOp;
-  state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.getSymName() == target.getName())
-      exportOp = op;
-  });
-  if (!exportOp) {
+  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
+      getEntryPoint(target);
+  if (failed(maybeExportOp)) {
     state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
     return emitDefaultDefiniteFailure(target);
   }
+  IREE::HAL::ExecutableExportOp exportOp = *maybeExportOp;
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
   rewriter.setInsertionPointToStart(&target.getBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
-          rewriter, transformOp, target, getWorkgroupDims(), getWarpDims(),
+          rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
           true);
   if (!diag.succeeded())
     return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
+  auto subgroupSizeAttr = rewriter.getIndexAttr(getSubgroupSize());
   rewriter.startRootUpdate(exportOp);
   exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
+  exportOp->setAttr(exportOp.getSubgroupSizeAttrName(), subgroupSizeAttr);
   rewriter.finalizeRootUpdate(exportOp);
   return DiagnosedSilenceableFailure::success();
 }
@@ -571,11 +564,13 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 
 static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
-                                                PatternBenefit benefit) {
-  auto groupReductionFn = [](Location loc, OpBuilder &builder, Value input,
-                             vector::CombiningKind kind, uint32_t size) {
+                                                PatternBenefit benefit,
+                                                unsigned subgroupSize) {
+  auto groupReductionFn = [subgroupSize](
+                              Location loc, OpBuilder &builder, Value input,
+                              vector::CombiningKind kind, uint32_t size) {
     return mlir::iree_compiler::emitGPUGroupReduction(loc, builder, input, kind,
-                                                      size, 32);
+                                                      size, subgroupSize);
   };
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
@@ -601,14 +596,21 @@ static void populateWarpExecuteOnLane0ToScf(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorWarpDistributionOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    target->emitOpError(
-        "applies only to isolated-from-above targets because it "
-        "needs to apply "
-        "patterns greedily");
+  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
+      getEntryPoint(target);
+  if (failed(maybeExportOp)) {
+    state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
+    return emitDefaultDefiniteFailure(target);
+  }
+  IREE::HAL::ExecutableExportOp exportOp = *maybeExportOp;
+
+  std::optional<llvm::APInt> subgroupSize = exportOp.getSubgroupSize();
+  if (!subgroupSize) {
+    state.getTopLevel()->emitOpError(
+        "could not extract subgroup size from IREE::HAL::ExecutableExportOp");
     return emitDefaultDefiniteFailure(target);
   }
 
@@ -642,7 +644,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   populateVectorTransferWriteDistribution(target, patterns,
                                           /*benefit=*/2);
   populatePropagateVectorDistribution(target, patterns,
-                                      /*benefit=*/1);
+                                      /*benefit=*/1,
+                                      subgroupSize->getSExtValue());
   if (failed(
           applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
     return mlir::emitDefiniteFailure(
@@ -767,7 +770,7 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
   for (int64_t index : indices) {
     if ((index >= 0) && (index < numOperands)) {
       FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-          rewriter, loc, target->getOperand(index), false, options, true);
+          rewriter, loc, target->getOperand(index), options);
       if (failed(ret)) {
         return emitDefaultDefiniteFailure(target)
                << "failed to promote operand";
@@ -983,9 +986,10 @@ collectEffects(Operation *op,
 /// set. Returns `true` if the memory effects added to `effects` are exact,
 /// `false` if they are a conservative over-approximation. The latter means that
 /// `effects` contain instances not associated with a specific value.
-bool getEffectsBefore(Operation *op,
-                      SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
-                      bool stopAtBarrier) {
+static bool
+getEffectsBefore(Operation *op,
+                 SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
+                 bool stopAtBarrier) {
   if (!op->getBlock())
     return true;
 
@@ -1062,9 +1066,10 @@ bool getEffectsBefore(Operation *op,
 /// set. Returns `true` if the memory effects added to `effects` are exact,
 /// `false` if they are a conservative over-approximation. The latter means that
 /// `effects` contain instances not associated with a specific value.
-bool getEffectsAfter(Operation *op,
-                     SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
-                     bool stopAtBarrier) {
+static bool
+getEffectsAfter(Operation *op,
+                SmallVectorImpl<MemoryEffects::EffectInstance> &effects,
+                bool stopAtBarrier) {
   if (!op->getBlock())
     return true;
 
@@ -1207,7 +1212,7 @@ static std::optional<bool> getKnownCapturingStatus(Operation *op, Value v) {
 /// the user may be storing this value into memory. This makes aliasing analysis
 /// more conservative as it cannot assume the pointer-like value is only passed
 /// around through SSA use-def.
-bool maybeCaptured(Value v) {
+static bool maybeCaptured(Value v) {
   SmallVector<Value> todo = {v};
   while (!todo.empty()) {
     Value v = todo.pop_back_val();
@@ -1320,7 +1325,7 @@ static bool mayAlias(Value first, Value second) {
 /// Returns `true` if the effect may be affecting memory aliasing the value. If
 /// the effect is not associated with any value, it is assumed to affect all
 /// memory and therefore aliases with everything.
-bool mayAlias(MemoryEffects::EffectInstance a, Value v2) {
+static bool mayAlias(MemoryEffects::EffectInstance a, Value v2) {
   if (Value v = a.getValue()) {
     return mayAlias(v, v2);
   }
@@ -1331,8 +1336,8 @@ bool mayAlias(MemoryEffects::EffectInstance a, Value v2) {
 /// an effect is not associated with any value, it is assumed to affect all
 /// memory and therefore aliases with everything. Effects on different resources
 /// cannot alias.
-bool mayAlias(MemoryEffects::EffectInstance a,
-              MemoryEffects::EffectInstance b) {
+static bool mayAlias(MemoryEffects::EffectInstance a,
+                     MemoryEffects::EffectInstance b) {
   if (a.getResource()->getResourceID() != b.getResource()->getResourceID())
     return false;
   if (Value v2 = b.getValue()) {
@@ -1424,36 +1429,17 @@ public:
     LLVM_DEBUG(DBGS() << "checking the necessity of: " << barrier << " "
                       << barrier.getLoc() << "\n");
 
-    {
-      LLVM_DEBUG(DBGS() << "with respect to the barrier(s) before\n");
-      SmallVector<MemoryEffects::EffectInstance> beforeEffects;
-      getEffectsBefore(barrier, beforeEffects, /*stopAtBarrier=*/true);
+    SmallVector<MemoryEffects::EffectInstance> beforeEffects;
+    getEffectsBefore(barrier, beforeEffects, /*stopAtBarrier=*/true);
 
-      SmallVector<MemoryEffects::EffectInstance> afterEffects;
-      getEffectsAfter(barrier, afterEffects, /*stopAtBarrier=*/false);
+    SmallVector<MemoryEffects::EffectInstance> afterEffects;
+    getEffectsAfter(barrier, afterEffects, /*stopAtBarrier=*/true);
 
-      if (!haveConflictingEffects(beforeEffects, afterEffects)) {
-        LLVM_DEBUG(DBGS() << "the barrier(s) before is sufficient, removing "
-                          << barrier << "\n");
-        rewriter.eraseOp(barrier);
-        return success();
-      }
-    }
-
-    {
-      LLVM_DEBUG(DBGS() << "with respect to the barrier(s) after\n");
-      SmallVector<MemoryEffects::EffectInstance> beforeEffects;
-      getEffectsBefore(barrier, beforeEffects, /*stopAtBarrier*/ false);
-
-      SmallVector<MemoryEffects::EffectInstance> afterEffects;
-      getEffectsAfter(barrier, afterEffects, /*stopAtBarrier*/ true);
-
-      if (!haveConflictingEffects(beforeEffects, afterEffects)) {
-        LLVM_DEBUG(DBGS() << "the barrier(s) after is sufficient, removing "
-                          << barrier << "\n");
-        rewriter.eraseOp(barrier);
-        return success();
-      }
+    if (!haveConflictingEffects(beforeEffects, afterEffects)) {
+      LLVM_DEBUG(DBGS() << "the surrounding barriers are sufficient, removing "
+                        << barrier << "\n");
+      rewriter.eraseOp(barrier);
+      return success();
     }
 
     LLVM_DEBUG(DBGS() << "barrier is necessary: " << barrier << " "
@@ -1491,6 +1477,21 @@ transform_dialect::EliminateGpuBarriersOp::applyToOne(
 
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::PackSharedMemoryAllocOp::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  packSharedMemoryAlloc(target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::PackSharedMemoryAllocOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

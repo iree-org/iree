@@ -7,8 +7,8 @@
 #ifndef IREE_COMPILER_API_SUPPORT_H
 #define IREE_COMPILER_API_SUPPORT_H
 
-#if (defined(_WIN32) || defined(__CYGWIN__))
-// Visibility annotations disabled.
+#if (defined(_WIN32) || defined(__CYGWIN__)) &&                                \
+    !defined(IREE_EMBED_ENABLE_WINDOWS_DLL_DECLSPEC)
 #define IREE_EMBED_EXPORTED
 #elif defined(_WIN32) || defined(__CYGWIN__)
 // Windows visibility declarations.

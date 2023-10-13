@@ -3,6 +3,7 @@ hide:
   - tags
 tags:
   - CPU
+icon: octicons/cpu-16
 ---
 
 # RISC-V cross-compilation
@@ -49,6 +50,10 @@ from the IREE root directory:
 ```shell
 ./build_tools/riscv/riscv_bootstrap.sh
 ```
+
+!!! note
+    The prebuilt toolchain is built with Ubuntu 20.04 LTS. It requires glibc >=2.31
+    for your host machine.
 
 #### Support vector extension
 

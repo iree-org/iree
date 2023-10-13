@@ -14,9 +14,11 @@ iree_hal_cts_test_suite(
   COMPILER_TARGET_BACKEND
     "vulkan-spirv"
   EXECUTABLE_FORMAT
-    "\"SPVE\""
+    "\"vulkan-spirv-fb\""
   DEPS
     iree::hal::drivers::vulkan::registration
+  EXCLUDED_TESTS
+    "semaphore_submission"  # SubmitWithWait hangs (requires async)
   LABELS
     driver=vulkan
 )

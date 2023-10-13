@@ -23,8 +23,8 @@ func.func @matmul_2048x512x1024() {
 //         CHECK:    scf.for {{.*}} -> (tensor<32x128xf32>) {
 //         CHECK:      %[[A:.*]] = tensor.extract_slice %{{.*}}[0, %{{.*}}] [32, 32] [1, 1] : tensor<32x1024xf32> to tensor<32x32xf32>
 //         CHECK:      %[[B:.*]] = tensor.extract_slice %{{.*}}[%{{.*}}, 0] [32, 128] [1, 1] : tensor<1024x128xf32> to tensor<32x128xf32>
-//         CHECK:      %[[PA:.*]] = bufferization.alloc_tensor() copy(%[[A]]) {bufferization.escape = [false]} : tensor<32x32xf32>
-//         CHECK:      %[[PB:.*]] = bufferization.alloc_tensor() copy(%[[B]]) {bufferization.escape = [false]} : tensor<32x128xf32>
+//         CHECK:      %[[PA:.*]] = bufferization.alloc_tensor() copy(%[[A]]) : tensor<32x32xf32>
+//         CHECK:      %[[PB:.*]] = bufferization.alloc_tensor() copy(%[[B]]) : tensor<32x128xf32>
 //         CHECK:      %[[M:.*]] = linalg.matmul {{.*}} ins(%[[PA]], %[[PB]] : tensor<32x32xf32>, tensor<32x128xf32>) outs(%{{.*}} : tensor<32x128xf32>) -> tensor<32x128xf32>
 //         CHECK:      scf.yield %[[M]] : tensor<32x128xf32>
 
@@ -78,8 +78,8 @@ func.func @matmul_multi_uses() {
 //         CHECK:    %[[C:.*]] = flow.dispatch.tensor.load {{.+}} -> tensor<32x128xf32>
 //         CHECK:    %[[A:.*]] = flow.dispatch.tensor.load {{.+}} -> tensor<32x1024xf32>
 //         CHECK:    %[[B:.*]] = flow.dispatch.tensor.load {{.+}} -> tensor<1024x128xf32>
-//         CHECK:    %[[PA:.*]] = bufferization.alloc_tensor() copy(%[[A]]) {bufferization.escape = [false]} : tensor<32x1024xf32>
-//         CHECK:    %[[PB:.*]] = bufferization.alloc_tensor() copy(%[[B]]) {bufferization.escape = [false]} : tensor<1024x128xf32>
+//         CHECK:    %[[PA:.*]] = bufferization.alloc_tensor() copy(%[[A]]) : tensor<32x1024xf32>
+//         CHECK:    %[[PB:.*]] = bufferization.alloc_tensor() copy(%[[B]]) : tensor<1024x128xf32>
 //         CHECK:    %[[M:.*]] = linalg.matmul ins(%[[PA]], %[[PB]] : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%{{.*}} : tensor<32x128xf32>) -> tensor<32x128xf32>
 //         CHECK:    "some_use"(%[[A]]) : (tensor<32x1024xf32>) -> ()
 
@@ -184,11 +184,11 @@ func.func @weight_dequant_matmul() {
 //       CHECK:     scf.for %{{.+}} = %c0 to %c128 step %c32 iter_args(%[[ARG2:.+]] = %[[ARG1]]) -> (tensor<32x128xf32>)
 //       CHECK:       %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS_LD]]
 // Check that we have a bufferization.alloc_tensor() for in-place bufferization later.
-//       CHECK:       %[[RHS_ALLOC:.+]] = bufferization.alloc_tensor() {bufferization.escape = [false]} : tensor<1x32x128xf32>
+//       CHECK:       %[[RHS_ALLOC:.+]] = bufferization.alloc_tensor() : tensor<1x32x128xf32>
 // Check that the weight dequant linalg.generic is fused inside the serial loops.
 //       CHECK:       %[[RHS:.+]] = linalg.generic
 //  CHECK-SAME:        outs(%[[RHS_ALLOC]] : tensor<1x32x128xf32>)
-//       CHECK:       %[[LHS_ALLOC:.+]] = bufferization.alloc_tensor() copy(%[[LHS_SLICE]]) {bufferization.escape = [false]} : tensor<32x1x32xf32>
+//       CHECK:       %[[LHS_ALLOC:.+]] = bufferization.alloc_tensor() copy(%[[LHS_SLICE]]) : tensor<32x1x32xf32>
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ins(%[[LHS_ALLOC]], %[[RHS]] : tensor<32x1x32xf32>, tensor<1x32x128xf32>)
 //  CHECK-SAME:         outs(%[[ARG2]] : tensor<32x128xf32>)

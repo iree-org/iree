@@ -166,11 +166,17 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+    case CodeGenPipeline::SPIRVBaseLowering:
+      addSPIRVBaseLoweringPassPipeline(pipeline);
+      break;
     case CodeGenPipeline::SPIRVBaseDistribute:
       addSPIRVBaseDistributePassPipeline(pipeline);
       break;
     case CodeGenPipeline::SPIRVBaseVectorize:
       addSPIRVBaseVectorizePassPipeline(pipeline);
+      break;
+    case CodeGenPipeline::SPIRVSubgroupReduce:
+      addSPIRVSubgroupReducePassPipeline(pipeline);
       break;
     case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
       addSPIRVCooperativeMatrixVectorizePassPipeline(
@@ -181,9 +187,6 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       addSPIRVMatmulPromoteVectorizePassPipeline(
           pipeline, translationInfo.value().getSoftwarePipelineDepth(),
           translationInfo.value().getSoftwarePipelineStoreStage());
-      break;
-    case CodeGenPipeline::SPIRVSubgroupReduce:
-      addSPIRVSubgroupReducePassPipeline(pipeline);
       break;
     case CodeGenPipeline::SPIRVWinogradVectorize:
       addSPIRVWinogradVectorizePassPipeline(pipeline);

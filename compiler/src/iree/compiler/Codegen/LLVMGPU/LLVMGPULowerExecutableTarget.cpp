@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
@@ -47,7 +46,6 @@ public:
                 IREE::HAL::HALDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 linalg::LinalgDialect,
-                linalg::transform::LinalgTransformDialect,
                 gpu::GPUDialect,
                 nvgpu::NVGPUDialect,
                 pdl::PDLDialect,

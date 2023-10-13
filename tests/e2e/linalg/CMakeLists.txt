@@ -15,6 +15,7 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "conv2d.mlir"
+    "i4_to_f32.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -26,6 +27,7 @@ iree_check_single_backend_test_suite(
     check_winograd_llvm-cpu_local-task
   SRCS
     "conv2d.mlir"
+    "i4_to_f32.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -50,6 +52,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "conv2d.mlir"
+    "i4_to_f32.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -61,6 +64,7 @@ iree_check_single_backend_test_suite(
     check_winograd_vulkan-spirv_vulkan
   SRCS
     "conv2d.mlir"
+    "i4_to_f32.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER

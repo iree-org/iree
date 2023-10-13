@@ -32,12 +32,9 @@ namespace iree_compiler {
 Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes) {
   assert(values[index].getType().isa<IREE::Util::SizeAwareTypeInterface>() &&
          "must be a size-aware type to get dims");
-  unsigned sizeIndex = 0;
-  for (unsigned i = 0; i < index; ++i) {
-    if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(values[i].getType())) {
-      ++sizeIndex;
-    }
-  }
+  unsigned sizeIndex = llvm::count_if(values.take_front(index), [](auto value) {
+    return isa<IREE::Util::SizeAwareTypeInterface>(value.getType());
+  });
   return sizes[sizeIndex];
 }
 

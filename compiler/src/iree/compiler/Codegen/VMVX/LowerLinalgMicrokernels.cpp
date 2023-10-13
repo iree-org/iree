@@ -121,15 +121,14 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
   return true;
 }
 
-struct StridedBufferDescriptor {
-  MemRefType memRefType;
-
+class StridedBufferDescriptor {
+public:
   // Size/offset/strides of the buffer.
   Value offset;
   SmallVector<Value> sizes;
   SmallVector<Value> strides;
 
-  StridedBufferDescriptor() = default;
+  StridedBufferDescriptor(MemRefType memRefType) : memRefType(memRefType) {}
 
   unsigned getRank() { return strides.size(); }
   Type getElementType() { return memRefType.getElementType(); }
@@ -149,8 +148,8 @@ private:
   // The base !util.buffer
   Value baseBuffer;
   friend class StridedBufferAnalysis;
+  MemRefType memRefType;
 };
-
 /// Holds the results of an analysis which indicates whether a given memref
 /// can be decomposed into fully known static or dynamic base, strides, offset
 /// and sizes. If this holds, then a StridedBufferDescriptor is guaranteed to
@@ -187,8 +186,7 @@ public:
     builder.setInsertionPointAfterValue(buffer);
 
     Location loc = buffer.getLoc();
-    desc = StridedBufferDescriptor();
-    desc->memRefType = llvm::cast<MemRefType>(buffer.getType());
+    desc = StridedBufferDescriptor(llvm::cast<MemRefType>(buffer.getType()));
 
     int rank = getType().getRank();
     SmallVector<Type> sizeStrideTypes;

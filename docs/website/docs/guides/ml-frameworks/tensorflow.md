@@ -4,9 +4,10 @@ hide:
 tags:
   - Python
   - TensorFlow
+icon: simple/tensorflow
 ---
 
-# TensorFlow Integration
+# TensorFlow integration
 
 IREE supports compiling and running TensorFlow programs represented as
 `tf.Module` [classes](https://www.tensorflow.org/api_docs/python/tf/Module)
@@ -43,31 +44,46 @@ graph LR
   C --> D
 ```
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
-Install TensorFlow by following the
-[official documentation](https://www.tensorflow.org/install):
+1. Install TensorFlow by following the
+    [official documentation](https://www.tensorflow.org/install):
 
-```shell
-python -m pip install tf-nightly
-```
+    ```shell
+    python -m pip install tf-nightly
+    ```
 
-Install IREE pip packages, either from pip or by
-[building from source](../../building-from-source/getting-started.md#python-bindings):
+2. Install IREE packages, either by
+    [building from source](../../building-from-source/getting-started.md#python-bindings)
+    or from pip:
 
-```shell
-python -m pip install \
-  iree-compiler \
-  iree-runtime \
-  iree-tools-tf
-```
+    === "Stable releases"
 
-!!! Caution
-    The TensorFlow package is currently only available on Linux and macOS. It
-    is not available on Windows yet (see
-    [this issue](https://github.com/openxla/iree/issues/6417)).
+        Stable release packages are
+        [published to PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
 
-## Importing models
+        ``` shell
+        python -m pip install \
+          iree-compiler \
+          iree-runtime \
+          iree-tools-tf
+        ```
+
+    === ":material-alert: Nightly releases"
+
+        Nightly releases are published on
+        [GitHub releases](https://github.com/openxla/iree/releases).
+
+        ``` shell
+        python -m pip install \
+          --find-links https://openxla.github.io/iree/pip-release-links.html \
+          --upgrade \
+          iree-compiler \
+          iree-runtime \
+          iree-tools-tf
+        ```
+
+## :octicons-package-dependents-16: Importing models
 
 IREE compilers transform a model into its final deployable format in several
 sequential steps. The first step for a TensorFlow model is to use either the
@@ -126,20 +142,20 @@ supported targets by following one of the
 
 <!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
 
-## Samples
+## :octicons-code-16: Samples
 
 | Colab notebooks |  |
 | -- | -- |
-Training an MNIST digits classifier | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/mnist_training.ipynb)
-Edge detection module | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/edge_detection.ipynb)
-Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/resnet.ipynb)
-TensorFlow Hub Import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
+Training an MNIST digits classifier | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_mnist_training.ipynb)
+Edge detection | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_edge_detection.ipynb)
+Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_resnet.ipynb)
+TensorFlow Hub import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
 
 End-to-end execution tests can be found in IREE's
 [integrations/tensorflow/e2e/](https://github.com/openxla/iree/tree/main/integrations/tensorflow/e2e)
 directory.
 
-## Troubleshooting
+## :octicons-question-16: Troubleshooting
 
 ### Missing serving signature in SavedModel
 

@@ -48,6 +48,16 @@ tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options);
 
+/// Populate IREE patterns related to resolving
+/// `memref.extract_strided_metadata`.
+void populateIREEResolveExtractStridedMetadataPatterns(
+    MLIRContext *context, RewritePatternSet &patterns);
+
+/// Populate patterns that replaces maximumf/minimumf with minumf/maxnumf ops.
+/// This is supposed to be used for targets which have faulty codegen
+/// for maximumf/minimumf ops, e.g. LLVM NVIDIA-PTX.
+void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
+
 } // namespace iree_compiler
 } // namespace mlir
 

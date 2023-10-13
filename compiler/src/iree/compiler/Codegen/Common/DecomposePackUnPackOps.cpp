@@ -85,6 +85,12 @@ struct FoldTrailingUnitTranspose
     if (numDropDims == 0)
       return failure();
 
+    // Dropping all dims. Elide now to avoid corner cases.
+    if (numDropDims == inputTy.getRank()) {
+      rewriter.replaceOp(op, op.getInput());
+      return success();
+    }
+
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> srcMixedSizes =
         tensor::getMixedSizes(rewriter, loc, op.getInput());
@@ -170,7 +176,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     IRRewriter rewriter(ctx);
     auto packOptions = scf::SCFTileAndFuseOptions().setTilingOptions(
         scf::SCFTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder, Operation *op) -> SmallVector<Value> {
+            [](OpBuilder &builder, Operation *op) -> SmallVector<OpFoldResult> {
               auto packOp = cast<tensor::PackOp>(op);
 
               // Do nothing if any of inner tile sizes is dynamic.
@@ -181,9 +187,8 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
               }
 
               int inputRank = packOp.getSourceRank();
-              SmallVector<Value> tileSizes(
-                  inputRank,
-                  builder.create<arith::ConstantIndexOp>(packOp.getLoc(), 1));
+              SmallVector<OpFoldResult> tileSizes(inputRank,
+                                                  builder.getIndexAttr(1));
               return tileSizes;
             }));
     funcOp->walk([&](tensor::PackOp op) {
@@ -198,18 +203,15 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     auto unpackTilingOptions =
         scf::SCFTilingOptions().setTileSizeComputationFunction(
             [](OpBuilder &builder, Operation *op) {
-              Location loc = op->getLoc();
               auto unpackOp = cast<tensor::UnPackOp>(op);
               int numLoops = unpackOp.getDestRank();
               auto dimAndTileMapping = unpackOp.getDimAndTileMapping();
-              SmallVector<Value> tileSizes;
+              SmallVector<OpFoldResult> tileSizes;
               for (int i = 0; i < numLoops; ++i) {
                 if (dimAndTileMapping.count(i)) {
-                  tileSizes.push_back(getValueOrCreateConstantIndexOp(
-                      builder, loc, dimAndTileMapping[i]));
+                  tileSizes.push_back(dimAndTileMapping[i]);
                 } else {
-                  tileSizes.push_back(
-                      builder.create<arith::ConstantIndexOp>(loc, 1));
+                  tileSizes.push_back(builder.getIndexAttr(1));
                 }
               }
               return tileSizes;

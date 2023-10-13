@@ -224,6 +224,14 @@ IREE_EMBED_EXPORTED bool
 ireeCompilerInvocationParseSource(iree_compiler_invocation_t *inv,
                                   iree_compiler_source_t *source);
 
+// Sets a mnemonic phase name to run compilation from. Default is "input".
+// The meaning of this is pipeline specific. See IREEVMPipelinePhase
+// for the standard pipeline.
+// Available since: 1.3
+IREE_EMBED_EXPORTED void
+ireeCompilerInvocationSetCompileFromPhase(iree_compiler_invocation_t *inv,
+                                          const char *phase);
+
 // Sets a mnemonic phase name to run compilation to. Default is "end".
 // The meaning of this is pipeline specific. See IREEVMPipelinePhase
 // for the standard pipeline.
@@ -238,17 +246,41 @@ ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv, bool enable);
 // Runs a compilation pipeline.
 // Returns false and emits diagnostics on failure.
 enum iree_compiler_pipeline_t {
+  // IREE's full compilation pipeline.
   IREE_COMPILER_PIPELINE_STD = 0,
+  // Pipeline to translate a single hal.executable into a target-specific
+  // binary form (such as an ELF file or a flatbuffer containing a SPIR-V
+  // blob).
   IREE_COMPILER_PIPELINE_HAL_EXECUTABLE = 1,
+  // IREE's precompilation pipeline, which does input preprocessing and
+  // pre-fusion global optimization.
+  // This is experimental and this should be changed as we move to a more
+  // cohesive approach for managing compilation phases.
+  IREE_COMPILER_PIPELINE_PRECOMPILE = 2,
 };
 IREE_EMBED_EXPORTED bool
 ireeCompilerInvocationPipeline(iree_compiler_invocation_t *inv,
                                enum iree_compiler_pipeline_t pipeline);
 
+// Runs an arbitrary pass pipeline.
+// Returns false and emits diagnostics on failure.
+// Available since: 1.4
+IREE_EMBED_EXPORTED bool
+ireeCompilerInvocationRunPassPipeline(iree_compiler_invocation_t *inv,
+                                      const char *textPassPipeline);
+
 // Outputs the current compiler state as textual IR to the output.
 IREE_EMBED_EXPORTED iree_compiler_error_t *
 ireeCompilerInvocationOutputIR(iree_compiler_invocation_t *inv,
                                iree_compiler_output_t *output);
+
+// Outputs the current compiler state as bytecode IR to the output.
+// Emits as the given bytecode version or most recent if -1.
+// Available since: 1.4
+IREE_EMBED_EXPORTED iree_compiler_error_t *
+ireeCompilerInvocationOutputIRBytecode(iree_compiler_invocation_t *inv,
+                                       iree_compiler_output_t *output,
+                                       int bytecodeVersion);
 
 // Assuming that the compiler has produced VM IR, converts it to bytecode
 // and outputs it. This is a valid next step after running the

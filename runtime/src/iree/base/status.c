@@ -224,6 +224,7 @@ iree_status_code_from_win32_error(uint32_t error) {
     case ERROR_ACCESS_DENIED:
       return IREE_STATUS_PERMISSION_DENIED;
     case ERROR_INVALID_HANDLE:
+    case ERROR_INVALID_PARAMETER:
       return IREE_STATUS_INVALID_ARGUMENT;
     case ERROR_NOT_READY:
     case ERROR_READ_FAULT:

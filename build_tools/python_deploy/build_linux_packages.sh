@@ -16,18 +16,17 @@
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Build specific Python versions and packages to custom directory:
-#   override_python_versions="cp38-cp38 cp39-cp39" \
-#   packages="iree-runtime iree-runtime-instrumented" \
+#   override_python_versions="cp39-cp39 cp310-310" \
+#   packages="iree-runtime" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Valid Python versions match a subdirectory under /opt/python in the docker
 # image. Typically:
-#   cp38-cp38 cp39-cp39 cp310-cp310
+#   cp39-cp39 cp310-cp310
 #
 # Valid packages:
 #   iree-runtime
-#   iree-runtime-instrumented
 #   iree-compiler
 #
 # Note that this script is meant to be run on CI and it will pollute both the
@@ -65,11 +64,12 @@ function find_git_dir_parent() {
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
-manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:e83893d35be4ce3558c989e9d5ccc4ff88d058bc3e74a83181059cc76e2cf1f8" }')}"
-python_versions="${override_python_versions:-cp38-cp38 cp39-cp39 cp310-cp310 cp311-cp311}"
+manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/nod-ai/manylinux_x86_64:main" }')}"
+python_versions="${override_python_versions:-cp39-cp39 cp310-cp310 cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
-packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
+packages="${packages:-iree-runtime iree-compiler}"
 package_suffix="${package_suffix:-}"
+toolchain_suffix="${toolchain_suffix:-release}"
 
 function run_on_host() {
   echo "Running on host"
@@ -88,6 +88,7 @@ function run_on_host() {
     -e "packages=${packages}" \
     -e "package_suffix=${package_suffix}" \
     -e "output_dir=${output_dir}" \
+    -e "toolchain_suffix=${toolchain_suffix}" \
     "${manylinux_docker_image}" \
     -- ${this_dir}/${script_name}
 
@@ -102,8 +103,15 @@ function run_in_docker() {
   git config --global --add safe.directory '*'
 
   echo "Using python versions: ${python_versions}"
-
   local orig_path="${PATH}"
+
+  # Configure toolchain.
+  export CMAKE_TOOLCHAIN_FILE="${repo_root}/build_tools/pkgci/linux_toolchain_${toolchain_suffix}.cmake"
+  echo "Using CMake toolchain ${CMAKE_TOOLCHAIN_FILE}"
+  if ! [ -f "$CMAKE_TOOLCHAIN_FILE" ]; then
+    echo "CMake toolchain not found (wrong toolchain_suffix?)"
+    exit 1
+  fi
 
   # Build phase.
   for package in ${packages}; do
@@ -116,6 +124,7 @@ function run_in_docker() {
       fi
       export PATH="${python_dir}/bin:${orig_path}"
       echo ":::: Python version $(python --version)"
+      prepare_python
       # replace dashes with underscores
       package_suffix="${package_suffix//-/_}"
       case "${package}" in
@@ -124,12 +133,6 @@ function run_in_docker() {
           install_deps "iree_runtime${package_suffix}" "${python_version}"
           build_iree_runtime
           run_audit_wheel "iree_runtime${package_suffix}" "${python_version}"
-          ;;
-        iree-runtime-instrumented)
-          clean_wheels "iree_runtime_instrumented${package_suffix}" "${python_version}"
-          install_deps "iree_runtime${package_suffix}" "${python_version}"
-          build_iree_runtime_instrumented
-          run_audit_wheel "iree_runtime_instrumented${package_suffix}" "${python_version}"
           ;;
         iree-compiler)
           clean_wheels "iree_compiler${package_suffix}" "${python_version}"
@@ -151,19 +154,13 @@ function build_wheel() {
 }
 
 function build_iree_runtime() {
-  IREE_HAL_DRIVER_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
-  build_wheel runtime/
-}
-
-function build_iree_runtime_instrumented() {
-  IREE_HAL_DRIVER_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
-  IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
-  IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
+  export IREE_RUNTIME_BUILD_TRACY=ON
+  # We install the needed build deps below for the tools.
+  export IREE_RUNTIME_BUILD_TRACY_TOOLS=ON
   build_wheel runtime/
 }
 
 function build_iree_compiler() {
-  IREE_TARGET_BACKEND_CUDA=$(uname -m | awk '{print ($1 == "x86_64") ? "ON" : "OFF"}') \
   build_wheel compiler/
 }
 
@@ -185,6 +182,16 @@ function clean_wheels() {
   rm -f -v "${output_dir}/${wheel_basename}-"*"-${python_version}-"*".whl"
 }
 
+function prepare_python() {
+  # The 0.17 series of patchelf can randomly corrupt executables. Fixes
+  # have landed but not yet been released. Consider removing this pin
+  # once 0.19 is released. We just override the system version with
+  # a pip side load.
+  pip install patchelf==0.16.1.0
+  hash -r
+  echo "patchelf version: $(patchelf --version) (0.17 is bad: https://github.com/NixOS/patchelf/issues/446)"
+}
+
 function install_deps() {
   local wheel_basename="$1"
   local python_version="$2"
@@ -200,9 +207,10 @@ function install_deps() {
     yum update -y
     # Required for Tracy
     yum install -y capstone-devel tbb-devel libzstd-devel
+    yum install -y clang lld
   elif [[ "$uname_m" == "x86_64" ]]; then
     # Check if the output is x86_64
-    echo "The architecture is x86_64 so assume we are on older manylinux2014 with TBB deps installed in the image"
+    echo "The architecture is x86_64 so assume we are on a managed image with deps"
   else
     echo "The architecture is unknown. Exiting"
     exit 1

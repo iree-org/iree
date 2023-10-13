@@ -103,6 +103,7 @@ iree_cc_library(
     MLIRNVGPUTransforms
     MLIRNVGPUUtils
     MLIRNVVMDialect
+    MLIRNVVMToLLVM
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRPass

@@ -54,11 +54,25 @@ def IPO : Pass<"iree-util-ipo", "mlir::ModuleOp"> {
   }];
 }
 
+def OutlineConstants :
+    Pass<"iree-util-outline-constants", "mlir::ModuleOp"> {
+  let summary = "Outlines tensor constants into util.globals at the module level.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createOutlineConstantsPass()
+  }];
+}
+
 def PropagateSubranges : Pass<"iree-util-propagate-subranges", "mlir::ModuleOp"> {
   let summary = "Propagates resource subranges across the program.";
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createPropagateSubrangesPass()
   }];
+}
+
+def StripAndSplatConstants :
+    Pass<"iree-util-strip-and-splat-constants", "mlir::ModuleOp"> {
+  let summary = "Strips constant util.global ops and replaces them with splats.";
+  let constructor = "mlir::iree_compiler::IREE::Util::createStripAndSplatConstantsPass()";
 }
 
 def StripDebugOps : Pass<"iree-util-strip-debug-ops", ""> {
@@ -98,6 +112,27 @@ def SimplifyGlobalAccesses :
   let summary = "Hoists loads and sinks stores to variables to decrease data dependency regions.";
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createSimplifyGlobalAccessesPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Resource Management
+//===----------------------------------------------------------------------===//
+
+def ImportResources : Pass<"iree-util-import-resources", ""> {
+  let summary = "Imports IR with arbitrary large-data into resources that IREE can manage efficiently";
+  let description = [{
+    MLIR has many interesting ways to store large constants, most of which
+    derive from *ElementsAttr. Given the uniquing/inline behavior, this exacts
+    very large runtime and memory overhead costs.
+
+    This is a temporary pass to convert a majority of the legacy
+    DenseElementsAttr attributes to DenseResourceElementsAttr. Ideally this
+    is done at the source (frontend), but this pass is provided to aid
+    transition and testing by doing a manual conversion with iree-opt.
+  }];
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createImportResourcesPass()
   }];
 }
 

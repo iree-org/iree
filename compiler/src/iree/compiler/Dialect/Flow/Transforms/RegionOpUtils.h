@@ -22,6 +22,11 @@ namespace IREE {
 namespace Flow {
 class DispatchRegionOp;
 
+/// Check if an operation is not null and is not nested within
+/// `flow.dispatch.region` or `flow.dispatch.workgroups` op.
+bool isNonNullAndOutsideDispatch(Operation *op);
+bool isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations);
+
 /// For a given operation returns the loop ranges needed to compute the op.
 SmallVector<Range> getLoopRanges(Operation *op, Location loc,
                                  OpBuilder &builder);

@@ -7,7 +7,6 @@ set(LIBS
   IREELinalgExtTransforms
   IREELinalgTransformDialect
   IREELinalgTransformDialectPasses
-  IREELinalgTransformTestPasses
   IREETransformsTestPasses
   # Core dialects.
   MLIRAffineDialect

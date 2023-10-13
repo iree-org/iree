@@ -204,6 +204,17 @@ func.func @constant() -> tensor<i32> {
 
 // -----
 
+// CHECK-LABEL: func @elided_constant
+// CHECK: %[[CONSTANT:.*]] = arith.constant dense_resource<__elided__> : tensor<1024xf32>
+func.func @elided_constant() -> tensor<1024xf32> {
+  %result = "stablehlo.constant"() {
+    value = dense_resource<__elided__> : tensor<1024xf32>
+  } : () -> (tensor<1024xf32>)
+  func.return %result : tensor<1024xf32>
+}
+
+// -----
+
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>

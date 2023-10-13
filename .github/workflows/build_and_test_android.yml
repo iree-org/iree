@@ -81,7 +81,7 @@ jobs:
             --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-            gcr.io/iree-oss/android@sha256:c05cb80509c818132378c04e638d5908ce961250a90dd60281b2f582378df063 \
+            gcr.io/iree-oss/android@sha256:d349a3d137d0ed0f7360af16096db682da0233679cdbb00a326150149e3c4fa4 \
             build_tools/cmake/build_android.sh
           echo "target-build-dir=${TARGET_BUILD_DIR}" >> "${GITHUB_OUTPUT}"
       - name: "Creating archive of target build dir"

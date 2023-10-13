@@ -122,17 +122,16 @@ struct ExecutableType
   using Base::Base;
 };
 
-struct PipelineLayoutType
-    : public Type::TypeBase<PipelineLayoutType, Type, TypeStorage> {
-  using Base::Base;
-};
-
 struct FenceType : public Type::TypeBase<FenceType, Type, TypeStorage> {
   using Base::Base;
 };
 
-struct RingBufferType
-    : public Type::TypeBase<RingBufferType, Type, TypeStorage> {
+struct FileType : public Type::TypeBase<FileType, Type, TypeStorage> {
+  using Base::Base;
+};
+
+struct PipelineLayoutType
+    : public Type::TypeBase<PipelineLayoutType, Type, TypeStorage> {
   using Base::Base;
 };
 
@@ -189,6 +188,31 @@ static inline AsmPrinter &
 operator<<(AsmPrinter &printer,
            std::optional<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>
                param) {
+  printer << (param.has_value()
+                  ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
+                  : StringRef{""});
+  return printer;
+}
+
+template <>
+struct FieldParser<
+    std::optional<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>> {
+  static FailureOr<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>
+  parse(AsmParser &parser) {
+    std::string value;
+    if (parser.parseKeywordOrString(&value))
+      return failure();
+    auto result = mlir::iree_compiler::IREE::HAL::symbolizeEnum<
+        mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>(value);
+    if (!result.has_value())
+      return failure();
+    return result.value();
+  }
+};
+static inline AsmPrinter &operator<<(
+    AsmPrinter &printer,
+    std::optional<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>
+        param) {
   printer << (param.has_value()
                   ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
                   : StringRef{""});

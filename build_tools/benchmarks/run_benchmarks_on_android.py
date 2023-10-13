@@ -40,8 +40,9 @@ import json
 import shutil
 import subprocess
 import tarfile
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Optional, Sequence, Tuple
 
+from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (
@@ -62,7 +63,6 @@ from common.android_device_utils import (
 )
 import common.common_arguments
 from e2e_test_artifacts import iree_artifacts
-from e2e_test_framework import serialization
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_parameters
 
@@ -214,10 +214,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             benchmark_case_dir.relative_to(self.config.root_benchmark_dir)
         )
 
-        run_config = benchmark_case.run_config
         self.__check_and_push_file(
             benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir
         )
+        run_config = benchmark_case.run_config
         taskset = self.__deduce_taskset_from_run_config(run_config)
         run_args = run_config.materialize_run_flags()
         run_args.append(f"--module={iree_artifacts.MODULE_FILENAME}")
@@ -225,8 +225,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if benchmark_results_filename is not None:
             self.__run_benchmark(
                 android_case_dir=android_case_dir,
-                tool_name=benchmark_case.benchmark_tool_name,
-                driver_info=benchmark_case.driver_info,
+                benchmark_case=benchmark_case,
                 run_args=run_args,
                 results_filename=benchmark_results_filename,
                 taskset=taskset,
@@ -235,7 +234,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if capture_filename is not None:
             self.__run_capture(
                 android_case_dir=android_case_dir,
-                tool_name=benchmark_case.benchmark_tool_name,
+                benchmark_case=benchmark_case,
                 run_args=run_args,
                 capture_filename=capture_filename,
                 taskset=taskset,
@@ -244,8 +243,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     def __run_benchmark(
         self,
         android_case_dir: pathlib.PurePosixPath,
-        tool_name: str,
-        driver_info: DriverInfo,
+        benchmark_case: BenchmarkCase,
         run_args: Sequence[str],
         results_filename: pathlib.Path,
         taskset: str,
@@ -253,6 +251,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if self.config.normal_benchmark_tool_dir is None:
             raise ValueError("normal_benchmark_tool_dir can't be None.")
 
+        tool_name = benchmark_case.benchmark_tool_name
         host_tool_path = self.config.normal_benchmark_tool_dir / tool_name
         android_tool = self.__check_and_push_file(host_tool_path, NORMAL_TOOL_REL_DIR)
         cmd = ["taskset", taskset, android_tool]
@@ -260,7 +259,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if tool_name == "iree-benchmark-module":
             cmd += get_iree_benchmark_module_arguments(
                 results_filename=f"'{results_filename.name}'",
-                driver_info=driver_info,
+                driver_info=benchmark_case.driver_info,
                 benchmark_min_time=self.config.benchmark_min_time,
             )
 
@@ -277,15 +276,16 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
     def __run_capture(
         self,
         android_case_dir: pathlib.PurePosixPath,
-        tool_name: str,
-        capture_filename: pathlib.Path,
+        benchmark_case: BenchmarkCase,
         run_args: Sequence[str],
+        capture_filename: pathlib.Path,
         taskset: str,
     ):
         capture_config = self.config.trace_capture_config
         if capture_config is None:
             raise ValueError("capture_config can't be None.")
 
+        tool_name = benchmark_case.benchmark_tool_name
         host_tool_path = capture_config.traced_benchmark_tool_dir / tool_name
         android_tool = self.__check_and_push_file(host_tool_path, TRACED_TOOL_REL_DIR)
         run_cmd = [
@@ -296,6 +296,12 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             android_tool,
         ]
         run_cmd += run_args
+        if tool_name == "iree-benchmark-module":
+            run_cmd += get_iree_benchmark_module_arguments(
+                driver_info=benchmark_case.driver_info,
+                benchmark_min_time=self.config.benchmark_min_time,
+                capture_mode=True,
+            )
 
         # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
         # waiting for the adb command to complete as that won't happen.
@@ -333,6 +339,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             return "80" if single_thread else "f0"
         elif device_parameters.ARM_LITTLE_CORES in device_params:
             return "08" if single_thread else "0f"
+        elif device_parameters.ALL_CORES in device_params:
+            return "80" if single_thread else "ff"
 
         raise ValueError(f"Unsupported config to deduce taskset: '{run_config}'.")
 
@@ -388,13 +396,10 @@ def main(args):
     commit = get_git_commit_hash("HEAD")
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    benchmark_group = benchmark_groups.get(args.target_device_name)
-    if benchmark_group is None:
-        raise ValueError("Target device not found in the benchmark config.")
-    run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group["run_configs"],
-        root_type=List[iree_definitions.E2EModelRunConfig],
+    run_configs = benchmark_suite_module.get_run_configs_by_target_and_shard(
+        benchmark_groups, args.target_device_name, args.shard_index
     )
+
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs, root_benchmark_dir=benchmark_config.root_benchmark_dir
     )

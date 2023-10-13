@@ -13,6 +13,13 @@ include "mlir/Pass/PassBase.td"
 // Common passes for all backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
+def AddFastMathFlags
+    : Pass<"iree-codegen-add-fast-math-flags", "LLVM::LLVMFuncOp"> {
+  let summary = "Add fast math flags to all the operations supporting them, "
+                "given a floating-point mode.";
+  let constructor = "mlir::iree_compiler::createAddFastMathFlagsPass()";
+}
+
 def BubbleUpOrdinalOps : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
   let summary = "Bubbles op ordinal ops to allow for workgroup count computation";
   let constructor = "mlir::iree_compiler::createBubbleUpOrdinalOpsPass()";
@@ -112,6 +119,13 @@ def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   ];
 }
 
+def DecomposeBatchMmt4DOps
+    : Pass<"iree-codegen-decompose-batch-mmt4d-ops", "func::FuncOp"> {
+  let summary = "Decompose batch_mmt4d ops into mmt4d ops";
+  let constructor =
+      "mlir::iree_compiler::createDecomposeBatchMmt4DOpsPass()";
+}
+
 def DecomposeConvolutionToLowerDimOps :
     Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
   let summary = "Decomposes linalg convolution ops to lower dim ops";
@@ -144,17 +158,45 @@ def DecomposePackUnPackOps :
   ];
 }
 
+def ReplaceSlowMinMaxOps
+    : Pass<"iree-codegen-replace-slow-min-max-ops", "func::FuncOp"> {
+  let summary =
+      "Replace slow min/max operations that propagate NaNs and distinguish "
+      "between +/-0.0 with faster min/max operations that ignore them.";
+  let constructor = "mlir::iree_compiler::createReplaceSlowMinMaxOpsPass()";
+}
+
 def EliminateEmptyTensors :
     Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
   let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
 }
 
-def EraseHALDescriptorTypeFromMemRef :
-    Pass<"iree-codegen-erase-hal-descriptor-type-from-memref", "func::FuncOp"> {
+def EmulateNarrowType :
+    Pass<"iree-codegen-emulate-narrow-type", "ModuleOp"> {
+  let summary = "Emulate narrow integer operations using wide integer operations";
+  let constructor = "mlir::iree_compiler::createEmulateNarrowTypePass()";
+}
+
+def EraseDeadAllocAndStores :
+    Pass<"iree-codegen-erase-dead-alloc-and-stores", "func::FuncOp"> {
+  let summary = "Erase alloc ops if all the uses are just stores";
+  let constructor =
+      "mlir::iree_compiler::createEraseDeadAllocAndStoresPass()";
+}
+
+def EraseHALDescriptorTypeFromMemRef
+    : Pass<"iree-codegen-erase-hal-descriptor-type-from-memref"> {
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
   let constructor =
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
+}
+
+def ConvertHALDescriptorTypeToGPUAddressSpace
+    : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
+  let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let constructor =
+      "mlir::iree_compiler::createConvertHALDescriptorTypeToGPUAddressSpacePass()";
 }
 
 def ExtractAddressComputation: Pass<"extract-address-computation"> {
@@ -222,6 +264,14 @@ def GenericVectorization :
       "Rewrite all tensor.pad ops in the function to vector form.">,
     Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
       "Enable vectorizaiton of operations that may generate vector.gather operations.">,
+    Option<"enableCleanup", "enable-cleanup", "bool",/*default=*/"true",
+      "Enable cleanups after vectorization. The patterns touch the structure"
+      "generated from tiling so it affects later steps like bufferization and vector hoisting.">,
+    Option<"generateContract", "generate-contract", "bool",/*default=*/"true",
+      "Enable conversion for reduction ops to contraction ops.">,
+    Option<"maxVectorSize", "max-vector-size", "int64_t",
+            /*default=*/"2147483647",
+           "Max vector size allowed to avoid creating large vectors.">
   ];
   let constructor =
       "mlir::iree_compiler::createGenericVectorizationPass()";
@@ -319,7 +369,7 @@ def PolynomialApproximationPass :
 
 def RematerializeParallelOps :
     Pass<"iree-codegen-rematerialize-parallel-ops", "func::FuncOp"> {
-  let summary = "Pass to rematerialize and merge parallel ops to avoid creating temporary allocs.";
+  let summary = "Pass to rematerialize and merge parallel ops into consumers.";
   let constructor = "mlir::iree_compiler::createRematerializeParallelOpsPass()";
 }
 

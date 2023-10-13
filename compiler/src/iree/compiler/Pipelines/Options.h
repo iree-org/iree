@@ -30,12 +30,16 @@ struct BindingOptions {
 // needs to be created in order to represent whole-module level framework
 // quirks. These are just about the ops in the functions.
 struct InputDialectOptions {
+  // Built-in input types, represented by an enum.
   enum class Type {
     // Applies no input transformation. Only supported core and extension ops
     // are supported.
     none,
     // Analyses the input to determine what input dialect pipeline to use.
     auto_detect,
+    // A named input pipeline from a plugin. If set, then 'pluginInputPipeline'
+    // must be set.
+    plugin,
 #ifdef IREE_HAVE_STABLEHLO_INPUT
     // Legalizes input defined over StableHLO ops.
     stablehlo,
@@ -43,16 +47,20 @@ struct InputDialectOptions {
     // preprocessing, e.g., flattening of tuples.
     stablehlo_xla,
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-    // Legalizes input defined over TMTensor ops.
-    tm_tensor,
-#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
     // Legalizes input defined over TOSA ops.
     tosa,
 #endif // IREE_HAVE_TOSA_INPUT
   };
-  Type type = Type::auto_detect;
+  // The flag value is captured into spec by the CL system and it must be
+  // interpreted by parseInputTypeSpec.
+  std::string inputTypeMnemonic{"auto"};
+
+  // Parses the user-provided inputTypeMnemonic, returning a recognized Type
+  // enumeration as appropriate. If the returned type is `plugin`, then it is
+  // a custom input type and the raw inputTypeMnemonic should be passed to the
+  // plugin system for resolution.
+  Type parseInputTypeMnemonic();
 
   bool demoteI64ToI32 = true;
   bool demoteF64ToF32 = true;
@@ -63,13 +71,23 @@ struct InputDialectOptions {
 };
 
 // Options controlling high level optimizations.
-struct HighLevelOptimizationOptions {
+struct GlobalOptimizationOptions {
+  // Gate various type based demotion passes that run before anything else.
+  bool demoteF64ToF32 = true;
+  bool demoteF32ToF16 = false;
+  bool promoteF16ToF32 = false;
+  bool promoteBF16ToF32 = false;
+  bool demoteI64ToI32 = false;
+
+  // Enables data tiling.
+  bool dataTiling = false;
+
   // Enables const-expr hoisting into globals.
-  bool constExprHoisting = false;
+  bool constExprHoisting = true;
 
   // Enables recursive evaluation of immutable globals using the compiler
   // and runtime.
-  bool constEval = false;
+  bool constEval = true;
 
   // Optimizations to reduce numeric precision where it is safe to do so.
   bool numericPrecisionReduction = false;
@@ -78,7 +96,7 @@ struct HighLevelOptimizationOptions {
   bool stripAssertions = false;
 
   void bindOptions(OptionsBinder &binder);
-  using FromFlags = OptionsFromFlags<HighLevelOptimizationOptions>;
+  using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };
 
 // Options controlling scheduling across host/device.
@@ -125,6 +143,8 @@ struct SchedulingOptions {
   DumpOutputFormat dumpStatisticsFormat = DumpOutputFormat::None;
   // File path to write statistics to; or `` for stderr or `-` for stdout.
   std::string dumpStatisticsFile = "";
+  // Enables fusing bindings with the same underlying storage.
+  bool optimizeBindings = true;
 
   // TODO(benvanik): favor size/speed/etc for partitioning.
   // TODO(benvanik): execution model to optimize for (unified/discrete memory,

@@ -26,7 +26,11 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 // A bitmask of flags controlling the behavior of a descriptor set.
 enum iree_hal_descriptor_set_layout_flag_bits_t {
   IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE = 0u,
-  // TODO(benvanik): add flag bits for binding table usage modes.
+
+  // Indicates the descriptor sets are 'bindless' and passed via implementation-
+  // specific parameter buffers stored in memory instead of API-level calls.
+  // Ignored by implementations that don't have a concept of indirect bindings.
+  IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_INDIRECT = 1u << 0,
 };
 typedef uint32_t iree_hal_descriptor_set_layout_flags_t;
 

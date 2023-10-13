@@ -294,7 +294,7 @@ typedef struct iree_loop_dispatch_params_t {
 typedef struct iree_loop_wait_until_params_t {
   // Callback issued after the deadline has passed.
   iree_loop_callback_t callback;
-  // Minimum time to wait before issueing the callback.
+  // Minimum time to wait before issuing the callback.
   iree_time_t deadline_ns;
 } iree_loop_wait_until_params_t;
 

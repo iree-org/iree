@@ -13,13 +13,13 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 from typing import Any, List, Optional
-import typing
 import atexit
 import json
 import shutil
 import subprocess
 import tarfile
 
+from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
@@ -32,8 +32,6 @@ from common.benchmark_definition import (
     parse_iree_benchmark_metrics,
 )
 from common.linux_device_utils import get_linux_device_info
-from e2e_test_framework.definitions import iree_definitions
-from e2e_test_framework import serialization
 from e2e_test_artifacts import iree_artifacts
 from e2e_model_tests import run_module_utils
 import common.common_arguments
@@ -114,11 +112,21 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         if capture_config is None:
             raise ValueError("capture_config can't be None.")
 
+        tool_name = benchmark_case.benchmark_tool_name
         tool_path = (
             capture_config.traced_benchmark_tool_dir
             / benchmark_case.benchmark_tool_name
         )
         cmd = self.__build_tool_cmds(benchmark_case=benchmark_case, tool_path=tool_path)
+
+        if tool_name == "iree-benchmark-module":
+            cmd.extend(
+                get_iree_benchmark_module_arguments(
+                    driver_info=benchmark_case.driver_info,
+                    benchmark_min_time=self.config.benchmark_min_time,
+                    capture_mode=True,
+                )
+            )
 
         process = subprocess.Popen(
             cmd, env={"TRACY_NO_EXIT": "1"}, stdout=subprocess.PIPE, text=True
@@ -142,13 +150,10 @@ def main(args):
     benchmark_config = BenchmarkConfig.build_from_args(args, commit)
 
     benchmark_groups = json.loads(args.execution_benchmark_config.read_text())
-    benchmark_group = benchmark_groups.get(args.target_device_name)
-    if benchmark_group is None:
-        raise ValueError("Target device not found in the benchmark config.")
-    run_configs = serialization.unpack_and_deserialize(
-        data=benchmark_group["run_configs"],
-        root_type=typing.List[iree_definitions.E2EModelRunConfig],
+    run_configs = benchmark_suite_module.get_run_configs_by_target_and_shard(
+        benchmark_groups, args.target_device_name, args.shard_index
     )
+
     benchmark_suite = BenchmarkSuite.load_from_run_configs(
         run_configs=run_configs, root_benchmark_dir=benchmark_config.root_benchmark_dir
     )

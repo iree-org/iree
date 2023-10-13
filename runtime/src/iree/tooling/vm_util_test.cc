@@ -18,7 +18,8 @@
 namespace iree {
 namespace {
 
-static Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
+static Status ParseToVariantList(iree_hal_device_t* device,
+                                 iree_hal_allocator_t* device_allocator,
                                  iree::span<const std::string> input_strings,
                                  iree_allocator_t host_allocator,
                                  iree_vm_list_t** out_list) {
@@ -28,8 +29,8 @@ static Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
     input_string_views[i].size = input_strings[i].size();
   }
   return iree_tooling_parse_to_variant_list(
-      device_allocator, input_string_views.data(), input_string_views.size(),
-      host_allocator, out_list);
+      device, device_allocator, input_string_views.data(),
+      input_string_views.size(), host_allocator, out_list);
 }
 
 static Status PrintVariantList(iree_vm_list_t* variant_list,
@@ -75,9 +76,9 @@ class VmUtilTest : public ::testing::Test {
 TEST_F(VmUtilTest, ParsePrintBuffer) {
   std::string buf_string = "&2x2xi32=[42 43][44 45]";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(
-      ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
-                         iree_vm_instance_allocator(instance_), &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(
+      device_, allocator_, std::vector<std::string>{buf_string},
+      iree_vm_instance_allocator(instance_), &variant_list));
   std::string result;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
   EXPECT_EQ(result,
@@ -87,9 +88,9 @@ TEST_F(VmUtilTest, ParsePrintBuffer) {
 TEST_F(VmUtilTest, ParsePrintBufferView) {
   std::string buf_string = "2x2xi32=[42 43][44 45]";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(
-      ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
-                         iree_vm_instance_allocator(instance_), &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(
+      device_, allocator_, std::vector<std::string>{buf_string},
+      iree_vm_instance_allocator(instance_), &variant_list));
   std::string result;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
   EXPECT_EQ(result,
@@ -99,9 +100,9 @@ TEST_F(VmUtilTest, ParsePrintBufferView) {
 TEST_F(VmUtilTest, ParsePrintScalar) {
   std::string input_string = "42";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(
-      ParseToVariantList(allocator_, std::vector<std::string>{input_string},
-                         iree_vm_instance_allocator(instance_), &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(
+      device_, allocator_, std::vector<std::string>{input_string},
+      iree_vm_instance_allocator(instance_), &variant_list));
   std::string result;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
   EXPECT_EQ(result, std::string("result[0]: i32=") + input_string + "\n");
@@ -110,9 +111,9 @@ TEST_F(VmUtilTest, ParsePrintScalar) {
 TEST_F(VmUtilTest, ParsePrintRank0BufferView) {
   std::string buf_string = "i32=42";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(
-      ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
-                         iree_vm_instance_allocator(instance_), &variant_list));
+  IREE_ASSERT_OK(ParseToVariantList(
+      device_, allocator_, std::vector<std::string>{buf_string},
+      iree_vm_instance_allocator(instance_), &variant_list));
   std::string result;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
   EXPECT_EQ(result,
@@ -124,7 +125,7 @@ TEST_F(VmUtilTest, ParsePrintMultipleBufferViews) {
   std::string buf_string2 = "2x3xf64=[1 2 3][4 5 6]";
   vm::ref<iree_vm_list_t> variant_list;
   IREE_ASSERT_OK(ParseToVariantList(
-      allocator_, std::vector<std::string>{buf_string1, buf_string2},
+      device_, allocator_, std::vector<std::string>{buf_string1, buf_string2},
       iree_vm_instance_allocator(instance_), &variant_list));
   std::string result;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));

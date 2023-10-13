@@ -13,13 +13,17 @@ EXPORTS
   ireeCompilerInvocationDestroy
   ireeCompilerInvocationEnableCallbackDiagnostics
   ireeCompilerInvocationEnableConsoleDiagnostics
-  ireeCompilerInvocationImportModule
+  ireeCompilerInvocationImportBorrowModule
+  ireeCompilerInvocationImportStealModule
   ireeCompilerInvocationOutputHALExecutable
   ireeCompilerInvocationOutputIR
+  ireeCompilerInvocationOutputIRBytecode
   ireeCompilerInvocationOutputVMBytecode
   ireeCompilerInvocationOutputVMCSource
   ireeCompilerInvocationParseSource
   ireeCompilerInvocationPipeline
+  ireeCompilerInvocationRunPassPipeline
+  ireeCompilerInvocationSetCompileFromPhase
   ireeCompilerInvocationSetCompileToPhase
   ireeCompilerInvocationSetCrashHandler
   ireeCompilerInvocationSetVerifyIR
@@ -33,11 +37,12 @@ EXPORTS
   ireeCompilerRegisterDialects
   ireeCompilerRunLldMain
   ireeCompilerRunMain
+  ireeCompilerSessionBorrowContext
   ireeCompilerSessionCreate
   ireeCompilerSessionDestroy
-  ireeCompilerSessionGetContext
   ireeCompilerSessionGetFlags
   ireeCompilerSessionSetFlags
+  ireeCompilerSessionStealContext
   ireeCompilerSetupGlobalCL
   ireeCompilerSourceDestroy
   ireeCompilerSourceOpenFile
@@ -167,6 +172,7 @@ EXPORTS
   mlirBlockGetParentOperation
   mlirBlockGetParentRegion
   mlirBlockGetTerminator
+  mlirBlockInsertArgument
   mlirBlockInsertOwnedOperation
   mlirBlockInsertOwnedOperationAfter
   mlirBlockInsertOwnedOperationBefore
@@ -182,6 +188,8 @@ EXPORTS
   mlirContextAppendDialectRegistry
   mlirContextAttachDiagnosticHandler
   mlirContextCreate
+  mlirContextCreateWithRegistry
+  mlirContextCreateWithThreading
   mlirContextDestroy
   mlirContextDetachDiagnosticHandler
   mlirContextEnableMultithreading
@@ -193,6 +201,7 @@ EXPORTS
   mlirContextIsRegisteredOperation
   mlirContextLoadAllAvailableDialects
   mlirContextSetAllowUnregisteredDialects
+  mlirContextSetThreadPool
   mlirCreateExternalPass
   mlirDenseArrayAttrGetTypeID
   mlirDenseArrayGetNumElements
@@ -303,7 +312,6 @@ EXPORTS
   mlirF32TypeGet
   mlirF64TypeGet
   mlirFlatSymbolRefAttrGet
-  mlirFlatSymbolRefAttrGetTypeID
   mlirFlatSymbolRefAttrGetValue
   mlirFloat16TypeGetTypeID
   mlirFloat32TypeGetTypeID
@@ -322,6 +330,7 @@ EXPORTS
   mlirFloatAttrDoubleGetChecked
   mlirFloatAttrGetTypeID
   mlirFloatAttrGetValueDouble
+  mlirFloatTF32TypeGetTypeID
   mlirFunctionTypeGet
   mlirFunctionTypeGetInput
   mlirFunctionTypeGetNumInputs
@@ -330,7 +339,6 @@ EXPORTS
   mlirFunctionTypeGetTypeID
   mlirGetDialectHandle__iree_input__
   mlirGetDialectHandle__iree_linalg_ext__
-  mlirGetDialectHandle__iree_linalg_transform__
   mlirGetDialectHandle__transform__
   mlirIREELinalgTransformRegisterPasses
   mlirIREETransformRegisterPasses
@@ -376,6 +384,8 @@ EXPORTS
   mlirIntegerTypeUnsignedGet
   mlirIsGlobalDebugEnabled
   mlirLinalgFillBuiltinNamedOpRegion
+  mlirLlvmThreadPoolCreate
+  mlirLlvmThreadPoolDestroy
   mlirLocationCallSiteGet
   mlirLocationEqual
   mlirLocationFileLineColGet
@@ -463,6 +473,7 @@ EXPORTS
   mlirOperationRemoveFromParent
   mlirOperationSetAttributeByName
   mlirOperationSetOperand
+  mlirOperationSetOperands
   mlirOperationStateAddAttributes
   mlirOperationStateAddOperands
   mlirOperationStateAddOwnedRegions
@@ -503,6 +514,7 @@ EXPORTS
   mlirRegionInsertOwnedBlock
   mlirRegionInsertOwnedBlockAfter
   mlirRegionInsertOwnedBlockBefore
+  mlirRegionTakeBody
   mlirRegisterLinalgPasses
   mlirShapedTypeGetDimSize
   mlirShapedTypeGetDynamicSize
@@ -544,6 +556,7 @@ EXPORTS
   mlirSymbolTableLookup
   mlirSymbolTableReplaceAllSymbolUses
   mlirSymbolTableWalkSymbolTables
+  mlirTF32TypeGet
   mlirTransformAnyOpTypeGet
   mlirTransformOperationTypeGet
   mlirTransformOperationTypeGetOperationName
@@ -590,6 +603,7 @@ EXPORTS
   mlirTypeIsAPDLValueType
   mlirTypeIsARankedTensor
   mlirTypeIsAShaped
+  mlirTypeIsATF32
   mlirTypeIsATensor
   mlirTypeIsATransformAnyOpType
   mlirTypeIsATransformOperationType
@@ -628,6 +642,7 @@ EXPORTS
   mlirValuePrint
   mlirValuePrintAsOperand
   mlirValueReplaceAllUsesOfWith
+  mlirValueSetType
   mlirVectorTypeGet
   mlirVectorTypeGetChecked
   mlirVectorTypeGetTypeID

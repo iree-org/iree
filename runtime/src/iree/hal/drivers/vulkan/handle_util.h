@@ -39,11 +39,14 @@ constexpr T exchange(T& obj, U&& new_value) {
 
 class VkDeviceHandle : public RefObject<VkDeviceHandle> {
  public:
-  VkDeviceHandle(DynamicSymbols* syms,
+  VkDeviceHandle(DynamicSymbols* syms, VkPhysicalDevice physical_device,
+                 iree_hal_vulkan_features_t enabled_features,
                  iree_hal_vulkan_device_extensions_t enabled_extensions,
                  bool owns_device, iree_allocator_t host_allocator,
                  const VkAllocationCallbacks* allocator = nullptr)
       : syms_(add_ref(syms)),
+        physical_device_(physical_device),
+        enabled_features_(enabled_features),
         enabled_extensions_(enabled_extensions),
         owns_device_(owns_device),
         allocator_(allocator),
@@ -53,7 +56,10 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
   VkDeviceHandle(const VkDeviceHandle&) = delete;
   VkDeviceHandle& operator=(const VkDeviceHandle&) = delete;
   VkDeviceHandle(VkDeviceHandle&& other) noexcept
-      : value_(exchange(other.value_, static_cast<VkDevice>(VK_NULL_HANDLE))),
+      : physical_device_(
+            exchange(other.physical_device_,
+                     static_cast<VkPhysicalDevice>(VK_NULL_HANDLE))),
+        value_(exchange(other.value_, static_cast<VkDevice>(VK_NULL_HANDLE))),
         syms_(std::move(other.syms_)),
         enabled_extensions_(other.enabled_extensions_),
         owns_device_(other.owns_device_),
@@ -68,6 +74,9 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
     value_ = VK_NULL_HANDLE;
   }
 
+  VkPhysicalDevice physical_device() const noexcept { return physical_device_; }
+  operator VkPhysicalDevice() const noexcept { return physical_device_; }
+
   VkDevice value() const noexcept { return value_; }
   VkDevice* mutable_value() noexcept { return &value_; }
   operator VkDevice() const noexcept { return value_; }
@@ -76,13 +85,19 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
   const VkAllocationCallbacks* allocator() const noexcept { return allocator_; }
   iree_allocator_t host_allocator() const noexcept { return host_allocator_; }
 
+  iree_hal_vulkan_features_t enabled_features() const {
+    return enabled_features_;
+  }
+
   const iree_hal_vulkan_device_extensions_t& enabled_extensions() const {
     return enabled_extensions_;
   }
 
  private:
+  VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
   VkDevice value_ = VK_NULL_HANDLE;
   ref_ptr<DynamicSymbols> syms_;
+  iree_hal_vulkan_features_t enabled_features_;
   iree_hal_vulkan_device_extensions_t enabled_extensions_;
   bool owns_device_;
   const VkAllocationCallbacks* allocator_ = nullptr;

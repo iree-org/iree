@@ -224,13 +224,12 @@ static SmallVector<Value>
 getTiedOperandsForDPSOps(DestinationStyleOpInterface dpsOp,
                          const BufferizationPlan &plan) {
   SmallVector<Value> tiedOperands(dpsOp.getOperation()->getNumResults());
-  auto outputOperands = dpsOp.getDpsInitOperands();
+  auto outputOperands = dpsOp.getDpsInits();
   for (auto [index, outTensor] : llvm::enumerate(outputOperands)) {
     // If the `outs` tensor has a single use (this op) and is not from a
     // read-only buffer, the `outs` tensor can be tied to the result.
-    if (outTensor->get().hasOneUse() &&
-        !isFromReadOnlyTensor(outTensor->get(), plan)) {
-      tiedOperands[index] = outTensor->get();
+    if (outTensor.hasOneUse() && !isFromReadOnlyTensor(outTensor, plan)) {
+      tiedOperands[index] = outTensor;
     }
   }
   return tiedOperands;
@@ -472,8 +471,8 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
 ///    not using a buffer from the dispatch ABI.
 static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
                                         BufferizationPlan &plan) {
-  for (auto [index, result] : enumerate(linalgOp.getDpsInitOperands())) {
-    if (linalgOp.payloadUsesValueFromOperand(result)) {
+  for (auto [index, result] : llvm::enumerate(linalgOp.getDpsInitsMutable())) {
+    if (linalgOp.payloadUsesValueFromOperand(&result)) {
       continue;
     }
     for (OpOperand *input : linalgOp.getDpsInputOperands()) {
@@ -483,11 +482,10 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
         continue;
       Type inputElementType = tensorType.getElementType();
       Type resultElementType =
-          llvm::cast<RankedTensorType>(result->get().getType())
-              .getElementType();
+          llvm::cast<RankedTensorType>(result.get().getType()).getElementType();
       if (input->get().hasOneUse() && (inputElementType == resultElementType) &&
           linalgOp.getMatchingIndexingMap(input) ==
-              linalgOp.getMatchingIndexingMap(result) &&
+              linalgOp.getMatchingIndexingMap(&result) &&
           !getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
               input->get(), plan) &&
           !isFromReadOnlyTensor(input->get(), plan)) {

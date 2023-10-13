@@ -121,7 +121,8 @@ iree_status_t iree_hal_embedded_elf_executable_plugin_load_from_file(
   // Try to load the file first, which is the most likely thing to fail.
   iree_file_contents_t* file_contents = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_file_read_contents(path, host_allocator, &file_contents));
+      z0, iree_file_read_contents(path, IREE_FILE_READ_FLAG_DEFAULT,
+                                  host_allocator, &file_contents));
 
   iree_hal_file_embedded_elf_executable_plugin_t* plugin = NULL;
   iree_status_t status =

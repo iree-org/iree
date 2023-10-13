@@ -39,7 +39,7 @@ void registerHALTargetBackends() {
 
 #ifdef IREE_HAVE_LLVM_CPU_TARGET
     IREE::HAL::registerLLVMCPUTargetBackends(
-        []() { return IREE::HAL::getLLVMTargetOptionsFromFlags(); });
+        []() { return IREE::HAL::LLVMTargetOptions::getFromFlags(); });
 #endif // IREE_HAVE_LLVM_CPU_TARGET
 #ifdef IREE_HAVE_METALSPIRV_TARGET
     IREE::HAL::registerMetalSPIRVTargetBackends();

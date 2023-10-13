@@ -24,31 +24,34 @@ struct GPUModel;
 // Base quantities generally useful for all GPU strategies.
 //===----------------------------------------------------------------------===//
 inline Attribute threadX(MLIRContext *ctx) {
-  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimX);
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::MappingId::DimX);
 }
 inline Attribute threadY(MLIRContext *ctx) {
-  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimY);
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::MappingId::DimY);
 }
 inline Attribute threadZ(MLIRContext *ctx) {
-  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::Threads::DimZ);
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx, mlir::gpu::MappingId::DimZ);
 }
 inline Attribute warpX(MLIRContext *ctx) {
-  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimX);
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::MappingId::DimX);
 }
 inline Attribute warpY(MLIRContext *ctx) {
-  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimY);
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::MappingId::DimY);
 }
 inline Attribute warpZ(MLIRContext *ctx) {
-  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::Warps::DimZ);
+  return mlir::gpu::GPUWarpMappingAttr::get(ctx, mlir::gpu::MappingId::DimZ);
 }
-inline Attribute linearIdX(MLIRContext *ctx) {
-  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimX);
+inline Attribute linearId0(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx,
+                                              mlir::gpu::MappingId::LinearDim0);
 }
-inline Attribute linearIdY(MLIRContext *ctx) {
-  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimY);
+inline Attribute linearId1(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx,
+                                              mlir::gpu::MappingId::LinearDim1);
 }
-inline Attribute linearIdZ(MLIRContext *ctx) {
-  return mlir::gpu::GPULinearIdMappingAttr::get(ctx, mlir::gpu::LinearId::DimZ);
+inline Attribute linearId2(MLIRContext *ctx) {
+  return mlir::gpu::GPUThreadMappingAttr::get(ctx,
+                                              mlir::gpu::MappingId::LinearDim2);
 }
 
 //===----------------------------------------------------------------------===//
@@ -70,12 +73,11 @@ int64_t adjustNumberOfWarpsForBlockShuffle(int64_t numWarpsToUse,
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-/// Takes an optional `warpDims` argument to specify the number of warp
-/// dimensions to consider along various dimensions and avoid second-guessing
-/// how the mapping to warps should occur.
-Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
-                                ArrayRef<int64_t> blockSize,
-                                ArrayRef<int64_t> warpDims = {});
+/// Takes an optional `subgroupSize` argument to specify the number of threads
+/// per subgroup.
+Value buildMapToBlockAndThreads(
+    ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize,
+    std::optional<int64_t> subgroupSize = std::nullopt);
 
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
@@ -159,7 +161,9 @@ buildDistributeMatmulCopies(ImplicitLocOpBuilder &b, Value variantH,
 void buildMatmulVectorization(ImplicitLocOpBuilder &b, Value variantH,
                               Value lhsCopyOpH, Value rhsCopyOpH,
                               Value copyBackOpH,
-                              const AbstractGemmLikeStrategy &strategy);
+                              const AbstractGemmLikeStrategy &strategy,
+                              bool vectorizePadding = false,
+                              bool vectorizeNdExtract = false);
 
 /// Build the transform IR to perform conversion to tensor core operations.
 /// This is currently subject to phase orderings as follows:

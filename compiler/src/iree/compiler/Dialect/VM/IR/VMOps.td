@@ -7,13 +7,13 @@
 #ifndef IREE_DIALECT_VM_OPS
 #define IREE_DIALECT_VM_OPS
 
-include "mlir/Interfaces/CallInterfaces.td"
-include "mlir/Interfaces/ControlFlowInterfaces.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
-include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
@@ -2951,6 +2951,12 @@ class VM_ConversionPseudoOp<Type src_type, Type dst_type, string mnemonic,
   let hasCanonicalizer = 1;
 }
 
+def VM_TruncI16I8Op :
+    VM_ConversionPseudoOp<I32, I32, "trunc.i16.i8"> {
+  let summary = [{integer truncate to 8 bits}];
+  let hasFolder = 1;
+}
+
 def VM_TruncI32I8Op :
     VM_ConversionOp<I32, I32, "trunc.i32.i8", VM_OPC_TruncI32I8> {
   let summary = [{integer truncate to 8 bits}];
@@ -4021,6 +4027,12 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
       (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getOperandsMutable();
     }
   }];
 }

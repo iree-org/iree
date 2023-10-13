@@ -12,7 +12,7 @@
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }>
 
 
@@ -70,7 +70,7 @@ hal.executable private @transpose_10_8x8_pattern {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }>
 
 
@@ -128,7 +128,7 @@ hal.executable private @transpose_021_8x8_pattern {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }>
 
 
@@ -186,7 +186,7 @@ hal.executable private @transpose_201_8x8_pattern {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }>
 
 
@@ -244,7 +244,7 @@ hal.executable private @transpose_210_8x8_pattern {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }>
 
 
@@ -302,7 +302,7 @@ hal.executable private @transpose_120_8x8_pattern {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }>
 
 
@@ -352,7 +352,7 @@ hal.executable private @transpose_102 {
     // No '+avx2' cpu feature.
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
-    target_triple = "x86_64-unknown-unknown-eabi-elf"
+    target_triple = "x86_64-none-elf"
   }>
 
 

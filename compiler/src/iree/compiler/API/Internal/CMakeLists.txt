@@ -12,15 +12,16 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Embed
+    CompilerDriver
   HDRS
     "Diagnostics.h"
   SRCS
+    "CompilerDriver.cpp"
     "Diagnostics.cpp"
-    "Embed.cpp"
   DEPS
     LLVMSupport
     MLIRBuiltinToLLVMIRTranslation
+    MLIRBytecodeWriter
     MLIRCAPIIR
     MLIRIR
     MLIRParser
@@ -83,6 +84,23 @@ iree_cc_library(
     iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::Tools::init_targets
+    iree::compiler::bindings::c::headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    IREEReduceToolEntryPoint
+  SRCS
+    "IREEReduceToolEntryPoint.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRSupport
+    iree::compiler::Reducer::iree_reduce_lib
+    iree::compiler::Tools::init_passes_and_dialects
     iree::compiler::bindings::c::headers
   PUBLIC
 )

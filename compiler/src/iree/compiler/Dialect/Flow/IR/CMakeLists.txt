@@ -47,6 +47,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRControlFlowInterfaces
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRMemRefDialect

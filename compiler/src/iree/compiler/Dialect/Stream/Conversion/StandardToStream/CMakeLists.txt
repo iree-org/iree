@@ -27,6 +27,7 @@ iree_cc_library(
     MLIRIR
     MLIRMemRefDialect
     MLIRPass
+    MLIRSCFDialect
     MLIRShapeDialect
     MLIRTensorDialect
     MLIRTransforms

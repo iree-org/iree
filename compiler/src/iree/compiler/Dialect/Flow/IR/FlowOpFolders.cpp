@@ -561,10 +561,9 @@ canonicalizeSubViewParts(OpTy op, RankedTensorType sliceType,
   mixedOffsets.assign(op.getMixedOffsets());
   mixedSizes.assign(op.getMixedSizes());
   mixedStrides.assign(op.getMixedStrides());
-  Builder builder(op.getContext());
-  if (failed(foldDynamicIndexList(builder, mixedOffsets)) &&
-      failed(foldDynamicIndexList(builder, mixedSizes)) &&
-      failed(foldDynamicIndexList(builder, mixedStrides))) {
+  if (failed(foldDynamicIndexList(mixedOffsets)) &&
+      failed(foldDynamicIndexList(mixedSizes)) &&
+      failed(foldDynamicIndexList(mixedStrides))) {
     return failure();
   }
 
@@ -662,9 +661,9 @@ struct FoldCastOpIntoDispatchStoreOp
 
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
         storeOp, parentOp.getSource(), storeOp.getTarget(),
-        storeOp.getTargetDims(), storeOp.offsets(), storeOp.sizes(),
-        storeOp.strides(), storeOp.static_offsets(), storeOp.static_sizes(),
-        storeOp.static_strides());
+        storeOp.getTargetDims(), storeOp.getOffsets(), storeOp.getSizes(),
+        storeOp.getStrides(), storeOp.getStaticOffsets(),
+        storeOp.getStaticSizes(), storeOp.getStaticStrides());
     return success();
   }
 };
@@ -1228,8 +1227,7 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
         updateOp.getStartIndices(), update,
         refreshDimsOnTypeChange(updateOp, updateOp.getUpdate().getType(),
                                 update.getType(), updateOp.getUpdateDims(),
-                                rewriter),
-        updateOp.getTiedOperandsAttr());
+                                rewriter));
     rewriter.replaceOpWithNewOp<tensor::CastOp>(
         updateOp, updateOp.getResult().getType(), newOp.getResult());
     return success();

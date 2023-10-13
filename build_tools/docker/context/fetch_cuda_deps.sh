@@ -25,6 +25,12 @@
 #   ./fetch_cuda_deps.sh /usr/local/iree_cuda_deps
 set -e
 
+ARCH="$(uname -m)"
+if [[ "${ARCH}" == "aarch64" ]]; then
+  echo "ERROR: Script does not support ${ARCH}."
+  exit 1
+fi
+
 TARGET_DIR="$1"
 if [ -z "$TARGET_DIR" ]; then
   echo "ERROR: Expected target directory (typically /usr/local/iree_cuda_deps for CI or $HOME/.iree_cuda_deps for local)"
@@ -38,7 +44,7 @@ DOWNLOAD_SCRIPT_PATH="$DOWNLOAD_DIR/parse_redist.py"
 # Parameters to the download script.
 # Look for an appropriate redistrib_*.json here to verify:
 #   https://developer.download.nvidia.com/compute/cuda/redist/
-VERSION="12.1.1"
+VERSION="12.2.1"
 PRODUCT="cuda"
 OS="linux"
 ARCH="x86_64"
@@ -79,6 +85,10 @@ for component in ${COMPONENTS[@]}; do
     --os "$OS" \
     --arch "$ARCH" \
     --component "$component"
+
+  # Each component comes with a LICENSE file that we need to be able to
+  # overwrite.
+  chmod +w "${SRC_DIR}/LICENSE"
 done
 
 if ! [ -d "$SRC_DIR" ]; then

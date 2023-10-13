@@ -21,13 +21,21 @@ on:
     - cron: "0 14 * * 1-5"
   workflow_dispatch:
 
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit). The workflow name is prepended to avoid conflicts between
+  # different workflows.
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
   build_all:
     needs: setup
-    if: fromJson(needs.setup.outputs.should-run)
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all')
     uses: ./.github/workflows/build_all.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -36,7 +44,7 @@ jobs:
 
   profile_cuda:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'profile_cuda')
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}

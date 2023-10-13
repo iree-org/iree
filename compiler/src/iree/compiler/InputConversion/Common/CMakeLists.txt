@@ -9,9 +9,6 @@ set(IREE_INPUT_DEPS "")
 if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
 endif()
-if(IREE_INPUT_TORCH)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
-endif()
 if(IREE_INPUT_TOSA)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
 endif()
@@ -54,7 +51,6 @@ iree_cc_library(
     "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"
     "SanitizeModuleNames.cpp"
-    "TopLevelSCFToCFG.cpp"
     "Utils.cpp"
   DEPS
     ::PassHeaders
@@ -101,6 +97,20 @@ iree_cc_library(
     MLIRPass
     MLIRTransforms
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    IREEImportPublicTest
+  SRCS
+    "IREEImportPublicTest.cpp"
+  DEPS
+    IREEInputDialect
+    MLIRIR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

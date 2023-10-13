@@ -38,8 +38,8 @@ void LLVMCPUTensorPadPass::runOnOperation() {
   auto funcOp = getOperation();
   // Preserve the innermost tensor.pad ops (i.e., pad for reduction dims), so we
   // can kick canonicalization patterns to fold outer tensor.pad ops away.
-  bool nofold;
-  utils::IteratorType targetIterType;
+  bool nofold = false;
+  utils::IteratorType targetIterType = utils::IteratorType::parallel;
   switch (option) {
   case LLVMCPUTensorPadOption::ParallelDims:
     LLVM_DEBUG(llvm::dbgs() << "padding parallel dims\n");
@@ -50,6 +50,9 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     LLVM_DEBUG(llvm::dbgs() << "padding reduction dims\n");
     targetIterType = utils::IteratorType::reduction;
     nofold = true;
+    break;
+  default: // Unreachable.
+    assert(false);
     break;
   };
   SmallVector<linalg::LinalgOp> candidates;
@@ -81,6 +84,12 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     OpBuilder builder(context);
     for (auto &operand : linalgOp->getOpOperands()) {
       auto elemType = getElementTypeOrSelf(operand.get().getType());
+      if (auto complexTy = elemType.dyn_cast<ComplexType>()) {
+        auto zeroAttr = builder.getZeroAttr(complexTy.getElementType());
+        paddingValueAttributes.push_back(
+            ArrayAttr::get(context, {zeroAttr, zeroAttr}));
+        continue;
+      }
       paddingValueAttributes.push_back(builder.getZeroAttr(elemType));
     }
 
@@ -90,10 +99,12 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     SmallVector<bool> noFold(linalgOp.getNumDpsInputs(), nofold);
     noFold.append(linalgOp.getNumDpsInits(), false);
 
-    auto options = linalg::LinalgPaddingOptions()
-                       .setPaddingDimensions(paddingDims)
-                       .setPaddingValues(paddingValueAttributes)
-                       .setPackPaddings(noFold);
+    auto options =
+        linalg::LinalgPaddingOptions()
+            .setPaddingDimensions(paddingDims)
+            .setPaddingValues(paddingValueAttributes)
+            .setPackPaddings(noFold)
+            .setCopyBackOp(linalg::LinalgPaddingOptions::CopyBackOp::None);
     FailureOr<linalg::LinalgOp> maybePaddedLinalgOp =
         linalg::padAndHoistLinalgOp(rewriter, linalgOp, options);
     if (failed(maybePaddedLinalgOp)) {

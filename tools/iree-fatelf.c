@@ -194,8 +194,9 @@ static iree_status_t fatelf_join(int argc, char** argv) {
       (fatelf_entry_t*)iree_alloca(entry_count * sizeof(fatelf_entry_t));
   memset(entries, 0, entry_count * sizeof(*entries));
   for (iree_elf64_byte_t i = 0; i < entry_count; ++i) {
-    IREE_RETURN_IF_ERROR(iree_file_read_contents(
-        argv[i], iree_allocator_system(), &entries[i].contents));
+    IREE_RETURN_IF_ERROR(
+        iree_file_read_contents(argv[i], IREE_FILE_READ_FLAG_DEFAULT,
+                                iree_allocator_system(), &entries[i].contents));
     entries[i].elf_data = entries[i].contents->const_buffer;
   }
 
@@ -327,8 +328,9 @@ static const char* fatelf_byte_order_id_str(iree_elf64_byte_t value) {
 // Splits a FatELF into multiple files, writing each beside the input file.
 static iree_status_t fatelf_split(int argc, char** argv) {
   iree_file_contents_t* fatelf_contents = NULL;
-  IREE_RETURN_IF_ERROR(iree_file_read_contents(argv[0], iree_allocator_system(),
-                                               &fatelf_contents));
+  IREE_RETURN_IF_ERROR(
+      iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
+                              iree_allocator_system(), &fatelf_contents));
   iree_fatelf_header_t* header = NULL;
   IREE_RETURN_IF_ERROR(fatelf_parse(fatelf_contents->const_buffer, &header));
 
@@ -374,8 +376,9 @@ static iree_status_t fatelf_split(int argc, char** argv) {
 static iree_status_t fatelf_select(int argc, char** argv) {
   IREE_SET_BINARY_MODE(stdout);  // ensure binary output mode
   iree_file_contents_t* fatelf_contents = NULL;
-  IREE_RETURN_IF_ERROR(iree_file_read_contents(argv[0], iree_allocator_system(),
-                                               &fatelf_contents));
+  IREE_RETURN_IF_ERROR(
+      iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
+                              iree_allocator_system(), &fatelf_contents));
   iree_const_byte_span_t elf_data = iree_const_byte_span_empty();
   IREE_RETURN_IF_ERROR(
       iree_fatelf_select(fatelf_contents->const_buffer, &elf_data));
@@ -409,8 +412,9 @@ static const char* fatelf_byte_order_enum_str(iree_elf64_byte_t value) {
 // Dumps the FatELF file records.
 static iree_status_t fatelf_dump(int argc, char** argv) {
   iree_file_contents_t* fatelf_contents = NULL;
-  IREE_RETURN_IF_ERROR(iree_file_read_contents(argv[0], iree_allocator_system(),
-                                               &fatelf_contents));
+  IREE_RETURN_IF_ERROR(
+      iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
+                              iree_allocator_system(), &fatelf_contents));
   iree_fatelf_header_t* header = NULL;
   IREE_RETURN_IF_ERROR(fatelf_parse(fatelf_contents->const_buffer, &header));
 

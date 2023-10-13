@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "AbstractGemmLikeStrategy.h"
     "Common.h"
+    "ConvolutionImplicitGemmStrategy.h"
     "CopyMapping.h"
     "MappingInfo.h"
     "MatmulTensorCoreStrategy.h"
@@ -26,6 +27,7 @@ iree_cc_library(
   SRCS
     "AbstractGemmLikeStrategy.cpp"
     "Common.cpp"
+    "ConvolutionImplicitGemmStrategy.cpp"
     "CopyMapping.cpp"
     "MappingInfo.cpp"
     "MatmulTensorCoreStrategy.cpp"

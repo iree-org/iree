@@ -116,7 +116,7 @@ serializeEmbeddedData(Location loc, Attribute valueAttr, uint64_t alignment,
 
   // Serialize the constant into the reserved memory.
   if (failed(value.serializeToBuffer(
-          llvm::support::endianness::little,
+          loc, llvm::support::endianness::little,
           ArrayRef<char>(reinterpret_cast<char *>(bytePtr),
                          static_cast<size_t>(totalSize))))) {
     mlir::emitError(loc) << "constant attribute failed to serialize: "
@@ -652,6 +652,7 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                                            actualSize >= kMaxEmbeddedDataSize);
 
     RodataRef rodataRef;
+    Location rodataLoc = rodataOp.getLoc();
     rodataRef.rodataOp = rodataOp;
     rodataRef.alignment =
         rodataOp.getAlignment().value_or(kDefaultRodataAlignment);
@@ -665,7 +666,7 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
           fileName, rodataRef.alignment, rodataRef.totalSize,
           [=](llvm::raw_ostream &os) {
             return rodataValue.serializeToStream(
-                llvm::support::endianness::little, os);
+                rodataLoc, llvm::support::endianness::little, os);
           });
     }
     rodataRefs[rodataOp.getOrdinal()->getLimitedValue()] = rodataRef;

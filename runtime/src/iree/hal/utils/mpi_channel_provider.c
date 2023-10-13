@@ -34,6 +34,14 @@ typedef struct iree_hal_mpi_channel_provider_t {
 
   iree_dynamic_library_t* library;
   iree_hal_mpi_dynamic_symbols_t symbols;
+
+  // MPI_Init and MPI_Finalize must be called exactly once in an application.
+  // It may be the case that the user of IREE has already initialized MPI.
+  // Deciding if we are owners of the context based on whether MPI is already
+  // initialized or not is not ideal since other parts of the user's application
+  // that use MPI will depend on the channel provider lifespan.
+  // It may be better to let the user be the owner of MPI's context.
+  bool is_mpi_context_owner;
 } iree_hal_mpi_channel_provider_t;
 
 static const iree_hal_channel_provider_vtable_t
@@ -66,11 +74,22 @@ IREE_API_EXPORT iree_status_t iree_hal_mpi_channel_provider_create(
       host_allocator, &channel_provider->library, &channel_provider->symbols);
 
   // If the library successfully loaded then try to initialize MPI.
+  int is_mpi_initialized_already;
   if (iree_status_is_ok(status)) {
-    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "MPI_Init");
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "MPI_Initialized");
     status = MPI_RESULT_TO_STATUS(&channel_provider->symbols,
-                                  MPI_Init(NULL, NULL), "MPI_Init");
+                                  MPI_Initialized(&is_mpi_initialized_already),
+                                  "MPI_Initialized");
     IREE_TRACE_ZONE_END(z1);
+  }
+  if (iree_status_is_ok(status)) {
+    if (!is_mpi_initialized_already) {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z2, "MPI_Init");
+      status = MPI_RESULT_TO_STATUS(&channel_provider->symbols,
+                                    MPI_Init(NULL, NULL), "MPI_Init");
+      IREE_TRACE_ZONE_END(z2);
+    }
+    channel_provider->is_mpi_context_owner = !is_mpi_initialized_already;
   }
 
   if (iree_status_is_ok(status)) {
@@ -101,7 +120,8 @@ static void iree_hal_mpi_channel_provider_destroy(
 
   // We must finalize MPI before unloading the library.
   // NOTE: once finalized MPI can never be used in the process again!
-  if (iree_hal_mpi_channel_provider_is_initialized(channel_provider)) {
+  if (channel_provider->is_mpi_context_owner &&
+      iree_hal_mpi_channel_provider_is_initialized(channel_provider)) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "MPI_Finalize");
     MPI_IGNORE_ERROR(&channel_provider->symbols, MPI_Finalize());
     IREE_TRACE_ZONE_END(z1);

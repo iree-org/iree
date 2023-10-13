@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -69,6 +71,7 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
@@ -96,6 +99,17 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       }
     }
     {
+      // Convert arith::maximumf/minimumf ops on AMD gpus since the lowering
+      // is faulty for them.
+      // TODO: Remove this once the lowering in LLVM is fixed
+      // (https://github.com/llvm/llvm-project/issues/67815).
+      RewritePatternSet patterns(&getContext());
+      populateReplaceSlowMinMaxOpsPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+    {
       RewritePatternSet llvmPatterns(&getContext());
       populateLowerHALInterfaceOp(llvmPatterns);
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
@@ -112,14 +126,10 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
-      target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
-        if (isEntryPoint(funcOp))
-          return false;
-        return true;
-      });
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
         signalPassFailure();
     }
+    ConvertToDynamicSharedMemory(m);
   }
 };
 

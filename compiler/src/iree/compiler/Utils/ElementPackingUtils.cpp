@@ -15,17 +15,17 @@
 namespace mlir {
 namespace iree_compiler {
 
-bool needToPackSubByteElementBitWidth(unsigned bitwidth) {
-  // Require the original bitwidth to be some power of two for now to avoid
+bool needToPackSubByteElementBitWidth(unsigned bitWidth) {
+  // Require the original bit width to be some power of two for now to avoid
   // trickiness and weirdness of packing and cross-byte access.
   // Also disallow boolean values for now--they may require separate interface
   // choices.
-  return bitwidth < 8 && llvm::isPowerOf2_32(bitwidth) && bitwidth != 1;
+  return bitWidth < 8 && llvm::isPowerOf2_32(bitWidth) && bitWidth != 1;
 }
 
 bool needToPackSubByteElements(RankedTensorType shapedType) {
-  unsigned bitwidth = IREE::Util::getTypeBitWidth(shapedType.getElementType());
-  return needToPackSubByteElementBitWidth(bitwidth);
+  unsigned bitWidth = IREE::Util::getTypeBitWidth(shapedType.getElementType());
+  return needToPackSubByteElementBitWidth(bitWidth);
 }
 
 Type legalizeStorageElementType(Type elementType) {
@@ -39,7 +39,7 @@ Type legalizeStorageElementType(Type elementType) {
   if (needToPackSubByteElementBitWidth(bitWidth))
     return elementType;
 
-  // Otherwise, extend them to the next power-of-two bitwidth.
+  // Otherwise, extend them to the next power-of-two bit width.
   unsigned alignedBitWidth =
       IREE::Util::getRoundedElementByteWidth(intType) * 8;
   if (alignedBitWidth == bitWidth)
@@ -78,7 +78,7 @@ Value calculateStorageElementCountInBytes(Location loc,
     unsigned byteElements = 8 / elementBits;
     // Perform some basic sanity check to make sure the total count is byte
     // aligned for fully static shapes.
-    if (dynamicDims.empty() && staticCount * byteElements % 8 != 0) {
+    if (dynamicDims.empty() && (staticCount * elementBits) % 8 != 0) {
       return nullptr;
     }
     auto divisor = builder.create<arith::ConstantIndexOp>(loc, byteElements);

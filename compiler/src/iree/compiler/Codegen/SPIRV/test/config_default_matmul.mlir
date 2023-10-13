@@ -44,14 +44,14 @@ hal.executable @batch_matmul_1x3x32 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 32], [0, 1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
-//      CHECK: hal.executable.export public @batch_matmul_1x3x32
-// CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
-//      CHECK: func.func @batch_matmul_1x3x32()
-//      CHECK:   linalg.batch_matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 32], [0, 1, 1]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
+// CHECK-LABEL: hal.executable.export public @batch_matmul_1x3x32
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
+//       CHECK: func.func @batch_matmul_1x3x32()
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
 
 // -----
 
@@ -98,18 +98,18 @@ hal.executable private @matmul_64x16xi8 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 16], [2, 8], [0, 0, 8]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
-//      CHECK: hal.executable.export public @matmul_64x16xi8
-// CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
-//      CHECK: func.func @matmul_64x16xi8()
-//      CHECK:   linalg.matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 16], [2, 8], [0, 0, 8]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
+// CHECK-LABEL: hal.executable.export public @matmul_64x16xi8
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
+//       CHECK: func.func @matmul_64x16xi8()
+//       CHECK:   linalg.matmul
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
 
 // -----
 
-// Non-16 / non-32 bit types cannot be vectorized right now.
+// Vectorize non-32 bit types.
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -142,7 +142,7 @@ hal.executable private @matmul_64x16xi64 {
             : !flow.dispatch.tensor<readonly:tensor<32x16xi64>> -> tensor<32x16xi64>
         %15 = tensor.empty() : tensor<64x16xi64>
         %16 = linalg.fill ins(%c0_i32 : i32) outs(%15 : tensor<64x16xi64>) -> tensor<64x16xi64>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<64x32xi64>, tensor<32x16xi64>) outs(%16 : tensor<64x16xi64>) -> tensor<64x16xi64>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [64, 16], strides = [1, 1]
             : tensor<64x16xi64> -> !flow.dispatch.tensor<writeonly:tensor<64x16xi64>>
@@ -152,14 +152,14 @@ hal.executable private @matmul_64x16xi64 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 16], [1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
-//      CHECK: hal.executable.export public @matmul_64x16xi64
-// CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [16 : index, 4 : index, 1 : index]
-//      CHECK: func.func @matmul_64x16xi64()
-//      CHECK:   linalg.matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16], [1, 4], [0, 0, 4]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
+// CHECK-LABEL: hal.executable.export public @matmul_64x16xi64
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [4 : index, 16 : index, 1 : index]
+//       CHECK: func.func @matmul_64x16xi64()
+//       CHECK:   linalg.matmul
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
 
 // -----
 
@@ -217,14 +217,14 @@ hal.executable @matmul_400x273 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 32], [1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
-//      CHECK: hal.executable.export public @matmul_400x273
-// CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
-//      CHECK: func.func @matmul_400x273()
-//      CHECK:   linalg.matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 32], [1, 1]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
+// CHECK-LABEL: hal.executable.export public @matmul_400x273
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
+//       CHECK: func.func @matmul_400x273()
+//       CHECK:   linalg.matmul
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
 
 // -----
 
@@ -283,14 +283,14 @@ hal.executable @matmul_25x546 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 2], [1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
-//      CHECK: hal.executable.export public @matmul_25x546
-// CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
-//      CHECK: func.func @matmul_25x546()
-//      CHECK:   linalg.matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 2], [1, 1]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
+// CHECK-LABEL: hal.executable.export public @matmul_25x546
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
+//       CHECK: func.func @matmul_25x546()
+//       CHECK:   linalg.matmul
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]
 
 // -----
 
@@ -359,11 +359,11 @@ hal.executable private @matmul_pointwise_256x1024 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 256], [8, 8], [0, 0, 8]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
-//      CHECK: hal.executable.export public @matmul_pointwise_256x1024
-// CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
-//      CHECK: func.func @matmul_pointwise_256x1024()
-//      CHECK:   linalg.matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 256], [8, 8], [0, 0, 8]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
+// CHECK-LABEL: hal.executable.export public @matmul_pointwise_256x1024
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
+//       CHECK: func.func @matmul_pointwise_256x1024()
+//       CHECK:   linalg.matmul
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]

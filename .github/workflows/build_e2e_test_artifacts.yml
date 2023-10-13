@@ -39,6 +39,14 @@ on:
           if set to 1.
         default: 1
         type: number
+      shard-count:
+        description: |
+          A device-name to integer mapping as a comma separated list.
+          Allows to assign a distinct shard count for each target device.
+          The reserved keyword `default` assigns a shard count to all target devices
+          that are not explicitly listed.
+        default: default=1
+        type: string
     outputs:
       e2e-test-artifacts-dir:
         description: |
@@ -97,12 +105,13 @@ jobs:
           IREE_BENCHMARK_PRESETS: ${{ inputs.benchmark-presets }}
           IREE_BUILD_DEFAULT_BENCHMARK_SUITES: ${{ inputs.build-default-benchmark-suites }}
           BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
+          IREE_SHARD_COUNT: ${{ inputs.shard-count }}
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
             --env "IREE_BENCHMARK_PRESETS=${IREE_BENCHMARK_PRESETS}" \
             --env "IREE_BUILD_DEFAULT_BENCHMARK_SUITES=${IREE_BUILD_DEFAULT_BENCHMARK_SUITES}" \
-            gcr.io/iree-oss/frontends@sha256:77e02052d174522778a4fd1a763f714efbae92370bf9f9079a91875a4b1b5e27 \
+            gcr.io/iree-oss/frontends@sha256:7ecfdda9ef9f64cfa12b1ed203992abab8057ba350ec8c2b7bf63d7dd8f160fc \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"

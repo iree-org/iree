@@ -57,6 +57,7 @@ iree_cc_library(
     "DotGeneralToDot.cpp"
     "EinsumToDotGeneral.cpp"
     "FlattenTuplesInCFG.cpp"
+    "FlattenTuplesInSCF.cpp"
     "GatherToTorchIndexSelect.cpp"
     "LowerComplex.cpp"
     "Passes.cpp"
@@ -73,6 +74,7 @@ iree_cc_library(
     MLIRIR
     MLIRMathDialect
     MLIRPass
+    MLIRSCFDialect
     MLIRShapeDialect
     MLIRSparseTensorDialect
     MLIRSupport

@@ -5,7 +5,7 @@
 // `transform.iree.populate_workgroup_count_region_using_num_threads_slice`
 
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 
 // Check that num_threads (32) is reflected in the map.
@@ -52,8 +52,8 @@ transform.sequence failures(propagate) {
   %original_matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
     : (!transform.any_op) -> !transform.any_op
 
-  %forall, %matmul =
-    transform.structured.tile_to_forall_op %original_matmul num_threads [32]
+  %matmul, %forall =
+    transform.structured.tile_using_forall %original_matmul num_threads [32]
       ( mapping = [#gpu.block<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
@@ -65,7 +65,7 @@ transform.sequence failures(propagate) {
 
 // -----
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 
 hal.executable private @matmul_static_dispatch_0 {
@@ -113,13 +113,13 @@ hal.executable private @matmul_static_dispatch_0 {
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !transform.any_op):
   %1 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %forall_op, %tiled_op = transform.structured.tile_to_forall_op %1   num_threads [] tile_sizes [1, 1, 1](mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>]): (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_op, %forall_op = transform.structured.tile_using_forall %1   num_threads [] tile_sizes [1, 1, 1](mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>]): (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_op : (!transform.any_op) -> ()
 }
 
 // -----
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable private @matmul_static_dispatch_0 {
@@ -163,6 +163,6 @@ hal.executable private @matmul_static_dispatch_0 {
 transform.sequence failures(propagate) {
 ^bb1(%variant_op: !transform.any_op):
   %1 = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %forall_op, %tiled_op = transform.structured.tile_to_forall_op %1   num_threads [] tile_sizes [5, 3](mapping = [#gpu.block<z>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_op, %forall_op = transform.structured.tile_using_forall %1   num_threads [] tile_sizes [5, 3](mapping = [#gpu.block<z>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_op : (!transform.any_op) -> ()
 }

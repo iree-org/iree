@@ -306,6 +306,8 @@ enum {
 
 #if !(IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING)
 
+static void* iree_tracing_obscure_ptr(void* ptr) { return ptr; }
+
 // Traces a new memory allocation with host |ptr| and the given |size|.
 // A balanced IREE_TRACE_FREE on the same |ptr| is required for proper memory
 // tracking. Allocations will be attributed to their parent zone.

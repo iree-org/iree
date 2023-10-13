@@ -30,6 +30,7 @@ public:
 
     auto originalType = op.getResult().getType();
     auto targetType = typeConverter->convertType(originalType);
+    auto targetBitwidth = IREE::Util::getTypeBitWidth(targetType);
     int32_t validByteWidth =
         IREE::Util::getRoundedElementByteWidth(originalType);
 
@@ -65,8 +66,7 @@ public:
       auto hi = rewriter.create<arith::ShLIOp>(
           op.getLoc(),
           rewriter.create<arith::ExtUIOp>(
-              op.getLoc(),
-              rewriter.getIntegerType(targetType.getIntOrFloatBitWidth()),
+              op.getLoc(), rewriter.getIntegerType(targetBitwidth),
               hiCallOp.getResult(0)),
           rewriter.create<arith::ConstantIntOp>(op.getLoc(), 32, 32));
 
@@ -75,8 +75,7 @@ public:
           ArrayRef<Value>{adaptor.getSourceBuffer(), sourceOffset,
                           halfByteWidth});
       auto lo = rewriter.create<arith::ExtUIOp>(
-          op.getLoc(),
-          rewriter.getIntegerType(targetType.getIntOrFloatBitWidth()),
+          op.getLoc(), rewriter.getIntegerType(targetBitwidth),
           loCallOp.getResult(0));
 
       value = rewriter.create<arith::OrIOp>(op.getLoc(), lo, hi);

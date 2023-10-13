@@ -20,10 +20,12 @@
   IN THE SOFTWARE.
 -->
 
-<!-- Determine base classes -->
+<!-- Determine classes -->
 {% set class = "md-header" %}
 {% if "navigation.tabs.sticky" in features %}
-  {% set class = class ~ " md-header--lifted" %}
+  {% set class = class ~ " md-header--shadow md-header--lifted" %}
+{% elif "navigation.tabs" not in features %}
+  {% set class = class ~ " md-header--shadow" %}
 {% endif %}
 
 <!-- Header -->
@@ -52,14 +54,15 @@
       aria-label="{{ config.site_name }}"
       data-md-component="logo"
     >
-      <div class="md-header__title">
-        {{ config.site_name }}
-      </div>
+    <div class="md-header__title">
+      {{ config.site_name }}
+    </div>
     </a>
 
     <!-- Button to open drawer -->
     <label class="md-header__button md-icon" for="__drawer">
-      {% include ".icons/material/menu" ~ ".svg" %}
+      {% set icon = config.theme.icon.menu or "material/menu" %}
+      {% include ".icons/" ~ icon ~ ".svg" %}
     </label>
 
     <!-- Header title -->
@@ -78,37 +81,41 @@
     </div>
 
     <!-- Color palette -->
-    {% if not config.theme.palette is mapping %}
-      <form class="md-header__option" data-md-component="palette">
-        {% for option in config.theme.palette %}
-          {% set scheme = option.scheme | d("default", true) %}
-          <input
-            class="md-option"
-            data-md-color-media="{{ option.media }}"
-            data-md-color-scheme="{{ scheme | replace(' ', '-') }}"
-            data-md-color-primary="{{ option.primary | replace(' ', '-') }}"
-            data-md-color-accent="{{ option.accent | replace(' ', '-') }}"
+    {% if config.theme.palette %}
+      {% if not config.theme.palette is mapping %}
+        <form class="md-header__option" data-md-component="palette">
+          {% for option in config.theme.palette %}
+            {% set scheme  = option.scheme  | d("default", true) %}
+            {% set primary = option.primary | d("indigo", true) %}
+            {% set accent  = option.accent  | d("indigo", true) %}
+            <input
+              class="md-option"
+              data-md-color-media="{{ option.media }}"
+              data-md-color-scheme="{{ scheme | replace(' ', '-') }}"
+              data-md-color-primary="{{ primary | replace(' ', '-') }}"
+              data-md-color-accent="{{ accent | replace(' ', '-') }}"
+              {% if option.toggle %}
+                aria-label="{{ option.toggle.name }}"
+              {% else  %}
+                aria-hidden="true"
+              {% endif %}
+              type="radio"
+              name="__palette"
+              id="__palette_{{ loop.index }}"
+            />
             {% if option.toggle %}
-              aria-label="{{ option.toggle.name }}"
-            {% else  %}
-              aria-hidden="true"
+              <label
+                class="md-header__button md-icon"
+                title="{{ option.toggle.name }}"
+                for="__palette_{{ loop.index0 or loop.length }}"
+                hidden
+              >
+                {% include ".icons/" ~ option.toggle.icon ~ ".svg" %}
+              </label>
             {% endif %}
-            type="radio"
-            name="__palette"
-            id="__palette_{{ loop.index }}"
-          />
-          {% if option.toggle %}
-            <label
-              class="md-header__button md-icon"
-              title="{{ option.toggle.name }}"
-              for="__palette_{{ loop.index0 or loop.length }}"
-              hidden
-            >
-              {% include ".icons/" ~ option.toggle.icon ~ ".svg" %}
-            </label>
-          {% endif %}
-        {% endfor %}
-      </form>
+          {% endfor %}
+        </form>
+      {% endif %}
     {% endif %}
 
     <!-- Site language selector -->
@@ -144,7 +151,8 @@
     <!-- Button to open search modal -->
     {% if "material/search" in config.plugins %}
       <label class="md-header__button md-icon" for="__search">
-        {% include ".icons/material/magnify.svg" %}
+        {% set icon = config.theme.icon.search or "material/magnify" %}
+        {% include ".icons/" ~ icon ~ ".svg" %}
       </label>
 
       <!-- Search interface -->

@@ -34,7 +34,7 @@ createWindowsLinkerTool(const llvm::Triple &targetTriple,
 std::unique_ptr<LinkerTool>
 LinkerTool::getForTarget(const llvm::Triple &targetTriple,
                          LLVMTargetOptions &targetOptions) {
-  if (targetOptions.linkEmbedded) {
+  if (targetOptions.target.getLinkEmbedded()) {
     return createEmbeddedLinkerTool(targetTriple, targetOptions);
   } else if (targetTriple.isAndroid()) {
     return createAndroidLinkerTool(targetTriple, targetOptions);

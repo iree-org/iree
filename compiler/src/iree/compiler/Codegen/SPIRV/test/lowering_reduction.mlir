@@ -1,9 +1,11 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-spirv-lower-executable-target-pass)))' \
+// RUN:   %s | FileCheck %s
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
     [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, Unknown:Unknown,
-    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32, cooperative_matrix_properties_nv = []>>}>
+    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32, cooperative_matrix_properties_khr = []>>}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
@@ -214,33 +216,9 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
-      %3 = tensor.empty() : tensor<12x128xf32>
-      %4 = tensor.empty() : tensor<12x128x40960xf32>
-      %5 = linalg.fill ins(%cst : f32) outs(%3 : tensor<12x128xf32>) -> tensor<12x128xf32>
-      %6 = linalg.fill ins(%cst_0 : f32) outs(%3 : tensor<12x128xf32>) -> tensor<12x128xf32>
-      %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<12x128x40960xf32>) outs(%5 : tensor<12x128xf32>) {
-      ^bb0(%in: f32, %out: f32):
-        %11 = arith.maxf %in, %out : f32
-        linalg.yield %11 : f32
-      } -> tensor<12x128xf32>
-      %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%2, %7 : tensor<12x128x40960xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x40960xf32>) {
-      ^bb0(%in: f32, %in_2: f32, %out: f32):
-        %11 = arith.subf %in, %in_2 : f32
-        %12 = math.exp %11 : f32
-        linalg.yield %12 : f32
-      } -> tensor<12x128x40960xf32>
-      %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%8 : tensor<12x128x40960xf32>) outs(%6 : tensor<12x128xf32>) {
-      ^bb0(%in: f32, %out: f32):
-        %11 = arith.addf %in, %out : f32
-        linalg.yield %11 : f32
-      } -> tensor<12x128xf32>
-      %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%8, %9 : tensor<12x128x40960xf32>, tensor<12x128xf32>) outs(%4 : tensor<12x128x40960xf32>) {
-      ^bb0(%in: f32, %in_2: f32, %out: f32):
-        %11 = arith.divf %cst_1, %in_2 : f32
-        %12 = arith.mulf %in, %11 : f32
-        linalg.yield %12 : f32
-      } -> tensor<12x128x40960xf32>
-      flow.dispatch.tensor.store %10, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+      %3 = tensor.empty() : tensor<12x128x40960xf32>
+      %4 = linalg.softmax dimension(2) ins(%2 : tensor<12x128x40960xf32>) outs(%3 : tensor<12x128x40960xf32>) -> tensor<12x128x40960xf32>
+      flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       return
     }
   }
@@ -250,19 +228,19 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
 //   CHECK-LABEL:  func.func @softmax
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32{{.+}}>, vector<4xf32>
-//         CHECK:      arith.maxf {{.*}} : vector<4xf32>
+//         CHECK:      arith.maximumf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <maxf>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    vector.reduction <maximumf>, %{{.*}} : vector<4xf32> into f32
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    arith.remui
 //         CHECK:    scf.if
 //         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
@@ -271,16 +249,16 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
 //         CHECK:    arith.minui
 //         CHECK:    memref.load
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
+//         CHECK:    arith.maximumf
 //         CHECK:    vector.splat %{{.*}} : vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read
@@ -317,12 +295,11 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
 //         CHECK:    arith.addf
 //         CHECK:    vector.splat
 //         CHECK:    vector.splat
-//         CHECK:    arith.divf
 //         CHECK:    scf.for
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf
 //         CHECK:      math.exp
-//         CHECK:      arith.mulf
+//         CHECK:      arith.divf
 //         CHECK:      vector.transfer_write
 //         CHECK:    }
 //         CHECK:    return

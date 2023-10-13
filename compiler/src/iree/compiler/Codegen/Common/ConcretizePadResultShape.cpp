@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
@@ -168,9 +169,6 @@ void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
   // Pulling in upstream scf.for and affine.min canonicalization patterns.
   // They work on tiled (but not distributed) loops.
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-  // Pulling in IREE scf.for and affine.min canonicalization patterns.
-  // They work on tiled and distributed loops.
-  populateFoldAffineMinInDistributedLoopsPatterns(patterns, numWorkgroups);
   // Pulling in flow.dispatch.tensor.load op canonicalization patterns.
   // Tiling can generate dim ops taking them as operands.
   IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,

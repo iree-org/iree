@@ -60,6 +60,12 @@ no-alt-text: false
 # (we use this for date/author in blog posts)
 first-line-heading: false
 
+# Allow "invalid" link fragments, since markdownlint does not skip over icons
+# For example, this triggers a lint error when it works just fine:
+#     See the [Python](#python) section for details.
+#     ### :simple-python: Python
+link-fragments: false
+
 # Link style:
 #   Markdown links can normally provide link destinations elsewhere and
 #   simply reference those destinations by a label, e.g.

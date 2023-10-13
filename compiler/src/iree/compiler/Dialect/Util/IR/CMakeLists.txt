@@ -63,11 +63,13 @@ iree_cc_library(
     ::UtilOpsGen
     ::UtilTypesGen
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRCastInterfaces
     MLIRControlFlowDialect
     MLIRControlFlowInterfaces
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRMemRefDialect

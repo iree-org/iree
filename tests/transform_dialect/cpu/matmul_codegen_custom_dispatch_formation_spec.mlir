@@ -4,8 +4,8 @@ transform.sequence failures(propagate) {
 ^bb1(%variant_op: !transform.any_op):
   %0 = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
 
-  %forall, %tiled_generic =
-    transform.structured.tile_to_forall_op %0 num_threads [2] 
+  %tiled_generic, %forall =
+    transform.structured.tile_using_forall %0 num_threads [2] 
     // TODO: IREE needs own workgroup mapping attribute.
     ( mapping = [#gpu.block<x>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -26,7 +26,6 @@ transform.sequence failures(propagate) {
   %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> (!transform.any_op)
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 
     : (!transform.any_op) -> !transform.any_op
-  transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!transform.any_op) -> ()
   transform.iree.forall_to_workgroup %memref_func : (!transform.any_op) -> ()
 
   // CSE is needed on the workgroup_count region to pass this particular test.

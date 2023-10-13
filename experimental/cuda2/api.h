@@ -59,6 +59,13 @@ typedef struct iree_hal_cuda2_device_params_t {
   // transient allocations while also increasing memory consumption.
   iree_host_size_t arena_block_size;
 
+  // The host and device event pool capacity.
+  // The CUDA driver implements semaphore with host and device events. This
+  // parameter controls the size of those pools. Larger values would make
+  // creating semaphore values quicker, though with increased memory
+  // consumption.
+  iree_host_size_t event_pool_capacity;
+
   // Enables tracing of command buffers when IREE tracing is enabled.
   // May take advantage of additional extensions for more accurate timing or
   // hardware-specific performance counters.

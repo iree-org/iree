@@ -17,7 +17,6 @@ iree_runtime_cc_library(
     hdrs = [
         "webgpu.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",

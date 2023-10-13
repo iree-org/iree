@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_HAL_TARGET_TARGETBACKEND_H_
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -134,9 +135,20 @@ public:
   // Types, Attributes).
   virtual void getDependentDialects(DialectRegistry &registry) const {}
 
-  // Returns the default device this backend targets.
+  // Returns the default device this backend targets. This may involve setting
+  // defaults from flags and other environmental sources, and it may be
+  // cross-targeting in a way that is not compatible with the host.
   virtual IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context) const = 0;
+
+  // Similar to getDefaultDeviceTarget, but always returns a DeviceTargetAttr
+  // that is configured for the host, regardless of if flags/environment were
+  // configured to cross-target in some way.
+  //
+  virtual std::optional<IREE::HAL::DeviceTargetAttr>
+  getHostDeviceTarget(MLIRContext *context) const {
+    return {};
+  }
 
   // Inserts passes used to translate the `hal.executable.variant` op contents.
   // The pass manager will be nested on `hal.executable` such that the pipeline

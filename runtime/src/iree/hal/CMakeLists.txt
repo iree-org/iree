@@ -50,6 +50,8 @@ iree_cc_library(
     "executable_cache.h"
     "fence.c"
     "fence.h"
+    "file.c"
+    "file.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
     "resource.h"
@@ -62,6 +64,7 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::path
     iree::base::internal::synchronization
+    iree::io::file_handle
   PUBLIC
 )
 

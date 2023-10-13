@@ -64,6 +64,7 @@ def main(args):
         branch_name,
         checkout=True,
         ref=f"{args.upstream_remote}/main",
+        remote=f"{args.upstream_remote}",
         force=args.reuse_branch,
     )
 
@@ -74,7 +75,7 @@ def main(args):
     # and you will find out.
     iree_utils.git_submodule_set_origin(
         "third_party/llvm-project",
-        url="https://github.com/iree-org/iree-llvm-fork.git",
+        url="https://github.com/shark-infra/llvm-project.git",
         branch="--default",
     )
 

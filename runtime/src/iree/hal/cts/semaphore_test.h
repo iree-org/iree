@@ -230,6 +230,9 @@ TEST_P(semaphore_test, PingPong) {
   iree_hal_semaphore_release(b2a);
 }
 
+// TODO: test waiting the same value multiple times.
+// TODO: test waiting for a finite amount of time.
+
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree

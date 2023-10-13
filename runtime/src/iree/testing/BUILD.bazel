@@ -58,6 +58,7 @@ iree_runtime_cc_library(
     tags = ["keep_dep"],
     deps = [
         ":gtest",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "@com_google_googletest//:gtest",
     ],

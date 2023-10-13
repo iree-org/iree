@@ -72,7 +72,6 @@ EXPLICIT_EXPORTS = [
     "mlirRegisterLinalgPasses",
     "mlirGetDialectHandle__iree_input__",
     "mlirGetDialectHandle__iree_linalg_ext__",
-    "mlirGetDialectHandle__iree_linalg_transform__",
     "mlirGetDialectHandle__transform__",
 ]
 

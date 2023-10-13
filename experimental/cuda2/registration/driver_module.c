@@ -14,11 +14,11 @@
 #include "iree/base/internal/flags.h"
 
 IREE_FLAG(
-    bool, cuda_async_allocations, true,
+    bool, cuda2_async_allocations, true,
     "Enables CUDA asynchronous stream-ordered allocations when supported.");
 
 IREE_FLAG(
-    bool, cuda_tracing, true,
+    bool, cuda2_tracing, true,
     "Enables tracing of stream events when Tracy instrumentation is enabled.\n"
     "Severely impacts benchmark timings and should only be used when\n"
     "analyzing dispatch timings.");
@@ -90,8 +90,8 @@ static iree_status_t iree_hal_cuda2_driver_factory_try_create(
 
   iree_hal_cuda2_device_params_t device_params;
   iree_hal_cuda2_device_params_initialize(&device_params);
-  device_params.stream_tracing = FLAG_cuda_tracing;
-  device_params.async_allocations = FLAG_cuda_async_allocations;
+  device_params.stream_tracing = FLAG_cuda2_tracing;
+  device_params.async_allocations = FLAG_cuda2_async_allocations;
 
   driver_options.default_device_index = FLAG_cuda2_default_index;
   if (FLAG_cuda2_default_index_from_mpi) {

@@ -99,9 +99,9 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   ArrayRef<int64_t> rhsShape =
       llvm::cast<ShapedType>(op->getOperand(1).getType()).getShape();
 
-  if (loweringConfig.getTileSizes().size() != 1) {
+  if (loweringConfig.getTilingLevels().size() != 1) {
     return op->emitOpError("expected 1 levels of tiling sizes, got ")
-           << loweringConfig.getTileSizes().size();
+           << loweringConfig.getTilingLevels().size();
   }
 
   SmallVector<int64_t> tileSizes =
@@ -200,9 +200,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   }
 
   // Verify that there are four level of tile sizes.
-  if (loweringConfig.getTileSizes().size() != 4) {
+  if (loweringConfig.getTilingLevels().size() != 4) {
     return op->emitOpError("expected 4 levels of tiling sizes, got ")
-           << loweringConfig.getTileSizes().size();
+           << loweringConfig.getTilingLevels().size();
   }
 
   ArrayRef<int64_t> lhsShape =
@@ -237,8 +237,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   Type rhsType = getElementType(op->getOperand(1));
   Type resultType = getElementType(op->getOperand(2));
 
-  auto properties = limits.getCooperativeMatrixPropertiesNv()
-                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  auto properties =
+      limits.getCooperativeMatrixPropertiesKhr()
+          .getAsRange<spirv::CooperativeMatrixPropertiesKHRAttr>();
 
   // Verify that the fourth level tile sizes match cooperative matrix,
   // and subgroup tile sizes should be multiple of cooperative matrix (M, N, K)
@@ -311,7 +312,7 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
     return success();
   }
 
-  const int numTileSizeLevels = loweringConfig.getTileSizes().size();
+  const int numTileSizeLevels = loweringConfig.getTilingLevels().size();
   SmallVector<int64_t> workgroupTileSizes =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
   SmallVector<int64_t> threadTileSizes =

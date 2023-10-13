@@ -89,13 +89,13 @@ def MapNestedForallToGpuThreadsOp :
 
   let arguments = (ins TransformHandleTypeInterface:$target,
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims,
-                   DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$warp_dims);
+                   DefaultValuedOptionalAttr<I64Attr, "32">:$subgroup_size);
   let results = (outs);
 
   let assemblyFormat = [{
     $target
     `workgroup_dims` `=` $workgroup_dims
-    (`warp_dims` `=` $warp_dims^)?
+    (`subgroup_size` `=` $subgroup_size^)?
     attr-dict
     `:` functional-type($target, results)
   }];
@@ -325,7 +325,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
+        ::mlir::func::FuncOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -643,6 +643,40 @@ def EliminateGpuBarriersOp :
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::func::FuncOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_alloc",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Pack shared memory allocation to reduce memory usage";
+  let description = [{
+    Looks for allocs in shared memory space with overlapping liveness and
+    groups them, then packs all the allocations in each group into one i8
+    alloc. Also adds barriers to make sure we are done writing/reading
+    from the previous alias group before starting a new one.
+
+    #### Return modes
+
+    It does not consume the target handle and always return success.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target
+  );
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::func::FuncOp funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];

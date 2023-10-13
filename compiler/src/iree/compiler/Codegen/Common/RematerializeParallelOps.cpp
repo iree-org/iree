@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-rematerialize-parallel-ops"
@@ -25,15 +25,15 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
   return t.isIntOrIndexOrFloat();
 }
 
-/// Merge elementwise operations into their consumers.
-struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
+/// Rematerialize all parallel elementwise operations into its users within a
+/// `flow.dispatch.region`.
+struct RematerializeParallelOpsPattern
+    : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    // Avoid doing this for scalar operations. This is a temporary solution
-    // to address #14258. Ideally we should apply this pass more prescriptively
-    // instead of default always.
+    // Avoid doing this for scalar operations.
     auto isScalarValue = [](Value v) {
       return isScalarOrTensorOfSizeOne(v.getType());
     };
@@ -50,12 +50,11 @@ struct MergeElementwiseOps : public OpRewritePattern<linalg::GenericOp> {
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, &opOperand);
       if (succeeded(fusionResult)) {
-        // Forward lowering config.
-        if (auto loweringAttr = getLoweringConfig(genericOp)) {
-          setLoweringConfig(fusionResult->fusedOp, loweringAttr);
-        }
         auto replacements = fusionResult->fusedOp->getResults().take_back(
             genericOp.getNumResults());
+        // Copy over any non native attributes for the operation.
+        auto prunedAttributeList = linalg::getPrunedAttributeList(genericOp);
+        fusionResult->fusedOp->setAttrs(prunedAttributeList);
         rewriter.replaceOp(genericOp, replacements);
         return success();
       }
@@ -69,7 +68,7 @@ struct RematerializeParallelOpsPass
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
-    fusionPatterns.insert<MergeElementwiseOps>(funcOp.getContext());
+    fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(fusionPatterns)))) {

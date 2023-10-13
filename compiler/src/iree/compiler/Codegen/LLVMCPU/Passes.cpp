@@ -5,17 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -47,6 +44,12 @@ static llvm::cl::opt<bool> clCheckLinalgVectorization(
         "Runs the pass to check if all the Linalg ops are vectorized"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clUseFastMinMaxOps(
+    "iree-llvmcpu-use-fast-min-max-ops",
+    llvm::cl::desc(
+        "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
+    llvm::cl::init(false));
+
 // TODO(#10820): Delete the flag. This should be a nop pass to default pipeline
 // while tensor.pad op is lowered to fill + insert_slice before Codegen.
 // However, it causes regressions in terms of compilation time. Skip the passes
@@ -65,7 +68,17 @@ static llvm::cl::opt<bool> clEnableMicrokernelsDecomposeLinalgGeneric(
 static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     "iree-llvmcpu-reassociate-fp-reductions",
     llvm::cl::desc("Enables reassociation for FP reductions"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
+
+static llvm::cl::opt<bool> clSkipIntermediateRoundings(
+    "iree-llvmcpu-skip-intermediate-roundings",
+    llvm::cl::desc(
+        "Allow skipping intermediate roundings. For example, in f16 matmul "
+        "kernels on targets with only f32 arithmetic, we have to perform each "
+        "multiply-accumulate in f32, and if this flag is false, then we have "
+        "to round those f32 accumulators to the nearest f16 every time, which "
+        "is slow."),
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
     "iree-llvmcpu-instrument-memory-accesses",
@@ -105,11 +118,6 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
-static LogicalResult cpuDeallocationFn(OpBuilder &builder, Location loc,
-                                       Value allocation) {
-  return success();
-}
-
 static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   createLinalgCopyOp(builder, loc, from, to);
@@ -118,15 +126,8 @@ static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
 
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = cpuAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn = cpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
-
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  passManager.addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
 }
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
@@ -187,8 +188,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
                                 CPUDoubleTilingPadExpert);
   }
 
-  if (tilingConfig.getNumTilingLevels() != 3) {
-    return op->emitOpError("expected three tiling levels, got ")
+  if (tilingConfig.getNumTilingLevels() != 4) {
+    return op->emitOpError("expected four tiling levels, got ")
            << tilingConfig.getNumTilingLevels();
   }
 
@@ -202,8 +203,9 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       }
     }
 
-    SmallVector<int64_t> secondLevelTileSizes =
-        tilingConfig.getVectorParallelSizes();
+    SmallVector<int64_t> secondLevelTileSizes;
+    std::tie(secondLevelTileSizes, std::ignore) =
+        tilingConfig.getVectorCommonParallelSizes();
     for (auto [index, tileSize] : llvm::enumerate(secondLevelTileSizes)) {
       if (tileSize != 0 && !pLoopsSet.contains(index)) {
         return op->emitOpError(
@@ -213,7 +215,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       }
     }
 
-    SmallVector<int64_t> thirdLevelTileSizes =
+    SmallVector<int64_t> thirdLevelTileSizes;
+    std::tie(thirdLevelTileSizes, std::ignore) =
         tilingConfig.getVectorReductionSizes();
     for (auto [index, tileSize] : llvm::enumerate(thirdLevelTileSizes)) {
       if (tileSize != 0 && pLoopsSet.contains(index)) {
@@ -226,17 +229,14 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   }
 
   // Verify interchange
-  if (!tilingConfig.getTileInterchange().empty()) {
-    for (auto level : llvm::seq<unsigned>(
-             0,
-             static_cast<unsigned>(tilingConfig.getTileInterchange().size()))) {
-      auto tileSizes = tilingConfig.getTileSizes()[level];
-      auto interchange = tilingConfig.getTileInterchangeSizes(level);
-      if (!isValidInterchange(interchange, tileSizes.size())) {
-        return op->emitOpError("expected [0, ")
-               << tileSizes.size()
-               << ") to be set exactly once in interchange #" << level;
-      }
+  auto tileSizesForLevel = tilingConfig.getTileSizes();
+  for (int level = 0; level < tilingConfig.getNumTilingLevels(); level++) {
+    auto interchange = tilingConfig.getTileInterchangeSizes(level);
+    auto &tileSizes = tileSizesForLevel[level];
+    if (!isValidInterchange(interchange, tileSizes.size())) {
+      return op->emitOpError("expected [0, ")
+             << tileSizes.size() << ") to be set exactly once in interchange #"
+             << level;
     }
   }
 
@@ -252,8 +252,11 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     Operation *op, TilingConfig &tilingConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
-  if (tilingConfig.getNumTilingLevels() != 3) {
-    return op->emitOpError("expected three tiling levels, got ")
+  if (!isa<linalg::ConvolutionOpInterface>(op))
+    return success();
+
+  if (tilingConfig.getNumTilingLevels() != 4) {
+    return op->emitOpError("expected four tiling levels, got ")
            << tilingConfig.getNumTilingLevels();
   }
 
@@ -331,7 +334,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
   // only.
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getVectorParallelLevel()));
+      createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   {
     GenericVectorizationPassOptions options;
@@ -368,8 +371,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTileAndFusePass(tilingConfig.getVectorParallelLevel()));
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
+      tilingConfig.getVectorCommonParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption::ParallelDims));
 
@@ -410,7 +413,8 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   if (enableMicrokernels) {
-    passManager.nest<ModuleOp>().addPass(createLLVMCPULowerToUKernelsPass());
+    passManager.nest<ModuleOp>().addPass(
+        createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
 
   // Tensor-level micro-kernel optimizations.
@@ -444,39 +448,37 @@ void addMultiTilingExpertPassPipeline(
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
-  // This is a temporary solution for handling aggressive fusion heuristics.
-  // This rematerializes parallel ops into the consumers to avoid stack
-  // allocation.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRematerializeParallelOpsPass());
-
   SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
   // Apply tile and fuse to all the non-distribution fusable levels. Skip
   // distribution level as that level has been fused already.
   if (allFusableLevels.size() > 1) {
-    ArrayRef<int64_t> nonDistFusableLevels(allFusableLevels.begin() + 1,
-                                           allFusableLevels.end());
-    for (int64_t level : nonDistFusableLevels) {
-      nestedModulePM.addNestedPass<func::FuncOp>(
-          createLLVMCPUTileAndFusePass(level));
-      nestedModulePM.addNestedPass<func::FuncOp>(
-          createFuseTensorPadWithConsumerPass());
-      nestedModulePM.addNestedPass<func::FuncOp>(
-          createConcretizePadResultShapePass());
+    llvm::SmallSetVector<int64_t, 4> fusableLevels(allFusableLevels.begin(),
+                                                   allFusableLevels.end());
+    for (int i = 0; i < tilingConfig.getNumTilingLevels(); ++i) {
+      if (i == tilingConfig.getDistributionLevel())
+        continue;
+      if (fusableLevels.contains(i)) {
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createLLVMCPUTileAndFusePass(i));
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createFuseTensorPadWithConsumerPass());
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createConcretizePadResultShapePass());
+        continue;
+      }
+
+      if (i == tilingConfig.getVectorReductionLevel()) {
+        // Run SplitReductionPass before the final reduction Fuse pass, because
+        // SplitReductionPass takes care of banked-tiling.
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
+        nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(i));
+        continue;
+      }
+
+      nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(i));
     }
   }
-
-  // Run SplitReductionPass before the final reduction Fuse pass, because
-  // SplitReductionPass takes care of banked-tiling.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createFuseTensorPadWithConsumerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createConcretizePadResultShapePass());
 
   if (enablePeeling) {
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
@@ -533,8 +535,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   // get tiled if the case is conv + generic op. In this case, we have to tile
   // along reduction dim again, which needs them to be Linalg ops form.
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTileAndFusePass(tilingConfig.getVectorParallelLevel()));
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
+      tilingConfig.getVectorCommonParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createFuseTensorPadWithConsumerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -542,6 +544,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUTilePass(tilingConfig.getVectorReductionLevel()));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUTileAndFusePass(tilingConfig.getVectorInnerParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposeConvolutionToLowerDimOpsPass());
 
@@ -599,10 +603,13 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
   if (enableMicrokernels) {
-    nestedModulePM.addPass(createLLVMCPULowerToUKernelsPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createDecomposeBatchMmt4DOpsPass());
+    nestedModulePM.addPass(
+        createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   } else {
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-        static_cast<int64_t>(tilingConfig.getVectorParallelLevel())));
+        static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
         static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -623,17 +630,19 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 }
 
 void addCPUDataTilingPipeline(OpPassManager &passManager,
-                              TilingConfig &tilingConfig) {
+                              TilingConfig &tilingConfig,
+                              bool enableVectorMasking) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUTilePass(tilingConfig.getVectorParallelLevel()));
+      createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass());
 
   {
     GenericVectorizationPassOptions options;
     options.vectorizePadding = true;
+    options.enableVectorMasking = enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -673,6 +682,10 @@ void addTransformDialectPasses(OpPassManager &passManager) {
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
+  // TODO: Remove the following pass and plumb support for #hal.descriptor_type
+  // memory space through the stack.
+  passManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
+
   // Lower `ukernel.*` ops to function calls
   passManager.addPass(createLowerUKernelOpsToCallsPass());
 
@@ -705,6 +718,11 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(
       createHoistStaticallyBoundAllocationsPass());
 
+  // Use `arith.minf/maxf` instead of `arith.minimumf/maximumf`.
+  if (clUseFastMinMaxOps) {
+    passManager.addNestedPass<func::FuncOp>(createReplaceSlowMinMaxOpsPass());
+  }
+
   // Resolve get_buffer_descriptor ops. All structural buffer manipulations
   // must conclude before this point.
   passManager.addNestedPass<func::FuncOp>(
@@ -724,6 +742,10 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // (HAL, IREE, Linalg, CF) -> LLVM
   passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  passManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  passManager.addPass(createEmulateNarrowTypePass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
   if (clInstrumentMemoryAccesses) {
     passManager.addNestedPass<func::FuncOp>(
         createInstrumentMemoryAccessesPass());
@@ -737,20 +759,25 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
+  passManager.addNestedPass<LLVM::LLVMFuncOp>(createAddFastMathFlagsPass());
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
-  addCommonTargetExecutablePreprocessingPasses(passManager.nest<ModuleOp>());
-  // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added way to
-  // late and should insted be be done during lowering to LLVM.
-  passManager.addPass(createExpandF16OpToF32Pass());
+  {
+    OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    addCommonTargetExecutablePreprocessingPasses(modulePassManager);
+    modulePassManager.addNestedPass<func::FuncOp>(
+        createRematerializeParallelOpsPass());
+    // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added way
+    // to late and should insted be be done during lowering to LLVM.
+    modulePassManager.addPass(createExpandF16OpToF32Pass());
 
-  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createLLVMCPUMaterializeEncodingPass());
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
+    modulePassManager.addNestedPass<func::FuncOp>(
+        createCPUMaterializeEncodingPass());
+    // TODO: Remove the following pass the plumb support for
+    // #hal.descriptor_type memory space through the stack.
+    modulePassManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
+  }
 
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

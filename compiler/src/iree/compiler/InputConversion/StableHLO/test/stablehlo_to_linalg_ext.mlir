@@ -365,6 +365,31 @@ func.func @scatter_partial(%arg0: tensor<10x5xf32>, %arg1: tensor<3x1xi32>, %arg
 
 // -----
 
+// CHECK-LABEL: func.func @scatter_ui32
+func.func @scatter_ui32(%arg0: tensor<1xui32>, %arg1: tensor<1x1xi32>, %arg2: tensor<1xui32>) -> tensor<1xui32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<ui32>, %arg4: tensor<ui32>):
+    stablehlo.return %arg4 : tensor<ui32>
+  }) {indices_are_sorted = true, scatter_dimension_numbers = #stablehlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>, unique_indices = true} : (tensor<1xui32>, tensor<1x1xi32>, tensor<1xui32>) -> tensor<1xui32>
+  return %0 : tensor<1xui32>
+}
+
+// CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK:         %[[BITCAST0:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<1xui32> to tensor<1xi32>
+// CHECK:         %[[BITCAST2:.+]] = builtin.unrealized_conversion_cast %[[ARG2]] : tensor<1xui32> to tensor<1xi32>
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:      unique_indices(true)
+// CHECK-SAME:      ins(%[[BITCAST2]], %[[ARG1]] : tensor<1xi32>, tensor<1x1xi32>)
+// CHECK-SAME:      outs(%[[BITCAST0]] : tensor<1xi32>)
+// CHECK:           ^bb0(%[[ARG3:.+]]: i32, %[[ARG4:.+]]: i32):
+// CHECK:              iree_linalg_ext.yield %[[ARG3]]
+// CHECK:         %[[BITCAST_OUT:.+]] = builtin.unrealized_conversion_cast %[[SCATTER]] : tensor<1xi32> to tensor<1xui32>
+// CHECK:         return %[[BITCAST_OUT]]
+
+// -----
+
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0)>
 // CHECK:      func.func @rfft_1d
 func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
@@ -542,6 +567,32 @@ func.func @chlo_top_k_int(%arg : tensor<16x16xi32>) -> (tensor<16x8xi32>, tensor
 
 // -----
 
+// CHECK:       func.func @chlo_top_k_uint
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
+func.func @chlo_top_k_uint(%arg: tensor<2000xui32>) -> (tensor<3xui32>, tensor<3xi32>) {
+  %values, %indices = chlo.top_k(%arg, k = 3) : tensor<2000xui32> -> (tensor<3xui32>, tensor<3xi32>)
+  return %values, %indices : tensor<3xui32>, tensor<3xi32>
+}
+
+// CHECK:        %[[CONVERTED:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<2000xui32> to tensor<2000xi32>
+// CHECK:        %[[D2:.+]] = tensor.empty() : tensor<3xi32>
+// CHECK:        %[[D3:.+]] = tensor.empty() : tensor<3xi32>
+// CHECK-DAG:    %[[CNEG:.+]] = arith.constant -2147483648 : i32
+// CHECK-DAG:    %[[CPOS:.+]] = arith.constant 2147483647 : i32
+// CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : i32) outs(%[[D2]]
+// CHECK-DAG:    %[[D5:.+]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D3]]
+// CHECK:        %[[D6:.+]]:2 = iree_linalg_ext.topk
+// CHECK-SAME:     dimension(0)
+// CHECK-SAME:     ins(%[[CONVERTED]]
+// CHECK-SAME:     outs(%[[D4]], %[[D5]]
+// CHECK:        ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
+// CHECK:        %[[D7:.+]] = arith.cmpi sge, %[[ARG1]], %[[ARG2]] : i32
+// CHECK:        iree_linalg_ext.yield %[[D7]] : i1
+// CHECK:        %[[CONVERTED_OUT:.+]] = builtin.unrealized_conversion_cast %[[D6]]#0 : tensor<3xi32> to tensor<3xui32>
+// CHECK:        return %[[CONVERTED_OUT]], %[[D6]]#1
+
+// -----
+
 // CHECK:       func.func @chlo_top_k_float
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
 func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tensor<16x8xi32>) {
@@ -563,3 +614,29 @@ func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tens
 // CHECK:        %[[D7:.+]] = arith.cmpf ogt, %[[ARG1]], %[[ARG2]] : f32
 // CHECK:        iree_linalg_ext.yield %[[D7]] : i1
 // CHECK:        return %[[D6]]#0, %[[D6]]#1
+
+// -----
+
+// CHECK-LABEL: @prefix
+// CHECK-SAME: %[[ARG0:.+]]: tensor<7x5xi32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<i32>
+func.func @prefix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32> {
+  %reduce = "stablehlo.reduce_window"(%arg0, %arg1) ({
+    ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
+    %787 = "stablehlo.add"(%arg2, %arg3) : (tensor<i32>, tensor<i32>) -> tensor<i32>
+    "stablehlo.return"(%787) : (tensor<i32>) -> ()
+  }) {base_dilations = dense<1> : tensor<2xi64>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>, window_dilations = dense<1> : tensor<2xi64>, window_dimensions = dense<[1, 5]> : tensor<2xi64>, window_strides = dense<1> : tensor<2xi64>} : (tensor<7x5xi32>, tensor<i32>) -> tensor<7x5xi32>
+  return %reduce : tensor<7x5xi32>
+}
+// CHECK:       %extracted = tensor.extract %[[ARG1]][] : tensor<i32>
+// CHECK:       %[[OUT0:.+]] = tensor.empty() : tensor<7x5xi32>
+// CHECK:       %[[OUT1:.+]] = tensor.empty() : tensor<7xi32>
+// CHECK:       %[[FILL:.+]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%[[ARG1]] : tensor<i32>) outs(%[[OUT1]] : tensor<7xi32>)
+// CHECK:       ^bb0(%[[IN:.+]]: i32, %[[OUT:.+]]: i32):
+// CHECK:         linalg.yield %[[IN]]
+// CHECK:       %[[SCAN:.+]]:2 = iree_linalg_ext.scan dimension(1) inclusive(true) ins(%[[ARG0]] : tensor<7x5xi32>) outs(%[[OUT0]], %[[FILL]] : tensor<7x5xi32>, tensor<7xi32>)
+// CHECK:       ^bb0(%[[ARG2:.+]]: i32, %[[ARG3:.+]]: i32):
+// CHECK:         %[[ADD:.+]] = arith.addi %[[ARG2]], %[[ARG3]] : i32
+// CHECK:         iree_linalg_ext.yield %[[ADD]]
+// CHECK:       } -> tensor<7x5xi32>, tensor<7xi32>
+// CHECK:       return %[[SCAN]]#0 : tensor<7x5xi32>

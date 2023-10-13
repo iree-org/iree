@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -16,9 +17,12 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static llvm::cl::opt<std::string> clBitcodeFile(
+static llvm::cl::opt<std::string> clBitcodeFiles(
     "iree-link-bitcode",
-    llvm::cl::desc("Paths of additional bitcode file to load and link."),
+    llvm::cl::desc(
+        "Paths of additional bitcode files to load and link. Comma-separated. "
+        "Any list entry that contains an equals (=) is parsed as `arch=path` "
+        "and is only linked if `arch` matches the target triple."),
     llvm::cl::init(""));
 
 bool anyRequiredSymbols(const llvm::Module &module, StringRef prefix) {
@@ -119,31 +123,48 @@ linkBitcodeObjects(Location loc, llvm::Linker &linker, unsigned linkerFlags,
   return success();
 }
 
-LogicalResult linkCmdlineBitcodeFile(Location loc, llvm::Linker &linker,
-                                     unsigned linkerFlags,
-                                     llvm::TargetMachine &targetMachine,
-                                     llvm::LLVMContext &context) {
-  if (clBitcodeFile.empty()) {
+LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
+                                      unsigned linkerFlags,
+                                      llvm::TargetMachine &targetMachine,
+                                      llvm::LLVMContext &context) {
+  if (clBitcodeFiles.empty()) {
     return success();
   }
-  auto bitcodeBufferRef = llvm::MemoryBuffer::getFile(clBitcodeFile);
-  if (auto ec = bitcodeBufferRef.getError()) {
-    return mlir::emitError(loc) << "failed reading user bitcode file `"
-                                << clBitcodeFile << "`: " << ec.message();
-  }
-  auto setAlwaysInline = [&](llvm::Module &module) {
-    for (auto &func : module.getFunctionList()) {
-      func.addFnAttr(llvm::Attribute::AlwaysInline);
+  SmallVector<StringRef> entries;
+  StringRef(clBitcodeFiles.getValue()).split(entries, ',');
+  for (StringRef entry : entries) {
+    StringRef path = entry;
+    if (entry.contains('=')) {
+      std::pair<StringRef, StringRef> components = entry.split('=');
+      StringRef filterArch = components.first;
+      const char *archName =
+          getIreeArchNameForTargetTriple(targetMachine.getTargetTriple());
+      if (filterArch != archName) {
+        continue;
+      }
+      path = components.second;
     }
-  };
-  if (failed(linkBitcodeModule(
-          loc, linker, linkerFlags, targetMachine, clBitcodeFile,
-          llvm::parseBitcodeFile(*bitcodeBufferRef->get(), context),
-          setAlwaysInline))) {
-    return mlir::emitError(loc) << "failed linking in user bitcode file `"
-                                << clBitcodeFile << "` for target triple '"
-                                << targetMachine.getTargetTriple().str() << "'";
+    auto bitcodeBufferRef = llvm::MemoryBuffer::getFile(path);
+    if (auto ec = bitcodeBufferRef.getError()) {
+      return mlir::emitError(loc) << "failed reading user bitcode file `"
+                                  << path << "`: " << ec.message();
+    }
+    auto setAlwaysInline = [&](llvm::Module &module) {
+      for (auto &func : module.getFunctionList()) {
+        func.addFnAttr(llvm::Attribute::AlwaysInline);
+      }
+    };
+    if (failed(linkBitcodeModule(
+            loc, linker, linkerFlags, targetMachine, path,
+            llvm::parseBitcodeFile(*bitcodeBufferRef->get(), context),
+            setAlwaysInline))) {
+      return mlir::emitError(loc)
+             << "failed linking in user bitcode file `" << path
+             << "` for target triple '" << targetMachine.getTargetTriple().str()
+             << "'";
+    }
   }
+
   return success();
 }
 

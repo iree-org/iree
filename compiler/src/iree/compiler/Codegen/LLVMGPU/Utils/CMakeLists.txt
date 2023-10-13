@@ -29,6 +29,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRNVGPUDialect
     MLIRVectorDialect
+    iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
   PUBLIC
 )

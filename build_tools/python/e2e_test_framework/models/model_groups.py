@@ -65,9 +65,6 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, threads=[1, 8]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.EFFICIENTNET_V2_S_FP32_TORCH, threads=[1, 8]
-    ),
     # Large models.
     # TODO: These models should be running at 8, 13, 28 threads but we use 8 for now until new hardware becomes available.
     common_definitions.CpuBenchmarkConfig(
@@ -77,7 +74,10 @@ X86_64_BENCHMARK_CONFIG = [
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[8]
     ),
     common_definitions.CpuBenchmarkConfig(
-        model=torch_models.EFFICIENTNET_B7_FP32_TORCH, threads=[8]
+        model=tf_models.GPT2_117M_1x4_FP32_TF, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
     ),
 ]
 
@@ -122,14 +122,16 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, threads=[8]
     ),
-    # Disabled due to https://github.com/openxla/iree/issues/12772.
-    # common_definitions.CpuBenchmarkConfig(model=torch_models.EFFICIENTNET_V2_S_FP32_TORCH, threads=[8]),
     # Large models.
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[8]
     ),
-    # Disabled due to https://github.com/openxla/iree/issues/12772.
-    # common_definitions.CpuBenchmarkConfig(model=torch_models.EFFICIENTNET_B7_FP32_TORCH, threads=[8]),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x4_FP32_TF, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
+    ),
 ]
 
 X86_64_BENCHMARK_CONFIG_LONG = [
@@ -182,43 +184,54 @@ MICRO_MATMUL_SPLITK = [
 
 # Batched Torch models.
 
-BERT_LARGE_TORCH_BATCHES = list(torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES.values())
-
-BERT_LARGE_FP16_TORCH_BATCHES = [
+BERT_LARGE_TORCH_BATCHES = [
     model
-    for batch_size, model in torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES.items()
-    # Batchsize 1 is included seperately in CUDA_MODELS
-    if batch_size != 1
+    for batch_size, model in torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES.items()
 ]
 
-RESNET50_TORCH_BATCHES = list(
-    torch_models.RESNET50_3X224X224_FP32_TORCH_BATCHES.values()
-)
-
-RESNET50_FP16_TORCH_BATCHES = list(
-    torch_models.RESNET50_3X224X224_FP16_TORCH_BATCHES.values()
-)
-
 # Batched Tensorflow models.
+BERT_LARGE_TF_BATCHES = [
+    model
+    for batch_size, model in tf_models.BERT_LARGE_384_FP32_TF_BATCHES.items()
+    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
+    if batch_size < 64
+]
 
-BERT_LARGE_TF_BATCHES = list(tf_models.BERT_LARGE_384_FP32_TF_BATCHES.values())
-
-RESNET50_TF_BATCHES = list(tf_models.RESNET50_3X224X224_FP32_TF_BATCHES.values())
+RESNET50_TF_BATCHES = [
+    model
+    for batch_size, model in tf_models.RESNET50_3X224X224_FP32_TF_BATCHES.items()
+    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
+    if batch_size < 2048
+]
 
 T5_LARGE_TF_BATCHES = [
     model
     for batch_size, model in tf_models.T5_LARGE_512_FP32_TF_BATCHES.items()
-    # Disabled due to https://github.com/openxla/iree/issues/13801.
-    if batch_size != 512
+    # Higher batch sizes disabled due to https://github.com/openxla/iree/issues/13801.
+    if batch_size < 48
 ]
 
 # Batched JAX models.
+RESNET50_JAX_BATCHES = [
+    model
+    for batch_size, model in jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCHES.items()
+    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
+    if batch_size < 2048
+]
 
-RESNET50_JAX_BATCHES = list(jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCHES.values())
+BERT_LARGE_JAX_BATCHES = [
+    model
+    for batch_size, model in jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES.items()
+    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
+    if batch_size < 64
+]
 
-BERT_LARGE_JAX_BATCHES = list(jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES.values())
-
-T5_LARGE_JAX_BATCHES = list(jax_models.T5_LARGE_FP32_JAX_512XI32_BATCHES.values())
+T5_LARGE_JAX_BATCHES = [
+    model
+    for batch_size, model in jax_models.T5_LARGE_FP32_JAX_512XI32_BATCHES.items()
+    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14666.
+    if batch_size < 48
+]
 
 # GPU model groups.
 
@@ -227,11 +240,9 @@ CUDA_MODELS = [
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
     tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512,
     tf_models.BERT_LARGE_TF_FP32_SEQLEN384,
-    torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
-    torch_models.MODEL_UNET_2D_FP32_TORCH,
-    torch_models.EFFICIENTNET_B7_FP32_TORCH,
-    torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES[1],
-    torch_models.EFFICIENTNET_V2_S_FP16_TORCH,
+    # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+    # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
+    # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]
 
 CUDA_MODELS_LONG = (
@@ -239,15 +250,13 @@ CUDA_MODELS_LONG = (
     + BERT_LARGE_TF_BATCHES
     + T5_LARGE_TF_BATCHES
     + BERT_LARGE_TORCH_BATCHES
-    + RESNET50_TORCH_BATCHES
-    + RESNET50_FP16_TORCH_BATCHES
-    + BERT_LARGE_FP16_TORCH_BATCHES
     + BERT_LARGE_JAX_BATCHES
     + RESNET50_JAX_BATCHES
     + T5_LARGE_JAX_BATCHES
 )
 
 VULKAN_MODELS = [
-    torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
-    torch_models.MODEL_UNET_2D_FP32_TORCH,
+    # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+    # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
+    # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]

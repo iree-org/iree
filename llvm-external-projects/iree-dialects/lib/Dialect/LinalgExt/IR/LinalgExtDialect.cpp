@@ -61,12 +61,3 @@ void IREELinalgExtDialect::initialize() {
 }
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc"
-
-//==----------------------------------------------------------------------===//
-// iree_linalg_ext.encoding
-//==----------------------------------------------------------------------===//
-
-EncodingAttr EncodingAttr::get(MLIRContext *context, TensorEncoding encoding) {
-  auto tensorEncodingAttr = TensorEncodingAttr::get(context, encoding);
-  return get(context, tensorEncodingAttr);
-}

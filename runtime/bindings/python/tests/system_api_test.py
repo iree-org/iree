@@ -6,6 +6,7 @@
 
 # pylint: disable=unused-variable
 
+import gc
 import logging
 import os
 import re
@@ -17,9 +18,14 @@ import iree.runtime
 import numpy as np
 
 
-def create_simple_mul_module(instance):
-    binary = iree.compiler.compile_str(
-        """
+_SIMPLE_MUL_BINARY = None
+
+
+def compile_simple_mul_binary():
+    global _SIMPLE_MUL_BINARY
+    if not _SIMPLE_MUL_BINARY:
+        _SIMPLE_MUL_BINARY = iree.compiler.compile_str(
+            """
       module @arithmetic {
         func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
           %0 = arith.mulf %arg0, %arg1 : tensor<4xf32>
@@ -27,9 +33,13 @@ def create_simple_mul_module(instance):
         }
       }
       """,
-        target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
-    )
-    m = iree.runtime.VmModule.from_flatbuffer(instance, binary)
+            target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
+        )
+    return _SIMPLE_MUL_BINARY
+
+
+def create_simple_mul_module(instance):
+    m = iree.runtime.VmModule.from_flatbuffer(instance, compile_simple_mul_binary())
     return m
 
 
@@ -146,6 +156,29 @@ class SystemApiTest(unittest.TestCase):
         m = create_simple_mul_module(ctx.instance)
         m1 = iree.runtime.load_vm_module(m)
         m2 = iree.runtime.load_vm_module(m)
+
+    def test_load_vm_flatbuffer(self):
+        # This API is old and not highly recommended but testing as-is.
+        m = iree.runtime.load_vm_flatbuffer(
+            compile_simple_mul_binary(), driver="local-sync"
+        )
+        m = iree.runtime.load_vm_flatbuffer(
+            compile_simple_mul_binary(), backend="llvm-cpu"
+        )
+
+    def test_load_vm_flatbuffer_file(self):
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            f.write(compile_simple_mul_binary())
+
+        def _cleanup():
+            os.unlink(f.name)
+
+        m = iree.runtime.load_vm_flatbuffer_file(
+            f.name, driver="local-sync", destroy_callback=_cleanup
+        )
+        del m
+        gc.collect()
+        self.assertFalse(os.path.exists(f.name))
 
 
 if __name__ == "__main__":

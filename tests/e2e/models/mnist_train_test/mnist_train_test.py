@@ -6,6 +6,7 @@
 
 import argparse
 import os
+import shutil
 import sys
 import tarfile
 import tempfile
@@ -31,7 +32,19 @@ def build_module(artifacts_dir: str):
         target_backends=[args.target_backend],
         input_type=InputType.STABLEHLO,
     )
-    return load_vm_flatbuffer_file(vmfb_file, driver=args.driver)
+    # On Windows, the flatbuffer is mmap'd and cannot be deleted while in use.
+    # So copy it to a temporary location and mmap from there (preserving the
+    # artifacts as-is).
+    with tempfile.NamedTemporaryFile(delete=False) as mmap_vmfb:
+        mmap_vmfb.close()
+        shutil.copyfile(vmfb_file, mmap_vmfb.name)
+
+        def cleanup():
+            os.unlink(mmap_vmfb.name)
+
+        return load_vm_flatbuffer_file(
+            mmap_vmfb.name, driver=args.driver, destroy_callback=cleanup
+        )
 
 
 def load_data(data_dir: str):

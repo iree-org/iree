@@ -93,6 +93,139 @@ class MigFetcher:
         return migs
 
 
+def update_mig(*, templates_client, migs_client, mig, args):
+    region = resource_basename(mig.region)
+    if args.command in [DIRECT_UPDATE_COMMAND_NAME, CANARY_COMMAND_NAME]:
+        if "testing" in args.version and args.env != TESTING_ENV_NAME:
+            scary_action = (
+                f"using testing template version '{args.version}' in"
+                f" environment '{args.env}'"
+            )
+            check_scary_action(scary_action, args.skip_confirmation)
+
+        strip = f"-{region}"
+        if not mig.name.endswith(strip):
+            raise ValueError(f"MIG name does not end with '{strip}' as expected")
+        template_name = f"{mig.name[:-len(strip)]}-{args.version}"
+
+        # TODO(gcmn): Make template naming consistent (ran into length limits)
+        template_name = template_name.replace(f"-{args.env}-", "-")
+        template_url = templates_client.get(
+            project=args.project, instance_template=template_name
+        ).self_link
+
+    current_templates = {v.name: v.instance_template for v in mig.versions}
+
+    if not current_templates:
+        raise RuntimeError(
+            f"Found no template versions for '{mig.name}'."
+            f" This shouldn't be possible."
+        )
+
+    # TODO(gcmn): These should probably be factored into functions
+    if args.command == CANARY_COMMAND_NAME:
+        if len(current_templates) > 1:
+            raise RuntimeError(
+                f"Instance group '{mig.name}' has multiple versions, but canary"
+                f" requires it start with exactly one. Current versions:"
+                f" {summarize_versions(mig.versions)}"
+            )
+
+        base_template = current_templates.get(args.base_version_name)
+        if not base_template:
+            raise RuntimeError(
+                f"Instance group '{mig.name}' does not have a current version"
+                f" named '{args.base_version_name}', which is required for an"
+                f" automatic canary. Current versions:"
+                f" {summarize_versions(mig.versions)}"
+            )
+
+        if base_template == template_url:
+            raise RuntimeError(
+                f"Instance group '{mig.name}' already has the requested canary"
+                f" version '{template_name}' as its base version. Current"
+                " versions:"
+                f" {summarize_versions(mig.versions)}"
+            )
+        new_versions = [
+            compute.InstanceGroupManagerVersion(
+                name=args.base_version_name, instance_template=base_template
+            ),
+            compute.InstanceGroupManagerVersion(
+                name=args.canary_version_name,
+                instance_template=template_url,
+                target_size=CANARY_SIZE,
+            ),
+        ]
+    elif args.command == DIRECT_UPDATE_COMMAND_NAME:
+        scary_action = (
+            f"an update of all instances in '{mig.name}' directly"
+            f" without doing a canary"
+        )
+        check_scary_action(scary_action, args.skip_confirmation)
+
+        new_versions = [
+            compute.InstanceGroupManagerVersion(
+                name=args.base_version_name, instance_template=template_url
+            )
+        ]
+    elif args.command == PROMOTE_CANARY_COMMAND_NAME:
+        new_base_template = current_templates.get(args.canary_version_name)
+        if new_base_template is None:
+            raise RuntimeError(
+                f"Instance group '{mig.name}' does not have a current version"
+                f" named '{args.canary_version_name}', which is required for an"
+                f" automatic canary promotion. Current versions:"
+                f" {summarize_versions(mig.versions)}"
+            )
+        new_versions = [
+            compute.InstanceGroupManagerVersion(
+                name=args.base_version_name, instance_template=new_base_template
+            )
+        ]
+    elif args.command == ROLLBACK_CANARY_COMMAND_NAME:
+        base_template = current_templates.get(args.base_version_name)
+        if base_template is None:
+            raise RuntimeError(
+                f"Instance group '{mig.name}' does not have a current version"
+                f" named '{args.base_version_name}', which is required for an"
+                f" automatic canary rollback. Current versions:"
+                f" {summarize_versions(mig.versions)}"
+            )
+        new_versions = [
+            compute.InstanceGroupManagerVersion(
+                name=args.base_version_name, instance_template=base_template
+            )
+        ]
+    else:
+        raise RuntimeError(f"Unrecognized command '{args.command}'")
+
+    update_policy = compute.InstanceGroupManagerUpdatePolicy(
+        type_=args.mode,
+        minimal_action=args.action,
+        most_disruptive_allowed_action=args.action,
+    )
+
+    print(
+        f"Updating {mig.name} to new versions:" f" {summarize_versions(new_versions)}"
+    )
+
+    request = compute.PatchRegionInstanceGroupManagerRequest(
+        project=args.project,
+        region=region,
+        instance_group_manager=mig.name,
+        instance_group_manager_resource=compute.InstanceGroupManager(
+            versions=new_versions, update_policy=update_policy
+        ),
+    )
+
+    if not args.dry_run:
+        migs_client.patch(request)
+    else:
+        print(f"Dry run, so not sending this patch request:\n```\n{request}```")
+    print(f"Successfully updated {mig.name}")
+
+
 def main(args):
     templates_client = compute.InstanceTemplatesClient()
     migs_client = compute.RegionInstanceGroupManagersClient()
@@ -130,137 +263,20 @@ def main(args):
         check_scary_action(scary_action, args.skip_confirmation)
 
     for mig in migs:
-        region = resource_basename(mig.region)
-        if args.command in [DIRECT_UPDATE_COMMAND_NAME, CANARY_COMMAND_NAME]:
-            if "testing" in args.version and args.env != TESTING_ENV_NAME:
-                scary_action = (
-                    f"using testing template version '{args.version}' in"
-                    f" environment '{args.env}'"
-                )
-                check_scary_action(scary_action, args.skip_confirmation)
-
-            strip = f"-{region}"
-            if not mig.name.endswith(strip):
-                raise ValueError(f"MIG name does not end with '{strip}' as expected")
-            template_name = f"{mig.name[:-len(strip)]}-{args.version}"
-
-            # TODO(gcmn): Make template naming consistent (ran into length limits)
-            template_name = template_name.replace(f"-{args.env}-", "-")
-            template_url = templates_client.get(
-                project=args.project, instance_template=template_name
-            ).self_link
-
-        current_templates = {v.name: v.instance_template for v in mig.versions}
-
-        if not current_templates:
-            error(
-                f"Found no template versions for '{mig.name}'."
-                f" This shouldn't be possible."
+        try:
+            update_mig(
+                templates_client=templates_client,
+                migs_client=migs_client,
+                mig=mig,
+                args=args,
             )
-
-        # TODO(gcmn): These should probably be factored into functions
-        if args.command == CANARY_COMMAND_NAME:
-            if len(current_templates) > 1:
-                error(
-                    f"Instance group '{mig.name}' has multiple versions, but canary"
-                    f" requires it start with exactly one. Current versions:"
-                    f" {summarize_versions(mig.versions)}"
-                )
-
-            base_template = current_templates.get(args.base_version_name)
-            if not base_template:
-                error(
-                    f"Instance group '{mig.name}' does not have a current version"
-                    f" named '{args.base_version_name}', which is required for an"
-                    f" automatic canary. Current versions:"
-                    f" {summarize_versions(mig.versions)}"
-                )
-
-            if base_template == template_url:
-                error(
-                    f"Instance group '{mig.name}' already has the requested canary"
-                    f" version '{template_name}' as its base version. Current"
-                    " versions:"
-                    f" {summarize_versions(mig.versions)}"
-                )
-            new_versions = [
-                compute.InstanceGroupManagerVersion(
-                    name=args.base_version_name, instance_template=base_template
-                ),
-                compute.InstanceGroupManagerVersion(
-                    name=args.canary_version_name,
-                    instance_template=template_url,
-                    target_size=CANARY_SIZE,
-                ),
-            ]
-        elif args.command == DIRECT_UPDATE_COMMAND_NAME:
-            scary_action = (
-                f"an update of all instances in '{mig.name}' directly"
-                f" without doing a canary"
-            )
-            check_scary_action(scary_action, args.skip_confirmation)
-
-            new_versions = [
-                compute.InstanceGroupManagerVersion(
-                    name=args.base_version_name, instance_template=template_url
-                )
-            ]
-        elif args.command == PROMOTE_CANARY_COMMAND_NAME:
-            new_base_template = current_templates.get(args.canary_version_name)
-            if new_base_template is None:
-                error(
-                    f"Instance group '{mig.name}' does not have a current version"
-                    f" named '{args.canary_version_name}', which is required for an"
-                    f" automatic canary promotion. Current versions:"
-                    f" {summarize_versions(mig.versions)}"
-                )
-            new_versions = [
-                compute.InstanceGroupManagerVersion(
-                    name=args.base_version_name, instance_template=new_base_template
-                )
-            ]
-        elif args.command == ROLLBACK_CANARY_COMMAND_NAME:
-            base_template = current_templates.get(args.base_version_name)
-            if base_template is None:
-                error(
-                    f"Instance group '{mig.name}' does not have a current version"
-                    f" named '{args.base_version_name}', which is required for an"
-                    f" automatic canary rollback. Current versions:"
-                    f" {summarize_versions(mig.versions)}"
-                )
-            new_versions = [
-                compute.InstanceGroupManagerVersion(
-                    name=args.base_version_name, instance_template=base_template
-                )
-            ]
-        else:
-            error(f"Unrecognized command '{args.command}'")
-
-        update_policy = compute.InstanceGroupManagerUpdatePolicy(
-            type_=args.mode,
-            minimal_action=args.action,
-            most_disruptive_allowed_action=args.action,
-        )
-
-        print(
-            f"Updating {mig.name} to new versions:"
-            f" {summarize_versions(new_versions)}"
-        )
-
-        request = compute.PatchRegionInstanceGroupManagerRequest(
-            project=args.project,
-            region=region,
-            instance_group_manager=mig.name,
-            instance_group_manager_resource=compute.InstanceGroupManager(
-                versions=new_versions, update_policy=update_policy
-            ),
-        )
-
-        if not args.dry_run:
-            migs_client.patch(request)
-        else:
-            print(f"Dry run, so not sending this patch request:\n```\n{request}```")
-        print(f"Successfully updated {mig.name}")
+        except RuntimeError as e:
+            print("Error updating '{mig.name}'")
+            print(e)
+            if args.keep_going:
+                print("Continuing past error, since --keep-going was specified")
+            else:
+                sys.exit(1)
 
 
 def parse_args():
@@ -339,6 +355,13 @@ def parse_args():
         action="store_true",
         default=False,
         help="Print all output but don't actually send the update request.",
+    )
+    subparser_base.add_argument(
+        "--keep-going",
+        "-k",
+        action="store_true",
+        default=False,
+        help="Continue updating additional MIGs even if updates for one fails.",
     )
 
     # Defaulting to true for testing environment avoids people getting in the

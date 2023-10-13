@@ -12,12 +12,14 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
@@ -149,6 +151,57 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
 bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto enableMicrokernels = getConfigBoolAttr(targetAttr, "ukernels");
   return enableMicrokernels && enableMicrokernels->getValue();
+}
+
+std::optional<StringRef>
+getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");
+  if (!cpuFeatures)
+    return std::nullopt;
+  return cpuFeatures->getValue();
+}
+
+// TODO(dcaballe): If we have to check for a significantly large number of
+// features in the future, we may want to consider a persistent state to carry
+// over processed HAL information or keeping the TTI instance alive and query
+// subtarget features data structure.
+bool hasFeature(IREE::HAL::ExecutableTargetAttr targetAttr, StringRef feature) {
+  std::optional<StringRef> features = getCpuFeatures(targetAttr);
+  if (!features) {
+    return false;
+  }
+
+  // Find feature string in list of features, making sure that we don't match a
+  // sub-string.
+  std::stringstream sstream(features->str());
+  std::string str;
+  while (std::getline(sstream, str, ',')) {
+    if (str == feature) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool isX86(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isX86();
+}
+
+bool isX86_64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().getArch() == llvm::Triple::x86_64;
+}
+
+bool isAArch64(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isAArch64();
+}
+
+bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isRISCV();
 }
 
 bool isReadOnly(Value v) {
@@ -659,29 +712,32 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               Location loc,
                                               OpFoldResult byteOffset,
                                               Type elementType) {
-  OpFoldResult elementWidth =
-      TypeSwitch<Type, OpFoldResult>(elementType)
-          .Case<ComplexType, FloatType, IntegerType, VectorType>(
-              [&](auto type) -> OpFoldResult {
-                return rewriter.getIndexAttr(
-                    IREE::Util::getRoundedElementByteWidth(elementType));
-              })
-          .Default([&](Type t) -> OpFoldResult {
-            return rewriter.create<IREE::Util::SizeOfOp>(loc, elementType)
-                .getResult();
-          });
-  AffineExpr s0, s1;
-  bindSymbols(rewriter.getContext(), s0, s1);
-  return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
-                                               {byteOffset, elementWidth});
+  if (isa<ComplexType, FloatType, IntegerType, VectorType>(elementType)) {
+    unsigned typeBitWidth = IREE::Util::getTypeBitWidth(elementType);
+    assert(llvm::isPowerOf2_32(typeBitWidth) &&
+           "unhandled non powers of 2 bit width while converting byte offset "
+           "to element offset");
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    return affine::makeComposedFoldedAffineApply(
+        rewriter, loc, (s0 * 8).floorDiv(typeBitWidth),
+        {byteOffset, rewriter.getIndexAttr(typeBitWidth)});
+  } else {
+    OpFoldResult elementByteSize =
+        rewriter.create<IREE::Util::SizeOfOp>(loc, elementType).getResult();
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    return affine::makeComposedFoldedAffineApply(rewriter, loc, s0.floorDiv(s1),
+                                                 {byteOffset, elementByteSize});
+  }
 }
 
 //===---------------------------------------------------------------------===//
 // Replace Memref users (transitively)
 //===---------------------------------------------------------------------===//
 
-/// Replaces a `use` with the `replacement` for cases where a simple substition
-/// might lead to verification errors.
+/// Replaces a `use` with the `replacement` for cases where a simple
+/// substition might lead to verification errors.
 static std::optional<SmallVector<Value>>
 replaceNonTrivialUse(RewriterBase &rewriter, Location loc, OpOperand &use,
                      Value replacement) {
@@ -877,6 +933,25 @@ SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp) {
   }
 
   return result;
+}
+
+bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
+  assert(rootOp.getNumDpsInputs() == 2 && "rootOp expected to have two inputs");
+
+  BackwardSliceOptions options;
+  options.inclusive = true;
+
+  // Get the backward slice of each input operand and take the union.
+  SetVector<Operation *> backwardSlice;
+  for (OpOperand *operand : rootOp.getDpsInputOperands()) {
+    SetVector<Operation *> tmpBackwardSlice;
+    getBackwardSlice(operand->get(), &tmpBackwardSlice, options);
+    backwardSlice.set_union(tmpBackwardSlice);
+  }
+
+  return llvm::any_of(backwardSlice, [](Operation *op) {
+    return llvm::isa<linalg::LinalgOp>(op);
+  });
 }
 
 } // namespace iree_compiler

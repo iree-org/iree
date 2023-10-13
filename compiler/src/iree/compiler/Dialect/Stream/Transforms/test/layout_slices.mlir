@@ -50,7 +50,7 @@ func.func @layoutDynamic(%size_a: index, %size_b: index) -> (index, index, index
   // CHECK-DAG: %c0 = arith.constant 0 : index
   // CHECK-DAG: %c16 = arith.constant 16 : index
   // CHECK-DAG: %0 = util.align %[[SIZE_A]], %c16 : index
-  // CHECK-DAG: %1 = arith.addi %c0, %0 : index
+  // CHECK-DAG: %1 = arith.addi %0, %c0 : index
   // CHECK-DAG: %2 = util.align %[[SIZE_B]], %c16 : index
   // CHECK-DAG: %3 = arith.addi %1, %2 : index
 
@@ -85,7 +85,7 @@ func.func @layoutMixedStaticDynamic(%size_a: index, %size_b: index) -> (index, i
   // CHECK-DAG: %c16 = arith.constant 16 : index
   // CHECK-DAG: %c208 = arith.constant 208 : index
   // CHECK-DAG: %0 = util.align %[[SIZE_A]], %c16 : index
-  // CHECK-DAG: %1 = arith.addi %c208, %0 : index
+  // CHECK-DAG: %1 = arith.addi %0, %c208 : index
   // CHECK-DAG: %2 = util.align %[[SIZE_B]], %c16 : index
   // CHECK-DAG: %3 = arith.addi %1, %2 : index
 

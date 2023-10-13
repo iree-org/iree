@@ -7,26 +7,16 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGINFO_H_
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-struct MatmulTileParams {
-  int64_t M = 1;
-  int64_t K = 1;
-  int64_t N = 1;
-};
-
 void adjustTileSizesToNarrowStaticShape(
     IREE::LinalgExt::MaterializeEncodingInfo &encodingInfo,
     ArrayRef<int64_t> shape);
-
-IREE::LinalgExt::MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(MatmulType type, MatmulOperandRole operandRole,
-                            MatmulTileParams tileParams);
 
 IREE::LinalgExt::MaterializeEncodingValueFn
 getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr);
@@ -36,14 +26,6 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
     IREE::LinalgExt::MaterializeEncodingConversionTarget &target,
     IREE::LinalgExt::MaterializeEncodingTypeConverter &typeConverter,
     IREE::LinalgExt::MaterializeEncodingValueFn materializeEncodingValueFn);
-
-// TODO(hanchung): Move the method to VMVX/EncodingInfo.h. This is required by
-// TileAndDistributeToWorkgroupPass and VMVXMaterializeEncodingPass. It can not
-// be in VMVX/EncodingInfo.h because there is a circular dependency. The Common/
-// should not depend on other target backends.
-FailureOr<IREE::LinalgExt::MaterializeEncodingValueInfo>
-chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
-                                          OpBuilder &builder, Location loc);
 
 } // namespace iree_compiler
 } // namespace mlir

@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <iree/builtins/ukernel/common.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/builtins/ukernel/api.h"
@@ -41,7 +43,7 @@ static void iree_mmt4d_reference_innerloop_f16f16f32(
   *out_ptr = acc;
 }
 
-static void iree_mmt4d_reference_innerloop_f16f16f16(
+static void iree_mmt4d_reference_innerloop_f16f16f16_noskipround(
     uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
   uint16_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
@@ -56,6 +58,36 @@ static void iree_mmt4d_reference_innerloop_f16f16f16(
     }
   }
   *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_f16f16f16_skipround(
+    uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  float acc_f32 = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE
+                      ? iree_math_f16_to_f32(*out_ptr)
+                      : 0.f;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      float lhs_f32 =
+          iree_math_f16_to_f32(lhs_ptr[k * params->M0 * params->K0 + k0]);
+      float rhs_f32 =
+          iree_math_f16_to_f32(rhs_ptr[k * params->N0 * params->K0 + k0]);
+      acc_f32 += lhs_f32 * rhs_f32;
+    }
+  }
+  *out_ptr = iree_math_f32_to_f16(acc_f32);
+}
+
+static void iree_mmt4d_reference_innerloop_f16f16f16(
+    uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  if (params->flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) {
+    iree_mmt4d_reference_innerloop_f16f16f16_skipround(out_ptr, lhs_ptr,
+                                                       rhs_ptr, params);
+  } else {
+    iree_mmt4d_reference_innerloop_f16f16f16_noskipround(out_ptr, lhs_ptr,
+                                                         rhs_ptr, params);
+  }
 }
 
 static void iree_mmt4d_reference_innerloop_bf16bf16f32(
@@ -211,9 +243,11 @@ static void iree_uk_test_mmt4d_for_shape_params(
   memcpy(&reference_params, &params, sizeof params);
   iree_uk_index_t out_buffer_size =
       iree_uk_2d_buffer_length(out_type, params.M, params.out_stride0);
-  void* reference_out_buffer = malloc(out_buffer_size);
-  iree_uk_write_random_buffer(reference_out_buffer, out_buffer_size, out_type,
+  void* init_out_buffer = malloc(out_buffer_size);
+  iree_uk_write_random_buffer(init_out_buffer, out_buffer_size, out_type,
                               engine);
+  void* reference_out_buffer = malloc(out_buffer_size);
+  memcpy(reference_out_buffer, init_out_buffer, out_buffer_size);
   reference_params.out_buffer =
       (char*)reference_out_buffer -
       (params.out_offset * iree_uk_type_size(out_type));
@@ -221,7 +255,7 @@ static void iree_uk_test_mmt4d_for_shape_params(
   iree_uk_mmt4d_params_t actual_params;
   memcpy(&actual_params, &params, sizeof params);
   void* actual_out_buffer = malloc(out_buffer_size);
-  memcpy(actual_out_buffer, reference_out_buffer, out_buffer_size);
+  memcpy(actual_out_buffer, init_out_buffer, out_buffer_size);
   actual_params.out_buffer = (char*)actual_out_buffer -
                              (params.out_offset * iree_uk_type_size(out_type));
 
@@ -231,19 +265,29 @@ static void iree_uk_test_mmt4d_for_shape_params(
   // For now we use exact comparisons, even for float, even though the reference
   // code accumulates in a different order compared to the actual code. This
   // relies on picking input test matrix elements so that all intermediate
-  // values are exactly representable - i.e. small integer numerators. This
-  // become problematic when we do float16. See the comment at the top of this
-  // file explaining how we refrain from letting this grow into a 1000-line-long
-  // fully-featured test.
-  if (memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size)) {
-    fprintf(stderr, "M=%d N=%d K=%d flags=%x\n", (int)params.M, (int)params.N,
-            (int)params.K, (int)params.flags);
-    fprintf(stderr, "actual %f reference %f\n",
-            ((const float*)actual_out_buffer)[0],
-            ((const float*)reference_out_buffer)[0]);
+  // values are exactly representable - i.e. small integer numerators.
+  bool fail = memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size);
+  if (fail) {
+    // The one thing that causes legitimate bit differences at the moment is
+    // when we enable skipping intermediate roundings but the actual kernel does
+    // not skip intermediate roundings, such as when falling back on a generic
+    // code path. In that case, we retry with reference code not skipping
+    // intermediate roundings. This currently only happens when the output type
+    // is f16.
+    if (out_type == IREE_UK_TYPE_FLOAT_16 &&
+        (params.flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS)) {
+      reference_params.flags &= ~IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
+      memcpy(reference_out_buffer, init_out_buffer, out_buffer_size);
+      iree_mmt4d_reference(&reference_params);
+      fail = memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size);
+    }
+  }
+
+  if (fail) {
     IREE_UK_TEST_FAIL(test);
   }
 
+  free(init_out_buffer);
   free(reference_out_buffer);
   free(actual_out_buffer);
   free(lhs_buffer);
@@ -292,8 +336,11 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
 }
 
 static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
-                                    int K0, const char* cpu_features,
-                                    const char* code_path_suffix) {
+                                    int K0, const char* cpu_features) {
+  const char* code_path_suffix = "";
+  if (flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) {
+    code_path_suffix = " skipround";
+  }
   char types_str[32];
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(flags);
   iree_uk_type_triple_str(types_str, sizeof types_str, mmt4d_type);
@@ -308,16 +355,19 @@ static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
 
 static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
                                const char* cpu_features) {
-  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
+  // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
+  // narrow variants for handling these cases.
+  for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
+    iree_uk_test_mmt4d_impl(flags, narrowM0, N0, K0, cpu_features);
+  }
+  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features);
 }
 
-static void iree_uk_test_mmt4d_default_and_intrinsics(
+static void iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
     iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
-  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
-#if defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
-  iree_uk_test_mmt4d_impl(flags | IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS, M0, N0,
-                          K0, cpu_features, " intrinsics");
-#endif  // defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
+  iree_uk_test_mmt4d(flags, M0, N0, K0, cpu_features);
+  iree_uk_test_mmt4d(flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS, M0,
+                     N0, K0, cpu_features);
 }
 
 int main(int argc, char** argv) {
@@ -332,18 +382,31 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 2, 9, 3, "");
 
 #if defined(IREE_ARCH_ARM_64)
-  // On arm64, some code paths have inline asm and intrinsics variants. For them
-  // we use iree_uk_test_mmt4d_default_and_intrinsics to test both.
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
+  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "");
+  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "fp16");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4, "bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4, "dotprod");
-  iree_uk_test_mmt4d_default_and_intrinsics(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8,
-                                            8, 8, "i8mm");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 8, "i8mm");
 #elif defined(IREE_ARCH_X86_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 4, 1, "");  // SSE
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 16, 16, 1,
                      "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 16, 16, 1,
+                     "avx512_base");
+  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "avx2_fma");
+  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 16, 16, 1, "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 16, 16, 2,
+                     "avx512_bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 4, 2, "");  // SSE2
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 2, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_base");

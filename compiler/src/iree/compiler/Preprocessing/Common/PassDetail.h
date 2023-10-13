@@ -7,8 +7,9 @@
 #ifndef IREE_COMPILER_PREPROCESSING_COMMON_PASS_DETAIL_H_
 #define IREE_COMPILER_PREPROCESSING_COMMON_PASS_DETAIL_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/FunctionInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

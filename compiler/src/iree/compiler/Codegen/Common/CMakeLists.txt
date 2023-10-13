@@ -98,6 +98,7 @@ iree_cc_library(
     MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
@@ -115,9 +116,11 @@ iree_cc_library(
     "EncodingInfo.h"
     "ExtractAddressComputation.h"
     "Passes.h"
+    "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
   SRCS
+    "AddFastMathFlags.cpp"
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
@@ -127,14 +130,18 @@ iree_cc_library(
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DecomposeAffineOpsPass.cpp"
+    "DecomposeBatchMmt4DOps.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
+    "EmulateNarrowType.cpp"
+    "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "ExtractAddressComputation.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
+    "FoldTensorSubsetIntoVectorTransferOps.cpp"
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
@@ -153,11 +160,13 @@ iree_cc_library(
     "PolynomialApproximationPass.cpp"
     "RematerializeParallelOps.cpp"
     "RemoveTrivialLoops.cpp"
+    "ReplaceSlowMinMaxOps.cpp"
     "SplitFullPartialTransferPass.cpp"
     "TestExecutablePreprocessing.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorizePad.cpp"
@@ -190,6 +199,7 @@ iree_cc_library(
     MLIRMathTransforms
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRMemRefUtils
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow

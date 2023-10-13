@@ -140,8 +140,9 @@ static iree_status_t iree_replay_benchmark_run_documents(
     // loading we can do that now before processing subsequent events.
     if (iree_status_is_ok(status) && !have_parsed_inputs && replay->device) {
       status = iree_tooling_parse_into_variant_list(
-          iree_hal_device_allocator(replay->device), FLAG_input_list().values,
-          FLAG_input_list().count, replay->host_allocator, replay->inputs);
+          replay->device, iree_hal_device_allocator(replay->device),
+          FLAG_input_list().values, FLAG_input_list().count,
+          replay->host_allocator, replay->inputs);
       have_parsed_inputs = true;
     }
 

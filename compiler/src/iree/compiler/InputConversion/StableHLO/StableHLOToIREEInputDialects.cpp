@@ -325,13 +325,35 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
     setFuncEncodings(srcOp, oldFuncType, newFuncType);
 
     // Tell the rewriter to convert the region signature.
-    TypeConverter &typeConverter = *getTypeConverter();
+    const TypeConverter &typeConverter = *getTypeConverter();
     if (failed(rewriter.convertRegionTypes(&srcOp.getBody(), typeConverter,
                                            &signatureConversion))) {
       return failure();
     }
 
     rewriter.finalizeRootUpdate(srcOp);
+    return success();
+  }
+};
+
+struct TensorEmptyPattern final : OpConversionPattern<tensor::EmptyOp> {
+  using OpConversionPattern<tensor::EmptyOp>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(tensor::EmptyOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto oldType = cast<ShapedType>(op.getType());
+    auto newType = getTypeConverter()->convertType(oldType);
+    if (newType == oldType)
+      return failure();
+
+    if (!newType)
+      return rewriter.notifyMatchFailure(op, "result type conversion failed");
+
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
+        op, oldType.getShape(),
+        getTypeConverter()->convertType(oldType.getElementType()),
+        op.getDynamicSizes());
     return success();
   }
 };
@@ -494,12 +516,15 @@ struct ConvertStableHloToIreeInputDialects final
 
     // Structural patterns (functions, cfg, terminators).
     patterns.add<BuiltinFuncOpPattern>(*typeConverter, context);
-    patterns.add<GlobalOpPattern>(*typeConverter, context);
+    patterns.add<GlobalOpPattern, TensorEmptyPattern>(*typeConverter, context);
 
     for (StringRef opName :
          {func::ReturnOp::getOperationName(), func::CallOp::getOperationName(),
           cf::CondBranchOp::getOperationName(),
-          cf::BranchOp::getOperationName(),
+          cf::BranchOp::getOperationName(), scf::ForOp::getOperationName(),
+          scf::IfOp::getOperationName(), scf::YieldOp::getOperationName(),
+          scf::ConditionOp::getOperationName(),
+          scf::WhileOp::getOperationName(),
           ml_program::GlobalLoadOp::getOperationName(),
           ml_program::GlobalLoadConstOp::getOperationName(),
           ml_program::GlobalStoreOp::getOperationName(),
@@ -559,6 +584,10 @@ struct ConvertStableHloToIreeInputDialects final
         [&](ml_program::GlobalOp op) {
           return typeConverter->isLegal(op.getType());
         });
+
+    target.addDynamicallyLegalOp<tensor::EmptyOp>([&](tensor::EmptyOp op) {
+      return typeConverter->isLegal(op.getType());
+    });
 
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();

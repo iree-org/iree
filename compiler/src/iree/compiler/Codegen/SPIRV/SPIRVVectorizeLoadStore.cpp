@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -36,6 +37,10 @@ constexpr int kMaxVectorNumElements = 4;
 
 namespace mlir {
 namespace iree_compiler {
+
+//===----------------------------------------------------------------------===//
+// Utility Functions
+//===----------------------------------------------------------------------===//
 
 /// Scans all uses of the given memref `value` to make sure they are ops that we
 /// can vectorize, including vector transfer ops and GPU subgroup MMA ops, or
@@ -57,7 +62,7 @@ static bool getUsesIfAllTransferOp(Value value,
     }
 
     if (auto transferOp = dyn_cast<VectorTransferOpInterface>(userOp)) {
-      if (!transferOp.permutation_map().isMinorIdentity()) {
+      if (!transferOp.getPermutationMap().isMinorIdentity()) {
         uses.clear();
         LLVM_DEBUG(llvm::dbgs() << "failed: non-minor-identity transfer user: "
                                 << *userOp << "\n");
@@ -76,7 +81,7 @@ static std::optional<unsigned> getBitWidth(Type type) {
     return type.getIntOrFloatBitWidth();
   }
   if (llvm::isa<VectorType>(type)) {
-    auto vecType = llvm::cast<VectorType>(type);
+    auto vecType = cast<VectorType>(type);
     auto elementType = vecType.getElementType();
     return elementType.getIntOrFloatBitWidth() * vecType.getNumElements();
   }
@@ -119,7 +124,7 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
     // still need to make sure we can load/store with good strides.
     // The `leadingDimension` attributes specifies the stride (numer of
     // *elements*) over the memref for the leading dimension.
-    auto memrefType = llvm::cast<MemRefType>(memrefVal.getType());
+    auto memrefType = cast<MemRefType>(memrefVal.getType());
     std::optional<unsigned> elementBits =
         getBitWidth(memrefType.getElementType());
     if (!elementBits)
@@ -138,7 +143,7 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
 /// memref uses.
 static unsigned isMemRefVectorizable(Value value,
                                      SmallVectorImpl<Operation *> &uses) {
-  auto memrefType = llvm::dyn_cast<MemRefType>(value.getType());
+  auto memrefType = dyn_cast<MemRefType>(value.getType());
 
   // Require scalar element type
   if (!memrefType || (!llvm::isa<IntegerType>(memrefType.getElementType()) &&
@@ -164,6 +169,12 @@ static unsigned isMemRefVectorizable(Value value,
   }
 
   unsigned elementNumBits = memrefType.getElementTypeBitWidth();
+  LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
+  if (elementNumBits < 8 && !llvm::isPowerOf2_32(elementNumBits)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "failed: not power-of-two sub-byte element type\n");
+    return 0;
+  }
   if (kMaxVectorNumBits % elementNumBits != 0) {
     LLVM_DEBUG(llvm::dbgs() << "failed: element not fitting in vector4\n");
     return 0;
@@ -171,11 +182,17 @@ static unsigned isMemRefVectorizable(Value value,
 
   if (getUsesIfAllTransferOp(value, uses)) {
     unsigned vectorBits = calculateMemRefVectorNumBits(uses);
+    LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
     if (!vectorBits)
       return 0;
+
+    // TODO: Fix sub-byte type support in vector.bitcast lowering.
+    if (vectorBits % 32 != 0) {
+      LLVM_DEBUG(llvm::dbgs() << "failed: less than 32-bit vector\n");
+      return 0;
+    }
+
     unsigned vectorSize = vectorBits / elementNumBits;
-    LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
-    LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
     // Again make sure we don't have vectors of odd numbers.
     if (vectorSize % 2 != 0) {
       LLVM_DEBUG(llvm::dbgs() << "failed: odd element count after grouping\n");
@@ -193,6 +210,10 @@ static unsigned isMemRefVectorizable(Value value,
 }
 
 namespace {
+//===----------------------------------------------------------------------===//
+// MemRef Usage Analysis
+//===----------------------------------------------------------------------===//
+
 /// Analyze memref usages to decide if it should be vectorized. Right now the
 /// logic is to vectorize memref only if it is used by vector transfer
 /// read/write ops.
@@ -249,6 +270,10 @@ void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// MemRef Conversion Patterns
+//===----------------------------------------------------------------------===//
+
 template <typename OpTy>
 class MemRefConversionPattern : public OpConversionPattern<OpTy> {
 public:
@@ -279,7 +304,29 @@ public:
 
   LogicalResult
   matchAndRewrite(func::FuncOp funcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override;
+                  ConversionPatternRewriter &rewriter) const override {
+    TypeConverter::SignatureConversion signatureConverter(
+        funcOp.getFunctionType().getNumInputs());
+    for (const auto [index, arg] : llvm::enumerate(funcOp.getArguments())) {
+      if (memrefUsageAnalysis.shouldVectorizeMemRef(arg)) {
+        if (auto memrefType = getVectorizedMemRefType(rewriter, arg)) {
+          signatureConverter.addInputs(index, *memrefType);
+          continue;
+        }
+      }
+      signatureConverter.addInputs(index, arg.getType());
+    }
+    // Creates a new function with the update signature.
+    rewriter.applySignatureConversion(&funcOp.getFunctionBody(),
+                                      signatureConverter);
+
+    // Creates a new function with the update signature.
+    rewriter.updateRootInPlace(funcOp, [&] {
+      funcOp.setType(rewriter.getFunctionType(
+          signatureConverter.getConvertedTypes(), std::nullopt));
+    });
+    return success();
+  }
 };
 
 class ProcessTransferRead final
@@ -299,40 +346,88 @@ public:
 
     Location loc = read.getLoc();
 
-    auto scalarMemrefType =
-        llvm::dyn_cast<MemRefType>(read.getSource().getType());
-    auto vectorMemrefType =
-        llvm::dyn_cast<MemRefType>(adaptor.getSource().getType());
+    auto scalarMemrefType = dyn_cast<MemRefType>(read.getSource().getType());
+    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getSource().getType());
+    auto memrefVectorType = cast<VectorType>(vectorMemrefType.getElementType());
     auto readVectorType = read.getVectorType();
-    if (!scalarMemrefType || !vectorMemrefType)
-      return failure();
+    if (!scalarMemrefType || !vectorMemrefType) {
+      return rewriter.notifyMatchFailure(
+          read, "failed to get scalar/vector memref type");
+    }
 
     std::optional<unsigned> vectorMemrefElemSize =
         getBitWidth(vectorMemrefType.getElementType());
     std::optional<unsigned> readVecSize = getBitWidth(readVectorType);
 
-    auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
-                                 adaptor.getIndices(), rewriter, loc);
+    FailureOr<SmallVector<Value>> indices =
+        adjustIndices(scalarMemrefType, vectorMemrefType, adaptor.getIndices(),
+                      rewriter, loc);
     if (failed(indices))
-      return failure();
+      return rewriter.notifyMatchFailure(read, "failed to adjust indices");
 
     // If the transfer_read can be replaced by a load after vectorization use
     // LoadOp and cast back to the original type.
     if (*vectorMemrefElemSize == *readVecSize) {
-      Type elemType = vectorMemrefType.getElementType();
       Value newLoad = rewriter.create<memref::LoadOp>(
-          loc, elemType, adaptor.getSource(), indices.value());
-      Type serializedVecType =
-          VectorType::get(read.getVectorType().getNumElements(),
-                          read.getVectorType().getElementType());
-      newLoad =
-          rewriter.create<vector::BitCastOp>(loc, serializedVecType, newLoad);
-      rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
-          read, read.getVectorType(), newLoad);
-    } else {
-      rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-          read, read.getVectorType(), adaptor.getSource(), indices.value());
+          loc, memrefVectorType, adaptor.getSource(), indices.value());
+      rewriter.replaceOpWithNewOp<vector::BitCastOp>(read, readVectorType,
+                                                     newLoad);
+      return success();
     }
+
+    // We use the minimal vector seen in all transfer uses as the vectorized
+    // memref element type, so it's guaranteed that the read vector size is
+    // some multiple of that.
+    assert(*readVecSize % *vectorMemrefElemSize == 0);
+
+    MLIRContext *context = rewriter.getContext();
+    AffineExpr sym0, sym1;
+    bindSymbols(context, sym0, sym1);
+    auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
+
+    // We have checked that this transfer op has identity map, so we increase
+    // the innermost index to perform continuous reads.
+    Value oldIndex = indices->back();
+
+    int vectorCount = *readVecSize / *vectorMemrefElemSize;
+    SmallVector<Value, 4> vectors;
+
+    VectorType combinedType =
+        VectorType::get(memrefVectorType.getNumElements() * vectorCount,
+                        memrefVectorType.getElementType());
+
+    for (int i = 0; i < vectorCount; ++i) {
+      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      indices->back() = rewriter.create<affine::AffineApplyOp>(
+          loc, addMap, ValueRange{oldIndex, iVal});
+      vectors.push_back(
+          rewriter.create<memref::LoadOp>(loc, adaptor.getSource(), *indices));
+    }
+
+    // If there is only two component vectors, we can use ShuffleOp, which is a
+    // bit simpler.
+    if (vectorCount == 2) {
+      SmallVector<int64_t> seqIndices =
+          llvm::to_vector(llvm::seq<int64_t>(readVectorType.getNumElements()));
+      auto ShuffleOp = rewriter.create<vector::ShuffleOp>(
+          loc, vectors[0], vectors[1], seqIndices);
+      rewriter.replaceOpWithNewOp<vector::BitCastOp>(read, readVectorType,
+                                                     ShuffleOp);
+      return success();
+    }
+
+    SmallVector<int64_t> offsets(combinedType.getRank(), 0);
+    SmallVector<int64_t> strides(combinedType.getRank(), 1);
+
+    Value newVector = rewriter.create<arith::ConstantOp>(
+        loc, combinedType, rewriter.getZeroAttr(combinedType));
+    for (int i = 0; i < vectorCount; ++i) {
+      offsets.back() = i * memrefVectorType.getNumElements();
+      newVector = rewriter.create<vector::InsertStridedSliceOp>(
+          loc, vectors[i], newVector, offsets, strides);
+    }
+
+    rewriter.replaceOp(read, newVector);
     return success();
   }
 };
@@ -354,38 +449,70 @@ public:
 
     Location loc = write.getLoc();
 
-    auto scalarMemrefType =
-        llvm::dyn_cast<MemRefType>(write.getSource().getType());
-    auto vectorMemrefType =
-        llvm::dyn_cast<MemRefType>(adaptor.getSource().getType());
+    auto scalarMemrefType = dyn_cast<MemRefType>(write.getSource().getType());
+    auto vectorMemrefType = dyn_cast<MemRefType>(adaptor.getSource().getType());
+    auto memrefVectorType = cast<VectorType>(vectorMemrefType.getElementType());
     auto writeVectorType = write.getVectorType();
-    if (!scalarMemrefType || !vectorMemrefType)
-      return failure();
+    if (!scalarMemrefType || !vectorMemrefType) {
+      return rewriter.notifyMatchFailure(
+          write, "failed to get scalar/vector memref type");
+    }
 
     std::optional<unsigned> vectorMemrefElemSize =
-        getBitWidth(vectorMemrefType.getElementType());
+        getBitWidth(memrefVectorType);
     std::optional<unsigned> writeVecSize = getBitWidth(writeVectorType);
 
-    auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
-                                 adaptor.getIndices(), rewriter, loc);
+    FailureOr<SmallVector<Value>> indices =
+        adjustIndices(scalarMemrefType, vectorMemrefType, adaptor.getIndices(),
+                      rewriter, loc);
     if (failed(indices))
-      return failure();
+      return rewriter.notifyMatchFailure(write, "failed to adjust indices");
 
     // If the transfer_write can be replaced by a store after vectorization cast
     // the original value and use StoreOp.
     if (*vectorMemrefElemSize == *writeVecSize) {
-      Type serializedVecType = VectorType::get(
-          writeVectorType.getNumElements(), writeVectorType.getElementType());
-      Value data = rewriter.create<vector::ShapeCastOp>(loc, serializedVecType,
-                                                        adaptor.getVector());
-      data = rewriter.create<vector::BitCastOp>(
-          loc, vectorMemrefType.getElementType(), data);
+      Value data = rewriter.create<vector::BitCastOp>(loc, memrefVectorType,
+                                                      adaptor.getVector());
       rewriter.replaceOpWithNewOp<memref::StoreOp>(
           write, data, adaptor.getSource(), indices.value());
-    } else {
-      rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-          write, adaptor.getVector(), adaptor.getSource(), indices.value());
+      return success();
     }
+
+    // We use the minimal vector seen in all transfer uses as the vectorized
+    // memref element type, so it's guaranteed that the read vector size is
+    // some multiple of that.
+    assert(*writeVecSize % *vectorMemrefElemSize == 0);
+
+    MLIRContext *context = rewriter.getContext();
+    AffineExpr sym0, sym1;
+    bindSymbols(context, sym0, sym1);
+    auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
+
+    // We have checked that this transfer op has identity map, so we increase
+    // the innermost index to perform continuous reads.
+    Value oldIndex = indices->back();
+
+    int vectorCount = *writeVecSize / *vectorMemrefElemSize;
+
+    SmallVector<int64_t> offsets(writeVectorType.getRank(), 0);
+    SmallVector<int64_t> sizes(writeVectorType.getRank(), 1);
+    SmallVector<int64_t> strides(writeVectorType.getRank(), 1);
+    sizes.back() = memrefVectorType.getNumElements();
+
+    for (int i = 0; i < vectorCount; ++i) {
+      offsets.back() = i * memrefVectorType.getNumElements();
+      auto slice = rewriter.create<vector::ExtractStridedSliceOp>(
+          loc, adaptor.getVector(), offsets, sizes, strides);
+      auto component =
+          rewriter.create<vector::BitCastOp>(loc, memrefVectorType, slice);
+      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      indices->back() = rewriter.create<affine::AffineApplyOp>(
+          loc, addMap, ValueRange{oldIndex, iVal});
+      rewriter.create<memref::StoreOp>(loc, component, adaptor.getSource(),
+                                       *indices);
+    }
+
+    rewriter.eraseOp(write);
     return success();
   }
 };
@@ -402,7 +529,7 @@ template <typename OpTy>
 std::optional<MemRefType>
 MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
     ConversionPatternRewriter &rewriter, Value memRefValue) const {
-  MemRefType type = llvm::cast<MemRefType>(memRefValue.getType());
+  MemRefType type = cast<MemRefType>(memRefValue.getType());
   unsigned vectorNumBits =
       memrefUsageAnalysis.getMemRefVectorSizeInBits(memRefValue);
 
@@ -413,8 +540,16 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   // allowed for loads use a larger element type.
   if (vectorNumElements > kMaxVectorNumElements) {
     scalarType = llvm::isa<IntegerType>(scalarType)
-                     ? llvm::cast<Type>(rewriter.getI32Type())
-                     : llvm::cast<Type>(rewriter.getF32Type());
+                     ? cast<Type>(rewriter.getI32Type())
+                     : cast<Type>(rewriter.getF32Type());
+    scalarNumBits = scalarType.getIntOrFloatBitWidth();
+    vectorNumElements = vectorNumBits / scalarNumBits;
+  }
+  // If we have sub-byte elements, try to make them as whole bytes.
+  if (scalarNumBits < 8) {
+    assert(isa<IntegerType>(scalarType));
+    assert(8 % scalarNumBits == 0);
+    scalarType = cast<Type>(rewriter.getI8Type());
     scalarNumBits = scalarType.getIntOrFloatBitWidth();
     vectorNumElements = vectorNumBits / scalarNumBits;
   }
@@ -427,8 +562,7 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   newShape.back() = newShape.back() / ratio;
 
   MemRefLayoutAttrInterface layout = {};
-  if (auto stridedLayout =
-          llvm::dyn_cast<StridedLayoutAttr>(type.getLayout())) {
+  if (auto stridedLayout = dyn_cast<StridedLayoutAttr>(type.getLayout())) {
     auto offset = stridedLayout.getOffset();
     if (offset != ShapedType::kDynamic) {
       offset = offset / ratio;
@@ -497,7 +631,7 @@ public:
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp subspanOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = llvm::dyn_cast<MemRefType>(subspanOp.getType());
+    auto memrefType = dyn_cast<MemRefType>(subspanOp.getType());
     if (!memrefType)
       return failure();
 
@@ -527,9 +661,9 @@ struct ProcessSubgroupMMALoad final
   matchAndRewrite(gpu::SubgroupMmaLoadMatrixOp loadOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto scalarMemrefType =
-        llvm::dyn_cast<MemRefType>(loadOp.getSrcMemref().getType());
+        dyn_cast<MemRefType>(loadOp.getSrcMemref().getType());
     auto vectorMemrefType =
-        llvm::dyn_cast<MemRefType>(adaptor.getSrcMemref().getType());
+        dyn_cast<MemRefType>(adaptor.getSrcMemref().getType());
 
     Location loc = loadOp.getLoc();
     auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
@@ -561,9 +695,9 @@ struct ProcessSubgroupMMAStore final
   matchAndRewrite(gpu::SubgroupMmaStoreMatrixOp storeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto scalarMemrefType =
-        llvm::dyn_cast<MemRefType>(storeOp.getDstMemref().getType());
+        dyn_cast<MemRefType>(storeOp.getDstMemref().getType());
     auto vectorMemrefType =
-        llvm::dyn_cast<MemRefType>(adaptor.getDstMemref().getType());
+        dyn_cast<MemRefType>(adaptor.getDstMemref().getType());
 
     Location loc = storeOp.getLoc();
     auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
@@ -586,6 +720,10 @@ struct ProcessSubgroupMMAStore final
     return success();
   }
 };
+
+//===----------------------------------------------------------------------===//
+// Auxiliary Conversion Patterns
+//===----------------------------------------------------------------------===//
 
 template <typename OpT>
 class PassThroughConversion : public OpConversionPattern<OpT> {
@@ -739,6 +877,10 @@ struct ScalarizeVectorTransferWrite final
   }
 };
 
+//===----------------------------------------------------------------------===//
+// Pass
+//===----------------------------------------------------------------------===//
+
 class SPIRVVectorizeLoadStorePass final
     : public SPIRVVectorizeLoadStoreBase<SPIRVVectorizeLoadStorePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -752,37 +894,26 @@ private:
 };
 } // namespace
 
-LogicalResult ProcessFunctionArgument::matchAndRewrite(
-    func::FuncOp funcOp, OpAdaptor adaptor,
-    ConversionPatternRewriter &rewriter) const {
-  TypeConverter::SignatureConversion signatureConverter(
-      funcOp.getFunctionType().getNumInputs());
-  for (const auto &[index, arg] : llvm::enumerate(funcOp.getArguments())) {
-    if (memrefUsageAnalysis.shouldVectorizeMemRef(arg)) {
-      if (auto memrefType = getVectorizedMemRefType(rewriter, arg)) {
-        signatureConverter.addInputs(index, *memrefType);
-        continue;
-      }
-    }
-    signatureConverter.addInputs(index, arg.getType());
-  }
-  // Creates a new function with the update signature.
-  rewriter.applySignatureConversion(&funcOp.getFunctionBody(),
-                                    signatureConverter);
-
-  // Creates a new function with the update signature.
-  rewriter.updateRootInPlace(funcOp, [&] {
-    funcOp.setType(rewriter.getFunctionType(
-        signatureConverter.getConvertedTypes(), std::nullopt));
-  });
-  return success();
-}
-
 void SPIRVVectorizeLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
   ModuleOp module = getOperation();
   MLIRContext *context = &getContext();
+
+  // Prior pass should have unrolled and broken down vectors with rank > 1.
+  for (func::FuncOp func : module.getOps<func::FuncOp>()) {
+    auto result = func.walk([](VectorTransferOpInterface transferOp) {
+      if (cast<VectorType>(transferOp.getVectorType()).getRank() > 1) {
+        transferOp.emitOpError(
+            "with rank > 1 should be broken down by prior passes");
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
+    if (result.wasInterrupted()) {
+      signalPassFailure();
+    }
+  }
 
   memrefUsageAnalysis = &getAnalysis<MemRefUsageAnalysis>();
 

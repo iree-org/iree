@@ -22,3 +22,7 @@ instructions.
 
 Developer documentation _can_ compromise on each of these points. Pages may
 also be promoted to website/ after some refinement.
+
+For more details on how this is set up, see
+
+* [IREE Website Overview - July 10, 2023](https://docs.google.com/presentation/d/116TyW_aCsPXmmjRYI2tRqpOwDaGNoV8LDC_j9hsMrDk/edit?usp=sharing)

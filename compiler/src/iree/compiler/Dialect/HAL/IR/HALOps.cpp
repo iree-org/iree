@@ -8,21 +8,16 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/IRMapping.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/FunctionImplementation.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -119,12 +114,17 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
-// hal.ex.shared_device
+// hal.ex.*
 //===----------------------------------------------------------------------===//
 
 void ExSharedDeviceOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "device");
+}
+
+void ExFileFromMemoryOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "memory_file");
 }
 
 //===----------------------------------------------------------------------===//
@@ -335,35 +335,18 @@ Value AllocatorAllocateOp::getResultSize(unsigned idx) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.allocator.allocate.initialized
+// hal.allocator.import
 //===----------------------------------------------------------------------===//
 
-void AllocatorAllocateInitializedOp::getAsmResultNames(
+void AllocatorImportOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getDidImport(), "did_import");
   setNameFn(getResult(), "mapped");
 }
 
-Value AllocatorAllocateInitializedOp::getOperandSize(unsigned idx) {
-  return {};
-}
+Value AllocatorImportOp::getOperandSize(unsigned idx) { return {}; }
 
-Value AllocatorAllocateInitializedOp::getResultSize(unsigned idx) {
-  return getLength();
-}
-
-//===----------------------------------------------------------------------===//
-// hal.allocator.try_map
-//===----------------------------------------------------------------------===//
-
-void AllocatorTryMapOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getDidMap(), "did_map");
-  setNameFn(getResult(), "mapped");
-}
-
-Value AllocatorTryMapOp::getOperandSize(unsigned idx) { return {}; }
-
-Value AllocatorTryMapOp::getResultSize(unsigned idx) { return getLength(); }
+Value AllocatorImportOp::getResultSize(unsigned idx) { return getLength(); }
 
 //===----------------------------------------------------------------------===//
 // hal.buffer.subspan
@@ -665,9 +648,10 @@ Value DeviceQueueAllocaOp::getResultSize(unsigned idx) {
 static LogicalResult verifyDeviceQueueFences(Operation *queueOp,
                                              Value waitFence,
                                              Value signalFence) {
-  if (waitFence == signalFence) {
+  if (waitFence == signalFence &&
+      !isa<IREE::Util::NullOp>(waitFence.getDefiningOp())) {
     return queueOp->emitOpError() << "device queue operations cannot wait and "
-                                     "signal on the same fence";
+                                     "signal on the same fence.";
   }
   return success();
 }
@@ -677,6 +661,14 @@ LogicalResult DeviceQueueAllocaOp::verify() {
 }
 
 LogicalResult DeviceQueueDeallocaOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueReadOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+LogicalResult DeviceQueueWriteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }
 

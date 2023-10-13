@@ -38,6 +38,14 @@ struct AbstractGemmLikeStrategy : GPUStrategy {
   /// override the user's choices.
   bool cliOptionsSpecified = false;
 
+  /// Non-default subgroup size to use configured based on hardware supported
+  /// values.
+  std::optional<int64_t> targetSubgroupSize = std::nullopt;
+
+  int64_t getSubgroupSize() const {
+    return targetSubgroupSize ? *targetSubgroupSize : subgroupSize;
+  }
+
   //===--------------------------------------------------------------------===//
   // Parameters that control the tiling and mapping.
   //===--------------------------------------------------------------------===//
@@ -110,6 +118,11 @@ struct AbstractGemmLikeStrategy : GPUStrategy {
   virtual LogicalResult validateRhsCopyMapping() const = 0;
   virtual MappingInfo resCopyMapping() const = 0;
   virtual LogicalResult validateResCopyMapping() const = 0;
+
+  /// Validates the mapping and emits a diagnostic on failure.
+  LogicalResult validateCopyMapping(MLIRContext *ctx,
+                                    const MappingInfo &mapping,
+                                    StringRef name) const;
 
   //===--------------------------------------------------------------------===//
   // Parameters that control compute mapping decisions.

@@ -205,12 +205,13 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # intrinsics (#14168).
     "-fno-lax-vector-conversions"
 
-  # TODO(#6959): Enable -Werror once we have a presubmit CI.
   GCC
     "-Wall"
+    "-Werror"
     "-Wno-address-of-packed-member"
     "-Wno-comment"
     "-Wno-format-zero-length"
+    "-Wno-uninitialized"
     # Technically UB but needed for intrusive ptrs
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-invalid-offsetof>
     $<$<COMPILE_LANGUAGE:C>:-Wno-pointer-sign>

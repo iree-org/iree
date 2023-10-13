@@ -1,0 +1,17 @@
+[project]
+name = "iree-distributed"
+version = "0.0.0"
+dependencies = [
+    "iree-compiler",
+    "iree-runtime",
+    "jax[cpu]",
+    "mpi4py",
+    "numpy",
+]
+[build-system]
+requires = [
+    "setuptools>=61",
+    "wheel",
+    "packaging",
+]
+build-backend = "setuptools.build_meta"

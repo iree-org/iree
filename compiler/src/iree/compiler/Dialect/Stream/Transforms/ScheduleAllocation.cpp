@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/EquivalenceClasses.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -22,9 +22,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-schedule-allocation"
@@ -39,22 +37,69 @@ namespace {
 // Alias analysis
 //===----------------------------------------------------------------------===//
 
-using ValueAliasingMap = llvm::MapVector<Value, SmallPtrSet<Value, 16>>;
+// Disjoint-set data structure holding non-overlapping sets of aliasing values.
+class ValueAliasingSet {
+public:
+  void addAlias(Value aliasee, Value aliaser) {
+    auto aliaseeWithId = getWithId(aliasee);
+    auto aliaserWithId = getWithId(aliaser);
+    valueAliasing.unionSets(aliaseeWithId, aliaserWithId);
+  }
+
+  SmallVector<SmallVector<Value>> getValueAliasSets() const {
+    SmallVector<SmallVector<Value>> result;
+    for (auto it = valueAliasing.begin(); it != valueAliasing.end(); ++it) {
+      if (!it->isLeader())
+        continue; // Ignore non-leader sets.
+      auto &aliasSet = result.emplace_back();
+      for (auto mi = valueAliasing.member_begin(it);
+           mi != valueAliasing.member_end(); ++mi) {
+        aliasSet.push_back(mi->value);
+      }
+    }
+    return result;
+  }
+
+  auto getValueAliases(Value value) const {
+    return llvm::make_filter_range(
+        llvm::map_range(
+            llvm::make_range(valueAliasing.findLeader(getWithId(value)),
+                             valueAliasing.member_end()),
+            NumberedValue::getValue),
+        [=](Value aliaser) { return aliaser != value; });
+  }
+
+private:
+  // EquivalenceClasses require ordering for value type to return deterministic
+  // results, so we provide it by assigning id to all values added to the set.
+  struct NumberedValue {
+    Value value;
+    int64_t id;
+
+    static Value getValue(const NumberedValue &value) { return value.value; }
+  };
+
+  struct Comparator {
+    int operator()(const NumberedValue &a, const NumberedValue &b) const {
+      return a.id < b.id;
+    }
+  };
+
+  NumberedValue getWithId(Value value) const {
+    auto [iterator, inserted] = id.try_emplace(value, id.size());
+    return {value, iterator->second};
+  }
+
+  mutable llvm::DenseMap<Value, int64_t> id;
+  llvm::EquivalenceClasses<NumberedValue, Comparator> valueAliasing;
+};
 
 // Builds a map of value aliases from aliasee to a set of aliasers.
 // Only values that alias will be present in the map. The map may contain
 // values nested within the |regionOp|.
 static void computeRegionValueAliases(Operation *regionOp,
-                                      ValueAliasingMap &valueAliases) {
+                                      ValueAliasingSet &valueAliases) {
   auto *block = &regionOp->getRegion(0).front();
-
-  auto propagateAlias = [&](Value streamValue, Value aliasedValue) {
-    auto &baseSet = valueAliases[streamValue];
-    baseSet.insert(aliasedValue);
-    auto &aliasedSet = valueAliases[aliasedValue];
-    baseSet.insert(aliasedSet.begin(), aliasedSet.end());
-    aliasedSet.insert(streamValue);
-  };
 
   // Filter out to only resource results - some regions may return additional
   // things like stream.async.execute returning a timepoint.
@@ -73,7 +118,7 @@ static void computeRegionValueAliases(Operation *regionOp,
         tiedStreamOp.getTiedResultOperandIndex(outerResult.getResultNumber());
     if (tiedOperandIndex.has_value()) {
       auto arg = block->getArgument(tiedOperandIndex.value());
-      propagateAlias(innerResult, arg);
+      valueAliases.addAlias(innerResult, arg);
     }
   }
 
@@ -95,31 +140,18 @@ static void computeRegionValueAliases(Operation *regionOp,
       if (tiedOp) {
         auto tiedOperand = tiedOp.getTiedResultOperand(result);
         if (tiedOperand) {
-          propagateAlias(result, tiedOperand);
-        }
-      }
-    }
-  }
-
-  // Invert the value aliaser->aliasee map so that we have for any particular
-  // value the list of all other values that alias it.
-  for (auto it : valueAliases) {
-    for (auto aliasee : it.second) {
-      for (auto aliaser : it.second) {
-        if (aliaser != aliasee) {
-          valueAliases[aliasee].insert(aliaser);
+          valueAliases.addAlias(result, tiedOperand);
         }
       }
     }
   }
 }
 
-// Builds a map of value aliases from aliasee to a set of aliasers.
-// Only values that alias will be present in the map. The map may contain
-// values nested within the |executeOp|.
-static ValueAliasingMap
+// Builds a set of aliasing sets. Only values that alias will be present in the
+// set. The set may contain values nested within the |executeOp|.
+static ValueAliasingSet
 computeExecutionRegionValueAliases(IREE::Stream::AsyncExecuteOp executeOp) {
-  ValueAliasingMap valueAliases;
+  ValueAliasingSet valueAliases;
   computeRegionValueAliases(executeOp, valueAliases);
   return valueAliases;
 }
@@ -154,7 +186,7 @@ using LivenessIntervalList = SmallVector<LivenessInterval>;
 // lifetime.
 static LivenessIntervalList
 computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
-                                        const ValueAliasingMap &valueAliases) {
+                                        const ValueAliasingSet &valueAliases) {
   // Perform a liveness analysis on the execution region.
   // Fragments have a single block and as such the live-in/live-out block
   // information derived here applies to the entire stream region.
@@ -243,29 +275,37 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
     }
   }
 
-  // Walk the alias map and union intervals and propagate back.
-  for (auto it : valueAliases) {
-    auto &aliasee = it.first;
-    auto &aliasers = it.second;
-    auto &aliaseeInterval = valueIntervals[aliasee];
-    if (aliaseeInterval.ordinal == -1) {
-      // Aliasee is nested somewhere within the current scope.
-      // We'd need to update this analysis to handle the nesting in order to
-      // compute the ranges here but that's not (currently) required as all
-      // allocated values roll up to the parent scope by way of the yields.
+  // Walk the alias set and union intervals and propagate back.
+  for (auto &aliasSet : valueAliases.getValueAliasSets()) {
+
+    // Return true if value is nested  somewhere within the current scope.
+    auto isNested = [&](Value value) -> bool {
+      return valueIntervals[value].ordinal == -1;
+    };
+
+    // We'd need to update this analysis to handle the nesting in order to
+    // compute the ranges here but that's not (currently) required as all
+    // allocated values roll up to the parent scope by way of the yields.
+    if (llvm::all_of(aliasSet, isNested))
       continue;
-    }
+
+    assert((llvm::all_of(aliasSet, isNested) ||
+            llvm::none_of(aliasSet, isNested)) &&
+           "nested values can't alias values in the current scope");
+
+    auto &aliaseeInterval = valueIntervals[aliasSet.front()];
     int start = aliaseeInterval.start;
     int end = aliaseeInterval.end;
-    for (auto aliaser : aliasers) {
+
+    auto aliasers = ArrayRef(aliasSet).drop_front(1);
+    for (Value aliaser : aliasers) {
       auto &aliaserInterval = valueIntervals[aliaser];
-      assert(aliaserInterval.ordinal != -1);
       start = std::min(start, aliaserInterval.start);
       end = std::max(end, aliaserInterval.end);
     }
-    aliaseeInterval.start = start;
-    aliaseeInterval.end = end;
-    for (auto aliaser : aliasers) {
+
+    // Propagate interval back to all values in the aliasing set.
+    for (Value aliaser : aliasSet) {
       auto &aliaserInterval = valueIntervals[aliaser];
       aliaserInterval.start = start;
       aliaserInterval.end = end;
@@ -336,8 +376,8 @@ struct AllocationScope {
   // Execution region being allocated.
   Operation *getRootOp() const { return rootOp; }
 
-  // Aliasing map for the entire root op, indicating which values are tied.
-  const ValueAliasingMap &getValueAliases() const { return valueAliases; }
+  // Aliasing set for the entire root op, indicating which values are tied.
+  const ValueAliasingSet &getValueAliases() const { return valueAliases; }
 
   // TODO(benvanik): rework this so that we don't do a switcheroo right in the
   // middle of processing.
@@ -390,15 +430,22 @@ struct AllocationScope {
       llvm::dbgs() << "\n";
     });
 
-    // TODO(#5410): make alias propagation map through an indexing map for
-    // slices/updates. Right now we assume all aliases are 1:1 full maps.
-    for (auto alias : valueAliases[resource]) {
-      resourceRangeMap.insert(std::make_pair(alias, resourceRange));
+    // Propagate alias subranges when present.
+    for (auto alias : valueAliases.getValueAliases(resource)) {
+      ResourceRange aliasRange = resourceRange;
+      if (auto subviewOp =
+              IREE::Stream::ResourceSubviewOp::findSubviewOp(alias)) {
+        aliasRange.resourceSize = subviewOp.getSubrangeResource();
+        aliasRange.resourceSize = subviewOp.getSubrangeResourceSize();
+        aliasRange.offset = subviewOp.getSubrangeOffset();
+        aliasRange.length = subviewOp.getSubrangeLength();
+      }
+      resourceRangeMap.insert(std::make_pair(alias, aliasRange));
       LLVM_DEBUG({
         llvm::dbgs() << "   = alias ";
         alias.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << " = ";
-        resourceRange.print(llvm::dbgs(), *asmState);
+        aliasRange.print(llvm::dbgs(), *asmState);
         llvm::dbgs() << "\n";
       });
     }
@@ -438,21 +485,18 @@ struct AllocationScope {
   void forEachResourceAlias(Value resource,
                             std::function<void(Value)> callback) const {
     callback(resource);
-    auto it = valueAliases.find(resource);
-    if (it != valueAliases.end()) {
-      for (auto alias : it->second) {
-        callback(alias);
-      }
+    for (Value alias : valueAliases.getValueAliases(resource)) {
+      callback(alias);
     }
   }
 
 private:
   Operation *rootOp;
 
-  // All values that have aliases mapped to a set of all of the values they
-  // alias with. That two things alias does not imply the values can be treated
-  // as equivalent: some values may be subranges of others.
-  ValueAliasingMap valueAliases;
+  // Disjoint-set of values that alias each other. That two things alias does
+  // not imply the values can be treated as equivalent: some values may be
+  // subranges of others.
+  ValueAliasingSet valueAliases;
 
   // Index value -> std.constant index value.
   DenseMap<int64_t, Value> indexConstantMap;
@@ -1220,7 +1264,7 @@ static Value findTiedYieldResult(Value seedValue) {
   auto regionOp =
       cast<RegionBranchOpInterface>(seedValue.getParentRegion()->getParentOp());
   SmallVector<RegionSuccessor> regions;
-  regionOp.getSuccessorRegions(0, regions);
+  regionOp.getSuccessorRegions(regionOp->getRegion(0), regions);
   auto results = regions.front().getSuccessorInputs();
   SmallVector<Value> worklist;
   worklist.push_back(seedValue);
@@ -1236,6 +1280,63 @@ static Value findTiedYieldResult(Value seedValue) {
     }
   }
   return {};
+}
+
+// Returns a reversed list of subrange operations that lead from an initial
+// resource down a sequence to |derivedValue|. The first element in the list
+// will be the last subview of |derivedValue| and the last element will be the
+// first subview.
+static SmallVector<IREE::Util::SubrangeOperand>
+gatherSubranges(Value derivedValue) {
+  SmallVector<IREE::Util::SubrangeOperand> subrangeStack;
+  Value baseValue = derivedValue;
+  while (auto definingOp = dyn_cast_or_null<IREE::Util::TiedOpInterface>(
+             baseValue.getDefiningOp())) {
+    auto tiedValue = definingOp.getTiedResultOperand(baseValue);
+    if (!tiedValue)
+      break;
+    if (auto subrangeOp = dyn_cast<IREE::Util::SubrangeOpInterface>(
+            definingOp.getOperation())) {
+      if (subrangeOp.getSubrangeResource() == tiedValue) {
+        subrangeStack.push_back(IREE::Util::SubrangeOperand{
+            subrangeOp.getSubrangeResource(),
+            subrangeOp.getSubrangeResourceSize(),
+            subrangeOp.getSubrangeOffset(), subrangeOp.getSubrangeLength()});
+      }
+    }
+    baseValue = tiedValue;
+  }
+  return subrangeStack;
+}
+
+// Returns a resource range for |resultValue| mapping to the base resource.
+//
+// Example:
+//   %0 = resource
+//   %1 = subview %0[%a for %a_length]
+//   %2 = subview %0[%b for %b_length]
+//   return %3 <- result
+// -> range(%0[(%a + %b) for %b_length])
+static ResourceRange deriveResourceRangeFromResult(Value resultValue,
+                                                   Value resultSize,
+                                                   OpBuilder &builder) {
+  auto subranges = gatherSubranges(resultValue);
+  if (subranges.empty())
+    return ResourceRange(resultValue, resultSize);
+
+  // TODO(benvanik): switch to affine.apply when fully supported.
+  Value offset;
+  for (auto subrange : llvm::reverse(subranges)) {
+    if (offset) {
+      offset = builder.createOrFold<arith::AddIOp>(resultValue.getLoc(), offset,
+                                                   subrange.offset);
+    } else {
+      offset = subrange.offset;
+    }
+  }
+
+  return ResourceRange(subranges.back().resource, subranges.back().resourceSize,
+                       offset, resultSize);
 }
 
 // TODO(benvanik): find a way to split this up. We could probably do this in
@@ -1398,8 +1499,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     if (tiedOperandIndex.has_value()) {
       // Already tied; no need to modify just map.
       auto tiedOperand = executeOp.getOperand(tiedOperandIndex.value());
-      auto arg = entryBlock.getArgument(tiedOperandIndex.value());
       LLVM_DEBUG({
+        auto arg = entryBlock.getArgument(tiedOperandIndex.value());
         AsmState asmState(executeOp->getParentOp());
         llvm::dbgs() << "  - tying operand ";
         tiedOperand.printAsOperand(llvm::dbgs(), asmState);
@@ -1408,10 +1509,35 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
         llvm::dbgs() << " = ";
         result.printAsOperand(llvm::dbgs(), asmState);
         llvm::dbgs() << "\n";
+        auto subrangeStack = gatherSubranges(yieldValue);
+        if (!subrangeStack.empty()) {
+          llvm::dbgs() << "    -> subranges:\n";
+          for (auto subrange : llvm::reverse(subrangeStack)) {
+            llvm::dbgs() << "       ";
+            subrange.resource.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << "{";
+            subrange.resourceSize.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << "}[";
+            subrange.offset.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << " for ";
+            subrange.length.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << "]\n";
+          }
+        }
       });
-      scope.mapResourceRange(yieldValue, ResourceRange(arg, resultSize),
-                             asmState.get());
-      resultReplacements.push_back(std::make_pair(result, tiedOperand));
+      auto resourceRange = deriveResourceRangeFromResult(yieldValue, resultSize,
+                                                         externalBuilder);
+      scope.mapResourceRange(yieldValue, resourceRange, asmState.get());
+      if (resourceRange.offset) {
+        auto resultSubviewOp =
+            externalBuilder.create<IREE::Stream::ResourceSubviewOp>(
+                yieldValue.getLoc(), tiedOperand, resourceRange.resourceSize,
+                resourceRange.offset, resourceRange.length);
+        resultReplacements.push_back(
+            std::make_pair(result, resultSubviewOp.getResult()));
+      } else {
+        resultReplacements.push_back(std::make_pair(result, tiedOperand));
+      }
       continue;
     }
 
@@ -1552,6 +1678,14 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   for (auto replacement : resultReplacements) {
     if (!replacement.second)
       continue; // handled already
+    LLVM_DEBUG({
+      AsmState asmState(newExecuteOp->getParentOp());
+      llvm::dbgs() << "  == replacing region result ";
+      replacement.first.printAsOperand(llvm::dbgs(), asmState);
+      llvm::dbgs() << " -> ";
+      replacement.second.printAsOperand(llvm::dbgs(), asmState);
+      llvm::dbgs() << "\n";
+    });
     replacement.first.replaceAllUsesWith(replacement.second);
   }
   scope.replaceRootOp(newExecuteOp);

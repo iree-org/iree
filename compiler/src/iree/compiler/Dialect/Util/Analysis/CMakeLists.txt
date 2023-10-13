@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRPass
+    MLIRSCFDialect
     MLIRSupport
     iree::compiler::Dialect::Util::IR
   PUBLIC

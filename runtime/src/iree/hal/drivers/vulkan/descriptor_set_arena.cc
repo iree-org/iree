@@ -11,10 +11,10 @@
 #include <utility>
 
 #include "iree/base/internal/math.h"
+#include "iree/hal/drivers/vulkan/base_buffer.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
-#include "iree/hal/drivers/vulkan/vma_buffer.h"
 
 namespace iree {
 namespace hal {
@@ -36,20 +36,19 @@ static void PopulateDescriptorSetWriteInfos(
     const auto& binding = bindings[i];
 
     auto& buffer_info = buffer_infos[i];
-    buffer_info.buffer =
-        binding.buffer ? iree_hal_vulkan_vma_buffer_handle(
-                             iree_hal_buffer_allocated_buffer(binding.buffer))
-                       : VK_NULL_HANDLE;
+    buffer_info.buffer = binding.buffer
+                             ? iree_hal_vulkan_buffer_handle(binding.buffer)
+                             : VK_NULL_HANDLE;
     buffer_info.offset =
         iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
     if (binding.length == IREE_WHOLE_BUFFER) {
       buffer_info.range = VK_WHOLE_SIZE;
     } else {
-      // Round up to a multiple of 32-bit. 32-bit is the most native bitwidth on
-      // GPUs; it has the best support compared to other bitwidths. We use VMA
-      // to manage GPU memory for us and VMA should already handled proper
-      // alignment when performing allocations; here we just need to provide the
-      // proper "view" to Vulkan drivers over the allocated memory.
+      // Round up to a multiple of 32-bit. 32-bit is the defacto native bitwidth
+      // on GPUs; it has the best support compared to other bitwidths. The
+      // allocator should already handled proper alignment when performing
+      // allocations; here we just need to provide the proper "view" to Vulkan
+      // drivers over the allocated memory.
       //
       // Note this is needed because we can see unusal buffers like
       // tensor<3xi8>. Depending on GPU capabilities, this might not always be

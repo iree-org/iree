@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
+#include "iree/compiler/Codegen/TransformStrategies/GPU/ConvolutionImplicitGemmStrategy.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MatmulTensorCoreStrategy.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -51,18 +52,16 @@ using iree_compiler::gpu::build1DSplittingStrategyWithOptionalThreadMapping;
 using iree_compiler::gpu::buildCommonTrailingStrategy;
 using iree_compiler::gpu::buildMapToBlockAndThreads;
 using iree_compiler::gpu::GPUModel;
-using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
 using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
-using iree_compiler::IREE::transform_dialect::
-    IREEEraseHALDescriptorTypeFromMemRefOp;
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
 using iree_compiler::IREE::transform_dialect::SynchronizeLoopOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
+using transform::MemRefEraseDeadAllocAndStoresOp;
 using transform::RewriteInDestinationPassingStyleOp;
 using transform::ScalarizeOp;
 using transform::SequenceOp;
@@ -83,7 +82,7 @@ int64_t mlir::iree_compiler::gpu::scaleUpByBitWidth(int64_t value,
 int64_t mlir::iree_compiler::gpu::adjustNumberOfWarpsForBlockShuffle(
     int64_t numWarpsToUse, int64_t bitWidth) {
   // Try to scale down the number of warps to use 32b elements in warp shuffles.
-  assert((bitWidth & bitWidth - 1) == 0 && "bitWidth must be a power of 2");
+  assert(((bitWidth & (bitWidth - 1)) == 0) && "bitWidth must be a power of 2");
   int64_t factor;
   for (factor = scaleUpByBitWidth(1, bitWidth); factor > 1; factor >>= 1)
     if (numWarpsToUse % factor == 0)
@@ -143,9 +142,12 @@ static std::pair<int64_t, int64_t> computeSplitPoint(int64_t upperBound,
 /// func.func.
 Value mlir::iree_compiler::gpu::buildMapToBlockAndThreads(
     ImplicitLocOpBuilder &b, Value funcH, ArrayRef<int64_t> blockSize,
-    ArrayRef<int64_t> warpDims) {
+    std::optional<int64_t> subgroupSize) {
   b.create<ForallToWorkgroupOp>(funcH);
-  b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize, warpDims);
+  auto mapToThreadsOp =
+      b.create<MapNestedForallToGpuThreadsOp>(funcH, blockSize);
+  if (subgroupSize)
+    mapToThreadsOp.setSubgroupSize(*subgroupSize);
   return funcH;
 }
 
@@ -441,9 +443,9 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
       paddedMatmulOpH.getType(), paddedMatmulOpH, b.getI64IntegerAttr(1));
 
   // Rewrite aligned pads as destination passing (linalg.copy)
-  if (strategy.alignedLhs())
+  if (strategy.alignedLhs() && strategy.packingDimensions[0])
     lhsH = b.create<RewriteInDestinationPassingStyleOp>(lhsH.getType(), lhsH);
-  if (strategy.alignedRhs())
+  if (strategy.alignedRhs() && strategy.packingDimensions[1])
     rhsH = b.create<RewriteInDestinationPassingStyleOp>(rhsH.getType(), rhsH);
 
   MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
@@ -463,7 +465,7 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
     copyBackOpH = buildDistributeOnePadOrCopyWithNumThreads(
         b, variantH, copyBackOpH,
         /*numThreads=*/resCopyMapping.numThreads,
-        /*threadDimMapping=*/rhsCopyMapping.threadMapping);
+        /*threadDimMapping=*/resCopyMapping.threadMapping);
   }
 
   return std::make_tuple(lhsCopyOpH, rhsCopyOpH, copyBackOpH);
@@ -474,7 +476,8 @@ mlir::iree_compiler::gpu::buildDistributeMatmulCopies(
 // TODO: generalize and don't hardcode.
 void mlir::iree_compiler::gpu::buildMatmulVectorization(
     ImplicitLocOpBuilder &b, Value variantH, Value lhsCopyOpH, Value rhsCopyOpH,
-    Value copyBackOpH, const AbstractGemmLikeStrategy &strategy) {
+    Value copyBackOpH, const AbstractGemmLikeStrategy &strategy,
+    bool vectorizePadding, bool vectorizeNdExtract) {
   // Canonicalize to make padOp outputs static shaped: this is currently a
   // prerequisite for vector masking.
   // Also, no canonicalization is allowed after vector masking and before we
@@ -487,18 +490,21 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   // Apply vector masking.
   if (!strategy.alignedLhs()) {
     MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
-    b.create<transform::MaskedVectorizeOp>(lhsCopyOpH, ValueRange(), false,
-                                           lhsCopyMapping.tileSizes);
+    SmallVector<bool> scalableSizes(lhsCopyMapping.tileSizes.size(), false);
+    b.create<transform::VectorizeOp>(lhsCopyOpH, ValueRange(), nullptr,
+                                     scalableSizes, lhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRhs()) {
     MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
-    b.create<transform::MaskedVectorizeOp>(rhsCopyOpH, ValueRange(), false,
-                                           rhsCopyMapping.tileSizes);
+    SmallVector<bool> scalableSizes(rhsCopyMapping.tileSizes.size(), false);
+    b.create<transform::VectorizeOp>(rhsCopyOpH, ValueRange(), nullptr,
+                                     scalableSizes, rhsCopyMapping.tileSizes);
   }
   if (!strategy.alignedRes()) {
     MappingInfo resCopyMapping = strategy.resCopyMapping();
-    b.create<transform::MaskedVectorizeOp>(copyBackOpH, ValueRange(), false,
-                                           resCopyMapping.tileSizes);
+    SmallVector<bool> scalableSizes(resCopyMapping.tileSizes.size(), false);
+    b.create<transform::VectorizeOp>(copyBackOpH, ValueRange(), nullptr,
+                                     scalableSizes, resCopyMapping.tileSizes);
   }
 
   // Lower all masked vector transfers at this point, as they make
@@ -509,7 +515,8 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   buildLowerMaskedTransfersAndCleanup(b, funcH, /*cleanup=*/false);
 
   // Apply vectorization + cleanups to what remains.
-  funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true);
+  funcH = iree_compiler::buildVectorize(b, funcH, /*applyCleanups=*/true,
+                                        vectorizePadding, vectorizeNdExtract);
 }
 
 /// Build the transform IR to perform conversion to tensor core operations.
@@ -567,7 +574,7 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
       transform::AnyOpType::get(b.getContext()), funcH);
   iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
-  b.create<ApplyBufferOptimizationsOp>(funcH);
+  b.create<MemRefEraseDeadAllocAndStoresOp>(funcH);
 
   if (strategy.useWmma) {
     auto vectorToMMaConversionOp = b.create<
@@ -679,7 +686,6 @@ Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,
   variantH = bufferizeOp.getResult();
   Value memrefFunc =
       b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  b.create<IREEEraseHALDescriptorTypeFromMemRefOp>(memrefFunc);
-  b.create<ApplyBufferOptimizationsOp>(memrefFunc);
+  b.create<MemRefEraseDeadAllocAndStoresOp>(memrefFunc);
   return variantH;
 }

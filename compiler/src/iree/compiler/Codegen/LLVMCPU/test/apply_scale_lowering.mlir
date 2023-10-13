@@ -10,7 +10,7 @@
   cpu_features = "+m,+a,+f,+d,+c",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 512 : index,
-  target_triple = "riscv64-unknown-unknown-eabi-elf"
+  target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
@@ -30,7 +30,7 @@ hal.executable private @apply_scale_no_vector_feature {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -58,7 +58,7 @@ hal.executable private @apply_scale_no_vector_feature {
   cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+v",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 512 : index,
-  target_triple = "riscv64-unknown-unknown-eabi-elf"
+  target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
@@ -78,7 +78,7 @@ hal.executable private @apply_scale_v {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -104,7 +104,7 @@ hal.executable private @apply_scale_v {
   cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve64x",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 512 : index,
-  target_triple = "riscv64-unknown-unknown-eabi-elf"
+  target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
@@ -124,7 +124,7 @@ hal.executable private @apply_scale_zve64x {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -150,7 +150,7 @@ hal.executable private @apply_scale_zve64x {
   cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve32x",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 512 : index,
-  target_triple = "riscv64-unknown-unknown-eabi-elf"
+  target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
@@ -170,7 +170,7 @@ hal.executable private @apply_scale_zve32x {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }
@@ -203,7 +203,7 @@ hal.executable private @apply_scale_zve32x {
   cpu_features = "+m,+a,+f,+d,+c,+zvl512b,+zve32f",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 512 : index,
-  target_triple = "riscv64-unknown-unknown-eabi-elf"
+  target_triple = "riscv64-none-elf"
 }>
 #map = affine_map<()[s0] -> (s0 ceildiv 2)>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
@@ -223,7 +223,7 @@ hal.executable private @apply_scale_zve32f {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<2xi32>
         %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
-        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        %3 = tosa.apply_scale %2, %cst, %cst_0 {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
         vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
         return
       }

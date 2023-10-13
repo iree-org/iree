@@ -14,7 +14,7 @@ hal.executable private @matmul_riscv  {
       cpu_features = "+m,+f",
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",
       native_vector_size = 16 : index,
-      target_triple = "riscv32-unknown-unknown-eabi-elf"
+      target_triple = "riscv32-none-elf"
     }> {
     hal.executable.export public @matmul_riscv layout(#pipeline_layout)
     builtin.module {
@@ -39,7 +39,7 @@ hal.executable private @matmul_riscv  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 64, 0], [8, 32, 0], [0, 0, 1]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 64, 0], [8, 32, 0], [0, 0, 1], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //      CHECK: hal.executable.export public @matmul_riscv
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -62,7 +62,7 @@ hal.executable private @thin_depthwise_conv_static {
       cpu_features = "+m,+f",
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",
       native_vector_size = 16 : index,
-      target_triple = "riscv32-unknown-unknown-eabi-elf"
+      target_triple = "riscv32-none-elf"
     }> {
     hal.executable.export public @thin_depthwise_conv_static layout(#pipeline_layout)
     builtin.module {
@@ -91,7 +91,7 @@ hal.executable private @thin_depthwise_conv_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 7, 7, 72, 0, 0], [1, 1, 7, 4, 0, 0], [0, 0, 0, 0, 1, 3]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 7, 7, 72, 0, 0], [1, 1, 7, 4, 0, 0], [0, 0, 0, 0, 1, 3], [0, 0, 0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
 //      CHECK: hal.executable.export public @thin_depthwise_conv_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

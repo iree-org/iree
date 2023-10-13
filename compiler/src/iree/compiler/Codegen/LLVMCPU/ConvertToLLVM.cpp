@@ -29,7 +29,6 @@
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
@@ -336,10 +335,10 @@ acquireInstrumentationEntry(Location loc, Value buffer, Value bufferPtr,
 
   Value offsetIndex =
       builder.create<LLVM::ConstantOp>(loc, i64Type, headOffset);
-  Value offsetPtr = builder.create<LLVM::GEPOp>(
-      loc, basePtr.getType(), LLVM::LLVMPointerType::get(builder.getContext()),
-      basePtr, offsetIndex,
-      /*inbounds=*/true);
+  auto i8Type = builder.getI8Type();
+  Value offsetPtr = builder.create<LLVM::GEPOp>(loc, basePtr.getType(), i8Type,
+                                                basePtr, offsetIndex,
+                                                /*inbounds=*/true);
   Value rawOffset = builder.create<LLVM::AtomicRMWOp>(
       loc, LLVM::AtomicBinOp::add, offsetPtr, entrySize,
       LLVM::AtomicOrdering::monotonic);
@@ -347,9 +346,8 @@ acquireInstrumentationEntry(Location loc, Value buffer, Value bufferPtr,
       builder.create<LLVM::ConstantOp>(loc, i64Type, ringSize - 1);
   Value wrappedOffset = builder.create<LLVM::AndOp>(loc, rawOffset, offsetMask);
 
-  Value entryPtr = builder.create<LLVM::GEPOp>(
-      loc, basePtr.getType(), LLVM::LLVMPointerType::get(builder.getContext()),
-      basePtr, wrappedOffset);
+  Value entryPtr = builder.create<LLVM::GEPOp>(loc, basePtr.getType(), i8Type,
+                                               basePtr, wrappedOffset);
 
   return {basePtr, entryPtr, wrappedOffset};
 }
@@ -1051,7 +1049,6 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(
       typeConverter, patterns, targetReassociateFpReductions.getValue());
-  populateLinalgToLLVMConversionPatterns(typeConverter, patterns);
   populateReconcileUnrealizedCastsPatterns(patterns);
 
   HALDispatchABI abi(&typeConverter);

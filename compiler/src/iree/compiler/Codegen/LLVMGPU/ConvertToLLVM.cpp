@@ -254,7 +254,14 @@ public:
     SmallVector<Type, 8> llvmInputTypes(
         argMapping.size(), LLVM::LLVMPointerType::get(rewriter.getContext()));
     funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-      auto llvmType = LLVM::LLVMPointerType::get(rewriter.getContext());
+      LLVM::LLVMPointerType llvmType;
+      if (auto memrefType = dyn_cast<BaseMemRefType>(subspanOp.getType())) {
+        unsigned addrSpace =
+            *getTypeConverter()->getMemRefAddressSpace(memrefType);
+        llvmType = LLVM::LLVMPointerType::get(rewriter.getContext(), addrSpace);
+      } else {
+        llvmType = LLVM::LLVMPointerType::get(rewriter.getContext());
+      }
       llvmInputTypes[argMapping[SetBinding(subspanOp.getSet(),
                                            subspanOp.getBinding())]] = llvmType;
     });
@@ -389,12 +396,15 @@ public:
           typeConverter->convertType(IndexType::get(rewriter.getContext()));
       auto baseOffsetValue = adaptor.getByteOffset();
       if (ShapedType::isDynamic(offset)) {
-        int32_t elementWidth =
-            IREE::Util::getRoundedElementByteWidth(memrefType.getElementType());
-        Value elementWidthVal =
-            rewriter.create<LLVM::ConstantOp>(loc, llvmIndexType, elementWidth);
-        Value elementOffsetVal = rewriter.create<LLVM::UDivOp>(
-            loc, baseOffsetValue, elementWidthVal);
+        int32_t elementBitWidth =
+            IREE::Util::getTypeBitWidth(memrefType.getElementType());
+        Value elementBitWidthVal = rewriter.create<LLVM::ConstantOp>(
+            loc, llvmIndexType, elementBitWidth);
+        Value eight = rewriter.create<LLVM::ConstantOp>(loc, llvmIndexType, 8);
+        Value bitOffset =
+            rewriter.create<LLVM::MulOp>(loc, baseOffsetValue, eight);
+        Value elementOffsetVal =
+            rewriter.create<LLVM::UDivOp>(loc, bitOffset, elementBitWidthVal);
         desc.setOffset(rewriter, loc, elementOffsetVal);
       } else {
         desc.setConstantOffset(rewriter, loc, offset);

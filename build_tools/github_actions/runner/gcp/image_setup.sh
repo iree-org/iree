@@ -210,15 +210,18 @@ EOF
 
   ########################### Install the ops agent ############################
 
-  nice_curl https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh \
-    | bash -s -- --also-install --remove-repo --version=2.24.0
-  cat <<EOF >> /etc/google-cloud-ops-agent/config.yaml
-logging:
-  receivers:
-    systemd:
-      type: systemd_journald
+  # TODO(#14766): google cloud ops agent hasn't support ARM64 ubuntu 22.04 yet.
+  if [[ "${RUNNER_TYPE^^}" != ARM64 ]]; then
+    nice_curl https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh \
+      | bash -s -- --also-install --remove-repo --version=2.24.0
+    cat <<EOF >> /etc/google-cloud-ops-agent/config.yaml
+  logging:
+    receivers:
+      systemd:
+        type: systemd_journald
 EOF
-  service google-cloud-ops-agent restart
+    service google-cloud-ops-agent restart
+  fi
 
   ############################### Install Docker ###############################
 
@@ -234,7 +237,7 @@ EOF
     https://download.docker.com/linux/ubuntu/gpg \
     | gpg --dearmor -o "${docker_gpg_file}"
   echo \
-    "deb [arch=amd64 signed-by=${docker_gpg_file}] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+    "deb [signed-by=${docker_gpg_file}] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
     > "${docker_apt_file}"
   apt-get update
   apt-get install docker-ce docker-ce-cli containerd.io
@@ -314,8 +317,8 @@ EOF
           bash -c "${script_dir}/check_cuda.sh && ${script_dir}/check_vulkan.sh"
     }
 
-    check_docker gcr.io/iree-oss/nvidia@sha256:de6e4453614aa48059fd611d7e7255f4d6ac27ac29a47aabdc04191ec1758533
-    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:5974a2af86926a324bdfe98bea7080212db66189613a10ee19526f761c4c1400
+    check_docker gcr.io/iree-oss/nvidia@sha256:4e814f5f3bac53c88b64f0fe89af9f3dcc43bcf8610ea8b4511e21015ad1fb9c
+    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:0451c9e93c2d938c08b767e2deb1870fdf98060a1b01685cbacbf3f50e677fc5
     check_docker gcr.io/iree-oss/nvidia-bleeding-edge@sha256:522491c028ec3b4070f23910c70c8162fd9612e11d9cf062a13444df7e88ab70
 
     # Remove the docker images we've fetched. We might want to pre-fetch Docker

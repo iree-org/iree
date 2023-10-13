@@ -38,14 +38,12 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/InputConversion/Common",
         "//compiler/src/iree/compiler/InputConversion/StableHLO",
-        "//compiler/src/iree/compiler/InputConversion/TMTensor",
         "//compiler/src/iree/compiler/InputConversion/TOSA",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:TosaDialect",
         "@stablehlo//:chlo_ops",
         "@stablehlo//:stablehlo_ops",
-        "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
 )
 
@@ -119,7 +117,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgPassIncGen",
-        "@llvm-project//mlir:LinalgToLLVM",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MLProgramDialect",
         "@llvm-project//mlir:MathDialect",
@@ -206,7 +203,7 @@ iree_compiler_cc_library(
     hdrs = ["iree_compile_lib.h"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API/Internal:Embed",
+        "//compiler/src/iree/compiler/API/Internal:CompilerDriver",
         "//compiler/src/iree/compiler/Pipelines",
         "@llvm-project//llvm:Support",
     ],

@@ -77,20 +77,22 @@ static TypedAttr foldBinaryOpIntOrFloat(TypedAttr lhs, TypedAttr rhs,
   Type elemTy = getElementTypeOrSelf(cast<TypedAttr>(lhs).getType());
 
   if (isa<IntegerType>(elemTy)) {
-    if (Attribute res = constFoldBinaryOp<IntegerAttr>(
-            operands, [&folder](const APInt &lhs, const APInt &rhs) {
-              return folder(lhs, rhs);
-            })) {
+    if (Attribute res =
+            constFoldBinaryOp<IntegerAttr, IntegerAttr::ValueType, void>(
+                operands, [&folder](const APInt &lhs, const APInt &rhs) {
+                  return folder(lhs, rhs);
+                })) {
       return cast<TypedAttr>(res);
     }
     return nullptr;
   }
 
   if (isa<FloatType>(elemTy)) {
-    if (Attribute res = constFoldBinaryOp<FloatAttr>(
-            operands, [&folder](const APFloat &lhs, const APFloat &rhs) {
-              return folder(lhs, rhs);
-            })) {
+    if (Attribute res =
+            constFoldBinaryOp<FloatAttr, FloatAttr::ValueType, void>(
+                operands, [&folder](const APFloat &lhs, const APFloat &rhs) {
+                  return folder(lhs, rhs);
+                })) {
       return cast<TypedAttr>(res);
     }
     return nullptr;
@@ -376,11 +378,13 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     }
 
     if (lhsAttr && rhsAttr) {
-      if (Attribute res = constFoldBinaryOp<IntegerAttr>(
-              ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
-              [direction, kind = *compType](const APInt &a, const APInt &b) {
-                return calculateComp(kind, direction, a, b);
-              })) {
+      if (Attribute res =
+              constFoldBinaryOp<IntegerAttr, IntegerAttr::ValueType, void>(
+                  ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
+                  [direction, kind = *compType](const APInt &a,
+                                                const APInt &b) {
+                    return calculateComp(kind, direction, a, b);
+                  })) {
         rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
         return success();
       }
@@ -978,16 +982,169 @@ struct ReshapeOpCanon final : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
   }
 };
 
-struct TransposeOpCanon final : OpRewritePattern<mlir::stablehlo::TransposeOp> {
+struct MergeConsecutiveReshapes final
+    : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ReshapeOp op,
+                                PatternRewriter &rewriter) const override {
+    // Fold noop reshape.
+    auto operand = op.getOperand();
+    if (op.getType() == operand.getType()) {
+      rewriter.replaceOp(op, op.getOperand());
+      return success();
+    }
+
+    // Fold reshape(reshape(x)).
+    auto reshapeOp = operand.getDefiningOp<mlir::stablehlo::ReshapeOp>();
+    if (!reshapeOp) {
+      return rewriter.notifyMatchFailure(
+          op, "requires defining op of operand to be Reshape");
+    }
+
+    op.setOperand(reshapeOp->getOperand(0));
+    return success();
+  }
+};
+
+struct TransposeIsReshape final
+    : OpRewritePattern<mlir::stablehlo::TransposeOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::TransposeOp op,
                                 PatternRewriter &rewriter) const override {
-    // Check if this transpose is a noop and use the operand instead.
-    if (!isIotaRange(op.getPermutation()))
-      return failure();
+    auto input = op.getOperand();
+    auto permutation = op.getPermutation();
 
-    rewriter.replaceOp(op, op.getOperand());
+    if (isIotaRange(permutation)) {
+      rewriter.replaceOp(op, op.getOperand());
+      return success();
+    }
+
+    auto inputTy = dyn_cast<RankedTensorType>(input.getType());
+    if (!inputTy || !inputTy.hasStaticShape() ||
+        !op.getType().hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          op, "requires input/output to be of a statically-shaped ranked "
+              "tensor type");
+    }
+
+    SmallVector<int64_t> permValues(permutation.getValues<int64_t>());
+
+    SmallVector<int64_t> nonZeroPerms;
+    nonZeroPerms.reserve(permValues.size());
+    for (auto idx : permValues) {
+      auto sz = inputTy.getDimSize(idx);
+      if (sz != 1)
+        nonZeroPerms.push_back(idx);
+    }
+
+    for (int i = 1, s = nonZeroPerms.size(); i < s; ++i)
+      if (nonZeroPerms[i - 1] > nonZeroPerms[i])
+        return rewriter.notifyMatchFailure(op, "memory layout change");
+
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, op.getType(),
+                                                            input);
+    return success();
+  }
+};
+
+/// Check if a `t` is a tensor with zero extents.
+static std::optional<RankedTensorType> isZeroExtent(Type t) {
+  auto type = dyn_cast<RankedTensorType>(t);
+  if (type && type.hasStaticShape() &&
+      llvm::any_of(type.getShape(), [](int64_t s) { return s == 0; })) {
+    return type;
+  }
+  return std::nullopt;
+}
+
+// Replace instances of zero extent tensors with empty tensors of the same
+// type.
+struct ZeroExtentTensorCanon final : RewritePattern {
+  ZeroExtentTensorCanon(MLIRContext *context, PatternBenefit benefit)
+      : RewritePattern(MatchAnyOpTypeTag(), benefit, context) {}
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    auto loc = op->getLoc();
+
+    if (!dyn_cast<::mlir::stablehlo::StablehloDialect>(op->getDialect())) {
+      return rewriter.notifyMatchFailure(op, "not stablehlo");
+    }
+
+    // If the result is a zero-extent tensor, replace the whole op with an empty
+    // tensor.
+    bool didUpdate = false;
+    for (auto result : op->getResults()) {
+      auto resultType = isZeroExtent(result.getType());
+      if (!resultType || result.use_empty()) {
+        continue;
+      }
+      rewriter.replaceAllUsesWith(result, rewriter.create<tensor::EmptyOp>(
+                                              loc, resultType->getShape(),
+                                              resultType->getElementType()));
+      didUpdate = true;
+    }
+
+    // If one of the operands is a zero-extent tensor, replace the operand with
+    // an empty tensor.
+    for (OpOperand &operand : op->getOpOperands()) {
+      auto operandType = isZeroExtent(operand.get().getType());
+      if (!operandType || operand.get().getDefiningOp<tensor::EmptyOp>()) {
+        continue;
+      }
+      Operation *owner = operand.getOwner();
+      int operandNum = operand.getOperandNumber();
+      auto emptyTensorOp = rewriter.create<tensor::EmptyOp>(
+          loc, operandType->getShape(), operandType->getElementType());
+      rewriter.updateRootInPlace(
+          owner, [&]() { owner->setOperand(operandNum, emptyTensorOp); });
+      didUpdate = true;
+    }
+    return success(didUpdate);
+  }
+};
+
+struct ReorderElementwiseAndShapeOp final
+    : OpTraitRewritePattern<OpTrait::Elementwise> {
+  using OpTraitRewritePattern::OpTraitRewritePattern;
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getOperands().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "expected to be unary");
+    }
+
+    auto definingOp = op->getOperand(0).getDefiningOp();
+    if (!definingOp) {
+      return rewriter.notifyMatchFailure(
+          op, "expected to have an op before elementise op");
+    }
+
+    if (!isa<mlir::stablehlo::ReshapeOp>(definingOp) &&
+        !isa<mlir::stablehlo::TransposeOp>(definingOp) &&
+        !isa<mlir::stablehlo::BroadcastOp>(definingOp)) {
+      return rewriter.notifyMatchFailure(
+          op, "defining operation of unexpected type");
+    }
+
+    // Only reorder if the defining op has no other uses.
+    if (!llvm::hasSingleElement(definingOp->getResult(0).getUses())) {
+      return rewriter.notifyMatchFailure(op, "operation has more than one use");
+    }
+
+    Value input = definingOp->getOperand(0);
+    Value result = op->getResult(0);
+    auto intermediateType = cast<ShapedType>(input.getType())
+                                .clone(getElementTypeOrSelf(result.getType()));
+
+    // Reorder the operation and rewire the inputs/outputs.
+    op->moveBefore(definingOp);
+    definingOp->getResult(0).setType(result.getType());
+    rewriter.replaceAllUsesWith(result, definingOp->getResult(0));
+    result.setType(intermediateType);
+    op->setOperands(input);
+    definingOp->setOperands(result);
     return success();
   }
 };
@@ -1002,6 +1159,10 @@ struct StableHLOCanonicalize final
                                             std::move(patterns)))) {
       signalPassFailure();
     }
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const final {
+    registry.insert<tensor::TensorDialect>();
   }
 };
 
@@ -1024,6 +1185,9 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
       ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon, GatherOpCanon,
-      ReshapeOpCanon, TransposeOpCanon>(context, benefit);
+      ReshapeOpCanon, MergeConsecutiveReshapes, TransposeIsReshape,
+      // Types.
+      ZeroExtentTensorCanon>(context, benefit);
+  patterns->add<ReorderElementwiseAndShapeOp>(context);
 }
 } // namespace mlir::iree_compiler::stablehlo

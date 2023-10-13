@@ -18,12 +18,12 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/Dominance.h"
-#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/CastInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
 
 namespace mlir {
@@ -432,25 +432,18 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
 
 // static
 bool TiedOpInterface::hasAnyTiedUses(Value value) {
-  for (auto &use : value.getUses()) {
-    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
-    if (!tiedOp)
-      continue;
-    if (tiedOp.isOperandTied(use.getOperandNumber()))
-      return true;
-  }
-  return false;
+  return llvm::any_of(value.getUses(), [](auto &use) {
+    if (auto tiedOp = dyn_cast<TiedOpInterface>(use.getOwner())) {
+      return tiedOp.isOperandTied(use.getOperandNumber());
+    }
+    return false;
+  });
 }
 
 bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
-  auto tiedOp = dyn_cast<TiedOpInterface>(op);
-  if (!tiedOp)
-    return false;
-  auto tiedIndices = tiedOp.getTiedResultOperandIndices();
-  for (unsigned i = 0; i < tiedIndices.size(); ++i) {
-    if (tiedIndices[i] == operandIndex) {
-      return true;
-    }
+  if (auto tiedOp = dyn_cast<TiedOpInterface>(op)) {
+    auto tiedIndices = tiedOp.getTiedResultOperandIndices();
+    return llvm::find(tiedIndices, operandIndex) != tiedIndices.end();
   }
   return false;
 }

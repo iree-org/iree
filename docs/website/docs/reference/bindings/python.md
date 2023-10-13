@@ -3,14 +3,10 @@ hide:
   - tags
 tags:
   - Python
+icon: simple/python
 ---
 
 # Python bindings
-
-!!! info
-
-    API reference pages for IREE's runtime and compiler Python APIs are hosted on
-    [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
 
 ## Overview
 
@@ -27,11 +23,6 @@ components:
 
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
-
-!!! Caution "Caution - Operating system support"
-    Packages are currently only available on Linux and macOS. They are not
-    available on Windows yet (see
-    [this issue](https://github.com/openxla/iree/issues/13484)).
 
 ## :octicons-download-16: Prerequisites
 
@@ -101,16 +92,66 @@ To use IREE's Python bindings, you will first need to install
 See [Building Python bindings](../../building-from-source/getting-started.md#python-bindings)
 page for instructions for building from source.
 
-## Using the Python bindings
+## Usage
 
-API reference pages for IREE's runtime and compiler Python APIs are hosted on
-[readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
+!!! info "Info - API reference pages"
+
+    API reference pages for IREE's runtime and compiler Python APIs are hosted on
+    [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
+
+    Documentation for the MLIR compiler Python APIs can be found at
+    [https://mlir.llvm.org/docs/Bindings/Python/](https://mlir.llvm.org/docs/Bindings/Python/).
+
+### Compile a program
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
+
+```python
+from iree import compiler as ireec
+
+# Compile a module.
+INPUT_MLIR = """
+module @arithmetic {
+  func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+    %0 = arith.mulf %arg0, %arg1 : tensor<4xf32>
+    return %0 : tensor<4xf32>
+  }
+}
+"""
+
+# Compile using the vmvx (reference) target:
+compiled_flatbuffer = ireec.tools.compile_str(
+    INPUT_MLIR,
+    target_backends=["vmvx"])
+```
+
+### Run a compiled program
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
+
+```python
+from iree import runtime as ireert
+import numpy as np
+
+# Register the module with a runtime context.
+# Use the "local-task" CPU driver, which can load the vmvx executable:
+config = ireert.Config("local-task")
+ctx = ireert.SystemContext(config=config)
+vm_module = ireert.VmModule.copy_buffer(ctx.instance, compiled_flatbuffer)
+ctx.add_vm_module(vm_module)
+
+# Invoke the function and print the result.
+print("INVOKE simple_mul")
+arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
+arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
+f = ctx.modules.arithmetic["simple_mul"]
+results = f(arg0, arg1).to_host()
+print("Results:", results)
+```
+
+### Samples
 
 Check out the samples in IREE's
 [samples/colab/ directory](https://github.com/openxla/iree/tree/main/samples/colab)
 and the [iree-samples repository](https://github.com/iree-org/iree-samples) for
 examples using the Python APIs.
-
-<!-- ## Troubleshooting -->
-
-<!-- TODO(scotttodd): update python, update pip, search GitHub issues -->

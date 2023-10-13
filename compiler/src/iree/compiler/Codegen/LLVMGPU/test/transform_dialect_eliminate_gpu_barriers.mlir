@@ -178,3 +178,67 @@ transform.sequence failures(propagate) {
   %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
   transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
 }
+
+// -----
+
+// CHECK-LABEL: @repeated_barrier
+func.func @repeated_barrier(%arg0: memref<?xf32>, %arg1: index, %arg2: f32) -> f32
+attributes {__parallel_region_boundary_for_test} {
+  %0 = memref.load %arg0[%arg1] : memref<?xf32>
+  // CHECK: gpu.barrier
+  gpu.barrier
+  // CHECK-NOT: gpu.barrier
+  gpu.barrier
+  memref.store %arg2, %arg0[%arg1] : memref<?xf32>
+  return %0 : f32
+}
+
+transform.sequence failures(propagate) {
+^bb0(%arg0: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+}
+
+// -----
+
+// CHECK-LABEL: @symmetric_stop
+func.func @symmetric_stop(%val: f32) -> (f32, f32, f32, f32, f32)
+attributes {__parallel_region_boundary_for_test} {
+  // CHECK: %[[A:.+]] = memref.alloc
+  // CHECK: %[[B:.+]] = memref.alloc
+  // CHECK: %[[C:.+]] = memref.alloc
+  %A = memref.alloc() : memref<f32>
+  %B = memref.alloc() : memref<f32>
+  %C = memref.alloc() : memref<f32>
+  // CHECK: memref.store %{{.*}}, %[[A]]
+  memref.store %val, %A[] : memref<f32>
+  // CHECK: gpu.barrier
+  gpu.barrier
+  // CHECK: memref.load %[[A]]
+  %0 = memref.load %A[] : memref<f32>
+  // CHECK: memref.store %{{.*}}, %[[B]]
+  memref.store %val, %B[] : memref<f32>
+  // This barrier is eliminated because the surrounding barriers are sufficient
+  // to guard write/read on all memrefs.
+  // CHECK-NOT: gpu.barrier
+  gpu.barrier
+  // CHECK: memref.load %[[A]]
+  %1 = memref.load %A[] : memref<f32>
+  // CHECK: memref.store %{{.*}} %[[C]]
+  memref.store %val, %C[] : memref<f32>
+  // CHECK: gpu.barrier
+  gpu.barrier
+  // CHECK: memref.load %[[A]]
+  // CHECK: memref.load %[[B]]
+  // CHECK: memref.load %[[C]]
+  %2 = memref.load %A[] : memref<f32>
+  %3 = memref.load %B[] : memref<f32>
+  %4 = memref.load %C[] : memref<f32>
+  return %0, %1, %2, %3, %4 : f32, f32, f32, f32, f32
+}
+
+transform.sequence failures(propagate) {
+^bb0(%arg0: !transform.any_op):
+  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+}

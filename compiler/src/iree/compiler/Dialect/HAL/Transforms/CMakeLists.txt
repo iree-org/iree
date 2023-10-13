@@ -51,6 +51,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTransforms
+    iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis

@@ -42,6 +42,25 @@ func.func @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
 
 // -----
 
+// Tests that copies are not inserted for operand with multiple uses by the same
+// user.
+
+// CHECK-LABEL: @multipleUsesOneUser
+func.func private @multipleUsesOneUser(%size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c256 = arith.constant 256 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: stream.async.splat
+  %0 = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
+  // CHECK-NOT: stream.async.clone
+  // CHECK: stream.async.dispatch
+  %1 = stream.async.dispatch @ex::@dispatch(%0[%c0 to %c128 for %c128], %0[%c128 to %c256 for %c128]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> %0{%size}
+  return %1 : !stream.resource<*>
+}
+
+// -----
+
 // Tests that copies are inserted when there are multiple uses of a mutated
 // value (in this case, the splat acting as an initializer). The additional
 // copy will be elided with the --iree-stream-elide-async-copies pass.

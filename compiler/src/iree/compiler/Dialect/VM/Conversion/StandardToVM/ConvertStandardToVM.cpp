@@ -64,7 +64,7 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
 
 // Converts a function signature with the given |signatureConversion| util.
 static FailureOr<FunctionType>
-convertFuncSignature(func::FuncOp srcOp, TypeConverter &typeConverter,
+convertFuncSignature(func::FuncOp srcOp, const TypeConverter &typeConverter,
                      TypeConverter::SignatureConversion &signatureConversion,
                      ConversionPatternRewriter &rewriter) {
   FunctionType srcFuncType = srcOp.getFunctionType();
@@ -131,7 +131,7 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
                                 newFuncOp.end());
 
     // Tell the rewriter to convert the region signature.
-    TypeConverter &typeConverter = *getTypeConverter();
+    const TypeConverter &typeConverter = *getTypeConverter();
     if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
                                            typeConverter,
                                            &signatureConversion))) {
@@ -849,6 +849,9 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32SOp>(srcOp, dstType,
                                                           adaptor.getIn());
+    } else if (srcType.isInteger(16) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I64SOp>(srcOp, dstType,
+                                                          adaptor.getIn());
     } else if (srcType.isInteger(32) && dstType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64SOp>(srcOp, dstType,
                                                           adaptor.getIn());
@@ -879,6 +882,9 @@ class TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
       rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
           srcOp, dstType, value,
           rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+    } else if (srcType.isInteger(16) && resultType.isInteger(8)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::TruncI16I8Op>(srcOp, dstType,
+                                                          adaptor.getIn());
     } else if (srcType.isInteger(32) && resultType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI32I8Op>(srcOp, dstType,
                                                           adaptor.getIn());
@@ -1135,30 +1141,29 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                                                 context);
 
   // Floating-point arithmetic ops.
-  patterns
-      .insert<UnaryArithmeticOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
-                                          IREE::VM::AbsF64Op>,
-              BinaryArithmeticOpConversion<arith::AddFOp, IREE::VM::AddF32Op,
-                                           IREE::VM::AddF64Op>,
-              UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
-                                          IREE::VM::CeilF64Op>,
-              UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
-                                          IREE::VM::FloorF64Op>,
-              BinaryArithmeticOpConversion<arith::DivFOp, IREE::VM::DivF32Op,
-                                           IREE::VM::DivF64Op>,
-              BinaryArithmeticOpConversion<arith::MulFOp, IREE::VM::MulF32Op,
-                                           IREE::VM::MulF64Op>,
-              UnaryArithmeticOpConversion<arith::NegFOp, IREE::VM::NegF32Op,
-                                          IREE::VM::NegF64Op>,
-              BinaryArithmeticOpConversion<arith::RemFOp, IREE::VM::RemF32Op,
-                                           IREE::VM::RemF64Op>,
-              BinaryArithmeticOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
-                                           IREE::VM::SubF64Op>,
-              BinaryArithmeticOpConversion<arith::MinFOp, IREE::VM::MinF32Op,
-                                           IREE::VM::MinF64Op>,
-              BinaryArithmeticOpConversion<arith::MaxFOp, IREE::VM::MaxF32Op,
-                                           IREE::VM::MaxF64Op>>(typeConverter,
-                                                                context);
+  patterns.insert<
+      UnaryArithmeticOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
+                                  IREE::VM::AbsF64Op>,
+      BinaryArithmeticOpConversion<arith::AddFOp, IREE::VM::AddF32Op,
+                                   IREE::VM::AddF64Op>,
+      UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
+                                  IREE::VM::CeilF64Op>,
+      UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
+                                  IREE::VM::FloorF64Op>,
+      BinaryArithmeticOpConversion<arith::DivFOp, IREE::VM::DivF32Op,
+                                   IREE::VM::DivF64Op>,
+      BinaryArithmeticOpConversion<arith::MulFOp, IREE::VM::MulF32Op,
+                                   IREE::VM::MulF64Op>,
+      UnaryArithmeticOpConversion<arith::NegFOp, IREE::VM::NegF32Op,
+                                  IREE::VM::NegF64Op>,
+      BinaryArithmeticOpConversion<arith::RemFOp, IREE::VM::RemF32Op,
+                                   IREE::VM::RemF64Op>,
+      BinaryArithmeticOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
+                                   IREE::VM::SubF64Op>,
+      BinaryArithmeticOpConversion<arith::MinimumFOp, IREE::VM::MinF32Op,
+                                   IREE::VM::MinF64Op>,
+      BinaryArithmeticOpConversion<arith::MaximumFOp, IREE::VM::MaxF32Op,
+                                   IREE::VM::MaxF64Op>>(typeConverter, context);
 
   // Floating-point conversion ops.
   patterns.insert<IntToFPOpConversion<arith::SIToFPOp, arith::ExtSIOp,

@@ -47,10 +47,6 @@ if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS ChloOps)
   list(APPEND IREE_INPUT_DEPS StablehloOps)
 endif()
-if(IREE_INPUT_TORCH)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TMTensor)
-  list(APPEND IREE_INPUT_DEPS TorchMLIRTMTensorDialect)
-endif()
 if(IREE_INPUT_TOSA)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
   list(APPEND IREE_INPUT_DEPS MLIRTosaDialect)
@@ -136,7 +132,6 @@ iree_cc_library(
     MLIRIR
     MLIRLLVMDialect
     MLIRLinalgDialect
-    MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRMLProgramDialect
     MLIRQuantDialect
@@ -214,7 +209,7 @@ iree_cc_library(
     "iree_compile_lib.cc"
   DEPS
     LLVMSupport
-    iree::compiler::API::Internal::Embed
+    iree::compiler::API::Internal::CompilerDriver
     iree::compiler::Pipelines
     iree::compiler::bindings::c::headers
   PUBLIC

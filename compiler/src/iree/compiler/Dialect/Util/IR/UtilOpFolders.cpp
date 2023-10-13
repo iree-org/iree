@@ -4,10 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
+
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
@@ -364,9 +367,11 @@ void RangeExtentsOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // a large majority of the cases we generate ourselves from packing/allocation.
 static bool isAlignedTo(Value value, Value alignment) {
   APInt staticValue;
+  bool hasStaticValue = matchPattern(value, m_ConstantInt(&staticValue));
   APInt staticAlignment;
-  if (matchPattern(value, m_ConstantInt(&staticValue)) &&
-      matchPattern(alignment, m_ConstantInt(&staticAlignment))) {
+  bool hasStaticAlignment =
+      matchPattern(alignment, m_ConstantInt(&staticAlignment));
+  if (hasStaticValue && hasStaticAlignment) {
     // If this value is itself a multiple of the alignment then we can fold.
     if (staticValue.urem(staticAlignment).isZero()) {
       return true; // value % alignment == 0
@@ -381,11 +386,12 @@ static bool isAlignedTo(Value value, Value alignment) {
 
     // If the alignments are constant we can compare them inline.
     APInt sourceAlignment;
-    APInt selfAlignment;
-    if (matchPattern(sourceAlignOp.getAlignment(),
-                     m_ConstantInt(&sourceAlignment)) &&
-        matchPattern(alignment, m_ConstantInt(&selfAlignment))) {
-      if (sourceAlignment.uge(selfAlignment)) {
+    if (hasStaticAlignment && matchPattern(sourceAlignOp.getAlignment(),
+                                           m_ConstantInt(&sourceAlignment))) {
+      if (sourceAlignment.uge(staticAlignment) &&
+          std::gcd(sourceAlignment.getZExtValue(),
+                   staticAlignment.getZExtValue()) ==
+              staticAlignment.getZExtValue()) {
         return true; // source alignment is >= our alignment
       }
     }
@@ -393,6 +399,15 @@ static bool isAlignedTo(Value value, Value alignment) {
     // Recurse and check the alignment on the input to the align; if it was
     // aligned earlier we can rely on that as align will never shrink a value.
     return isAlignedTo(sourceAlignOp.getValue(), alignment);
+  }
+
+  // Affine apply ops producing the value to be aligned usually include
+  // alignment already.
+  if (auto affineOp = value.getDefiningOp<affine::AffineApplyOp>()) {
+    if (hasStaticAlignment) {
+      return (affineOp.getAffineMap().getLargestKnownDivisorOfMapExprs() %
+              staticAlignment.getZExtValue()) == 0;
+    }
   }
 
   // If we are sourced from add/mul we peephole check to see if what is being
@@ -414,7 +429,7 @@ static bool isAlignedTo(Value value, Value alignment) {
     }
   } else if (auto sourceMulOp = value.getDefiningOp<arith::MulIOp>()) {
     // Two aligned values multiplied together are still aligned.
-    if (isAlignedTo(sourceMulOp.getLhs(), alignment) &&
+    if (isAlignedTo(sourceMulOp.getLhs(), alignment) ||
         isAlignedTo(sourceMulOp.getRhs(), alignment)) {
       return true;
     }

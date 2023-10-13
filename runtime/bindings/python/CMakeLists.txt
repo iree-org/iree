@@ -20,14 +20,12 @@ if(NOT nanobind_FOUND)
   find_package(nanobind CONFIG REQUIRED)
 endif()
 
-set(_PYTHON_EXTRA_SRCS)
 set(_EXTRA_INSTALL_TOOL_TARGETS)
 set(_TRACY_ENABLED OFF)
 
-if(TARGET IREETracyCaptureServer)
-  message(STATUS "Bundline Tracy CLI tools with Python API")
+if(IREE_BUILD_TRACY)
+  message(STATUS "Bundling Tracy CLI tools with Python API")
   set(_TRACY_ENABLED ON)
-  list(APPEND _PYTHON_EXTRA_SRCS "iree/runtime/scripts/iree-tracy-capture")
   list(APPEND _EXTRA_INSTALL_TOOL_TARGETS "IREETracyCaptureServer")
 endif()
 
@@ -86,6 +84,7 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::hal::drivers
   iree::hal::utils::allocators
   iree::modules::hal
+  iree::tooling::device_util
   iree::tooling::modules
   iree::vm
   iree::vm::bytecode::module
@@ -106,7 +105,7 @@ target_compile_definitions(iree_runtime_bindings_python_PyExtRt
 
 set_target_properties(
   iree_runtime_bindings_python_PyExtRt
-  PROPERTIES OUTPUT_NAME "iree/_runtime"
+  PROPERTIES OUTPUT_NAME "iree/_runtime_libs/_runtime"
 )
 
 iree_py_library(
@@ -122,12 +121,15 @@ iree_py_library(
     "iree/runtime/system_api.py"
     "iree/runtime/system_setup.py"
     "iree/runtime/tracing.py"
-    "iree/runtime/scripts/iree_benchmark_trace/__main__.py"
-    "iree/runtime/scripts/iree_benchmark_module/__main__.py"
-    "iree/runtime/scripts/iree_cpuinfo/__main__.py"
-    "iree/runtime/scripts/iree_run_trace/__main__.py"
-    "iree/runtime/scripts/iree_run_module/__main__.py"
-    ${_PYTHON_EXTRA_SRCS}
+    "iree/runtime/version.py"
+    "iree/_runtime/__init__.py"
+    "iree/_runtime/libs.py"
+    "iree/_runtime/scripts/iree_benchmark_trace/__main__.py"
+    "iree/_runtime/scripts/iree_benchmark_module/__main__.py"
+    "iree/_runtime/scripts/iree_cpuinfo/__main__.py"
+    "iree/_runtime/scripts/iree_run_trace/__main__.py"
+    "iree/_runtime/scripts/iree_run_module/__main__.py"
+    "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
     iree_runtime_bindings_python_PyExtRt
 )
@@ -135,38 +137,44 @@ iree_py_library(
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-benchmark-module
-  TO_EXE_NAME iree/runtime/iree-benchmark-module
+  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
 )
 
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-benchmark-trace
-  TO_EXE_NAME iree/runtime/iree-benchmark-trace
+  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-trace
 )
 
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-cpuinfo
-  TO_EXE_NAME iree/runtime/iree-cpuinfo
+  TO_EXE_NAME iree/_runtime_libs/iree-cpuinfo
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-dump-module
+  TO_EXE_NAME iree/_runtime_libs/iree-dump-module
 )
 
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-run-trace
-  TO_EXE_NAME iree/runtime/iree-run-trace
+  TO_EXE_NAME iree/_runtime_libs/iree-run-trace
 )
 
 iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-run-module
-  TO_EXE_NAME iree/runtime/iree-run-module
+  TO_EXE_NAME iree/_runtime_libs/iree-run-module
 )
 
 if(_TRACY_ENABLED)
   iree_symlink_tool(
     TARGET runtime
     FROM_TOOL_TARGET IREETracyCaptureServer
-    TO_EXE_NAME iree-tracy-capture
+    TO_EXE_NAME iree/_runtime_libs/iree-tracy-capture
   )
 endif()
 
@@ -221,6 +229,13 @@ iree_py_test(
 if(IREE_BUILD_BUNDLED_LLVM)
   iree_py_test(
     NAME
+      benchmark_test
+    SRCS
+      "tests/benchmark_test.py"
+  )
+
+  iree_py_test(
+    NAME
       system_api_test
     SRCS
       "tests/system_api_test.py"
@@ -240,17 +255,6 @@ iree_py_test(
   SRCS
     "tests/vm_types_test.py"
 )
-
-# TODO: Enable this once the CI bots are updated to install the python3-venv
-# apt package. https://github.com/openxla/iree/issues/9080
-# iree_py_test(
-#   NAME
-#     package_test
-#   SRCS
-#     "tests/package_test.py"
-#   ARGS
-#     "${IREE_BINARY_DIR}/runtime"
-# )
 
 ################################################################################
 # Install
@@ -272,7 +276,7 @@ install(
 # _runtime.so -> python_packages/iree_runtime/iree/_runtime.so
 install(
   TARGETS iree_runtime_bindings_python_PyExtRt
-  DESTINATION "${_INSTALL_DIR}/iree"
+  DESTINATION "${_INSTALL_DIR}/iree/_runtime_libs"
   COMPONENT "${_INSTALL_COMPONENT}"
 )
 
@@ -290,10 +294,11 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
     iree-cpuinfo
     iree-benchmark-module
     iree-benchmark-trace
+    iree-dump-module
     iree-run-module
     iree-run-trace
     ${_EXTRA_INSTALL_TOOL_TARGETS}
-  DESTINATION \"${_INSTALL_DIR}/iree/runtime\"
+  DESTINATION \"${_INSTALL_DIR}/iree/_runtime_libs\"
   COMPONENT \"${_INSTALL_COMPONENT}\"
 )
 ")

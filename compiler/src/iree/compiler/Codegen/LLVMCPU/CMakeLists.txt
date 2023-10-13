@@ -46,7 +46,6 @@ iree_cc_library(
     "KernelDispatch.h"
     "Passes.h"
     "TargetMLTransformInfo.h"
-    "TileSizeSelection.h"
     "Utils.h"
   SRCS
     "ConvertToLLVM.cpp"
@@ -60,7 +59,6 @@ iree_cc_library(
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPULowerToUKernels.cpp"
-    "LLVMCPUMaterializeEncodingPass.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUPeel.cpp"
     "LLVMCPUSplitReduction.cpp"
@@ -72,7 +70,6 @@ iree_cc_library(
     "LLVMCPUVectorLowering.cpp"
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
-    "TileSizeSelection.cpp"
     "Utils.cpp"
     "VectorContractCustomKernels.cpp"
     "VerifyLinalgTransformLegality.cpp"
@@ -81,6 +78,7 @@ iree_cc_library(
     ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgExtUtils
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     LLVMBinaryFormat
@@ -107,7 +105,6 @@ iree_cc_library(
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
-    MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMathDialect
@@ -137,6 +134,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface

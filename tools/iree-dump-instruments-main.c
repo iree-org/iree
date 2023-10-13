@@ -180,16 +180,16 @@ static iree_status_t iree_tooling_dump_dispatch_ringbuffer(
         const iree_instrument_dispatch_print_t* print =
             (const iree_instrument_dispatch_print_t*)header;
         fprintf(stream, "%016" PRIX64 " | PRINT %.*s\n",
-                print->workgroup_offset, (int)print->length, print->data);
+                (uint64_t)print->workgroup_offset, (int)print->length,
+                print->data);
         i += iree_host_align(sizeof(*print) + print->length, 16);
         break;
       }
       case IREE_INSTRUMENT_DISPATCH_TYPE_VALUE: {
         const iree_instrument_dispatch_value_t* value =
             (const iree_instrument_dispatch_value_t*)header;
-        fprintf(stream,
-                "%016" PRIX64 " | VALUE %04u = ", value->workgroup_offset,
-                (uint32_t)value->ordinal);
+        fprintf(stream, "%016" PRIX64 " | VALUE %04u = ",
+                (uint64_t)value->workgroup_offset, (uint32_t)value->ordinal);
         iree_tooling_dump_print_value(value->type, value->bits, stream);
         fputc('\n', stream);
         i += sizeof(*value);
@@ -199,7 +199,7 @@ static iree_status_t iree_tooling_dump_dispatch_ringbuffer(
         const iree_instrument_dispatch_memory_op_t* op =
             (const iree_instrument_dispatch_memory_op_t*)header;
         fprintf(stream, "%016" PRIX64 " | LOAD  %016" PRIX64 " %u\n",
-                op->workgroup_offset, op->address, (int)op->length);
+                (uint64_t)op->workgroup_offset, op->address, (int)op->length);
         i += sizeof(*op);
         break;
       }
@@ -207,7 +207,7 @@ static iree_status_t iree_tooling_dump_dispatch_ringbuffer(
         const iree_instrument_dispatch_memory_op_t* op =
             (const iree_instrument_dispatch_memory_op_t*)header;
         fprintf(stream, "%016" PRIX64 " | STORE %016" PRIX64 " %u\n",
-                op->workgroup_offset, op->address, (int)op->length);
+                (uint64_t)op->workgroup_offset, op->address, (int)op->length);
         i += sizeof(*op);
         break;
       }
@@ -255,6 +255,8 @@ static iree_status_t iree_tooling_dump_instrument_file(
 }
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   if (argc < 2) {
     fprintf(stderr,
             "Syntax: iree-dump-instruments instruments.bin > instruments.txt\n"
@@ -274,12 +276,14 @@ int main(int argc, char** argv) {
             "        --instrument_file=instrument.bin\n"
             "  $ iree-dump-instruments instrument.bin\n"
             "\n");
-    return 1;
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   iree_file_contents_t* file_contents = NULL;
   iree_status_t status =
-      iree_file_read_contents(argv[1], iree_allocator_system(), &file_contents);
+      iree_file_read_contents(argv[1], IREE_FILE_READ_FLAG_DEFAULT,
+                              iree_allocator_system(), &file_contents);
   if (iree_status_is_ok(status)) {
     status =
         iree_tooling_dump_instrument_file(file_contents->const_buffer, stdout);
@@ -289,7 +293,9 @@ int main(int argc, char** argv) {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
     return EXIT_FAILURE;
   }
+  IREE_TRACE_APP_EXIT(EXIT_SUCCESS);
   return EXIT_SUCCESS;
 }

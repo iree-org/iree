@@ -9,7 +9,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -28,11 +27,10 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
-#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/TypeRange.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -221,11 +219,28 @@ static RankedTensorType getSourceTypeOfPackLikeOp(Operation *op) {
   return llvm::cast<RankedTensorType>(source.getType());
 }
 
-/// Returns true if the operation is an `unpack` op or an `unset_encoding` op
-/// that has unpack semantics
-// TODO(ravishankarm): This seems like a use case for interface.
-static bool isUnPackLikeOp(Operation *op) {
-  return isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op);
+/// Returns true if the operation is an `unpack` op or an `unset_encoding` op,
+/// or an `extract_slice` op whose source operand matches those criteria,
+/// recursively.
+/// The idea is that we want to ensure that `extract_slice` ops can't prevent
+/// fusion between a `unset_encoding` producer and some linalg consumer. In
+///   %0 = unset_encoding ...
+///   %1 = extract_slice %0 ...
+///   %2 = linalg.generic ins(%1) ...
+/// we are not content to be fusing %1 into %0, we also want to be fusing %2,
+/// so we want to prevent %1 from acting as a consumer fusion barrier.
+static bool isUnpackLikeOpViaExtractSliceOps(Operation *op) {
+  if (isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op)) {
+    return true;
+  }
+  if (isa<tensor::ExtractSliceOp>(op)) {
+    Value source = op->getOperand(0);
+    Operation *producer = source.getDefiningOp();
+    if (isUnpackLikeOpViaExtractSliceOps(producer)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /// Since `iree_linalg_ext.set_encoding` doesnt have padding semantics a
@@ -250,6 +265,10 @@ static bool isPadUsedInSetEncoding(tensor::PadOp padOp) {
 static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   if (auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(op)) {
     return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
+  }
+  if (auto unsetEncodingOp = dyn_cast<IREE::LinalgExt::UnsetEncodingOp>(op)) {
+    return llvm::SmallBitVector(unsetEncodingOp.getResultType().getRank(),
+                                true);
   }
 
   auto interfaceOp = dyn_cast<TilingInterface>(op);
@@ -468,7 +487,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
   // generic ops.
-  if (isUnPackLikeOp(producer)) {
+  if (isUnpackLikeOpViaExtractSliceOps(producer)) {
     // Fuse `unset_encoding` -> `extract_slice` op since they get folded into
     // `unpack` on materialization.
     if (isa<tensor::ExtractSliceOp>(consumer)) {
@@ -528,8 +547,8 @@ isFusableWithConsumer(OpOperand &fusedOperand,
       continue;
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
         !llvm::any_of(
-            consumerLinalgOp.getDpsInitOperands(), [&](OpOperand *initOperand) {
-              return canUseInOperandAsInitOperand(inputOperand, initOperand);
+            consumerLinalgOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
+              return canUseInOperandAsInitOperand(inputOperand, &initOperand);
             })) {
       return false;
     }
@@ -634,13 +653,7 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (consumerLinalgOp.isDpsInput(&operand)) {
-    // Only fuse on inputs if both ops are generic ops.
-    if (!isa<linalg::GenericOp>(consumer) ||
-        !isa<linalg::GenericOp>(producer)) {
-      return false;
-    }
-  } else if (!consumerLinalgOp.isDpsInit(&operand)) {
+  if (!consumerLinalgOp.isDpsInit(&operand)) {
     return false;
   }
 
@@ -691,13 +704,12 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
 /// very simple heuristic is used below, but the mechanism should be general
 /// enough to capture any heuristic.
 static unsigned
-decideFusableLinalgOps(FunctionOpInterface funcOp,
-                       DominanceInfo const &dominanceInfo,
-                       FormDispatchRegionsOptions const &options) {
-  unsigned numRootOps = 0;
-  MLIRContext *context = funcOp->getContext();
+decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
+                       FormDispatchRegionsOptions const &options,
+                       unsigned numRootOps = 0) {
+  MLIRContext *context = region.getContext();
   OpBuilder builder(context);
-  for (Block &block : funcOp.getFunctionBody()) {
+  for (Block &block : region) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
     // So procedure here is to
@@ -705,6 +717,14 @@ decideFusableLinalgOps(FunctionOpInterface funcOp,
     // - To fuse with consumers make the consumer the root.
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
+      if (isa<scf::SCFDialect>(op.getDialect())) {
+        for (auto &region : op.getRegions()) {
+          numRootOps = decideFusableLinalgOps(region, dominanceInfo, options,
+                                              numRootOps);
+        }
+        continue;
+      }
+
       // Start with a root operation and fuse its producers.
       if (hasFusionGroupsAttribute(&op) || !isRootOp(&op))
         continue;
@@ -720,7 +740,7 @@ decideFusableLinalgOps(FunctionOpInterface funcOp,
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
   // into their own dispatches.
-  for (Block &block : funcOp.getFunctionBody()) {
+  for (Block &block : region) {
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
@@ -760,7 +780,8 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    FormDispatchRegionsOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
-  unsigned numRoots = decideFusableLinalgOps(funcOp, dominanceInfo, options);
+  unsigned numRoots =
+      decideFusableLinalgOps(funcOp.getFunctionBody(), dominanceInfo, options);
   SmallVector<Operation *> roots(numRoots, nullptr);
   DenseMap<unsigned, SmallVector<Operation *>> producers;
 

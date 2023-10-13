@@ -101,7 +101,7 @@ function(standalone_plugin_library _DST_VAR_ARCH_LIBRARIES _ARCH)
       standalone_plugin.c
       ${IREE_CLANG_TARGET}
     COMMAND ${IREE_CLANG_BINARY}
-      -target ${LLVM_ARCH}-unknown-unknown-eabi-elf
+      -target ${LLVM_ARCH}-none-elf
       -isystem ${IREE_CLANG_BUILTIN_HEADERS_PATH}
       -std=c17
       -fPIC

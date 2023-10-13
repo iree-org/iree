@@ -35,7 +35,7 @@ function(embedded_function_object _ARCH)
       functions.c
       ${IREE_CLANG_TARGET}
     COMMAND ${IREE_CLANG_BINARY}
-      -target ${_LLVM_ARCH}-unknown-unknown-eabi-elf
+      -target ${_LLVM_ARCH}-none-elf
       -isystem ${IREE_CLANG_BUILTIN_HEADERS_PATH}
       -std=c17
       -ffreestanding

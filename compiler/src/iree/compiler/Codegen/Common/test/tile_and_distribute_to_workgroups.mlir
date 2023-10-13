@@ -13,7 +13,7 @@
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "aarch64-unknown-unknown-eabi-elf"
+  target_triple = "aarch64-none-elf"
 }>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @matmul_tensors {
@@ -462,7 +462,7 @@ hal.executable private @add_distribute4D_zero_tile_size {
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "aarch64-unknown-unknown-eabi-elf"}>
+  target_triple = "aarch64-none-elf"}>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @batch_matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
@@ -1244,7 +1244,7 @@ hal.executable private @restrict_num_workgroups {
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0)>
 #map2 = affine_map<(d0) -> (d0)>
@@ -1317,7 +1317,7 @@ hal.executable private @reduction {
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
@@ -1389,7 +1389,7 @@ hal.executable private @gemm_unit_N {
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
@@ -1641,7 +1641,7 @@ hal.executable private @scalar {
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "aarch64-unknown-unknown-eabi-elf"
+  target_triple = "aarch64-none-elf"
 }>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @rank_reduced_slice {
@@ -1698,7 +1698,7 @@ hal.executable private @rank_reduced_slice {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 0], [8, 32, 0], [0, 0, 16]], tile_interchange = [[1, 0, 2], [], []]>
+#config = #iree_codegen.lowering_config<tile_sizes = [{sizes=[32, 64, 0], interchange=[1, 0, 2]}, [8, 32, 0], [0, 0, 16]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1845,7 +1845,7 @@ hal.executable private @tile_multiuse_producer {
             iterator_types = ["parallel", "parallel", "reduction"]}
             ins(%3 : tensor<12x128x128xf32>) outs(%1 : tensor<12x128xf32>) {
           ^bb0(%arg0: f32, %arg1: f32):
-            %11 = arith.maxf %arg0, %arg1 : f32
+            %11 = arith.maximumf %arg0, %arg1 : f32
             linalg.yield %11 : f32
           } -> tensor<12x128xf32>
         %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<12x128xf32>) -> tensor<12x128xf32>
@@ -2242,7 +2242,7 @@ hal.executable private @dynamic_unpack_fusion {
         %cst = arith.constant dense<[-918, -4433, 87, -234, -21393, 7738, 529, -8835, -16817, -375, -199, 572, 5082, 15569, -186, 4955]> : tensor<16xi32>
         %c12544 = arith.constant 12544 : index
         %c16 = arith.constant 16 : index
-        %0:2 = iree_codegen.query_tile_sizes tensor<12544x16xi32, #iree_linalg_ext.encoding<MATMUL_I8I8I32_RESULT>> -> index, index
+        %0:2 = iree_codegen.query_tile_sizes tensor<12544x16xi32, #iree_linalg_ext.encoding<user = MATMUL_I8I8I32, role = RESULT>> -> index, index
         %1 = affine.apply affine_map<()[s0] -> (12544 ceildiv s0)>()[%0#0]
         %2 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#1]
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c200960) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1}
@@ -2281,7 +2281,7 @@ hal.executable private @dynamic_unpack_fusion {
 // -----
 
 hal.executable private @elem_pack {
-  hal.executable.variant public @embedded_elf_arm_64, target = <"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-unknown-unknown-eabi-elf"}> {
+  hal.executable.variant public @embedded_elf_arm_64, target = <"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}> {
     hal.executable.export public @elem_pack ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer>, <4, storage_buffer>, <5, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -2432,7 +2432,7 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "aarch64-unknown-unknown-eabi-elf"
+  target_triple = "aarch64-none-elf"
 }>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @matmul_tensors {

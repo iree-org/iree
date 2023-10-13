@@ -14,7 +14,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "add_fmfs.mlir"
     "affinemin_canonicalization.mlir"
+    "batch_matmuls.mlir"
     "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
@@ -22,11 +24,13 @@ iree_lit_test_suite(
     "convert_bf16_to_uint16_buffers.mlir"
     "convert_to_destination_passing_style.mlir"
     "convolutions.mlir"
-    "dead_alloc.mlir"
     "decompose_affine_ops.mlir"
+    "decompose_batch_mmt4d_ops.mlir"
     "decompose_linalg_generic.mlir"
     "decompose_pack_unpack_ops.mlir"
     "eliminate_empty_tensors.mlir"
+    "emulate_narrow_type.mlir"
+    "erase_dead_alloc_and_stores.mlir"
     "erase_hal_descriptor_type.mlir"
     "extract_address_computation.mlir"
     "flatten_memref_subspan.mlir"
@@ -46,6 +50,7 @@ iree_lit_test_suite(
     "remove_dead_allocs.mlir"
     "remove_trivial_loops.mlir"
     "repeated_matcher_use.mlir"
+    "replace_slow_min_max_ops.mlir"
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
     "transform_buffer_opt.mlir"
@@ -62,6 +67,7 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
+    batch_matmul_match_spec.mlir
     convolution_match_spec.mlir
     reductions_codegen_spec.mlir
     reductions_match_spec.mlir

@@ -62,6 +62,12 @@ def DetachElementwiseFromNamedOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDetachElementwiseFromNamedOpsPass()";
 }
 
+def FoldUnitExtentDims :
+    InterfacePass<"iree-flow-fold-unit-extent-dims", "mlir::FunctionOpInterface"> {
+  let summary = "Fold unit extent dimension of operations";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFoldUnitExtentDimsPass()";
+}
+
 def FormDispatchRegions :
     InterfacePass<"iree-flow-form-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions";
@@ -103,7 +109,7 @@ def CloneProducersIntoDispatchRegions :
 def CollapseDimensions :
     InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
   let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimensionsPass()";  
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimensionsPass()";
 }
 
 def DispatchWithTransformDialect :
@@ -172,6 +178,12 @@ def FusionOfTensorOps :
     Option<"multiUseFusionIteration", "multi-use-fusion-iteration", "unsigned",
            /*default=*/"2", "Number of iterations to fuse multiuse ops">
   ];
+}
+
+def GeneralizeLinalgNamedOps :
+    InterfacePass<"iree-flow-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Convert some Linalg named ops into linalg.generics";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createGeneralizeLinalgNamedOpsPass()";
 }
 
 def InferNumericNarrowing :
@@ -250,11 +262,6 @@ def OutlineDispatchRegions :
 def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
   let summary = "Introduce tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::IREE::Flow::createSetEncodingPass()";
-  let options = [
-    Option<"defaultPadding", "default-padding", "int64_t",
-           /*default=*/"16",
-           "Default padding to use so packing can be done without padding during the packing">
-  ];
 }
 
 def TensorPadToTensorInsertSlice :
@@ -292,6 +299,12 @@ def RaiseSpecialOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
 }
 
+def RemoveZeroExtentTensors :
+    InterfacePass<"iree-flow-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
+  let summary = "Remove tensors that have 0-extents";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createRemoveZeroExtentTensorsPass()";
+}
+
 def SplitReduction :
     Pass<"iree-flow-split-reduction-ops", ""> {
   let summary = "Split reduction dimension to increase parallelism.";
@@ -304,15 +317,21 @@ def StripSignedness :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }
 
-def StripAndSplatConstantVariables :
-    Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
-  let summary = "Strips constant util.globals and replaces them with splats.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
+def TopLevelSCFToCFG :
+    InterfacePass<"iree-top-level-scf-to-cfg", "mlir::FunctionOpInterface"> {
+  let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createTopLevelSCFToCFGPass()";
 }
 
 def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
   let summary = "Checks the legality of the IR at the start of IREE flow transformation pipeline.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
+}
+
+def FuseDequantizationMatmul:
+    Pass<"iree-flow-fuse-dequantization-matmul", ""> {
+  let summary = "Fuse dequantization and matmul linalg.generic ops";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFuseDequantizationMatmulPass()";
 }
 
 #endif  // IREE_DIALECT_FLOW_PASSES

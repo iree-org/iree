@@ -180,8 +180,6 @@ def _parse_arguments():
     parser.add_argument("--verbose", action="store_true")
     verification_parser = parser.add_mutually_exclusive_group(required=True)
     verification_parser.add_argument("--github_event_json", type=pathlib.Path)
-    # Temporary option for buildkite pipeline.
-    verification_parser.add_argument("--no_verify_pr", action="store_true")
     return parser.parse_args()
 
 

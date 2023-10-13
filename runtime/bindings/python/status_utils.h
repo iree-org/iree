@@ -7,9 +7,8 @@
 #ifndef IREE_BINDINGS_PYTHON_IREE_COMMON_STATUS_UTILS_H_
 #define IREE_BINDINGS_PYTHON_IREE_COMMON_STATUS_UTILS_H_
 
-#include <nanobind/nanobind.h>
-
 #include "iree/base/api.h"
+#include "nanobind/nanobind.h"
 
 namespace iree {
 namespace python {

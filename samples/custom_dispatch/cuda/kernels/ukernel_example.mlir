@@ -15,7 +15,7 @@ func.func @ukernel_example() {
       // the workgroup size/block size.
       // Note: The name "iree_codegen.export_config" is also important for it to be
       // propagated through the compiler.
-      attributes {iree_codegen.export_config = #iree_codegen.export_config<workgroup_size = [4 : index]>} {
+      attributes {iree_codegen.export_config = #iree_codegen.export_config<workgroup_size = [4]>} {
     %id = flow.dispatch.workgroup.id[0] : index
     %count = flow.dispatch.workgroup.count[0] : index
 

@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_framework import serialization
 
 MODEL_FLAGFILE_NAME = "flagfile"
 MODEL_TOOLFILE_NAME = "tool"
@@ -214,3 +215,56 @@ class BenchmarkSuite(object):
             benchmark_cases.append(benchmark_case)
 
         return BenchmarkSuite(benchmark_cases=benchmark_cases)
+
+
+def get_run_configs_by_target_and_shard(
+    benchmark_groups: Dict, target_device_name: str, shard_index: Optional[int] = None
+):
+    """Returns a flat list of run_configs from `benchmark_groups`, filtered by the given `target_device_name`.
+    If a `shard_index` is given, only the run configs for the given shard are returned, otherwise all the run configs are returned.
+    """
+    benchmark_group = benchmark_groups.get(target_device_name)
+    if benchmark_group is None:
+        raise ValueError(
+            "Target device '{}' not found in the benchmark config.".format(
+                target_device_name
+            )
+        )
+
+    if shard_index is None:
+        # In case no shard index was given we will run ALL benchmarks from ALL shards
+        packed_run_configs = [
+            shard["run_configs"] for shard in benchmark_group["shards"]
+        ]
+    else:
+        # Otherwise we will only run the benchmarks from the given shard
+        benchmark_shard = next(
+            (
+                shard
+                for shard in benchmark_group["shards"]
+                if shard["index"] == shard_index
+            ),
+            None,
+        )
+        if benchmark_shard is None:
+            raise ValueError(
+                "Given shard (index={}) not found in the benchmark config group. Available indexes: [{}].".format(
+                    shard_index,
+                    ", ".join(
+                        str(shard["index"]) for shard in benchmark_group["shards"]
+                    ),
+                )
+            )
+        packed_run_configs = [benchmark_shard["run_configs"]]
+
+    # When no `shard_index` is given we might have more than one shard to process.
+    # We do this by deserializing the `run_config` field from each shard separately
+    # and then merge the unpacked flat lists of `E2EModelRunConfig`.
+    return [
+        run_config
+        for packed_run_config in packed_run_configs
+        for run_config in serialization.unpack_and_deserialize(
+            data=packed_run_config,
+            root_type=List[iree_definitions.E2EModelRunConfig],
+        )
+    ]

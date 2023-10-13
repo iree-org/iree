@@ -9,9 +9,12 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -189,6 +192,28 @@ struct CondBranchOpConversion
   }
 };
 
+static ValueRange asValueRange(ArrayRef<Value> values) { return values; }
+
+struct SwitchOpConversion : public OpConversionPattern<mlir::cf::SwitchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::cf::SwitchOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Expand any resource operands to resource + size.
+    auto defaultOperands = expandResourceOperands(
+        op.getLoc(), adaptor.getDefaultOperands(), rewriter);
+    auto caseOperands = llvm::to_vector(
+        llvm::map_range(adaptor.getCaseOperands(), [&](ValueRange operands) {
+          return expandResourceOperands(op.getLoc(), operands, rewriter);
+        }));
+    rewriter.replaceOpWithNewOp<mlir::cf::SwitchOp>(
+        op, adaptor.getFlag(), op.getDefaultDestination(), defaultOperands,
+        op.getCaseValuesAttr(), op.getCaseDestinations(),
+        llvm::to_vector(llvm::map_range(caseOperands, asValueRange)));
+    return success();
+  }
+};
+
 struct SelectOpConversion : public OpConversionPattern<mlir::arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -210,6 +235,183 @@ struct SelectOpConversion : public OpConversionPattern<mlir::arith::SelectOp> {
     rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
         op, adaptor.getTrueValue().getType(),
         ValueRange{resourceSelectOp.getResult(), sizeSelectOp.getResult()});
+    return success();
+  }
+};
+
+struct ScfIfOpConversion : public OpConversionPattern<mlir::scf::IfOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::scf::IfOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Expand any resource operands to resource + size.
+    auto expandedOperands =
+        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
+
+    // Expand any resource results to resource + size.
+    SmallVector<Type> expandedTypes;
+    struct Result {
+      size_t originalIndex;
+      size_t newIndex;
+      Type newType;
+    };
+    SmallVector<Result> resultMap;
+    for (auto originalType : llvm::enumerate(op.getResultTypes())) {
+      SmallVector<Type> newTypes;
+      if (failed(getTypeConverter()->convertType(originalType.value(),
+                                                 newTypes))) {
+        return rewriter.notifyMatchFailure(op,
+                                           "unable to convert result types");
+      }
+      resultMap.push_back(
+          Result{originalType.index(), expandedTypes.size(), newTypes.front()});
+      expandedTypes.append(newTypes);
+    }
+
+    // Create a new call that takes the expanded input operands and returns the
+    // expanded output results. We can't directly replace the original call as
+    // the result counts differ.
+    auto ifOp = rewriter.create<mlir::scf::IfOp>(op.getLoc(), expandedTypes,
+                                                 op.getCondition());
+
+    ifOp.getThenRegion().getBlocks().clear();
+    rewriter.inlineRegionBefore(op.getThenRegion(), ifOp.getThenRegion(),
+                                ifOp.getThenRegion().end());
+
+    ifOp.getElseRegion().getBlocks().clear();
+    rewriter.inlineRegionBefore(op.getElseRegion(), ifOp.getElseRegion(),
+                                ifOp.getElseRegion().end());
+
+    // Tie all resource results together so we end up with 1:1 results with the
+    // original op.
+    SmallVector<Value> results;
+    for (auto result : resultMap) {
+      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
+        auto oldType = op.getResult(result.originalIndex).getType();
+        auto resource = ifOp.getResult(result.newIndex + 0);
+        auto resourceSize = ifOp.getResult(result.newIndex + 1);
+        results.push_back(rewriter
+                              .create<mlir::UnrealizedConversionCastOp>(
+                                  op.getLoc(), TypeRange{oldType},
+                                  ValueRange{resource, resourceSize})
+                              .getResult(0));
+      } else {
+        results.push_back(ifOp.getResult(result.newIndex));
+      }
+    }
+    rewriter.replaceOp(op, results);
+    return success();
+  }
+};
+
+struct ScfWhileOpConversion : public OpConversionPattern<mlir::scf::WhileOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::scf::WhileOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto &typeConverter = *getTypeConverter();
+    // Expand any resource operands to resource + size.
+    auto expandedOperands =
+        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
+
+    // Expand any resource results to resource + size.
+    SmallVector<Type> expandedTypes;
+    struct Result {
+      size_t originalIndex;
+      size_t newIndex;
+      Type newType;
+    };
+    SmallVector<Result> resultMap;
+    for (auto originalType : llvm::enumerate(op.getResultTypes())) {
+      SmallVector<Type> newTypes;
+      if (failed(getTypeConverter()->convertType(originalType.value(),
+                                                 newTypes))) {
+        return rewriter.notifyMatchFailure(op,
+                                           "unable to convert result types");
+      }
+      resultMap.push_back(
+          Result{originalType.index(), expandedTypes.size(), newTypes.front()});
+      expandedTypes.append(newTypes);
+    }
+
+    TypeConverter::SignatureConversion newSignature(op.getNumOperands());
+    for (auto argType : llvm::enumerate(op.getOperandTypes())) {
+      if (failed(typeConverter.convertSignatureArg(
+              argType.index(), argType.value(), newSignature))) {
+        return failure();
+      }
+    }
+
+    // Create a new call that takes the expanded input operands and returns the
+    // expanded output results. We can't directly replace the original call as
+    // the result counts differ.
+    auto whileOp = rewriter.create<mlir::scf::WhileOp>(
+        op.getLoc(), expandedTypes, expandedOperands);
+
+    // Inline the `before` block and update the block arguments.
+    whileOp.getBefore().getBlocks().clear();
+    rewriter.inlineRegionBefore(op.getBefore(), whileOp.getBefore(),
+                                whileOp.getBefore().end());
+    if (failed(rewriter.convertRegionTypes(&whileOp.getBefore(), typeConverter,
+                                           &newSignature))) {
+      return failure();
+    }
+
+    // Inline the `after` block and update the block arguments.
+    whileOp.getAfter().getBlocks().clear();
+    rewriter.inlineRegionBefore(op.getAfter(), whileOp.getAfter(),
+                                whileOp.getAfter().end());
+    if (failed(rewriter.convertRegionTypes(&whileOp.getAfter(), typeConverter,
+                                           &newSignature))) {
+      return failure();
+    }
+
+    // Tie all resource results together so we end up with 1:1 results with the
+    // original op.
+    SmallVector<Value> results;
+    for (auto result : resultMap) {
+      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
+        auto oldType = op.getResult(result.originalIndex).getType();
+        auto resource = whileOp.getResult(result.newIndex + 0);
+        auto resourceSize = whileOp.getResult(result.newIndex + 1);
+        results.push_back(rewriter
+                              .create<mlir::UnrealizedConversionCastOp>(
+                                  op.getLoc(), TypeRange{oldType},
+                                  ValueRange{resource, resourceSize})
+                              .getResult(0));
+      } else {
+        results.push_back(whileOp.getResult(result.newIndex));
+      }
+    }
+    rewriter.replaceOp(op, results);
+    return success();
+  }
+};
+
+struct ScfConditionOpConversion
+    : public OpConversionPattern<mlir::scf::ConditionOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::scf::ConditionOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Expand any resource operands to resource + size.
+    auto expandedOperands =
+        expandResourceOperands(op.getLoc(), adaptor.getArgs(), rewriter);
+    rewriter.replaceOpWithNewOp<mlir::scf::ConditionOp>(
+        op, adaptor.getCondition(), expandedOperands);
+    return success();
+  }
+};
+
+struct ScfYieldOpConversion : public OpConversionPattern<mlir::scf::YieldOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::scf::YieldOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Expand any resource operands to resource + size.
+    auto expandedOperands =
+        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
+    rewriter.replaceOpWithNewOp<mlir::scf::YieldOp>(op, expandedOperands);
     return success();
   }
 };
@@ -258,11 +460,43 @@ void populateStandardStructuralToStreamPatterns(
           return typeConverter.isLegal(type);
         });
       });
+  conversionTarget.addDynamicallyLegalOp<mlir::cf::SwitchOp>(
+      [&](mlir::cf::SwitchOp op) {
+        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
+          return typeConverter.isLegal(type);
+        });
+      });
+  conversionTarget.addDynamicallyLegalOp<mlir::scf::IfOp>(
+      [&](mlir::scf::IfOp op) {
+        return llvm::all_of(op.getResultTypes(), [&](Type type) {
+          return typeConverter.isLegal(type);
+        });
+      });
+  conversionTarget.addDynamicallyLegalOp<mlir::scf::WhileOp>(
+      [&](mlir::scf::WhileOp op) {
+        return llvm::all_of(op.getResultTypes(), [&](Type type) {
+          return typeConverter.isLegal(type);
+        });
+      });
+  conversionTarget.addDynamicallyLegalOp<mlir::scf::ConditionOp>(
+      [&](mlir::scf::ConditionOp op) {
+        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
+          return typeConverter.isLegal(type);
+        });
+      });
+  conversionTarget.addDynamicallyLegalOp<mlir::scf::YieldOp>(
+      [&](mlir::scf::YieldOp op) {
+        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
+          return typeConverter.isLegal(type);
+        });
+      });
 
   patterns
       .insert<FuncOpSignatureConversion, CallOpConversion, ReturnOpConversion,
-              BranchOpConversion, CondBranchOpConversion, SelectOpConversion>(
-          typeConverter, context);
+              BranchOpConversion, CondBranchOpConversion, SwitchOpConversion,
+              SelectOpConversion, ScfConditionOpConversion, ScfIfOpConversion,
+              ScfWhileOpConversion, ScfYieldOpConversion>(typeConverter,
+                                                          context);
 }
 
 } // namespace iree_compiler

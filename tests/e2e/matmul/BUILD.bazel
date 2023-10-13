@@ -38,7 +38,7 @@ py_binary(
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_small" % lhs_rhs_type,
     compiler_flags = [
-        "--iree-flow-enable-data-tiling",
+        "--iree-opt-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -62,7 +62,7 @@ py_binary(
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
     compiler_flags = [
-        "--iree-flow-enable-data-tiling",
+        "--iree-opt-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -96,7 +96,7 @@ py_binary(
     name = "e2e_matmul_mmt4d_%s_intrinsics_%s" % (lhs_rhs_type, size),
     compiler_flags = [
         "--iree-codegen-mmt4d-use-intrinsics",
-        "--iree-flow-enable-data-tiling",
+        "--iree-opt-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -145,7 +145,7 @@ py_binary(
     name = "e2e_matmul_mmt4d_%s_small_vmvx_ukernel" % lhs_rhs_type,
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
-        "--iree-flow-enable-data-tiling",
+        "--iree-opt-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -184,7 +184,7 @@ X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
     name = "e2e_matmul_mmt4d_%s_%s_ukernel" % (lhs_rhs_type, size),
     compiler_flags = [
         "--iree-llvmcpu-enable-microkernels",
-        "--iree-flow-enable-data-tiling",
+        "--iree-opt-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -307,7 +307,7 @@ iree_generated_trace_runner_test(
         "nomsan",
         "notsan",
         "noubsan",
-        "requires-gpu-nvidia",
+        "requires-gpu-sm80",
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
@@ -485,6 +485,31 @@ iree_generated_trace_runner_test(
     ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+)
+
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f16_gpu_large_rdna3",
+    compiler_flags = [
+        "--iree-vulkan-target-triple=rdna3-unknown-linux",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--shapes=gpu_large_aligned",
+        "--compilation_info=SPIRVCooperativeMatrixVectorize",
+    ],
+    runner_args = [
+        "--require_exact_results=false",
+    ],
+    tags = [
+        "requires-gpu",
+        "requires-gpu-rdna3",
+        "vulkan_uses_vk_khr_shader_float16_int8",
+    ],
+    target_backends_and_drivers = [
+        ("vulkan-spirv", "vulkan"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 )

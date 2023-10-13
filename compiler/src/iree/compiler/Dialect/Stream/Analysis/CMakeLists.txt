@@ -29,6 +29,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRIR
     MLIRPass
+    MLIRSCFDialect
     MLIRSupport
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::Analysis

@@ -16,8 +16,8 @@ transform.sequence failures(propagate) {
 
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ==============================================================
-  %forall, %_ =
-    transform.structured.tile_to_forall_op %div tile_sizes [1, 4]
+  %_, %forall =
+    transform.structured.tile_using_forall %div tile_sizes [1, 4]
       ( mapping = [#gpu.block<x>, #gpu.block<y>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!transform.any_op) -> ()
@@ -35,6 +35,10 @@ transform.sequence failures(propagate) {
   %forall_with_type = transform.cast %forall : !transform.any_op to !transform.op<"scf.forall">
   transform.iree.share_forall_operands %forall_with_type
     : (!transform.op<"scf.forall">) -> !transform.op<"scf.forall">
+  transform.apply_patterns to %variant_op {
+    transform.apply_patterns.canonicalization
+  } : !transform.any_op
+  transform.iree.apply_cse %variant_op : !transform.any_op
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // ================================================================
@@ -56,7 +60,7 @@ transform.sequence failures(propagate) {
                                                   %tiled_exp_and_exps_sum,
                                                   %tiled_exp_and_exps_sum_2
     : !transform.any_op
-  transform.structured.tile_to_forall_op %reduction_linalg_ops tile_sizes [1, 1]
+  transform.structured.tile_using_forall %reduction_linalg_ops tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   // Fully parallel ops are tiled and mapped.
@@ -64,7 +68,7 @@ transform.sequence failures(propagate) {
                                                  %tiled_exps_sum_fill,
                                                  %tiled_div
     : !transform.any_op
-  transform.structured.tile_to_forall_op %parallel_linalg_ops num_threads [1, 4, 32]
+  transform.structured.tile_using_forall %parallel_linalg_ops num_threads [1, 4, 32]
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
@@ -76,14 +80,13 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
+  transform.structured.vectorize_children_and_apply_patterns %func : (!transform.any_op) -> !transform.any_op
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================
   transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
   %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> !transform.any_op
   %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-  transform.iree.erase_hal_descriptor_type_from_memref %memref_func : (!transform.any_op) -> ()
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // =========================================================

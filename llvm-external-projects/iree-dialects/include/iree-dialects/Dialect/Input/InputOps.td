@@ -8,37 +8,33 @@
 #define IREE_DIALECTS_DIALECT_INPUT_OPS_TD
 
 include "iree-dialects/Dialect/Input/InputDialect.td"
+include "iree-dialects/Dialect/Input/InputInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def IREEInput_NullOp : IREEInput_PureOp<"null"> {
-  let summary = "a null value";
-  let description = [{
-    Initializes reference and variant types with a null value.
-  }];
+//===----------------------------------------------------------------------===//
+// Pseudo ops for conversion support
+//===----------------------------------------------------------------------===//
 
-  let results = (outs
-    AnyType:$result
-  );
-
-  let assemblyFormat = [{
-    attr-dict `:` type($result)
-  }];
+def OpGroupPseudoOps : OpDocGroup {
+  let summary = "Pseudo ops for conversion support";
+  let description = "";
 }
 
-//===----------------------------------------------------------------------===//
-// Casts
-//===----------------------------------------------------------------------===//
+let opDocGroup = OpGroupPseudoOps in {
 
-def IREEInput_TensorToBufferViewOp : IREEInput_PureOp<"cast.tensor_to_buffer_view"> {
-  let summary = "Casts a tensor to a BufferView, capturing dynamic dims";
+def IREEInput_TensorExportOp : IREEInput_PureOp<"tensor.export"> {
+  let summary = "Exports a tensor to a Buffer(View), capturing dynamic dims";
   let arguments = (ins
     IREEInput_Tensor:$source,
     IREEInput_ShapeDynamicDims:$source_dims
   );
-  let results = (outs IREEInput_BufferViewType:$target);
+  let results = (outs
+    AnyTypeOf<[IREEInput_BufferType, IREEInput_BufferViewType]>:$target
+  );
 
   let assemblyFormat = [{
     $source `:` type($source) (`{` $source_dims^ `}`)? `->` type($target)
@@ -46,10 +42,10 @@ def IREEInput_TensorToBufferViewOp : IREEInput_PureOp<"cast.tensor_to_buffer_vie
   }];
 }
 
-def IREEInput_BufferViewToTensorOp : IREEInput_PureOp<"cast.buffer_view_to_tensor"> {
-  let summary = "Casts a BufferView to a tensor, providing dynamic dims";
+def IREEInput_TensorImportOp : IREEInput_PureOp<"tensor.import"> {
+  let summary = "Imports a Buffer(View) to a tensor, providing dynamic dims";
   let arguments = (ins
-    IREEInput_BufferViewType:$source,
+    AnyTypeOf<[IREEInput_BufferType, IREEInput_BufferViewType]>:$source,
     IREEInput_ShapeDynamicDims:$target_dims
   );
   let results = (outs IREEInput_Tensor:$target);
@@ -60,9 +56,18 @@ def IREEInput_BufferViewToTensorOp : IREEInput_PureOp<"cast.buffer_view_to_tenso
   }];
 }
 
+} // OpGroupPseudoOps
+
 //===----------------------------------------------------------------------===//
 // Global variables
 //===----------------------------------------------------------------------===//
+
+def OpGroupGlobalVariableOps : OpDocGroup {
+  let summary = "Global variable ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupGlobalVariableOps in {
 
 def IREEInput_GlobalOp : IREEInput_Op<"global", [
     Symbol,
@@ -200,9 +205,95 @@ def IREEInput_GlobalStoreIndirectOp : IREEInput_Op<"global.store.indirect"> {
   let hasVerifier = 1;
 }
 
+} // OpGroupGlobalVariableOps
+
 //===----------------------------------------------------------------------===//
-// Buffer Views
+// Buffers and Buffer Views
 //===----------------------------------------------------------------------===//
+
+def OpGroupBufferAndBufferViewOps : OpDocGroup {
+  let summary = "Buffer and buffer view ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupBufferAndBufferViewOps in {
+
+def IREEInput_BufferSubspanOp : IREEInput_PureOp<"buffer.subspan", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+  ]> {
+  let summary = [{buffer subspan operation}];
+  let description = [{
+    Returns a reference to a subspan of the buffer.
+  }];
+
+  let arguments = (ins
+    IREEInput_BufferType:$source_buffer,
+    IREEInput_DeviceSize:$source_offset,
+    IREEInput_DeviceSize:$length
+  );
+  let results = (outs
+    IREEInput_BufferType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $source_buffer `:` type($source_buffer) `>`
+    `` `[` $source_offset `,` $length `]`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def IREEInput_BufferViewCreateOp : IREEInput_PureOp<"buffer_view.create"> {
+  let summary = [{buffer view reference initializer}];
+  let description = [{
+    Creates a reference to a buffer with a particular shape and element type.
+    The buffer is not copied and both the original and view references must be
+    synchronized. This makes it easier to associate commonly-carried metadata
+    along with the contents.
+  }];
+
+  let arguments = (ins
+    IREEInput_BufferType:$source_buffer,
+    IREEInput_DeviceSize:$source_offset,
+    IREEInput_DeviceSize:$source_length,
+    IREEInput_ElementType:$element_type,
+    IREEInput_EncodingType:$encoding_type,
+    IREEInput_Shape:$shape
+  );
+  let results = (outs
+    IREEInput_BufferViewType:$result
+  );
+
+  let assemblyFormat = [{
+    `buffer` `(` $source_buffer `:` type($source_buffer) `)`
+    `` `[` $source_offset `,` $source_length `]`
+    `shape` `(` `[` $shape `]` `)`
+    `type` `(` $element_type `)`
+    `encoding` `(` $encoding_type `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "Value":$sourceBuffer,
+      "Value":$sourceOffset,
+      "Value":$sourceLength,
+      "int32_t":$elementType,
+      "int32_t":$encodingType,
+      "ValueRange":$shape
+    )>,
+    OpBuilder<(ins
+      "Value":$sourceBuffer,
+      "Value":$sourceOffset,
+      "Value":$sourceLength,
+      "Value":$elementType,
+      "Value":$encodingType,
+      "ValueRange":$shape
+    )>,
+  ];
+}
 
 def IREEInput_BufferViewRankOp : IREEInput_PureOp<"buffer_view.rank"> {
   let summary = [{buffer view rank query}];
@@ -241,9 +332,58 @@ def IREEInput_BufferViewDimOp : IREEInput_PureOp<"buffer_view.dim"> {
   }];
 }
 
+} // OpGroupBufferAndBufferViewOps
+
+//===----------------------------------------------------------------------===//
+// Byte buffers
+//===----------------------------------------------------------------------===//
+
+def OpGroupByteBufferOps : OpDocGroup {
+  let summary = "Byte buffer ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupByteBufferOps in {
+
+def IREEInput_ByteBufferConstantOp : IREEInput_PureOp<"byte_buffer.constant", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{constant host-side byte buffer}];
+  let description = [{
+    Defines a compile-time byte buffer based on the given attribute value.
+    The attribute will be serialized into the canonical IREE format for the
+    chosen host target.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$name,
+    StrAttr:$value,
+    OptionalAttr<IndexAttr>:$alignment,
+    OptionalAttr<StrAttr>:$mime_type
+  );
+  let results = (outs
+    IREEInput_ByteBufferType:$result
+  );
+
+  let assemblyFormat = [{
+    ($name^)? attr-dict `:` type($result) `=` $value
+  }];
+
+  let hasVerifier = 1;
+}
+
+} // OpGroupByteBufferOps
+
 //===----------------------------------------------------------------------===//
 // Mutable Lists
 //===----------------------------------------------------------------------===//
+
+def OpGroupMutableListOps : OpDocGroup {
+  let summary = "Mutable list ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupMutableListOps in {
 
 def IREEInput_ListCreateOp : IREEInput_PureOp<
     "list.create", [MemoryEffects<[MemAlloc]>]> {
@@ -327,9 +467,18 @@ def IREEInput_ListSetOp : IREEInput_Op<"list.set", [MemoryEffects<[MemWrite]>]> 
   let assemblyFormat = "$list `[` $index `]` `,` $value attr-dict `:` type($list) `,` type($value)";
 }
 
+} // OpGroupMutableListOps
+
 //===----------------------------------------------------------------------===//
 // Tensor ops
 //===----------------------------------------------------------------------===//
+
+def OpGroupTensorOps : OpDocGroup {
+  let summary = "Tensor ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupTensorOps in {
 
 def IREEInput_TensorReshapeOp : IREEInput_PureOp<"tensor.reshape", [
     AllElementTypesMatch<["source", "result"]>,
@@ -494,6 +643,11 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
     AllTypesMatch<["target", "result"]>,
     AllElementTypesMatch<["update", "target", "result"]>,
     AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<IREEInput_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+    ]>,
   ]> {
   let summary = [{updates a tensor with the contents of another tensor}];
   let description = [{
@@ -515,7 +669,7 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    type($result) (`{` $target_dims^ `}`)?
+    custom<ShapedTiedResult>(type($result), $target_dims)
     attr-dict-with-keyword
   }];
 
@@ -544,11 +698,20 @@ def IREEInput_TensorTraceOp : IREEInput_Op<"tensor.trace", []> {
   let assemblyFormat = "$key attr-dict ($operands^ `:` type($operands))?";
 }
 
+} // OpGroupTensorOps
+
 //===----------------------------------------------------------------------===//
 // Workgroup dispatch
 // These ops allow both scheduling and accessing parameters of workgroup
 // dispatches across an arbitrary nd-grid.
 //===----------------------------------------------------------------------===//
+
+def OpGroupWorkgroupDispatchOps : OpDocGroup {
+  let summary = "Workgroup dispatch ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupWorkgroupDispatchOps in {
 
 // TODO: Define dispatch.workgroup op.
 
@@ -635,11 +798,35 @@ def IREEInput_DispatchWorkgroupSizeOp : IREEInput_PureOp<"dispatch.workgroup.siz
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 }
 
+} // OpGroupWorkgroupDispatchOps
+
 //===----------------------------------------------------------------------===//
 // Utilities
 // Various utility ops needed for program completeness. These arguably should
 // not be exclusive to IREE.
 //===----------------------------------------------------------------------===//
+
+def OpGroupUtilityOps : OpDocGroup {
+  let summary = "Utility ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupUtilityOps in {
+
+def IREEInput_NullOp : IREEInput_PureOp<"null"> {
+  let summary = "a null value";
+  let description = [{
+    Initializes reference and variant types with a null value.
+  }];
+
+  let results = (outs
+    AnyType:$result
+  );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result)
+  }];
+}
 
 def IREEInput_AlignOp : IREEInput_PureOp<"align", [
   SameOperandsAndResultType
@@ -673,5 +860,202 @@ def IREEInput_AlignOp : IREEInput_PureOp<"align", [
     }]>,
   ];
 }
+
+} // OpGroupUtilityOps
+
+//===----------------------------------------------------------------------===//
+// Executable Source
+//===----------------------------------------------------------------------===//
+
+def OpGroupExecutableSourceOps : OpDocGroup {
+  let summary = "Executable source ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupExecutableSourceOps in {
+
+def IREEInput_ExecutableSourceOp : IREEInput_Op<"executable.source", [
+    IsolatedFromAbove,
+    SingleBlockImplicitTerminator<"IREE::Input::ExecutableSourceEndOp">,
+    Symbol,
+    SymbolTable,
+  ]> {
+  let summary = [{generic source contents of an executable op}];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<IREEInput_ExecutableObjectsAttr>:$objects
+  );
+
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
+}
+
+def IREEInput_ExecutableSourceEndOp : IREEInput_Op<"executable.source_end", [
+    HasParent<"IREE::Input::ExecutableSourceOp">,
+    Terminator,
+  ]> {
+  let summary = [{terminator pseudo-op for the executable source op}];
+  let assemblyFormat = "attr-dict";
+}
+
+def IREEInput_ExecutableExportOp : IREEInput_Op<"executable.export", [
+    Symbol,
+    HasParent<"IREE::Input::ExecutableSourceOp">,
+    IsolatedFromAbove,
+  ]> {
+  let summary = [{executable entry point declaration}];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<IREEInput_OrdinalAttr>:$ordinal,
+    IREEInput_PipelineLayoutAttr:$layout,
+    OptionalAttr<IREEInput_WorkgroupSizeAttr>:$workgroup_size,
+    OptionalAttr<IREEInput_SubgroupSizeAttr>:$subgroup_size,
+    OptionalAttr<IndexAttr>:$workgroup_local_memory
+  );
+
+  let builders = [
+    OpBuilder<(ins
+      "StringAttr":$sym_name,
+      "IntegerAttr":$ordinal,
+      "IREE::Input::PipelineLayoutAttr":$layout,
+      "ArrayAttr":$workgroup_size,
+      "IntegerAttr":$subgroup_size,
+      "IntegerAttr":$workgroup_local_memory
+    ), [{
+      build($_builder, $_state, nullptr, sym_name, ordinal, layout,
+            workgroup_size, subgroup_size, workgroup_local_memory);
+    }]>,
+  ];
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    `ordinal` `(` $ordinal `)`
+    `layout` `(` $layout `)`
+    attr-dict-with-keyword
+  }];
+
+  // TODO(ezhulenev): Add verifier.
+}
+
+} // OpGroupExecutableSourceOps
+
+//===----------------------------------------------------------------------===//
+// Dispatch
+//===----------------------------------------------------------------------===//
+
+def OpGroupDispatchOps : OpDocGroup {
+  let summary = "Dispatch ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupDispatchOps in {
+
+def IREEInput_DispatchOp : IREEInput_PureOp<"dispatch", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+  DeclareOpInterfaceMethods<IREEInput_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{a dispatch of an executable across a grid}];
+
+  let arguments = (ins
+    Variadic<IREEInput_Dim>:$workload,
+    SymbolRefAttr:$entry_point,
+    Variadic<AnyType>:$arguments,
+    IREEInput_ShapeDynamicDims:$argument_dims,
+    IREEInput_ShapeDynamicDims:$result_dims,
+    OptionalAttr<IREEInput_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    $entry_point
+    (`[` $workload^ `]`)? ``
+    `(` $arguments `)` attr-dict `:`
+    custom<ShapedFunctionType>(ref($arguments),
+                               type($arguments), $argument_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "ExecutableExportOp":$exportOp, "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayAttr":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+    OpBuilder<(ins
+      "ExecutableExportOp":$exportOp, "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayRef<int64_t>":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes),
+      [{
+        build($_builder, $_state, exportOp, workload,
+              resultTypes, resultDims, arguments, argumentDims,
+              $_builder.getIndexArrayAttr(tiedOperands),
+              attributes);
+      }]>
+  ];
+}
+
+} // OpGroupDispatchOps
+
+//===----------------------------------------------------------------------===//
+// Compiler hints
+//===----------------------------------------------------------------------===//
+
+def OpGroupCompilerHintOps : OpDocGroup {
+  let summary = "Compiler hint ops";
+  let description = "";
+}
+
+let opDocGroup = OpGroupCompilerHintOps in {
+
+def IREEInput_OptimizationBarrierOp : IREEInput_Op<"optimization_barrier", [
+  SameOperandsAndResultType,
+]> {
+  let summary = "Prevents compiler optimizations across a value.";
+  let description = [{
+    Wraps any operands in an unoptimizable identity to prevent its results from
+    being folded. It will be dropped during the final step in compilation and
+    has no effect at runtime.
+  }];
+  let arguments = (ins Variadic<AnyType>:$operands);
+  let results = (outs Variadic<AnyType>:$results);
+
+  let assemblyFormat = [{
+    attr-dict
+    ($operands^ `:` type($operands))?
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
+    )>,
+  ];
+
+  let hasVerifier = 1;
+}
+
+} // OpGroupCompilerHintOps
 
 #endif // IREE_DIALECTS_DIALECT_INPUT_OPS_TD

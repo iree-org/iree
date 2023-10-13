@@ -28,6 +28,8 @@ export CTEST_PARALLEL_LEVEL="${CTEST_PARALLEL_LEVEL:-$(get_default_parallel_leve
 
 # Respect the user setting, but default to turning on Vulkan.
 export IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-0}"
+# Respect the user setting, but default to turning off Metal.
+export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
 # Respect the user setting, but default to turning off CUDA.
 export IREE_CUDA_DISABLE="${IREE_CUDA_DISABLE:-1}"
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
@@ -37,6 +39,10 @@ export IREE_VULKAN_F16_DISABLE="${IREE_VULKAN_F16_DISABLE:-1}"
 export IREE_NVIDIA_GPU_TESTS_DISABLE="${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}"
 # Respect the user setting, but default to skipping tests that require SM80 Nvidia GPU.
 export IREE_NVIDIA_SM80_TESTS_DISABLE="${IREE_NVIDIA_SM80_TESTS_DISABLE:-1}"
+# Respect the user setting, but default to skipping tests that require RDNA3 AMD GPU.
+export IREE_AMD_RDNA3_TESTS_DISABLE="${IREE_AMD_RDNA3_TESTS_DISABLE:-1}"
+# Respect the user setting, but default to skipping tests that require more than one device(GPU).
+export IREE_MULTI_DEVICE_TESTS_DISABLE="${IREE_MULTI_DEVICE_TESTS_DISABLE:-1}"
 # Respect the user setting, default to no --repeat-until-fail.
 export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT="${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT:-}"
 # Respect the user setting, default to no --tests-regex.
@@ -82,6 +88,12 @@ fi
 if (( IREE_NVIDIA_SM80_TESTS_DISABLE == 1 )); then
   label_exclude_args+=("^requires-gpu-sm80$")
 fi
+if (( IREE_AMD_RDNA3_TESTS_DISABLE == 1 )); then
+  label_exclude_args+=("^requires-gpu-rdna3$")
+fi
+if (( IREE_MULTI_DEVICE_TESTS_DISABLE == 1 )); then
+  label_exclude_args+=("^requires-multiple-devices$")
+fi
 
 
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
@@ -115,7 +127,7 @@ elif [[ "${OSTYPE}" =~ ^darwin ]]; then
     #TODO(#12496): Remove after fixing the test on macOS
     "iree/compiler/bindings/python/test/transforms/ireec/compile_sample_module"
     #TODO(#13501): Fix failing sample on macOS
-    "iree/samples/custom_module/async/test/example.mlir"
+    "iree/samples/custom_module/async/test/example.mlir.test"
   )
 fi
 

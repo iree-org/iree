@@ -15,7 +15,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
-#define DEBUG_TYPE "iree-util-hoist-into-globals"
+#define DEBUG_TYPE "iree-constexpr"
 
 using llvm::dbgs;
 
@@ -25,11 +25,18 @@ namespace IREE {
 namespace Util {
 namespace {
 
+static llvm::cl::opt<std::string> clPrintDotGraphToFile(
+    "iree-util-hoist-into-globals-print-constexpr-dotgraph-to",
+    llvm::cl::desc(
+        "Prints a dot graph representing the const-expr analysis. The red "
+        "nodes represent roots and the green nodes represent hoisted values."),
+    llvm::cl::value_desc("filename"));
+
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
-// expressions into globals. It is not expected that such a greedy algorithm
-// is great, but it is simple. Naive use of this algorithm very likely
+// Hoist expressions into globals. It is not expected that such a greedy
+// algorithm is great, but it is simple. Naive use of this algorithm very likely
 // favors programs that consume more memory at runtime than is strictly
 // necessary. Either this algorithm can be made smarter or a follow-on pass
 // can sink globals into the program where it is profitable to reduce
@@ -47,6 +54,19 @@ public:
     LLVM_DEBUG(dbgs() << "\n\n");
     ConstExprHoistingPolicy policy(constExprs);
     policy.initialize();
+
+    // Print analysis dot graph if requested.
+    if (!clPrintDotGraphToFile.empty()) {
+      std::error_code ec;
+      llvm::raw_fd_ostream file(clPrintDotGraphToFile, ec);
+      if (ec) {
+        getOperation().emitError()
+            << "failed to open file for printing dot graph: " << ec.message();
+        return signalPassFailure();
+      }
+      policy.printDotGraph(file);
+      file.close();
+    }
 
     // Maps original values to newly materialized values.
     HoistedValueMap hoistedMap;
@@ -102,6 +122,9 @@ public:
       Location loc = originalValue.getLoc();
       OpBuilder builder = getModuleEndBuilder();
       auto initializerOp = builder.create<InitializerOp>(loc);
+      // Signals that this initializer is eligible for constant evaluation
+      // at compile time.
+      initializerOp->setAttr("iree.compiler.consteval", builder.getUnitAttr());
       Block *entryBlock = initializerOp.addEntryBlock();
       OpBuilder initBuilder = OpBuilder::atBlockEnd(entryBlock);
       IRMapping valueMapping;

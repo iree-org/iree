@@ -416,22 +416,22 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_resume_call(
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
-    const iree_vm_module_t* interface,
+    const iree_vm_module_t* module_interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_vm_instance_t* instance, iree_allocator_t allocator,
     iree_vm_module_t** out_module) {
-  IREE_ASSERT_ARGUMENT(interface);
+  IREE_ASSERT_ARGUMENT(module_interface);
   IREE_ASSERT_ARGUMENT(module_descriptor);
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
 
-  if (IREE_UNLIKELY(!interface->begin_call) &&
+  if (IREE_UNLIKELY(!module_interface->begin_call) &&
       IREE_UNLIKELY(!module_descriptor->functions)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "native modules must provide call support or function pointers");
-  } else if (IREE_UNLIKELY(!interface->begin_call) &&
+  } else if (IREE_UNLIKELY(!module_interface->begin_call) &&
              IREE_UNLIKELY(module_descriptor->export_count !=
                            module_descriptor->function_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -454,9 +454,9 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, sizeof(*module), (void**)&module));
 
-  iree_status_t status =
-      iree_vm_native_module_initialize(interface, module_descriptor, instance,
-                                       allocator, (iree_vm_module_t*)module);
+  iree_status_t status = iree_vm_native_module_initialize(
+      module_interface, module_descriptor, instance, allocator,
+      (iree_vm_module_t*)module);
   if (!iree_status_is_ok(status)) {
     iree_allocator_free(allocator, module);
     return status;
@@ -467,22 +467,22 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
-    const iree_vm_module_t* interface,
+    const iree_vm_module_t* module_interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
     iree_vm_instance_t* instance, iree_allocator_t allocator,
     iree_vm_module_t* base_module) {
-  IREE_ASSERT_ARGUMENT(interface);
+  IREE_ASSERT_ARGUMENT(module_interface);
   IREE_ASSERT_ARGUMENT(module_descriptor);
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(base_module);
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)base_module;
 
-  if (IREE_UNLIKELY(!interface->begin_call) &&
+  if (IREE_UNLIKELY(!module_interface->begin_call) &&
       IREE_UNLIKELY(!module_descriptor->functions)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "native modules must provide call support or function pointers");
-  } else if (IREE_UNLIKELY(!interface->begin_call) &&
+  } else if (IREE_UNLIKELY(!module_interface->begin_call) &&
              IREE_UNLIKELY(module_descriptor->export_count !=
                            module_descriptor->function_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -499,7 +499,7 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
   module->descriptor = module_descriptor;
 
   // TODO(benvanik): version interface and copy only valid bytes.
-  memcpy(&module->user_interface, interface, sizeof(*interface));
+  memcpy(&module->user_interface, module_interface, sizeof(*module_interface));
   module->self =
       module->user_interface.self ? module->user_interface.self : module;
 

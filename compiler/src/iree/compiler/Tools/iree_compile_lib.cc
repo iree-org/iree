@@ -27,8 +27,9 @@ enum class OutputFormat {
   vm_asm,
   vm_bytecode,
   vm_c,
-  // Non-user exposed output format for use with --compile-mode=hal-executable.
+  // Non-user exposed output formats.
   hal_executable,
+  precompile,
 };
 
 enum class CompileMode {
@@ -41,6 +42,23 @@ enum class CompileMode {
   // target-specific binary form (such as an ELF file or a flatbuffer containing
   // a SPIR-V blob).
   hal_executable,
+  // IREE's precompilation pipeline, which does input preprocessing and
+  // pre-fusion global optimizations.
+  precompile,
+};
+
+struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
+  BytecodeVersionParser(llvm::cl::Option &O)
+      : llvm::cl::parser<std::optional<int64_t>>(O) {}
+  bool parse(llvm::cl::Option &O, StringRef /*argName*/, StringRef arg,
+             std::optional<int64_t> &v) {
+    long long w;
+    if (llvm::getAsSignedInteger(arg, 10, w))
+      return O.error("Invalid argument '" + arg +
+                     "', only integer is supported.");
+    v = w;
+    return false;
+  }
 };
 
 } // namespace
@@ -82,7 +100,10 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
               CompileMode::hal_executable, "hal-executable",
               "Compile an MLIR module containing a single hal.executable into "
               "a target-specific binary form (such as an ELF file or a "
-              "flatbuffer containing a SPIR-V blob)")),
+              "flatbuffer containing a SPIR-V blob)"),
+          clEnumValN(CompileMode::precompile, "precompile",
+                     "Precompilation pipeline which does input conversion and "
+                     "global optimizations.")),
       llvm::cl::init(CompileMode::std), llvm::cl::cat(mainOptions));
 
   // Debugging/diagnostics.
@@ -90,6 +111,18 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       "verify",
       llvm::cl::desc("Verifies the IR for correctness throughout compilation."),
       llvm::cl::init(true));
+
+  llvm::cl::opt<IREEVMPipelinePhase> compileFrom(
+      "compile-from",
+      llvm::cl::desc("Compilation phase to resume from, starting with the "
+                     "following phase."),
+      llvm::cl::init(IREEVMPipelinePhase::Start));
+  SmallVector<std::string> compileFromPhases;
+  enumerateIREEVMPipelinePhases(
+      [&](IREEVMPipelinePhase phase, StringRef name, StringRef desc) {
+        compileFrom.getParser().addLiteralOption(name, phase, desc);
+        compileFromPhases.push_back(name.str());
+      });
 
   llvm::cl::opt<IREEVMPipelinePhase> compileTo(
       "compile-to",
@@ -102,6 +135,19 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         compileTo.getParser().addLiteralOption(name, phase, desc);
         compileToPhases.push_back(name.str());
       });
+
+  llvm::cl::opt<bool> emitMLIRBytecode(
+      "emit-mlir-bytecode",
+      llvm::cl::desc(
+          "Emit bytecode when generating compile-to or VM MLIR output."),
+      llvm::cl::init(false));
+  llvm::cl::opt<std::optional<int64_t>, /*ExternalStorage=*/false,
+                mlir::iree_compiler::BytecodeVersionParser>
+      emitMLIRBytecodeVersion(
+          "emit-mlir-bytecode-version",
+          llvm::cl::desc("Use specified bytecode version when "
+                         "generating compile-to or VM MLIR output."),
+          llvm::cl::init(std::nullopt));
 
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
@@ -188,6 +234,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     InvState r(s);
 
     ireeCompilerInvocationEnableConsoleDiagnostics(r.inv);
+    ireeCompilerInvocationSetCompileFromPhase(
+        r.inv,
+        compileFromPhases[static_cast<int>(compileFrom.getValue())].c_str());
     ireeCompilerInvocationSetCompileToPhase(
         r.inv, compileToPhases[static_cast<int>(compileTo.getValue())].c_str());
     ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
@@ -210,14 +259,31 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         return false;
       break;
     }
+    case CompileMode::precompile: {
+      outputFormat = OutputFormat::precompile;
+      if (!ireeCompilerInvocationPipeline(r.inv,
+                                          IREE_COMPILER_PIPELINE_PRECOMPILE))
+        return false;
+      break;
+    }
     default:
       llvm::errs() << "INTERNAL ERROR: unknown compile mode\n";
       return false;
     }
 
+    auto outputMLIR = [&](iree_compiler_invocation_t *inv,
+                          iree_compiler_output_t *output) {
+      if (emitMLIRBytecode) {
+        return ireeCompilerInvocationOutputIRBytecode(
+            inv, output, emitMLIRBytecodeVersion.value_or(-1));
+      } else {
+        return ireeCompilerInvocationOutputIR(inv, output);
+      }
+    };
+
     // Ending early and just emitting IR.
     if (compileTo != IREEVMPipelinePhase::End) {
-      if (auto error = ireeCompilerInvocationOutputIR(r.inv, s.output)) {
+      if (auto error = outputMLIR(r.inv, s.output)) {
         s.handleError(error);
         return false;
       }
@@ -228,7 +294,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
     iree_compiler_error_t *outputError = nullptr;
     switch (outputFormat) {
     case OutputFormat::vm_asm:
-      outputError = ireeCompilerInvocationOutputIR(r.inv, s.output);
+      outputError = outputMLIR(r.inv, s.output);
       break;
     case OutputFormat::vm_bytecode:
       outputError = ireeCompilerInvocationOutputVMBytecode(r.inv, s.output);
@@ -240,6 +306,10 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 #endif // IREE_HAVE_C_OUTPUT_FORMAT
     case OutputFormat::hal_executable: {
       outputError = ireeCompilerInvocationOutputHALExecutable(r.inv, s.output);
+      break;
+    }
+    case OutputFormat::precompile: {
+      outputError = outputMLIR(r.inv, s.output);
       break;
     }
     default:

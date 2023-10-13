@@ -19,6 +19,8 @@ iree_cc_library(
     "vulkan_driver.h"
   SRCS
     "api.cc"
+    "base_buffer.c"
+    "base_buffer.h"
     "builtin_executables.cc"
     "builtin_executables.h"
     "command_queue.h"
@@ -35,8 +37,10 @@ iree_cc_library(
     "extensibility_util.cc"
     "extensibility_util.h"
     "handle_util.h"
-    "internal_vk_mem_alloc.cc"
-    "internal_vk_mem_alloc.h"
+    "native_allocator.cc"
+    "native_allocator.h"
+    "native_buffer.cc"
+    "native_buffer.h"
     "native_event.cc"
     "native_event.h"
     "native_executable.cc"
@@ -47,14 +51,12 @@ iree_cc_library(
     "native_semaphore.h"
     "nop_executable_cache.cc"
     "nop_executable_cache.h"
+    "sparse_buffer.cc"
+    "sparse_buffer.h"
     "status_util.c"
     "status_util.h"
     "tracing.cc"
     "tracing.h"
-    "vma_allocator.cc"
-    "vma_allocator.h"
-    "vma_buffer.cc"
-    "vma_buffer.h"
     "vulkan_device.cc"
     "vulkan_driver.cc"
     "vulkan_headers.h"
@@ -72,10 +74,11 @@ iree_cc_library(
     iree::hal::drivers::vulkan::util::intrusive_list
     iree::hal::drivers::vulkan::util::ref_ptr
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::file_transfer
+    iree::hal::utils::memory_file
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::spirv_executable_def_c_fbs
-    vulkan_memory_allocator
   PUBLIC
 )
 

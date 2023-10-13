@@ -13,7 +13,7 @@
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #pipeline_layout5 = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -57,10 +57,11 @@ hal.executable private @check_no_cse {
 }
 // CHECK-LABEL: func.func @check_no_cse()
 //   CHECK-NOT:    memref.alloc
-//       CHECK:    %[[FOR:.+]] = scf.for
-//       CHECK:    %[[DIVF:.+]] = arith.divf %[[FOR]]
-//       CHECK:    %[[RES:.+]] = vector.extract %[[DIVF]]
-//       CHECK:    memref.store %[[RES]]
+//       CHECK:    scf.for
+//       CHECK:      arith.addf
+//       CHECK:    vector.reduction <add>
+//       CHECK:    arith.divf
+//       CHECK:    memref.store
 
 // -----
 
@@ -68,9 +69,8 @@ hal.executable private @check_no_cse {
 // be non-divisible by problem sizes. If padding and vectorizing are kicked in,
 // vector ops will be generated.
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[65, 65], [8, 32, 0], [0, 0, 16]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>,
-    workgroup_size = []>
+    lowering_config = <tile_sizes = [[65, 65], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
+    translation_info  = <CPUDoubleTilingPadExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -114,9 +114,8 @@ hal.executable private @preset_pad_config_matmul  {
 // be non-divisible by problem sizes. If padding and vectorizing are kicked in,
 // vector ops will be generated.
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>,
-    workgroup_size = []>
+    lowering_config = <tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
+    translation_info  = <CPUDoubleTilingPadExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -174,7 +173,7 @@ hal.executable private @preset_pad_config_dynamic_matmul  {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 64 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #pipeline_layout5 = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -212,7 +211,7 @@ hal.executable private @pad_partially_unaligned_matmul {
         %18 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%17, %14 : tensor<1x144xf32>, tensor<1x144xf32>) outs(%15 : tensor<1x144xf32>) {
         ^bb0(%in: f32, %in_0: f32, %out: f32):
           %19 = arith.addf %in, %in_0 : f32
-          %20 = arith.maxf %19, %cst : f32
+          %20 = arith.maximumf %19, %cst : f32
           linalg.yield %20 : f32
         } -> tensor<1x144xf32>
         flow.dispatch.tensor.store %18, %11, offsets = [0, 0], sizes = [1, 144], strides = [1, 1] : tensor<1x144xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x144xf32>>
@@ -228,7 +227,7 @@ hal.executable private @pad_partially_unaligned_matmul {
 //   CHECK-NOT:   memref.alloca
 //       CHECK:     vector.fma
 //       CHECK:     arith.addf {{.*}} : vector<
-//       CHECK:     arith.maxf {{.*}} : vector<
+//       CHECK:     arith.maximumf {{.*}} : vector<
 
 // -----
 
@@ -236,7 +235,7 @@ hal.executable private @pad_partially_unaligned_matmul {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 6, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -289,7 +288,7 @@ hal.executable private @batch_matmul_dynamic {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+  target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -334,7 +333,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
       cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 16 : index,
-      target_triple = "x86_64-unknown-unknown-eabi-elf"
+      target_triple = "x86_64-none-elf"
     }> {
     hal.executable.export public @vectorize_fill_conv2d_generic ordinal(0) layout(
       #hal.pipeline.layout<push_constants = 0, sets = [
@@ -399,7 +398,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
 // -----
 
 hal.executable private @multi_result {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
     hal.executable.export public @multi_result ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -447,7 +446,7 @@ hal.executable private @multi_result {
 // -----
 
 hal.executable private @quant_matmul_fusion {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
     hal.executable.export public @quant_matmul_fusion ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer, ReadOnly>, <4, storage_buffer, ReadOnly>, <5, storage_buffer, ReadOnly>, <6, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -482,7 +481,7 @@ hal.executable private @quant_matmul_fusion {
           %18 = arith.muli %in_1, %c12_i32 : i32
           %19 = arith.subi %in_0, %18 : i32
           %20 = arith.addi %in, %19 : i32
-          %21 = "tosa.apply_scale"(%20, %in_2, %in_3) {double_round = true} : (i32, i32, i8) -> i32
+          %21 = tosa.apply_scale %20, %in_2, %in_3 {double_round = true} : (i32, i32, i8) -> i32
           %22 = arith.addi %21, %c-128_i32 : i32
           %23 = arith.cmpi slt, %22, %c-128_i32 : i32
           %24 = arith.select %23, %c-128_i32, %22 : i32
@@ -517,7 +516,7 @@ hal.executable private @quant_matmul_fusion {
 //     CHECK-NEXT:         arith.addi
 //          CHECK:         arith.muli
 //     CHECK-NEXT:         arith.addi
-//          CHECK:       %{{.+}} = "tosa.apply_scale"({{.+}}) <{double_round = true}> : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
+//          CHECK:       %{{.+}} = tosa.apply_scale {{.+}} {double_round = true} : (vector<8x32xi32>, vector<8x32xi32>, vector<8x32xi8>) -> vector<8x32xi32>
 
 // -----
 
@@ -525,7 +524,7 @@ hal.executable private @mmt4d_ukernel {
   hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64",
       {cpu = "generic", cpu_features = "",
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-       native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf",
+       native_vector_size = 16 : index, target_triple = "x86_64-none-elf",
        ukernels = true}> {
     hal.executable.export public @ukernel_dispatch ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index):
@@ -562,7 +561,7 @@ hal.executable private @ukernel_pass_through {
     "llvm-cpu", "embedded-elf-x86_64", {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf",
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf",
       ukernels = false}> {
     hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<
       push_constants = 2, sets = [
@@ -603,11 +602,11 @@ hal.executable private @ukernel_pass_through {
 //       CHECK:     hal.return %[[ARG1]], %[[ARG2]], %[[ARG2]]
 //       CHECK:   func @dispatch
 //       CHECK:     %[[INPUT0:.+]] = hal.interface.binding.subspan set(0) binding(0)
-//  CHECK-SAME:         memref<?xf32>
+//  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:     %[[INPUT1:.+]] = hal.interface.binding.subspan set(0) binding(1)
-//  CHECK-SAME:         memref<?xf32>
+//  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
 //       CHECK:     %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
-//  CHECK-SAME:         memref<?xf32>
+//  CHECK-SAME:         memref<?xf32, #hal.descriptor_type<storage_buffer>>
 //   CHECK-DAG:     %[[OFFSET:.+]] = affine.apply
 //   CHECK-DAG:     %[[SIZE:.+]] = affine.min
 //   CHECK-DAG:     %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[OUTPUT]][%[[OFFSET]]] [%[[SIZE]]]
@@ -637,13 +636,13 @@ hal.executable private @ukernel_pass_through {
   cpu_features = "+sve,+sme",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "aarch64-unknown-unknown-eabi-elf"
+  target_triple = "aarch64-none-elf"
 }>
 
 hal.executable private @aarch64_ssve__cpu_buffer_ops_tile_and_vectorize {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0]]>,
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -671,7 +670,7 @@ hal.executable private @aarch64_ssve__cpu_buffer_ops_tile_and_vectorize {
 hal.executable private @aarch64_ssve__cpu_double_tiling_peeling_expert {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0]]>,
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -699,7 +698,7 @@ hal.executable private @aarch64_ssve__cpu_double_tiling_peeling_expert {
 hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0]]>,
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -731,13 +730,13 @@ hal.executable private @aarch64_ssve__cpu_conv_tile_and_decompose_expert {
   cpu_features = "+sme",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
-  target_triple = "aarch64-unknown-unknown-eabi-elf"
+  target_triple = "aarch64-none-elf"
 }>
 
 hal.executable private @aarch64_ssve_sve_disabled {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_no_sve {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0]]>,
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [1], [0], [0]]>,
       translation_info = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
     } {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):

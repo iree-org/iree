@@ -1,6 +1,4 @@
 add_mlir_library(IREELinalgTransformDialect
-  LinalgTransformOps.cpp
-  ScopedTransform.cpp
   StructuredTransformOpsExt.cpp
 
   DEPENDS
@@ -38,6 +36,6 @@ add_mlir_library(IREELinalgTransformDialect
   MLIRMemRefToLLVM
   MLIRMathToLLVM
   MLIRVectorToLLVM
-  MLIRLinalgToLLVM
+  MLIRVectorToLLVMPass
   MLIRSCFToControlFlow
 )

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -90,13 +91,13 @@ static MaskResult getMask(Operation *op) {
           ? maybeExtractOp.getVector().getDefiningOp<vector::CreateMaskOp>()
           : transferRead.getMask().getDefiningOp<vector::CreateMaskOp>();
   if (maybeExtractOp) {
-    if (maybeExtractOp.getPosition().size() + 1 !=
+    if (maybeExtractOp.getStaticPosition().size() + 1 !=
         llvm::cast<VectorType>(maskOp->getResultTypes().front()).getRank()) {
       LDBG("----mask through extract unexpected position size -> Skip: "
            << maybeExtractOp);
       return MaskResult{};
     }
-    if (maybeExtractOp.getPosition().size() != 1) {
+    if (maybeExtractOp.getStaticPosition().size() != 1) {
       LDBG("----only mask through 2-D -> 1-D extract supported atm -> Skip: "
            << maybeExtractOp);
       return MaskResult{};
@@ -113,9 +114,9 @@ static Value getMaskValue(RewriterBase &rewriter, Operation *op) {
   Value count = maskResult.maskOp->getOperands().back();
   vector::ExtractOp maybeExtractOp = maskResult.maybeExtractOp;
   if (maybeExtractOp) {
-    assert(maybeExtractOp.getPosition().size() == 1 && "expected single pos");
-    int64_t sliceNum =
-        llvm::cast<IntegerAttr>(maybeExtractOp.getPosition()[0]).getInt();
+    assert(maybeExtractOp.getStaticPosition().size() == 1 &&
+           "expected single pos");
+    int64_t sliceNum = maybeExtractOp.getStaticPosition()[0];
     // TODO: to support >2-D mask + extract, and all the cmp.
     Location loc = op->getLoc();
     Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
@@ -292,12 +293,17 @@ void createAsyncGroups(RewriterBase &rewriter, func::FuncOp funcOp,
       Value storeBase = getMemrefOperand(writeOp);
       Value loadBase = getMemrefOperand(readOp);
       Value mask = getMaskValue(rewriter, readOp);
+      auto dstMemref = llvm::cast<MemRefType>(storeBase.getType());
+      int64_t sizeInBytes =
+          (dstMemref.getElementTypeBitWidth() * numElements) / 8;
+      UnitAttr bypassL1 =
+          useMMASync && sizeInBytes == 16 ? rewriter.getUnitAttr() : UnitAttr();
       Value token = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
           writeOp->getLoc(),
           nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()), storeBase,
           getIndices(writeOp), loadBase, getIndices(readOp),
           rewriter.getIndexAttr(numElements), mask,
-          /*bypassL1=*/useMMASync ? rewriter.getUnitAttr() : UnitAttr());
+          /*bypassL1=*/bypassL1);
       tokens.push_back(token);
     }
     // Create the group and wait for it right after.
@@ -342,6 +348,72 @@ void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp) {
                         transposedOperands, resultTypes, op->getAttrs());
     rewriter.replaceAllUsesWith(transposeOp.getResult(), newOp->getResult(0));
   }
+}
+
+/// Insert barriers and wait operations if there are allocs of a different alias
+/// group before the given alloc.
+static void addBarrier(func::FuncOp funcOp, Operation *alloc,
+                       ArrayRef<Operation *> aliasGroup) {
+  Block *entryBlock = &(*funcOp.getBlocks().begin());
+  bool needBarrier = false;
+  if (alloc->getBlock() != entryBlock) {
+    needBarrier = true;
+  } else {
+    for (Operation &op : entryBlock->getOperations()) {
+      if (&op == alloc)
+        break;
+      if (op.getNumRegions() != 0) {
+        needBarrier = true;
+        break;
+      }
+      if (isa<memref::AllocOp>(&op) && !llvm::is_contained(aliasGroup, &op)) {
+        needBarrier = true;
+        break;
+      }
+    }
+  }
+  if (!needBarrier)
+    return;
+  OpBuilder builder(alloc);
+  // TODO: make it a option if needed.
+  bool hasAsyncCopies = true;
+  if (hasAsyncCopies) {
+    Value groupToken = builder.create<nvgpu::DeviceAsyncCreateGroupOp>(
+        funcOp.getLoc(), nvgpu::DeviceAsyncTokenType::get(funcOp.getContext()),
+        SmallVector<Value>());
+    builder.create<nvgpu::DeviceAsyncWaitOp>(funcOp.getLoc(), groupToken,
+                                             builder.getI32IntegerAttr(0));
+  }
+  builder.create<gpu::BarrierOp>(alloc->getLoc());
+}
+
+void packSharedMemoryAlloc(func::FuncOp funcOp) {
+  DominanceInfo dominators(funcOp);
+  SmallVector<Operation *> allocs;
+  funcOp.walk([&](memref::AllocOp alloc) {
+    if (hasSharedMemoryAddressSpace(alloc.getType())) {
+      allocs.push_back(alloc);
+    }
+  });
+  // First sink the alloc as low as possible in the CFG.
+  sinkOpsInCFG(allocs, dominators);
+  SmallVector<AliasGroup> aliasGroups;
+  analyseAllocsForPacking(funcOp, allocs, aliasGroups);
+  // If there is 1 or less alias group there is nothing to do.
+  if (aliasGroups.size() <= 1)
+    return;
+
+  // Pack all the allocations into one i8 alloc.
+  // We may need to add extra barriers to make sure we are done writting or
+  // reading from the previous alias group before starting a new one.
+  for (size_t i = 0; i < aliasGroups.size(); i++) {
+    for (Operation *alloc : aliasGroups[i]) {
+      addBarrier(funcOp, alloc, aliasGroups[i]);
+    }
+  }
+
+  OpBuilder builder(funcOp.getContext());
+  packAllocs(builder, funcOp, aliasGroups);
 }
 
 } // namespace iree_compiler

@@ -137,23 +137,6 @@ struct ResourceSizeOpPattern
   }
 };
 
-// The staging buffer returned from this is always a !util.buffer.
-// We can thus directly pass along the input buffer that's being mapped
-// (after taking a subspan for the defined range).
-struct ResourceMapOpPattern
-    : public OpConversionPattern<IREE::Stream::ResourceMapOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(IREE::Stream::ResourceMapOp mapOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::Util::BufferSubspanOp>(
-        mapOp, adaptor.getSource(),
-        getResourceSize(mapOp.getLoc(), adaptor.getSource(), rewriter),
-        adaptor.getSourceOffset(), adaptor.getResultSize());
-    return success();
-  }
-};
-
 // The constant buffer returned from this is always a !util.buffer.
 // We can thus directly pass along the input buffer that's being mapped
 // (after taking a subspan for the defined range).
@@ -230,6 +213,65 @@ struct ResourceSubviewOpPattern
           subviewOp, adaptor.getSource(), adaptor.getSourceSize(),
           adaptor.getSourceOffset(), adaptor.getResultSize());
     }
+    return success();
+  }
+};
+
+struct FileConstantOpPattern
+    : public OpConversionPattern<IREE::Stream::FileConstantOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileConstantOp constantOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::BufferSubspanOp>(
+        constantOp, constantOp.getSource(), constantOp.getSourceSize(),
+        constantOp.getSourceOffset(), constantOp.getSourceLength());
+    return success();
+  }
+};
+
+struct FileReadOpPattern
+    : public OpConversionPattern<IREE::Stream::FileReadOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileReadOp readOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value sourceSize = rewriter.create<IREE::Util::BufferSizeOp>(
+        readOp.getLoc(), adaptor.getSource());
+    rewriter.create<IREE::Util::BufferCopyOp>(
+        readOp.getLoc(), adaptor.getSource(), sourceSize,
+        rewriter.createOrFold<arith::IndexCastOp>(readOp.getLoc(),
+                                                  rewriter.getIndexType(),
+                                                  adaptor.getSourceOffset()),
+        adaptor.getTarget(), adaptor.getTargetSize(), adaptor.getTargetOffset(),
+        adaptor.getLength());
+    auto resolvedTimepoint =
+        rewriter.create<arith::ConstantIntOp>(readOp.getLoc(), 0, 64)
+            .getResult();
+    rewriter.replaceOp(readOp, resolvedTimepoint);
+    return success();
+  }
+};
+
+struct FileWriteOpPattern
+    : public OpConversionPattern<IREE::Stream::FileWriteOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::FileWriteOp writeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value targetSize = rewriter.create<IREE::Util::BufferSizeOp>(
+        writeOp.getLoc(), adaptor.getTarget());
+    rewriter.create<IREE::Util::BufferCopyOp>(
+        writeOp.getLoc(), adaptor.getSource(), adaptor.getSourceSize(),
+        adaptor.getSourceOffset(), adaptor.getTarget(), targetSize,
+        rewriter.createOrFold<arith::IndexCastOp>(writeOp.getLoc(),
+                                                  rewriter.getIndexType(),
+                                                  adaptor.getTargetOffset()),
+        adaptor.getLength());
+    auto resolvedTimepoint =
+        rewriter.create<arith::ConstantIntOp>(writeOp.getLoc(), 0, 64)
+            .getResult();
+    rewriter.replaceOp(writeOp, resolvedTimepoint);
     return success();
   }
 };
@@ -678,11 +720,11 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
                                        TypeConverter &typeConverter,
                                        RewritePatternSet &patterns) {
+  // Resources are just buffers (no shape/encoding/etc).
+  // We use !hal.buffer when going across the external ABI boundary but
+  // otherwise use our host buffer type.
   typeConverter.addConversion(
       [=](IREE::Stream::ResourceType type, SmallVectorImpl<Type> &results) {
-        // Resources are just buffers (no shape/encoding/etc).
-        // We use !hal.buffer when going across the external ABI boundary but
-        // otherwise use memrefs.
         if (type.getLifetime() == IREE::Stream::Lifetime::External) {
           results.push_back(IREE::HAL::BufferType::get(context));
         } else {
@@ -691,21 +733,29 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
         return success();
       });
 
+  // Today files all originate from host buffers and we just treat them the
+  // same. Note that file initialization from buffers may require subviews.
+  typeConverter.addConversion(
+      [=](IREE::Stream::FileType type, SmallVectorImpl<Type> &results) {
+        results.push_back(IREE::Util::BufferType::get(context));
+        return success();
+      });
+
+  // Timepoints and files are both no-oped in the inline HAL.
   typeConverter.addConversion(
       [=](IREE::Stream::TimepointType type, SmallVectorImpl<Type> &results) {
-        // TODO(benvanik): model timepoints as semaphores.
-        // This may become a !hal.semaphore + index, or some !hal.timepoint that
-        // we then do more analysis on once we know what devices are in use
-        // where.
         results.push_back(IntegerType::get(context, 64));
         return success();
       });
 
   patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
                   ResourceDeallocaOpPattern, ResourceSizeOpPattern,
-                  ResourceMapOpPattern, ResourceTryMapOpPattern,
-                  ResourceLoadOpPattern, ResourceStoreOpPattern,
-                  ResourceSubviewOpPattern>(typeConverter, context);
+                  ResourceTryMapOpPattern, ResourceLoadOpPattern,
+                  ResourceStoreOpPattern, ResourceSubviewOpPattern>(
+      typeConverter, context);
+
+  patterns.insert<FileConstantOpPattern, FileReadOpPattern, FileWriteOpPattern>(
+      typeConverter, context);
 
   patterns.insert<TensorImportBufferOpPattern, TensorImportBufferViewOpPattern,
                   TensorExportBufferOpPattern, TensorExportBufferViewOpPattern,

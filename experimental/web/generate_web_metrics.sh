@@ -84,8 +84,8 @@ wget -nc https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallSta
 # Import programs into MLIR                                                   #
 ###############################################################################
 
-# Note: you can also download imported programs from runs of the
-# https://buildkite.com/iree/iree-benchmark-android pipeline.
+# Note: you can also download imported programs from CI runs:
+# https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/benchmark_suites.md#fetching-benchmark-artifacts-from-ci
 
 IREE_IMPORT_TFLITE_PATH=iree-import-tflite
 

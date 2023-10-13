@@ -30,7 +30,11 @@ namespace {
 // leave the cleanup of redundant work to further optimization passes to keep
 // this simple.
 static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
-  auto *entryBlock = dispatchOp.getBody();
+  Region &body = dispatchOp.getWorkgroupBody();
+  if (body.empty()) {
+    return;
+  }
+  auto *entryBlock = &body.front();
 
   // Map of SSA values on the outside of the op to arguments on the inside.
   // This lets us avoid capturing duplicate values - they'd be cleaned up

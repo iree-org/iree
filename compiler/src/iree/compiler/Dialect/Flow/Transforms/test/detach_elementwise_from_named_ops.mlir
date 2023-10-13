@@ -165,7 +165,7 @@ func.func @generic_cst_output(%arg0 : tensor<114x114x64xf32>) -> tensor<56x56x64
       indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]}
       ins(%arg0, %1 : tensor<114x114x64xf32>, tensor<3x3xf32>) outs(%cst : tensor<56x56x64xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
-    %3 = arith.maxf %out, %in : f32
+    %3 = arith.maximumf %out, %in : f32
     linalg.yield %3 : f32
   } -> tensor<56x56x64xf32>
   return %2 : tensor<56x56x64xf32>

@@ -55,9 +55,10 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
     // Check that any type that should have been mapped to buffer view was.
     // This is just to catch conflicts in type conversions that may sneak in
     // during development.
-    assert(!HALTypeConverter::shouldConvertToBufferView(srcOperand.getType()) ||
-           dstOperand.getType().isa<IREE::HAL::BufferViewType>() &&
-               "expect that tensors have been mapped to buffer views");
+    assert(
+        (!HALTypeConverter::shouldConvertToBufferView(srcOperand.getType()) ||
+         dstOperand.getType().isa<IREE::HAL::BufferViewType>()) &&
+        "expect that tensors have been mapped to buffer views");
     state.addOperands({dstOperand});
   }
   for (auto resultType : srcOp->getResultTypes()) {

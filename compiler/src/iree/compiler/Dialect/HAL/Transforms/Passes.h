@@ -27,6 +27,8 @@ namespace HAL {
 //===----------------------------------------------------------------------===//
 
 enum class PipelinePhase {
+  // Pipeline entry point.
+  Start,
   // Runs the transform pipeline up to executable sources (pre translation).
   ExecutableSources,
   // Runs the transform pipeline until just after executable translation.
@@ -48,6 +50,7 @@ enum class PipelinePhase {
 void buildHALTransformPassPipeline(
     OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
     const TargetOptions &targetOptions,
+    PipelinePhase compileFrom = PipelinePhase::Start,
     PipelinePhase compileTo = PipelinePhase::End);
 
 // Adds a set of passes to the given pass manager that run the head of the HAL

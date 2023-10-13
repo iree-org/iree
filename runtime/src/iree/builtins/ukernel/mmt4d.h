@@ -13,6 +13,9 @@
 extern "C" {
 #endif  // __cplusplus
 
+// `mmt4d` microkernel. Used on LLVMCPU (as well as VMVX), due to difficulty of
+// code generation of matrix multiplications kernels.
+
 typedef struct iree_uk_mmt4d_params_t {
   const void* lhs_buffer;
   iree_uk_index_t lhs_offset;

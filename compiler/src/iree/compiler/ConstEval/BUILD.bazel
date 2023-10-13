@@ -57,6 +57,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
@@ -72,6 +73,7 @@ iree_compiler_cc_library(
         "Runtime.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Target/Bytecode",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_task/registration",
@@ -79,6 +81,7 @@ iree_compiler_cc_library(
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm/bytecode:module",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],
 )

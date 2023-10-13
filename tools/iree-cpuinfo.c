@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
   if (IREE_ARCH_ENUM == IREE_ARCH_ENUM_##arch) {                              \
     bool result = (cpu_data[field_index] & (1ull << bit_pos)) != 0;           \
-    printf("%-20s %ld\n", llvm_name, result);                                 \
+    printf("%-20s %d\n", llvm_name, (int)result);                             \
   }
 #include "iree/schemas/cpu_feature_bits.inl"
 #undef IREE_CPU_FEATURE_BIT

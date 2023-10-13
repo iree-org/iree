@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LinkerTool.h"
 #include "iree/compiler/Utils/ToolUtils.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/FileSystem.h"
@@ -120,7 +121,7 @@ public:
     }
 
     // Strip debug information (only, no relocations) when not requested.
-    if (!targetOptions.debugSymbols) {
+    if (!targetOptions.target.debugSymbols) {
       flags.push_back("--strip-debug");
     }
 

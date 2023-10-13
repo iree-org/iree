@@ -63,11 +63,11 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 //      CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
 //          CHECK: scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} -> (vector<8xf32>) {
 //          CHECK:   arith.addf %{{.*}} : vector<8x16xf32>
-// CHECK-COUNT-16:   vector.extract %{{.*}} : vector<16x8xf32>{{[[:space:]].*}}arith.addf %{{.*}} : vector<8xf32>
+// CHECK-COUNT-16:   vector.extract %{{.*}} : vector<8xf32> from vector<16x8xf32>{{[[:space:]].*}}arith.addf %{{.*}} : vector<8xf32>
 //          CHECK:   scf.yield %{{.*}} : vector<8xf32>
 //          CHECK: }
 //          CHECK: math.sqrt %{{.*}} : vector<8xf32>
-//          CHECK: vector.store %{{.*}} : memref<8xf32, strided<[1], offset: ?>>, vector<8xf32>
+//          CHECK: vector.store %{{.*}} : memref<8xf32, strided<[1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<8xf32>
 
 //      EXEC: result[0]: hal.buffer_view
 // EXEC-NEXT: 32xf32=32 32 32 32 32 32 32 32

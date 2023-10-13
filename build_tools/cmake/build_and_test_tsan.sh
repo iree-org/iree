@@ -69,6 +69,7 @@ fi
 # machines and often un-actionable anyway.
 # See e.g. https://github.com/openxla/iree/issues/9393
 export IREE_VULKAN_DISABLE=1
+export IREE_METAL_DISABLE=1
 export IREE_CUDA_DISABLE=1
 
 # Honor the "notsan" label on tests.

@@ -10,7 +10,7 @@
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "mlir/IR/FunctionInterfaces.td"
+include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -35,8 +35,7 @@ let opDocGroup = OpGroupPartitionedRegionOps in {
 
 def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     Util_ShapeAwareOp,
-    AttrSizedOperandSegments,
-    SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">]> {
+    AttrSizedOperandSegments]> {
   let summary = [{a group of ops}];
   let description = [{
     This op is a container/grouping of ops. It represents a fusion group before
@@ -76,7 +75,6 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
 def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
-  SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
@@ -1013,6 +1011,12 @@ def FLOW_CallOp : FLOW_Op<"call", [
     ValueRange getResultDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
     }
+
+    /// Get the argument operands to the called function as a mutable range, this is
+    /// required by the call interface.
+    MutableOperandRange getArgOperandsMutable() {
+      return getArgumentsMutable();
+    }
   }];
 
   let hasVerifier = 1;
@@ -1468,8 +1472,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     FLOW_ShapeDynamicDims:$target_dims,
     Variadic<FLOW_Dim>:$start_indices,
     FLOW_Tensor:$update,
-    FLOW_ShapeDynamicDims:$update_dims,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+    FLOW_ShapeDynamicDims:$update_dims
   );
   let results = (outs
     FLOW_Tensor:$result
@@ -1478,7 +1481,7 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let assemblyFormat = [{
     $update `,` $target `[` $start_indices `]` `:`
     type($update) (`{` $update_dims^ `}`)? `->`
-    custom<ShapedTiedResult>(type($result), $target_dims, $tied_operands)
+    custom<ShapedTiedResult>(type($result), $target_dims)
     attr-dict-with-keyword
   }];
 

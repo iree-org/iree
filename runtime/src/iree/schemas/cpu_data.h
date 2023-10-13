@@ -7,6 +7,8 @@
 #ifndef IREE_SCHEMAS_CPU_DATA_H_
 #define IREE_SCHEMAS_CPU_DATA_H_
 
+#include <stdint.h>
+
 //===----------------------------------------------------------------------===//
 // CPU processor data field values
 //===----------------------------------------------------------------------===//
@@ -64,13 +66,11 @@
   IREE_CPU_DATA##field_index##_##arch##_##bit_name
 
 // Bitmasks and values for processor data field 0.
-enum iree_cpu_data_field_0_e {
-
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \
-  IREE_CPU_FEATURE_BIT_NAME(arch, field_index, bit_name) = 1ull << bit_pos,
+  static const uint64_t IREE_CPU_FEATURE_BIT_NAME(arch, field_index,          \
+                                                  bit_name) = 1ull << bit_pos;
 #include "iree/schemas/cpu_feature_bits.inl"
 #undef IREE_CPU_FEATURE_BIT
-};
 
 #undef IREE_CPU_FEATURE_BIT_NAME
 

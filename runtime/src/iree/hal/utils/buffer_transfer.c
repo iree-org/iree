@@ -112,13 +112,13 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
       (iree_all_bits_set(iree_hal_buffer_memory_type(source.device_buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
        iree_all_bits_set(iree_hal_buffer_allowed_usage(source.device_buffer),
-                         IREE_HAL_BUFFER_USAGE_MAPPING));
+                         IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
   bool is_target_mappable =
       !target.device_buffer ||
       (iree_all_bits_set(iree_hal_buffer_memory_type(target.device_buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
        iree_all_bits_set(iree_hal_buffer_allowed_usage(target.device_buffer),
-                         IREE_HAL_BUFFER_USAGE_MAPPING));
+                         IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
   if (is_source_mappable && is_target_mappable) {
     return iree_hal_device_transfer_mappable_range(
         device, source, source_offset, target, target_offset, data_length,
@@ -163,15 +163,19 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
     };
     status = iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device), source_params, data_length,
-        iree_make_const_byte_span(source.host_buffer.data + source_offset,
-                                  data_length),
         &source_buffer);
     source_offset = 0;
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_transfer_h2d(
+          device, source.host_buffer.data + source_offset, source_buffer, 0,
+          data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+          iree_infinite_timeout());
+    }
   }
 
   // Allocate the staging buffer for download from the device.
   iree_hal_buffer_t* target_buffer = target.device_buffer;
-  if (!target_buffer) {
+  if (iree_status_is_ok(status) && !target_buffer) {
     // Allocate uninitialized staging memory for the transfer target.
     // We only allocate enough for the portion we are transfering.
     // TODO(benvanik): use import if supported to avoid the allocation/copy.
@@ -182,7 +186,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
     };
     status = iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device), target_params, data_length,
-        iree_const_byte_span_empty(), &target_buffer);
+        &target_buffer);
     target_offset = 0;
   }
 
@@ -355,8 +359,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_map_range(
           .usage =
               IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
       },
-      local_byte_length, iree_const_byte_span_empty(),
-      &emulation_state->host_local_buffer);
+      local_byte_length, &emulation_state->host_local_buffer);
 
   // We need to capture a copy of the device buffer to work with; unless the
   // user was nice and said they don't care about the contents with the DISCARD

@@ -47,6 +47,7 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     LLVMipo
+    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

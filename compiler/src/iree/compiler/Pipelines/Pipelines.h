@@ -21,7 +21,7 @@ class PipelineExtensions;
 // Hooks for injecting behavior into the IREEVM pipeline. Since these are not
 // derived from CLI options, we maintain them as a separate struct.
 struct IREEVMPipelineHooks {
-  // If the HighLevelOptimizationOptions::constEval option is true, then
+  // If the GlobalOptimizationOptions::constEval option is true, then
   // this callback must be set to populate a pass manager to perform
   // constant eval. It typically just adds a ConstEval::createJitGlobalsPass()
   // pass. It must be injected like this to avoid circular dependencies from
@@ -34,9 +34,11 @@ struct IREEVMPipelineHooks {
 };
 
 enum class IREEVMPipelinePhase {
+  Start,
   Input,
   ABI,
   Preprocessing,
+  GlobalOptimization,
   Flow,
   Stream,
   ExecutableSources,
@@ -50,6 +52,8 @@ enum class IREEVMPipelinePhase {
 inline static void enumerateIREEVMPipelinePhases(
     std::function<void(IREEVMPipelinePhase, StringRef name, StringRef desc)>
         callback) {
+  callback(IREEVMPipelinePhase::Start, "start",
+           "Entry point to the compilation pipeline.");
   callback(IREEVMPipelinePhase::Input, "input",
            "Performs input processing and lowering into core IREE "
            "input dialects (linalg/etc).");
@@ -57,6 +61,8 @@ inline static void enumerateIREEVMPipelinePhases(
            "Adjusts program ABI for the specified execution environment.");
   callback(IREEVMPipelinePhase::Preprocessing, "preprocessing",
            "Compiles up to the `preprocessing` specified");
+  callback(IREEVMPipelinePhase::GlobalOptimization, "global-optimization",
+           "Compiles up to global optimization.");
   callback(IREEVMPipelinePhase::Flow, "flow",
            "Compiles up to the `flow` dialect.");
   callback(IREEVMPipelinePhase::Stream, "stream",
@@ -73,6 +79,18 @@ inline static void enumerateIREEVMPipelinePhases(
            "Complete the full compilation pipeline.");
 }
 
+// Builds a pass pipeline to perform pre-compilation global optimizations.
+void buildIREEPrecompileTransformPassPipeline(
+    const IREE::HAL::TargetBackendRegistry &targetRegistry,
+    BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    PreprocessingOptions preprocessingOptions,
+    GlobalOptimizationOptions highLevelOptimizationOptions,
+    SchedulingOptions schedulingOptions,
+    IREE::HAL::TargetOptions executableOptions, IREEVMPipelineHooks &hooks,
+    OpPassManager &passManager,
+    IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Start,
+    IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::GlobalOptimization);
+
 // Builds a pass pipeline to perform end-to-end compilation from a
 // supported MLIR-based input to the IREE vm dialect.
 //
@@ -82,11 +100,12 @@ void buildIREEVMTransformPassPipeline(
     const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
-    HighLevelOptimizationOptions highLevelOptimizationOptions,
+    GlobalOptimizationOptions highLevelOptimizationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager,
+    IREEVMPipelinePhase compileFrom = IREEVMPipelinePhase::Start,
     IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::End);
 
 // Builds the above with options initialized from flags.

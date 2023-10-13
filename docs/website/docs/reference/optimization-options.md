@@ -1,3 +1,7 @@
+---
+icon: octicons/rocket-16
+---
+
 # Optimization options
 
 This page documents various supported flags for optimizing IREE programs. Each
@@ -14,7 +18,7 @@ These flags can be passed to the:
 
 ## High level program optimizations
 
-### Constant evaluation (`--iree-opt-const-eval` (off))
+### Constant evaluation (`--iree-opt-const-eval` (on))
 
 Performs compile-time evaluation of any global initializers which produce
 the initial values for global constants, storing the global directly in the

@@ -45,12 +45,8 @@ std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 
 /// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
 /// operation.
-std::unique_ptr<OperationPass<>> createLLVMCPULowerToUKernelsPass();
-
-/// Materialize the encoding of operations. The layout to use for the encoded
-/// operations are LLVMCPU specific.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUMaterializeEncodingPass();
+std::unique_ptr<OperationPass<>>
+createLLVMCPULowerToUKernelsPass(bool skipIntermediateRoundings = true);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUMmt4dVectorLoweringPass();
@@ -126,7 +122,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
 
 /// Populates the passes to lower ops through data tiling transformations.
 void addCPUDataTilingPipeline(OpPassManager &passManager,
-                              TilingConfig &tilingConfig);
+                              TilingConfig &tilingConfig,
+                              bool enableVectorMasking);
 
 /// Populates the passes to lower to scalars operations for linalg based
 /// code-generation. This pipeline does not vectorize, but instead just

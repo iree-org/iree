@@ -1066,7 +1066,7 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
       /*desc=*/[{
         Returns the subrange operand values for the given flat operand index.
       }],
-      /*retTy=*/"SubrangeOperand",
+      /*retTy=*/"IREE::Util::SubrangeOperand",
       /*methodName=*/"getSubrangeOperand",
       /*args=*/(ins "unsigned":$operandIndex)
     >,
@@ -1076,7 +1076,10 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
       }],
       /*retTy=*/"void",
       /*methodName=*/"setSubrangeOperand",
-      /*args=*/(ins "unsigned":$operandIndex, "SubrangeOperand":$operand)
+      /*args=*/(ins
+        "unsigned":$operandIndex,
+        "IREE::Util::SubrangeOperand":$operand
+      )
     >,
   ];
 }
@@ -1099,9 +1102,10 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the total storage size required by the serialized value.
+        Returns the storage size in bytes required by the serialized value.
         Any of the serialization methods will write precisely this number of
-        bytes.
+        bytes. If the value is sub-byte aligned the storage size will be rounded
+        up to the next whole byte.
       }],
       /*retTy=*/"int64_t",
       /*methodName=*/"getStorageSize",
@@ -1115,13 +1119,14 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToVector",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "SmallVectorImpl<char> &":$buffer
       ),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         buffer.resize($_attr.getStorageSize());
-        return $_attr.serializeToBuffer(endian, buffer);
+        return $_attr.serializeToBuffer(loc, endian, buffer);
       }]
     >,
     InterfaceMethod<
@@ -1132,6 +1137,7 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToBuffer",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "ArrayRef<char>":$buffer
       )
@@ -1144,13 +1150,14 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*retTy=*/"LogicalResult",
       /*methodName=*/"serializeToStream",
       /*args=*/(ins
+        "Location":$loc,
         "llvm::support::endianness":$endian,
         "llvm::raw_ostream &":$os
       ),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         SmallVector<char> buffer;
-        if (failed($_attr.serializeToVector(endian, buffer))) {
+        if (failed($_attr.serializeToVector(loc, endian, buffer))) {
           return failure();
         }
         os.write(reinterpret_cast<const char *>(buffer.data()), buffer.size());

@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -76,8 +77,10 @@ public:
     }
 
     // Tile the current op and fuse its immediate input operands.
+    SmallVector<OpFoldResult> tileSizesOfr =
+        getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
     FailureOr<scf::SCFTilingResult> tilingResult =
-        tileConsumerAndFuseInputProducer(rewriter, op, tileSizes);
+        tileConsumerAndFuseInputProducer(rewriter, op, tileSizesOfr);
     if (failed(tilingResult)) {
       return rewriter.notifyMatchFailure(op, "failed to tile consumer");
     }
@@ -91,9 +94,9 @@ public:
 
 private:
   FailureOr<scf::SCFTilingResult>
-  tileConsumerAndFuseInputProducer(RewriterBase &rewriter,
+  tileConsumerAndFuseInputProducer(PatternRewriter &rewriter,
                                    TilingInterface consumer,
-                                   ArrayRef<int64_t> tileSizes) const {
+                                   ArrayRef<OpFoldResult> tileSizes) const {
     // First tile the current op as the consumer op.
     auto tilingOptions = scf::SCFTilingOptions().setTileSizes(tileSizes);
     FailureOr<scf::SCFTilingResult> tilingResult =
@@ -137,11 +140,28 @@ private:
 
     // Fuse the candidate immeidate operands into the tiled loop.
     OpBuilder::InsertionGuard guard(rewriter);
+    auto forLoops =
+        llvm::to_vector(llvm::map_range(tilingResult->loops, [](Operation *op) {
+          return cast<scf::ForOp>(op);
+        }));
     while (!candidates.empty()) {
       tensor::ExtractSliceOp sliceOp = candidates.back();
       candidates.pop_back();
-      tileAndFuseProducerOfSlice(rewriter, sliceOp, tilingResult->loops);
+      std::optional<scf::SCFFuseProducerOfSliceResult> result =
+          tileAndFuseProducerOfSlice(rewriter, sliceOp, forLoops);
+      if (result) {
+        // Mark the fused input producer for distribution when writing to shared
+        // memory. We cannot use the current matmul op's tiling scheme here
+        // given dimensions are different.
+        IREE::LinalgExt::LinalgTransformationFilter f(
+            ArrayRef<StringAttr>(),
+            rewriter.getStringAttr(getCopyToWorkgroupMemoryMarker()));
+        f.replaceLinalgTransformationFilter(
+            rewriter, result->tiledAndFusedProducer.getDefiningOp());
+      }
     }
+    tilingResult->loops = llvm::to_vector(
+        llvm::map_range(forLoops, [](auto op) -> Operation * { return op; }));
     return tilingResult;
   }
 
@@ -206,7 +226,15 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
   SmallVector<TilingInterface> computeOps;
   funcOp.walk([&](TilingInterface op) { computeOps.push_back(op); });
 
+  auto marker =
+      StringAttr::get(funcOp.getContext(), getCopyToWorkgroupMemoryMarker());
+
   for (TilingInterface tilingOp : computeOps) {
+    auto attr = tilingOp->getAttr(
+        IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
+    if (attr == marker)
+      continue;
+
     size_t numLoops = 0;
     for (auto type : tilingOp.getLoopIteratorTypes()) {
       if (type == utils::IteratorType::parallel)
@@ -226,9 +254,9 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
     SmallVector<Attribute> idDims;
     auto getThreadMapping = [&](int64_t dim) {
       return mlir::gpu::GPUThreadMappingAttr::get(
-          tilingOp->getContext(), dim == 0   ? mlir::gpu::Threads::DimX
-                                  : dim == 1 ? mlir::gpu::Threads::DimY
-                                             : mlir::gpu::Threads::DimZ);
+          tilingOp->getContext(), dim == 0   ? mlir::gpu::MappingId::DimX
+                                  : dim == 1 ? mlir::gpu::MappingId::DimY
+                                             : mlir::gpu::MappingId::DimZ);
     };
     for (unsigned loop : llvm::reverse(partitionedLoops)) {
       int64_t num = elementPerWorkgroup[id++];
@@ -255,7 +283,8 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
   for (linalg::ConvolutionOpInterface convOp : convOps) {
     auto consumerOp = cast<linalg::LinalgOp>(*convOp);
     IRRewriter rewriter(funcOp.getContext());
-    SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 1);
+    SmallVector<OpFoldResult> tileSizes = getAsIndexOpFoldResult(
+        funcOp.getContext(), getTileSizes(consumerOp, 1));
     if (tileSizes.empty())
       return success();
 
@@ -281,10 +310,10 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
     // Fully unroll the generated loop. This allows us to remove the loop
     // for parallel output window dimension, so it helps future vector
     // transformations.
-    ArrayRef<scf::ForOp> loops = tileAndFuseResult.value().loops;
+    ArrayRef<Operation *> loops = tileAndFuseResult.value().loops;
     if (!loops.empty()) {
       assert(loops.size() == 1);
-      scf::ForOp loopOp = loops.front();
+      scf::ForOp loopOp = cast<scf::ForOp>(loops.front());
       IntegerAttr ub;
       if (!matchPattern(loopOp.getUpperBound(), m_Constant(&ub))) {
         loopOp.emitOpError("upper bound should be a constant");
@@ -316,10 +345,6 @@ public:
     if (!isEntryPoint(funcOp))
       return;
 
-    funcOp->walk([&](linalg::LinalgOp op) {
-      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-    });
-
     auto workgroupSize = llvm::map_to_vector(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
@@ -328,7 +353,7 @@ public:
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After second level of tiling";
+      llvm::dbgs() << "// --- After second level of tiling:\n";
       funcOp.dump();
     });
 
@@ -338,7 +363,7 @@ public:
       return signalPassFailure();
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After tile reductions:";
+      llvm::dbgs() << "// --- After tile reductions:\n";
       funcOp.dump();
     });
 
@@ -347,7 +372,7 @@ public:
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After conv unrolling:";
+      llvm::dbgs() << "// --- After conv unrolling:\n";
       funcOp.dump();
     });
   }

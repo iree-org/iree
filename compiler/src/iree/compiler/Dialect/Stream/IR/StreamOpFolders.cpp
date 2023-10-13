@@ -668,16 +668,6 @@ void ResourceSizeOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
-// stream.resource.map
-//===----------------------------------------------------------------------===//
-
-void ResourceMapOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                MLIRContext *context) {
-  // TODO(benvanik): fold subviews up into maps to limit range.
-  results.insert<ElideUnusedOp<ResourceMapOp>>(context);
-}
-
-//===----------------------------------------------------------------------===//
 // stream.resource.try_map
 //===----------------------------------------------------------------------===//
 
@@ -996,6 +986,24 @@ void ResourceSubviewOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                     MLIRContext *context) {
   results.insert<FoldResourceSubviewOps>(context);
   results.insert<SinkSubviewAcrossSelectOps>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.file.read
+//===----------------------------------------------------------------------===//
+
+void FileReadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                             MLIRContext *context) {
+  results.insert<ElideUnusedOp<FileReadOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.file.write
+//===----------------------------------------------------------------------===//
+
+void FileWriteOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                              MLIRContext *context) {
+  results.insert<ElideUnusedOp<FileWriteOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1350,8 +1358,8 @@ struct ConvertSplatConstantsIntoSplats
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto value = constantOp.getValue();
-    if (!value.isSplat())
+    auto value = dyn_cast<ElementsAttr>(constantOp.getValue());
+    if (!value || !value.isSplat())
       return failure();
 
     auto splatElementAttr =

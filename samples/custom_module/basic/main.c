@@ -64,8 +64,8 @@ int main(int argc, char** argv) {
   if (strcmp(module_path, "-") == 0) {
     IREE_CHECK_OK(iree_stdin_read_contents(allocator, &module_contents));
   } else {
-    IREE_CHECK_OK(
-        iree_file_read_contents(module_path, allocator, &module_contents));
+    IREE_CHECK_OK(iree_file_read_contents(
+        module_path, IREE_FILE_READ_FLAG_DEFAULT, allocator, &module_contents));
   }
 
   // Load the bytecode module from the vmfb.

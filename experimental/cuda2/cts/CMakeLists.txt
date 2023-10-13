@@ -17,13 +17,9 @@ iree_hal_cts_test_suite(
     "\"PTXE\""
   DEPS
     iree::experimental::cuda2::registration
-  INCLUDED_TESTS
-    "allocator"
-    "buffer_mapping"
-    "executable_cache"
-    "descriptor_set_layout"
-    "driver"
-    "pipeline_layout"
+  EXCLUDED_TESTS
+    # HAL event is unimplemented for now.
+    "event"
   LABELS
     driver=cuda2
     requires-gpu-nvidia

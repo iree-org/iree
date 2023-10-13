@@ -35,7 +35,6 @@ iree_cc_library(
     internal_headers
   HDRS
     "common.h"
-    "elementwise.h"
     "exported_bits.h"
     "mmt4d.h"
     "mmt4d_internal.h"
@@ -58,8 +57,6 @@ iree_cc_library(
     "api.h"
   SRCS
     "common.h"
-    "elementwise.c"
-    "elementwise.h"
     "exported_bits.h"
     "mmt4d.c"
     "mmt4d.h"
@@ -143,7 +140,9 @@ iree_c_embed_data(
     embed_ukernel_bitcode
   SRCS
     "runtime/src/iree/builtins/ukernel/arch/arm_64/ukernel_bitcode_arm_64.bc"
+    "runtime/src/iree/builtins/ukernel/arch/arm_64/ukernel_bitcode_arm_64_entry_points.bc"
     "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64.bc"
+    "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64_entry_points.bc"
     "ukernel_bitcode_32bit_base.bc"
     "ukernel_bitcode_64bit_base.bc"
   DEPS

@@ -7,6 +7,7 @@ add_mlir_library(IREEInputDialect
 
   DEPENDS
   IREEInputIncGen
+  IREEInputInterfacesIncGen
 
   LINK_LIBS PUBLIC
   MLIRArithDialect

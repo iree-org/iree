@@ -232,10 +232,10 @@ static iree_status_t iree_hal_inline_module_buffer_allocate_with_storage(
   // the storage in. Today this is all intentionally simple and something we can
   // change in the runtime without impacting the compiler/artifacts.
 
-  // Try allocating the buffer first
+  // Allocate the buffer with uninitialized contents.
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      device_allocator, params, allocation_size, initial_data, &buffer));
+      device_allocator, params, allocation_size, &buffer));
 
   // Map and retain the HAL buffer and return a VM buffer that is usable as if
   // it were a native iree_vm_buffer_t.
@@ -245,6 +245,13 @@ static iree_status_t iree_hal_inline_module_buffer_allocate_with_storage(
   if (!iree_status_is_ok(status)) {
     iree_hal_buffer_release(buffer);
     return status;
+  }
+
+  // Now that we know we have a host pointer mapped we can copy over the initial
+  // data (if any).
+  if (!iree_const_byte_span_is_empty(initial_data)) {
+    memcpy(iree_vm_buffer_data(storage), initial_data.data,
+           iree_min(initial_data.data_length, allocation_size));
   }
 
   *out_buffer = buffer;

@@ -53,11 +53,6 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
-static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
-                                       Value allocation) {
-  return success();
-}
-
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   bool needsBarrier = false;
@@ -79,16 +74,10 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
 
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  passManager.addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
 }
 
 static void
@@ -477,6 +466,7 @@ void addGPUDefaultPassPipeline(OpPassManager &pm) {
 static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
   pm.addPass(createExtractAddressComputationGPUPass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  pm.addPass(memref::createFoldMemRefAliasOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   // Hoist loop invariant variables to give decompose affine pass the right loop
   // dependencies.
@@ -491,6 +481,8 @@ static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
+  pm.addPass(createConvertHALDescriptorTypeToGPUAddressSpacePass());
+
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -548,14 +540,17 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  pm.addPass(memref::createFoldMemRefAliasOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
+  pm.addPass(createEmulateNarrowTypePass());
   pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
   // Cast address spaces of all function arguments to generic
-  if (!useROCM)
-    pm.addPass(createLLVMGPUCastAddressSpaceFunction());
+  pm.addPass(createLLVMGPUCastAddressSpaceFunction());
   if (useROCM) {
     // convert to ROCDL.
     pm.addPass(createConvertToROCDLPass());
@@ -586,10 +581,6 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//

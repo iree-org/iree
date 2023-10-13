@@ -91,12 +91,12 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
 /// TypeConverter to use for materializing the encoding.
 struct MaterializeEncodingTypeConverter : public TypeConverter {
   MaterializeEncodingTypeConverter(MaterializeEncodingFn fn);
-  MaterializeEncodingFn &getMaterializeEncodingFn() {
+  const MaterializeEncodingFn &getMaterializeEncodingFn() const {
     return materializeEncodingFn;
   }
 
 private:
-  MaterializeEncodingFn materializeEncodingFn;
+  const MaterializeEncodingFn materializeEncodingFn;
 };
 
 /// Conversion target to use for for materializing the encoding.
@@ -109,7 +109,8 @@ template <typename OpTy>
 class OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
 public:
   OpMaterializeEncodingPattern(
-      MLIRContext *context, MaterializeEncodingTypeConverter &typeConverter,
+      MLIRContext *context,
+      const MaterializeEncodingTypeConverter &typeConverter,
       MaterializeEncodingValueFn materializeEncodingValueFn = {},
       PatternBenefit benefit = 1)
       : OpConversionPattern<OpTy>(typeConverter, context, benefit),
@@ -130,6 +131,9 @@ void populateMaterializeEncodingPatterns(
     MaterializeEncodingConversionTarget &conversionTarget,
     MaterializeEncodingTypeConverter &typeConverter,
     MaterializeEncodingValueFn materializeEncodingValueFn = {});
+
+void populateMaterializeUpperBoundTileSizePatterns(
+    RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
 
 /// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
 std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();

@@ -16,43 +16,6 @@ include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
-def ApplyBufferOptimizationsOp :
-  Op<Transform_Dialect, "iree.apply_buffer_optimizations",
-    [TransformEachOpTrait,
-     TransformOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    This applies memory optimization on memref. In particular it does store to
-    load forwarding, dead store elimination and dead alloc elimination.
-
-    #### Return modes
-
-    This operation applies a set of memory optimization on the whole region of
-    the operand.
-
-    The transformation does not consume the target handle.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs);
-
-  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def ApplyBubbleCollapsePatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.bubble_collapse",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
@@ -116,6 +79,19 @@ def ApplyFoldReshapeIntoTensorHalInterfacePatternsOp : Op<Transform_Dialect,
   let description = [{
     Populate patterns that fold tensor.expand_shape/tensor.collapse_shape into
     the source hal.interface.binding.subspan op.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyFoldTensorSliceIntoTransferPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.fold_tensor_slice_into_transfer",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Indicates that tensor.extract_slice -> vector.transfer_read and
+    vector.transfer_write -> tensor.insert_slice op chains should be folded into
+    vector tranfer read and write ops
   }];
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -343,43 +319,6 @@ def IREEEliminateEmptyTensorsOp : Op<
   }];
 }
 
-def IREEEraseHALDescriptorTypeFromMemRefOp : Op<Transform_Dialect,
-    "iree.erase_hal_descriptor_type_from_memref",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Erase #hal.descriptor_type from MemRef memory space to ignore all IREE
-    memory space planning. This is meant to ease transitioning given that
-    various LLVM conversion upstream patterns assumes numeric memory space,
-    especially the default 0.
-
-    Return modes:
-    =============
-    The pass is ran on all FuncOp nested under the top-level op on which
-    the transform dialect interpreter pass is applied.
-
-    If any of the pass on any of the FuncOp fails, the transformation
-    definitely fails. Otherwise the transformation succeeds.
-
-    This transform does not consume the target handle.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs);
-
-  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -411,7 +350,7 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
     This region may require arbitrary computations and cannot magically match
     what the `stream.cmd.dispatch` has already imposed on us at a distance.
     For now we must specify the number of values properly when applying the
-    topLevel tile_to_forall_op.
+    topLevel tile_using_forall.
 
     If the unique topLevel scf.forall operation contained within the
     FuncOp referred to by the `target` transform handle lowers to workgroup
@@ -540,6 +479,49 @@ def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
       ::mlir::Operation *target,
       ::mlir::transform::ApplyToEachResultList &results,
       ::mlir::transform::TransformState &state);
+  }];
+}
+
+def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Swizzle workgroup ids";
+  let description = [{
+    Swizzle workgroup ids for better cache reuse.
+
+    This transform implements the following swizzling logic (x, y here are the
+    workgroup ids and tiledx, tiledy are the swizzled workgroup ids) :
+
+    t_tiledx = (x + (y % tile) * grid_size_x) / tile;
+    t_tiledy = (y / tile) * tile + (x + (y % tile) * grid_size_x) % tile;
+    c = grid_size_y % tile != 0 && ((y / tile) * tile + tile) > grid_size_y;
+    tiledx = c ? x : t_tiledx;
+    tiledy = c ? y : t_tiledy;
+
+    #### Return modes
+    This transform replaces the old workgroup ids inside the given operation's
+    region with swizzled workgroup ids.
+
+    It does not consume the target handle and always return success.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          I64Attr:$log_tile
+  );
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::func::FuncOp funcOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 

@@ -18,6 +18,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Pass pipeline to lower IREE HAL executables without any tiling and
+/// distribution.
+void addSPIRVBaseLoweringPassPipeline(OpPassManager &pm);
+
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to
 /// workgroups and invocations. Each invocation handles a scalar.
 void addSPIRVBaseDistributePassPipeline(OpPassManager &pm);
@@ -91,6 +95,10 @@ createSPIRVEraseStorageBufferStaticShapePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVFoldProcessorIDUsesPass();
 
+// This pass generalizes named Linalg ops that are better off as generics.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVGeneralizeNamedOpsPass();
+
 /// Main pass to lower executables to scalar + vector code on SPIR-V path.
 /// Invokes one of the pass pipelines that translate the executable to
 /// scalar + vector code.
@@ -128,8 +136,11 @@ createSPIRVVectorToGPUSubgroupMMAOpsPass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
-/// Pass to vectorize Linalg ops with buffer semantics.
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass();
+/// Pass to lower vector ops to meet SPIR-V requirements.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVInitialVectorLoweringPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVFinalVectorLoweringPass();
 
 /// Pass to do vectorization suitable for lowering to SPIR-V cooperative ops.
 std::unique_ptr<OperationPass<func::FuncOp>>

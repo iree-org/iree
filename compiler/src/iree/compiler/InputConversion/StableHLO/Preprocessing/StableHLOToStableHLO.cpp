@@ -1347,6 +1347,37 @@ struct RngBitcastFloat final
   }
 };
 
+struct ZeroConcat final : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ConcatenateOp op,
+                                PatternRewriter &rewriter) const override {
+    auto type = dyn_cast<RankedTensorType>(op.getType());
+    if (!type || !type.hasStaticShape())
+      return failure();
+
+    uint64_t axis = op.getDimension();
+    OperandRange origInputs = op.getInputs();
+    SmallVector<Value> nonzeroInputs;
+    for (auto input : origInputs) {
+      auto type = dyn_cast<RankedTensorType>(input.getType());
+      ArrayRef<int64_t> shape = type.getShape();
+      if (axis > shape.size())
+        return failure();
+
+      if (shape[axis] != 0)
+        nonzeroInputs.push_back(input);
+    }
+
+    if (nonzeroInputs.size() == origInputs.size())
+      return failure();
+
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ConcatenateOp>(
+        op, nonzeroInputs, /*dimension=*/axis);
+    return success();
+  }
+};
+
 // Similar to DotIsMul, this finds the case where a dot general
 // can be represented using a mul operation. This includes possibly making
 // an implicit cast explicit prior the mul.
@@ -1689,6 +1720,9 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
     int64_t k;
     // Check that the output of the sort op gets fed into a slice.
     for (auto [idx, result] : llvm::enumerate(opResults)) {
+      if (result.getUsers().empty())
+        return rewriter.notifyMatchFailure(
+            op, "Sort isn't calling into a slice op.");
       auto sliceOp =
           dyn_cast<mlir::stablehlo::SliceOp>(*result.getUsers().begin());
       if (!sliceOp) {
@@ -1719,6 +1753,85 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
     topV.replaceAllUsesWith(topK.getResults()[0]);
     topI.replaceAllUsesWith(topK.getResults()[1]);
     return success();
+  }
+};
+
+struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getCallTargetName() != "ApproxTopK")
+      return rewriter.notifyMatchFailure(op, "not ApproxTopK operation.");
+
+    auto computationName =
+        dyn_cast<SymbolRefAttr>(op.getCalledComputationsAttr()[0]);
+    Operation *funcOp;
+    for (auto parent = op->getParentOp(); parent;
+         parent = parent->getParentOp()) {
+      funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+          parent, computationName);
+      if (funcOp)
+        break;
+    }
+    if (!funcOp)
+      return rewriter.notifyMatchFailure(op, "computation function not found.");
+
+    int64_t k = cast<ShapedType>(op.getType(0)).getDimSize(1);
+    auto input = op.getOperand(0);
+    auto iota = op.getOperand(1);
+
+    if (auto iotaOp =
+            dyn_cast_or_null<mlir::stablehlo::IotaOp>(iota.getDefiningOp())) {
+      int64_t iotaDim = iotaOp.getIotaDimension();
+      auto iotaLastDim = cast<ShapedType>(iotaOp.getType()).getRank() - 1;
+      if (iotaDim != iotaLastDim || iotaLastDim != 1) {
+        return rewriter.notifyMatchFailure(op, "Iota of last dim not found.");
+      }
+    }
+
+    Block &block = funcOp->getRegion(0).front();
+    auto stablehloCompareOp =
+        dyn_cast<mlir::stablehlo::CompareOp>(block.front());
+    if (!stablehloCompareOp) {
+      return rewriter.notifyMatchFailure(op, "not stablehlo compare op");
+    }
+
+    auto returnOp = block.getTerminator();
+    auto freturnOp = dyn_cast<func::ReturnOp>(returnOp);
+    auto sreturnOp = dyn_cast<mlir::stablehlo::ReturnOp>(returnOp);
+    if (!freturnOp && !sreturnOp) {
+      return rewriter.notifyMatchFailure(op, "could not find ReturnOp");
+    }
+
+    if (returnOp->getNumOperands() != 1 ||
+        returnOp->getOperand(0) != stablehloCompareOp.getResult()) {
+      return rewriter.notifyMatchFailure(op, "ReturnOp operand not compare op");
+    }
+
+    auto direction = stablehloCompareOp.getComparisonDirection();
+    bool getTop = direction == mlir::stablehlo::ComparisonDirection::GT ||
+                  direction == mlir::stablehlo::ComparisonDirection::GE;
+    if (getTop) {
+      auto topK =
+          rewriter.create<chlo::TopKOp>(op.getLoc(), op.getResultTypes(), input,
+                                        rewriter.getI64IntegerAttr(k));
+      rewriter.replaceOp(op, topK);
+      return success();
+    }
+
+    bool getBottom = direction == mlir::stablehlo::ComparisonDirection::LT ||
+                     direction == mlir::stablehlo::ComparisonDirection::LE;
+    if (getBottom) {
+      input = rewriter.create<mlir::stablehlo::NegOp>(op.getLoc(), input);
+      auto topK =
+          rewriter.create<chlo::TopKOp>(op.getLoc(), op.getResultTypes(), input,
+                                        rewriter.getI64IntegerAttr(k));
+      rewriter.replaceOp(op, topK);
+      return success();
+    }
+
+    return failure();
   }
 };
 
@@ -1791,11 +1904,11 @@ struct StableHLOToStableHLOPreprocessing final
     patterns.insert<CustomCallIsTopK>(context);
 
     // Identify an iota->sort->slice pattern that maps to TopK.
-    patterns.insert<IotaSortSliceIsTopK>(context);
+    patterns.insert<IotaSortSliceIsTopK, ApproxTopK>(context);
 
     // Additional canonicalizers that simplify to computationally
     // less-complex operations.
-    patterns.insert<DotToMul>(context);
+    patterns.insert<DotToMul, ZeroConcat>(context);
 
     // Unary elementwise op.
     patterns.insert<

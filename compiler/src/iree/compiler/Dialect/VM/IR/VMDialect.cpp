@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -146,6 +147,8 @@ struct VMFolderInterface : public DialectFoldInterface {
 VMDialect::VMDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()),
       fallbackOpAsmInterface(new VMOpAsmInterface) {
+  context->loadDialect<IREE::Util::UtilDialect>();
+
   registerAttributes();
   registerTypes();
   addInterfaces<VMInlinerInterface, VMFolderInterface>();

@@ -17,7 +17,6 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -25,6 +24,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -634,18 +634,6 @@ LogicalResult ResourceAllocOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// stream.resource.map
-//===----------------------------------------------------------------------===//
-
-LogicalResult ResourceMapOp::verify() {
-  ResourceMapOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
-    return failure();
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // stream.resource.try_map
 //===----------------------------------------------------------------------===//
 
@@ -789,6 +777,58 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
     }
   }
   return {};
+}
+
+//===----------------------------------------------------------------------===//
+// stream.file.constant
+//===----------------------------------------------------------------------===//
+
+void FileConstantOp::getAsmResultNames(mlir::OpAsmSetValueNameFn setNameFn) {
+  setNameFn(getResult(), "file");
+}
+
+IREE::Util::SubrangeOperand
+FileConstantOp::getSubrangeOperand(unsigned operandIndex) {
+  if (operandIndex == 0) {
+    return IREE::Util::SubrangeOperand{getSource(), getSourceSize(),
+                                       getSourceOffset(), getSourceLength()};
+  } else {
+    assert(false && "only source is a subrange");
+    return {};
+  }
+}
+
+void FileConstantOp::setSubrangeOperand(unsigned operandIndex,
+                                        IREE::Util::SubrangeOperand operand) {
+  assert(operandIndex == 0 && "only source is a subrange");
+  getSourceMutable().assign(operand.resource);
+  getSourceSizeMutable().assign(operand.resourceSize);
+  getSourceOffsetMutable().assign(operand.offset);
+  getSourceLengthMutable().assign(operand.length);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.file.read
+//===----------------------------------------------------------------------===//
+
+LogicalResult FileReadOp::verify() {
+  FileReadOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getTarget(), op.getTargetSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.file.write
+//===----------------------------------------------------------------------===//
+
+LogicalResult FileWriteOp::verify() {
+  FileWriteOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize()))) {
+    return failure();
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1235,13 +1275,9 @@ void AsyncUpdateOp::getAsyncAccessRanges(
 
 LogicalResult AsyncCopyOp::verify() {
   AsyncCopyOp op = *this;
-  if (op.getSource() == op.getTarget()) {
-    // If we want to perform memmove-like operations where it's safe to copy
-    // overlapping ranges we'll need to emit some runtime checks. We can in
-    // many cases statically detect a lack of overlap just based on symbolic
-    // offset equality but that requires some analysis we don't have yet.
-    return op.emitOpError() << "cannot copy within the same resource (yet)";
-  }
+  // TODO(ezhulenev): We should reject copy operations when we know that buffers
+  // overlap. This will be verified at run time by command buffer validation,
+  // but it would be better to reject invalid IR early.
   if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
       failed(verifyOpValueSizes(op, op.getResult(), op.getTargetSize()))) {
     return failure();
@@ -1713,14 +1749,14 @@ AsyncCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   };
   for (auto [calleeArg, expectedArg] :
        llvm::zip_equal(calleeType.getInputs(), expectedType.getInputs())) {
-    if (!typesCompatible) {
+    if (!typesCompatible(calleeArg, expectedArg)) {
       return emitOpError("function argument type mismatch; expected ")
              << expectedArg << " but callee provides " << calleeArg;
     }
   }
   for (auto [calleeResult, expectedResult] :
        llvm::zip_equal(calleeType.getResults(), expectedType.getResults())) {
-    if (!typesCompatible) {
+    if (!typesCompatible(calleeResult, expectedResult)) {
       return emitOpError("function result type mismatch; expected ")
              << expectedResult << " but callee provides " << calleeResult;
     }
@@ -1824,18 +1860,17 @@ std::pair<unsigned, unsigned> AsyncExecuteOp::getTiedResultsIndexAndLength() {
 }
 
 OperandRange
-AsyncExecuteOp::getSuccessorEntryOperands(std::optional<unsigned> index) {
-  assert(index && index.value() == 0 && "invalid region index");
+AsyncExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
+  assert(point.getRegionOrNull() == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
 void AsyncExecuteOp::getSuccessorRegions(
-    std::optional<unsigned> index, ArrayRef<Attribute> operands,
-    SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor(getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -1980,18 +2015,17 @@ LogicalResult AsyncConcurrentOp::verify() {
 }
 
 OperandRange
-AsyncConcurrentOp::getSuccessorEntryOperands(std::optional<unsigned> index) {
-  assert(index && index.value() == 0 && "invalid region index");
+AsyncConcurrentOp::getEntrySuccessorOperands(RegionBranchPoint point) {
+  assert(point == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
 void AsyncConcurrentOp::getSuccessorRegions(
-    std::optional<unsigned> index, ArrayRef<Attribute> operands,
-    SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor(getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -2791,19 +2825,17 @@ LogicalResult CmdExecuteOp::verify() {
   return success();
 }
 
-OperandRange
-CmdExecuteOp::getSuccessorEntryOperands(std::optional<unsigned> index) {
-  assert(index && index.value() == 0 && "invalid region index");
+OperandRange CmdExecuteOp::getEntrySuccessorOperands(RegionBranchPoint point) {
+  assert(point == &getBody() && "invalid region index");
   return getResourceOperands();
 }
 
 void CmdExecuteOp::getSuccessorRegions(
-    std::optional<unsigned> index, ArrayRef<Attribute> operands,
-    SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -2868,12 +2900,11 @@ LogicalResult CmdSerialOp::verify() {
 }
 
 void CmdSerialOp::getSuccessorRegions(
-    std::optional<unsigned> index, ArrayRef<Attribute> operands,
-    SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
@@ -2894,12 +2925,11 @@ LogicalResult CmdConcurrentOp::verify() {
 }
 
 void CmdConcurrentOp::getSuccessorRegions(
-    std::optional<unsigned> index, ArrayRef<Attribute> operands,
-    SmallVectorImpl<RegionSuccessor> &regions) {
+    RegionBranchPoint point, SmallVectorImpl<RegionSuccessor> &regions) {
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.has_value()) {
+  if (!point.isParent()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
@@ -3094,20 +3124,11 @@ LogicalResult BindingSubspanOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// stream.return
-//===----------------------------------------------------------------------===//
-
-MutableOperandRange
-ReturnOp::getMutableSuccessorOperands(std::optional<unsigned> index) {
-  return getOperandsMutable();
-}
-
-//===----------------------------------------------------------------------===//
 // stream.yield
 //===----------------------------------------------------------------------===//
 
 MutableOperandRange
-YieldOp::getMutableSuccessorOperands(std::optional<unsigned> index) {
+YieldOp::getMutableSuccessorOperands(RegionBranchPoint point) {
   return getResourceOperandsMutable();
 }
 

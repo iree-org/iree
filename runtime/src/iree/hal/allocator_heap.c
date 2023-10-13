@@ -167,8 +167,10 @@ iree_hal_heap_allocator_query_buffer_compatibility(
   // Host currently uses mapping to copy buffers, which is done a lot.
   // We could probably remove this mutation by preventing copies in those cases.
   // TODO(benvanik): check if transfer is still required for DMA copy source.
-  params->usage |=
-      IREE_HAL_BUFFER_USAGE_MAPPING | IREE_HAL_BUFFER_USAGE_TRANSFER;
+  params->usage |= IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+                   IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
+                   IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER;
 
   return compatibility;
 }
@@ -176,7 +178,7 @@ iree_hal_heap_allocator_query_buffer_compatibility(
 static iree_status_t iree_hal_heap_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_heap_allocator_t* allocator =
       iree_hal_heap_allocator_cast(base_allocator);
@@ -196,7 +198,7 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
   IREE_STATISTICS(statistics = &allocator->statistics);
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_heap_buffer_create(
-      base_allocator, statistics, &compat_params, allocation_size, initial_data,
+      base_allocator, statistics, &compat_params, allocation_size,
       allocator->data_allocator, allocator->host_allocator, &buffer));
 
   *out_buffer = buffer;
@@ -234,7 +236,7 @@ static iree_status_t iree_hal_heap_allocator_import_buffer(
       ptr = external_buffer->handle.host_allocation.ptr;
       break;
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION:
-      ptr = (void*)external_buffer->handle.device_allocation.ptr;
+      ptr = (void*)((intptr_t)external_buffer->handle.device_allocation.ptr);
       break;
     default:
       return iree_make_status(IREE_STATUS_UNAVAILABLE,

@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -61,12 +62,16 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Verify we support the program.
   passManager.addPass(IREE::Stream::createVerifyInputPass());
 
+  // Cleanup the program prior to outlining constants in case there is
+  // propagation or fusion that needs to happen first.
+  addCleanupPatterns(passManager);
+
   // Turn all constant ops into global variables and fix up the IR.
   // As many locations change and constants are deduplicated we'll end up with
   // a lot of extraneous IR (mostly global loads) and clean those up here.
-  passManager.addPass(IREE::Stream::createOutlineConstantsPass());
+  passManager.addPass(IREE::Util::createOutlineConstantsPass());
 
-  // Perform cleanup after constnat simplification as more canonicalizers may be
+  // Perform cleanup after constant simplification as more canonicalizers may be
   // able to kick in.
   addCleanupPatterns(passManager);
 
@@ -140,6 +145,11 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // move across devices. We do it before scheduling waves as lifetime doesn't
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
+
+  // Cleanup patterns currently fail on SCF operations.
+  passManager.addNestedPass<func::FuncOp>(
+      IREE::Flow::createTopLevelSCFToCFGPass());
+
   addCleanupPatterns(passManager);
 
   // Verify all stream.async.* op access ranges that we can by taking advantage
