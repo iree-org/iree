@@ -286,8 +286,6 @@ static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
 // flow.dispatch.region
 //===----------------------------------------------------------------------===//
 
-// Verifies the workgroup count
-
 static LogicalResult
 verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
   // Verify the workload operands match the expected capture args.
