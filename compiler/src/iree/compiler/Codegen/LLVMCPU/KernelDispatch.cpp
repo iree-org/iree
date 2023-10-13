@@ -2279,8 +2279,10 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
 
   // Multi-lowering config works only if all the operations can share the same
   // distribution and TileAndFuse tile sizes.
+  size_t maxLoopNums = 0;
   for (auto op : computeOps) {
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
+    maxLoopNums = std::max(maxLoopNums, iterTypes.size());
     for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
       if (idx >= tileAndFuseSizes.size())
         break;
@@ -2291,9 +2293,65 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     }
   }
 
+  SmallVector<int64_t> vecInnerTileSizes(maxLoopNums, 0);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto targetMLTransInfo =
       TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
+  for (auto op : computeOps) {
+    // The lowering config is already set on rootOperation, so we skip it.
+    if (op == rootOperation)
+      continue;
+
+    TypeSwitch<Operation *>(op)
+        .Case<tensor::PackOp>([&](auto packOp) {
+
+        })
+        .Case<linalg::GenericOp>([&](auto genericOp) {
+          auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
+          auto linalgOpInfo = LinalgOpInfo(genericOp);
+          int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
+          SmallVector<int64_t> vecTileSizes = getMinTilingSizesForEachDim(
+              entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+          for (auto &vecTileSize : vecTileSizes) {
+            vecTileSize = roundUpToPow2(std::min(vecTileSize, vecSize),
+                                        vecPreProcStrategy ==
+                                            VectorPreProcStrategy::Masking);
+          }
+
+          // If the dimension is already tiled, we don't tile it again. This
+          // prevents the mismatch common vector sizes between producer and
+          // consumers. E.g., the convolution vectorization does not support
+          // masking yet, while the strategy for generic op could use masking.
+          // This introduces odd behavior like convolution takes 12 as tile size
+          // while generic op takes 8 as tile size. It would introduce an
+          // inefficient loop and only apply masking on generic op, which hurts
+          // performance a lot. Thus, we do not tile it again, so they have
+          // consistent vector tile sizes.
+          for (auto i : llvm::seq<int64_t>(
+                   0, std::min(tileAndFuseSizes.size(), vecTileSizes.size()))) {
+            if (tileAndFuseSizes[i])
+              vecTileSizes[i] = 0;
+          }
+
+          SmallVector<int64_t> reductionTiles;
+          splitParallelAndReductionTiles(genericOp, vecTileSizes,
+                                         reductionTiles);
+          setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
+                                         vecTileSizes, reductionTiles);
+          for (auto [pos, tileSize] : llvm::enumerate(vecTileSizes)) {
+            if (tileSize == 0)
+              continue;
+            assert((vecInnerTileSizes[pos] == 0 ||
+                    vecInnerTileSizes[pos] == tileSize) &&
+                   "Incompatible vector inner tile sizes");
+            vecInnerTileSizes[pos] = tileSize;
+          }
+        })
+        .Default([&](auto) {
+
+        });
+  }
+
   for (auto op : computeOps) {
     // The lowering config is already set on rootOperation, so we skip it.
     if (op == rootOperation)
