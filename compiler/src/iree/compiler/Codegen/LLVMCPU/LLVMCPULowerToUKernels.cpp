@@ -569,8 +569,7 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
       context, isVMVXBackend);
   // These patterns are used on LLVMCPU and VMVX. Only for riscv target.
-  patterns.insert<LowerToUKernelPattern<linalg::SoftmaxOp>>(context,
-                                                                     isRISCV);
+  patterns.insert<LowerToUKernelPattern<linalg::SoftmaxOp>>(context, isRISCV);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

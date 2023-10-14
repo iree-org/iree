@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
+#include <iree/compiler/Codegen/Dialect/IREECodegenAttrs.h>
+
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -31,6 +33,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "kernel-dispatch"
@@ -1743,6 +1746,21 @@ static LogicalResult setElementwiseGenericOpRootConfig(
                                                tileSizes, passPipeline);
 }
 
+static LogicalResult setRootConfig(
+    func::FuncOp entryPointFn, linalg::SoftmaxOp softmaxOp,
+    DispatchLoweringPassPipeline pipeline =
+        DispatchLoweringPassPipeline::CPUDefault) {
+  assert(!getLoweringConfig(softmaxOp) &&
+         "expected lowering_config is not set");
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), pipeline);
+
+  if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
+    return failure();
+  }
+  return success();
+}
+
 /// Sets the lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult
@@ -2050,6 +2068,8 @@ setRootConfigImpl(func::FuncOp entryPointFn, Operation *op,
                   const TargetMLTransformInfo &targetMLTransInfo) {
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
+        .Case<linalg::SoftmaxOp>(
+            [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::GenericOp>([&](auto op) {
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
@@ -2266,7 +2286,9 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   }
 
   auto ctx = entryPointFn.getContext();
-  TilingConfig tilingConfig(getLoweringConfig(rootOperation));
+  auto loweringConfigAttr = getLoweringConfig(rootOperation);
+  if (!loweringConfigAttr) return;
+  TilingConfig tilingConfig(loweringConfigAttr);
   SmallVector<int64_t> distTileSizes, tileAndFuseSizes;
   if (tilingConfig.getNumTilingLevels() > 0) {
     distTileSizes = tilingConfig.getDistributionTileSizes();
