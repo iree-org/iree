@@ -222,6 +222,10 @@ public:
     // final FlatBuffer.
     std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
     std::string targetHSACO = createHsaco(targetObj, libraryName);
+    if (targetHSACO.empty()) {
+      return failure();
+    }
+
     if (!options.dumpBinariesPath.empty()) {
       dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
                      variantOp.getName(), ".hsaco", targetHSACO);
