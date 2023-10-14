@@ -89,7 +89,7 @@
 namespace mlir::iree_compiler::embed {
 namespace {
 
-// If note using memfd_create, then we need to align output buffers
+// If not using memfd_create, then we need to align output buffers
 // similarly, which is unfortunately, quite platform specific.
 // While memfd_create aligns to a page, we align these to 64 bytes,
 // which matches runtime requirements.
