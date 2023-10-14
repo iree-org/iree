@@ -107,7 +107,7 @@ struct rt_aligned_allocator {
     T *alloc = static_cast<T *>(
         _aligned_malloc(n * sizeof(T), kOutputBufferAlignment));
 #else
-    T *alloc static_cast<T *>(
+    T *alloc = static_cast<T *>(
         std::aligned_alloc(n * sizeof(T), kOutputBufferAlignment));
 #endif
     assert((reinterpret_cast<uintptr_t>(alloc) &
