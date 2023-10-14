@@ -335,6 +335,7 @@ endif()
 
 #-------------------------------------------------------------------------------
 # Experimental next-generation CUDA HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=cuda2
 #-------------------------------------------------------------------------------
 
 set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2")
@@ -344,6 +345,7 @@ set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_REGISTER "iree_hal_cuda2_driver_module_regist
 
 #-------------------------------------------------------------------------------
 # Experimental ROCM HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=rocm
 #-------------------------------------------------------------------------------
 
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm")
@@ -353,6 +355,7 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register
 
 #-------------------------------------------------------------------------------
 # Experimental WebGPU HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=webgpu
 #-------------------------------------------------------------------------------
 
 set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu")
