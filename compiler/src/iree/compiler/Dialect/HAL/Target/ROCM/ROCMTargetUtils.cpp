@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
+#include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
@@ -131,15 +132,14 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
 // Inspiration from this section comes from LLVM-PROJECT-MLIR by
 // ROCmSoftwarePlatform
 // https://github.com/ROCmSoftwarePlatform/llvm-project-mlir/blob/miopen-dialect/mlir/lib/ExecutionEngine/ROCm/BackendUtils.cpp
-std::string createHsaco(const std::string isa, StringRef name) {
+std::string createHsaco(Location loc, const std::string isa, StringRef name) {
   // Save the ISA binary to a temp file.
   int tempIsaBinaryFd = -1;
   SmallString<128> tempIsaBinaryFilename;
   std::error_code ec = llvm::sys::fs::createTemporaryFile(
       "kernel", "o", tempIsaBinaryFd, tempIsaBinaryFilename);
   if (ec) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "temporary file for ISA binary creation error.\n";
+    mlir::emitError(loc) << "temporary file for ISA binary creation error";
     return {};
   }
   llvm::FileRemover cleanupIsaBinary(tempIsaBinaryFilename);
@@ -153,56 +153,45 @@ std::string createHsaco(const std::string isa, StringRef name) {
   ec = llvm::sys::fs::createTemporaryFile("kernel", "hsaco", tempHsacoFD,
                                           tempHsacoFilename);
   if (ec) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "temporary file for HSA code object creation error.\n";
+    mlir::emitError(loc) << "temporary file for HSA code object creation error";
     return {};
   }
   llvm::FileRemover cleanupHsaco(tempHsacoFilename);
 
   // Invoke lld. Expect a true return value from lld.
   // Searching for LLD
-  std::string lldProgram;
-  std::string toolName = "ld.lld";
-  if (llvm::sys::fs::exists(toolName)) {
-    llvm::SmallString<256> absolutePath(toolName);
-    llvm::sys::fs::make_absolute(absolutePath);
-    lldProgram = std::string(absolutePath);
-  } else {
-    // Next search the environment path.
-    if (auto result = llvm::sys::Process::FindInEnvPath("PATH", toolName)) {
-      lldProgram = std::string(*result);
-    }
-  }
+  const SmallVector<std::string> &toolNames{"iree-lld", "lld"};
+  std::string lldProgram = findTool(toolNames);
   if (lldProgram.empty()) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "unable to find ld.lld in PATH\n";
+    mlir::emitError(loc) << "unable to find iree-lld";
     return {};
   }
-  // Setting Up LLD Args
   std::vector<llvm::StringRef> lldArgs{
-      llvm::StringRef("ld.lld"),   llvm::StringRef("-flavor"),
-      llvm::StringRef("gnu"),      llvm::StringRef("-shared"),
-      tempIsaBinaryFilename.str(), llvm::StringRef("-o"),
+      lldProgram,
+      llvm::StringRef("-flavor"),
+      llvm::StringRef("gnu"),
+      llvm::StringRef("-shared"),
+      tempIsaBinaryFilename.str(),
+      llvm::StringRef("-o"),
       tempHsacoFilename.str(),
   };
 
   // Executing LLD
   std::string errorMessage;
   int lldResult = llvm::sys::ExecuteAndWait(
-      lldProgram, llvm::ArrayRef<llvm::StringRef>(lldArgs), std::nullopt, {}, 5,
-      0, &errorMessage);
+      unescapeCommandLineComponent(lldProgram),
+      llvm::ArrayRef<llvm::StringRef>(lldArgs),
+      llvm::StringRef("LLD_VERSION=IREE"), {}, 0, 0, &errorMessage);
   if (lldResult) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "ld.lld execute fail:" << errorMessage << "Error Code:" << lldResult
-        << "\n";
+    mlir::emitError(loc) << "iree-lld execute fail:" << errorMessage
+                         << "Error Code:" << lldResult;
     return {};
   }
 
   // Load the HSA code object.
   auto hsacoFile = mlir::openInputFile(tempHsacoFilename);
   if (!hsacoFile) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "read HSA code object from temp file error.\n";
+    mlir::emitError(loc) << "read HSA code object from temp file error";
     return {};
   }
   std::string strHSACO(hsacoFile->getBuffer().begin(),

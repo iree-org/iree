@@ -221,7 +221,12 @@ public:
     // Serialize hsaco kernel into the binary that we will embed in the
     // final FlatBuffer.
     std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
-    std::string targetHSACO = createHsaco(targetObj, libraryName);
+    std::string targetHSACO =
+        createHsaco(variantOp.getLoc(), targetObj, libraryName);
+    if (targetHSACO.empty()) {
+      return failure();
+    }
+
     if (!options.dumpBinariesPath.empty()) {
       dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
                      variantOp.getName(), ".hsaco", targetHSACO);
