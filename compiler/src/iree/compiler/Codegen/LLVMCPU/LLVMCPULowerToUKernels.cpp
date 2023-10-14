@@ -456,11 +456,11 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
 }
 
 static FailureOr<IREE::Codegen::UKernelOpInterface> matchDAGForUKernel(
-    RewriterBase &rewriter, IREE::LinalgExt::SoftmaxOp op,
+    RewriterBase &rewriter, linalg::SoftmaxOp op,
     bool /*skipIntermediateRoundings*/) {
   Location loc = op.getLoc();
-  auto input = op.input();
-  auto output = op.output();
+  auto input = op.getInput();
+  auto output = op.getOutput();
   auto outputType = op.getInputOperandType();
   auto outputElemType = outputType.getElementType();
   uint64_t dim = op.getDimension();
@@ -569,7 +569,7 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
       context, isVMVXBackend);
   // These patterns are used on LLVMCPU and VMVX. Only for riscv target.
-  patterns.insert<LowerToUKernelPattern<IREE::LinalgExt::SoftmaxOp>>(context,
+  patterns.insert<LowerToUKernelPattern<linalg::SoftmaxOp>>(context,
                                                                      isRISCV);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
