@@ -12,9 +12,9 @@
 # We use .deb files that we host because we have to pin the version and packages
 # routinely dissapear from the Ubuntu apt repositories. The versions need to be
 # compatible with the host driver (usually <= host driver version).
-ARG NVIDIA_GL_DEB="libnvidia-gl-530_535.86.05-0ubuntu0.22.04.1_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_535.86.05-0ubuntu0.22.04.1_amd64.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-530_535.86.05-0ubuntu0.22.04.1_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-535_535.113.01-0ubuntu0.22.04.1_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-535_535.113.01-0ubuntu0.22.04.1_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-535_535.113.01-0ubuntu0.22.04.1_all.deb"
 ARG NVIDIA_EGL_WAYLAND_DEB="libnvidia-egl-wayland1_1.1.9-1.1_amd64.deb"
 
 
