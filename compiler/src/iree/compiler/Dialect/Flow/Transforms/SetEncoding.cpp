@@ -21,11 +21,13 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -86,24 +88,32 @@ static Value setEncoding(OpBuilder &builder, Location loc, Value source,
 static LinalgExt::EncodingAttr makeEncoding(OpBuilder &builder,
                                             LinalgExt::EncodingUser user,
                                             LinalgExt::EncodingRole role,
+                                            TypeRange operandTypes,
                                             Type originalType) {
   auto *context = builder.getContext();
   auto userAttr = LinalgExt::EncodingUserAttr::get(context, user);
   auto roleAttr = LinalgExt::EncodingRoleAttr::get(context, role);
+  SmallVector<Attribute> elemTypeAttrs =
+      llvm::map_to_vector(operandTypes, [](auto t) {
+        return TypeAttr::get(t.template cast<ShapedType>().getElementType())
+            .template cast<Attribute>();
+      });
+  auto operandElemTypesAttr = ArrayAttr::get(context, elemTypeAttrs);
   auto originalTypeAttr =
       originalType ? TypeAttr::get(originalType) : TypeAttr{};
   return LinalgExt::EncodingAttr::get(context, userAttr, roleAttr,
-                                      originalTypeAttr);
+                                      operandElemTypesAttr, originalTypeAttr);
 }
 
 static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
                                LinalgExt::EncodingUser user,
-                               LinalgExt::EncodingRole role) {
+                               LinalgExt::EncodingRole role,
+                               TypeRange operandTypes) {
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
   auto encodingForPad =
-      makeEncoding(builder, user, role, /*originalType=*/Type{});
+      makeEncoding(builder, user, role, operandTypes, /*originalType=*/Type{});
   Value padded = pad(builder, loc, source, encodingForPad);
   // For setEncoding() below, we potentially need to specify an encoding with an
   // explicit original_type, because the operand there is the padded tensor
@@ -114,7 +124,7 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   auto encodingForSetEncoding = encodingForPad;
   if (padded.getType() != source.getType()) {
     encodingForSetEncoding =
-        makeEncoding(builder, user, role, source.getType());
+        makeEncoding(builder, user, role, operandTypes, source.getType());
   }
   return setEncoding(builder, loc, padded, encodingForSetEncoding);
 }
@@ -177,40 +187,18 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       return failure();
     }
 
-    LinalgExt::EncodingUser user;
-
-    if (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()) {
-      user = LinalgExt::EncodingUser::MATMUL_F32F32F32;
-    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
-               outElemType.isF32()) {
-      user = LinalgExt::EncodingUser::MATMUL_F16F16F32;
-    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
-               outElemType.isF16()) {
-      user = LinalgExt::EncodingUser::MATMUL_F16F16F16;
-    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
-               outElemType.isF32()) {
-      user = LinalgExt::EncodingUser::MATMUL_BF16BF16F32;
-    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
-               outElemType.isBF16()) {
-      user = LinalgExt::EncodingUser::MATMUL_BF16BF16BF16;
-    } else if (lhsElemType.isSignlessInteger(8) &&
-               rhsElemType.isSignlessInteger(8) &&
-               outElemType.isSignlessInteger(32)) {
-      user = LinalgExt::EncodingUser::MATMUL_I8I8I32;
-    } else {
-      return rewriter.notifyMatchFailure(
-          matmulOp,
-          "unhandled combination of (lhs, rhs, result) element types");
-    }
-
+    LinalgExt::EncodingUser user = LinalgExt::EncodingUser::MATMUL;
     Location loc = matmulOp.getLoc();
-
-    Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
-                                         LinalgExt::EncodingRole::LHS);
-    Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
-                                         LinalgExt::EncodingRole::RHS);
-    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
-                                         LinalgExt::EncodingRole::RESULT);
+    TypeRange operandTypes = matmulOp->getOperandTypes();
+    Value encodedLhs =
+        padAndSetEncoding(rewriter, loc, origLhs, user,
+                          LinalgExt::EncodingRole::LHS, operandTypes);
+    Value encodedRhs =
+        padAndSetEncoding(rewriter, loc, origRhs, user,
+                          LinalgExt::EncodingRole::RHS, operandTypes);
+    Value encodedOut =
+        padAndSetEncoding(rewriter, loc, origOut, user,
+                          LinalgExt::EncodingRole::RESULT, operandTypes);
 
     Value matmulTiled = rewriter
                             .create<linalg::MatmulOp>(
@@ -271,40 +259,18 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
       return failure();
     }
 
-    LinalgExt::EncodingUser user;
-
-    if (lhsElemType.isF32() && rhsElemType.isF32() && outElemType.isF32()) {
-      user = LinalgExt::EncodingUser::BATCH_MATMUL_F32F32F32;
-    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
-               outElemType.isF32()) {
-      user = LinalgExt::EncodingUser::BATCH_MATMUL_F16F16F32;
-    } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
-               outElemType.isF16()) {
-      user = LinalgExt::EncodingUser::BATCH_MATMUL_F16F16F16;
-    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
-               outElemType.isF32()) {
-      user = LinalgExt::EncodingUser::BATCH_MATMUL_BF16BF16F32;
-    } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
-               outElemType.isBF16()) {
-      user = LinalgExt::EncodingUser::BATCH_MATMUL_BF16BF16BF16;
-    } else if (lhsElemType.isSignlessInteger(8) &&
-               rhsElemType.isSignlessInteger(8) &&
-               outElemType.isSignlessInteger(32)) {
-      user = LinalgExt::EncodingUser::BATCH_MATMUL_I8I8I32;
-    } else {
-      return rewriter.notifyMatchFailure(
-          matmulOp,
-          "unhandled combination of (lhs, rhs, result) element types");
-    }
-
+    LinalgExt::EncodingUser user = LinalgExt::EncodingUser::BATCH_MATMUL;
     Location loc = matmulOp.getLoc();
-
-    Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
-                                         LinalgExt::EncodingRole::LHS);
-    Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
-                                         LinalgExt::EncodingRole::RHS);
-    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
-                                         LinalgExt::EncodingRole::RESULT);
+    TypeRange operandTypes = matmulOp->getOperandTypes();
+    Value encodedLhs =
+        padAndSetEncoding(rewriter, loc, origLhs, user,
+                          LinalgExt::EncodingRole::LHS, operandTypes);
+    Value encodedRhs =
+        padAndSetEncoding(rewriter, loc, origRhs, user,
+                          LinalgExt::EncodingRole::RHS, operandTypes);
+    Value encodedOut =
+        padAndSetEncoding(rewriter, loc, origOut, user,
+                          LinalgExt::EncodingRole::RESULT, operandTypes);
 
     Value matmulTiled = rewriter
                             .create<linalg::BatchMatmulOp>(
