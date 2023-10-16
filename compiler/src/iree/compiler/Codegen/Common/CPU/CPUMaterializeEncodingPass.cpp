@@ -32,23 +32,23 @@ using IREE::HAL::ExecutableTargetAttr;
 
 namespace {
 
-static MatmulTileParams
+static FailureOr<MatmulTileParams>
 chooseMatmulTileParamsGeneric(ExecutableTargetAttr target) {
   if (isVMVXBackend(target) && hasMicrokernels(target)) {
     // VMVX+ukernel uses dynamic tile shapes.
-    return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+    return MatmulTileParams{ShapedType::kDynamic, ShapedType::kDynamic,
+                            ShapedType::kDynamic};
   } else {
     // Some vaguely reasonable static tile shape.
-    return {8, 4, 8};
+    return MatmulTileParams{8, 4, 8};
   }
 }
 
-static MatmulTileParams
+static FailureOr<MatmulTileParams>
 chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
                               ExecutableTargetAttr target) {
   if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
-    assert(false);
-    return {};
+    return failure();
   }
 
   assert(elementTypes.size() == 3);
@@ -62,32 +62,30 @@ chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
     // the arithmetic will have to expand f16 to f32 in registers. We may
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
-    return {8, 1, 8};
+    return MatmulTileParams{8, 1, 8};
   }
 
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
       out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       // Aim to use SMMLA.
-      return {8, 8, 8};
+      return MatmulTileParams{8, 8, 8};
     }
     if (hasFeature(target, "+dotprod")) {
       // Aim to use SDOT.
-      return {8, 4, 8};
+      return MatmulTileParams{8, 4, 8};
     }
-    return {8, 1, 8};
+    return MatmulTileParams{8, 1, 8};
   }
 
-  assert(false);
-  return {};
+  return failure();
 }
 
-static MatmulTileParams
+static FailureOr<MatmulTileParams>
 chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
                              ExecutableTargetAttr target) {
   if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
-    assert(false);
-    return {};
+    return failure();
   }
 
   assert(elementTypes.size() == 3);
@@ -102,17 +100,17 @@ chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
     if (hasFeature(target, "+avx512f")) {
-      return {16, 1, 16};
+      return MatmulTileParams{16, 1, 16};
     }
     if (hasFeature(target, "+avx")) {
       // Note: for good performance, most +avx users will also want to add
       // +fma, but that's a local instruction selection detail and the tile
       // layout is unaffected, as there are enough registers even with the
       // need for intermediate product registers when +fma is not used.
-      return {8, 1, 8};
+      return MatmulTileParams{8, 1, 8};
     }
     // SSE fallback.
-    return {8, 1, 4};
+    return MatmulTileParams{8, 1, 4};
   }
 
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
@@ -121,27 +119,26 @@ chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
       // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
       // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
       // call for {16, 4, 16} but we can't use it because of its unsigned LHS.
-      return {16, 2, 16};
+      return MatmulTileParams{16, 2, 16};
     }
     if (hasFeature(target, "+avx512bw")) {
       // Aim to use VPMADDWD (zmm).
-      return {16, 2, 16};
+      return MatmulTileParams{16, 2, 16};
     }
     if (hasFeature(target, "+avx2")) {
       // Aim to use VPMADDWD (ymm).
-      return {8, 2, 8};
+      return MatmulTileParams{8, 2, 8};
     }
     // SSE fallback. Aim to use PMADDWD (xmm).
-    return {8, 2, 4};
+    return MatmulTileParams{8, 2, 4};
   }
 
-  assert(false);
-  return {};
+  return failure();
 }
 
-static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
-                                               TypeRange elementTypes,
-                                               ExecutableTargetAttr target) {
+static FailureOr<MatmulTileParams>
+chooseMatmulTileParams(EncodingUser user, TypeRange elementTypes,
+                       ExecutableTargetAttr target) {
   if (isAArch64(target)) {
     return chooseMatmulTileParamsAArch64(user, elementTypes, target);
   }
@@ -197,10 +194,13 @@ materializeEncodingForTarget(RankedTensorType tensorType,
       llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
         return a.cast<TypeAttr>().getValue();
       }));
-  MatmulTileParams tileParams =
+  FailureOr<MatmulTileParams> tileParams =
       chooseMatmulTileParams(user, elementTypes, targetAttr);
+  if (failed(tileParams)) {
+    return failure();
+  }
   auto encodingInfo =
-      IREE::LinalgExt::chooseEncodingInfoForMatmul(user, role, tileParams);
+      IREE::LinalgExt::chooseEncodingInfoForMatmul(user, role, *tileParams);
   auto originalTypeAttr = encoding.getOriginalType();
   auto originalType = originalTypeAttr
                           ? originalTypeAttr.getValue().cast<RankedTensorType>()

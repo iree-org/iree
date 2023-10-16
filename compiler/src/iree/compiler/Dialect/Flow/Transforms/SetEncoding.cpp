@@ -93,11 +93,11 @@ static LinalgExt::EncodingAttr makeEncoding(OpBuilder &builder,
   auto *context = builder.getContext();
   auto userAttr = LinalgExt::EncodingUserAttr::get(context, user);
   auto roleAttr = LinalgExt::EncodingRoleAttr::get(context, role);
-  SmallVector<Attribute> elemTypeAttrs;
-  for (auto t : operandTypes) {
-    elemTypeAttrs.emplace_back(
-        TypeAttr::get(t.cast<ShapedType>().getElementType()));
-  }
+  SmallVector<Attribute> elemTypeAttrs =
+      llvm::map_to_vector(operandTypes, [](auto t) {
+        return TypeAttr::get(t.template cast<ShapedType>().getElementType())
+            .template cast<Attribute>();
+      });
   auto operandElemTypesAttr = ArrayAttr::get(context, elemTypeAttrs);
   auto originalTypeAttr =
       originalType ? TypeAttr::get(originalType) : TypeAttr{};
