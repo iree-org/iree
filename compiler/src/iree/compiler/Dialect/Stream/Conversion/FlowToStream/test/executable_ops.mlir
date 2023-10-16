@@ -1,5 +1,14 @@
 // RUN: iree-opt --split-input-file --iree-stream-conversion --canonicalize %s | FileCheck %s
 
+// CHECK-LABEL: @extern_executable
+flow.executable private @extern_executable {
+  // CHECK: stream.executable.export public @dispatch
+  flow.executable.export public @dispatch
+  // CHECK-NOT: builtin.module
+}
+
+// -----
+
 // CHECK-LABEL: @workgroup_count_region
 flow.executable private @workgroup_count_region {
   // CHECK-NEXT: stream.executable.export public @dispatch

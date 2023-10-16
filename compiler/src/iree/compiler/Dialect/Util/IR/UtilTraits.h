@@ -37,6 +37,12 @@ struct DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
+template <typename ConcreteType>
+struct ImplicitlyCaptured
+    : public OpTrait::TraitBase<ConcreteType, ImplicitlyCaptured> {
+  static LogicalResult verifyTrait(Operation *op) { return success(); }
+};
+
 } // namespace Util
 } // namespace IREE
 } // namespace OpTrait

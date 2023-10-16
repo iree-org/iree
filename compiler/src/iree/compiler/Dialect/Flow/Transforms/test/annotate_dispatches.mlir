@@ -164,3 +164,12 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+// Executables with no contents are ignored.
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch
+  flow.executable.export public @dispatch
+}
