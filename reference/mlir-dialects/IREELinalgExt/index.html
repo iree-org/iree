@@ -3115,6 +3115,7 @@ Syntax:
 <div class="highlight"><pre><span></span><code>#iree_linalg_ext.encoding&lt;
   EncodingUserAttr,   # user
   EncodingRoleAttr,   # role
+  ArrayAttr,   # elementTypes
   TypeAttr   # originalType
 &gt;
 </code></pre></div>
@@ -3134,6 +3135,7 @@ through operations like pack/unpack.
 | :-------: | :-------: | ----------- |
 | user | `EncodingUserAttr` | kind of operation using this tensor |
 | role | `EncodingRoleAttr` | role of this tensor as an operand |
+| elementTypes | `ArrayAttr` | element types of the user's operands |
 | originalType | `TypeAttr` | type of the original tensor type before padding |
 
 ### EncodingRoleAttr
@@ -3169,18 +3171,8 @@ Syntax:
 </code></pre></div>
 
 Enum cases:
-* MATMUL_F32F32F32 (`MATMUL_F32F32F32`)
-* MATMUL_I8I8I32 (`MATMUL_I8I8I32`)
-* MATMUL_F16F16F32 (`MATMUL_F16F16F32`)
-* MATMUL_F16F16F16 (`MATMUL_F16F16F16`)
-* MATMUL_BF16BF16F32 (`MATMUL_BF16BF16F32`)
-* MATMUL_BF16BF16BF16 (`MATMUL_BF16BF16BF16`)
-* BATCH_MATMUL_F32F32F32 (`BATCH_MATMUL_F32F32F32`)
-* BATCH_MATMUL_I8I8I32 (`BATCH_MATMUL_I8I8I32`)
-* BATCH_MATMUL_F16F16F32 (`BATCH_MATMUL_F16F16F32`)
-* BATCH_MATMUL_F16F16F16 (`BATCH_MATMUL_F16F16F16`)
-* BATCH_MATMUL_BF16BF16F32 (`BATCH_MATMUL_BF16BF16F32`)
-* BATCH_MATMUL_BF16BF16BF16 (`BATCH_MATMUL_BF16BF16BF16`)
+* MATMUL (`MATMUL`)
+* BATCH_MATMUL (`BATCH_MATMUL`)
 ##### Parameters:
 
 | Parameter | C++ type | Description |
