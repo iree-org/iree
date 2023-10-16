@@ -13,6 +13,7 @@
 *.VC.opendb
 *.suo
 *.user
+*.code-workspace
 
 # macOS files
 .DS_Store
