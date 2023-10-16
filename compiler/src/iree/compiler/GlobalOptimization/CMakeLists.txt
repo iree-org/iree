@@ -53,12 +53,20 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgExtUtils
     LLVMSupport
+    MLIRArithDialect
+    MLIRArithUtils
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
+    MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRTensorDialect
+    MLIRTensorTransforms
+    MLIRTensorUtils
     MLIRTransforms
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Dialect::Flow::Transforms
