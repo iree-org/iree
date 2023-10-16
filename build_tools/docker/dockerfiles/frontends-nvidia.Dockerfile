@@ -13,9 +13,9 @@ FROM gcr.io/iree-oss/frontends@sha256:7ecfdda9ef9f64cfa12b1ed203992abab8057ba350
 # We use .deb files that we host because we have to pin the version exactly to
 # match the host machine and packages routinely dissapear from the Ubuntu
 # apt repositories.
-ARG NVIDIA_GL_DEB="libnvidia-gl-530_535.86.05-0ubuntu0.20.04.2_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_535.86.05-0ubuntu0.20.04.2_amd64.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-530_535.86.05-0ubuntu0.20.04.2_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-535_535.113.01-0ubuntu0.20.04.1_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-535_535.113.01-0ubuntu0.20.04.1_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-535_535.113.01-0ubuntu0.20.04.1_all.deb"
 
 WORKDIR /install-nvidia
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMMON_DEB}" \
