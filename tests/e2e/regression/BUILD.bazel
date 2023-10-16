@@ -192,7 +192,6 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-input-type=tosa",
-        "--iree-vmvx-enable-microkernels",
     ],
     target_backend = "vmvx",
 )

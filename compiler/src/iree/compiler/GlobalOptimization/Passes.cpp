@@ -68,11 +68,12 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
-      // Enable data tiling after they are in a canonical form.
-      .addPredicatedPass(transformOptions.options.dataTiling,
-                         createSetEncodingPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
+  // Enable data tiling after they are in a canonical form.
+  if (transformOptions.options.dataTiling) {
+    mainPassManager.addPass(createSetEncodingPass());
+  }
   mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
 
   OpPassManager pipeline(ModuleOp::getOperationName());

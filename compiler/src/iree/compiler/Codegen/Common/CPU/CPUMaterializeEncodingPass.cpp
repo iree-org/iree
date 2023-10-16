@@ -78,7 +78,10 @@ chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
     return MatmulTileParams{8, 1, 8};
   }
 
-  return failure();
+  // XXX(hanchung): should we just fall back to matmul op if it is not
+  // supported?
+  // Some vaguely reasonable static tile shape.
+  return MatmulTileParams{8, 1, 8};
 }
 
 static FailureOr<MatmulTileParams>
@@ -133,7 +136,10 @@ chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
     return MatmulTileParams{8, 2, 4};
   }
 
-  return failure();
+  // XXX(hanchung): should we just fall back to matmul op if it is not
+  // supported?
+  // Some vaguely reasonable static tile shape.
+  return MatmulTileParams{8, 4, 8};
 }
 
 static FailureOr<MatmulTileParams>

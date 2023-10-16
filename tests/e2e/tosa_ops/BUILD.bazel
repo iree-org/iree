@@ -132,65 +132,6 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
-VMVX_MICROKERNELS_SRCS = enforce_glob(
-    [
-        "abs.mlir",
-        "add.mlir",
-        "arithmetic_right_shift.mlir",
-        "bitwise_and.mlir",
-        "bitwise_or.mlir",
-        "bitwise_xor.mlir",
-        "ceil.mlir",
-        "clamp.mlir",
-        "clz.mlir",
-        "const.mlir",
-        "equal.mlir",
-        "exp.mlir",
-        "floor.mlir",
-        "fully_connected.mlir",
-        "gather.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
-        "if.mlir",
-        "log.mlir",
-        "logical_left_shift.mlir",
-        "logical_right_shift.mlir",
-        "logical_right_shift_16.mlir",
-        "matmul.mlir",
-        "max_pool.mlir",
-        "maximum.mlir",
-        "minimum.mlir",
-        "mul.mlir",
-        "mul_shift.mlir",
-        "negate.mlir",
-        "pad.mlir",
-        "reciprocal.mlir",
-        "reduce.mlir",
-        "reshape.mlir",
-        "rsqrt.mlir",
-        "select.mlir",
-        "sigmoid.mlir",
-        "sub.mlir",
-        "table.mlir",
-        "tanh.mlir",
-        "transpose.mlir",
-        "while.mlir",
-    ],
-    include = ["*.mlir"],
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_vmvx_local-sync_microkernels",
-    srcs = VMVX_MICROKERNELS_SRCS,
-    compiler_flags = [
-        "--iree-input-type=tosa",
-        "--iree-vmvx-enable-microkernels",
-    ],
-    # Sync has more strict runtime error checking for mis-compiled programs.
-    driver = "local-sync",
-    target_backend = "vmvx",
-)
-
 VULKAN_SRCS = enforce_glob(
     [
         "abs.mlir",

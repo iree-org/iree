@@ -395,7 +395,9 @@ getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingUser user,
   Type rhs = operandTypes[1].cast<TypeAttr>().getValue();
   Type out = operandTypes[2].cast<TypeAttr>().getValue();
 
-  if (lhs.isF32() && rhs.isF32() && out.isF32()) {
+  if ((lhs.isF32() && rhs.isF32() && out.isF32()) ||
+      (lhs.isSignlessInteger(32) && rhs.isSignlessInteger(32) &&
+       out.isSignlessInteger(32))) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
   } else if (lhs.isF16() && rhs.isF16() && out.isF32()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F32;

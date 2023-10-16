@@ -2,6 +2,7 @@
 // RUN:   --Xcompiler,iree-input-type=stablehlo \
 // RUN:   --Xcompiler,iree-hal-target-backends=vmvx \
 // RUN:   --Xcompiler,iree-flow-trace-dispatch-tensors \
+// RUN:   --Xcompiler,iree-opt-data-tiling=false \
 // RUN:   %s 2>&1 | FileCheck %s
 
 func.func @two_dispatch() -> (tensor<5x5xf32>, tensor<3x5xf32>) {

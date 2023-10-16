@@ -79,8 +79,9 @@ struct GlobalOptimizationOptions {
   bool promoteBF16ToF32 = false;
   bool demoteI64ToI32 = false;
 
-  // Enables data tiling.
-  bool dataTiling = false;
+  // Enables data tiling. Note that it now only works on llvm-cpu and vmvx
+  // backends. The option will be ignored if other backends are involved.
+  bool dataTiling = true;
 
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;

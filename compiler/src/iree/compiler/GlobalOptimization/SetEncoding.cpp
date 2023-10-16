@@ -12,6 +12,8 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -33,6 +35,8 @@
 
 #include "llvm/Support/Debug.h"
 
+#define DEBUG_TYPE "iree-global-opt-set-encoding"
+
 namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
@@ -40,6 +44,25 @@ namespace GlobalOptimization {
 //===---------------------------------------------------------------------===//
 // Utility functions
 //===---------------------------------------------------------------------===//
+
+static bool isCPUOrVMVXBackendOrUnkown(Operation *moduleOp) {
+  auto targetsAttr = moduleOp->getAttrOfType<ArrayAttr>("hal.device.targets");
+  if (!targetsAttr) {
+    return true;
+  }
+  if (targetsAttr.size() != 1) {
+    return false;
+  }
+  auto deviceTarget = cast<IREE::HAL::DeviceTargetAttr>(targetsAttr[0]);
+  SmallVector<IREE::HAL::ExecutableTargetAttr, 4> executableTargets =
+      deviceTarget.getExecutableTargets();
+  if (executableTargets.size() != 1) {
+    return false;
+  }
+  auto executableTarget = executableTargets[0];
+  return executableTarget.getBackend() == "llvm-cpu" ||
+         executableTarget.getBackend() == "vmvx";
+}
 
 /// Pads `value` enough for any actual tile sizes that could result from
 /// materialization of `encodingAttr`.
@@ -329,6 +352,12 @@ struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
 } // namespace
 
 void SetEncodingPass::runOnOperation() {
+  if (!isCPUOrVMVXBackendOrUnkown(getOperation())) {
+    LLVM_DEBUG(llvm::dbgs() << "only llvm-cpu and vmvx are supported, ignoring "
+                               "other backends...\n");
+    return;
+  }
+
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);

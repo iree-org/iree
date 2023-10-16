@@ -25,6 +25,7 @@ func.func @matmul_static(
 // CODEGEN-DEFAULT:         hal.return %[[C2]], %[[C1]], %[[C1]]
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
+// RUN:   --iree-opt-data-tiling=false \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_default_spec.mlir | \
 // RUN: iree-run-module --module=- --function=matmul_static \
 // RUN:   --input="3x5xf32=1" \
