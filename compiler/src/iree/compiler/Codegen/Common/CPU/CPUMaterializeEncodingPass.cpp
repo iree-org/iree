@@ -15,8 +15,10 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -42,26 +44,29 @@ chooseMatmulTileParamsGeneric(ExecutableTargetAttr target) {
 }
 
 static MatmulTileParams
-chooseMatmulTileParamsAArch64(EncodingUser user, ExecutableTargetAttr target) {
-  switch (user) {
-  case EncodingUser::MATMUL_F32F32F32:
-  case EncodingUser::MATMUL_F16F16F32:
-  case EncodingUser::MATMUL_F16F16F16:
-  case EncodingUser::MATMUL_BF16BF16F32:
-  case EncodingUser::MATMUL_BF16BF16BF16:
-  case EncodingUser::BATCH_MATMUL_F32F32F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F16:
-  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
-  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
+chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
+                              ExecutableTargetAttr target) {
+  if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
+    assert(false);
+    return {};
+  }
+
+  assert(elementTypes.size() == 3);
+  Type lhs = elementTypes[0];
+  Type rhs = elementTypes[1];
+  Type out = elementTypes[2];
+
+  if (out.isF32() || out.isF16() || out.isBF16()) {
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
     return {8, 1, 8};
-  case EncodingUser::MATMUL_I8I8I32:
-  case EncodingUser::BATCH_MATMUL_I8I8I32:
+  }
+
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+      out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       // Aim to use SMMLA.
       return {8, 8, 8};
@@ -71,25 +76,26 @@ chooseMatmulTileParamsAArch64(EncodingUser user, ExecutableTargetAttr target) {
       return {8, 4, 8};
     }
     return {8, 1, 8};
-  default:
-    assert(false);
-    return {};
   }
+
+  assert(false);
+  return {};
 }
 
 static MatmulTileParams
-chooseMatmulTileParamsX86_64(EncodingUser user, ExecutableTargetAttr target) {
-  switch (user) {
-  case EncodingUser::MATMUL_F32F32F32:
-  case EncodingUser::MATMUL_F16F16F32:
-  case EncodingUser::MATMUL_F16F16F16:
-  case EncodingUser::MATMUL_BF16BF16F32:
-  case EncodingUser::MATMUL_BF16BF16BF16:
-  case EncodingUser::BATCH_MATMUL_F32F32F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F16:
-  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
-  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
+chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
+                             ExecutableTargetAttr target) {
+  if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
+    assert(false);
+    return {};
+  }
+
+  assert(elementTypes.size() == 3);
+  Type lhs = elementTypes[0];
+  Type rhs = elementTypes[1];
+  Type out = elementTypes[2];
+
+  if (out.isF32() || out.isF16() || out.isBF16()) {
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
@@ -107,8 +113,10 @@ chooseMatmulTileParamsX86_64(EncodingUser user, ExecutableTargetAttr target) {
     }
     // SSE fallback.
     return {8, 1, 4};
-  case EncodingUser::MATMUL_I8I8I32:
-  case EncodingUser::BATCH_MATMUL_I8I8I32:
+  }
+
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+      out.isSignlessInteger(32)) {
     if (hasFeature(target, "+avx512vnni")) {
       // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
       // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
@@ -125,19 +133,20 @@ chooseMatmulTileParamsX86_64(EncodingUser user, ExecutableTargetAttr target) {
     }
     // SSE fallback. Aim to use PMADDWD (xmm).
     return {8, 2, 4};
-  default:
-    assert(false);
-    return {};
   }
+
+  assert(false);
+  return {};
 }
 
 static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
+                                               TypeRange elementTypes,
                                                ExecutableTargetAttr target) {
   if (isAArch64(target)) {
-    return chooseMatmulTileParamsAArch64(user, target);
+    return chooseMatmulTileParamsAArch64(user, elementTypes, target);
   }
   if (isX86_64(target)) {
-    return chooseMatmulTileParamsX86_64(user, target);
+    return chooseMatmulTileParamsX86_64(user, elementTypes, target);
   }
   return chooseMatmulTileParamsGeneric(target);
 }
@@ -184,7 +193,12 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   }
   auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
-  MatmulTileParams tileParams = chooseMatmulTileParams(user, targetAttr);
+  auto elementTypes = llvm::to_vector(
+      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
+        return a.cast<TypeAttr>().getValue();
+      }));
+  MatmulTileParams tileParams =
+      chooseMatmulTileParams(user, elementTypes, targetAttr);
   auto encodingInfo =
       IREE::LinalgExt::chooseEncodingInfoForMatmul(user, role, tileParams);
   auto originalTypeAttr = encoding.getOriginalType();

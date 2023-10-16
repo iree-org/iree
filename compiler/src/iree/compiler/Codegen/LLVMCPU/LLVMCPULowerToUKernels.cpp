@@ -383,27 +383,37 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
       genericMicroKernelOp.getOperation());
 }
 
-static uint32_t flagForUser(IREE::LinalgExt::EncodingUser user) {
-  switch (user) {
-  case IREE::LinalgExt::EncodingUser::MATMUL_F32F32F32:
+static uint32_t
+getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingUser user,
+                              ArrayRef<Attribute> operandTypes) {
+  if (user != IREE::LinalgExt::EncodingUser::MATMUL ||
+      operandTypes.size() != 3) {
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
+  }
+
+  Type lhs = operandTypes[0].cast<TypeAttr>().getValue();
+  Type rhs = operandTypes[1].cast<TypeAttr>().getValue();
+  Type out = operandTypes[2].cast<TypeAttr>().getValue();
+
+  if (lhs.isF32() && rhs.isF32() && out.isF32()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
-  case IREE::LinalgExt::EncodingUser::MATMUL_I8I8I32:
-    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
-  case IREE::LinalgExt::EncodingUser::MATMUL_F16F16F32:
+  } else if (lhs.isF16() && rhs.isF16() && out.isF32()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F32;
-  case IREE::LinalgExt::EncodingUser::MATMUL_F16F16F16:
+  } else if (lhs.isF16() && rhs.isF16() && out.isF16()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F16F16F16;
-  case IREE::LinalgExt::EncodingUser::MATMUL_BF16BF16F32:
+  } else if (lhs.isBF16() && rhs.isBF16() && out.isF32()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32;
-  case IREE::LinalgExt::EncodingUser::MATMUL_BF16BF16BF16:
+  } else if (lhs.isBF16() && rhs.isBF16() && out.isBF16()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16;
-  default: // Unreachable.
-    assert(false);
+  } else if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+             out.isSignlessInteger(32)) {
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
+  } else {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 }
 
-static uint32_t flagForRole(IREE::LinalgExt::EncodingRole role) {
+static uint32_t getFlagForRole(IREE::LinalgExt::EncodingRole role) {
   switch (role) {
   case IREE::LinalgExt::EncodingRole::LHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
@@ -411,9 +421,8 @@ static uint32_t flagForRole(IREE::LinalgExt::EncodingRole role) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
   case IREE::LinalgExt::EncodingRole::RESULT:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
-  default: // Unreachable.
-    assert(false);
-    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
+  default:
+    return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_NONE;
   }
 }
 
@@ -439,11 +448,14 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   for (int64_t i : tensorType.getShape()) {
     inputValues.push_back(rewriter.create<arith::ConstantIndexOp>(loc, i));
   }
+  uint32_t flagForUserAndOperandTypes = getFlagForUserAndOperandTypes(
+      encoding.getUser().getValue(), encoding.getElementTypes().getValue());
+  uint32_t flagForRole = getFlagForRole(encoding.getRole().getValue());
+  if (!flagForUserAndOperandTypes || !flagForRole) {
+    return rewriter.notifyMatchFailure(op, "unhandled encoding");
+  }
   inputValues.push_back(rewriter.create<arith::ConstantIntOp>(
-      loc,
-      flagForUser(encoding.getUser().getValue()) |
-          flagForRole(encoding.getRole().getValue()),
-      32));
+      loc, flagForUserAndOperandTypes | flagForRole, 32));
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   auto fn = getFnNameAndDefAttrs("query_tile_sizes.2d", rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
