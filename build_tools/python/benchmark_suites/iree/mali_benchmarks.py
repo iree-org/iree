@@ -60,8 +60,6 @@ class Android_Mali_Benchmarks(object):
 
     FP32_MODELS = [
         tflite_models.MOBILEBERT_FP32,
-        tf_models.GPT2_117M_1x4_FP32_TF,
-        tf_models.GPT2_117M_1x1_FP32_TF,
     ]
     FP16_MODELS = [tflite_models.MOBILEBERT_FP16]
     QUANT_MODELS = [
