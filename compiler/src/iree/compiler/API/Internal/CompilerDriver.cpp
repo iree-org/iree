@@ -103,12 +103,24 @@ struct rt_aligned_allocator {
   rt_aligned_allocator(const rt_aligned_allocator<U> &) noexcept {}
 
   T *allocate(std::size_t n) {
+    std::size_t size = n * sizeof(T);
 #ifdef _WIN32
-    T *alloc = static_cast<T *>(
-        _aligned_malloc(n * sizeof(T), kOutputBufferAlignment));
+    T *alloc = static_cast<T *>(_aligned_malloc(size, kOutputBufferAlignment));
 #else
+    // std::aligned_alloc requires `size` to be a multiple of `alignment`.
+    // Rounding `size` to the next multiple of `alignment` can theoretically
+    // overflow. This being allocator code, we try to be righteous.
+    // It helps that the size type here is unsigned, so overflow is well-defined
+    // as wrap-around.
+    std::size_t rounded_up_size =
+        (size + kOutputBufferAlignment - 1) & ~(kOutputBufferAlignment - 1);
+    if (rounded_up_size < size) {
+      // overflow!
+      return nullptr;
+    }
     T *alloc = static_cast<T *>(
-        std::aligned_alloc(n * sizeof(T), kOutputBufferAlignment));
+        std::aligned_alloc(kOutputBufferAlignment, rounded_up_size));
+
 #endif
     assert((reinterpret_cast<uintptr_t>(alloc) &
             (kOutputBufferAlignment - 1)) == 0 &&
