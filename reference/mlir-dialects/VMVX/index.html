@@ -1672,6 +1672,54 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#vmvxcopy-vmvxcopyop" class="md-nav__link">
+    vmvx.copy (VMVX::CopyOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmvxfill2d-vmvxfill2dop" class="md-nav__link">
+    vmvx.fill2d (VMVX::Fill2DOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmvxunary-vmvxunaryop" class="md-nav__link">
+    vmvx.unary (VMVX::UnaryOp)
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#utility-ops" class="md-nav__link">
+    Utility ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Utility ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" class="md-nav__link">
+    vmvx.get_buffer_descriptor (VMVX::GetBufferDescriptorOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop" class="md-nav__link">
+    vmvx.get_raw_interface_binding_buffer (VMVX::GetRawInterfaceBindingBufferOp)
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2306,6 +2354,54 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#vmvxcopy-vmvxcopyop" class="md-nav__link">
+    vmvx.copy (VMVX::CopyOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmvxfill2d-vmvxfill2dop" class="md-nav__link">
+    vmvx.fill2d (VMVX::Fill2DOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmvxunary-vmvxunaryop" class="md-nav__link">
+    vmvx.unary (VMVX::UnaryOp)
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#utility-ops" class="md-nav__link">
+    Utility ops
+  </a>
+  
+    <nav class="md-nav" aria-label="Utility ops">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" class="md-nav__link">
+    vmvx.get_buffer_descriptor (VMVX::GetBufferDescriptorOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop" class="md-nav__link">
+    vmvx.get_raw_interface_binding_buffer (VMVX::GetRawInterfaceBindingBufferOp)
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2347,6 +2443,14 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <li><a href="#operation-definition">Operation definition</a><ul>
 <li><a href="#abi-ops">ABI ops</a><ul>
 <li><a href="#vmvxbinary-vmvxbinaryop">vmvx.binary (VMVX::BinaryOp)</a></li>
+<li><a href="#vmvxcopy-vmvxcopyop">vmvx.copy (VMVX::CopyOp)</a></li>
+<li><a href="#vmvxfill2d-vmvxfill2dop">vmvx.fill2d (VMVX::Fill2DOp)</a></li>
+<li><a href="#vmvxunary-vmvxunaryop">vmvx.unary (VMVX::UnaryOp)</a></li>
+</ul>
+</li>
+<li><a href="#utility-ops">Utility ops</a><ul>
+<li><a href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop">vmvx.get_buffer_descriptor (VMVX::GetBufferDescriptorOp)</a></li>
+<li><a href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop">vmvx.get_raw_interface_binding_buffer (VMVX::GetRawInterfaceBindingBufferOp)</a></li>
 </ul>
 </li>
 </ul>
@@ -2377,210 +2481,313 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>opcode</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>element_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of 8-bit signless integer or 16-bit signless integer or 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float</td></tr>
+</table>
+
+<h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
-
-##### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-| `lhs_buffer` | a reference counted byte buffer
-| `lhs_offset` | index
-| `lhs_strides` | index
-| `rhs_buffer` | a reference counted byte buffer
-| `rhs_offset` | index
-| `rhs_strides` | index
-| `out_buffer` | a reference counted byte buffer
-| `out_offset` | index
-| `out_strides` | index
-| `sizes` | index
-
-#### `vmvx.copy` (VMVX::CopyOp)
-
-_Copy from one buffer to another_
-
-
-Syntax:
-
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>lhs_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>lhs_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>lhs_strides</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>rhs_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>rhs_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>rhs_strides</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_strides</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>sizes</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="vmvxcopy-vmvxcopyop"><code>vmvx.copy</code> (VMVX::CopyOp)<a class="headerlink" href="#vmvxcopy-vmvxcopyop" title="Permanent link">link</a></h4>
+<p><em>Copy from one buffer to another</em></p>
+<p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.copy` `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `strides` `[` $out_strides `]` `:` type($out_buffer) `)`
               `sizes` `` `(` $sizes `)`
               `:` $element_type
               attr-dict
 </code></pre></div>
-
-
-Traits: SameVariadicOperandSize
-
-##### Attributes:
-
+<p>Traits: SameVariadicOperandSize</p>
+<h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>element_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of 8-bit signless integer or 16-bit signless integer or 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float</td></tr>
+</table>
+
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
-
-##### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-| `in_buffer` | a reference counted byte buffer
-| `in_offset` | index
-| `in_strides` | index
-| `out_buffer` | a reference counted byte buffer
-| `out_offset` | index
-| `out_strides` | index
-| `sizes` | index
-
-#### `vmvx.fill2d` (VMVX::Fill2DOp)
-
-_Fill a tile with a scalar_
-
-
-Syntax:
-
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>in_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>in_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>in_strides</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_strides</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>sizes</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="vmvxfill2d-vmvxfill2dop"><code>vmvx.fill2d</code> (VMVX::Fill2DOp)<a class="headerlink" href="#vmvxfill2d-vmvxfill2dop" title="Permanent link">link</a></h4>
+<p><em>Fill a tile with a scalar</em></p>
+<p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.fill2d` `scalar` `` `(` $scalar `:` type($scalar) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `row_stride` $out_row_stride `:` type($out_buffer) `)`
               `sizes` `` `(` $m `,` $n `)`
               attr-dict
 </code></pre></div>
-
-Fills a tile with dimensions [m, n] with a scalar.
-
-##### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-| `scalar` | 8-bit signless integer or 16-bit signless integer or 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float
-| `out_buffer` | a reference counted byte buffer
-| `out_offset` | index
-| `out_row_stride` | index
-| `m` | index
-| `n` | index
-
-#### `vmvx.unary` (VMVX::UnaryOp)
-
-_Performs a strided elementwise unary operation_
-
-
-Syntax:
-
+<p>Fills a tile with dimensions [m, n] with a scalar.</p>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>scalar</code></td>
+<td>8-bit signless integer or 16-bit signless integer or 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_row_stride</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>m</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>n</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="vmvxunary-vmvxunaryop"><code>vmvx.unary</code> (VMVX::UnaryOp)<a class="headerlink" href="#vmvxunary-vmvxunaryop" title="Permanent link">link</a></h4>
+<p><em>Performs a strided elementwise unary operation</em></p>
+<p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.unary` `op` `` `(` $opcode `:` $element_type `)`
               `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
               `out` `` `(` $out_buffer `offset` $out_offset `strides` `[` $out_strides `]` `:` type($out_buffer) `)`
               `sizes` `` `(` $sizes `)`
               attr-dict
 </code></pre></div>
-
-Performs the operation in-place as if:
+<p>Performs the operation in-place as if:
 <div class="highlight"><pre><span></span><code>  OUT = OP(IN)
-</code></pre></div>
-
-Where `OP` is a concrete operation name as defined in ukernel/elementwise.h
-
-Traits: SameVariadicOperandSize
-
-##### Attributes:
-
+</code></pre></div></p>
+<p>Where <code>OP</code> is a concrete operation name as defined in ukernel/elementwise.h</p>
+<p>Traits: SameVariadicOperandSize</p>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>opcode</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>element_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of 8-bit signless integer or 16-bit signless integer or 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float</td></tr>
+</table>
+
+<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
-
-##### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-| `in_buffer` | a reference counted byte buffer
-| `in_offset` | index
-| `in_strides` | index
-| `out_buffer` | a reference counted byte buffer
-| `out_offset` | index
-| `out_strides` | index
-| `sizes` | index
-
-
-### Utility ops
-
-
-
-#### `vmvx.get_buffer_descriptor` (VMVX::GetBufferDescriptorOp)
-
-_Late binds a base buffer/offset/strides_
-
-
-Syntax:
-
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>in_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>in_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>in_strides</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>out_strides</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>sizes</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h3 id="utility-ops">Utility ops<a class="headerlink" href="#utility-ops" title="Permanent link">link</a></h3>
+<h4 id="vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop"><code>vmvx.get_buffer_descriptor</code> (VMVX::GetBufferDescriptorOp)<a class="headerlink" href="#vmvxget_buffer_descriptor-vmvxgetbufferdescriptorop" title="Permanent link">link</a></h4>
+<p><em>Late binds a base buffer/offset/strides</em></p>
+<p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_buffer_descriptor` $source `:` type($source) `-&gt;` type(results) attr-dict
 </code></pre></div>
-
-Queries a base buffer, offset and strides. This op is late bound to its
+<p>Queries a base buffer, offset and strides. This op is late bound to its
 source (alloca, binding, etc), allowing additional layers of
 transformations to be added as lowering progresses (or for buffers to be
-combined).
-
-This op has canonicalization rules which will bubble it up through the
+combined).</p>
+<p>This op has canonicalization rules which will bubble it up through the
 view stack. A final reconciliation pass is used explicitly to bind it to
-concrete sources.
-
-Traits: AlwaysSpeculatableImplTrait, SameVariadicResultSize
-
-Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)
-
-Effects: MemoryEffects::Effect{}
-
-##### Operands:
-
-| Operand | Description |
-| :-----: | ----------- |
-| `source` | memref of any type values
-
-##### Results:
-
-| Result | Description |
-| :----: | ----------- |
-| `base_buffer` | a reference counted byte buffer
-| `offset` | index
-| `sizes` | index
-| `strides` | index
-
-#### `vmvx.get_raw_interface_binding_buffer` (VMVX::GetRawInterfaceBindingBufferOp)
-
-_Gets the raw buffer associated with a binding_
-
-
-Syntax:
-
+concrete sources.</p>
+<p>Traits: AlwaysSpeculatableImplTrait, SameVariadicResultSize</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>memref of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>base_buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>sizes</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>strides</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h4 id="vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop"><code>vmvx.get_raw_interface_binding_buffer</code> (VMVX::GetRawInterfaceBindingBufferOp)<a class="headerlink" href="#vmvxget_raw_interface_binding_buffer-vmvxgetrawinterfacebindingbufferop" title="Permanent link">link</a></h4>
+<p><em>Gets the raw buffer associated with a binding</em></p>
+<p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vmvx.get_raw_interface_binding_buffer` `set` `(` $set `)` `binding` `(` $binding `)` attr-dict
 </code></pre></div>
-
-Normally, a slice of a binding buffer is returned via
+<p>Normally, a slice of a binding buffer is returned via
 hal.interface.binding.subspan. However, the normal VMVX lowering flow for
 this presumes that the result is a memref, and upon final conversion, it
-will offset the memref automatically to make it consistent.
-
-This op is used in situations where earlier in a lowering, we have fully
+will offset the memref automatically to make it consistent.</p>
+<p>This op is used in situations where earlier in a lowering, we have fully
 resolved the binding to a buffer and would just like the raw backing
-buffer as passed to the interface.
-
-Traits: AlwaysSpeculatableImplTrait
-
-Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)
-
-Effects: MemoryEffects::Effect{}
-
-##### Attributes:
-
+buffer as passed to the interface.</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>set</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 <tr><td><code>binding</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
+</table>
+
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
 <table>
-
-##### Results:
-
-| Result | Description |
-| :----: | ----------- |
-| `buffer` | a reference counted byte buffer
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>buffer</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+</tbody>
+</table>
 
 
 
