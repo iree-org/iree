@@ -107,8 +107,9 @@ def HoistIntoGlobals : Pass<"iree-util-hoist-into-globals", "mlir::ModuleOp"> {
   }];
   let options = [
     Option<"maxSizeIncreaseThreshold", "max-size-increase-threshold", "int64_t",
-      /*default=*/"2147483647",
-      "Maximum byte size increase allowed for constant expr hoisting policy to allow hoisting.">
+      /*default=*/"1048576",
+      "Maximum byte size increase allowed for constant expr hoisting policy to"
+      "allow hoisting. The threshold is 1MB by default.">
   ];
 }
 
