@@ -1164,30 +1164,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=adreno-unknown-android31"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [qualcomm-adreno-vulkan_android31-vulkan_spirv][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=adreno-unknown-android31"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [qualcomm-adreno-vulkan_android31-vulkan_spirv][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_/module.vmfb"
@@ -1201,32 +1177,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=adreno-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [qualcomm-adreno-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=adreno-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [qualcomm-adreno-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
@@ -1235,30 +1185,6 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags]"
   PUBLIC
 )
 
@@ -1298,34 +1224,6 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-stream-partitioning-favor=max-concurrency"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-stream-partitioning-favor=max-concurrency"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-stream-partitioning-favor=max-concurrency"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency]"
   PUBLIC
 )
 
@@ -1370,36 +1268,6 @@ iree_bytecode_module(
     "--iree-stream-partitioning-favor=max-concurrency"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-stream-partitioning-favor=max-concurrency"
-    "--iree-hal-benchmark-dispatch-repeat-count=32"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-stream-partitioning-favor=max-concurrency"
-    "--iree-hal-benchmark-dispatch-repeat-count=32"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel]"
   PUBLIC
 )
 
@@ -2866,38 +2734,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=adreno-unknown-android31"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [qualcomm-adreno-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=adreno-unknown-android31"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [qualcomm-adreno-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/module.vmfb"
@@ -2915,40 +2751,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=adreno-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [qualcomm-adreno-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=adreno-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [qualcomm-adreno-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
@@ -2961,38 +2763,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3044,42 +2814,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-stream-partitioning-favor=max-concurrency"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-stream-partitioning-favor=max-concurrency"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,compile-stats]"
   PUBLIC
 )
 
@@ -3136,44 +2870,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X4XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-stream-partitioning-favor=max-concurrency"
-    "--iree-hal-benchmark-dispatch-repeat-count=32"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_GPT2_117M_TF_1X1XI32.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=stablehlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-stream-partitioning-favor=max-concurrency"
-    "--iree-hal-benchmark-dispatch-repeat-count=32"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel,compile-stats]"
   PUBLIC
 )
 
@@ -3305,16 +3001,6 @@ add_dependencies(iree-benchmark-suites-android-cpu
 )
 
 add_dependencies(iree-benchmark-suites-android-gpu
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_demote-f32-to-f16_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_demote-f32-to-f16_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_demote-f32-to-f16_
@@ -3346,22 +3032,12 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
@@ -3470,22 +3146,12 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_data-tiling_ukernel_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__default-flags_
-  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_data-tiling_ukernel_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
