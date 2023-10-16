@@ -105,11 +105,11 @@ bool ireeCompilerLoadLibrary(const char *libraryPath) {
   int apiMajor = packedApiVersion >> 16;
 
 #define HANDLE_SYMBOL(fn_name)                                                 \
-  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(                    \
-      localLibraryHandle, #fn_name);                  \
+  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(localLibraryHandle, \
+                                                           #fn_name);          \
   if (!__##fn_name) {                                                          \
     fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol '%s'\n",       \
-            #fn_name);                                \
+            #fn_name);                                                         \
     return false;                                                              \
   }
 #define HANDLE_VERSIONED_SYMBOL(fn_name, availApiMajor, availApiMinor)         \
