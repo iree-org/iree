@@ -82,17 +82,17 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //   CHECK-LABEL:  func.func @conv_nchw
 // TODO: hoist the accumulator read and fold the transfer_write.
 //         CHECK:    vector.transfer_write
+// CHECK-COUNT-4:    vector.transfer_read
 //         CHECK:    scf.for
 //         CHECK:      scf.for
-// CHECK-COUNT-3:        vector.transfer_read
-//         CHECK:        vector.contract
-//         CHECK:        vector.transfer_write
 // CHECK-COUNT-2:        vector.transfer_read
 //         CHECK:        vector.contract
-//         CHECK:        vector.transfer_write
-// CHECK-COUNT-2:        vector.transfer_read
+//         CHECK:        vector.transfer_read
 //         CHECK:        vector.contract
-//         CHECK:        vector.transfer_write
-// CHECK-COUNT-2:        vector.transfer_read
+//         CHECK:        vector.transfer_read
 //         CHECK:        vector.contract
-//         CHECK:        vector.transfer_write
+//         CHECK:        vector.transfer_read
+//         CHECK:        vector.contract
+//         CHECK:      scf.yield
+//         CHECK:    scf.yield
+// CHECK-COUNT-4:    vector.transfer_write
