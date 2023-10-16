@@ -4476,11 +4476,10 @@ _Executable entry point declaration_
 An entry point exported by the executable with statically-available
 information describing the IO interface it uses and other dispatch metadata.
 
-The `calculate_workgroup_count` region represents the computation that
+The `workgroup_count` region represents the computation that
 returns the number of workgroups to use in the 3D grid dispatch.
 The arguments to the region represents the workload as captured by each
-dispatch.
-It returns the number of workgroups along x, y, and z.
+dispatch. It returns the number of workgroups along x, y, and z.
 
 Traits: HasParent<IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp>, IsolatedFromAbove
 
@@ -5502,6 +5501,151 @@ Effects: MemoryEffects::Effect{}
 ### Pseudo Ops
 
 Pseudo ops for conversion support.
+
+#### `hal.dispatch.extern` (HAL::DispatchExternOp)
+
+_A dispatch of workgroups across a 3-dimensional grid_
+
+
+Syntax:
+
+<div class="highlight"><pre><span></span><code>operation ::= `hal.dispatch.extern` $export
+              (`[` $workload^ `]`)? ``
+              `(` $arguments `)` `:`
+              custom&lt;ShapedFunctionType&gt;(ref($arguments),
+              type($arguments), $argument_dims,
+              type($results), $result_dims,
+              $tied_operands)
+              `layout` `(` $layout `)`
+              (`bindings` `(` $bindings^ `)`)?
+              `objects` `(` $objects `)`
+              `count` `` custom&lt;WorkgroupCountRegion&gt;($workgroup_count)
+              attr-dict-with-keyword
+</code></pre></div>
+
+Dispatches some number of workgroups across a 3-dimensional grid using a
+function defined externally in one or more referenced objects. Objects are
+declared per executable target and selected automatically during linking
+based on where the dispatch is used. Semantically this is equivalent to
+a `flow.dispatch.workgroups` but with the workgroup region invisible to the
+compiler. See `hal.executable` for more information about object linkage.
+
+Note that since this happens at tensor level the dispatch operation has
+value semantics: some tensors (and optionally other primitive types) are
+consumed and one or more new result tensors are produced. Inside each
+workgroup, however, the input and output tensors are available for arbitrary
+loads and stores. In many cases each workgroup will load some particular
+tile(s) from the input tensors and store some particular tile(s) to the
+output tensors unique to that workgroup. Though it's possible for multiple
+workgroups to load the same regions of the input tensors behavior is
+undefined if multiple workgroups store to the same regions of the output
+tensors. Codegen guarantees this behavior but when sourcing externally
+authored dispatch functions it's critical that this behavior is observed.
+
+Though the representation is similar to the GPU-style grid dispatch model
+here we still have not yet allocated buffers, determined the target device
+for execution, or even completed fully resolving shapes/types/etc. Because
+of this it's important that the workgroup body use the platform-dependent
+primitives for accessing workgroup ID, size, and count intrinsics instead
+of hardcoding them to a particular set of values. Assume that any workgroup
+dispatch may end up being specialized for several different target devices
+and even several different variants for a particular target device
+(differing workgroup sizes, etc). To aid deduplication code producing these
+external dispatches should try not to specialize early for particular shapes
+and instead emit the most generic code possible as having 500 slightly
+different `hal.dispatch.extern` ops pointing at the same object file is
+likely to require 500 copies of the object instead of 500 calls to the same
+object.
+
+Because at this point in the layering devices have not yet been selected the
+workgroup count cannot be fully evaluated. Instead workload parameters are
+captured that are then passed to a function that when later evaluated
+computes the actual workgroup count based on target information. The
+workload is not limited to the 3D XYZ grid dispatch of the workgroup count
+and can contain any number of parameters used to compute it. If workgroup
+size or distribution varies based on the target device a `!hal.device`
+argument can be used by the workgroup count calculation region to factor in
+device parameters. See `hal.device.query` for more information on how to
+query information.
+
+<div class="highlight"><pre><span></span><code>%r = hal.dispatch.extern &quot;some_function&quot;[%c5, %c5](%0, %1)
+    : (tensor&lt;5x5xf32&gt;, tensor&lt;5xf32&gt;) -&gt; tensor&lt;5x5xf32&gt;
+  ...
+</code></pre></div>
+
+The number of results of the operation is equal to the number of results
+in the type signature (`(tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32>`).
+Each tensor argument and result in the type signature has a corresponding
+pipeline layout slot and must be declared. If multiple arguments or results
+share the same layout slot they can be aliased using the `bindings`
+attribute and otherwise each is assumed unique.
+
+There are no `arguments` operands for results, but a result can be tied an
+argument by writing the argument operand's SSA value instead of its type:
+E.g., in the above example, `-> %0` would tie the first argument to the
+result. In that case, there would be no separate block argument for the
+result.
+
+Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, IsolatedFromAbove
+
+Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp
+
+Effects: MemoryEffects::Effect{}
+
+##### Attributes:
+
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>export</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td><details><summary>executable entry point layout specification</summary>{{% markdown %}}
+    Specifies the layout information used for interacting with executable
+    functions. This allows host code to correctly map parameters to the
+    lower-level target-specific argument passing behavior.
+  {{% /markdown %}}</details></td></tr>
+<tr><td><code>objects</code></td><td>::mlir::iree_compiler::IREE::HAL::ExecutableObjectsAttr</td><td><details><summary>target-specific object file references</summary>{{% markdown %}}
+    A dictionary mapping executable target specifications to a list of objects.
+    This is used to allow layers of the stack that support multi-targeting to
+    specify information used during lowering into each particular target.
+
+    The key attributes are matched against each target variant based on the
+    backend and format as well as any configuration data provided. When
+    comparing the configuration only fields present in both the key and
+    target variant will be checked and must match. This allows specification of
+    generic sets ("all x86_64 targets get these objects") as well as specific
+    ones ("only x86_64 targets with vector_size = 64 get these objects").
+
+    Example:
+    <div class="highlight"><pre><span></span><code>#hal.executable.objects&lt;{
+  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_64&quot;&gt; = [
+    #hal.executable.object&lt;{path = &quot;some/file_arm_64.obj&quot;}&gt;
+  ],
+  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-x86_64&quot;&gt; = [
+    #hal.executable.object&lt;{path = &quot;some/file_x86_64.obj&quot;}&gt;
+  ]
+}&gt;
+</code></pre></div>
+  {{% /markdown %}}</details></td></tr>
+<tr><td><code>workgroup_size</code></td><td>::mlir::ArrayAttr</td><td>index array attribute</td></tr>
+<tr><td><code>subgroup_size</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
+<tr><td><code>workgroup_local_memory</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
+<tr><td><code>bindings</code></td><td>::mlir::ArrayAttr</td><td>HAL binding array attribute</td></tr>
+<tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
+<table>
+
+##### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+| `workload` | index
+| `arguments` | any type
+| `argument_dims` | index
+| `result_dims` | index
+
+##### Results:
+
+| Result | Description |
+| :----: | ----------- |
+| `results` | any type
 
 #### `hal.tensor.barrier` (HAL::TensorBarrierOp)
 
