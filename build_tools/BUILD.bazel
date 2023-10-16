@@ -4,16 +4,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cc_library")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-# Helper for getting linkopts into libraries in a way we can easily spot and
-# rewrite from bazel-to-cmake and copybara.
-cc_library(
-    name = "default_linkopts",
+iree_cc_library(
+    name = "pthreads",
     linkopts = select({
         "//build_tools/bazel:iree_is_msvc": [],
         "//build_tools/bazel:iree_is_android": [
@@ -26,7 +26,7 @@ cc_library(
     }),
 )
 
-cc_library(
+iree_cc_library(
     name = "dl",
     linkopts = select({
         "//build_tools/bazel:iree_is_msvc": [],

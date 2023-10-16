@@ -41,7 +41,7 @@ config_setting(
     },
 )
 
-cc_library(
+iree_runtime_cc_library(
     name = "disabled",
 )
 
