@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,12 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# The choice between iree_runtime_cc_library/iree_compiler_cc_library doesn't
-# really matter here, as these "libraries" only define linkopts. However, it is
-# still useful to go through one of the wrapper functions to avoid going
-# directly to the native/global cc_library.
-
-iree_runtime_cc_library(
+iree_cc_library(
     name = "pthreads",
     linkopts = select({
         "//build_tools/bazel:iree_is_msvc": [],
@@ -31,7 +26,7 @@ iree_runtime_cc_library(
     }),
 )
 
-iree_runtime_cc_library(
+iree_cc_library(
     name = "dl",
     linkopts = select({
         "//build_tools/bazel:iree_is_msvc": [],
