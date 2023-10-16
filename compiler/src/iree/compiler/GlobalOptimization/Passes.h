@@ -11,6 +11,7 @@
 
 #include "iree/compiler/Pipelines/Options.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -36,6 +37,29 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
 // distinction to keep that as an option.
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions);
+
+//===----------------------------------------------------------------------===//
+// Input canonicalization and legalization
+//===----------------------------------------------------------------------===//
+
+// Creates a pass to convert linalg convolution ops with 1x1 kernels into
+// linalg.matmul
+std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
+
+// Create a pass to detach elementwise ops from named Linalg ops.
+std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
+
+// Apply patterns to erase unused linalg operands and remove dead code
+// associated.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createEraseUnusedLinalgOperands();
+
+// Removes tensors that have 0-extents.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createRemoveZeroExtentTensorsPass();
+
+// Sets encoding for tensors to allow tiled execution of operations.
+std::unique_ptr<Pass> createSetEncodingPass();
 
 // Materializes logical encodings to physical encodings if there is a single
 // device target.

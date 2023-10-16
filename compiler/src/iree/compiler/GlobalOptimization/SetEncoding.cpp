@@ -12,8 +12,8 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/PassDetail.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -35,8 +35,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace GlobalOptimization {
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -85,14 +84,13 @@ static Value setEncoding(OpBuilder &builder, Location loc, Value source,
                                                         source);
 };
 
-static LinalgExt::EncodingAttr makeEncoding(OpBuilder &builder,
-                                            LinalgExt::EncodingUser user,
-                                            LinalgExt::EncodingRole role,
-                                            TypeRange operandTypes,
-                                            Type originalType) {
+static IREE::LinalgExt::EncodingAttr
+makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
+             IREE::LinalgExt::EncodingRole role, TypeRange operandTypes,
+             Type originalType) {
   auto *context = builder.getContext();
-  auto userAttr = LinalgExt::EncodingUserAttr::get(context, user);
-  auto roleAttr = LinalgExt::EncodingRoleAttr::get(context, role);
+  auto userAttr = IREE::LinalgExt::EncodingUserAttr::get(context, user);
+  auto roleAttr = IREE::LinalgExt::EncodingRoleAttr::get(context, role);
   SmallVector<Attribute> elemTypeAttrs =
       llvm::map_to_vector(operandTypes, [](auto t) {
         return TypeAttr::get(t.template cast<ShapedType>().getElementType())
@@ -101,13 +99,13 @@ static LinalgExt::EncodingAttr makeEncoding(OpBuilder &builder,
   auto operandElemTypesAttr = ArrayAttr::get(context, elemTypeAttrs);
   auto originalTypeAttr =
       originalType ? TypeAttr::get(originalType) : TypeAttr{};
-  return LinalgExt::EncodingAttr::get(context, userAttr, roleAttr,
-                                      operandElemTypesAttr, originalTypeAttr);
+  return IREE::LinalgExt::EncodingAttr::get(
+      context, userAttr, roleAttr, operandElemTypesAttr, originalTypeAttr);
 }
 
 static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                               LinalgExt::EncodingUser user,
-                               LinalgExt::EncodingRole role,
+                               IREE::LinalgExt::EncodingUser user,
+                               IREE::LinalgExt::EncodingRole role,
                                TypeRange operandTypes) {
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
@@ -187,18 +185,18 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       return failure();
     }
 
-    LinalgExt::EncodingUser user = LinalgExt::EncodingUser::MATMUL;
+    IREE::LinalgExt::EncodingUser user = IREE::LinalgExt::EncodingUser::MATMUL;
     Location loc = matmulOp.getLoc();
     TypeRange operandTypes = matmulOp->getOperandTypes();
     Value encodedLhs =
         padAndSetEncoding(rewriter, loc, origLhs, user,
-                          LinalgExt::EncodingRole::LHS, operandTypes);
+                          IREE::LinalgExt::EncodingRole::LHS, operandTypes);
     Value encodedRhs =
         padAndSetEncoding(rewriter, loc, origRhs, user,
-                          LinalgExt::EncodingRole::RHS, operandTypes);
+                          IREE::LinalgExt::EncodingRole::RHS, operandTypes);
     Value encodedOut =
         padAndSetEncoding(rewriter, loc, origOut, user,
-                          LinalgExt::EncodingRole::RESULT, operandTypes);
+                          IREE::LinalgExt::EncodingRole::RESULT, operandTypes);
 
     Value matmulTiled = rewriter
                             .create<linalg::MatmulOp>(
@@ -208,7 +206,7 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
 
     // Sizes are computed by original output size.
     FailureOr<SmallVector<OpFoldResult>> origOutSizes =
-        LinalgExt::getDims(rewriter, loc, origOut);
+        IREE::LinalgExt::getDims(rewriter, loc, origOut);
     if (failed(origOutSizes)) {
       return rewriter.notifyMatchFailure(matmulOp,
                                          "failed to get shape of result");
@@ -259,18 +257,19 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
       return failure();
     }
 
-    LinalgExt::EncodingUser user = LinalgExt::EncodingUser::BATCH_MATMUL;
+    IREE::LinalgExt::EncodingUser user =
+        IREE::LinalgExt::EncodingUser::BATCH_MATMUL;
     Location loc = matmulOp.getLoc();
     TypeRange operandTypes = matmulOp->getOperandTypes();
     Value encodedLhs =
         padAndSetEncoding(rewriter, loc, origLhs, user,
-                          LinalgExt::EncodingRole::LHS, operandTypes);
+                          IREE::LinalgExt::EncodingRole::LHS, operandTypes);
     Value encodedRhs =
         padAndSetEncoding(rewriter, loc, origRhs, user,
-                          LinalgExt::EncodingRole::RHS, operandTypes);
+                          IREE::LinalgExt::EncodingRole::RHS, operandTypes);
     Value encodedOut =
         padAndSetEncoding(rewriter, loc, origOut, user,
-                          LinalgExt::EncodingRole::RESULT, operandTypes);
+                          IREE::LinalgExt::EncodingRole::RESULT, operandTypes);
 
     Value matmulTiled = rewriter
                             .create<linalg::BatchMatmulOp>(
@@ -280,7 +279,7 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
 
     // Sizes are computed by original output size.
     FailureOr<SmallVector<OpFoldResult>> origOutSizes =
-        LinalgExt::getDims(rewriter, loc, origOut);
+        IREE::LinalgExt::getDims(rewriter, loc, origOut);
     if (failed(origOutSizes)) {
       return rewriter.notifyMatchFailure(matmulOp,
                                          "failed to get shape of result");
@@ -348,7 +347,6 @@ std::unique_ptr<Pass> createSetEncodingPass() {
   return std::make_unique<SetEncodingPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
+} // namespace GlobalOptimization
 } // namespace iree_compiler
 } // namespace mlir

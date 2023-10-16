@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-set-encoding --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-set-encoding --cse --split-input-file %s | FileCheck %s
 
 func.func @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {

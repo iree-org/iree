@@ -12,8 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/PassDetail.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -27,8 +27,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace GlobalOptimization {
 
 namespace {
 
@@ -214,7 +213,6 @@ std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass() {
   return std::make_unique<DetachElementwiseFromNamedOpsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
+} // namespace GlobalOptimization
 } // namespace iree_compiler
 } // namespace mlir

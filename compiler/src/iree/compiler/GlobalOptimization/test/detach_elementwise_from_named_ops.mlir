@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-flow-detach-elementwise-from-named-ops --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-global-opt-detach-elementwise-from-named-ops --mlir-print-local-scope %s | FileCheck %s
 
 func.func @matmul(%a: tensor<?x64xf32>, %b: tensor<64x?xf32>, %c: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = linalg.generic {
