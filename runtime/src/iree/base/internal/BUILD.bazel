@@ -123,8 +123,8 @@ iree_runtime_cc_library(
         ":internal",
         ":path",
         ":synchronization",
-        "//build_tools:default_linkopts",
         "//build_tools:dl",
+        "//build_tools:pthreads",
         "//runtime/src/iree/base",
     ],
 )
@@ -273,7 +273,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":internal",
-        "//build_tools:default_linkopts",
+        "//build_tools:pthreads",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
     ],
@@ -372,8 +372,8 @@ iree_runtime_cc_library(
     deps = [
         ":internal",
         ":synchronization",
-        "//build_tools:default_linkopts",
         "//build_tools:dl",
+        "//build_tools:pthreads",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
     ],
