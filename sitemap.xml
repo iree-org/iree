@@ -86,12 +86,17 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-cuda-rocm/</loc>
+         <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-cuda/</loc>
          <lastmod>2023-10-17</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-metal/</loc>
+         <lastmod>2023-10-17</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-rocm/</loc>
          <lastmod>2023-10-17</lastmod>
          <changefreq>daily</changefreq>
     </url>
