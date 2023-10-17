@@ -60,4 +60,10 @@ def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
 }
 
+def LiftGenericToTransposeBatchMatmul:
+    Pass<"iree-global-opt-lift-generic-to-tranpose-batch-matmul", ""> {
+  let summary = "Convert linalg.generic ops to linalg.batch_matmul, possibly with transposes on operands/result.";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createLiftGenericToTransposeBatchMatmulPass()";
+}
+
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

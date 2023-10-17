@@ -44,6 +44,7 @@ iree_cc_library(
     "EraseUnusedLinalgOperands.cpp"
     "ExpandVectors.cpp"
     "FuseDequantizationMatmul.cpp"
+    "LiftGenericToTransposeBatchMatmul.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "Passes.cpp"
     "RemoveZeroExtentTensors.cpp"
