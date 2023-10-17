@@ -1275,26 +1275,23 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   //    memory cache behavior.
   // Both means we cannot use a too large workgroup size.
 
-  std::optional<int64_t> parallelSize = 1;
+  int64_t parallelSize = 1;
   for (int64_t dim : parallelDims) {
-    if (ShapedType::isDynamic(bounds[dim])) {
-      parallelSize = std::nullopt;
-      break;
-    }
-    *parallelSize *= bounds[dim];
+    if (!ShapedType::isDynamic(bounds[dim]))
+      parallelSize *= bounds[dim];
   }
   // Total parallel size that can fill the GPU with enough workgorups.
   // TODO: query from the target device; roughly 2x hardware compute unit.
   int parallelThreshold = 256;
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
-  while (parallelSize && *parallelSize > parallelThreshold &&
+  while (parallelSize > parallelThreshold &&
          (groupSize / 2) % subgroupSize == 0 &&
          reductionSize / (groupSize * vectorSize) < targetVectorCount) {
     // Use less subgroups per workgroup..
     groupSize /= 2;
     // in order to host more workgroups per hardware compute unit.
-    *parallelSize /= 2;
+    parallelSize /= 2;
   }
 
   // Current warp reduction pattern is a two step butterfly warp reduce.
