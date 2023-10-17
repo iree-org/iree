@@ -50,6 +50,158 @@ struct CollapseDimensionsPass
 };
 } // namespace
 
+// For the `operand` with `LinalgOp` producers and consumers get map of
+// producer loop -> consumer loop.
+static FailureOr<AffineMap>
+getProducerLoopToConsumerLoopsMap(OpOperand &operand) {
+  linalg::LinalgOp consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
+  if (!consumer) {
+    return failure();
+  }
+  linalg::LinalgOp producer =
+      dyn_cast_or_null<linalg::LinalgOp>(operand.get().getDefiningOp());
+  if (!producer) {
+    return failure();
+  }
+
+  AffineMap consumerOperandMap = consumer.getMatchingIndexingMap(&operand);
+  if (!consumerOperandMap.isPermutation()) {
+    return failure();
+  }
+
+  // Compute the producer loops -> consumer loops map. This allows you to find
+  // which producer loop maps to which consumer loop.
+  AffineMap inverseConsumerOperandMap =
+      inverseAndBroadcastProjectedPermutation(consumerOperandMap);
+  if (!inverseConsumerOperandMap ||
+      !inverseConsumerOperandMap.isProjectedPermutation(
+          /*allowZeroInResults=*/true)) {
+    return failure();
+  }
+
+  AffineMap producerResultMap =
+      producer.getIndexingMapMatchingResult(operand.get().cast<OpResult>());
+  if (!producerResultMap.isProjectedPermutation()) {
+    return failure();
+  }
+  AffineMap producerLoopToConsumerLoop =
+      inverseConsumerOperandMap.compose(producerResultMap);
+  return producerLoopToConsumerLoop;
+}
+
+// For a given list of collapsible loops in the consumer, get the
+// collapsible loops in the producer.
+static FailureOr<SmallVector<ReassociationIndices>> getCollapsedProducerLoops(
+    OpOperand &operand, ArrayRef<ReassociationIndices> collapsedConsumerLoops) {
+  FailureOr<AffineMap> producerLoopsToConsumerLoopsMap =
+      getProducerLoopToConsumerLoopsMap(operand);
+  if (failed(producerLoopsToConsumerLoopsMap) ||
+      !producerLoopsToConsumerLoopsMap->isProjectedPermutation(
+          /*allowZeroInResults=*/true)) {
+    return failure();
+  }
+
+  SmallVector<ReassociationIndices> collapsedProducerLoops;
+  for (ReassociationIndicesRef collapsedLoops : collapsedConsumerLoops) {
+    // It is assumed that it is valid to collapse the loops specified in
+    // `collapsibleConsumerLoops`, so either,
+    // 1) all the loops exist, and arecontiguous, in the result exprs of
+    // `consumerOperandMap`, or
+    // 2) all the loops are absent in the result exprs of `consumerOperandMap`.
+    if (llvm::all_of(collapsedLoops, [&](int64_t loopDim) {
+          return producerLoopsToConsumerLoopsMap->getResult(loopDim)
+              .isa<AffineConstantExpr>();
+        })) {
+      continue;
+    }
+    ReassociationIndices producerLoops =
+        llvm::map_to_vector(collapsedLoops, [&](int64_t loopDim) -> int64_t {
+          return producerLoopsToConsumerLoopsMap->getResult(loopDim)
+              .cast<AffineDimExpr>()
+              .getPosition();
+        });
+    collapsedProducerLoops.emplace_back(std::move(producerLoops));
+  }
+
+  linalg::LinalgOp producer = operand.get().getDefiningOp<linalg::LinalgOp>();
+  if (!producer) {
+    return failure();
+  }
+  if (collapsedProducerLoops.empty()) {
+    return SmallVector<ReassociationIndices>{};
+  }
+  if (!linalg::areDimSequencesPreserved(producer.getIndexingMapsArray(),
+                                        collapsedProducerLoops)) {
+    return failure();
+  }
+  return collapsedProducerLoops;
+}
+
+/// Walk the producer/consumer chains from the root op to check if the
+/// tensor.collapse_shape/tensor.expand_shape can be propagated across
+/// them.
+static bool
+isPropogatableCollapse(linalg::GenericOp genericOp,
+                       ArrayRef<ReassociationIndices> collapsibleLoops) {
+  struct CollapseInfo {
+    linalg::LinalgOp linalgOp;
+    SmallVector<ReassociationIndices> collapsibleLoops;
+  };
+
+  SmallVector<CollapseInfo> worklist;
+  llvm::DenseSet<CollapseInfo> visited;
+  worklist.emplace_back(genericOp, collapsibleLoops);
+  visited.insert(CollapseInfo{genericOp, llvm::to_vector(collapsibleLoops)});
+
+  auto addToWorklist = [&](linalg::LinalgOp linalgOp,
+                           SmallVector<ReassociationIndices> &&loops) {
+    CollapseInfo entry{linalgOp, llvm::to_vector(loops)};
+    visited.insert(entry);
+    worklist.emplace_back(std::move(entry));
+  };
+
+  while (!worklist.empty()) {
+    CollapseInfo current = worklist.pop_back_val();
+
+    for (OpOperand &operand : current.linalgOp->getOpOperands()) {
+
+      Operation *producer = operand.get().getDefiningOp();
+      // If there is no defining Op, or definingOp is outside the surrounding
+      // dispatch op, then the tensor.collapse_shape does not need to be
+      // propagated more.
+      if (!producer || producer->getParentOp() != genericOp->getParentOp()) {
+        continue;
+      }
+
+      bool checkProducer =
+          TypeSwitch<Operation *, bool>(producer)
+              .Case<tensor::EmptyOp>([](auto producerOp) { return true; })
+              .Case<linalg::FillOp>([&](auto fillOp) {
+                addToWorklist(fillOp, std::move(current.collapsibleLoops));
+                return true;
+              })
+              .Case<linalg::GenericOp>([&](auto genericOp) {
+                FailureOr<SmallVector<ReassociationIndices>>
+                    collapsedProducerLoops = getCollapsedProducerLoops(
+                        operand, current.collapsibleLoops);
+                if (failed(collapsedProducerLoops)) {
+                  return false;
+                }
+                if (!collapsedProducerLoops->empty()) {
+                  addToWorklist(genericOp, std::move(*collapsedProducerLoops));
+                }
+                return true;
+              })
+              .Default([](Operation *) { return false; });
+
+      if (!checkProducer) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 /// Searches the same sequence in all the affine maps and collapses these
 /// dimensions. It only applies these to "parallel" loops without mixing them
 /// with "reduction" types. It is expected that the `genericOp` has projected
@@ -149,6 +301,9 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
     llvm::dbgs() << "\n";
   });
 
+  if (!isPropogatableCollapse(genericOp, contiguousLoops)) {
+    return {};
+  }
   return contiguousLoops;
 }
 
@@ -179,68 +334,41 @@ static bool isEligibleForCollapse(linalg::GenericOp genericOp) {
   return true;
 }
 
-/// Traverses all the the Ops in DispatchRegionOps and finds linalg.generic Op
-/// without any producers.
-static FailureOr<linalg::GenericOp>
+/// Find the operation whose dimensions are collapsed. In theory, more than
+/// one generic op dimensions could be collapsed, but for now starting with a
+/// single operation
+static std::optional<linalg::GenericOp>
 findRootGenericOp(DispatchRegionOp regionOp) {
   if (!llvm::hasSingleElement(regionOp.getBody())) {
-    return failure();
+    return std::nullopt;
   }
 
-  // Check the yielded value is from a single `linalg.generic`.
-  auto returnOp =
-      cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
-  auto collapsibleOp = dyn_cast_or_null<linalg::GenericOp>(
-      returnOp->getOperand(0).getDefiningOp());
-  if (!collapsibleOp) {
-    return failure();
+  auto genericOps = llvm::map_to_vector(
+      regionOp.getBody().front().getOps<linalg::LinalgOp>(),
+      [](linalg::LinalgOp linalgOp) {
+        return dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
+      });
+  if (genericOps.empty()) {
+    return std::nullopt;
   }
-  for (auto returnVal : returnOp->getOperands().drop_front()) {
-    if (returnVal.getDefiningOp() != collapsibleOp.getOperation()) {
-      return failure();
+
+  // Abort if any linalg op is not a generic op. This will prevent the
+  // propagation of the reshapes to the edges.
+  if (llvm::any_of(genericOps, [](linalg::GenericOp genericOp) -> bool {
+        return !genericOp;
+      })) {
+    return std::nullopt;
+  }
+
+  // First check for ops with reduction iterator types.
+  for (auto genericOp : genericOps) {
+    if (genericOp.getNumReductionLoops() != 0) {
+      return genericOp;
     }
   }
 
-  // Check that the operands of the generic op are defined outside the dispatch.
-  for (OpOperand *inputOperands : collapsibleOp.getDpsInputOperands()) {
-    Operation *definingOp = inputOperands->get().getDefiningOp();
-    if (definingOp &&
-        definingOp->getParentOfType<DispatchRegionOp>() == regionOp) {
-      return failure();
-    }
-  }
-
-  // Check that the output is either a `tensor.empty` or a `linalg.fill` op by
-  // traversing the operations that define the `init` operands of the
-  // `collapsibleOp`.
-  std::deque<Operation *> worklist;
-  llvm::SmallDenseSet<Operation *> visited;
-  auto addDefiningOpToWorklist = [&](Value v) {
-    Operation *definingOp = v.getDefiningOp();
-    if (definingOp &&
-        definingOp->getParentOfType<DispatchRegionOp>() == regionOp &&
-        !visited.count(definingOp)) {
-      worklist.push_back(definingOp);
-      visited.insert(definingOp);
-    }
-  };
-  for (Value initOperand : collapsibleOp.getDpsInits()) {
-    addDefiningOpToWorklist(initOperand);
-  }
-
-  while (!worklist.empty()) {
-    Operation *op = worklist.front();
-    worklist.pop_front();
-    if (auto fillOp = dyn_cast<linalg::FillOp>(op)) {
-      addDefiningOpToWorklist(fillOp.getDpsInitOperand(0)->get());
-      continue;
-    }
-    if (isa<tensor::EmptyOp>(op)) {
-      continue;
-    }
-    return failure();
-  }
-  return collapsibleOp;
+  // Just return the last generic op.
+  return genericOps.back();
 }
 
 /// Hoist `tensor.collapse_shape` ops at the beginning of the `dispatchOp`
@@ -256,8 +384,8 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
   Block &body = dispatchOp.getBody().front();
   auto returnOp = cast<Flow::ReturnOp>(body.getTerminator());
 
-  // 1. Get the slice of operations within `dispatchOp` that produce the yielded
-  // value.
+  // 1. Get the slice of operations within `dispatchOp` that produce the
+  // yielded value.
   BackwardSliceOptions sliceOptions;
   sliceOptions.filter = [&](Operation *op) {
     return op->getParentOfType<DispatchRegionOp>();
@@ -290,9 +418,10 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
 
   // 4. From the yielded values find any that are produced by
   //    `tensor.expand_shape` operation and move them out of the dispatch. For
-  //    this a new `DispatchRegionOp` is needed. For values that are yielded and
-  //    produced from `tensor.expand_shape`, the type of the result changes. The
-  //    dynamic dimensions of the result type also need to be updated.
+  //    this a new `DispatchRegionOp` is needed. For values that are yielded
+  //    and produced from `tensor.expand_shape`, the type of the result
+  //    changes. The dynamic dimensions of the result type also need to be
+  //    updated.
   SmallVector<Type> newReturnTypes;
   SmallVector<Value> newDynamicDims;
   SmallVector<Value> newYieldVals;
@@ -319,8 +448,8 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
     ArrayRef<int64_t> expandedShape = expandShapeOp.getResultType().getShape();
 
     // 4c. Dynamic dims of the result shape is obtained by taking the static
-    //     shape + dynamic dims and collapsing them using the same reassociation
-    //     map as the `tensor.expand_shape`.
+    //     shape + dynamic dims and collapsing them using the same
+    //     reassociation map as the `tensor.expand_shape`.
     for (auto [index, shape] : llvm::enumerate(collapsedShapeType.getShape())) {
       int64_t staticCollapsedShape = 1;
       SmallVector<OpFoldResult> dynamicCollapsedDims;
@@ -359,8 +488,8 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
   auto newDispatchOp = rewriter.create<DispatchRegionOp>(
       loc, newReturnTypes, newDynamicDims, dispatchOp.getWorkload());
 
-  // 5a. Move the body over, but replace the `flow.return` to use the new yield
-  // values.
+  // 5a. Move the body over, but replace the `flow.return` to use the new
+  // yield values.
   Region &newBody = newDispatchOp.getBody();
   rewriter.inlineRegionBefore(dispatchOp.getBody(), newBody, newBody.begin());
   {
@@ -447,8 +576,8 @@ void CollapseDimensionsPass::runOnOperation() {
     llvm::dbgs() << "\n";
   });
 
-  // Move all the `tensor.collapse_shape` leafs  and `tensor.expand_shape` roots
-  // of the modified dispatches out of the dispatch.
+  // Move all the `tensor.collapse_shape` leafs  and `tensor.expand_shape`
+  // roots of the modified dispatches out of the dispatch.
   for (auto dispatchOp : modifiedDispatchOps) {
     Region &body = dispatchOp.getBody();
     assert(llvm::hasSingleElement(body) && "expected op with a single body");
