@@ -513,7 +513,8 @@ hal.executable @i4_dequant_matvec {
             affine_map<(d0, d1, d2) -> (d0, d1)>,
             affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
           iterator_types = ["parallel", "parallel", "parallel"]}
-        ins(%26, %27, %28 : tensor<11008x32x128xi4>, tensor<11008x32xf16>, tensor<11008x32xf16>) outs(%30 : tensor<11008x32x128xf16>) {
+        ins(%26, %27, %28 : tensor<11008x32x128xi4>, tensor<11008x32xf16>, tensor<11008x32xf16>)
+        outs(%30 : tensor<11008x32x128xf16>) {
         ^bb0(%in: i4, %in_0: f16, %in_1: f16, %out: f16):
           %35 = arith.extui %in : i4 to i32
           %36 = arith.uitofp %35 : i32 to f16
@@ -522,7 +523,10 @@ hal.executable @i4_dequant_matvec {
           linalg.yield %38 : f16
         } -> tensor<11008x32x128xf16>
         %34 = linalg.generic {
-          indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
+          indexing_maps = [
+            affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
+            affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
           iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
         ins(%29, %33 : tensor<?x32x128xf16>, tensor<11008x32x128xf16>) outs(%32 : tensor<?x11008xf16>) {
         ^bb0(%in: f16, %in_0: f16, %out: f16):
