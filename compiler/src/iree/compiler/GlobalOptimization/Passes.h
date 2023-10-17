@@ -54,17 +54,17 @@ std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createEraseUnusedLinalgOperands();
 
+// Materializes logical encodings to physical encodings if there is a single
+// device target.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createMaterializeHomogeneousEncodingsPass();
+
 // Removes tensors that have 0-extents.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveZeroExtentTensorsPass();
 
 // Sets encoding for tensors to allow tiled execution of operations.
 std::unique_ptr<Pass> createSetEncodingPass();
-
-// Materializes logical encodings to physical encodings if there is a single
-// device target.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createMaterializeHomogeneousEncodingsPass();
 
 void registerGlobalOptimizationPipeline();
 

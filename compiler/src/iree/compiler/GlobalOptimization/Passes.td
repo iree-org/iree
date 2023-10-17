@@ -27,6 +27,13 @@ def EraseUnusedLinalgOperands :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createEraseUnusedLinalgOperands()";
 }
 
+def MaterializeHomogeneousEncodings :
+  Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
+  let summary = "Materializes logical encodings to physical encodings if there is a single device target.";
+  let constructor =
+  "mlir::iree_compiler::GlobalOptimization::createMaterializeHomogeneousEncodingsPass()";
+}
+
 def RemoveZeroExtentTensors :
     InterfacePass<"iree-global-opt-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
   let summary = "Remove tensors that have 0-extents";
@@ -36,13 +43,6 @@ def RemoveZeroExtentTensors :
 def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
   let summary = "Introduce tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
-}
-
-def MaterializeHomogeneousEncodings :
-  Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
-  let summary = "Materializes logical encodings to physical encodings if there is a single device target.";
-  let constructor =
-  "mlir::iree_compiler::GlobalOptimization::createMaterializeHomogeneousEncodingsPass()";
 }
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES
