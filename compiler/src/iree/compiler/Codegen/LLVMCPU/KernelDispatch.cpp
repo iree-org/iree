@@ -2310,7 +2310,7 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     // Multi-lowering config works only if all the operations can share the same
     // distribution tile sizes.
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
-    for (auto [size, iterType] : llvm::zip_equal(distTileSizes, iterTypes)) {
+    for (auto [size, iterType] : llvm::zip(distTileSizes, iterTypes)) {
       if (size && iterType != utils::IteratorType::parallel)
         return;
     }
