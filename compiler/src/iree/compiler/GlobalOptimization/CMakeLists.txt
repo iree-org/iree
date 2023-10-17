@@ -53,6 +53,7 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgExtUtils
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils
     MLIRFuncDialect
