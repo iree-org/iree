@@ -566,6 +566,8 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                           IREE::VM::TargetOptions vmOptions,
                           IREE::VM::BytecodeTargetOptions bytecodeOptions,
                           llvm::raw_ostream &output) {
+  IREE_TRACE_FRAME_MARK();
+  IREE_TRACE_FRAME_MARK_BEGIN_NAMED("TranslateToBytecode");
   moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
 
   if (failed(canonicalizeModule(bytecodeOptions, moduleOp))) {
@@ -686,6 +688,7 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   }
   archiveWriter.reset();
 
+  IREE_TRACE_FRAME_MARK_END_NAMED("TranslateToBytecode");
   return success();
 }
 
