@@ -242,6 +242,9 @@ std::unique_ptr<Pass> createRaiseSpecialOps();
 // Create a pass to split reduction dimension.
 std::unique_ptr<Pass> createSplitReductionPass();
 
+// Create a pass to collapse reduction dimensions
+std::unique_ptr<Pass> createCollapseDimsPass();
+
 //===----------------------------------------------------------------------===//
 // Module Analysis and Finalization
 //===----------------------------------------------------------------------===//

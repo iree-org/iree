@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "cleanup_tensor_shapes.mlir"
     "clone_producers_into_dispatch_regions.mlir"
     "collapse_linalg_generic_on_tensors.mlir"
+    "collapse_reduction.mlir"
     "conv1x1_to_matmul.mlir"
     "convert_region_to_workgroups.mlir"
     "deduplicate_executables.mlir"
