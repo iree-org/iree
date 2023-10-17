@@ -442,11 +442,10 @@ def TransformDialectInterpreter :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
-    Option<"transformLibraryFileName",
-           "transform-library-file-name",
+    ListOption<"transformLibraryPaths",
+           "transform-library-paths",
            "std::string",
-           /*default=*/"\"\"",
-           "If non-empty, the name of the file containing definitions of "
+           "If non-empty, the paths to files containing definitions of "
            "external symbols referenced in the transform script. "
            "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",

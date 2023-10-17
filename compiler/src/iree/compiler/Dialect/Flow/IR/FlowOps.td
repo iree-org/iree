@@ -660,7 +660,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
     // TODO(benvanik): add compatibility and versioning attributes.
   );
 
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
@@ -676,9 +676,10 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
-
     ::mlir::ModuleOp getInnerModule() {
-      return *getBlock().getOps<::mlir::ModuleOp>().begin();
+      auto it = getBlock().getOps<::mlir::ModuleOp>();
+      if (it.empty()) return {};
+      return *it.begin();
     }
   }];
 

@@ -119,12 +119,11 @@ public:
           "Select the operation with 'transform.target_tag' attribute having "
           "the given value as container IR for top-level transform ops."),
       ::llvm::cl::init("")};
-  Pass::Option<std::string> transformLibraryFileName{
-      *this, "transform-library-file-name",
+  Pass::ListOption<std::string> transformLibraryPaths{
+      *this, "transform-library-paths", llvm::cl::ZeroOrMore,
       llvm::cl::desc(
           "Optional name of the file containing transform dialect symbol "
-          "definitions to be injected into the transform module."),
-      llvm::cl::init("")};
+          "definitions to be injected into the transform module.")};
 };
 
 struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {

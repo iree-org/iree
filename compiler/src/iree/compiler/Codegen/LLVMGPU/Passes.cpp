@@ -254,7 +254,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorCorePreparationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
@@ -321,7 +322,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorCorePreparationPass(GPUTensorCoreType::MMA_SYNC));
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());

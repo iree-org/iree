@@ -326,16 +326,17 @@ public:
     DenseMap<Attribute, SymbolRefAttr> entryPointRefReplacements;
     for (auto executableOp :
          getOperation().getBody()->getOps<IREE::Flow::ExecutableOp>()) {
-      // Rename each export op.
+      auto innerModuleOp = executableOp.getInnerModule();
+      if (!innerModuleOp)
+        continue;
       for (auto exportOp :
            executableOp.getBlock().getOps<ExecutableExportOp>()) {
         auto oldSymbolRefAttr = SymbolRefAttr::get(
             &getContext(), executableOp.getName(),
             {SymbolRefAttr::get(&getContext(), exportOp.getSymName())});
 
-        auto funcOp =
-            executableOp.getInnerModule().lookupSymbol<FunctionOpInterface>(
-                exportOp.getFunctionRef());
+        auto funcOp = innerModuleOp.lookupSymbol<FunctionOpInterface>(
+            exportOp.getFunctionRef());
         if (!funcOp)
           continue; // extern module, maybe
         std::string summary = summarizeDispatchRegion(funcOp.getFunctionBody());

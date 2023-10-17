@@ -114,6 +114,68 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<WorkgroupCountRegion>($body)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
+                                             Region &body) {
+  SmallVector<OpAsmParser::Argument> args;
+  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
+                                      /*allowType=*/true,
+                                      /*allowAttrs=*/true))) {
+    return failure();
+  }
+
+  // Return types must be 3 dimensions (workgroup count XYZ).
+  SmallVector<Type> returnTypes;
+  if (failed(parser.parseArrowTypeList(returnTypes))) {
+    return failure();
+  }
+  if (returnTypes.size() != 3 ||
+      !llvm::all_of(returnTypes, [](Type type) { return type.isIndex(); })) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "workgroup count region must return the XYZ dimension counts";
+  }
+
+  // Parse region contents.
+  if (failed(parser.parseRegion(body, args, /*enableNameShadowing=*/false))) {
+    return failure();
+  }
+
+  // Verify the return types match.
+  for (auto returnOp : body.getOps<IREE::HAL::ReturnOp>()) {
+    for (auto [resultType, returnType] :
+         llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
+      if (resultType != returnType) {
+        return returnOp.emitOpError()
+               << "operands do not match expected region return types";
+      }
+    }
+  }
+
+  return success();
+}
+
+static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
+                                      Region &body) {
+  if (body.empty())
+    return;
+  p << "(";
+  auto args = body.getArguments();
+  for (unsigned i = 0; i < args.size(); ++i) {
+    if (i > 0)
+      p << ", ";
+    p.printRegionArgument(args[i]);
+  }
+  p << ")";
+  Type indexType = IndexType::get(body.getContext());
+  p.printArrowTypeList(TypeRange{indexType, indexType, indexType});
+  p << " ";
+  p.printRegion(body, /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.ex.*
 //===----------------------------------------------------------------------===//
 
@@ -317,6 +379,136 @@ TensorBarrierOp::getTiedResultOperandIndex(unsigned resultIndex) {
 SmallVector<int64_t> TensorBarrierOp::getTiedResultOperandIndices() {
   size_t numSources = getSources().size();
   return llvm::to_vector(llvm::seq<int64_t>(0, numSources));
+}
+
+//===----------------------------------------------------------------------===//
+// hal.dispatch.extern
+//===----------------------------------------------------------------------===//
+
+void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
+                             ValueRange workload, TypeRange resultTypes,
+                             ValueRange resultDims, ValueRange arguments,
+                             ValueRange argumentDims,
+                             ArrayRef<int64_t> tiedOperands,
+                             ArrayRef<NamedAttribute> attributes) {
+  state.addTypes(resultTypes);
+  state.addOperands(workload);
+  state.addOperands(arguments);
+  state.addOperands(argumentDims);
+  state.addOperands(resultDims);
+  state.addAttributes(attributes);
+  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                     builder.getIndexArrayAttr(tiedOperands));
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
+                         static_cast<int32_t>(workload.size()),
+                         static_cast<int32_t>(arguments.size()),
+                         static_cast<int32_t>(argumentDims.size()),
+                         static_cast<int32_t>(resultDims.size()),
+                     }));
+
+  llvm::BitVector operandAliases(llvm::size(arguments), false);
+  llvm::BitVector resultAliases(llvm::size(resultTypes), false);
+  for (unsigned resultIndex = 0; resultIndex < tiedOperands.size();
+       ++resultIndex) {
+    int64_t tiedOperandIndex = tiedOperands[resultIndex];
+    if (tiedOperandIndex != IREE::Util::TiedOpInterface::kUntiedIndex) {
+      operandAliases[tiedOperandIndex] = true;
+      resultAliases[resultIndex] = true;
+    }
+  }
+
+  // NOTE: workgroup count region is empty; callers are expected to populate it.
+  state.addRegion();
+}
+
+// Verifies that |dynamicDims| contains the appropriate number of dims for all
+// of the dynamic dimensions in |values|.
+static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
+                                         ValueRange dynamicDims) {
+  unsigned requiredCount = 0;
+  for (auto value : values) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(value.getType())) {
+      requiredCount += shapedType.getNumDynamicDims();
+    }
+  }
+  if (dynamicDims.size() != requiredCount) {
+    return op->emitOpError()
+           << "value set has " << requiredCount
+           << " dynamic dimensions but only " << dynamicDims.size()
+           << " dimension values are attached";
+  }
+  return success();
+}
+
+static LogicalResult
+verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
+  // Verify the workload operands match the expected capture args.
+  auto regionArguments =
+      llvm::make_filter_range(region.getArgumentTypes(), [](Type type) {
+        return !type.isa<IREE::HAL::DeviceType>();
+      });
+  if (workload.size() != llvm::range_size(regionArguments)) {
+    return op->emitOpError()
+           << "workload operands and workgroup count args mismatch ("
+           << workload.size() << " vs " << llvm::range_size(regionArguments)
+           << ")";
+  }
+  for (auto [index, values] :
+       llvm::enumerate(llvm::zip_equal(workload, regionArguments))) {
+    auto [workloadValue, capturedType] = values;
+    if (workloadValue.getType() != capturedType) {
+      return op->emitOpError()
+             << "workload value " << index << " type mismatch; operand is "
+             << workloadValue.getType() << " but region captures "
+             << capturedType;
+    }
+  }
+  return success();
+}
+
+LogicalResult DispatchExternOp::verify() {
+  Operation *op = getOperation();
+
+  if (failed(verifyOpDynamicDims(getOperation(), getArguments(),
+                                 getArgumentDims())) ||
+      failed(
+          verifyOpDynamicDims(getOperation(), getResults(), getResultDims()))) {
+    return failure();
+  }
+
+  auto verifyIOType = [&](Type type) -> LogicalResult {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+      if (shapedType.getElementType().isIndex()) {
+        return op->emitOpError() << "I/O type " << type
+                                 << " is invalid: index types must not cross "
+                                    "the dispatch boundary";
+      }
+    }
+    return success();
+  };
+  for (auto type : getOperandTypes()) {
+    if (failed(verifyIOType(type)))
+      return failure();
+  }
+  for (auto type : getResultTypes()) {
+    if (failed(verifyIOType(type)))
+      return failure();
+  }
+
+  if (failed(
+          verifyWorkgroupCountRegion(op, getWorkload(), getWorkgroupCount()))) {
+    return failure();
+  }
+
+  return success();
+}
+
+std::pair<unsigned, unsigned>
+DispatchExternOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(1);
 }
 
 //===----------------------------------------------------------------------===//

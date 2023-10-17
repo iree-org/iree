@@ -374,9 +374,15 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
         createGenericVectorizationPass(options));
   }
 
+  // With subview ops, vector hoisting won't kick in. So fold memref subview ops
+  // before performing vector unrolling and hoisting.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+
   // Vectorize to cooperative ops.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVVectorizeToCooperativeOpsPass());
+  nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createHoistRedundantVectorTransfersPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -391,10 +397,6 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
   // forwarding, shape casting and casting op cancelling.
   nestedModulePM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
       /*flatten=*/false, /*dropUnitDims=*/false));
-
-  // Fold subview ops is reqiured for converting vector transfer ops into SPIR-V
-  // cooperative ops in the next step.
-  nestedModulePM.addPass(memref::createFoldMemRefAliasOpsPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -466,19 +468,19 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
   nestedPM.addNestedPass<func::FuncOp>(createGPUReduceSharedMemoryBankConflicts(
       detail::bankConflictReductionPaddingBits));
 
-  addSPIRVVectorLoweringPasses(nestedPM);
+  // With subview ops, vector hoisting won't kick in. So fold memref subview ops
+  // before performing vector unrolling and hoisting.
+  nestedPM.addNestedPass<func::FuncOp>(memref::createFoldMemRefAliasOpsPass());
+
+  nestedPM.addNestedPass<func::FuncOp>(createSPIRVInitialVectorLoweringPass());
+  nestedPM.addPass(createCSEPass());
+  nestedPM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
+  nestedPM.addNestedPass<func::FuncOp>(createSPIRVFinalVectorLoweringPass());
+
   nestedPM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedPM.addPass(createCanonicalizerPass());
   nestedPM.addPass(createCSEPass());
-  // After vectorization and some basic cleanup, optimize vector transfer ops.
-  // Here we won't have large n-D vectors being put as loop carried values due
-  // to hoisting. Because this is before folding all memref subview ops away, we
-  // still have subview ops using the same indices, which allows for transfer
-  // read/write forwarding.
-  nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
-      /*flatten=*/false, /*dropUnitDims=*/false));
-
-  nestedPM.addNestedPass<func::FuncOp>(memref::createFoldMemRefAliasOpsPass());
   nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
       /*flatten=*/false, /*dropUnitDims=*/false));
 

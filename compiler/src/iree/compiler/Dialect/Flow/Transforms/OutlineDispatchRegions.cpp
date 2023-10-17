@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -25,11 +26,15 @@ namespace IREE {
 namespace Flow {
 namespace {
 
+//===----------------------------------------------------------------------===//
+// flow.dispatch.workgroups
+//===----------------------------------------------------------------------===//
+
 // Creates a flow.executable out of a set of functions, pulling in all other
 // functions reachable by the provided functions.
 static ExecutableOp createExecutable(Location loc, StringRef executableName,
                                      ArrayRef<mlir::func::FuncOp> funcOps,
-                                     ModuleOp parentModuleOp) {
+                                     mlir::ModuleOp parentModuleOp) {
   assert(!funcOps.empty() && "must have at least one entry function");
 
   // Create the executable that will contain the outlined region.
@@ -58,29 +63,29 @@ static ExecutableOp createExecutable(Location loc, StringRef executableName,
 }
 
 // Converts a dispatch region op into a dispatch op to the outlined region.
-static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
-                                         ExecutableOp executableOp,
-                                         ExecutableExportOp exportOp) {
+static LogicalResult convertDispatchWorkgroupsToDispatchOp(
+    IREE::Flow::DispatchWorkgroupsOp dispatchWorkgroupsOp,
+    IREE::Flow::ExecutableOp executableOp,
+    IREE::Flow::ExecutableExportOp exportOp) {
   // Insert at the same place as the original region.
-  OpBuilder builder(regionOp);
+  OpBuilder builder(dispatchWorkgroupsOp);
 
   // Create the dispatch op to the executable function.
   // Note that we copy the tied operand indices from the workgroups op - it
   // lines up 1:1 with the dispatch once we've outlined things.
-  auto dispatchOp = builder.create<DispatchOp>(
-      regionOp.getLoc(), exportOp, regionOp.getWorkload(),
-      regionOp.getResultTypes(), regionOp.getResultDims(),
-      regionOp.getArguments(), regionOp.getArgumentDims(),
-      regionOp.getTiedOperandsAttr());
-  dispatchOp->setDialectAttrs(regionOp->getDialectAttrs());
+  auto dispatchOp = builder.create<IREE::Flow::DispatchOp>(
+      dispatchWorkgroupsOp.getLoc(), exportOp,
+      dispatchWorkgroupsOp.getWorkload(), dispatchWorkgroupsOp.getResultTypes(),
+      dispatchWorkgroupsOp.getResultDims(), dispatchWorkgroupsOp.getArguments(),
+      dispatchWorkgroupsOp.getArgumentDims(),
+      dispatchWorkgroupsOp.getTiedOperandsAttr());
+  dispatchOp->setDialectAttrs(dispatchWorkgroupsOp->getDialectAttrs());
 
   // Replace uses of the existing results with the new results.
-  for (int i = 0; i < regionOp.getNumResults(); ++i) {
-    regionOp.getResult(i).replaceAllUsesWith(dispatchOp.getResult(i));
+  for (int i = 0; i < dispatchWorkgroupsOp.getNumResults(); ++i) {
+    dispatchWorkgroupsOp.getResult(i).replaceAllUsesWith(
+        dispatchOp.getResult(i));
   }
-
-  // Erase original region.
-  regionOp.erase();
 
   return success();
 }
@@ -113,39 +118,110 @@ createWorkgroupFunc(Location loc, StringRef functionName, Region &region) {
 
 // Outlines a dispatch region into a flow.executable and replaces the region op
 // with a dispatch to that outlined executable.
-static LogicalResult
-outlineDispatchWorkgroupsOp(std::string executableOpName,
-                            std::string exportOpName,
-                            DispatchWorkgroupsOp regionOp) {
+static LogicalResult outlineDispatchWorkgroupsOp(
+    std::string name, IREE::Flow::DispatchWorkgroupsOp dispatchWorkgroupsOp) {
   // Convert the region to a free-floating function.
-  auto workgroupFuncOp = createWorkgroupFunc(regionOp.getLoc(), exportOpName,
-                                             regionOp.getWorkgroupBody());
+  auto workgroupFuncOp =
+      createWorkgroupFunc(dispatchWorkgroupsOp.getLoc(), name,
+                          dispatchWorkgroupsOp.getWorkgroupBody());
   if (!workgroupFuncOp) {
     return failure();
   }
 
   // Create the executable with the region cloned into it.
-  auto parentFuncOp = regionOp->getParentOfType<FunctionOpInterface>();
+  auto parentFuncOp =
+      dispatchWorkgroupsOp->getParentOfType<FunctionOpInterface>();
   auto executableOp =
-      createExecutable(regionOp.getLoc(), executableOpName, {workgroupFuncOp},
+      createExecutable(dispatchWorkgroupsOp.getLoc(), name, {workgroupFuncOp},
                        parentFuncOp->getParentOfType<mlir::ModuleOp>());
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
 
   // Add an export pointing at the entry point function.
   OpBuilder builder(executableOp.getBody());
-  auto exportOp = builder.create<ExecutableExportOp>(
-      regionOp.getLoc(), workgroupFuncOp.getName(),
+  auto exportOp = builder.create<IREE::Flow::ExecutableExportOp>(
+      dispatchWorkgroupsOp.getLoc(), workgroupFuncOp.getName(),
       SymbolRefAttr::get(workgroupFuncOp));
+  exportOp->setDialectAttrs(dispatchWorkgroupsOp->getDialectAttrs());
 
   // Move over the workgroup count region, if present.
-  if (!regionOp.getWorkgroupCount().empty()) {
-    exportOp.getWorkgroupCount().takeBody(regionOp.getWorkgroupCount());
+  if (!dispatchWorkgroupsOp.getWorkgroupCount().empty()) {
+    exportOp.getWorkgroupCount().takeBody(
+        dispatchWorkgroupsOp.getWorkgroupCount());
   }
-  exportOp->setDialectAttrs(regionOp->getDialectAttrs());
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
-  return convertToDispatchOp(regionOp, executableOp, exportOp);
+  return convertDispatchWorkgroupsToDispatchOp(dispatchWorkgroupsOp,
+                                               executableOp, exportOp);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.dispatch.extern
+//===----------------------------------------------------------------------===//
+
+// Converts a dispatch region op into a dispatch op to the outlined region.
+static LogicalResult
+convertDispatchExternToDispatchOp(IREE::HAL::DispatchExternOp dispatchExternOp,
+                                  IREE::Flow::ExecutableOp executableOp,
+                                  IREE::Flow::ExecutableExportOp exportOp) {
+  // Insert at the same place as the original region.
+  OpBuilder builder(dispatchExternOp);
+
+  // Create the dispatch op to the executable function.
+  // Note that we copy the tied operand indices from the workgroups op - it
+  // lines up 1:1 with the dispatch once we've outlined things.
+  auto dispatchOp = builder.create<IREE::Flow::DispatchOp>(
+      dispatchExternOp.getLoc(), exportOp, dispatchExternOp.getWorkload(),
+      dispatchExternOp.getResultTypes(), dispatchExternOp.getResultDims(),
+      dispatchExternOp.getArguments(), dispatchExternOp.getArgumentDims(),
+      dispatchExternOp.getTiedOperandsAttr());
+  dispatchOp->setDialectAttrs(dispatchExternOp->getDialectAttrs());
+  if (auto bindingsAttr = dispatchExternOp.getBindingsAttr()) {
+    dispatchOp->setAttr("hal.interface.bindings", bindingsAttr);
+  }
+
+  // Replace uses of the existing results with the new results.
+  for (int i = 0; i < dispatchExternOp.getNumResults(); ++i) {
+    dispatchExternOp.getResult(i).replaceAllUsesWith(dispatchOp.getResult(i));
+  }
+
+  return success();
+}
+
+// Outlines a dispatch region into a flow.executable and replaces the region op
+// with a dispatch to that outlined executable.
+static LogicalResult
+outlineDispatchExternOp(std::string name,
+                        IREE::HAL::DispatchExternOp dispatchExternOp) {
+  // Create the executable that will contain the outlined region.
+  // NOTE: this will get uniquified if we have multiple in the same block.
+  auto parentFuncOp = dispatchExternOp->getParentOfType<FunctionOpInterface>();
+  auto parentModuleOp = parentFuncOp->getParentOfType<mlir::ModuleOp>();
+  OpBuilder parentModuleBuilder(&parentModuleOp.getBody()->back());
+  auto executableOp = parentModuleBuilder.create<IREE::Flow::ExecutableOp>(
+      dispatchExternOp.getLoc(), name);
+  executableOp.getOperation()->moveBefore(parentFuncOp);
+  executableOp.setPrivate();
+  executableOp->setAttr("hal.executable.objects",
+                        dispatchExternOp.getObjectsAttr());
+
+  // Add an export pointing at the entry point function.
+  OpBuilder builder(executableOp.getBody());
+  auto exportOp = builder.create<IREE::Flow::ExecutableExportOp>(
+      dispatchExternOp.getLoc(), dispatchExternOp.getExport(),
+      FlatSymbolRefAttr::get(builder.getContext(),
+                             dispatchExternOp.getExport()));
+  exportOp->setDialectAttrs(dispatchExternOp->getDialectAttrs());
+  exportOp->setAttr("hal.interface.layout", dispatchExternOp.getLayoutAttr());
+
+  // Move over the workgroup count region, if present.
+  if (!dispatchExternOp.getWorkgroupCount().empty()) {
+    exportOp.getWorkgroupCount().takeBody(dispatchExternOp.getWorkgroupCount());
+  }
+
+  // Finally convert the dispatch region into a dispatch to the outlined func.
+  return convertDispatchExternToDispatchOp(dispatchExternOp, executableOp,
+                                           exportOp);
 }
 
 } // namespace
@@ -154,41 +230,61 @@ class OutlineDispatchRegionsPass
     : public OutlineDispatchRegionsBase<OutlineDispatchRegionsPass> {
 public:
   OutlineDispatchRegionsPass() = default;
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Flow::FlowDialect>();
+  }
 
   void runOnOperation() override {
     // Convert each dispatch region into a flow.executable + dispatch op.
     int initializerCount = 0;
-    for (auto it :
-         llvm::enumerate(getOperation().getOps<FunctionOpInterface>())) {
-      FunctionOpInterface op = it.value();
-      Operation *operation = op;
-
-      // Generate a nice name if possible.
+    int funcLikeCount = 0;
+    for (auto funcOp : getOperation().getOps<FunctionOpInterface>()) {
+      // Generate a nice name if possible. All ops we outline in the same scope
+      // will have the same root name.
       std::string namePrefix;
-      if (auto funcOp = llvm::dyn_cast<mlir::func::FuncOp>(operation)) {
-        namePrefix = funcOp.getName().str();
-      } else if (llvm::isa<IREE::Util::InitializerOp>(operation)) {
+      if (isa<IREE::Util::InitializerOp>(funcOp)) {
         namePrefix =
             std::string("_initializer_") + std::to_string(initializerCount++);
       } else {
-        namePrefix =
-            std::string("_function_like_") + std::to_string(it.index());
-      }
-
-      llvm::SmallVector<DispatchWorkgroupsOp> dispatchWorkgroupsOps;
-      // Outline all of the dispatch regions ops in this function.
-      op.walk([&](DispatchWorkgroupsOp op) {
-        dispatchWorkgroupsOps.push_back(op);
-      });
-      for (int i = 0; i < dispatchWorkgroupsOps.size(); ++i) {
-        std::string executableOpName =
-            (namePrefix + "_dispatch_" + llvm::Twine(i)).str();
-        if (failed(outlineDispatchWorkgroupsOp(executableOpName,
-                                               executableOpName,
-                                               dispatchWorkgroupsOps[i]))) {
-          return signalPassFailure();
+        namePrefix = funcOp.getName().str();
+        if (namePrefix.empty()) {
+          namePrefix =
+              std::string("_func_like_") + std::to_string(funcLikeCount++);
         }
       }
+
+      // Outline all of the dispatch regions ops in this function.
+      SmallVector<Operation *> deadOps;
+      auto outlineOps = [&](Operation *op) {
+        return TypeSwitch<Operation *, WalkResult>(op)
+            .Case<IREE::Flow::DispatchWorkgroupsOp>(
+                [&](auto dispatchWorkgroupsOp) {
+                  if (failed(outlineDispatchWorkgroupsOp(
+                          (namePrefix + "_dispatch_" +
+                           llvm::Twine(deadOps.size()))
+                              .str(),
+                          dispatchWorkgroupsOp))) {
+                    return WalkResult::interrupt();
+                  }
+                  deadOps.push_back(op);
+                  return WalkResult::advance();
+                })
+            .Case<IREE::HAL::DispatchExternOp>([&](auto dispatchExternOp) {
+              if (failed(outlineDispatchExternOp(
+                      (namePrefix + "_dispatch_" + llvm::Twine(deadOps.size()))
+                          .str(),
+                      dispatchExternOp))) {
+                return WalkResult::interrupt();
+              }
+              deadOps.push_back(op);
+              return WalkResult::advance();
+            })
+            .Default(WalkResult::advance());
+      };
+      if (funcOp.walk(outlineOps).wasInterrupted())
+        return signalPassFailure();
+      for (auto *deadOp : deadOps)
+        deadOp->erase();
     }
   }
 };

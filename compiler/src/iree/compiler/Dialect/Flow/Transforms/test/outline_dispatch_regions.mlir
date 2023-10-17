@@ -1,4 +1,4 @@
-// RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-outline-dispatch-regions %s | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-outline-dispatch-regions --mlir-print-local-scope %s | FileCheck %s
 
 //      CHECK: flow.executable private @staticShapeDispatch_dispatch_0
 // CHECK-NEXT:   flow.executable.export public @staticShapeDispatch_dispatch_0
@@ -175,4 +175,59 @@ func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
     flow.return %x_capture, %y_capture, %z : index, index, index
   }
   return %0 : tensor<4xi32>
+}
+
+// -----
+
+//      CHECK: flow.executable private @dispatchExtern_dispatch_0
+// CHECK-NEXT:   flow.executable.export public @main
+// CHECK-SAME:     workgroups(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
+// CHECK-NEXT:       %ok, %value = hal.device.query<%arg0 : !hal.device> key("some" :: "value") : i1, i32
+// CHECK-NEXT:       %0 = arith.index_cast %value : i32 to index
+// CHECK-NEXT:       hal.return %arg1, %arg2, %0 : index, index, index
+// CHECK-NEXT:     } attributes {
+// CHECK-SAME:       hal.interface.layout = #hal.pipeline.layout<push_constants = 1, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
+// CHECK-SAME:     }
+
+// Demonstrates the full functionality of an extern dispatch op.
+// Note that some fields are optional.
+
+// CHECK-LABEL: func.func @dispatchExtern
+func.func @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %arg2: i32) -> tensor<8xi32> {
+  %x = arith.constant 100 : index
+  %y = arith.constant 50 : index
+  // Dispatch workgroups to the externally defined function "main" in the
+  // referenced object files.
+  // CHECK: %[[RESULT:.+]] = flow.dispatch @dispatchExtern_dispatch_0::@main[%c100, %c50](%arg0, %arg1, %arg2) {
+  // CHECK-SAME: hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>]
+  // CHECK-SAME: } : (tensor<4xi32>, tensor<8xi32>, i32) -> %arg1
+  %result = hal.dispatch.extern "main"[%x, %y](%arg0, %arg1, %arg2) : (tensor<4xi32>, tensor<8xi32>, i32) -> %arg1
+    // Must match the external definition.
+    layout(#hal.pipeline.layout<push_constants = 1, sets = [
+      <0, bindings = [
+          <0, storage_buffer, ReadOnly>,
+          <1, storage_buffer>
+      ]>
+    ]>)
+    // Optional, automatically inferred if omitted.
+    bindings([
+      #hal.interface.binding<0, 0>,
+      #hal.interface.binding<0, 1>
+    ])
+    // Can have object references for multiple targets or configurations.
+    objects(#hal.executable.objects<{
+      #hal.executable.target<"llvm-cpu", "a"> = [#hal.executable.object<{path = "a.o"}>],
+      #hal.executable.target<"llvm-cpu", "b"> = [#hal.executable.object<{path = "b.o"}>]
+    }>)
+    // Translates the workload (%x and %y captured above) into an XYZ workgroup
+    // count, optionally using device information.
+    count(%device: !hal.device, %x_capture: index, %y_capture: index) -> (index, index, index) {
+      // Shows how device queries can be used when computing the workgroup count.
+      // The device is the one used at runtime.
+      %ok, %z_i32 = hal.device.query<%device : !hal.device> key("some" :: "value") : i1, i32
+      %z = arith.index_cast %z_i32 : i32 to index
+      hal.return %x_capture, %y_capture, %z : index, index, index
+    }
+  // CHECK: return %[[RESULT]]
+  return %result : tensor<8xi32>
 }

@@ -94,18 +94,8 @@ chooseEncodingInfo(RankedTensorType tensorType) {
   auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
   switch (user) {
-  case EncodingUser::MATMUL_F32F32F32:
-  case EncodingUser::MATMUL_F16F16F32:
-  case EncodingUser::MATMUL_F16F16F16:
-  case EncodingUser::MATMUL_BF16BF16F32:
-  case EncodingUser::MATMUL_BF16BF16BF16:
-  case EncodingUser::MATMUL_I8I8I32:
-  case EncodingUser::BATCH_MATMUL_F32F32F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F16:
-  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
-  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
-  case EncodingUser::BATCH_MATMUL_I8I8I32:
+  case EncodingUser::MATMUL:
+  case EncodingUser::BATCH_MATMUL:
     return chooseEncodingInfoForMatmul(user, role, /*tileParams=*/{8, 4, 8});
   }
   llvm_unreachable("unhandled EncodingUser case");

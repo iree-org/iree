@@ -45,12 +45,6 @@ def CollapseDims :
   let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimsPass()";
 }
 
-def Convert1X1FilterConv2DToMatmul:
-    Pass<"iree-flow-convert-1x1-filter-conv2d-to-matmul", ""> {
-  let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvert1X1FilterConv2DToMatmulPass()";
-}
-
 def ConvertRegionToWorkgroups :
     Pass<"iree-flow-convert-region-to-workgroups", ""> {
   let summary = "Convert DispatchRegion ops to Workgroups ops.";
@@ -67,12 +61,6 @@ def DeduplicateExecutables :
     Pass<"iree-flow-deduplicate-executables", "mlir::ModuleOp"> {
   let summary = "Deduplicates executables that are identical";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDeduplicateExecutablesPass()";
-}
-
-def DetachElementwiseFromNamedOps :
-    Pass<"iree-flow-detach-elementwise-from-named-ops", ""> {
-  let summary = "Detaches elementwise ops from named Linalg ops";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDetachElementwiseFromNamedOpsPass()";
 }
 
 def FoldUnitExtentDims :
@@ -136,11 +124,10 @@ def DispatchWithTransformDialect :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
-    Option<"transformLibraryFileName",
-           "transform-library-file-name",
+    ListOption<"transformLibraryPaths",
+           "transform-library-paths",
            "std::string",
-           /*default=*/"\"\"",
-           "If non-empty, the name of the file containing definitions of "
+           "If non-empty, the paths to files containing definitions of "
            "external symbols referenced in the transform script. "
            "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
@@ -178,12 +165,6 @@ def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
             /*default=*/"true", "Print result types of operations">
   ];
   let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
-}
-
-def EraseUnusedLinalgOperands :
-    Pass<"iree-flow-erase-unused-linalg-operands", "mlir::ModuleOp"> {
-  let summary = "Erase unused linalg operand and remove dead code.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createEraseUnusedLinalgOperands()";
 }
 
 def ExpandTensorShapes :
@@ -294,17 +275,6 @@ def RaiseSpecialOps :
     Pass<"iree-flow-raise-special-ops", ""> {
   let summary = "raise special ops like softmax to the high level linalg.ext representation";
   let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
-}
-
-def RemoveZeroExtentTensors :
-    InterfacePass<"iree-flow-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
-  let summary = "Remove tensors that have 0-extents";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createRemoveZeroExtentTensorsPass()";
-}
-
-def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
-  let summary = "Introduce tensor encoding for compute operations";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createSetEncodingPass()";
 }
 
 def SplitReduction :

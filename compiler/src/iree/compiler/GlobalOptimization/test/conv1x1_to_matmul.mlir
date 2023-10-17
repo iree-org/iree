@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file -iree-flow-convert-1x1-filter-conv2d-to-matmul %s | FileCheck %s
+// RUN: iree-opt --split-input-file -iree-global-opt-convert-1x1-filter-conv2d-to-matmul %s | FileCheck %s
 
 func.func @nhwc_conv_2d(%input: tensor<1x4x5x2xf32>, %filter: tensor<1x1x2x7xf32>) -> tensor<1x4x5x7xf32> {
     %0 = tensor.empty() : tensor<1x4x5x7xf32>

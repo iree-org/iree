@@ -224,7 +224,6 @@ iree_compiler_cc_binary(
     ],
     tags = ["hostonly"],
     deps = [
-        "//build_tools:default_linkopts",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",

@@ -669,6 +669,10 @@ def HAL_InterfaceBindingAttr :
   }];
 }
 
+def HAL_InterfaceBindingArrayAttr :
+    TypedArrayAttrBase<HAL_InterfaceBindingAttr,
+                       "HAL binding array attribute">;
+
 //===----------------------------------------------------------------------===//
 // Device and executable target specification
 //===----------------------------------------------------------------------===//

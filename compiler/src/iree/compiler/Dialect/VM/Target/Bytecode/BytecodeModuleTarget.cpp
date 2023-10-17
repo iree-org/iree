@@ -566,6 +566,7 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                           IREE::VM::TargetOptions vmOptions,
                           IREE::VM::BytecodeTargetOptions bytecodeOptions,
                           llvm::raw_ostream &output) {
+  IREE_TRACE_SCOPE();
   moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
 
   if (failed(canonicalizeModule(bytecodeOptions, moduleOp))) {

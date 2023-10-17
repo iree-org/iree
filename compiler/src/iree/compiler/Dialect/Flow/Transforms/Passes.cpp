@@ -195,8 +195,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
         return createInitializeEmptyTensorsPass(clZeroFillEmptyTensors);
       });
 
-  // Module pass to outline the dispatch regions into their own functions
-  // wrapped in executables.
+  // Module pass to outline dispatch regions (and similar ops) into their own
+  // functions wrapped in executables.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   // Annotate executables based on their contents.

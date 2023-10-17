@@ -52,8 +52,9 @@ from the IREE root directory:
 ```
 
 !!! note
-    The prebuilt toolchain is built with Ubuntu 20.04 LTS. It requires glibc >=2.31
-    for your host machine.
+    The prebuilt toolchain is built with AlmaLinux release 8.8
+    [docker](https://quay.io/pypa/manylinux_2_28_x86_64)
+    It requires glibc >= 2.28 for your host machine.
 
 #### Support vector extension
 

@@ -245,16 +245,6 @@ CUDA_MODELS = [
     # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]
 
-CUDA_MODELS_LONG = (
-    RESNET50_TF_BATCHES
-    + BERT_LARGE_TF_BATCHES
-    + T5_LARGE_TF_BATCHES
-    + BERT_LARGE_TORCH_BATCHES
-    + BERT_LARGE_JAX_BATCHES
-    + RESNET50_JAX_BATCHES
-    + T5_LARGE_JAX_BATCHES
-)
-
 VULKAN_MODELS = [
     # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
     # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,

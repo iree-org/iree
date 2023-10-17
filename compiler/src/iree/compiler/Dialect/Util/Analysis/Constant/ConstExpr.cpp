@@ -25,12 +25,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
-static llvm::cl::opt<int64_t> clConstExprMaxSizeIncreaseThreshold(
-    "iree-util-const-expr-max-size-increase-threshold",
-    llvm::cl::desc("Maximum byte size increase allowed for constant expr "
-                   "hoisting policy to allow hoisting."),
-    llvm::cl::init(1024 * 1024));
-
 //===----------------------------------------------------------------------===//
 // ConstExprAnalysis
 //===----------------------------------------------------------------------===//
@@ -248,8 +242,9 @@ void ConstExprAnalysis::dump() const { print(llvm::errs()); }
 //===----------------------------------------------------------------------===//
 
 ConstExprHoistingPolicy::ConstExprHoistingPolicy(
-    const ConstExprAnalysis &analysis)
-    : analysis(analysis), decisions(analysis.allocedConstInfos.size()) {
+    const ConstExprAnalysis &analysis, int64_t threshold)
+    : analysis(analysis), constExprMaxSizeIncreaseThreshold(threshold),
+      decisions(analysis.allocedConstInfos.size()) {
   for (auto &it : analysis.allocedConstInfos) {
     decisions[it.get()] = {};
   }
@@ -320,7 +315,7 @@ void ConstExprHoistingPolicy::initialize() {
 }
 
 static bool doesHoistingIncreaseSizeSignificantly(
-    const ConstExprAnalysis::ConstValueInfo *info) {
+    const ConstExprAnalysis::ConstValueInfo *info, int64_t threshold) {
 
   int64_t inSize = 0;
   for (Value root : info->roots) {
@@ -354,7 +349,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
         getRoundedPhysicalStorageSize(elementCount, type.getElementType());
   }
 
-  return outSize > inSize + clConstExprMaxSizeIncreaseThreshold.getValue();
+  return outSize > inSize + threshold;
 }
 
 void ConstExprHoistingPolicy::makeInvariantDecision(
@@ -376,7 +371,8 @@ void ConstExprHoistingPolicy::makeInvariantDecision(
 
   // Check 4: Does hoisting this value significantly increase the size of the
   // module?
-  if (doesHoistingIncreaseSizeSignificantly(info)) {
+  if (doesHoistingIncreaseSizeSignificantly(
+          info, constExprMaxSizeIncreaseThreshold)) {
     return decision->disableHoist();
   }
 }

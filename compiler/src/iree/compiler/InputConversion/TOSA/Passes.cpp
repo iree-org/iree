@@ -49,7 +49,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
       iree_compiler::createTosaToLinalgExt());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
-  tosa::addTosaToLinalgPasses(passManager);
+  tosa::addTosaToLinalgPasses(passManager, TosaToLinalgOptions());
   passManager.addNestedPass<func::FuncOp>(
       iree_compiler::createConverti48Toi64());
 

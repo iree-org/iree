@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/PassDetail.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
@@ -14,8 +14,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace GlobalOptimization {
 
 namespace {
 
@@ -184,7 +183,6 @@ std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass() {
   return std::make_unique<Convert1X1FilterConv2DToMatmulPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
+} // namespace GlobalOptimization
 } // namespace iree_compiler
 } // namespace mlir

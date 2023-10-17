@@ -95,6 +95,20 @@ def llama2_7b_f16qi4_stripped_sm80_cuda_vmfb(llama2_7b_f16qi4_stripped_source):
 
 
 @pytest.fixture
+def llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb(llama2_7b_f16qi4_stripped_source):
+    return iree_compile(
+        llama2_7b_f16qi4_stripped_source,
+        "rdna3_rocm",
+        flags=COMMON_FLAGS
+        + [
+            "--iree-hal-target-backends=rocm",
+            "--iree-rocm-target-chip=gfx1100",
+            "--iree-rocm-link-bc=true",
+        ],
+    )
+
+
+@pytest.fixture
 def llama2_7b_f16qi4_sm80_cuda_vmfb(llama2_7b_f16qi4_source):
     return iree_compile(
         llama2_7b_f16qi4_source,
@@ -196,6 +210,29 @@ def test_step_a100_vulkan_stripped(llama2_7b_f16qi4_a100_vulkan_vmfb):
     iree_benchmark_module(
         llama2_7b_f16qi4_a100_vulkan_vmfb,
         device="vulkan",
+        function="second_vicuna_forward",
+        args=[
+            "--input=1x1xi64",
+        ]
+        + (["--input=1x32x1x128xf16"] * 64),
+    )
+
+
+@pytest.mark.presubmit
+@pytest.mark.unstable_linalg
+@pytest.mark.plat_rdna3_rocm
+def test_step_rdna3_rocm_stripped(llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb):
+    iree_benchmark_module(
+        llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb,
+        device="rocm",
+        function="first_vicuna_forward",
+        args=[
+            "--input=1x1xi64",
+        ],
+    )
+    iree_benchmark_module(
+        llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb,
+        device="rocm",
         function="second_vicuna_forward",
         args=[
             "--input=1x1xi64",
