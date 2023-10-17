@@ -168,10 +168,28 @@ void buildIREEPrecompileTransformPassPipeline(
       return; // early-exit
 
     if (compileFrom < IREEVMPipelinePhase::GlobalOptimization) { // late-entry
-      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimization");
+      // This pass pipeline recursively invokes the compiler if constEval is
+      // enabled. In that case, we have to be careful to not emit unbalanced
+      // trace frames:
+      //   begin 'GlobalOptimization'
+      //   begin 'Input'
+      //   end   'Input'
+      //   begin 'GlobalOptimization' <-- unbalanced! Use a different name.
+      //   end   'GlobalOptimization'
+      //   ...
+      //   end   'GlobalOptimization'
+      if (globalOptimizationOptions.constEval) {
+        IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimizationConst");
+      } else {
+        IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimization");
+      }
       GlobalOptimization::buildGlobalOptimizationPassPipeline(
           passManager, globalTransformOptions);
-      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
+      if (globalOptimizationOptions.constEval) {
+        IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimizationConst");
+      } else {
+        IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
+      }
     }
     if (compileTo == IREEVMPipelinePhase::GlobalOptimization)
       return; // early-exit
