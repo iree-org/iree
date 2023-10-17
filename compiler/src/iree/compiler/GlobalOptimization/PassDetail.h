@@ -8,6 +8,7 @@
 #define IREE_COMPILER_GLOBALOPTIMIZATION_PASSDETAIL_H_
 
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

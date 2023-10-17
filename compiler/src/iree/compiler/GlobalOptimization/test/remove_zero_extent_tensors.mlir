@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --allow-unregistered-dialect \
-// RUN:          --pass-pipeline="builtin.module(func.func(iree-flow-remove-zero-extent-tensors))" \
+// RUN:          --pass-pipeline="builtin.module(func.func(iree-global-opt-remove-zero-extent-tensors))" \
 // RUN:          %s | FileCheck %s
 
 func.func @zero_sized_operands(%arg0 : tensor<?x0xf32>, %arg1 : index) -> tensor<?x?xf32> {

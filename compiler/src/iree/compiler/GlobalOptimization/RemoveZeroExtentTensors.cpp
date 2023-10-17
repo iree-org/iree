@@ -4,17 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/PassDetail.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace GlobalOptimization {
 
 /// Check if a `t` is a `tensor` with zero extents.
 static std::optional<RankedTensorType> isZeroExtent(Type t) {
@@ -108,7 +108,6 @@ createRemoveZeroExtentTensorsPass() {
   return std::make_unique<RemoveZeroExtentTensorsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
+} // namespace GlobalOptimization
 } // namespace iree_compiler
 } // namespace mlir
