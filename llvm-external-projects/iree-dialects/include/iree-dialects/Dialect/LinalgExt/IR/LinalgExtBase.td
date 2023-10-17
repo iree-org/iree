@@ -25,7 +25,6 @@ def IREELinalgExt_Dialect : Dialect {
     A dialect designed for experimenting with non-structured operations that
     cannot be represented efficiently/directly by the Linalg dialect.
   }];
-  let hasCanonicalizer = 1;
   let useDefaultAttributePrinterParser = 1;
 }
 

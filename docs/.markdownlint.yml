@@ -53,6 +53,9 @@ no-inline-html: false
 no-duplicate-heading:
   siblings_only: true
 
+# Allow headers to end with punctuation for icons (e.g. `:icon-name:`)
+no-trailing-punctuation: false
+
 # Allow images w/o alt-text
 no-alt-text: false
 

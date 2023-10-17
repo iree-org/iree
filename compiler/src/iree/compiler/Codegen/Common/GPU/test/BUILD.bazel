@@ -24,7 +24,6 @@ iree_lit_test_suite(
             "gpu_pipeline.mlir",
             "gpu_tensor_alloc.mlir",
             "gpu_tensor_tile.mlir",
-            "gpu_vectorization.mlir",
             "gpu_workgroup_swizzle.mlir",
             "gpu_tile_reduction.mlir",
             "reduce_bank_conflicts.mlir",

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_dispatches.mlir"
     "capture_dispatch_dynamic_dims.mlir"
     "cleanup_numeric_narrowing.mlir"
     "cleanup_tensor_shapes.mlir"

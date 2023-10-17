@@ -199,6 +199,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // wrapped in executables.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
+  // Annotate executables based on their contents.
+  // This is optional but can provide useful information during compilation and
+  // runtime profiling/tracing.
+  passManager.addPass(IREE::Flow::createAnnotateDispatchesPass());
+
   // Trace/break dispatches by ordinal in the specified region. There is a
   // similar version of the pass run both before and after deduplication
   // depending on if the target is specified by ordinal or by symbol.

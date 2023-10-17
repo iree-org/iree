@@ -260,6 +260,8 @@ def prepare_installation():
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
             # TODO(scotttodd): include IREE_TARGET_BACKEND_WEBGPU here (and in env)
             get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
+            get_env_cmake_option("IREE_TARGET_BACKEND_ROCM", "ON"),
+            get_env_cmake_option("IREE_ENABLE_LLD", "OFF"),
         ]
         cmake_args.extend(get_cmake_version_info_args())
 

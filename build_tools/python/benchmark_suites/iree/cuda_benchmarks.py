@@ -94,15 +94,4 @@ class Linux_CUDA_Benchmarks(object):
             execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
             presets=[benchmark_presets.CUDA],
         )
-        large_module_configs = self._generate_configs(
-            model_groups.CUDA_MODELS_LONG,
-            self.SM_80_COMPILE_CONFIG,
-            execution_config=module_execution_configs.CUDA_CONFIG,
-            presets=[benchmark_presets.CUDA_LARGE],
-        )
-        return (
-            run_configs
-            + ubench_run_configs
-            + ubench_splitk_run_configs
-            + large_module_configs
-        )
+        return run_configs + ubench_run_configs + ubench_splitk_run_configs

@@ -48,6 +48,8 @@ NB_MODULE(_runtime, m) {
                                     &argc, &argv),
                    "Error parsing flags");
   });
+
+  m.def("disable_leak_checker", []() { py::set_leak_warnings(false); });
 }
 
 }  // namespace python

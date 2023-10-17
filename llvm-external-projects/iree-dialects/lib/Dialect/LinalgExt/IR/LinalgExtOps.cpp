@@ -2414,101 +2414,6 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 }
 
 //===----------------------------------------------------------------------===//
-// SoftmaxOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult SoftmaxOp::verify() {
-  Operation *op = getOperation();
-  auto inputType = input().getType().cast<ShapedType>();
-  auto outputType = output().getType().cast<ShapedType>();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  ArrayRef<int64_t> outputShape = outputType.getShape();
-  if (failed(verifyCompatibleShape(inputShape, outputShape))) {
-    return op->emitOpError("incompatible output shape");
-  }
-  int64_t inputRank = getInputOperandRank();
-  int64_t dimension = getDimension();
-  if ((dimension < 0) || (dimension >= inputRank)) {
-    return op->emitOpError("incorrect dimension specified");
-  }
-  return success();
-}
-
-SmallVector<Range> SoftmaxOp::getIterationDomain(OpBuilder &builder) {
-  int64_t operandRank = getInputOperandRank();
-  SmallVector<Range> loopBounds(operandRank);
-  Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = input();
-  for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
-    loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
-    loopBounds[dim].stride = one;
-  }
-  return loopBounds;
-}
-
-SmallVector<utils::IteratorType> SoftmaxOp::getLoopIteratorTypes() {
-  SmallVector<utils::IteratorType> iteratorTypes(getInputOperandRank(),
-                                                 utils::IteratorType::parallel);
-  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
-  return iteratorTypes;
-}
-
-FailureOr<TilingResult>
-SoftmaxOp::getTiledImplementation(OpBuilder &builder,
-                                  ArrayRef<OpFoldResult> offsets,
-                                  ArrayRef<OpFoldResult> sizes) {
-  int64_t rank = getInputOperandRank();
-  auto oneAttr = builder.getI64IntegerAttr(1);
-  SmallVector<OpFoldResult> strides(rank, oneAttr);
-  SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), input(), offsets, sizes, strides));
-  tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), getOutputs()[0], offsets, sizes, strides));
-
-  SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[1].getType());
-  }
-  Operation *tiledOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
-}
-
-LogicalResult SoftmaxOp::getResultTilePosition(
-    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
-    SmallVector<OpFoldResult> &resultSizes) {
-  if (resultNumber == 0) {
-    resultOffsets.assign(offsets.begin(), offsets.end());
-    resultSizes.assign(sizes.begin(), sizes.end());
-    return success();
-  }
-  return failure();
-}
-
-LogicalResult SoftmaxOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
-  return memref::foldMemRefCast(*this);
-}
-
-LogicalResult
-SoftmaxOp::reifyResultShapes(OpBuilder &b,
-                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  return cast<LinalgExtOp>(getOperation())
-      .reifyResultShapes(b, reifiedReturnShapes);
-}
-
-void SoftmaxOp::build(OpBuilder &builder, OperationState &state, Value source,
-                      Value output, int64_t dimension) {
-  build(builder, state, TypeRange({output.getType()}), ValueRange(source),
-        ValueRange(output), dimension);
-}
-
-//===----------------------------------------------------------------------===//
 // AttentionOp
 //===----------------------------------------------------------------------===//
 
@@ -2650,7 +2555,6 @@ DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
-DEFINE_OP_GET_EFFECTS(SoftmaxOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
 
 //===----------------------------------------------------------------------===//
@@ -2712,71 +2616,6 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
   reifiedReturnShapes.resize(1);
   reifiedReturnShapes[0] = getDims(builder, getLoc(), getSource());
   return success();
-}
-
-namespace {
-/// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
-/// changes.
-struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
-  using OpInterfaceRewritePattern<LinalgExtOp>::OpInterfaceRewritePattern;
-
-  LogicalResult matchAndRewrite(LinalgExtOp op,
-                                PatternRewriter &rewriter) const override {
-    // If no operand comes from a tensor::CastOp and can be folded then fail.
-    bool hasTensorCastOperand =
-        llvm::any_of(op->getOpOperands(), [&](OpOperand &opOperand) {
-          if (opOperand.get().isa<BlockArgument>())
-            return false;
-          auto castOp = opOperand.get().getDefiningOp<tensor::CastOp>();
-          return castOp && canFoldIntoConsumerOp(castOp);
-        });
-    if (!hasTensorCastOperand)
-      return failure();
-
-    SmallVector<Type, 4> newResultTypes;
-    newResultTypes.reserve(op->getNumResults());
-    SmallVector<Value, 4> newOperands;
-    newOperands.reserve(op->getNumOperands());
-    // Inputs may fold.
-    auto destinationStyleOp =
-        cast<DestinationStyleOpInterface>(op.getOperation());
-    for (OpOperand &opOperand : op->getOpOperands()) {
-      auto tensorCastOp = opOperand.get().getDefiningOp<tensor::CastOp>();
-      newOperands.push_back(canFoldIntoConsumerOp(tensorCastOp)
-                                ? tensorCastOp.getSource()
-                                : opOperand.get());
-      if (destinationStyleOp.isDpsInit(&opOperand)) {
-        newResultTypes.push_back(newOperands.back().getType());
-      }
-    }
-    // Clone op.
-    Operation *newOp = mlir::clone(rewriter, op, newResultTypes, newOperands);
-    SmallVector<Value, 4> replacements;
-    replacements.reserve(newOp->getNumResults());
-    for (auto result : llvm::zip(op->getResults(), newOp->getResults())) {
-      Value oldResult = std::get<0>(result);
-      Value newResult = std::get<1>(result);
-      if (newResult.getType() != oldResult.getType()) {
-        replacements.push_back(rewriter.create<tensor::CastOp>(
-            op->getLoc(), oldResult.getType(), newResult));
-      } else {
-        replacements.push_back(newResult);
-      }
-    }
-    rewriter.replaceOp(op, replacements);
-
-    return success();
-  }
-};
-} // namespace
-
-//===----------------------------------------------------------------------===//
-// LinalgExtDialect
-//===----------------------------------------------------------------------===//
-
-void IREELinalgExtDialect::getCanonicalizationPatterns(
-    RewritePatternSet &results) const {
-  results.add<FoldTensorCastOp>(getContext());
 }
 
 // clang-format off
