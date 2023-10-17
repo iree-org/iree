@@ -70,10 +70,8 @@ public:
   TraceFrameMarkBeginPass(llvm::StringRef name) { this->name = name; }
 
   void runOnOperation() override {
-    // Always mark the top level (unnamed) frame.
-    IREE_TRACE_FRAME_MARK();
-
     if (!name.empty()) {
+      IREE_TRACE_FRAME_MARK(); // Top level (unnamed) frame.
       IREE_TRACE_FRAME_MARK_BEGIN_NAMED(name.data());
     }
   }
