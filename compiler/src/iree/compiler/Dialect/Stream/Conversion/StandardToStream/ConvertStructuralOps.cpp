@@ -344,7 +344,7 @@ struct ScfForOpConversion : public OpConversionPattern<mlir::scf::ForOp> {
     }
 
     // Create a new call that takes the expanded input operands and returns the
-    // expanded output results. We can't directly replace the original call as
+    // expanded output results. We can't directly replace the original loop as
     // the result counts differ.
     auto forOp = rewriter.create<mlir::scf::ForOp>(
         op.getLoc(), adaptor.getLowerBound(), adaptor.getUpperBound(),
