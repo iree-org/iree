@@ -11,6 +11,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -24,8 +26,17 @@ class LiftGenericToTransposeBatchMatmul
 public:
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::GenericOp convOp,
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
+    llvm::dbgs() << "LiftGenericToTransposeBatchMatmul on " << genericOp << "\n\n\n";
+
+    FailureOr<linalg::ContractionDimensions> contractionDims = linalg::inferContractionDims(genericOp);
+    if (failed(contractionDims)) {
+      llvm::dbgs() << "failed to infer contraction dims\n";
+      return failure();
+    }
+    llvm::dbgs() << 
+
     return failure();
   }
 };
