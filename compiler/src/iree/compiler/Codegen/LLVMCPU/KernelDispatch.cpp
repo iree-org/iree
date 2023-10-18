@@ -2308,10 +2308,14 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   size_t maxLoopNums = 0;
   for (auto op : computeOps) {
     // Multi-lowering config works only if all the operations can share the same
-    // distribution tile sizes.
+    // distribution and parallel tile sizes from the root op.
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
-    for (auto [size, iterType] : llvm::zip(distTileSizes, iterTypes)) {
-      if (size && iterType != utils::IteratorType::parallel)
+    for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
+      if (idx >= parallelVecTileSizes.size())
+        break;
+      if (iterType == utils::IteratorType::parallel)
+        continue;
+      if (distTileSizes[idx] || parallelVecTileSizes[idx])
         return;
     }
     maxLoopNums = std::max(maxLoopNums, iterTypes.size());
@@ -2405,9 +2409,9 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                 if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
                   continue;
                 tileSizes[pos] = tileSizes[pos] / size;
-                if (!outerDimsPerm.empty())
-                  applyPermutationToVector(tileSizes, outerDimsPerm);
               }
+              if (!outerDimsPerm.empty())
+                applyPermutationToVector(tileSizes, outerDimsPerm);
             }
           })
           .Case<linalg::GenericOp>([&](auto genericOp) {
