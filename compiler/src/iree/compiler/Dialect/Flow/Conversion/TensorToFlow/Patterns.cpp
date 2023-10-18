@@ -183,6 +183,57 @@ struct ConvertTensorFromElementsPattern
   }
 };
 
+/// Populates given sizes array from type (for static sizes) and from
+/// the tensor (for dynamic sizes).
+static void sizesForTensor(OpBuilder &builder, SmallVectorImpl<Value> &sizes,
+                           Location loc, ShapedType stp, Value tensor) {
+  for (const auto &d : enumerate(stp.getShape())) {
+    Value dim;
+    if (d.value() == ShapedType::kDynamic)
+      dim = builder.create<tensor::DimOp>(loc, tensor, d.index());
+    else
+      dim = builder.create<arith::ConstantIndexOp>(loc, d.value());
+    sizes.push_back(dim);
+  }
+}
+
+/// Convert tensor.reshape ops into flow.tensor.reshape ops where possible.
+struct ConvertTensorReshape
+    : public OpRewritePattern<tensor::ReshapeOp> {
+  using OpRewritePattern<tensor::ReshapeOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::ReshapeOp op,
+                                PatternRewriter &rewriter) const override {
+      if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+        return failure();
+      }
+      auto loc = op.getLoc();
+      Value input = op.getSource();
+      ShapedType inputType = llvm::dyn_cast<ShapedType>(input.getType());
+      ShapedType resultType =
+          llvm::dyn_cast_if_present<ShapedType>(op.getResult().getType());
+      if (!inputType || !resultType || !inputType.hasRank() ||
+          !resultType.hasRank()) {
+        return rewriter.notifyMatchFailure(op, "not ranked shaped types");
+      }
+
+      SmallVector<Value> srcSizes;
+      sizesForTensor(rewriter, srcSizes, loc, inputType, input);
+
+      FailureOr<Value> output = tensor::getOrCreateDestination(rewriter, loc, op.getOperation()->getResult(0));
+      if (failed(output)) {
+        op.emitError() << "unable to get/create destination tensor";
+      }
+      Value outTensor = output.value();
+
+      SmallVector<Value> destSizes;
+      sizesForTensor(rewriter, destSizes, loc, resultType, outTensor);
+
+      rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, resultType, input, srcSizes, destSizes);
+      return success();
+  }
+};
+
 /// Converts linalg.tensor_reshape operations into flow.tensor.reshape
 /// operations.
 template <typename TensorReshapeOp>
