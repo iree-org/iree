@@ -236,6 +236,7 @@ iree_check_single_backend_test_suite(
     "vmvx"
   COMPILER_FLAGS
     "--iree-input-type=tosa"
+    "--iree-vmvx-enable-microkernels"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

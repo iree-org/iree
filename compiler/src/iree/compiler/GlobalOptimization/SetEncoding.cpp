@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
@@ -45,7 +46,7 @@ namespace GlobalOptimization {
 // Utility functions
 //===---------------------------------------------------------------------===//
 
-static bool isCPUOrVMVXBackendOrUnkown(Operation *moduleOp) {
+static bool isX86OrAArch64OrVMVXBackendOrUnkown(Operation *moduleOp) {
   auto targetsAttr = moduleOp->getAttrOfType<ArrayAttr>("hal.device.targets");
   if (!targetsAttr) {
     return true;
@@ -60,8 +61,13 @@ static bool isCPUOrVMVXBackendOrUnkown(Operation *moduleOp) {
     return false;
   }
   auto executableTarget = executableTargets[0];
-  return executableTarget.getBackend() == "llvm-cpu" ||
-         executableTarget.getBackend() == "vmvx";
+  if (executableTarget.getBackend() == "vmvx") {
+    return true;
+  }
+  if (executableTarget.getBackend() == "llvm-cpu") {
+    return isX86(executableTarget) || isAArch64(executableTarget);
+  }
+  return false;
 }
 
 /// Pads `value` enough for any actual tile sizes that could result from
@@ -167,6 +173,17 @@ static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
                                                 sizes, strides);
 }
 
+static bool isSupportedContractionTypes(Type lhs, Type rhs, Type out) {
+  if (out.isF32() || out.isF16() || out.isBF16()) {
+    return true;
+  }
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+      out.isSignlessInteger(32)) {
+    return true;
+  }
+  return false;
+}
+
 namespace {
 
 /// Rewrites the matmul op to work on tensors with encoding. Optionally
@@ -205,6 +222,10 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     Type outElemType = getElemType(origOut);
 
     if (!lhsElemType || !rhsElemType || !outElemType) {
+      return failure();
+    }
+
+    if (!isSupportedContractionTypes(lhsElemType, rhsElemType, outElemType)) {
       return failure();
     }
 
@@ -277,6 +298,9 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
     Type outElemType = getElemType(origOut);
 
     if (!lhsElemType || !rhsElemType || !outElemType) {
+      return failure();
+    }
+    if (!isSupportedContractionTypes(lhsElemType, rhsElemType, outElemType)) {
       return failure();
     }
 
@@ -352,7 +376,7 @@ struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
 } // namespace
 
 void SetEncodingPass::runOnOperation() {
-  if (!isCPUOrVMVXBackendOrUnkown(getOperation())) {
+  if (!isX86OrAArch64OrVMVXBackendOrUnkown(getOperation())) {
     LLVM_DEBUG(llvm::dbgs() << "only llvm-cpu and vmvx are supported, ignoring "
                                "other backends...\n");
     return;
