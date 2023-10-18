@@ -180,3 +180,19 @@ func.func @tensorUpdateDynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x4xf32>,
   %0 = flow.tensor.update %arg0, %arg1[%arg2, %arg3] : tensor<?x?xf32>{%c1, %c2} -> %arg1 as tensor<?x4xf32>{%c3}
   return %0 : tensor<?x4xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @tensorTrace
+//  CHECK-SAME: (%[[TENSOR0:.+]]: tensor<5xf32>, %[[TENSOR1:.+]]: tensor<?x3x?xi32>, %[[TENSOR1_DIM0:.+]]: index, %[[TENSOR1_DIM2:.+]]: index)
+func.func @tensorTrace(%tensor0: tensor<5xf32>, %tensor1: tensor<?x3x?xi32>, %tensor1_dim0: index, %tensor1_dim2: index) {
+  //      CHECK: flow.tensor.trace "FOOBAR" = [
+  // CHECK-SAME:   %[[TENSOR0]] : tensor<5xf32>,
+  // CHECK-SAME:   %[[TENSOR1]] : tensor<?x3x?xi32>{%[[TENSOR1_DIM0]], %[[TENSOR1_DIM2]]}
+  // CHECK-SAME: ]
+  flow.tensor.trace "FOOBAR" = [
+    %tensor0 : tensor<5xf32>,
+    %tensor1 : tensor<?x3x?xi32>{%tensor1_dim0, %tensor1_dim2}
+  ]
+  return
+}

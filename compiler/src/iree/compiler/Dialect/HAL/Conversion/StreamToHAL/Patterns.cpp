@@ -758,8 +758,22 @@ struct TensorTraceOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> bufferViews;
+    auto resourceEncodingDims = adaptor.getResourceEncodingDims();
+    for (auto [resource, resourceSize, resourceEncoding] : llvm::zip_equal(
+             adaptor.getResources(), adaptor.getResourceSizes(),
+             adaptor.getResourceEncodings().getAsRange<TypeAttr>())) {
+      int64_t dynamicDimCount =
+          cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims();
+      bufferViews.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
+          traceOp.getLoc(), rewriter.getType<IREE::HAL::BufferViewType>(),
+          resource, resourceEncoding,
+          resourceEncodingDims.take_front(dynamicDimCount), resourceSize,
+          /*affinity=*/IREE::Stream::AffinityAttr{}));
+      resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
+    }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewTraceOp>(
-        traceOp, traceOp.getKeyAttr(), adaptor.getOperands());
+        traceOp, traceOp.getKeyAttr(), bufferViews);
     return success();
   }
 };

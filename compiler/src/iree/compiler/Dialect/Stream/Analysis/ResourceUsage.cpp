@@ -591,6 +591,9 @@ private:
         .Case([&](IREE::Stream::TensorExportOp op) {
           removeAssumedBits(NOT_MUTATED | NOT_EXTERNAL);
         })
+        .Case([&](IREE::Stream::TensorTraceOp op) {
+          removeAssumedBits(NOT_STAGING_READ);
+        })
         .Case([&](IREE::Stream::AsyncCloneOp op) {
           removeAssumedBits(NOT_TRANSFER_READ);
           auto &resultUsage = solver.getElementFor<ValueResourceUsage>(

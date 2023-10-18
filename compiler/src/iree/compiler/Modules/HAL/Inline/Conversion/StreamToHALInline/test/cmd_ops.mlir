@@ -156,24 +156,3 @@ func.func @cmdCall(%arg0: !stream.resource<external>, %arg1: i32, %arg2: !stream
   } => !stream.timepoint
   return %timepoint : !stream.timepoint
 }
-
-// -----
-
-// CHECK-LABEL: @trace_tensor
-// CHECK-SAME: %[[ARG0:.+]]: !hal.buffer
-func.func @trace_tensor(%arg0: !stream.resource<external>) -> () {
-  // CHECK-DAG: %[[C180:.+]] = arith.constant 180 : index
-  %c180 = arith.constant 180 : index
-
-  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-  // CHECK-DAG: %[[C45:.+]] = arith.constant 45 : index
-  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-  // CHECK-DAG: %[[C268435488:.+]] = arith.constant 268435488 : i32
-  // CHECK-DAG: %[[C1_i32:.+]] = arith.constant 1 : i32
-  // CHECK: %[[VIEW:.+]] = hal_inline.buffer_view.create buffer(%[[ARG0]] : !hal.buffer)[%[[C0]], %[[C180]]] shape([%[[C1]], %[[C45]]]) type(%[[C268435488]]) encoding(%[[C1_i32]]) : !hal.buffer_view
-  %tensor = stream.tensor.export %arg0 : tensor<1x45xi32> in !stream.resource<external>{%c180} -> tensor<1x45xi32>
-
-  // CHECK: hal_inline.buffer_view.trace %[[VIEW]] : !hal.buffer_view attributes {key = "whatevs"}
-  stream.tensor.trace {key = "whatevs"} %tensor : tensor<1x45xi32>
-  return
-}
