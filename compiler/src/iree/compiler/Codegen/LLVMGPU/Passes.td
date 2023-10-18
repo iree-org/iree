@@ -65,10 +65,10 @@ def LLVMGPUSelectLoweringStrategy :
   let constructor = "mlir::iree_compiler::createLLVMGPUSelectLoweringStrategyPass()";
 }
 
-def LLVMGPUTensorCoreVectorization :
-    Pass<"iree-llvmgpu-tensorcore-vectorization", "func::FuncOp"> {
-  let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
-  let constructor = "mlir::iree_compiler::createLLVMGPUTensorCoreVectorizationPass()";
+def LLVMGPUTensorCorePreparation :
+    Pass<"iree-llvmgpu-tensorcore-preparation", "func::FuncOp"> {
+  let summary = "Pass to transform vector.contract to a form that can be lowered to GPU MMA ops";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTensorCorePreparationPass()";
 }
 
 def LLVMGPUTensorPad :

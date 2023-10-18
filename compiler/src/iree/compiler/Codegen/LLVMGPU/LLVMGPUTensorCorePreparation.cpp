@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
@@ -22,29 +20,13 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-codegen-gpu-tensorcore-vectorization"
-
-using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
-using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
+#define DEBUG_TYPE "iree-codegen-gpu-tensorcore-preparation"
 
 namespace mlir::iree_compiler {
 
 //====---------------------------------------------------------------------===//
-// Patterns for vectorization
+// Patterns for preparation
 //====---------------------------------------------------------------------===//
-
-static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  IREE::LinalgExt::LinalgTransformationFilter f(
-      StringAttr::get(patterns.getContext(), getVectorizeMarker()));
-  IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, vectorizationOptions, f);
-  patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), vectorizationOptions,
-      f.addOpFilter<linalg::ContractionOpInterface>());
-  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVectorReductionToContractPatterns(patterns);
-}
 
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
                                          bool useMmaSyncShape) {
@@ -66,10 +48,10 @@ static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 }
 
 namespace {
-struct LLVMGPUTensorCoreVectorizationPass
-    : public LLVMGPUTensorCoreVectorizationBase<
-          LLVMGPUTensorCoreVectorizationPass> {
-  LLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType)
+struct LLVMGPUTensorCorePreparationPass
+    : public LLVMGPUTensorCorePreparationBase<
+          LLVMGPUTensorCorePreparationPass> {
+  LLVMGPUTensorCorePreparationPass(GPUTensorCoreType tensorCoreType)
       : tensorCoreType(tensorCoreType) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
@@ -77,36 +59,13 @@ struct LLVMGPUTensorCoreVectorizationPass
   void runOnOperation() override {
     auto funcOp = getOperation();
     LLVM_DEBUG({
-      llvm::dbgs() << "LLVMGPUTensorCoreVectorizationPass runOnOperation():\n";
+      llvm::dbgs() << "LLVMGPUTensorCorePreparationPass runOnOperation():\n";
       funcOp->dump();
     });
 
     MLIRContext *context = &getContext();
     {
-      // Step 1(a). Vectorize (linalg to vector).
-      RewritePatternSet vectorizationPatterns(context);
-      populateVectorizationPatterns(vectorizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorizationPatterns)))) {
-        return signalPassFailure();
-      }
-      LLVM_DEBUG({
-        llvm::dbgs() << "\nAfter populateVectorizationPatterns:\n";
-        funcOp->dump();
-      });
-
-      // Step 1(b). Fold arithmetic extensions into vector contraction ops.
-      // Linalg to vector conversion introduces arithmetic extensions on the
-      // operands of vector contraction ops for mixed precision computation.
-      // This pattern folds the arithmetic extensions into the vector.contract.
-      RewritePatternSet foldArithExtPatterns(context);
-      vector::populateFoldArithExtensionPatterns(foldArithExtPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(foldArithExtPatterns)))) {
-        return signalPassFailure();
-      }
-
-      // Step 2. Fold consumer add ops into the contraction op itself.
+      // Step 1. Merge transpose into transfer_read ops.
       RewritePatternSet canonicalizationPatterns(context);
       vector::ContractionOp::getCanonicalizationPatterns(
           canonicalizationPatterns, context);
@@ -122,7 +81,7 @@ struct LLVMGPUTensorCoreVectorizationPass
         funcOp->dump();
       });
 
-      // Step 3. Prepare vector operations to be lowered to native tensor core
+      // Step 2. Prepare vector operations to be lowered to native tensor core
       // operations (nvgpu.mmasync, nvgpu.ldmatrix).
       if (tensorCoreType == GPUTensorCoreType::MMA_SYNC) {
         RewritePatternSet vectorContractPatterns(funcOp.getContext());
@@ -143,7 +102,7 @@ struct LLVMGPUTensorCoreVectorizationPass
       });
 
       bool useMmaSyncShape = tensorCoreType == GPUTensorCoreType::MMA_SYNC;
-      // Step 4. Break and unroll warp tile size to native math and load sizes.
+      // Step 3. Break and unroll warp tile size to native math and load sizes.
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns, useMmaSyncShape);
       if (failed(applyPatternsAndFoldGreedily(
@@ -163,8 +122,8 @@ private:
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType) {
-  return std::make_unique<LLVMGPUTensorCoreVectorizationPass>(tensorCoreType);
+createLLVMGPUTensorCorePreparationPass(GPUTensorCoreType tensorCoreType) {
+  return std::make_unique<LLVMGPUTensorCorePreparationPass>(tensorCoreType);
 }
 
 } // namespace mlir::iree_compiler
