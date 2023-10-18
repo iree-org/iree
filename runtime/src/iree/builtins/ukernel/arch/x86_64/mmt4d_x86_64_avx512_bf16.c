@@ -65,7 +65,6 @@ iree_uk_mmt4d_tile_bf16bf16f32_1x16x2_to_16x16x2_x86_64_avx512_bf16(
   for (iree_uk_int32_t k = 0; k < params->K; ++k) {
     __m512 rhs = _mm512_loadu_ps(rhs_ptr);
     rhs_ptr += 32;
-#pragma clang loop unroll(full)
     for (int i = 0; i < M0; ++i) {
       acc[i] = iree_mm512_dpbf16_ps_broadcast_rhs(acc[i], rhs, lhs_ptr + 2 * i);
     }
