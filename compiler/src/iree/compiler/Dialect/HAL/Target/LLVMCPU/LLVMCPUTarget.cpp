@@ -49,7 +49,7 @@ static llvm::cl::opt<bool> clEnableCPUMicrokernels(
     "iree-llvmcpu-enable-microkernels",
     llvm::cl::desc(
         "Enables microkernel lowering for llvmcpu backend (experimental)"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
     "iree-llvmcpu-native-vector-width-in-bytes",
