@@ -2108,7 +2108,7 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 static LogicalResult
 adjustTileSizesForPackOp(func::FuncOp entryPointFn, tensor::PackOp packOp,
                          SmallVector<int64_t> &distTileSizes,
-                         SmallVector<int64_t> &commonVecTileSizes) {
+                         SmallVector<int64_t> &parallelVecTileSizes) {
   // Align the tile sizes of the root op to the pack op's inner tile sizes, so
   // we can derive the outer tile sizes for pack ops later in
   // setLoweringConfigForComputeOps by dividing with inner tile sizes.
@@ -2119,9 +2119,8 @@ adjustTileSizesForPackOp(func::FuncOp entryPointFn, tensor::PackOp packOp,
                    [](int64_t size) { return ShapedType::isDynamic(size); })) {
     return failure();
   }
-
-  // Pack op has special requirements on vector tile sizes to achieve good
-  // performance. Override the vector tile sizes with pack op.
+  // Pack op requires special vector tile sizes to achieve good performance.
+  // Override the parallel vector tile sizes from pack op.
   auto vecTileSizes = getPackVectorTileSizes(entryPointFn, packOp);
   auto outerDimsPerm = packOp.getOuterDimsPerm();
   if (!outerDimsPerm.empty()) {
@@ -2135,20 +2134,21 @@ adjustTileSizesForPackOp(func::FuncOp entryPointFn, tensor::PackOp packOp,
   for (auto [pos, size] : llvm::enumerate(vecTileSizes)) {
     if (!size)
       continue;
-    if (!commonVecTileSizes[pos]) {
-      commonVecTileSizes[pos] = size;
+    if (!parallelVecTileSizes[pos]) {
+      parallelVecTileSizes[pos] = size;
       continue;
     }
     // If other ops already set a smaller tile size, don't override it to avoid
     // too large tile size on them.
-    commonVecTileSizes[pos] = std::min(commonVecTileSizes[pos], size);
+    parallelVecTileSizes[pos] = std::min(parallelVecTileSizes[pos], size);
   }
-
+  // Ensure tile sizes are aligned to the inner tile sizes.
   for (auto [pos, size] : llvm::zip_equal(innerDimsPos, innerTiles)) {
     if (distTileSizes[pos])
       distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
-    if (commonVecTileSizes[pos])
-      commonVecTileSizes[pos] = llvm::alignTo(commonVecTileSizes[pos], size);
+    if (parallelVecTileSizes[pos])
+      parallelVecTileSizes[pos] =
+          llvm::alignTo(parallelVecTileSizes[pos], size);
   }
   return success();
 }
@@ -2288,9 +2288,8 @@ adjustTileSizesForGenericOp(func::FuncOp entryPointFn,
 /// `rootOperation` sets the tile sizes for `d0` and the rest of dims in
 /// reduction. But it does not have tile sizes for the rest of dims in
 /// elementwise op and pack ops. This method sets the vectorization tile sizes
-/// for other compute ops. E.g., [[X, 0], [Y, 0], [0, 0], [0, 4]] for the
-/// elementwise operations and [[X, 0], [Y, 0], [0, 0], [0, 16]] for the pack
-/// op.
+/// for other compute ops. E.g., [[X, 0], [Y, 0], [0, 0], [0, 16]] for the
+/// elementwise operations and [[X, 0], [Y, 0], [0, 0], [0, 1]] for the pack op.
 static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                                            ArrayRef<Operation *> computeOps,
                                            Operation *rootOperation) {
@@ -2350,6 +2349,7 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     // Tile sizes have been initialized from rootOperation, so we skip it.
     if (op == rootOperation)
       continue;
+
     TypeSwitch<Operation *>(op)
         .Case<tensor::PackOp>([&](auto packOp) {
           if (failed(adjustTileSizesForPackOp(
