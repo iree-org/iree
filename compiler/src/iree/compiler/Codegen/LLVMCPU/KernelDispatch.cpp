@@ -1344,6 +1344,18 @@ static SmallVector<int64_t> getPackVectorTileSizes(func::FuncOp entryPointFn,
   if (hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
     tileSizes.back() = vectorSize;
   }
+
+  auto dimPos = op.getInnerDimsPos();
+  auto innerTiles = op.getStaticTiles();
+  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
+      continue;
+    tileSizes[pos] = std::max<int64_t>(tileSizes[pos] / size, 1);
+  }
+  auto outerDimsPerm = op.getOuterDimsPerm();
+  if (!outerDimsPerm.empty())
+    applyPermutationToVector(tileSizes, outerDimsPerm);
+
   return tileSizes;
 }
 
