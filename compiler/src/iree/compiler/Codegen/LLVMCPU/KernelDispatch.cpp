@@ -2361,6 +2361,9 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
         });
   }
 
+  LLVM_DEBUG(KD_DBGS() << "Parallel vector tile sizes: " << parallelVecTileSizes
+                       << "\n");
+
   // Split parallel vector tile sizes into common parts and op-specific parts.
   SmallVector<int64_t> commonVecTileSizes = parallelVecTileSizes;
   SmallVector<int64_t> innerVecTileSizes(maxLoopNums, 0);
@@ -2368,7 +2371,7 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
     for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
       if (iterType == utils::IteratorType::reduction) {
-        innerVecTileSizes[idx] = commonVecTileSizes[idx];
+        innerVecTileSizes[idx] = parallelVecTileSizes[idx];
         commonVecTileSizes[idx] = 0;
       }
     }
