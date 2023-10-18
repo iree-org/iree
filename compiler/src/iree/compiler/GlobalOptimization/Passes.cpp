@@ -73,8 +73,10 @@ void buildGlobalOptimizationPassPipeline(
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
     mainPassManager.addPass(createSetEncodingPass());
+    mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
+    mainPassManager.addPass(createCanonicalizerPass());
+    mainPassManager.addPass(createCSEPass());
   }
-  mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
@@ -87,6 +89,8 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(IREE::Util::createApplyPatternsPass());
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
   pipeline.addPass(IREE::Util::createIPOPass());
+  pipeline.addPass(createCanonicalizerPass());
+  pipeline.addPass(createCSEPass());
 
   if (transformOptions.options.constExprHoisting) {
     pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass(
