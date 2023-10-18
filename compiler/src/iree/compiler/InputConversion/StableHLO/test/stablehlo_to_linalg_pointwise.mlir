@@ -1242,11 +1242,11 @@ func.func @minf(%lhs: tensor<2x2xf32>, %rhs: tensor<2x2xf32>) -> tensor<2x2xf32>
 // CHECK: linalg.generic
 // CHECK-SAME: {someattr}
 // CHECK-NEXT: ^bb0(%[[LHS_IN:.*]]: f32, %[[RHS_IN:.*]]: f32, %{{.*}}: f32):
-// CHECK-NEXT:   %[[RESULT:.*]] = arith.minf %[[LHS_IN]], %[[RHS_IN]] : f32
+// CHECK-NEXT:   %[[RESULT:.*]] = arith.minimumf %[[LHS_IN]], %[[RHS_IN]] : f32
 // CHECK-NEXT:   linalg.yield %[[RESULT]] : f32
 
 // CHECK-PRIMITIVE: linalg.map
-// CHECK-PRIMITIVE: arith.minf
+// CHECK-PRIMITIVE: arith.minimumf
 
 // -----
 
@@ -1308,8 +1308,8 @@ func.func @clamp_static(%lb : tensor<4xf32>, %x : tensor<4xf32>, %ub : tensor<4x
   // CHECK: %[[INIT:.*]] = tensor.empty
   // CHECK: %[[RESULT:.*]] = linalg.generic {{.*}} ins(%[[LB]], %[[X]], %[[UB]] : tensor<4xf32>, tensor<4xf32>, tensor<4xf32>) outs(%[[INIT]] : tensor<4xf32>)
   // CHECK: ^bb0(%[[SCALAR_LB:.*]]: f32, %[[SCALAR_X:.*]]: f32, %[[SCALAR_UB:.*]]: f32, %{{.*}}: f32):
-  // CHECK:   %[[MAX:.*]] = arith.maxf %[[SCALAR_LB]], %[[SCALAR_X]] : f32
-  // CHECK:   %[[MIN:.*]] = arith.minf %[[MAX]], %[[SCALAR_UB]] : f32
+  // CHECK:   %[[MAX:.*]] = arith.maximumf %[[SCALAR_LB]], %[[SCALAR_X]] : f32
+  // CHECK:   %[[MIN:.*]] = arith.minimumf %[[MAX]], %[[SCALAR_UB]] : f32
   // CHECK:   linalg.yield %[[MIN]]
   // CHECK: } -> tensor<4xf32>
   // CHECK: return %[[RESULT]] : tensor<4xf32>
@@ -1324,8 +1324,8 @@ func.func @clamp_static(%lb : tensor<4xf32>, %x : tensor<4xf32>, %ub : tensor<4x
 // CHECK-PRIMITIVE: %[[INIT:.*]] = tensor.empty
 // CHECK-PRIMITIVE: %[[RESULT:.*]] = linalg.map ins(%[[LB]], %[[X]], %[[UB]] : tensor<4xf32>, tensor<4xf32>, tensor<4xf32>) outs(%[[INIT]] : tensor<4xf32>)
 // CHECK-PRIMITIVE: (%[[SCALAR_LB:.*]]: f32, %[[SCALAR_X:.*]]: f32, %[[SCALAR_UB:.*]]: f32)
-// CHECK-PRIMITIVE:   %[[MAX:.*]] = arith.maxf %[[SCALAR_LB]], %[[SCALAR_X]] : f32
-// CHECK-PRIMITIVE:   %[[MIN:.*]] = arith.minf %[[MAX]], %[[SCALAR_UB]] : f32
+// CHECK-PRIMITIVE:   %[[MAX:.*]] = arith.maximumf %[[SCALAR_LB]], %[[SCALAR_X]] : f32
+// CHECK-PRIMITIVE:   %[[MIN:.*]] = arith.minimumf %[[MAX]], %[[SCALAR_UB]] : f32
 // CHECK-PRIMITIVE:   linalg.yield %[[MIN]]
 // CHECK-PRIMITIVE: return %[[RESULT]] : tensor<4xf32>
 
@@ -1338,8 +1338,8 @@ func.func @clamp_dynamic(%lb : tensor<?xf32>, %x : tensor<?xf32>, %ub : tensor<?
   // CHECK: %[[INIT:.*]] = tensor.empty
   // CHECK: %[[RESULT:.*]] = linalg.generic {{.*}} ins(%[[LB]], %[[X]], %[[UB]] : tensor<?xf32>, tensor<?xf32>, tensor<?xf32>) outs(%[[INIT]] : tensor<?xf32>)
   // CHECK: ^bb0(%[[SCALAR_LB:.*]]: f32, %[[SCALAR_X:.*]]: f32, %[[SCALAR_UB:.*]]: f32, %{{.*}}: f32):
-  // CHECK:   %[[MAX:.*]] = arith.maxf %[[SCALAR_LB]], %[[SCALAR_X]] : f32
-  // CHECK:   %[[MIN:.*]] = arith.minf %[[MAX]], %[[SCALAR_UB]] : f32
+  // CHECK:   %[[MAX:.*]] = arith.maximumf %[[SCALAR_LB]], %[[SCALAR_X]] : f32
+  // CHECK:   %[[MIN:.*]] = arith.minimumf %[[MAX]], %[[SCALAR_UB]] : f32
   // CHECK:   linalg.yield %[[MIN]]
   // CHECK: } -> tensor<?xf32>
   // CHECK: return %[[RESULT]] : tensor<?xf32>
@@ -1386,8 +1386,8 @@ func.func @clamp_scalar(%lb : tensor<f32>, %x : tensor<?xf32>, %ub : tensor<f32>
 // CHECK-PRIMITIVE-DAG: %[[SCALAR_UB:.*]] = tensor.extract %[[UB]]
 // CHECK-PRIMITIVE: %[[RESULT:.*]] = linalg.map ins(%[[X]] : tensor<?xf32>) outs(%[[INIT]] : tensor<?xf32>)
 // CHECK-PRIMITIVE: (%[[SCALAR_X:.*]]: f32)
-// CHECK-PRIMITIVE:   %[[MAX:.*]] = arith.maxf %[[SCALAR_LB]], %[[SCALAR_X]] : f32
-// CHECK-PRIMITIVE:   %[[MIN:.*]] = arith.minf %[[MAX]], %[[SCALAR_UB]] : f32
+// CHECK-PRIMITIVE:   %[[MAX:.*]] = arith.maximumf %[[SCALAR_LB]], %[[SCALAR_X]] : f32
+// CHECK-PRIMITIVE:   %[[MIN:.*]] = arith.minimumf %[[MAX]], %[[SCALAR_UB]] : f32
 // CHECK-PRIMITIVE:   linalg.yield %[[MIN]]
 // CHECK-PRIMITIVE: return %[[RESULT]]
 

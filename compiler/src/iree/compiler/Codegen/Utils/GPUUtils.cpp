@@ -424,11 +424,13 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
   case vector::CombiningKind::OR:
   case vector::CombiningKind::XOR:
     return builder.getZeroAttr(type);
+  case vector::CombiningKind::MINIMUMF:
   case vector::CombiningKind::MINF: {
     auto posInfApFloat = APFloat::getInf(
         llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/false);
     return builder.getFloatAttr(type, posInfApFloat);
   }
+  case vector::CombiningKind::MAXIMUMF:
   case vector::CombiningKind::MAXF: {
     auto negInfApFloat = APFloat::getInf(
         llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/true);

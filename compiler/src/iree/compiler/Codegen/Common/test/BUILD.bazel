@@ -6,8 +6,8 @@
 
 # Tests for common transforms.
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -43,6 +43,7 @@ iree_lit_test_suite(
             "fold_tensor_extract_op.mlir",
             "forop_canonicalization.mlir",
             "hoist_statically_bound_allocations.mlir",
+            "hoist_unrolled_vector_extract_insert_slice.mlir",
             "iree_comprehensive_bufferize.mlir",
             "iree_expand_strided_metadata.mlir",
             "lower_ukernel_to_calls.mlir",
@@ -53,6 +54,7 @@ iree_lit_test_suite(
             "remove_dead_allocs.mlir",
             "remove_trivial_loops.mlir",
             "repeated_matcher_use.mlir",
+            "replace_slow_min_max_ops.mlir",
             "test_partitionable_loops_interface.mlir",
             "tile_and_distribute_to_workgroups.mlir",
             "transform_buffer_opt.mlir",

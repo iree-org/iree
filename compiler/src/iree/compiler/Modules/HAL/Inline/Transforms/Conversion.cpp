@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/Patterns.h"
+#include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/Conversion/UtilToHAL/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
@@ -46,11 +47,19 @@ public:
         mlir::func::FuncDialect, mlir::scf::SCFDialect,
         mlir::arith::ArithDialect, mlir::affine::AffineDialect>();
 
-    TypeConverter typeConverter;
+    SmallVector<const HALConversionDialectInterface *> conversionInterfaces;
+    for (auto *dialect : context->getLoadedDialects()) {
+      if (auto *conversionInterface =
+              dialect
+                  ->getRegisteredInterface<HALConversionDialectInterface>()) {
+        conversionInterfaces.emplace_back(conversionInterface);
+      }
+    }
+
+    HALTypeConverter typeConverter(conversionInterfaces);
     RewritePatternSet patterns(context);
 
     // Pass-through.
-    typeConverter.addConversion([](Type type) { return type; });
     typeConverter.addConversion([](IndexType type) { return type; });
     typeConverter.addConversion([](IntegerType type) { return type; });
     typeConverter.addConversion([](FloatType type) { return type; });

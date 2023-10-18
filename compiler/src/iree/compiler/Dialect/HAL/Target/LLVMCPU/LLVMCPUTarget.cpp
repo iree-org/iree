@@ -10,7 +10,6 @@
 #include <unordered_set>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -179,7 +178,6 @@ public:
     // clang-format off
     registry.insert<IREE::Codegen::IREECodegenDialect,
                     IREE::LinalgExt::IREELinalgExtDialect,
-                    linalg::transform::LinalgTransformDialect,
                     mlir::transform::TransformDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
@@ -352,6 +350,8 @@ public:
     for (auto exportOp : variantOp.getBlock().getOps<ExecutableExportOp>()) {
       // Find the matching function in the LLVM module.
       auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
+      if (!llvmFunc)
+        continue;
       llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
       llvmFunc->setDSOLocal(true);
 
@@ -659,7 +659,8 @@ public:
       // object file per library).
       std::string objectData;
       if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
-                                      llvm::CGFT_ObjectFile, &objectData))) {
+                                      llvm::CodeGenFileType::ObjectFile,
+                                      &objectData))) {
         return variantOp.emitError()
                << "failed to compile LLVM-IR module to an object file";
       }
@@ -676,7 +677,8 @@ public:
     if (!options.dumpIntermediatesPath.empty()) {
       std::string asmData;
       if (failed(runEmitObjFilePasses(targetMachine.get(), llvmModule.get(),
-                                      llvm::CGFT_AssemblyFile, &asmData))) {
+                                      llvm::CodeGenFileType::AssemblyFile,
+                                      &asmData))) {
         return variantOp.emitError()
                << "failed to compile LLVM-IR module to an assembly file";
       }

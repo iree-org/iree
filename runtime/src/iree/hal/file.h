@@ -13,6 +13,7 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/resource.h"
+#include "iree/io/file_handle.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,64 +32,11 @@ enum iree_hal_file_mode_bits_t {
 };
 typedef uint32_t iree_hal_file_mode_t;
 
-typedef void(IREE_API_PTR* iree_hal_file_release_fn_t)(void* user_data);
-
-// A callback issued when a file is released.
-typedef struct {
-  // Callback function pointer.
-  iree_hal_file_release_fn_t fn;
-  // User data passed to the callback function. Unowned.
-  void* user_data;
-} iree_hal_file_release_callback_t;
-
-// Returns a no-op file release callback that implies that no cleanup is
-// required.
-static inline iree_hal_file_release_callback_t
-iree_hal_file_release_callback_null(void) {
-  iree_hal_file_release_callback_t callback = {NULL, NULL};
-  return callback;
-}
-
-// Defines the type of an external file handle.
-// Each type may only be usable in a subset of implementations and platforms and
-// may even vary based on the runtime device properties or file instance.
-//
-// See the notes on each type for requirements; compatibility often requires
-// the handle to check and trying to import/export is the most reliable way to
-// check for support.
-typedef enum iree_hal_external_file_type_e {
-  IREE_HAL_EXTERNAL_FILE_TYPE_NONE = 0,
-
-  // A fixed-size range of host memory.
-  // An imported/exported file does not own a reference to the memory and the
-  // caller is responsible for ensuring the memory remains live for as long as
-  // the iree_hal_file_t referencing it.
-  IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION,
-
-  // TODO(benvanik): file descriptor, FILE*, HANDLE, etc.
-} iree_hal_external_file_type_t;
-
-// Flags for controlling iree_hal_external_file_t implementation details.
+// Flags for controlling imported file handle implementation details.
 enum iree_hal_external_file_flag_bits_t {
   IREE_HAL_EXTERNAL_FILE_FLAG_NONE = 0u,
 };
 typedef uint32_t iree_hal_external_file_flags_t;
-
-// Handle to a typed external file.
-// This is a non-owning reference and the underlying file contents must remain
-// valid for as long as the handle is in use. Some file types support internal
-// referencing counting but in general ownership remains with the caller.
-// See the type enum for more information.
-typedef struct iree_hal_external_file_t {
-  // Type of the resource used to interpret the handle.
-  iree_hal_external_file_type_t type;
-  // Flags indicating file compatibility.
-  iree_hal_external_file_flags_t flags;
-  union {
-    // IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION
-    iree_byte_span_t host_allocation;
-  } handle;
-} iree_hal_external_file_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_file_t
@@ -137,10 +85,8 @@ typedef struct iree_hal_file_t iree_hal_file_t;
 // of the external file handle.
 IREE_API_EXPORT iree_status_t iree_hal_file_import(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_memory_access_t access,
-    iree_hal_external_file_t* IREE_RESTRICT external_file,
-    iree_hal_file_release_callback_t release_callback,
-    iree_hal_file_t** out_file);
+    iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
+    iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file);
 
 // Retains the given |file| for the caller.
 IREE_API_EXPORT void iree_hal_file_retain(iree_hal_file_t* file);

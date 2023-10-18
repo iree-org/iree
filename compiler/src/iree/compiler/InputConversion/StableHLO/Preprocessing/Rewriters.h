@@ -24,7 +24,8 @@ void populateCanonicalizationPatterns(MLIRContext *context,
 /// Collection of rewrite patterns for lowering of StableHLO dot general
 /// operations.
 void populatePreprocessingDotGeneralToDotPatterns(MLIRContext *context,
-                                                  RewritePatternSet *patterns);
+                                                  RewritePatternSet *patterns,
+                                                  PatternBenefit benefit = 1);
 
 /// Collection of rewrite patterns for lowering of StableHLO einsum operations.
 void populatePreprocessingEinsumToDotGeneralPatterns(

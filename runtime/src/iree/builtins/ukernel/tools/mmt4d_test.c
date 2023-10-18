@@ -336,8 +336,11 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
 }
 
 static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
-                                    int K0, const char* cpu_features,
-                                    const char* code_path_suffix) {
+                                    int K0, const char* cpu_features) {
+  const char* code_path_suffix = "";
+  if (flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) {
+    code_path_suffix = " skipround";
+  }
   char types_str[32];
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(flags);
   iree_uk_type_triple_str(types_str, sizeof types_str, mmt4d_type);
@@ -352,15 +355,19 @@ static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
 
 static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
                                const char* cpu_features) {
-  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
+  // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
+  // narrow variants for handling these cases.
+  for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
+    iree_uk_test_mmt4d_impl(flags, narrowM0, N0, K0, cpu_features);
+  }
+  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features);
 }
 
 static void iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
     iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
-  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
-  iree_uk_test_mmt4d_impl(
-      flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS, M0, N0, K0,
-      cpu_features, " skipround");
+  iree_uk_test_mmt4d(flags, M0, N0, K0, cpu_features);
+  iree_uk_test_mmt4d(flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS, M0,
+                     N0, K0, cpu_features);
 }
 
 int main(int argc, char** argv) {
@@ -398,6 +405,8 @@ int main(int argc, char** argv) {
       IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
       IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 16, 16, 1, "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 16, 16, 2,
+                     "avx512_bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 4, 2, "");  // SSE2
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 2, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_base");

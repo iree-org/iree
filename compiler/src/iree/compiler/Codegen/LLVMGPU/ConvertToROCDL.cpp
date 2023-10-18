@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -93,6 +94,17 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+    {
+      // Convert arith::maximumf/minimumf ops on AMD gpus since the lowering
+      // is faulty for them.
+      // TODO: Remove this once the lowering in LLVM is fixed
+      // (https://github.com/llvm/llvm-project/issues/67815).
+      RewritePatternSet patterns(&getContext());
+      populateReplaceSlowMinMaxOpsPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }

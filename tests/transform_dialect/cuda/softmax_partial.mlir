@@ -42,7 +42,7 @@ func.func @softmax_partial() -> !out_tensor_t {
                        iterator_types = ["parallel", "parallel", "reduction"]}
   ins(%0 : !out_tensor_t) outs(%2 : !tmp_tensor_t) {
   ^bb0(%arg0: f32, %arg1: f32):
-    %8 = arith.maxf %arg0, %arg1 : f32
+    %8 = arith.maximumf %arg0, %arg1 : f32
     linalg.yield %8 : f32
   } -> !tmp_tensor_t
 

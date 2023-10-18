@@ -1,5 +1,4 @@
 add_mlir_library(IREELinalgTransformDialectPasses
-  ExpertExpansion.cpp
   TransformInterpreter.cpp
 
   DEPENDS

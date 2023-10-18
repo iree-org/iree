@@ -254,7 +254,14 @@ public:
     SmallVector<Type, 8> llvmInputTypes(
         argMapping.size(), LLVM::LLVMPointerType::get(rewriter.getContext()));
     funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-      auto llvmType = LLVM::LLVMPointerType::get(rewriter.getContext());
+      LLVM::LLVMPointerType llvmType;
+      if (auto memrefType = dyn_cast<BaseMemRefType>(subspanOp.getType())) {
+        unsigned addrSpace =
+            *getTypeConverter()->getMemRefAddressSpace(memrefType);
+        llvmType = LLVM::LLVMPointerType::get(rewriter.getContext(), addrSpace);
+      } else {
+        llvmType = LLVM::LLVMPointerType::get(rewriter.getContext());
+      }
       llvmInputTypes[argMapping[SetBinding(subspanOp.getSet(),
                                            subspanOp.getBinding())]] = llvmType;
     });

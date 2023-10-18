@@ -30,6 +30,7 @@ using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
 static constexpr StringLiteral kCudaTarget = "cuda";
+static constexpr StringLiteral kRocmTarget = "rocm";
 namespace mlir {
 namespace iree_compiler {
 llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
@@ -162,11 +163,19 @@ bool isCudaTarget(func::FuncOp entryPoint) {
   return false;
 }
 
-static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
+bool isRocmTarget(func::FuncOp entryPoint) {
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+    if (auto backend = targetAttr.getBackend()) {
+      return backend.getValue().str() == kRocmTarget;
+    }
+  }
+  return false;
+}
+
+static TargetInfo getCudaTargetInfo(func::FuncOp entryPoint) {
   TargetInfo info;
-  // TODO: fill out target info for other vendors.
-  if (!isCudaTarget(entryPoint))
-    return info;
   // All the cuda target are assumed to have warp support.
   info.hasWarpShuffle = true;
   StringRef targetName = getTargetArch(entryPoint);
@@ -186,6 +195,34 @@ static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
   if (smVersion >= 80) {
     info.hasTF32TensorCore = true;
     info.hasMmaSync = true;
+  }
+  return info;
+}
+
+// TODO: Plumb in WarpSize into TargetInfo for wave64 systems.
+static TargetInfo getRocmTargetInfo(func::FuncOp entryPoint) {
+  TargetInfo info;
+  StringRef targetName = getTargetArch(entryPoint);
+  // If no target name is set assume all the features are off.
+  if (targetName == "")
+    return info;
+  if (!targetName.starts_with("gfx")) {
+    entryPoint.emitError("unknown target name ") << targetName;
+    return info;
+  }
+  // Assumes all gfx has warp shuffle.
+  info.hasWarpShuffle = true;
+  // TODO: Check and enable for WMMA once pipeline is available.
+  return info;
+}
+
+static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
+  TargetInfo info;
+  // TODO: fill out target info for other vendors.
+  if (isCudaTarget(entryPoint)) {
+    info = getCudaTargetInfo(entryPoint);
+  } else if (isRocmTarget(entryPoint)) {
+    info = getRocmTargetInfo(entryPoint);
   }
   return info;
 }
@@ -254,6 +291,20 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2) {
     return failure();
   }
+
+  // Also exclude the case of matvec, which has only one non-unit parallel dim.
+  // They should go down different pipelines.
+  int nonUnitParallelDimCount = 0;
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<utils::IteratorType, 4> kinds = op.getIteratorTypesArray();
+  for (auto [kind, bound] : llvm::zip(kinds, bounds)) {
+    if (kind == utils::IteratorType::parallel)
+      nonUnitParallelDimCount += bound != 1;
+  }
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op) &&
+      nonUnitParallelDimCount == 1)
+    return failure();
+
   // Don't consider operations that don't have a broadcast, those should go
   // through reductions.
   if (llvm::any_of(op.getIndexingMapsArray(),
@@ -549,18 +600,14 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   int64_t skipInnerTiling = 0;
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     for (auto [index, outputOperand] :
-         llvm::enumerate(genericOp.getDpsInitOperands())) {
-      if (!genericOp.getMatchingIndexingMap(outputOperand)
+         llvm::enumerate(genericOp.getDpsInitsMutable())) {
+      if (!genericOp.getMatchingIndexingMap(&outputOperand)
                .isProjectedPermutation()) {
         vectorSize = 1;
         break;
       }
       ArrayRef<int64_t> shape =
-          llvm::cast<ShapedType>(cast<linalg::LinalgOp>(op)
-                                     .getDpsInitOperand(index)
-                                     ->get()
-                                     .getType())
-              .getShape();
+          llvm::cast<ShapedType>(outputOperand.get().getType()).getShape();
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         vectorSize = 1;
         break;
@@ -738,24 +785,26 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   if (!isa<linalg::GenericOp>(op))
     return failure();
-  // TODO: Enable dynamic shape.
-  auto walkResult = entryPoint.walk([](linalg::LinalgOp op) {
-    using utils::IteratorType;
-    SmallVector<IteratorType, 4> kinds = op.getIteratorTypesArray();
-    SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-    for (auto [kind, bound] : llvm::zip_equal(kinds, bounds)) {
-      if (kind == IteratorType::reduction && ShapedType::isDynamic(bound))
-        return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  if (walkResult.wasInterrupted()) {
-    return failure();
-  }
+
+  SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
-  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+
+  if (reductionDims.empty())
     return failure();
+
+  // Make sure reduction dimensions are static and innermost ones.
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim]))
+      return failure();
+    if (dim < numParallelDims)
+      return failure();
+  }
+
   if (op.getRegionOutputArgs().size() != 1)
     return failure();
 
@@ -767,24 +816,26 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
 
   bool foundSingleReductionOutput = false;
-  for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
+  for (auto [index, initOpOperand] : llvm::enumerate(op.getDpsInitsMutable())) {
     // Only single combiner operations are supported for now.
     SmallVector<Operation *> combinerOps;
-    if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
+    if (matchReduction(op.getRegionOutputArgs(), index, combinerOps) &&
         combinerOps.size() == 1) {
       if (foundSingleReductionOutput)
         return failure();
       foundSingleReductionOutput = true;
       continue;
     }
-    if (!op.getMatchingIndexingMap(op.getDpsInitOperand(i)).isIdentity())
+    if (!op.getMatchingIndexingMap(&initOpOperand).isIdentity())
       return failure();
   }
   if (!foundSingleReductionOutput)
     return failure();
 
-  std::optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
-  if (!dimSize || *dimSize % cudaWarpSize != 0)
+  int64_t reductionSize = 1;
+  for (int64_t dim : reductionDims)
+    reductionSize *= bounds[dim];
+  if (reductionSize % cudaWarpSize != 0)
     return failure();
 
   const Type elementType =
@@ -799,17 +850,58 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
 
   const unsigned largestLoadSizeInBits = 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
-  while ((*dimSize / vectorSize) % cudaWarpSize != 0)
+  while ((reductionSize / vectorSize) % cudaWarpSize != 0)
     vectorSize /= 2;
 
-  // TODO: Add reduction tiling to handle larger reductions.
+  // Deduce the workgroup size we should use for reduction. Currently a
+  // workgroup processes all elements in reduction dimensions. Need to make sure
+  // the workgroup size we use can divide the total reduction size, and it's
+  // also within hardware limitations.
   const int64_t maxWorkgroupSize = 1024;
-  int64_t groupSize = *dimSize / vectorSize;
+  int64_t groupSize = reductionSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
   }
+
+  // Then we need to strike a balance--
+  // 1) parallel dimensions are distributed to workgroups. If there are many
+  //    workgroups dispatched, we'd want to have each GPU core hosting multiple
+  //    of them for occupancy.
+  // 2) we want each thread to read quite a few 128-bit vectors for better
+  //    memory cache behavior.
+  // Both means we cannot use a too large workgroup size.
+
+  std::optional<int64_t> parallelSize = 1;
+  for (int64_t dim : parallelDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      parallelSize = std::nullopt;
+      break;
+    }
+    *parallelSize *= bounds[dim];
+  }
+  // Total parallel size that can fill the GPU with enough workgorups.
+  // TODO: query from the target device; roughly 2x hardware compute unit.
+  int parallelThreshold = 256;
+  // How many 128-bit vectors each thread should at least read.
+  const int targetVectorCount = 8;
+  while (parallelSize && *parallelSize > parallelThreshold &&
+         (groupSize / 2) % cudaWarpSize == 0 &&
+         reductionSize / (groupSize * vectorSize) < targetVectorCount) {
+    // Use less subgroups per workgroup..
+    groupSize /= 2;
+    // in order to host more workgroups per hardware compute unit.
+    *parallelSize /= 2;
+  }
+
+  // Current warp reduction pattern is a two step butterfly warp reduce.
+  // First, do warp reductions along multiple subgroups.
+  // Second, reduce results from multiple subgroups using single warp reduce.
+  // The final warp reduce requires subgroup count <= subgroup size to work.
+  if ((groupSize / cudaWarpSize) > cudaWarpSize)
+    return failure();
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
@@ -817,8 +909,20 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
-  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
-  reductionTileSizes.push_back(groupSize * vectorSize);
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  int64_t remaingGroupSize = groupSize;
+  for (int i = reductionDims.size() - 1; i >= 0; --i) {
+    int64_t dim = reductionDims[i];
+    int64_t bound = bounds[dim];
+    if (i == reductionDims.size() - 1)
+      bound /= vectorSize;
+    APInt size = llvm::APIntOps::GreatestCommonDivisor(
+        {64, uint64_t(remaingGroupSize)}, {64, uint64_t(bound)});
+    reductionTileSizes[dim] = size.getSExtValue();
+    if (i == reductionDims.size() - 1)
+      reductionTileSizes[dim] *= vectorSize;
+    remaingGroupSize /= size.getSExtValue();
+  }
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
   tileSizes.emplace_back(std::move(reductionTileSizes)); // reduction level

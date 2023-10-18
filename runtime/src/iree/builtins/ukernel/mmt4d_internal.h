@@ -81,6 +81,24 @@ typedef void (*iree_uk_mmt4d_tile_func_t)(
             const void* IREE_UK_RESTRICT rhs_panel, \
             const iree_uk_mmt4d_params_t* params);
 
+#define IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(GENERIC_FUNC, FUNC, M0) \
+  void FUNC(void* IREE_UK_RESTRICT out_tile,                        \
+            const void* IREE_UK_RESTRICT lhs_panel,                 \
+            const void* IREE_UK_RESTRICT rhs_panel,                 \
+            const iree_uk_mmt4d_params_t* params) {                 \
+    GENERIC_FUNC(out_tile, lhs_panel, rhs_panel, params, M0);       \
+  }
+
+#define IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(G, F1, F2, F4, F8) \
+  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F1, 1)                        \
+  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F2, 2)                        \
+  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F4, 4)                        \
+  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F8, 8)
+
+#define IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(G, F1, F2, F4, F8, F16) \
+  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(G, F1, F2, F4, F8)               \
+  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F16, 16)
+
 // In order to be helpful as a reference for future architecture-specific
 // kernels, the generic kernels are structured like an actual optimized kernel,
 // using an "accumulator tile" that in this case is a stack array (which would

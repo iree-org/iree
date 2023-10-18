@@ -572,7 +572,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
         ins(%4, %6 : tensor<3x64x4xf32>, tensor<f32>) outs(%5 : tensor<3x64xf32>)  {
       ^bb0(%in: f32, %in_0: f32, %out: f32):
         %8 = arith.subf %in, %in_0 : f32
-        %9 = arith.maxf %8, %cst : f32
+        %9 = arith.maximumf %8, %cst : f32
         %10 = arith.mulf %9, %9 : f32
         %11 = arith.addf %out, %10 : f32
         linalg.yield %11 : f32
@@ -814,7 +814,7 @@ hal.executable @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 {
         %13 = arith.mulf %12, %in_8 : f32
         %14 = arith.divf %13, %10 : f32
         %15 = arith.addf %14, %in_10 : f32
-        %16 = arith.maxf %15, %cst_0 : f32
+        %16 = arith.maximumf %15, %cst_0 : f32
         linalg.yield %16 : f32
         } -> tensor<256x112x112x64xf32>
         flow.dispatch.tensor.store %8, %2, offsets = [0, 0, 0, 0], sizes = [256, 112, 112, 64], strides = [1, 1, 1, 1] : tensor<256x112x112x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<256x112x112x64xf32>>

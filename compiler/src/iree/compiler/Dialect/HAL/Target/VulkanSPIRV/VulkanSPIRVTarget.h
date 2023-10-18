@@ -18,9 +18,11 @@ namespace HAL {
 // Options controlling the SPIR-V translation.
 struct VulkanSPIRVTargetOptions {
   // Vulkan target environment as #vk.target_env attribute assembly.
-  std::string vulkanTargetEnv;
+  std::string targetEnv;
   // Vulkan target triple.
-  std::string vulkanTargetTriple;
+  std::string targetTriple;
+  // Whether to use indirect bindings for all generated dispatches.
+  bool indirectBindings = false;
 };
 
 // Returns a VulkanSPIRVTargetOptions struct initialized with Vulkan/SPIR-V

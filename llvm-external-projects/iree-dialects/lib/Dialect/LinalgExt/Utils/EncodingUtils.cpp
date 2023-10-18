@@ -12,31 +12,11 @@ namespace IREE {
 namespace LinalgExt {
 
 bool isMatmulEncodingUser(EncodingUser user) {
-  switch (user) {
-  case EncodingUser::MATMUL_F32F32F32:
-  case EncodingUser::MATMUL_F16F16F32:
-  case EncodingUser::MATMUL_F16F16F16:
-  case EncodingUser::MATMUL_BF16BF16F32:
-  case EncodingUser::MATMUL_BF16BF16BF16:
-  case EncodingUser::MATMUL_I8I8I32:
-    return true;
-  default:
-    return false;
-  }
+  return user == EncodingUser::MATMUL;
 }
 
 bool isBatchMatmulEncodingUser(EncodingUser user) {
-  switch (user) {
-  case EncodingUser::BATCH_MATMUL_F32F32F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F16:
-  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
-  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
-  case EncodingUser::BATCH_MATMUL_I8I8I32:
-    return true;
-  default:
-    return false;
-  }
+  return user == EncodingUser::BATCH_MATMUL;
 }
 
 MaterializeEncodingInfo

@@ -47,18 +47,26 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   //     "IREE Vulkan/SPIR-V backend options");
 
   static llvm::cl::opt<std::string> clVulkanTargetTriple(
-      "iree-vulkan-target-triple", llvm::cl::desc("Vulkan target triple"),
+      "iree-vulkan-target-triple",
+      llvm::cl::desc(
+          "Vulkan target triple controlling the SPIR-V environment."),
       llvm::cl::init("unknown-unknown-unknown"));
 
   static llvm::cl::opt<std::string> clVulkanTargetEnv(
       "iree-vulkan-target-env",
       llvm::cl::desc(
-          "Vulkan target environment as #vk.target_env attribute assembly"),
+          "Vulkan target environment as #vk.target_env attribute assembly."),
       llvm::cl::init(""));
 
+  static llvm::cl::opt<bool> clVulkanIndirectBindings(
+      "iree-vulkan-experimental-indirect-bindings",
+      llvm::cl::desc("Force indirect bindings for all generated dispatches."),
+      llvm::cl::init(false));
+
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
-  targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
+  targetOptions.targetEnv = clVulkanTargetEnv;
+  targetOptions.targetTriple = clVulkanTargetTriple;
+  targetOptions.indirectBindings = clVulkanIndirectBindings;
 
   return targetOptions;
 }
@@ -291,23 +299,30 @@ private:
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
     targetAttrs.push_back(getExecutableTarget(
-        context, getSPIRVTargetEnv(options_.vulkanTargetEnv,
-                                   options_.vulkanTargetTriple, context)));
+        context,
+        getSPIRVTargetEnv(options_.targetEnv, options_.targetTriple, context),
+        options_.indirectBindings));
     return ArrayAttr::get(context, targetAttrs);
   }
 
   IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context,
-                      spirv::TargetEnvAttr targetEnv) const {
+  getExecutableTarget(MLIRContext *context, spirv::TargetEnvAttr targetEnv,
+                      bool indirectBindings) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
     configItems.emplace_back(b.getStringAttr(spirv::getTargetEnvAttrName()),
                              targetEnv);
+    if (indirectBindings) {
+      configItems.emplace_back(b.getStringAttr("hal.bindings.indirect"),
+                               UnitAttr::get(context));
+    }
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(
-        context, b.getStringAttr("vulkan"), b.getStringAttr("vulkan-spirv-fb"),
+        context, b.getStringAttr("vulkan"),
+        indirectBindings ? b.getStringAttr("vulkan-spirv-fb-ptr")
+                         : b.getStringAttr("vulkan-spirv-fb"),
         configAttr);
   }
 

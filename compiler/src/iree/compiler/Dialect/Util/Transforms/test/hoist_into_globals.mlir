@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals --allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals="max-size-increase-threshold=64" --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @hoist_simple_const_expr
 module @hoist_simple_const_expr {
@@ -248,3 +248,68 @@ module @do_not_hoist_uses_within_dispatches {
 //       CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[CST]]
 //       CHECK:     flow.return %[[SLICE]]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module @do_not_hoist_uses_within_dispatches {
+  func.func @main() -> tensor<2x2xi32> {
+    %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+    %1 = arith.constant dense<[[6, 7], [8,9]]> : tensor<2x2xi32>
+    %expanded = tensor.expand_shape %0[[0, 1]] : tensor<4xi32> into tensor<2x2xi32>
+    %2 = tensor.empty() : tensor<2x2xi32>
+    %3 = flow.dispatch.region -> (tensor<2x2xi32>) {
+      %4 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%expanded, %1 : tensor<2x2xi32>, tensor<2x2xi32>) outs(%2 : tensor<2x2xi32>) {
+      ^bb0(%in: i32, %in_0: i32, %out: i32):
+        %13 = arith.addi %in, %in_0 : i32
+        linalg.yield %13 : i32
+      } -> tensor<2x2xi32>
+      flow.return %4 : tensor<2x2xi32>
+    }
+    return %3 : tensor<2x2xi32>
+  }
+}
+// CHECK-LABEL: @do_not_hoist_uses_within_dispatches
+//       CHECK:   %[[CST:.+]] = arith.constant
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[CST]]
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:     %[[ADD:.+]] = linalg.generic 
+//  CHECK-SAME:     %[[EXPANDED]]
+//       CHECK:     flow.return %[[ADD]]
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+// The --iree-util-const-expr-max-size-increase-threshold flag controls the
+// maximum size increase (vs sum of size of it's roots) allowed for hoisting a
+// constant expression. The threshold is set to 64 bytes in this test suite.
+// In this test, the size increase is exactly 64 bytes, so the constant
+// expression is hoisted.
+// CHECK-LABEL: @hoist_no_significant_size_increase_const_expr
+// CHECK: util.global
+// CHECK: util.initializer
+module @hoist_no_significant_size_increase_const_expr {
+  func.func @main() -> (tensor<128xi8>) {
+    %0 = arith.constant dense<0> : tensor<32xi8>
+    %1 = arith.constant dense<0> : tensor<32xi8>
+    %2 = "iree_unregistered.const_expr"(%0, %1) 
+    : (tensor<32xi8>, tensor<32xi8>) -> tensor<128xi8>
+    return %2 : tensor<128xi8>
+  }
+}
+
+// -----
+
+// In this test, the size increase is 65 bytes, so the constant expression is
+// not hoisted.
+// CHECK-LABEL: @do_not_hoist_significant_size_increase_const_expr
+// CHECK-NOT: util.global
+// CHECK-NOT: util.initializer
+module @do_not_hoist_significant_size_increase_const_expr {
+  func.func @main() -> (tensor<129xi8>) {
+    %0 = arith.constant dense<0> : tensor<32xi8>
+    %1 = arith.constant dense<0> : tensor<32xi8>
+    %2 = "iree_unregistered.const_expr"(%0, %1) 
+    : (tensor<32xi8>, tensor<32xi8>) -> tensor<129xi8>
+    return %2 : tensor<129xi8>
+  }
+}

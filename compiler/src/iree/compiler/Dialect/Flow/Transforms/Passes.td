@@ -9,7 +9,14 @@
 
 include "mlir/Pass/PassBase.td"
 
-def CaptureDispatchDynamicDims : Pass<"iree-flow-capture-dispatch-dynamic-dims", ""> {
+def AnnotateDispatches :
+    Pass<"iree-flow-annotate-dispatches", "mlir::ModuleOp"> {
+  let summary = "Annotates executable dispatches based on their contents.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createAnnotateDispatchesPass()";
+}
+
+def CaptureDispatchDynamicDims :
+    Pass<"iree-flow-capture-dispatch-dynamic-dims", ""> {
   let summary = "Captures dynamic shape dimensions required by dispatch operands/results.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createCaptureDispatchDynamicDimsPass()";
 }
@@ -26,16 +33,16 @@ def CleanupNumericNarrowing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createCleanupNumericNarrowingPass()";
 }
 
+def CloneProducersIntoDispatchRegions :
+    InterfacePass<"iree-flow-clone-producers-into-dispatch-regions", "mlir::FunctionOpInterface"> {
+  let summary = "Clone producers into dispatch regions to be isolated above";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCloneProducersIntoDispatchRegionsPass()";
+}
+
 def CollapseDims :
     Pass<"iree-flow-collapse-dims", ""> {
   let summary = "Collapse reduction dimensions when possible.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createCollapseDimsPass()";
-}
-
-def Convert1X1FilterConv2DToMatmul:
-    Pass<"iree-flow-convert-1x1-filter-conv2d-to-matmul", ""> {
-  let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvert1X1FilterConv2DToMatmulPass()";
 }
 
 def ConvertRegionToWorkgroups :
@@ -54,12 +61,6 @@ def DeduplicateExecutables :
     Pass<"iree-flow-deduplicate-executables", "mlir::ModuleOp"> {
   let summary = "Deduplicates executables that are identical";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDeduplicateExecutablesPass()";
-}
-
-def DetachElementwiseFromNamedOps :
-    Pass<"iree-flow-detach-elementwise-from-named-ops", ""> {
-  let summary = "Detaches elementwise ops from named Linalg ops";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDetachElementwiseFromNamedOpsPass()";
 }
 
 def FoldUnitExtentDims :
@@ -100,10 +101,10 @@ def FormScalarDispatches :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormScalarDispatchesPass()";
 }
 
-def CloneProducersIntoDispatchRegions :
-    InterfacePass<"iree-flow-clone-producers-into-dispatch-regions", "mlir::FunctionOpInterface"> {
-  let summary = "Clone producers into dispatch regions to be isolated above";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createCloneProducersIntoDispatchRegionsPass()";
+def FuseDequantizationMatmul:
+    Pass<"iree-flow-fuse-dequantization-matmul", ""> {
+  let summary = "Fuse dequantization and matmul linalg.generic ops";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFuseDequantizationMatmulPass()";
 }
 
 def CollapseDimensions :
@@ -123,11 +124,10 @@ def DispatchWithTransformDialect :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
-    Option<"transformLibraryFileName",
-           "transform-library-file-name",
+    ListOption<"transformLibraryPaths",
+           "transform-library-paths",
            "std::string",
-           /*default=*/"\"\"",
-           "If non-empty, the name of the file containing definitions of "
+           "If non-empty, the paths to files containing definitions of "
            "external symbols referenced in the transform script. "
            "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",
@@ -150,10 +150,21 @@ def DispatchWithTransformDialect :
   ];
 }
 
-def EraseUnusedLinalgOperands :
-    Pass<"iree-flow-erase-unused-linalg-operands", "mlir::ModuleOp"> {
-  let summary = "Erase unused linalg operand and remove dead code.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createEraseUnusedLinalgOperands()";
+def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
+  let summary = "Print visualization of dispatches";
+  let options = [
+    Option<"maxLabelLen", "max-label-len", "unsigned",
+            /*default=*/"20", "Limit attribute/type length to number of chars">,
+    Option<"printAttrs", "print-attrs", "bool",
+           /*default=*/"true", "Print attributes of operations">,
+    Option<"printControlFlowEdges", "print-control-flow-edges", "bool",
+           /*default=*/"false", "Print control flow edges">,
+    Option<"printDataFlowEdges", "print-data-flow-edges", "bool",
+           /*default=*/"true", "Print data flow edges">,
+    Option<"printResultTypes", "print-result-types", "bool",
+            /*default=*/"true", "Print result types of operations">
+  ];
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
 }
 
 def ExpandTensorShapes :
@@ -192,7 +203,8 @@ def InferNumericNarrowing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInferNumericNarrowingPass()";
 }
 
-def InitializeEmptyTensors : Pass<"iree-flow-initialize-empty-tensors", ""> {
+def InitializeEmptyTensors :
+    Pass<"iree-flow-initialize-empty-tensors", ""> {
   let summary = "Initialize empty tensors";
   let options = [
     Option<"zeroFill", "zero-fill", "bool", /*default=*/"false",
@@ -259,50 +271,10 @@ def OutlineDispatchRegions :
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }
 
-def SetEncoding : Pass<"iree-flow-set-encoding", ""> {
-  let summary = "Introduce tensor encoding for compute operations";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createSetEncodingPass()";
-}
-
-def TensorPadToTensorInsertSlice :
-    Pass<"iree-flow-tensor-pad-to-tensor-insert-slice", ""> {
-  let summary = "Convert tensor.pad into linalg.fill + tensor.insert_slice";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createTensorPadToTensorInsertSlicePass()";
-  let options = [
-    Option<"optionSkipSingleLinalgOpUses", "skip-one-linalg-use-case", "bool",
-           /*default=*/"false",
-           "Skip the op that has only one use which is used"
-           "by a Linalg op">,
-  ];
-}
-
-def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
-  let summary = "Print visualization of dispatches";
-  let options = [
-    Option<"maxLabelLen", "max-label-len", "unsigned",
-            /*default=*/"20", "Limit attribute/type length to number of chars">,
-    Option<"printAttrs", "print-attrs", "bool",
-           /*default=*/"true", "Print attributes of operations">,
-    Option<"printControlFlowEdges", "print-control-flow-edges", "bool",
-           /*default=*/"false", "Print control flow edges">,
-    Option<"printDataFlowEdges", "print-data-flow-edges", "bool",
-           /*default=*/"true", "Print data flow edges">,
-    Option<"printResultTypes", "print-result-types", "bool",
-            /*default=*/"true", "Print result types of operations">
-  ];
-  let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
-}
-
 def RaiseSpecialOps :
     Pass<"iree-flow-raise-special-ops", ""> {
   let summary = "raise special ops like softmax to the high level linalg.ext representation";
   let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
-}
-
-def RemoveZeroExtentTensors :
-    InterfacePass<"iree-flow-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
-  let summary = "Remove tensors that have 0-extents";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createRemoveZeroExtentTensorsPass()";
 }
 
 def SplitReduction :
@@ -317,6 +289,18 @@ def StripSignedness :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }
 
+def TensorPadToTensorInsertSlice :
+    Pass<"iree-flow-tensor-pad-to-tensor-insert-slice", ""> {
+  let summary = "Convert tensor.pad into linalg.fill + tensor.insert_slice";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createTensorPadToTensorInsertSlicePass()";
+  let options = [
+    Option<"optionSkipSingleLinalgOpUses", "skip-one-linalg-use-case", "bool",
+           /*default=*/"false",
+           "Skip the op that has only one use which is used"
+           "by a Linalg op">,
+  ];
+}
+
 def TopLevelSCFToCFG :
     InterfacePass<"iree-top-level-scf-to-cfg", "mlir::FunctionOpInterface"> {
   let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";
@@ -326,12 +310,6 @@ def TopLevelSCFToCFG :
 def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
   let summary = "Checks the legality of the IR at the start of IREE flow transformation pipeline.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
-}
-
-def FuseDequantizationMatmul:
-    Pass<"iree-flow-fuse-dequantization-matmul", ""> {
-  let summary = "Fuse dequantization and matmul linalg.generic ops";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createFuseDequantizationMatmulPass()";
 }
 
 #endif  // IREE_DIALECT_FLOW_PASSES

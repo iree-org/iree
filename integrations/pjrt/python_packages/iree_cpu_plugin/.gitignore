@@ -1,0 +1,2 @@
+# Pip always creates a build/ dir.
+build/

@@ -223,12 +223,9 @@ struct FileConstantOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::FileConstantOp constantOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Files don't currently exist on the inline HAL backend so we just assign
-    // it to null and let DCE remove the rest of the uses.
-    auto dummyFile =
-        rewriter.create<arith::ConstantIntOp>(constantOp.getLoc(), 0, 32)
-            .getResult();
-    rewriter.replaceOp(constantOp, dummyFile);
+    rewriter.replaceOpWithNewOp<IREE::Util::BufferSubspanOp>(
+        constantOp, constantOp.getSource(), constantOp.getSourceSize(),
+        constantOp.getSourceOffset(), constantOp.getSourceLength());
     return success();
   }
 };
@@ -239,7 +236,15 @@ struct FileReadOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::FileReadOp readOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Immediately resolve the timepoint as this is a no-op today.
+    Value sourceSize = rewriter.create<IREE::Util::BufferSizeOp>(
+        readOp.getLoc(), adaptor.getSource());
+    rewriter.create<IREE::Util::BufferCopyOp>(
+        readOp.getLoc(), adaptor.getSource(), sourceSize,
+        rewriter.createOrFold<arith::IndexCastOp>(readOp.getLoc(),
+                                                  rewriter.getIndexType(),
+                                                  adaptor.getSourceOffset()),
+        adaptor.getTarget(), adaptor.getTargetSize(), adaptor.getTargetOffset(),
+        adaptor.getLength());
     auto resolvedTimepoint =
         rewriter.create<arith::ConstantIntOp>(readOp.getLoc(), 0, 64)
             .getResult();
@@ -254,7 +259,15 @@ struct FileWriteOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::FileWriteOp writeOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // Immediately resolve the timepoint as this is a no-op today.
+    Value targetSize = rewriter.create<IREE::Util::BufferSizeOp>(
+        writeOp.getLoc(), adaptor.getTarget());
+    rewriter.create<IREE::Util::BufferCopyOp>(
+        writeOp.getLoc(), adaptor.getSource(), adaptor.getSourceSize(),
+        adaptor.getSourceOffset(), adaptor.getTarget(), targetSize,
+        rewriter.createOrFold<arith::IndexCastOp>(writeOp.getLoc(),
+                                                  rewriter.getIndexType(),
+                                                  adaptor.getTargetOffset()),
+        adaptor.getLength());
     auto resolvedTimepoint =
         rewriter.create<arith::ConstantIntOp>(writeOp.getLoc(), 0, 64)
             .getResult();
@@ -707,11 +720,11 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
                                        TypeConverter &typeConverter,
                                        RewritePatternSet &patterns) {
+  // Resources are just buffers (no shape/encoding/etc).
+  // We use !hal.buffer when going across the external ABI boundary but
+  // otherwise use our host buffer type.
   typeConverter.addConversion(
       [=](IREE::Stream::ResourceType type, SmallVectorImpl<Type> &results) {
-        // Resources are just buffers (no shape/encoding/etc).
-        // We use !hal.buffer when going across the external ABI boundary but
-        // otherwise use memrefs.
         if (type.getLifetime() == IREE::Stream::Lifetime::External) {
           results.push_back(IREE::HAL::BufferType::get(context));
         } else {
@@ -720,12 +733,15 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
         return success();
       });
 
-  // Timepoints and files are both no-oped in the inline HAL.
+  // Today files all originate from host buffers and we just treat them the
+  // same. Note that file initialization from buffers may require subviews.
   typeConverter.addConversion(
       [=](IREE::Stream::FileType type, SmallVectorImpl<Type> &results) {
-        results.push_back(IntegerType::get(context, 32));
+        results.push_back(IREE::Util::BufferType::get(context));
         return success();
       });
+
+  // Timepoints and files are both no-oped in the inline HAL.
   typeConverter.addConversion(
       [=](IREE::Stream::TimepointType type, SmallVectorImpl<Type> &results) {
         results.push_back(IntegerType::get(context, 64));

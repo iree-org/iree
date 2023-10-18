@@ -488,3 +488,28 @@ iree_generated_trace_runner_test(
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 )
+
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f16_gpu_large_rdna3",
+    compiler_flags = [
+        "--iree-vulkan-target-triple=rdna3-unknown-linux",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--shapes=gpu_large_aligned",
+        "--compilation_info=SPIRVCooperativeMatrixVectorize",
+    ],
+    runner_args = [
+        "--require_exact_results=false",
+    ],
+    tags = [
+        "requires-gpu",
+        "requires-gpu-rdna3",
+        "vulkan_uses_vk_khr_shader_float16_int8",
+    ],
+    target_backends_and_drivers = [
+        ("vulkan-spirv", "vulkan"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+)

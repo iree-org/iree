@@ -2,6 +2,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "assume_strict_symbols.mlir"
     "attention.mlir"
     "scan.mlir"
     "scatter.mlir"

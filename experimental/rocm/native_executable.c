@@ -61,6 +61,8 @@ iree_status_t iree_hal_rocm_native_executable_create(
       iree_hal_rocm_ExecutableDef_entry_points_get(executable_def);
   iree_hal_rocm_BlockSizeDef_vec_t block_sizes_vec =
       iree_hal_rocm_ExecutableDef_block_sizes_get(executable_def);
+  flatbuffers_uint32_vec_t shared_memory_sizes =
+      iree_hal_rocm_ExecutableDef_shared_memory_sizes_get(executable_def);
   iree_host_size_t entry_count = flatbuffers_string_vec_len(entry_points_vec);
 
   // Calculate the total number of characters across all entry point names. This
@@ -94,6 +96,17 @@ iree_status_t iree_hal_rocm_native_executable_create(
         "hipModuleLoadDataEx");
   }
 
+  // Query allowed max shared memory.
+  int32_t max_shared_mem = 0;
+  if (iree_status_is_ok(status)) {
+    status = ROCM_RESULT_TO_STATUS(
+        context->syms,
+        hipDeviceGetAttribute(&max_shared_mem,
+                              hipDeviceAttributeMaxSharedMemoryPerBlock,
+                              context->rocm_device),
+        "hipDeviceGetAttribute");
+  }
+
   if (iree_status_is_ok(status)) {
     executable->entry_count = entry_count;
     for (iree_host_size_t i = 0; i < entry_count; i++) {
@@ -111,6 +124,20 @@ iree_status_t iree_hal_rocm_native_executable_create(
                                     entry_name);
           break;
         }
+        if (shared_memory_sizes[i] > max_shared_mem) {
+          status =
+              iree_make_status(IREE_STATUS_INTERNAL,
+                               "ROCM driver error: Requested shared memory "
+                               "size of %d larger than allowed size of %d",
+                               shared_memory_sizes[i], max_shared_mem);
+        } else if (shared_memory_sizes[i] != 0) {
+          status = ROCM_RESULT_TO_STATUS(
+              context->syms,
+              hipFuncSetAttribute(
+                  function, HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                  shared_memory_sizes[i]),
+              "hipFuncSetAttribute");
+        }
         // Package required parameters for kernel launches for each entry point.
         iree_hal_rocm_kernel_params_t* params = &executable->entry_points[i];
         params->layout = executable_params->pipeline_layouts[i];
@@ -119,6 +146,7 @@ iree_status_t iree_hal_rocm_native_executable_create(
         params->block_size[0] = block_sizes_vec[i].x;
         params->block_size[1] = block_sizes_vec[i].y;
         params->block_size[2] = block_sizes_vec[i].z;
+        params->shared_memory_size = shared_memory_sizes[i];
         // Stash the entry point name in the string table for use when tracing.
         IREE_TRACE({
           iree_host_size_t entry_name_length =

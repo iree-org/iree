@@ -22,6 +22,20 @@
 #include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
+IREE_FLAG(bool, require_exact_results, true,
+          "Requires floating point result elements to match exactly.");
+IREE_FLAG(
+    float, acceptable_fp_delta, 1e-5,
+    "Maximum absolute difference allowed with inexact floating point results.");
+IREE_FLAG(
+    int32_t, max_elements_to_check, 10000,
+    "Maximum number of matrix elements to check for each matmul. For larger "
+    "matrices, only every n-th element will be checked for some n chosed to "
+    "stay just under that threshold and to avoid being a divisor of the inner "
+    "dimension size to avoid special patterns. As the check uses a slow "
+    "reference implementation, this is a trade-off between test latency and "
+    "coverage. The value 0 means check all elements.");
+
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
 static const char* emoji(bool good) { return good ? "🦄" : "🐞"; }
@@ -546,7 +560,8 @@ static void reference_matmul_element(
 
 // Reference matmul implementation, used to compare matmul results against.
 static iree_status_t reference_matmul(iree_vm_list_t* input_list,
-                                      iree_hal_buffer_view_t* result) {
+                                      iree_hal_buffer_view_t* result,
+                                      int compute_every) {
   iree_hal_buffer_view_t* lhs = NULL;
   iree_hal_buffer_view_t* rhs = NULL;
   iree_hal_buffer_view_t* acc = NULL;
@@ -575,8 +590,11 @@ static iree_status_t reference_matmul(iree_vm_list_t* input_list,
   iree_hal_element_type_t lhs_type = iree_hal_buffer_view_element_type(lhs);
   iree_hal_element_type_t rhs_type = iree_hal_buffer_view_element_type(rhs);
   iree_hal_element_type_t acc_type = iree_hal_buffer_view_element_type(result);
+  int count = 0;
   for (iree_hal_dim_t m = 0; m < m_size; ++m) {
     for (iree_hal_dim_t n = 0; n < n_size; ++n) {
+      if (++count < compute_every) continue;
+      count = 0;
       reference_matmul_element(m_size, k_size, n_size, lhs_type, rhs_type,
                                acc_type, lhs_mapping.contents.data,
                                rhs_mapping.contents.data,
@@ -656,12 +674,19 @@ static bool matmul_result_elements_agree(iree_e2e_test_value_t expected,
     case IREE_E2E_TEST_VALUE_TYPE_I32:
       return actual.i32 == expected.i32;
     // Since we fill buffers with small integers for floating point GEMMs
-    // functional testing, we test for bit-exactness on the actual and
-    // expected values.
+    // functional testing, we can test for bit-exactness on the actual and
+    // expected values. Inexact results are only permitted when the
+    // `require_exact_results` flag is set to `false`.
     case IREE_E2E_TEST_VALUE_TYPE_F16:
-      return actual.f16_u16 == expected.f16_u16;
+      if (actual.f16_u16 == expected.f16_u16) return true;
+      if (FLAG_require_exact_results) return false;
+      return fabsf(iree_math_f16_to_f32(actual.f16_u16) -
+                   iree_math_f16_to_f32(expected.f16_u16)) <
+             FLAG_acceptable_fp_delta;
     case IREE_E2E_TEST_VALUE_TYPE_F32:
-      return actual.f32 == expected.f32;
+      if (actual.f32 == expected.f32) return true;
+      if (FLAG_require_exact_results) return false;
+      return fabsf(actual.f32 - expected.f32) < FLAG_acceptable_fp_delta;
     default:
       iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                          "unhandled value type"));
@@ -779,8 +804,11 @@ static iree_status_t check_matmul_failure(
     iree_hal_dim_t col, iree_hal_buffer_view_t* lhs,
     iree_hal_buffer_view_t* rhs, iree_hal_buffer_view_t* acc,
     iree_hal_buffer_view_t* actual_result,
-    iree_hal_buffer_view_t* expected_result) {
-  if (!file) {
+    iree_hal_buffer_view_t* expected_result, int check_every) {
+  if (!file || check_every > 1) {
+    // No logging of errors with check_every>1 as most of the reference matrix
+    // elements have not been computed. The caller is expected to retry with
+    // check_every=1.
     return iree_make_status(IREE_STATUS_ABORTED);
   }
   fprintf(file,
@@ -857,7 +885,7 @@ static iree_status_t check_matmul_results_impl(
     iree_hal_dim_t n_size, iree_hal_buffer_view_t* lhs,
     iree_hal_buffer_view_t* rhs, iree_hal_buffer_view_t* acc,
     iree_hal_buffer_view_t* actual_result,
-    iree_hal_buffer_view_t* expected_result) {
+    iree_hal_buffer_view_t* expected_result, int check_every) {
   iree_hal_buffer_mapping_t actual_result_mapping;
   iree_hal_buffer_mapping_t expected_result_mapping;
   IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
@@ -866,8 +894,11 @@ static iree_status_t check_matmul_results_impl(
       expected_result, IREE_HAL_MEMORY_ACCESS_READ, &expected_result_mapping));
   iree_hal_element_type_t result_type =
       iree_hal_buffer_view_element_type(actual_result);
+  int count = 0;
   for (iree_hal_dim_t m = 0; m < m_size; ++m) {
     for (iree_hal_dim_t n = 0; n < n_size; ++n) {
+      if (++count < check_every) continue;
+      count = 0;
       iree_e2e_test_value_t actual_value =
           read_matrix_element(m_size, n_size, result_type,
                               actual_result_mapping.contents.data, m, n);
@@ -877,7 +908,7 @@ static iree_status_t check_matmul_results_impl(
       if (!matmul_result_elements_agree(actual_value, expected_value)) {
         return check_matmul_failure(file, actual_value, expected_value, m, n,
                                     lhs, rhs, acc, actual_result,
-                                    expected_result);
+                                    expected_result, check_every);
       }
     }
   }
@@ -906,8 +937,31 @@ static iree_status_t check_matmul_results(
   IREE_RETURN_IF_ERROR(get_matmul_sizes(lhs, rhs, acc, actual_result, &m_size,
                                         &k_size, &n_size));
 
-  return check_matmul_results_impl(file, m_size, k_size, n_size, lhs, rhs, acc,
-                                   actual_result, expected_result);
+  int check_every = 1;
+  if (FLAG_max_elements_to_check) {
+    check_every = (iree_hal_buffer_view_element_count(actual_result) +
+                   FLAG_max_elements_to_check - 1) /
+                  FLAG_max_elements_to_check;
+    if (check_every < 1) check_every = 1;
+    if (check_every > 1)
+      while ((n_size % check_every) == 0) ++check_every;
+  }
+
+  IREE_CHECK_OK(reference_matmul(input_list, expected_result, check_every));
+
+  iree_status_t status =
+      check_matmul_results_impl(file, m_size, k_size, n_size, lhs, rhs, acc,
+                                actual_result, expected_result, check_every);
+
+  if (!iree_status_is_ok(status) && check_every > 1) {
+    // If we got a failure with check_every>1, that didn't log a useful
+    // numerical summary, as most of the reference matrix entries hadn't been
+    // computed. Rerun now with check_every=1 to get that numerical logging.
+    status = check_matmul_results_impl(file, m_size, k_size, n_size, lhs, rhs,
+                                       acc, actual_result, expected_result, 1);
+  }
+
+  return status;
 }
 
 /*****************************************************************************
@@ -1026,9 +1080,6 @@ static iree_status_t do_matmul_and_check_results(
   IREE_CHECK_OK(allocate_host_buffer_view_like(replay->device, device_allocator,
                                                host_actual_result,
                                                &host_expected_result));
-
-  // Use the reference matmul implementation to fill host_expected_result
-  IREE_CHECK_OK(reference_matmul(host_inputs, host_expected_result));
 
   // Check that host_actual_result and host_expected_result agree.
   iree_status_t status = check_matmul_results(

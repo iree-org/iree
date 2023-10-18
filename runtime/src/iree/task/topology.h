@@ -152,8 +152,32 @@ iree_status_t iree_task_topology_push_group(
 void iree_task_topology_initialize_from_group_count(
     iree_host_size_t group_count, iree_task_topology_t* out_topology);
 
+// Initializes a topology with the given groups each assigned a platform thread
+// affinity. See `iree_thread_affinity_t` for more information about how to
+// properly initialize the thread affinities for each platform.
+iree_status_t iree_task_topology_initialize_from_thread_affinities(
+    iree_host_size_t group_count,
+    const iree_thread_affinity_t* group_affinities,
+    iree_task_topology_t* out_topology);
+
+// Initializes a topology with one group for each logical CPU specified.
+//
+// The logical CPU IDs are in the platform-defined flattened domain of 0 to
+// the total number of logical processors in the system such as those returned
+// by `lscpu --extended`/lstopo/the bit index in cpu_set_t. The same ID is used
+// on the file-based access in e.g. `/sys/devices/system/cpu/cpu<cpu_id>/`.
+iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
+    iree_host_size_t cpu_count, const uint32_t* cpu_ids,
+    iree_task_topology_t* out_topology);
+
+// Initializes a topology with one group for each logical CPU specified in a
+// comma-delimited list.
+// See iree_task_topology_initialize_from_logical_cpu_set for more information.
+iree_status_t iree_task_topology_initialize_from_logical_cpu_set_string(
+    iree_string_view_t cpu_id_set, iree_task_topology_t* out_topology);
+
 // Initializes a topology with one group for each physical core with the given
-// NUMA node ID (usually package or cluster). Up to |max_core_count| physical
+// NUMA |node_id| (usually package or cluster). Up to |max_core_count| physical
 // cores will be selected from the node.
 iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,

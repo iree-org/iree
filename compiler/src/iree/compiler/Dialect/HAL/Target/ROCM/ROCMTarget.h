@@ -23,7 +23,7 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
                           std::string bitCodeDir);
 
 // Compiles ISAToHsaco Code
-std::string createHsaco(const std::string isa, StringRef name);
+std::string createHsaco(Location loc, const std::string isa, StringRef name);
 
 } // namespace HAL
 } // namespace IREE

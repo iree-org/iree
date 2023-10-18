@@ -49,7 +49,7 @@ func.func @softmax() -> !out_tensor_t {
      ins(%input : !in_tensor_t)
     outs(%input_max_filled : !tmp_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32):
-        %max = arith.maxf %arg0, %arg1 : f32
+        %max = arith.maximumf %arg0, %arg1 : f32
         linalg.yield %max : f32
       } -> !tmp_tensor_t
 

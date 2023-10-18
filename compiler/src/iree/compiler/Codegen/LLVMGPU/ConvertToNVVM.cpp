@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -37,6 +38,31 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
+int kDefaultCUDACapability = 80;
+
+/// Return the CUDA capability of the gpu. Assumes CUDA capability is 80 (sm_80)
+/// if not specified.
+static int getCUDACapbility(Operation *op) {
+  FailureOr<IREE::HAL::ExecutableVariantOp> variantOp =
+      getExecutableVariantOp(op);
+  if (failed(variantOp)) {
+    return kDefaultCUDACapability;
+  }
+
+  auto targetAttr = variantOp->getTargetAttr();
+  if (auto config = targetAttr.getConfiguration()) {
+    if (auto attr = config.getAs<StringAttr>("target_arch")) {
+      StringRef targetName = attr.getValue();
+      APInt version;
+      if (targetName.starts_with("sm_") &&
+          !targetName.substr(3).getAsInteger(10, version)) {
+        return version.getZExtValue();
+      }
+    }
+  }
+  return kDefaultCUDACapability;
+}
 
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding NVVM equivalent.
@@ -108,6 +134,19 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateGpuRewritePatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
+      }
+    }
+    {
+      // Convert arith::maximumf/minimumf ops on older gpus since the lowering
+      // is faulty for them.
+      // TODO: Remove this once the lowering in LLVM is fixed
+      // (https://github.com/llvm/llvm-project/issues/64606).
+      if (getCUDACapbility(m) < 80) {
+        RewritePatternSet patterns(&getContext());
+        populateReplaceSlowMinMaxOpsPatterns(patterns);
+        if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+          return signalPassFailure();
+        }
       }
     }
     {

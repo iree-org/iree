@@ -63,7 +63,7 @@ LLVMTarget::LLVMTarget() {
   // LLVM optimization levels.
   // TODO(benvanik): add an option for this.
   optimizerOptLevel = llvm::OptimizationLevel::O2;
-  codeGenOptLevel = llvm::CodeGenOpt::Aggressive;
+  codeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
   llvmTargetOptions.FloatABIType = DEFAULT_FLOAT_ABI;
 
   // Force `-ffunction-sections` so we can strip unused code.

@@ -198,7 +198,7 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
                   linalgOp.getDpsInitOperand(result.getResultNumber())))
             return WalkResult::skip();
           return WalkResult::advance();
-        } else if (auto minfOp = dyn_cast<arith::MinFOp>(definingOp)) {
+        } else if (auto minfOp = dyn_cast<arith::MinimumFOp>(definingOp)) {
           auto lhs = solver.getElementFor<FloatRangeValueElement>(
               *this, Position::forValue(minfOp.getLhs()),
               DFX::Resolution::REQUIRED);
@@ -214,7 +214,7 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
                      << newState.getAssumed().getAsStr(solver.getAsmState())
                      << "\n");
           return WalkResult::advance();
-        } else if (auto maxfOp = dyn_cast<arith::MaxFOp>(definingOp)) {
+        } else if (auto maxfOp = dyn_cast<arith::MaximumFOp>(definingOp)) {
           auto lhs = solver.getElementFor<FloatRangeValueElement>(
               *this, Position::forValue(maxfOp.getLhs()),
               DFX::Resolution::REQUIRED);

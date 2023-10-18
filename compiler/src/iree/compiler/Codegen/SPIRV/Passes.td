@@ -112,9 +112,16 @@ def SPIRVTileToCooperativeOps : Pass<
     "mlir::iree_compiler::createSPIRVTileToCooperativeOpsPass()";
 }
 
-def SPIRVVectorize : Pass<"iree-spirv-vectorize", "func::FuncOp"> {
-  let summary = "Vectorize Linalg ops with buffer semantics";
-  let constructor = "mlir::iree_compiler::createSPIRVVectorizePass()";
+def SPIRVInitialVectorLowering : Pass<
+    "iree-spirv-initial-vector-lowering", "func::FuncOp"> {
+  let summary = "Perform initial lowering of vectors ops to fit SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVInitialVectorLoweringPass()";
+}
+
+def SPIRVFinalVectorLowering : Pass<
+    "iree-spirv-final-vector-lowering", "func::FuncOp"> {
+  let summary = "Perform final lowering of vectors ops to fit SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVFinalVectorLoweringPass()";
 }
 
 def SPIRVVectorizeLoadStore :

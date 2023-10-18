@@ -1,4 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' \
+// RUN:   %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -14,13 +16,13 @@ hal.executable public @matmul_256x1024x128_div_add {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
@@ -94,13 +96,13 @@ hal.executable public @batch_matmul_16x128x256x512_div {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
@@ -162,13 +164,13 @@ hal.executable @generic_batch_matmul_32x8x512x64 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
@@ -232,13 +234,13 @@ hal.executable public @batch_matmul_16x1024x1024x80 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
@@ -290,13 +292,13 @@ hal.executable public @matmul_256x1024x8 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,

@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -144,6 +145,11 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // move across devices. We do it before scheduling waves as lifetime doesn't
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
+
+  // Cleanup patterns currently fail on SCF operations.
+  passManager.addNestedPass<func::FuncOp>(
+      IREE::Flow::createTopLevelSCFToCFGPass());
+
   addCleanupPatterns(passManager);
 
   // Verify all stream.async.* op access ranges that we can by taking advantage

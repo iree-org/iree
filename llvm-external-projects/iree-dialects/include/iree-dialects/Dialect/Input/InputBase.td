@@ -281,6 +281,18 @@ def IREEInput_DescriptorSetBindingAttr :
   }];
 }
 
+def IREEInput_DescriptorSetLayoutFlags_None :
+    I32BitEnumAttrCase<"None", 0x0000>;
+def IREEInput_DescriptorSetLayoutFlags_Indirect :
+    I32BitEnumAttrCase<"Indirect", 0x0001>;
+def IREEInput_DescriptorSetLayoutFlagsAttr :
+    I32BitEnumAttr<"DescriptorSetLayoutFlags", "valid DescriptorSetLayout flags", [
+      IREEInput_DescriptorSetLayoutFlags_None,
+      IREEInput_DescriptorSetLayoutFlags_Indirect,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Input";
+}
+
 def IREEInput_DescriptorSetLayoutAttr :
     AttrDef<IREEInput_Dialect, "DescriptorSetLayout", []> {
   let mnemonic = "descriptor_set.layout";
@@ -288,13 +300,15 @@ def IREEInput_DescriptorSetLayoutAttr :
 
   let parameters = (ins
     AttrParameter<"int64_t", "">:$ordinal,
-    ArrayRefParameter<"DescriptorSetBindingAttr", "">:$bindings
+    ArrayRefParameter<"DescriptorSetBindingAttr", "">:$bindings,
+    OptionalParameter<"std::optional<DescriptorSetLayoutFlags>">:$flags
   );
 
   let assemblyFormat = [{
     `<`
     $ordinal `,`
     `bindings` `=` `[` $bindings `]`
+    (`,` `flags` `=` $flags^)?
     `>`
   }];
 }

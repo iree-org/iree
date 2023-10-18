@@ -6,6 +6,9 @@ build-backend = "setuptools.build_meta"
 markers = [
     "plat_host_cpu: mark tests as running on the host CPU",
     "plat_rdna3_vulkan: mark tests as running on AMD RDNA3 Vulkan device",
+    "plat_nvidia_a100: mark tests as running on NVIDIA A100 device",
+    "plat_rdna3_rocm: mark tests as running on AMD RDNA3 ROCm device",
     "presubmit: mark test as running on presubmit",
+    "postsubmit: mark test as running on postsubmit",
     "unstable_linalg: mark test as depending on unstable, serialized linalg IR",
 ]

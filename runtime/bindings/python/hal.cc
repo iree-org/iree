@@ -328,6 +328,11 @@ void HalDevice::BeginProfiling(std::optional<std::string> mode,
                  "starting device profiling");
 }
 
+void HalDevice::FlushProfiling() {
+  CheckApiStatus(iree_hal_device_profiling_flush(raw_ptr()),
+                 "flushing device profiling");
+}
+
 void HalDevice::EndProfiling() {
   CheckApiStatus(iree_hal_device_profiling_end(raw_ptr()),
                  "ending device profiling");
@@ -843,6 +848,7 @@ void SetupHalBindings(nanobind::module_ m) {
           py::keep_alive<0, 1>())
       .def("begin_profiling", &HalDevice::BeginProfiling,
            py::arg("mode") = py::none(), py::arg("file_path") = py::none())
+      .def("flush_profiling", &HalDevice::FlushProfiling)
       .def("end_profiling", &HalDevice::EndProfiling)
       .def("create_semaphore", &HalDevice::CreateSemaphore,
            py::arg("initial_value"))

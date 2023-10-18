@@ -13,8 +13,10 @@ runtime entirely or interface with custom accelerators.
   with minimal platform dependencies
 * [:octicons-server-16: GPU - Vulkan](./gpu-vulkan.md)
   for cross-platform usage and interop with graphics applications
-* [:octicons-server-16: GPU - CUDA/ROCm](./gpu-cuda-rocm.md)
-  for NVIDIA/AMD-specific solutions
+* [:simple-nvidia: GPU - CUDA](./gpu-cuda.md)
+  for NVIDIA-specific solutions
+* [:simple-amd: GPU - ROCm](./gpu-rocm.md)
+  for AMD-specific solutions
 * [:simple-apple: GPU - Metal](./gpu-metal.md)
   for running on Apple hardware
 
@@ -58,6 +60,7 @@ When compiling programs, a list of target backends must be specified via
             llvm-cpu
             metal
             metal-spirv
+            rocm
             vmvx
             vmvx-inline
             vulkan
@@ -73,6 +76,7 @@ When compiling programs, a list of target backends must be specified via
          'llvm-cpu',
          'metal',
          'metal-spirv',
+         'rocm',
          'vmvx',
          'vmvx-inline',
          'vulkan',

@@ -12,7 +12,7 @@ func.func @matmul_reduction(%lhs : tensor<16x16xf16>, %rhs : tensor<16x16xf16>) 
   %6 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]}
         ins(%2 : tensor<16x16xf16>) outs(%init : tensor<16xf16>) {
         ^bb0(%in: f16, %out: f16):
-          %20 = arith.maxf %in, %out : f16
+          %20 = arith.maximumf %in, %out : f16
           linalg.yield %20 : f16
         } -> tensor<16xf16>
   %8 = linalg.generic {indexing_maps = [#map1, #map], iterator_types=["parallel", "parallel"]}

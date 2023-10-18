@@ -40,7 +40,7 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // CHECK:          %[[D10:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
 // CHECK-SAME:       "reduction"]} ins(%[[D9]] : tensor<1024x1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:            %[[D18:.+]] = arith.maxf %[[IN]], %[[OUT]] : f32
+// CHECK:            %[[D18:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
 // CHECK:            linalg.yield %[[D18]] : f32
 // CHECK:          } -> tensor<1024xf32>
 // CHECK:          %[[D11:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP]]], iterator_types = ["parallel",
@@ -139,7 +139,7 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // CHECK:          %[[D10:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
 // CHECK-SAME:       "reduction"]} ins(%[[D9]] : tensor<?x?xf32>) outs(%[[ARG8]] : tensor<?xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:            %[[D18:.+]] = arith.maxf %[[IN]], %[[OUT]] : f32
+// CHECK:            %[[D18:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
 // CHECK:            linalg.yield %[[D18]] : f32
 // CHECK:          } -> tensor<?xf32>
 // CHECK:          %[[D11:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP]]], iterator_types = ["parallel",
@@ -238,7 +238,7 @@ func.func @attention(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>,
 // CHECK:          %[[D11:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]]], iterator_types = ["parallel",
 // CHECK-SAME:       "reduction"]} ins(%[[D10]] : tensor<1024x1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:            %[[D21:.+]] = arith.maxf %[[IN]], %[[OUT]] : f32
+// CHECK:            %[[D21:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
 // CHECK:            linalg.yield %[[D21]] : f32
 // CHECK:          } -> tensor<1024xf32>
 // CHECK:          %[[D12:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP]]], iterator_types = ["parallel",

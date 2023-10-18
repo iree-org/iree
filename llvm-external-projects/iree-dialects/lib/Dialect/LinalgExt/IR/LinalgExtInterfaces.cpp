@@ -15,20 +15,13 @@ using namespace IREE::LinalgExt;
 
 LogicalResult
 IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
+  // TODO(ravishankarm): Make `LinalgExt` Interface inherit from
+  // `DestinationStyleOpInterface`
   LinalgExtOp linalgExtOp = cast<LinalgExtOp>(op);
-  if (op->getNumResults()) {
-    if (op->getNumResults() != linalgExtOp.getNumOutputs()) {
-      return linalgExtOp.emitOpError(
-          "expected number of outputs to be same as the number of results");
-    }
-    for (auto en : llvm::enumerate(op->getResultTypes())) {
-      Type outputType = linalgExtOp.getOutputs()[en.index()].getType();
-      if (en.value() != outputType) {
-        return linalgExtOp.emitOpError("expected type of `outs` operand #")
-               << en.index() << " " << outputType
-               << " to be same as result type " << en.value();
-      }
-    }
+  if (!isa<DestinationStyleOpInterface>(op)) {
+    return linalgExtOp.emitOpError(
+        "expected operation that implements LinalgExtInterface to also "
+        "implement DestinationStyleOpInterface");
   }
   return success();
 }
@@ -50,7 +43,7 @@ static void getDimValues(OpBuilder &b, Location loc, Value v, Ty t,
 LogicalResult LinalgExtOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   Operation *op = getOperation();
-  for (auto output : getOutputs()) {
+  for (auto output : cast<DestinationStyleOpInterface>(op).getDpsInits()) {
     SmallVector<OpFoldResult> dims;
     Type outputType = output.getType();
     if (auto rankedTensorType = outputType.dyn_cast<RankedTensorType>()) {

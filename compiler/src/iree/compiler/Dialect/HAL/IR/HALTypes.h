@@ -11,6 +11,7 @@
 #include <optional>
 
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -109,7 +110,9 @@ struct DescriptorSetLayoutType
   using Base::Base;
 };
 
-struct DeviceType : public Type::TypeBase<DeviceType, Type, TypeStorage> {
+struct DeviceType
+    : public Type::TypeBase<DeviceType, Type, TypeStorage,
+                            mlir::OpTrait::IREE::Util::ImplicitlyCaptured> {
   using Base::Base;
 };
 
@@ -188,6 +191,31 @@ static inline AsmPrinter &
 operator<<(AsmPrinter &printer,
            std::optional<mlir::iree_compiler::IREE::HAL::CollectiveReductionOp>
                param) {
+  printer << (param.has_value()
+                  ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
+                  : StringRef{""});
+  return printer;
+}
+
+template <>
+struct FieldParser<
+    std::optional<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>> {
+  static FailureOr<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>
+  parse(AsmParser &parser) {
+    std::string value;
+    if (parser.parseKeywordOrString(&value))
+      return failure();
+    auto result = mlir::iree_compiler::IREE::HAL::symbolizeEnum<
+        mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>(value);
+    if (!result.has_value())
+      return failure();
+    return result.value();
+  }
+};
+static inline AsmPrinter &operator<<(
+    AsmPrinter &printer,
+    std::optional<mlir::iree_compiler::IREE::HAL::DescriptorSetLayoutFlags>
+        param) {
   printer << (param.has_value()
                   ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
                   : StringRef{""});

@@ -17,7 +17,7 @@ class TargetConverter:
         self._update_target_mappings(
             {
                 # Internal utilities to emulate various binary/library options.
-                f"{iree_core_repo}//build_tools:default_linkopts": [],
+                f"{iree_core_repo}//build_tools:pthreads": [],
                 f"{iree_core_repo}//build_tools:dl": ["${CMAKE_DL_LIBS}"],
                 f"{iree_core_repo}//compiler/src/iree/compiler/API:CAPI": [
                     "IREECompilerCAPILib"

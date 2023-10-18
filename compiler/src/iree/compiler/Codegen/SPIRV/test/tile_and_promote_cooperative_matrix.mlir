@@ -1,5 +1,10 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=false skip-thread=true}, cse)))))' %s | FileCheck %s
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=true skip-thread=true}, cse)))))' %s | FileCheck %s --check-prefix=PROMOTEC
+// RUN: iree-opt --split-input-file --mlir-print-local-scope \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=false skip-thread=true}, cse)))))' \
+// RUN:   %s | FileCheck %s
+
+// RUN: iree-opt --split-input-file --mlir-print-local-scope \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=true skip-thread=true}, cse)))))' \
+// RUN:   %s | FileCheck %s --check-prefix=PROMOTEC
 
 // Single tile per workgroup means no subview ops for promotion.
 
@@ -16,20 +21,20 @@
 hal.executable @matmul_f16_32x32x32 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.5,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 8, n_size = 8, result_type = i32, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
@@ -121,20 +126,20 @@ hal.executable @matmul_f16_32x32x32 {
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.5,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 8, n_size = 8, result_type = i32, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
@@ -271,20 +276,20 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.5,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 8, n_size = 8, result_type = i32, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
@@ -390,20 +395,20 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.5,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 8, n_size = 8, result_type = i32, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
@@ -509,13 +514,13 @@ hal.executable @batch_matmul_f16_1x64x128x512 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
       [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
@@ -617,13 +622,13 @@ hal.executable @matmul_f16_f512x4096x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
       [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
@@ -734,13 +739,13 @@ hal.executable @matmul_f16_f512x4096x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
       [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
@@ -851,13 +856,13 @@ hal.executable @matmul_f16_128x262144x2304 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
       [SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,

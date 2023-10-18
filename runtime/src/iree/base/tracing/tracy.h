@@ -104,6 +104,9 @@ typedef struct ___tracy_source_location_data iree_tracing_location_t;
   (TracyCZoneCtx) { zone_id, 1 }
 #endif  // __cplusplus
 
+void iree_tracing_tracy_initialize();
+void iree_tracing_tracy_deinitialize();
+
 IREE_MUST_USE_RESULT iree_zone_id_t
 iree_tracing_zone_begin_impl(const iree_tracing_location_t* src_loc,
                              const char* name, size_t name_length);
@@ -185,8 +188,8 @@ void* iree_tracing_obscure_ptr(void* ptr);
 
 #define IREE_TRACE(expr) expr
 
-#define IREE_TRACE_APP_ENTER()
-#define IREE_TRACE_APP_EXIT(exit_code)
+#define IREE_TRACE_APP_ENTER() iree_tracing_tracy_initialize()
+#define IREE_TRACE_APP_EXIT(exit_code) iree_tracing_tracy_deinitialize()
 #define IREE_TRACE_SET_APP_INFO(value, value_length) \
   ___tracy_emit_message_appinfo(value, value_length)
 #define IREE_TRACE_SET_THREAD_NAME(name) ___tracy_set_thread_name(name)

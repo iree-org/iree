@@ -6,7 +6,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
@@ -74,7 +73,6 @@ public:
                     func::FuncDialect,
                     gpu::GPUDialect,
                     linalg::LinalgDialect,
-                    linalg::transform::LinalgTransformDialect,
                     LLVM::LLVMDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
@@ -82,8 +80,8 @@ public:
                     tensor::TensorDialect,
                     transform::TransformDialect,
                     vector::VectorDialect
-        // clang-format on
-        >();
+                    // clang-format on
+                    >();
 
     // TODO: these should be registered by the extension instead, but there is
     // no support for it in core currently.

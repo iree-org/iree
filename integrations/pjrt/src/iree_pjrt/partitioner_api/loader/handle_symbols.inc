@@ -1,0 +1,36 @@
+// Copyright 2023 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+HANDLE_SYMBOL(openxlaPartitionerErrorDestroy)
+HANDLE_SYMBOL(openxlaPartitionerErrorGetMessage)
+HANDLE_SYMBOL(openxlaPartitionerGetAPIVersion)
+HANDLE_SYMBOL(openxlaPartitionerGlobalInitialize)
+HANDLE_SYMBOL(openxlaPartitionerGetRevision)
+HANDLE_SYMBOL(openxlaPartitionerSetupGlobalCL)
+HANDLE_SYMBOL(openxlaPartitionerGlobalShutdown)
+HANDLE_SYMBOL(openxlaPartitionerSessionCreate)
+HANDLE_SYMBOL(openxlaPartitionerSessionDestroy)
+HANDLE_SYMBOL(openxlaPartitionerSessionSetFlags)
+HANDLE_SYMBOL(openxlaPartitionerSessionGetFlags)
+HANDLE_SYMBOL(openxlaPartitionerInvocationCreate)
+// HANDLE_SYMBOL(openxlaPartitionerInvocationEnableCallbackDiagnostics)
+HANDLE_SYMBOL(openxlaPartitionerInvocationEnableConsoleDiagnostics)
+HANDLE_SYMBOL(openxlaPartitionerInvocationDestroy)
+HANDLE_SYMBOL(openxlaPartitionerInvocationSetCrashHandler)
+HANDLE_SYMBOL(openxlaPartitionerInvocationParseSource)
+HANDLE_SYMBOL(openxlaPartitionerInvocationSetVerifyIR)
+HANDLE_SYMBOL(openxlaPartitionerInvocationPipeline)
+HANDLE_SYMBOL(openxlaPartitionerInvocationOutputIR)
+HANDLE_SYMBOL(openxlaPartitionerSourceDestroy)
+HANDLE_SYMBOL(openxlaPartitionerSourceOpenFile)
+HANDLE_SYMBOL(openxlaPartitionerSourceWrapBuffer)
+HANDLE_SYMBOL(openxlaPartitionerOutputDestroy)
+HANDLE_SYMBOL(openxlaPartitionerOutputOpenFile)
+HANDLE_SYMBOL(openxlaPartitionerOutputOpenFD)
+HANDLE_SYMBOL(openxlaPartitionerOutputOpenMembuffer)
+HANDLE_SYMBOL(openxlaPartitionerOutputMapMemory)
+HANDLE_SYMBOL(openxlaPartitionerOutputKeep)
+HANDLE_SYMBOL(openxlaPartitionerOutputWrite)

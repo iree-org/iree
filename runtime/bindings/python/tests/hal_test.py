@@ -75,6 +75,7 @@ class DeviceHalTest(unittest.TestCase):
 
     def testProfilingDefaults(self):
         self.device.begin_profiling()
+        self.device.flush_profiling()
         self.device.end_profiling()
         # Just running is sufficient.
 

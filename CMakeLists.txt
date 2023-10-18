@@ -335,6 +335,7 @@ endif()
 
 #-------------------------------------------------------------------------------
 # Experimental next-generation CUDA HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=cuda2
 #-------------------------------------------------------------------------------
 
 set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2")
@@ -344,6 +345,7 @@ set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_REGISTER "iree_hal_cuda2_driver_module_regist
 
 #-------------------------------------------------------------------------------
 # Experimental ROCM HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=rocm
 #-------------------------------------------------------------------------------
 
 set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm")
@@ -353,6 +355,7 @@ set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register
 
 #-------------------------------------------------------------------------------
 # Experimental WebGPU HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=webgpu
 #-------------------------------------------------------------------------------
 
 set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu")
@@ -379,6 +382,9 @@ cmake_dependent_option(IREE_TARGET_BACKEND_LLVM_CPU_WASM "Enables WebAssembly in
 cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
 
+# Default target backends that are not yet fully supported but are being brought up.
+cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
+
 # Supported default target backends that are only available on certain
 # platforms.
 set(IREE_TARGET_BACKEND_CUDA_DEFAULT ${IREE_TARGET_BACKEND_DEFAULTS})
@@ -389,7 +395,6 @@ cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler tar
 
 # Non-default target backends either have additional dependencies or are
 # experimental/niche in some fashion.
-cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 # Disable WebGPU by default - it has complex deps and is under development.
 cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 
@@ -812,6 +817,10 @@ else()
   # Add default external projects.
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
   iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
+  if(IREE_TARGET_BACKEND_ROCM)
+    set(ROCM_DEVICELIB_ENABLE_TESTING OFF)
+    iree_llvm_add_external_project(ROCm-Device-Libs ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ROCm-Device-Libs)
+  endif()
 
   # Ensure that LLVM-based dependencies needed for testing are included.
   add_dependencies(iree-test-deps FileCheck)
@@ -895,7 +904,7 @@ if(IREE_TARGET_BACKEND_WEBGPU)
   #   * https://chromium.googlesource.com/vulkan-deps/+/refs/heads/main/DEPS
   # or they can be updated independently
   set(IREE_TINT_TAG         "fdb8787e9c1b79770bd98a8faf37fbe48a3077a4")  # 2023-03-06
-  set(IREE_SPIRV_TOOLS_TAG  "95f93810bbae12e1a601a3a5a5d975e5558a2994")  # 2023-02-15
+  set(IREE_SPIRV_TOOLS_TAG  "43b8886490eb6af81fc61e0ff071c51a922af864")  # 2023-08-11
 
   iree_set_spirv_headers_cmake_options()
   add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
@@ -944,8 +953,8 @@ if(IREE_ENABLE_CLANG_TIDY)
 endif()
 
 if(IREE_BUILD_TRACY)
-  if(NOT CMAKE_SYSTEM_NAME MATCHES "Linux")
-    message(WARNING "Building Tracy (IREE_BUILD_TRACY) on non-Linux is unsupported and may fail below.")
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin|Linux")
+    message(WARNING "Building Tracy (IREE_BUILD_TRACY) on non-Darwin/Linux is unsupported and may fail below.")
   endif()
   add_subdirectory(build_tools/third_party/tracy ${CMAKE_CURRENT_BINARY_DIR}/tracy)
   if(NOT TARGET IREETracyCaptureServer)

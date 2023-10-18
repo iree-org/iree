@@ -63,11 +63,8 @@ public:
   explicit IREEComprehensiveBufferizePass(
       std::optional<BufferizationOptions::AllocationFn> allocationFn =
           std::nullopt,
-      std::optional<BufferizationOptions::DeallocationFn> deallocationFn =
-          std::nullopt,
       std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt)
-      : allocationFn(allocationFn), deallocationFn(deallocationFn),
-        memCpyFn(memCpyFn) {}
+      : allocationFn(allocationFn), memCpyFn(memCpyFn) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -91,7 +88,6 @@ public:
 
 private:
   const std::optional<BufferizationOptions::AllocationFn> allocationFn;
-  const std::optional<BufferizationOptions::DeallocationFn> deallocationFn;
   const std::optional<BufferizationOptions::MemCpyFn> memCpyFn;
 };
 } // namespace
@@ -114,11 +110,6 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
                              type.getLayout());
   }
   return builder.create<memref::AllocOp>(loc, type, dynamicSizes).getResult();
-}
-static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
-                                           Value allocation) {
-  builder.create<memref::DeallocOp>(loc, allocation);
-  return success();
 }
 static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
@@ -164,11 +155,7 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
     return failure();
 
   // Rewrite tensor.empty ops that are anchored on specific ops.
-  if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
-          rewriter, op, state)))
-    return failure();
-  if (failed(
-          storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, op, state)))
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, op, state)))
     return failure();
 
   return success();
@@ -189,10 +176,14 @@ void EliminateEmptyTensorsPass::runOnOperation() {
     }
   }
 
-  OneShotBufferizationOptions options = getBufferizationOptions();
-
   IRRewriter rewriter(moduleOp->getContext());
-  if (failed(eliminateEmptyTensors(rewriter, moduleOp, options)))
+  auto bufferizationOptions = getBufferizationOptions();
+  OneShotAnalysisState state(moduleOp, bufferizationOptions);
+  // Analyze IR.
+  if (failed(analyzeOp(moduleOp, state)))
+    return signalPassFailure();
+  // Eliminate empty tensors.
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, moduleOp, state)))
     return signalPassFailure();
 }
 
@@ -216,7 +207,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
   options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
 
   if (failed(runIREEOneShotBufferize(moduleOp, options))) {
@@ -239,16 +229,13 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
-    std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   if (!allocationFn)
     allocationFn = defaultAllocationFn;
-  if (!deallocationFn)
-    deallocationFn = defaultDeallocationFn;
   if (!memCpyFn)
     memCpyFn = defaultMemCpyFn;
-  return std::make_unique<IREEComprehensiveBufferizePass>(
-      allocationFn, deallocationFn, memCpyFn);
+  return std::make_unique<IREEComprehensiveBufferizePass>(allocationFn,
+                                                          memCpyFn);
 }
 
 void addIREEPostBufferizationPasses(OpPassManager &passManager) {
@@ -265,12 +252,11 @@ void addIREEPostBufferizationPasses(OpPassManager &passManager) {
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
-    std::optional<BufferizationOptions::DeallocationFn> deallocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   passManager.addPass(createEliminateEmptyTensorsPass());
   passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
-  passManager.addPass(createIREEComprehensiveBufferizePass(
-      allocationFn, deallocationFn, memCpyFn));
+  passManager.addPass(
+      createIREEComprehensiveBufferizePass(allocationFn, memCpyFn));
   addIREEPostBufferizationPasses(passManager);
 }
 

@@ -5,14 +5,14 @@
 // CHECK-SAME:          %[[RHS:[^:[:space:]]+]]
 // CHECK-SAME:          %[[ACC:[^:[:space:]]+]]
 // CHECK-DAG:       %[[ZERO:.*]]          = arith.constant dense<0> : vector<4x4xi8>
-// CHECK-DAG:       %[[ACC_ROW_0:.*]]     = vector.extract %[[ACC]][0] : vector<8x8xi32>
-// CHECK-DAG:       %[[ACC_ROW_1:.*]]     = vector.extract %[[ACC]][1] : vector<8x8xi32>
-// CHECK-DAG:       %[[ACC_ROW_2:.*]]     = vector.extract %[[ACC]][2] : vector<8x8xi32>
-// CHECK-DAG:       %[[ACC_ROW_3:.*]]     = vector.extract %[[ACC]][3] : vector<8x8xi32>
-// CHECK-DAG:       %[[ACC_ROW_4:.*]]     = vector.extract %[[ACC]][4] : vector<8x8xi32>
-// CHECK-DAG:       %[[ACC_ROW_5:.*]]     = vector.extract %[[ACC]][5] : vector<8x8xi32>
-// CHECK-DAG:       %[[ACC_ROW_6:.*]]     = vector.extract %[[ACC]][6] : vector<8x8xi32>
-// CHECK-DAG:       %[[ACC_ROW_7:.*]]     = vector.extract %[[ACC]][7] : vector<8x8xi32>
+// CHECK-DAG:       %[[ACC_ROW_0:.*]]     = vector.extract %[[ACC]][0] : vector<8xi32> from vector<8x8xi32>
+// CHECK-DAG:       %[[ACC_ROW_1:.*]]     = vector.extract %[[ACC]][1] : vector<8xi32> from vector<8x8xi32>
+// CHECK-DAG:       %[[ACC_ROW_2:.*]]     = vector.extract %[[ACC]][2] : vector<8xi32> from vector<8x8xi32>
+// CHECK-DAG:       %[[ACC_ROW_3:.*]]     = vector.extract %[[ACC]][3] : vector<8xi32> from vector<8x8xi32>
+// CHECK-DAG:       %[[ACC_ROW_4:.*]]     = vector.extract %[[ACC]][4] : vector<8xi32> from vector<8x8xi32>
+// CHECK-DAG:       %[[ACC_ROW_5:.*]]     = vector.extract %[[ACC]][5] : vector<8xi32> from vector<8x8xi32>
+// CHECK-DAG:       %[[ACC_ROW_6:.*]]     = vector.extract %[[ACC]][6] : vector<8xi32> from vector<8x8xi32>
+// CHECK-DAG:       %[[ACC_ROW_7:.*]]     = vector.extract %[[ACC]][7] : vector<8xi32> from vector<8x8xi32>
 // CHECK-DAG:       %[[ACC_CHUNK_00:.*]]  = vector.extract_strided_slice %[[ACC_ROW_0]] {offsets = [0]
 // CHECK-DAG:       %[[ACC_CHUNK_01:.*]]  = vector.extract_strided_slice %[[ACC_ROW_0]] {offsets = [4]
 // CHECK-DAG:       %[[ACC_CHUNK_02:.*]]  = vector.extract_strided_slice %[[ACC_ROW_1]] {offsets = [0]

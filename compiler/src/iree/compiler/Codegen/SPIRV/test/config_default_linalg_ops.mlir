@@ -553,7 +553,7 @@ hal.executable private @odd_reduction_dimension_size_501 {
           iterator_types = ["parallel", "reduction"]
         } ins(%2 : tensor<512x501xf32>) outs(%5 : tensor<512xf32>) {
         ^bb0(%in: f32, %out: f32):
-          %8 = arith.maxf %out, %in : f32
+          %8 = arith.maximumf %out, %in : f32
           linalg.yield %8 : f32
         } -> tensor<512xf32>
         %7 = linalg.generic {
@@ -612,7 +612,7 @@ hal.executable private @odd_reduction_dimension_size_2809 {
           iterator_types = ["parallel", "reduction"]
         } ins(%2 : tensor<512x2809xf32>) outs(%5 : tensor<512xf32>) {
         ^bb0(%in: f32, %out: f32):
-          %8 = arith.maxf %out, %in : f32
+          %8 = arith.maximumf %out, %in : f32
           linalg.yield %8 : f32
         } -> tensor<512xf32>
         %7 = linalg.generic {
@@ -670,7 +670,7 @@ hal.executable private @broadcast {
           iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         } ins(%2 : tensor<f32>) outs(%3 : tensor<2048x1x1x1xf32>) {
         ^bb0(%in: f32, %out: f32):
-          %5 = arith.maxf %in, %cst : f32
+          %5 = arith.maximumf %in, %cst : f32
           %6 = arith.divf %cst_0, %5 : f32
           linalg.yield %6 : f32
         } -> tensor<2048x1x1x1xf32>

@@ -130,6 +130,22 @@ static inline bool iree_device_size_has_alignment(
 #define iree_sizeof_struct(t) iree_host_align(sizeof(t), iree_max_align_t)
 
 // Returns the ceil-divide of |lhs| by non-zero |rhs|.
+static inline iree_host_size_t iree_host_size_ceil_div(iree_host_size_t lhs,
+                                                       iree_host_size_t rhs) {
+  return ((lhs != 0) && (lhs > 0) == (rhs > 0))
+             ? ((lhs + ((rhs > 0) ? -1 : 1)) / rhs) + 1
+             : -(-lhs / rhs);
+}
+
+// Returns the floor-divide of |lhs| by non-zero |rhs|.
+static inline iree_host_size_t iree_host_size_floor_div(iree_host_size_t lhs,
+                                                        iree_host_size_t rhs) {
+  return ((lhs != 0) && ((lhs < 0) != (rhs < 0)))
+             ? -((-lhs + ((rhs < 0) ? 1 : -1)) / rhs) - 1
+             : lhs / rhs;
+}
+
+// Returns the ceil-divide of |lhs| by non-zero |rhs|.
 static inline iree_device_size_t iree_device_size_ceil_div(
     iree_device_size_t lhs, iree_device_size_t rhs) {
   return ((lhs != 0) && (lhs > 0) == (rhs > 0))

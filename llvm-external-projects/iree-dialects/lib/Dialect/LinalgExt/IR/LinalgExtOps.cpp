@@ -50,16 +50,18 @@ static Type getComplexElementTypeOrSelf(Type ty) {
 static void getEffectsImpl(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects,
-    ValueRange results, ValueRange inputBuffers, ValueRange outputBuffers) {
-  for (Value value : results) {
-    effects.emplace_back(MemoryEffects::Allocate::get(), value,
-                         SideEffects::DefaultResource::get());
-  }
-  for (Value value : inputBuffers) {
+    ValueRange inputOperands, ValueRange outputOperands) {
+  for (Value value : inputOperands) {
+    if (!llvm::isa<MemRefType>(value.getType())) {
+      continue;
+    }
     effects.emplace_back(MemoryEffects::Read::get(), value,
                          SideEffects::DefaultResource::get());
   }
-  for (Value value : outputBuffers) {
+  for (Value value : outputOperands) {
+    if (!llvm::isa<MemRefType>(value.getType())) {
+      continue;
+    }
     effects.emplace_back(MemoryEffects::Read::get(), value,
                          SideEffects::DefaultResource::get());
     effects.emplace_back(MemoryEffects::Write::get(), value,
@@ -408,15 +410,15 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
 
 LogicalResult SortOp::verify() {
   Operation *op = getOperation();
-  if (getNumInputs()) {
+  if (getNumDpsInputs()) {
     return op->emitOpError("does not expect to take any inputs");
   }
-  if (getNumOutputs() == 0) {
+  if (getNumDpsInits() == 0) {
     return op->emitOpError("expected at least one `outs` operand");
   }
 
   Block &block = getRegion().front();
-  size_t numOutputs = getNumOutputs();
+  size_t numOutputs = getNumDpsInits();
   if (block.getNumArguments() != 2 * numOutputs) {
     return op->emitOpError("region block should have ")
            << 2 * numOutputs << " arguments";
@@ -542,13 +544,11 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
       [&](OpBuilder &b, Location loc, Value iv, ValueRange iters) {
         SmallVector<Value> indices(ivs);
         Value ivPlusOne = b.create<arith::AddIOp>(loc, iv, one);
-        for (auto output : getOutputOperands()) {
+        for (auto output : getDpsInits()) {
           indices[sortDim] = iv;
-          sortBlkArgs.push_back(
-              b.create<memref::LoadOp>(loc, output->get(), indices));
+          sortBlkArgs.push_back(b.create<memref::LoadOp>(loc, output, indices));
           indices[sortDim] = ivPlusOne;
-          sortBlkArgs.push_back(
-              b.create<memref::LoadOp>(loc, output->get(), indices));
+          sortBlkArgs.push_back(b.create<memref::LoadOp>(loc, output, indices));
         }
       });
 
@@ -581,15 +581,13 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
         SmallVector<Value> indices(ivs.begin(), ivs.end());
         Value ivPlusOne =
             b.create<arith::AddIOp>(loc, scfFor.getInductionVar(), one);
-        for (int i = 0, e = getNumOutputs(); i < e; ++i) {
+        for (int i = 0, e = getNumDpsInits(); i < e; ++i) {
           Value v1 = sortBlkArgs[i * 2];
           Value v2 = sortBlkArgs[i * 2 + 1];
           indices[sortDim] = scfFor.getInductionVar();
-          b.create<memref::StoreOp>(loc, v2, getOutputOperand(i)->get(),
-                                    indices);
+          b.create<memref::StoreOp>(loc, v2, getDpsInits()[i], indices);
           indices[sortDim] = ivPlusOne;
-          b.create<memref::StoreOp>(loc, v1, getOutputOperand(i)->get(),
-                                    indices);
+          b.create<memref::StoreOp>(loc, v1, getDpsInits()[i], indices);
         }
         b.create<scf::YieldOp>(loc);
       });
@@ -619,16 +617,16 @@ LogicalResult FftOp::verify() {
   if (length & (length - 1)) {
     return op->emitOpError("only powers of 2 are handled currently");
   }
-  if (!getNumInputs() || !isScalar(getInputOperand(0))) {
+  if (!getNumDpsInputs() || !isScalar(getDpsInputOperand(0))) {
     return op->emitOpError("expected to carry `stage` input");
   }
-  if (getNumInputs() != 1) {
-    if (getNumInputs() != 3 || isScalar(getInputOperand(1)) ||
-        isScalar(getInputOperand(2))) {
+  if (getNumDpsInputs() != 1) {
+    if (getNumDpsInputs() != 3 || isScalar(getDpsInputOperand(1)) ||
+        isScalar(getDpsInputOperand(2))) {
       return op->emitOpError("expected to carry real and imag coeff inputs");
     }
   }
-  if (getNumOutputs() != 2) {
+  if (getNumDpsInits() != 2) {
     return op->emitOpError(
         "expected outputs to be real and imag tensor/memref");
   }
@@ -857,10 +855,10 @@ FftOp::reifyResultShapes(OpBuilder &b,
 
 LogicalResult ScanOp::verify() {
   Operation *op = getOperation();
-  if (getNumInputs() != 1) {
+  if (getNumDpsInputs() != 1) {
     return op->emitOpError("expected one input operands");
   }
-  if (getNumOutputs() != 2) {
+  if (getNumDpsInits() != 2) {
     return op->emitOpError("expected two output operands");
   }
   if (!input().getType().isa<ShapedType>()) {
@@ -1091,10 +1089,10 @@ ScanOp::reifyResultShapes(OpBuilder &b,
 
 LogicalResult ReverseOp::verify() {
   Operation *op = getOperation();
-  if (getNumInputs() != 1) {
+  if (getNumDpsInputs() != 1) {
     return op->emitOpError("expected exactly one input");
   }
-  if (getNumOutputs() != 1) {
+  if (getNumDpsInits() != 1) {
     return op->emitOpError("expected exactly one output");
   }
   auto inputType = input().getType().cast<ShapedType>();
@@ -1237,10 +1235,10 @@ ReverseOp::reifyResultShapes(OpBuilder &b,
 
 LogicalResult TopkOp::verify() {
   Operation *op = getOperation();
-  if (getNumInputs() != 1 && getNumInputs() != 2) {
+  if (getNumDpsInputs() != 1 && getNumDpsInputs() != 2) {
     return op->emitOpError("expected one or two input operands");
   }
-  if (getNumOutputs() != 2) {
+  if (getNumDpsInits() != 2) {
     return op->emitOpError("expected two output operands");
   }
   if (getDimension() >= getInputRank()) {
@@ -1481,8 +1479,8 @@ LogicalResult TopkOp::getResultTilePosition(
     SmallVector<OpFoldResult> &resultSizes) {
   resultOffsets.assign(offsets.begin(), offsets.end());
   resultSizes.assign(sizes.begin(), sizes.end());
-  Value kSize = getDimValue(
-      builder, getLoc(), getOutputOperand(resultNumber)->get(), getDimension());
+  Value kSize = getDimValue(builder, getLoc(), getDpsInits()[resultNumber],
+                            getDimension());
   resultSizes[getDimension()] = getAsOpFoldResult(kSize);
   return success();
 }
@@ -1951,17 +1949,17 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
     ivVec.push_back(loop.getInductionVar());
   }
   // The body of the innermost loops does the actual data movement.
-  builder.create<scf::ForOp>(loc, zero,
-                             getValueOrCreateConstantIndexOp(
-                                 builder, loc, outputShape[0].back()),
-                             one, ValueRange{},
-                             [&](OpBuilder &bodyBuilder, Location bodyLoc,
-                                 Value iv, ValueRange regionIterArgs) {
-                               ivVec.push_back(iv);
-                               generatePackOpScalarImplementationBody(
-                                   *this, bodyBuilder, bodyLoc, ivVec);
-                               bodyBuilder.create<scf::YieldOp>(bodyLoc);
-                             });
+  builder.create<scf::ForOp>(
+      loc, zero,
+      getValueOrCreateConstantIndexOp(builder, loc, outputShape[0].back()), one,
+      ValueRange{},
+      [&](OpBuilder &bodyBuilder, Location bodyLoc, Value iv,
+          ValueRange regionIterArgs) {
+        ivVec.push_back(iv);
+        generatePackOpScalarImplementationBody(*this, bodyBuilder, bodyLoc,
+                                               ivVec);
+        bodyBuilder.create<scf::YieldOp>(bodyLoc);
+      });
   return success();
 }
 
@@ -2089,10 +2087,10 @@ LogicalResult UnPackOp::verify() {
 
 LogicalResult WinogradInputTransformOp::verify() {
   Operation *op = getOperation();
-  if (getNumInputs() != 1) {
+  if (getNumDpsInputs() != 1) {
     return op->emitOpError("expected one input operand");
   }
-  if (getNumOutputs() != 1) {
+  if (getNumDpsInits() != 1) {
     return op->emitOpError("expected one output operand");
   }
   auto inputType = input().getType().cast<ShapedType>();
@@ -2259,10 +2257,10 @@ LogicalResult WinogradInputTransformOp::reifyResultShapes(
 
 LogicalResult WinogradOutputTransformOp::verify() {
   Operation *op = getOperation();
-  if (getNumInputs() != 1) {
+  if (getNumDpsInputs() != 1) {
     return op->emitOpError("expected one input operand");
   }
-  if (getNumOutputs() != 1) {
+  if (getNumDpsInits() != 1) {
     return op->emitOpError("expected one output operand");
   }
   auto inputType = input().getType().cast<ShapedType>();
@@ -2416,101 +2414,6 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 }
 
 //===----------------------------------------------------------------------===//
-// SoftmaxOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult SoftmaxOp::verify() {
-  Operation *op = getOperation();
-  auto inputType = input().getType().cast<ShapedType>();
-  auto outputType = output().getType().cast<ShapedType>();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  ArrayRef<int64_t> outputShape = outputType.getShape();
-  if (failed(verifyCompatibleShape(inputShape, outputShape))) {
-    return op->emitOpError("incompatible output shape");
-  }
-  int64_t inputRank = getInputOperandRank();
-  int64_t dimension = getDimension();
-  if ((dimension < 0) || (dimension >= inputRank)) {
-    return op->emitOpError("incorrect dimension specified");
-  }
-  return success();
-}
-
-SmallVector<Range> SoftmaxOp::getIterationDomain(OpBuilder &builder) {
-  int64_t operandRank = getInputOperandRank();
-  SmallVector<Range> loopBounds(operandRank);
-  Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = input();
-  for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
-    loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
-    loopBounds[dim].stride = one;
-  }
-  return loopBounds;
-}
-
-SmallVector<utils::IteratorType> SoftmaxOp::getLoopIteratorTypes() {
-  SmallVector<utils::IteratorType> iteratorTypes(getInputOperandRank(),
-                                                 utils::IteratorType::parallel);
-  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
-  return iteratorTypes;
-}
-
-FailureOr<TilingResult>
-SoftmaxOp::getTiledImplementation(OpBuilder &builder,
-                                  ArrayRef<OpFoldResult> offsets,
-                                  ArrayRef<OpFoldResult> sizes) {
-  int64_t rank = getInputOperandRank();
-  auto oneAttr = builder.getI64IntegerAttr(1);
-  SmallVector<OpFoldResult> strides(rank, oneAttr);
-  SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), input(), offsets, sizes, strides));
-  tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), getOutputs()[0], offsets, sizes, strides));
-
-  SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[1].getType());
-  }
-  Operation *tiledOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
-}
-
-LogicalResult SoftmaxOp::getResultTilePosition(
-    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
-    SmallVector<OpFoldResult> &resultSizes) {
-  if (resultNumber == 0) {
-    resultOffsets.assign(offsets.begin(), offsets.end());
-    resultSizes.assign(sizes.begin(), sizes.end());
-    return success();
-  }
-  return failure();
-}
-
-LogicalResult SoftmaxOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
-  return memref::foldMemRefCast(*this);
-}
-
-LogicalResult
-SoftmaxOp::reifyResultShapes(OpBuilder &b,
-                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  return cast<LinalgExtOp>(getOperation())
-      .reifyResultShapes(b, reifiedReturnShapes);
-}
-
-void SoftmaxOp::build(OpBuilder &builder, OperationState &state, Value source,
-                      Value output, int64_t dimension) {
-  build(builder, state, TypeRange({output.getType()}), ValueRange(source),
-        ValueRange(output), dimension);
-}
-
-//===----------------------------------------------------------------------===//
 // AttentionOp
 //===----------------------------------------------------------------------===//
 
@@ -2639,10 +2542,7 @@ LogicalResult AttentionOp::reifyResultShapes(
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
           &effects) {                                                          \
-    SmallVector<Value> inputBuffers = getInputBufferOperands();                \
-    SmallVector<Value> outputBuffers = getOutputBufferOperands();              \
-    getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,        \
-                   outputBuffers);                                             \
+    getEffectsImpl(effects, getDpsInputs(), getDpsInits());                    \
   }
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
@@ -2655,7 +2555,6 @@ DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
-DEFINE_OP_GET_EFFECTS(SoftmaxOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
 
 //===----------------------------------------------------------------------===//
@@ -2717,81 +2616,6 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
   reifiedReturnShapes.resize(1);
   reifiedReturnShapes[0] = getDims(builder, getLoc(), getSource());
   return success();
-}
-
-namespace {
-/// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
-/// changes.
-struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
-  using OpInterfaceRewritePattern<LinalgExtOp>::OpInterfaceRewritePattern;
-
-  LogicalResult matchAndRewrite(LinalgExtOp op,
-                                PatternRewriter &rewriter) const override {
-    // If no operand comes from a tensor::CastOp and can be folded then fail.
-    bool hasTensorCastOperand =
-        llvm::any_of(op.getInputAndOutputOperands(), [&](OpOperand *opOperand) {
-          if (opOperand->get().isa<BlockArgument>())
-            return false;
-          auto castOp = opOperand->get().getDefiningOp<tensor::CastOp>();
-          return castOp && canFoldIntoConsumerOp(castOp);
-        });
-    if (!hasTensorCastOperand)
-      return failure();
-
-    SmallVector<Type, 4> newResultTypes;
-    newResultTypes.reserve(op->getNumResults());
-    SmallVector<Value, 4> newOperands;
-    newOperands.reserve(op->getNumOperands());
-    // Inputs may fold.
-    for (OpOperand *opOperand : op.getInputOperands()) {
-      auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
-      newOperands.push_back(canFoldIntoConsumerOp(tensorCastOp)
-                                ? tensorCastOp.getSource()
-                                : opOperand->get());
-    }
-    // Init tensors may fold, in which case the resultType must also change.
-    for (OpOperand *opOperand : op.getOutputOperands()) {
-      auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
-      bool fold = canFoldIntoConsumerOp(tensorCastOp);
-      newOperands.push_back(fold ? tensorCastOp.getOperand()
-                                 : opOperand->get());
-      newResultTypes.push_back(newOperands.back().getType());
-    }
-    // Add the other operands.
-    for (OpOperand *opOperand : op.getNonInputOrOutputOperands()) {
-      auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
-      newOperands.push_back(canFoldIntoConsumerOp(tensorCastOp)
-                                ? tensorCastOp.getSource()
-                                : opOperand->get());
-    }
-    // Clone op.
-    Operation *newOp = mlir::clone(rewriter, op, newResultTypes, newOperands);
-    SmallVector<Value, 4> replacements;
-    replacements.reserve(newOp->getNumResults());
-    for (auto result : llvm::zip(op->getResults(), newOp->getResults())) {
-      Value oldResult = std::get<0>(result);
-      Value newResult = std::get<1>(result);
-      if (newResult.getType() != oldResult.getType()) {
-        replacements.push_back(rewriter.create<tensor::CastOp>(
-            op->getLoc(), oldResult.getType(), newResult));
-      } else {
-        replacements.push_back(newResult);
-      }
-    }
-    rewriter.replaceOp(op, replacements);
-
-    return success();
-  }
-};
-} // namespace
-
-//===----------------------------------------------------------------------===//
-// LinalgExtDialect
-//===----------------------------------------------------------------------===//
-
-void IREELinalgExtDialect::getCanonicalizationPatterns(
-    RewritePatternSet &results) const {
-  results.add<FoldTensorCastOp>(getContext());
 }
 
 // clang-format off

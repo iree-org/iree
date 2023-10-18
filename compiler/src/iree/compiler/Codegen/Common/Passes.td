@@ -158,6 +158,14 @@ def DecomposePackUnPackOps :
   ];
 }
 
+def ReplaceSlowMinMaxOps
+    : Pass<"iree-codegen-replace-slow-min-max-ops", "func::FuncOp"> {
+  let summary =
+      "Replace slow min/max operations that propagate NaNs and distinguish "
+      "between +/-0.0 with faster min/max operations that ignore them.";
+  let constructor = "mlir::iree_compiler::createReplaceSlowMinMaxOpsPass()";
+}
+
 def EliminateEmptyTensors :
     Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
@@ -182,6 +190,13 @@ def EraseHALDescriptorTypeFromMemRef
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
   let constructor =
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
+}
+
+def ConvertHALDescriptorTypeToGPUAddressSpace
+    : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
+  let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let constructor =
+      "mlir::iree_compiler::createConvertHALDescriptorTypeToGPUAddressSpacePass()";
 }
 
 def ExtractAddressComputation: Pass<"extract-address-computation"> {
@@ -266,6 +281,12 @@ def HoistRedundantVectorTransfers :
     Pass<"iree-codegen-hoist-redundant-vector-transfers", "func::FuncOp"> {
   let summary = "Hoist redundant vector transfers";
   let constructor = "mlir::iree_compiler::createHoistRedundantVectorTransfersPass()";
+}
+
+def HoistUnrolledVectorExtractInsertSlice :
+    Pass<"iree-codegen-hoist-vector-extract-insert-slice", "func::FuncOp"> {
+  let summary = "Hoist unrolled vector (extract, insert) pairs out of scf.for op";
+  let constructor =  "mlir::iree_compiler::createHoistUnrolledVectorExtractInsertSlicePass()";
 }
 
 def HoistStaticallyBoundAllocations :
@@ -421,11 +442,10 @@ def TransformDialectInterpreter :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
-    Option<"transformLibraryFileName",
-           "transform-library-file-name",
+    ListOption<"transformLibraryPaths",
+           "transform-library-paths",
            "std::string",
-           /*default=*/"\"\"",
-           "If non-empty, the name of the file containing definitions of "
+           "If non-empty, the paths to files containing definitions of "
            "external symbols referenced in the transform script. "
            "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",

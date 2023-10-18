@@ -1698,7 +1698,7 @@ hal.executable private @rank_reduced_slice {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 0], [8, 32, 0], [0, 0, 16]], tile_interchange = [[1, 0, 2], [], []]>
+#config = #iree_codegen.lowering_config<tile_sizes = [{sizes=[32, 64, 0], interchange=[1, 0, 2]}, [8, 32, 0], [0, 0, 16]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1845,7 +1845,7 @@ hal.executable private @tile_multiuse_producer {
             iterator_types = ["parallel", "parallel", "reduction"]}
             ins(%3 : tensor<12x128x128xf32>) outs(%1 : tensor<12x128xf32>) {
           ^bb0(%arg0: f32, %arg1: f32):
-            %11 = arith.maxf %arg0, %arg1 : f32
+            %11 = arith.maximumf %arg0, %arg1 : f32
             linalg.yield %11 : f32
           } -> tensor<12x128xf32>
         %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<12x128xf32>) -> tensor<12x128xf32>
@@ -2242,7 +2242,7 @@ hal.executable private @dynamic_unpack_fusion {
         %cst = arith.constant dense<[-918, -4433, 87, -234, -21393, 7738, 529, -8835, -16817, -375, -199, 572, 5082, 15569, -186, 4955]> : tensor<16xi32>
         %c12544 = arith.constant 12544 : index
         %c16 = arith.constant 16 : index
-        %0:2 = iree_codegen.query_tile_sizes tensor<12544x16xi32, #iree_linalg_ext.encoding<user = MATMUL_I8I8I32, role = RESULT>> -> index, index
+        %0:2 = iree_codegen.query_tile_sizes tensor<12544x16xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32]>> -> index, index
         %1 = affine.apply affine_map<()[s0] -> (12544 ceildiv s0)>()[%0#0]
         %2 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#1]
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c200960) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1}

@@ -31,15 +31,6 @@ declare_mlir_dialect_python_bindings(
   DIALECT_NAME iree_linalg_ext
 )
 
-declare_mlir_dialect_python_bindings(
-  ADD_TO_PARENT IREEDialectsPythonSources.Dialects
-  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
-  TD_FILE dialects/LinalgTransformBinding.td
-  SOURCES dialects/iree_linalg_transform.py
-          dialects/_iree_linalg_transform_ops_ext.py
-  DIALECT_NAME iree_linalg_transform
-  )
-
 declare_mlir_dialect_extension_python_bindings(
   ADD_TO_PARENT IREEDialectsPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"

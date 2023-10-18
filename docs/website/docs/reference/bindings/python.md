@@ -24,11 +24,6 @@ components:
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-!!! Caution "Caution - Operating system support"
-    Packages are currently only available on Linux and macOS. They are not
-    available on Windows yet (see
-    [this issue](https://github.com/openxla/iree/issues/13484)).
-
 ## :octicons-download-16: Prerequisites
 
 To use IREE's Python bindings, you will first need to install
@@ -136,6 +131,7 @@ compiled_flatbuffer = ireec.tools.compile_str(
 
 ```python
 from iree import runtime as ireert
+import numpy as np
 
 # Register the module with a runtime context.
 # Use the "local-task" CPU driver, which can load the vmvx executable:

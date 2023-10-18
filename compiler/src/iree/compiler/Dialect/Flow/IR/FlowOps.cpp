@@ -63,14 +63,19 @@ verifyDispatchWorkload(Operation *op, IREE::Flow::ExecutableExportOp exportOp,
   // the workload here matches what is expected.
   if (!exportOp.getWorkgroupCount().empty()) {
     auto &workgroupCount = exportOp.getWorkgroupCount();
-    if (workgroupCount.getNumArguments() != workload.size()) {
+    auto explicitArgs = llvm::make_filter_range(
+        workgroupCount.getArgumentTypes(), [](Type type) {
+          return !type.hasTrait<
+              mlir::OpTrait::IREE::Util::ImplicitlyCaptured>();
+        });
+    if (llvm::range_size(explicitArgs) != workload.size()) {
       return op->emitOpError()
              << "workload mismatch; entry point expects "
-             << workgroupCount.getNumArguments()
+             << llvm::range_size(explicitArgs)
              << " arguments but dispatch provides " << workload.size();
     }
-    for (auto [index, expectedType, actualType] : llvm::enumerate(
-             workgroupCount.getArgumentTypes(), workload.getTypes())) {
+    for (auto [index, expectedType, actualType] :
+         llvm::enumerate(explicitArgs, workload.getTypes())) {
       if (expectedType != actualType) {
         return op->emitOpError()
                << "workload operand " << index << " type mismatch; expected "
@@ -109,10 +114,12 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
                    ArrayRef<OpFoldResult> mixedSizes) {
   ArrayRef<int64_t> resultShape = slicedObjectType.getShape();
   llvm::SmallBitVector droppedDims(mixedSizes.size());
-  if (slicedObjectType.getRank() == mixedSizes.size()) {
+  size_t maxDroppedDims = mixedSizes.size() - resultShape.size();
+  if (maxDroppedDims == 0) {
     return droppedDims;
   }
   unsigned shapePos = 0;
+  int numSet = 0;
   for (const auto &size : llvm::enumerate(mixedSizes)) {
     std::optional<int64_t> sizeVal = getConstantIntValue(size.value());
     // If the size is not 1, or if the current matched dimension of the result
@@ -124,6 +131,10 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
       continue;
     }
     droppedDims.set(size.index());
+    numSet++;
+    if (numSet == maxDroppedDims) {
+      break;
+    }
   }
   return droppedDims;
 }
@@ -279,8 +290,6 @@ static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
 //===----------------------------------------------------------------------===//
 // flow.dispatch.region
 //===----------------------------------------------------------------------===//
-
-// Verifies the workgroup count
 
 static LogicalResult
 verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {

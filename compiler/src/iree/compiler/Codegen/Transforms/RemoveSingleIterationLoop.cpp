@@ -181,10 +181,10 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     // The first iteration is always run and the second iteration is never run
     // so the loop always have 1 iteration. Inline its body and remove the loop.
     SmallVector<Value> blockArgs;
-    blockArgs.reserve(op.getNumIterOperands() + 1);
+    blockArgs.reserve(op.getInitArgs().size() + 1);
     blockArgs.push_back(op.getLowerBound());
-    llvm::append_range(blockArgs, op.getIterOperands());
-    replaceOpWithRegion(rewriter, op, op.getLoopBody(), blockArgs);
+    llvm::append_range(blockArgs, op.getInitArgs());
+    replaceOpWithRegion(rewriter, op, op.getRegion(), blockArgs);
     return success();
   }
 

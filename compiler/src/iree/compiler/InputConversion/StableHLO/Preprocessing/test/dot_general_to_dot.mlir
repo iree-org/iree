@@ -2,13 +2,13 @@
 // RUN:   --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @testDebatch1
-// CHECK-SAME:   ([[ARG0:%.+]]: tensor<1x1x2xf32>, [[ARG1:%.+]]: tensor<2x3xf32>)
-func.func @testDebatch1(%arg0: tensor<1x1x2xf32>, %arg1: tensor<2x3xf32>) -> tensor<1x1x3xf32> {
+// CHECK-SAME:   ([[ARG0:%.+]]: tensor<1x5x2xf32>, [[ARG1:%.+]]: tensor<2x3xf32>)
+func.func @testDebatch1(%arg0: tensor<1x5x2xf32>, %arg1: tensor<2x3xf32>) -> tensor<1x5x3xf32> {
   // CHECK-DAG: [[T0:%.+]] = stablehlo.transpose [[ARG0]], dims = [0, 1, 2]
-  // CHECK-DAG: [[R0:%.+]] = stablehlo.reshape [[T0]] : (tensor<1x1x2xf32>) -> tensor<1x2xf32>
+  // CHECK-DAG: [[R0:%.+]] = stablehlo.reshape [[T0]] : (tensor<1x5x2xf32>) -> tensor<5x2xf32>
   // CHECK-DAG: [[T1:%.+]] = stablehlo.transpose [[ARG1]], dims = [0, 1]
-  // CHECK:     [[R1:%.+]] = stablehlo.dot [[R0]], [[T1]], precision = [DEFAULT, DEFAULT] : (tensor<1x2xf32>, tensor<2x3xf32>) -> tensor<1x3xf32>
-  // CHECK:     [[R2:%.+]] = stablehlo.reshape [[R1]] : (tensor<1x3xf32>) -> tensor<1x1x3xf32>
+  // CHECK:     [[R1:%.+]] = stablehlo.dot [[R0]], [[T1]], precision = [DEFAULT, DEFAULT] : (tensor<5x2xf32>, tensor<2x3xf32>) -> tensor<5x3xf32>
+  // CHECK:     [[R2:%.+]] = stablehlo.reshape [[R1]] : (tensor<5x3xf32>) -> tensor<1x5x3xf32>
   // CHECK:     return [[R2]]
   %0 = "stablehlo.dot_general"(%arg0, %arg1) {
     dot_dimension_numbers = #stablehlo.dot<
@@ -16,21 +16,21 @@ func.func @testDebatch1(%arg0: tensor<1x1x2xf32>, %arg1: tensor<2x3xf32>) -> ten
       rhs_contracting_dimensions = [0]
     >,
    precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>]
-  } : (tensor<1x1x2xf32>, tensor<2x3xf32>) -> tensor<1x1x3xf32>
+  } : (tensor<1x5x2xf32>, tensor<2x3xf32>) -> tensor<1x5x3xf32>
 
-  func.return %0 : tensor<1x1x3xf32>
+  func.return %0 : tensor<1x5x3xf32>
 }
 
 // -----
 
 // CHECK-LABEL: @testDebatch2
-// CHECK-SAME:   ([[ARG0:%.+]]: tensor<2x3xf32>, [[ARG1:%.+]]: tensor<1x1x2xf32>)
-func.func @testDebatch2(%arg0: tensor<2x3xf32>, %arg1: tensor<1x1x2xf32>) -> tensor<3x1x1xf32> {
+// CHECK-SAME:   ([[ARG0:%.+]]: tensor<2x3xf32>, [[ARG1:%.+]]: tensor<1x5x2xf32>)
+func.func @testDebatch2(%arg0: tensor<2x3xf32>, %arg1: tensor<1x5x2xf32>) -> tensor<3x1x5xf32> {
   // CHECK-DAG: [[R0:%.+]] = stablehlo.transpose [[ARG0]], dims = [1, 0] : (tensor<2x3xf32>) -> tensor<3x2xf32>
-  // CHECK-DAG: [[R1:%.+]] = stablehlo.transpose [[ARG1]], dims = [2, 0, 1] : (tensor<1x1x2xf32>) -> tensor<2x1x1xf32>
-  // CHECK-DAG: [[R2:%.+]] = stablehlo.reshape [[R1]] : (tensor<2x1x1xf32>) -> tensor<2x1xf32>
-  // CHECK:     [[R3:%.+]] = stablehlo.dot [[R0]], [[R2]], precision = [DEFAULT, DEFAULT] : (tensor<3x2xf32>, tensor<2x1xf32>) -> tensor<3x1xf32>
-  // CHECK:     [[R4:%.+]] = stablehlo.reshape [[R3]] : (tensor<3x1xf32>) -> tensor<3x1x1xf32>
+  // CHECK-DAG: [[R1:%.+]] = stablehlo.transpose [[ARG1]], dims = [2, 0, 1] : (tensor<1x5x2xf32>) -> tensor<2x1x5xf32>
+  // CHECK-DAG: [[R2:%.+]] = stablehlo.reshape [[R1]] : (tensor<2x1x5xf32>) -> tensor<2x5xf32>
+  // CHECK:     [[R3:%.+]] = stablehlo.dot [[R0]], [[R2]], precision = [DEFAULT, DEFAULT] : (tensor<3x2xf32>, tensor<2x5xf32>) -> tensor<3x5xf32>
+  // CHECK:     [[R4:%.+]] = stablehlo.reshape [[R3]] : (tensor<3x5xf32>) -> tensor<3x1x5xf32>
 
   %0 = "stablehlo.dot_general"(%arg0, %arg1) {
     dot_dimension_numbers = #stablehlo.dot<
@@ -38,8 +38,8 @@ func.func @testDebatch2(%arg0: tensor<2x3xf32>, %arg1: tensor<1x1x2xf32>) -> ten
       rhs_contracting_dimensions = [2]
     >,
     precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>]
-  } : (tensor<2x3xf32>, tensor<1x1x2xf32>) -> tensor<3x1x1xf32>
-  func.return %0 : tensor<3x1x1xf32>
+  } : (tensor<2x3xf32>, tensor<1x5x2xf32>) -> tensor<3x1x5xf32>
+  func.return %0 : tensor<3x1x5xf32>
 }
 
 // -----
@@ -102,9 +102,11 @@ func.func @testMatVec(%arg0: tensor<32x20xf32>, %arg1: tensor<32xf32>) -> tensor
   // CHECK-DAG:  [[T0:%.+]] = stablehlo.transpose [[ARG0]], dims = [1, 0]
   // CHECK-DAG:  [[T1:%.+]] = stablehlo.transpose [[ARG1]], dims = [0]
   // CHECK-DAG:  [[R1:%.+]] = stablehlo.reshape [[T1]] : (tensor<32xf32>) -> tensor<32x1xf32>
-  // CHECK-NEXT: [[M:%.+]]  = stablehlo.dot [[T0]], [[R1]]
-  // CHECK-NEXT: [[R:%.+]]  = stablehlo.reshape [[M]]
-  // CHECK-NEXT: return [[R]]
+  // CHECK-DAG:  [[R2:%.+]] = stablehlo.reshape [[R1]] : (tensor<32x1xf32>) -> tensor<32xf32>
+  // CHECK-NEXT: [[M:%.+]]  = stablehlo.dot [[T0]], [[R2]]
+  // CHECK-NEXT: [[R1:%.+]]  = stablehlo.reshape [[M]]
+  // CHECK-NEXT: [[R2:%.+]]  = stablehlo.reshape [[R1]]
+  // CHECK-NEXT: return [[R2]]
   %0 = "stablehlo.dot_general"(%arg0, %arg1) {
     dot_dimension_numbers = #stablehlo.dot<
       lhs_contracting_dimensions = [0],
@@ -169,7 +171,7 @@ func.func @dot_no_rhs_batch(%arg0: tensor<1x512x768xf32>, %arg1: tensor<768x12x6
 
 // CHECK-LABEL: @testPrefElem
 func.func @testPrefElem(%arg0: tensor<1x1x2xf32>, %arg1: tensor<2x3xf32>) -> tensor<1x1x3xf64> {
-  // CHECK: stablehlo.dot {{%.*}}, {{%.*}} precision = [DEFAULT, DEFAULT] : (tensor<1x2xf32>, tensor<2x3xf32>) -> tensor<1x3xf64>
+  // CHECK: stablehlo.dot {{%.*}}, {{%.*}} precision = [DEFAULT, DEFAULT] : (tensor<2xf32>, tensor<2x3xf32>) -> tensor<3xf64>
   %0 = "stablehlo.dot_general"(%arg0, %arg1) {
     dot_dimension_numbers = #stablehlo.dot<
       lhs_contracting_dimensions = [2],
@@ -179,4 +181,46 @@ func.func @testPrefElem(%arg0: tensor<1x1x2xf32>, %arg1: tensor<2x3xf32>) -> ten
   } : (tensor<1x1x2xf32>, tensor<2x3xf32>) -> tensor<1x1x3xf64>
 
   func.return %0 : tensor<1x1x3xf64>
+}
+
+// -----
+
+// CHECK-LABEL: @vecmat
+func.func @vecmat(%arg0 : tensor<1x256xf32>, %arg1 : tensor<256x40xf32>) -> tensor<1x40xf32> {
+  // CHECK: %[[R:.+]] = stablehlo.reshape %arg0 : (tensor<1x256xf32>) -> tensor<256xf32>
+  // CHECK: %[[DOT:.+]] = stablehlo.dot %[[R]], %arg1, precision = [DEFAULT, DEFAULT] : (tensor<256xf32>, tensor<256x40xf32>) -> tensor<40xf32>
+  // CHECK: %[[R:.+]] = stablehlo.reshape %[[DOT]] : (tensor<40xf32>) -> tensor<1x40xf32>
+  %0 = "stablehlo.dot"(%arg0, %arg1) {precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>]} : (tensor<1x256xf32>, tensor<256x40xf32>) -> tensor<1x40xf32>
+
+  // CHECK: return %[[R]]
+  return %0 : tensor<1x40xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @matvec
+func.func @matvec(%arg0 : tensor<20x144xf32>, %arg1 : tensor<1x144xf32>) -> tensor<20x1xf32> {
+  // CHECK: %[[T0:.+]] = stablehlo.transpose %arg0, dims = [0, 1] : (tensor<20x144xf32>) -> tensor<20x144xf32>
+  // CHECK: %[[T1:.+]] = stablehlo.transpose %arg1, dims = [1, 0] : (tensor<1x144xf32>) -> tensor<144x1xf32>
+  // CHECK: %[[R0:.+]] = stablehlo.reshape %[[T1]] : (tensor<144x1xf32>) -> tensor<144xf32>
+  // CHECK: %[[DOT:.+]] = stablehlo.dot %[[T0]], %[[R0]], precision = [DEFAULT, DEFAULT] : (tensor<20x144xf32>, tensor<144xf32>) -> tensor<20xf32>
+  // CHECK: %[[R2:.+]] = stablehlo.reshape %[[DOT]] : (tensor<20xf32>) -> tensor<20x1xf32>
+  %0 = "stablehlo.dot_general"(%arg0, %arg1) {dot_dimension_numbers = #stablehlo.dot<lhs_contracting_dimensions = [1], rhs_contracting_dimensions = [1]>, precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>]} : (tensor<20x144xf32>, tensor<1x144xf32>) -> tensor<20x1xf32>
+
+  // CHECK: return %[[R2]]
+  return %0 : tensor<20x1xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @vecdot
+func.func @vecdot(%arg0 : tensor<1x32xf64>, %arg1 : tensor<32x1xf64>) -> tensor<1x1xf64> {
+  // CHECK: %[[R0:.+]] = stablehlo.reshape %arg0 : (tensor<1x32xf64>) -> tensor<32xf64>
+  // CHECK: %[[R1:.+]] = stablehlo.reshape %arg1 : (tensor<32x1xf64>) -> tensor<32xf64>
+  // CHECK: %[[DOT:.+]] = stablehlo.dot %[[R0]], %[[R1]], precision = [DEFAULT, DEFAULT] : (tensor<32xf64>, tensor<32xf64>) -> tensor<f64>
+  // CHECK: %[[R2:.+]] = stablehlo.reshape %[[DOT]] : (tensor<f64>) -> tensor<1x1xf64>
+  %0 = "stablehlo.dot"(%arg0, %arg1) {precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>]} : (tensor<1x32xf64>, tensor<32x1xf64>) -> tensor<1x1xf64>
+
+  // CHECK: %[[R2]]
+  return %0 : tensor<1x1xf64>
 }

@@ -314,7 +314,7 @@ jobs:
               --env CTEST_PARALLEL_LEVEL=2 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:4e814f5f3bac53c88b64f0fe89af9f3dcc43bcf8610ea8b4511e21015ad1fb9c \
+              gcr.io/iree-oss/nvidia@sha256:4bc8f74e6f8dece34184eedfafede9c28ba3af1674e6774f5cd867802beffc9b \
               bash -euo pipefail -c \
                 "./build_tools/scripts/check_cuda.sh
                 ./build_tools/scripts/check_vulkan.sh
@@ -362,7 +362,7 @@ jobs:
               --env CTEST_PARALLEL_LEVEL=4 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:4e814f5f3bac53c88b64f0fe89af9f3dcc43bcf8610ea8b4511e21015ad1fb9c \
+              gcr.io/iree-oss/nvidia@sha256:4bc8f74e6f8dece34184eedfafede9c28ba3af1674e6774f5cd867802beffc9b \
               bash -euo pipefail -c \
                 "./build_tools/scripts/check_cuda.sh
                 ./build_tools/scripts/check_vulkan.sh
@@ -383,8 +383,6 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Building runtime"
-        # Note ccache is read-only here since this job runs on a GitHub-hosted runner
-        # and GitHub runners don't have write access to GCS
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "BUILD_PRESET=test" \
@@ -485,7 +483,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VMVX_DISABLE=0 \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:4b74c16cb3cda0b748bb3562a489da10cd637ca07a56a81bff0d75690f6c3d5b \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:1d2424dc512545a32b68e3f6b839541832fa24b5fce78cb253b3a4cd4592d9b2 \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -518,7 +516,7 @@ jobs:
             --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/frontends-nvidia@sha256:0451c9e93c2d938c08b767e2deb1870fdf98060a1b01685cbacbf3f50e677fc5 \
+            gcr.io/iree-oss/frontends-nvidia@sha256:c3d590c6f1a6369cd34ccf0fc6f9ca2fbf8ee06abdc58a2827fc847718c308b8 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
@@ -637,8 +635,6 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Building size-optimized runtime"
-        # Note ccache is read-only here since this job runs on a GitHub-hosted runner
-        # and GitHub runners don't have write access to GCS
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33 \
@@ -926,19 +922,19 @@ jobs:
           - platform: linux
             arch: riscv_64
             abi: lp64d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:e3b68a91018ada9d1cb3829a1de846e8d737e1575c528cea5a21a770bd02d2a7"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: riscv_32
             abi: ilp32d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:e3b68a91018ada9d1cb3829a1de846e8d737e1575c528cea5a21a770bd02d2a7"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: generic
             arch: riscv_32
             abi: ilp32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:e3b68a91018ada9d1cb3829a1de846e8d737e1575c528cea5a21a770bd02d2a7"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./tests/riscv32/smoke.sh"
           - platform: emscripten
@@ -1027,11 +1023,11 @@ jobs:
         target:
           - platform: linux
             arch: riscv_64
-            docker_image: "gcr.io/iree-oss/riscv@sha256:e3b68a91018ada9d1cb3829a1de846e8d737e1575c528cea5a21a770bd02d2a7"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: riscv_32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:e3b68a91018ada9d1cb3829a1de846e8d737e1575c528cea5a21a770bd02d2a7"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: x86_64
