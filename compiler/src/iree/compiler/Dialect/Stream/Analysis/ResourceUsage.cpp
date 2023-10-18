@@ -568,15 +568,15 @@ private:
                 DFX::Resolution::REQUIRED);
             getState() ^= parentUsage.getState();
           } else if (auto whileOp =
-                  dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+                         dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
             auto value =
                 Position::forValue(whileOp.getBefore().getArgument(operandIdx));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
-          } else if (auto forOp = dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
-            auto value = Position::forValue(forOp.getRegionIterArg(
-                operandIdx));
+          } else if (auto forOp =
+                         dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
+            auto value = Position::forValue(forOp.getRegionIterArg(operandIdx));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
