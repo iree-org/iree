@@ -210,7 +210,7 @@ struct ConvertTensorReshapeOpPattern
       Value input = op.getSource();
       ShapedType inputType = llvm::dyn_cast<ShapedType>(input.getType());
       ShapedType resultType =
-          llvm::dyn_cast_if_present<ShapedType>(op.getResult().getType());
+          llvm::dyn_cast<ShapedType>(op.getResult().getType());
       if (!inputType || !resultType || !inputType.hasRank() ||
           !resultType.hasRank()) {
         return rewriter.notifyMatchFailure(op, "not ranked shaped types");
