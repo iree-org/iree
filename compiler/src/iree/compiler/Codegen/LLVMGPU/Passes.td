@@ -60,10 +60,10 @@ def LLVMGPUPackSharedMemoryAlloc :
   let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
 }
 
-def LLVMGPUTensorCorePreparation :
-    Pass<"iree-llvmgpu-tensorcore-preparation", "func::FuncOp"> {
-  let summary = "Pass to transform vector.contract to a form that can be lowered to GPU MMA ops";
-  let constructor = "mlir::iree_compiler::createLLVMGPUTensorCorePreparationPass()";
+def LLVMGPUTensorCoreVectorization :
+    Pass<"iree-llvmgpu-tensorcore-vectorization", "func::FuncOp"> {
+  let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTensorCoreVectorizationPass()";
 }
 
 def LLVMGPUTensorPad :
