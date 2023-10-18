@@ -517,10 +517,10 @@ private:
               *this, Position::forValue(op.getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);
           getState() ^= operandUsage.getState();
-          int64_t blockIdx = operandIdx > 0 ? operandIdx - 2 : operandIdx;
-          if (blockIdx >= 0) {
+          if (operandIdx >= op.getNumControlOperands()) {
+            int64_t blockIdx = operandIdx - op.getNumControlOperands();
             auto &beforeUsage = solver.getElementFor<ValueResourceUsage>(
-                *this, Position::forValue(op.getBody()->getArgument(blockIdx)),
+                *this, Position::forValue(op.getRegionIterArg(blockIdx)),
                 DFX::Resolution::REQUIRED);
             getState() ^= beforeUsage.getState();
           }
@@ -578,8 +578,8 @@ private:
           }
 
           if (auto forOp = dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
-            auto value = Position::forValue(
-                forOp.getRegion().front().getArgument(operandIdx + 1));
+            auto value = Position::forValue(forOp.getRegionIterArg(
+                operandIdx + forOp.getNumInductionVars()));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
