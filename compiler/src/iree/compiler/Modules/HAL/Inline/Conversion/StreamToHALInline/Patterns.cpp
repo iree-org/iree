@@ -70,16 +70,11 @@ struct ResourceAllocOpPattern
     Value minAlignment =
         rewriter.create<arith::ConstantIndexOp>(allocOp.getLoc(), 64);
 
-    SmallVector<Value> results;
-    for (auto [resourceResult, storageSize] :
-         llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
-      auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
-          allocOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
-          storageSize);
-      results.push_back(allocateOp.getResult());
-    }
+    auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
+        allocOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
+        adaptor.getStorageSize());
+    rewriter.replaceOp(allocOp, allocateOp.getResult());
 
-    rewriter.replaceOp(allocOp, results);
     return success();
   }
 };

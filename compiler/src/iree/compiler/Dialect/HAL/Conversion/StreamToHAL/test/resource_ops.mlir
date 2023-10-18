@@ -1,25 +1,21 @@
 // RUN: iree-opt --split-input-file --iree-hal-conversion %s | FileCheck %s
 
 // CHECK-LABEL: @resourceAlloc
-func.func @resourceAlloc(%arg0: index, %arg1: index) -> (!stream.resource<transient>, !stream.resource<transient>) {
+func.func @resourceAlloc(%arg0: index) -> !stream.resource<transient> {
   // CHECK: %[[RET0:.+]] = hal.allocator.allocate
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   // CHECK-SAME: : !hal.buffer{%arg0}
-  // CHECK-NEXT: %[[RET1:.+]] = hal.allocator.allocate
-  // CHECK-SAME: type("DeviceVisible|DeviceLocal")
-  // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
-  // CHECK-SAME: : !hal.buffer{%arg1}
-  %0:2 = stream.resource.alloc uninitialized : !stream.resource<transient>{%arg0}, !stream.resource<transient>{%arg1}
-  // CHECK: return %[[RET0]], %[[RET1]]
-  return %0#0, %0#1 : !stream.resource<transient>, !stream.resource<transient>
+  %0 = stream.resource.alloc uninitialized : !stream.resource<transient>{%arg0}
+  // CHECK: return %[[RET0]]
+  return %0 : !stream.resource<transient>
 }
 
 // -----
 
 // CHECK-LABEL: @resourceAlloca
 // CHECK-SAME: (%[[SIZE:.+]]: index)
-func.func @resourceAlloca(%size: index) -> (!stream.resource<staging>, !stream.timepoint) {
+func.func @resourceAlloca(%size: index) -> (!stream.resource<transient>, !stream.timepoint) {
   // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
   // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
   // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
@@ -30,16 +26,16 @@ func.func @resourceAlloca(%size: index) -> (!stream.resource<staging>, !stream.t
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
-  %0:2 = stream.resource.alloca uninitialized : !stream.resource<staging>{%size} => !stream.timepoint
+  %0:2 = stream.resource.alloca uninitialized : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: return %[[RET0]], %[[SIGNAL_FENCE]]
-  return %0#0, %0#1 : !stream.resource<staging>, !stream.timepoint
+  return %0#0, %0#1 : !stream.resource<transient>, !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @resourceAllocaAwait
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[WAIT_FENCE:.+]]: !hal.fence)
-func.func @resourceAllocaAwait(%size: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<staging>, !stream.timepoint) {
+func.func @resourceAllocaAwait(%size: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<transient>, !stream.timepoint) {
   // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
   // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
   // CHECK-SAME: affinity(%c-1
@@ -49,16 +45,16 @@ func.func @resourceAllocaAwait(%size: index, %await_timepoint: !stream.timepoint
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
-  %0:2 = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<staging>{%size} => !stream.timepoint
+  %0:2 = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: return %[[RET0]], %[[SIGNAL_FENCE]]
-  return %0#0, %0#1 : !stream.resource<staging>, !stream.timepoint
+  return %0#0, %0#1 : !stream.resource<transient>, !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @resourceDealloca
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[RESOURCE:.+]]: !hal.buffer)
-func.func @resourceDealloca(%size: index, %resource: !stream.resource<staging>) -> !stream.timepoint {
+func.func @resourceDealloca(%size: index, %resource: !stream.resource<transient>) -> !stream.timepoint {
   // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
   // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
   // CHECK: hal.device.queue.dealloca
@@ -66,7 +62,7 @@ func.func @resourceDealloca(%size: index, %resource: !stream.resource<staging>) 
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: buffer(%[[RESOURCE]] : !hal.buffer)
-  %0 = stream.resource.dealloca %resource : !stream.resource<staging>{%size} => !stream.timepoint
+  %0 = stream.resource.dealloca %resource : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: return %[[SIGNAL_FENCE]]
   return %0 : !stream.timepoint
 }
@@ -77,14 +73,14 @@ func.func @resourceDealloca(%size: index, %resource: !stream.resource<staging>) 
 
 // CHECK-LABEL: @resourceDeallocaAwait
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[RESOURCE:.+]]: !hal.buffer, %[[WAIT_FENCE:.+]]: !hal.fence)
-func.func @resourceDeallocaAwait(%size: index, %resource: !stream.resource<staging>, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
+func.func @resourceDeallocaAwait(%size: index, %resource: !stream.resource<transient>, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
   // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
   // CHECK: hal.device.queue.dealloca
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: buffer(%[[RESOURCE]] : !hal.buffer)
-  %0 = stream.resource.dealloca await(%await_timepoint) => %resource : !stream.resource<staging>{%size} => !stream.timepoint
+  %0 = stream.resource.dealloca await(%await_timepoint) => %resource : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: return %[[SIGNAL_FENCE]]
   return %0 : !stream.timepoint
 }

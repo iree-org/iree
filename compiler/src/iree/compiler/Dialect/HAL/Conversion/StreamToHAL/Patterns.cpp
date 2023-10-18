@@ -332,26 +332,19 @@ struct ResourceAllocOpPattern
         lookupAllocatorAndQueueAffinityFor(allocOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
-    SmallVector<Value> results;
-    for (auto [resourceResult, storageSize] :
-         llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
-      auto resourceType =
-          llvm::cast<IREE::Stream::ResourceType>(resourceResult.getType());
+    auto resourceType =
+        cast<IREE::Stream::ResourceType>(allocOp.getResult().getType());
 
-      auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-      auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-      if (failed(deriveAllowedResourceBufferBits(allocOp.getLoc(), resourceType,
-                                                 memoryTypes, bufferUsage))) {
-        return failure();
-      }
-
-      auto allocateOp = rewriter.create<IREE::HAL::AllocatorAllocateOp>(
-          allocOp.getLoc(), bufferType, allocator, queueAffinity, memoryTypes,
-          bufferUsage, storageSize);
-      results.push_back(allocateOp.getResult());
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+    if (failed(deriveAllowedResourceBufferBits(allocOp.getLoc(), resourceType,
+                                               memoryTypes, bufferUsage))) {
+      return failure();
     }
 
-    rewriter.replaceOp(allocOp, results);
+    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateOp>(
+        allocOp, bufferType, allocator, queueAffinity, memoryTypes, bufferUsage,
+        adaptor.getStorageSize());
     return success();
   }
 };
@@ -367,16 +360,14 @@ struct ResourceAllocaOpPattern
         lookupDeviceAndQueueAffinityFor(allocaOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
-    // Transient allocations are device-local. Copies are required to get their
-    // contents back on the host/another device.
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-
-    // TODO(benvanik): refine usage.
-    // We know by construction that transient buffers are not host visible and
-    // as such can only be used for device commands. We should be able to more
-    // closely limit to just dispatch or transfer though.
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
-                       IREE::HAL::BufferUsageBitfield::DispatchStorage;
+    auto resourceType =
+        cast<IREE::Stream::ResourceType>(allocaOp.getResult().getType());
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+    if (failed(deriveAllowedResourceBufferBits(loc, resourceType, memoryTypes,
+                                               bufferUsage))) {
+      return failure();
+    }
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
