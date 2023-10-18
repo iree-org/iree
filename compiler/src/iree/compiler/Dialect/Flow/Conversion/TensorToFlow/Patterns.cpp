@@ -198,7 +198,7 @@ static void sizesForTensor(OpBuilder &builder, SmallVectorImpl<Value> &sizes,
 }
 
 /// Convert tensor.reshape ops into flow.tensor.reshape ops where possible.
-struct ConvertTensorReshape
+struct ConvertTensorReshapeOpPattern
     : public OpRewritePattern<tensor::ReshapeOp> {
   using OpRewritePattern<tensor::ReshapeOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ReshapeOp op,
@@ -298,7 +298,7 @@ void populateTensorToFlowConversionPatterns(MLIRContext *context,
       .insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
               ConvertTensorCastPattern, ConvertTensorExtractPattern,
               ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
-              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern,
+              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern, ConvertTensorReshapeOpPattern,
               ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
               ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
