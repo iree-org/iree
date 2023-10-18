@@ -2425,7 +2425,7 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                 applyPermutationToVector(tileSizes, outerDimsPerm);
             }
           })
-          .Case<linalg::GenericOp>([&](auto genericOp) {
+          .Default([&](auto) {
             if (reductionTileSizeMap.contains(op)) {
               tileSizesList.push_back(reductionTileSizeMap[op]);
             } else {
@@ -2433,17 +2433,12 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
             }
             // Only copy the inner vector tile sizes on parallel dims.
             SmallVector<int64_t> vecTileSizes(numLoops, 0);
-            for (auto [idx, iteratorType] :
-                 llvm::enumerate(genericOp.getIteratorTypesArray())) {
-              if (iteratorType == utils::IteratorType::parallel)
+            auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
+            for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
+              if (iterType == utils::IteratorType::parallel)
                 vecTileSizes[idx] = innerVecTileSizes[idx];
             }
             tileSizesList.push_back(vecTileSizes);
-          })
-          .Default([&](auto) {
-            // Do nothing for unknown ops.
-            tileSizesList.push_back(zeros);
-            tileSizesList.push_back(zeros);
           });
     }
 
