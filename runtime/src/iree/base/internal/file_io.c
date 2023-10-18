@@ -290,7 +290,7 @@ static iree_status_t iree_file_map_contents_readonly_platform(
   HANDLE file =
       CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                   FILE_ATTRIBUTE_READONLY | FILE_FLAG_RANDOM_ACCESS, NULL);
-  if (!file) {
+  if (file == INVALID_HANDLE_VALUE) {
     return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
                             "failed to open file '%s'", path);
   }
