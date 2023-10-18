@@ -8,6 +8,7 @@ RC_PFN_DECL(hipCtxCreate, hipCtx_t *, unsigned int, hipDevice_t)
 RC_PFN_DECL(hipCtxDestroy, hipCtx_t)
 RC_PFN_DECL(hipDeviceGet, hipDevice_t *, int)  // No direct, need to modify
 RC_PFN_DECL(hipGetDeviceCount, int *)
+RC_PFN_DECL(hipGetDeviceProperties, hipDeviceProp_t *, int)
 RC_PFN_DECL(hipDeviceGetName, char *, int,
             hipDevice_t)  // No direct, need to modify
 RC_PFN_STR_DECL(

@@ -156,10 +156,61 @@ static iree_status_t iree_hal_rocm_driver_dump_device_info(
     iree_string_builder_t* builder) {
   iree_hal_rocm_driver_t* driver = iree_hal_rocm_driver_cast(base_driver);
   hipDevice_t device = (hipDevice_t)device_id;
-  if (!device) return iree_ok_status();
-  // TODO: dump detailed device info.
-  (void)driver;
-  (void)device;
+
+  hipDeviceProp_t prop;
+  ROCM_RETURN_IF_ERROR(&driver->syms, hipGetDeviceProperties(&prop, device),
+                       "hipGetDeviceProperties");
+
+  // GPU capabilities and architecture.
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-compute-capability: %d.%d", prop.major, prop.minor));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-arch-name: %s", prop.gcnArchName));
+
+  // Launch configuration limits.
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- launch-max-block-dims: (%d, %d, %d)", prop.maxThreadsDim[0],
+      prop.maxThreadsDim[1], prop.maxThreadsDim[2]));
+
+  int shared_memory_kb = prop.sharedMemPerBlock / 1024;
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-thread-count: %d", prop.maxThreadsPerBlock));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-32-bit-register-count: %d", prop.regsPerBlock));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-shared-memory: %d KB", shared_memory_kb));
+
+  // Memory hierarchy related information.
+  int const_memory_mb = prop.totalConstMem / 1024 / 1024;
+  int global_memory_mb = prop.totalGlobalMem / 1024 / 1024;
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-is-integrated-memory: %d", prop.integrated));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-supports-managed-memory: %d", prop.managedMemory));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-total-const-memory-size: %d MB", const_memory_mb));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-total-global-memory-size: %d MB", global_memory_mb));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-l2-cache-size: %d bytes", prop.l2CacheSize));
+
+  // GPU related information.
+  int compute_clock_mhz = prop.clockRate / 1000;
+  int memory_clock_mhz = prop.memoryClockRate / 1000;
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-compute-unit-count: %d", prop.multiProcessorCount));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-compute-max-clock-rate: %d mHz", compute_clock_mhz));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-memory-max-clock-rate: %d mHz", memory_clock_mhz));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-warp-size: %d", prop.warpSize));
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
   return iree_ok_status();
 }
 
