@@ -2112,6 +2112,7 @@ adjustTileSizesForPackOp(func::FuncOp entryPointFn, tensor::PackOp packOp,
   // Align the tile sizes of the root op to the pack op's inner tile sizes, so
   // we can derive the outer tile sizes for pack ops later in
   // setLoweringConfigForComputeOps by dividing with inner tile sizes.
+  ArrayRef<int64_t> innerDimsPos = packOp.getInnerDimsPos();
   ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
   // Currently we only handle pack op with static inner tile sizes.
   if (llvm::any_of(innerTiles,
@@ -2119,28 +2120,35 @@ adjustTileSizesForPackOp(func::FuncOp entryPointFn, tensor::PackOp packOp,
     return failure();
   }
 
-  ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (distTileSizes[pos] == 0)
-      continue;
-    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
-    LLVM_DEBUG(KD_DBGS() << "Align # " << pos << " dist tile size to "
-                         << distTileSizes[pos] << "\n");
-  }
-
   // Pack op has special requirements on vector tile sizes to achieve good
   // performance. Override the vector tile sizes with pack op.
-  SmallVector<int64_t> vecTileSizes =
-      getPackVectorTileSizes(entryPointFn, packOp);
-  SmallVector<int64_t> outerDimsPerm(packOp.getOuterDimsPerm());
-  if (outerDimsPerm.empty())
-    outerDimsPerm = llvm::to_vector(llvm::seq<int64_t>(packOp.getSourceRank()));
-  for (auto [pos, size] : llvm::zip_equal(outerDimsPerm, vecTileSizes)) {
-    commonVecTileSizes[pos] = size;
+  auto vecTileSizes = getPackVectorTileSizes(entryPointFn, packOp);
+  auto outerDimsPerm = packOp.getOuterDimsPerm();
+  if (!outerDimsPerm.empty()) {
+    auto invertedPerm = invertPermutationVector(outerDimsPerm);
+    applyPermutationToVector(vecTileSizes, invertedPerm);
   }
   // Scale to actual tile sizes with the pack op's inner tile sizes.
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    commonVecTileSizes[pos] *= size;
+  for (auto [pos, size] : llvm::zip_equal(innerDimsPos, innerTiles)) {
+    vecTileSizes[pos] *= size;
+  }
+  for (auto [pos, size] : llvm::enumerate(vecTileSizes)) {
+    if (!size)
+      continue;
+    if (!commonVecTileSizes[pos]) {
+      commonVecTileSizes[pos] = size;
+      continue;
+    }
+    // If other ops already set a smaller tile size, don't override it to avoid
+    // too large tile size on them.
+    commonVecTileSizes[pos] = std::min(commonVecTileSizes[pos], size);
+  }
+
+  for (auto [pos, size] : llvm::zip_equal(innerDimsPos, innerTiles)) {
+    if (distTileSizes[pos])
+      distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
+    if (commonVecTileSizes[pos])
+      commonVecTileSizes[pos] = llvm::alignTo(commonVecTileSizes[pos], size);
   }
   return success();
 }
