@@ -43,6 +43,7 @@ iree_cc_library(
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandVectors.cpp"
+    "MaterializeExternDispatches.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "Passes.cpp"
     "RemoveZeroExtentTensors.cpp"
@@ -65,6 +66,8 @@ iree_cc_library(
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
     MLIRPass
     MLIRTensorDialect
     MLIRTensorTransforms
@@ -74,6 +77,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Pipelines::Options
     iree::compiler::Utils

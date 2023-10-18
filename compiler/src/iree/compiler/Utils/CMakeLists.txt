@@ -15,6 +15,7 @@ iree_cc_library(
     Utils
   HDRS
     "ConversionUtils.h"
+    "CustomPatternApplicatorPassBase.h"
     "ElementPackingUtils.h"
     "FlatbufferUtils.h"
     "IndexSet.h"
@@ -27,6 +28,7 @@ iree_cc_library(
     "TracingUtils.h"
   SRCS
     "ConversionUtils.cpp"
+    "CustomPatternApplicatorPassBase.cpp"
     "ElementPackingUtils.cpp"
     "FlatbufferUtils.cpp"
     "ModuleUtils.cpp"
@@ -40,9 +42,11 @@ iree_cc_library(
     MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
+    MLIRPDLDialect
     MLIRParser
     MLIRPass
     MLIRSupport
+    MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
     iree::base

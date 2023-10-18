@@ -18,6 +18,7 @@ iree_compiler_cc_library(
     name = "Utils",
     srcs = [
         "ConversionUtils.cpp",
+        "CustomPatternApplicatorPassBase.cpp",
         "ElementPackingUtils.cpp",
         "FlatbufferUtils.cpp",
         "ModuleUtils.cpp",
@@ -29,6 +30,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConversionUtils.h",
+        "CustomPatternApplicatorPassBase.h",
         "ElementPackingUtils.h",
         "FlatbufferUtils.h",
         "IndexSet.h",
@@ -50,9 +52,11 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],

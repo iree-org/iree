@@ -526,6 +526,16 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
                              ValueRange workload, TypeRange resultTypes,
                              ValueRange resultDims, ValueRange arguments,
                              ValueRange argumentDims,
+                             DenseI64ArrayAttr tiedOperands,
+                             DictionaryAttr attributes) {
+  build(builder, state, workload, resultTypes, resultDims, arguments,
+        argumentDims, tiedOperands.asArrayRef(), attributes.getValue());
+}
+
+void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
+                             ValueRange workload, TypeRange resultTypes,
+                             ValueRange resultDims, ValueRange arguments,
+                             ValueRange argumentDims,
                              ArrayRef<int64_t> tiedOperands,
                              ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
@@ -548,6 +558,24 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
 
   // NOTE: workgroup count region is empty; callers are expected to populate it.
   state.addRegion();
+}
+
+/// Helper to emplace a block on the given hal.dispatch.extern op. This returns
+/// the entry block of the updated workgroup count region and sets up the
+/// block arguments as a !hal.device + inferred from the workload types.
+/// The workgroup count region will not include the terminator and that is left
+/// up to the user to properly populate.
+Block *DispatchExternOp::emplaceWorkgroupCountRegion(OpBuilder &builder) {
+  SmallVector<Type> countTypes({builder.getType<IREE::HAL::DeviceType>()});
+  SmallVector<Location> countLocs({getLoc()});
+  for (auto workloadIdx : getWorkload()) {
+    countTypes.push_back(workloadIdx.getType());
+    countLocs.push_back(workloadIdx.getLoc());
+  }
+
+  auto &entryBlock = getWorkgroupCount().emplaceBlock();
+  entryBlock.addArguments(countTypes, countLocs);
+  return &entryBlock;
 }
 
 // Verifies that |dynamicDims| contains the appropriate number of dims for all

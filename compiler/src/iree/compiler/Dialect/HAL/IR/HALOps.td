@@ -407,6 +407,12 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
       "ValueRange":$workload,
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "DenseI64ArrayAttr":$tiedOperands,
+      CArg<"DictionaryAttr", "nullptr">:$attributes)>,
+    OpBuilder<(ins
+      "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
       "ArrayRef<int64_t>":$tiedOperands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
@@ -419,6 +425,8 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
           }),
           getResultTypes());
     }
+
+    Block *emplaceWorkgroupCountRegion(OpBuilder &builder);
 
     /// Returns the index of the args() operand in the Operation operands list.
     unsigned mapArgOperandToOpOperand(unsigned i) { return i + getWorkload().size(); };

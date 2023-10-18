@@ -32,6 +32,18 @@ def ExpandVectors : Pass<"iree-global-opt-expand-vectors", ""> {
   let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandVectorsPass()";
 }
 
+def MaterializeExternDispatchesPass :
+    Pass<"iree-materialize-extern-dispatches", ""> {
+  let summary = "Pass to form custom external dispatches";
+  let constructor =
+    "mlir::iree_compiler::GlobalOptimization::createMaterializeExternDispatchesPass()";
+  let options = [
+    ListOption<"pdlModuleFileNames", "pdl-module-file-names", "std::string",
+            "Optional files to load a pdl module from.",
+            "llvm::cl::ZeroOrMore">
+  ];
+}
+
 def MaterializeHomogeneousEncodings :
   Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
   let summary = "Materializes logical encodings to physical encodings if there is a single device target.";

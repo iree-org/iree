@@ -50,8 +50,10 @@ iree_lit_test_suite(
   SRCS
     "example.mlir"
     "example_inline.mlir"
+    "example_pattern_module.mlir"
   DATA
     ${_SPV_TARGET}
+    "example_patterns.mlir"
   TOOLS
     FileCheck
     iree-compile
