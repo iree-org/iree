@@ -218,31 +218,6 @@ struct ConvertMemRefStore final : OpConversionPattern<memref::StoreOp> {
   }
 };
 
-struct ConvertFuncCall final : OpConversionPattern<func::CallOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult
-  matchAndRewrite(func::CallOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    bool skip = true;
-    SmallVector<Type> types;
-    for (auto ty : op.getResultTypes()) {
-      types.push_back(getTypeConverter()->convertType(ty));
-      if (ty != types.back())
-        skip = false;
-    }
-    for (auto ty : op.getOperandTypes()) {
-      if (ty != getTypeConverter()->convertType(ty))
-        skip = false;
-    }
-    if (skip)
-      return failure();
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, adaptor.getCallee(), types,
-                                              adaptor.getOperands());
-    return success();
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // Helper functions
 //===----------------------------------------------------------------------===//
