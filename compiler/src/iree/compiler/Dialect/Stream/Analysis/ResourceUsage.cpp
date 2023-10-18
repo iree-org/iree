@@ -567,19 +567,16 @@ private:
                 Position::forValue(op->getParentOp()->getResult(operandIdx)),
                 DFX::Resolution::REQUIRED);
             getState() ^= parentUsage.getState();
-          }
-          if (auto whileOp =
+          } else if (auto whileOp =
                   dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
             auto value =
                 Position::forValue(whileOp.getBefore().getArgument(operandIdx));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
-          }
-
-          if (auto forOp = dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
+          } else if (auto forOp = dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
             auto value = Position::forValue(forOp.getRegionIterArg(
-                operandIdx + forOp.getNumInductionVars()));
+                operandIdx));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
@@ -588,6 +585,8 @@ private:
                 *this, Position::forValue(forOp->getResult(operandIdx)),
                 DFX::Resolution::REQUIRED);
             getState() ^= parentUsage.getState();
+          } else {
+            assert("Unsupported test case");
           }
         })
         .Case([&](mlir::func::ReturnOp op) {
