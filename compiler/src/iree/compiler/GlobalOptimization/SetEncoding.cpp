@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -27,6 +28,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
@@ -46,21 +48,30 @@ namespace GlobalOptimization {
 // Utility functions
 //===---------------------------------------------------------------------===//
 
-static bool isX86OrAArch64OrVMVXBackendOrUnkown(Operation *moduleOp) {
+static FailureOr<IREE::HAL::ExecutableTargetAttr>
+getSingleExecutableTargetAttr(Operation *moduleOp) {
   auto targetsAttr = moduleOp->getAttrOfType<ArrayAttr>("hal.device.targets");
   if (!targetsAttr) {
-    return true;
+    return IREE::HAL::ExecutableTargetAttr();
   }
   if (targetsAttr.size() != 1) {
-    return false;
+    return failure();
   }
   auto deviceTarget = cast<IREE::HAL::DeviceTargetAttr>(targetsAttr[0]);
   SmallVector<IREE::HAL::ExecutableTargetAttr, 4> executableTargets =
       deviceTarget.getExecutableTargets();
   if (executableTargets.size() != 1) {
-    return false;
+    return failure();
   }
-  auto executableTarget = executableTargets[0];
+
+  return executableTargets[0];
+}
+
+static bool isX86OrAArch64OrVMVXBackendOrUnkown(
+    IREE::HAL::ExecutableTargetAttr executableTarget) {
+  if (!executableTarget) {
+    return true;
+  }
   if (executableTarget.getBackend() == "vmvx") {
     return true;
   }
@@ -68,6 +79,15 @@ static bool isX86OrAArch64OrVMVXBackendOrUnkown(Operation *moduleOp) {
     return isX86(executableTarget) || isAArch64(executableTarget);
   }
   return false;
+}
+
+static bool
+enableVmvxMicroKernel(IREE::HAL::ExecutableTargetAttr executableTarget) {
+  if (!executableTarget || executableTarget.getBackend() != "vmvx") {
+    return false;
+  }
+  auto enableMicrokernels = getConfigBoolAttr(executableTarget, "ukernels");
+  return enableMicrokernels && enableMicrokernels->getValue();
 }
 
 /// Pads `value` enough for any actual tile sizes that could result from
@@ -376,7 +396,12 @@ struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
 } // namespace
 
 void SetEncodingPass::runOnOperation() {
-  if (!isX86OrAArch64OrVMVXBackendOrUnkown(getOperation())) {
+  auto executableTarget = getSingleExecutableTargetAttr(getOperation());
+  if (failed(executableTarget)) {
+    LLVM_DEBUG(llvm::dbgs() << "backends more than one is not supported\n");
+    return;
+  }
+  if (!isX86OrAArch64OrVMVXBackendOrUnkown(executableTarget.value())) {
     LLVM_DEBUG(llvm::dbgs() << "only llvm-cpu and vmvx are supported, ignoring "
                                "other backends...\n");
     return;
@@ -385,7 +410,12 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);
-    patterns.insert<SetBatchMatmulEncoding, SetMatmulEncoding>(context);
+    patterns.insert<SetMatmulEncoding>(context);
+    // VMVX microkernel path does not support batch_matmul. Do not insert the
+    // pattern if it is going on VMVX microkernel path.
+    if (!enableVmvxMicroKernel(executableTarget.value())) {
+      patterns.insert<SetBatchMatmulEncoding>(context);
+    }
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
