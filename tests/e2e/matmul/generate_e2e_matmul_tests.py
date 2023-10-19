@@ -627,7 +627,6 @@ def parse_arguments():
         default="",
         required=False,
     )
-    
     parser.add_argument(
         "--shapes",
         type=str,
@@ -635,7 +634,6 @@ def parse_arguments():
         help="Collection of matrix shapes to test",
         required=True,
     )
-
     parser.add_argument(
         "--compilation_info",
         type=str,
@@ -644,7 +642,6 @@ def parse_arguments():
         default="",
         required=False,
     )
-
     parser.add_argument(
         "--module_path",
         type=str,
