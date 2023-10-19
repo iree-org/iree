@@ -87,12 +87,16 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         "--acc_type=%s" % acc_type,
         "--shapes=%s" % size,
     ],
-    tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator and sanitizers.
-        "noriscv",
+    tags = ([
+        # "--shapes=large" can cause timeouts on sanitizers.
         "noasan",
         "notsan",
-    ] if size == "large" else [],
+    ] if size == "large" else []) + ([
+        # "--shapes=large" can cause timeouts on RISC-V emulator.
+        # "--lhs_rhs_type=bf16" triggers internel LLVM assertion errors on RISC-V target.
+        "noasan",
+        "notsan",
+    ] if size == "large" or lhs_rhs_type == "bf16" else []),
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <assert.h>
-#include <iree/hal/buffer_view.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
