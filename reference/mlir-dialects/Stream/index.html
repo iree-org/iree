@@ -5606,7 +5606,7 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>external resource</td>
+<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_encoding_dims</code></td>
@@ -5693,18 +5693,19 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>external resource</td>
+<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 </tbody>
 </table>
 <h3 id="resource-ops">Resource ops<a class="headerlink" href="#resource-ops" title="Permanent link">link</a></h3>
 <p>Generic resource ops.</p>
 <h4 id="streamresourcealloc-streamresourceallocop"><code>stream.resource.alloc</code> (Stream::ResourceAllocOp)<a class="headerlink" href="#streamresourcealloc-streamresourceallocop" title="Permanent link">link</a></h4>
-<p><em>Allocates a persistent value with undefined contents</em></p>
+<p><em>Allocates a persistent resource</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.alloc` (`on` `(` $affinity^ `)`)?
               (`uninitialized` $uninitialized^)?
-              attr-dict `:` custom&lt;SizeAwareTypeList&gt;(type($results), $storage_sizes)
+              attr-dict `:`
+              type($result) `{` $storage_size `}`
 </code></pre></div>
 <p>Allocates a persistent value (one that is long-lived and possibly external
 to the program) with undefined contents. Consumers of the allocated
@@ -5718,8 +5719,7 @@ they have matching lifetimes. When lowering to execution environments the
 separate allocations may be fused into one or more slab allocations in order
 to reduce overheads. How many allocations can be fused is based on the size
 of the individual resources and the target constraints (how large any single
-buffer may be, etc). At the stream dialect level treat a multi-result alloc
-as a way to indicate similar lifetimes.</p>
+buffer may be, etc).</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: AffinityOpInterface, ConditionallySpeculatable, MemoryEffectOpInterface (MemoryEffectOpInterface), Util_SizeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</p>
@@ -5740,7 +5740,7 @@ as a way to indicate similar lifetimes.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>storage_sizes</code></td>
+<td style="text-align: center;"><code>storage_size</code></td>
 <td>index</td>
 </tr>
 </tbody>
@@ -5755,7 +5755,7 @@ as a way to indicate similar lifetimes.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>results</code></td>
+<td style="text-align: center;"><code>result</code></td>
 <td>any stream-compatible type</td>
 </tr>
 </tbody>
@@ -5815,7 +5815,7 @@ execution using this resource must await on the timepoint.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>staging resource or transient resource</td>
+<td>any stream-compatible type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
@@ -5927,7 +5927,7 @@ the result timepoint is reached.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operand</code></td>
-<td>staging resource or transient resource</td>
+<td>any stream-compatible type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>operand_size</code></td>
