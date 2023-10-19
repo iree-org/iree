@@ -209,24 +209,22 @@ struct ConvertTensorReshapeOpPattern
       auto loc = op.getLoc();
       Value input = op.getSource();
       ShapedType inputType = llvm::dyn_cast<ShapedType>(input.getType());
-      ShapedType resultType =
-          llvm::dyn_cast<ShapedType>(op.getResult().getType());
-      if (!inputType || !resultType || !inputType.hasRank() ||
-          !resultType.hasRank()) {
+      ShapedType shapeOperandType = llvm::dyn_cast<ShapedType>(op.getShape().getType());
+      ShapedType resultType = op.getResult().getType();
+      if (!inputType || !inputType.hasRank()) {
         return rewriter.notifyMatchFailure(op, "not ranked shaped types");
       }
 
       SmallVector<Value> srcSizes;
       sizesForTensor(rewriter, srcSizes, loc, inputType, input);
 
-      FailureOr<Value> output = tensor::getOrCreateDestination(rewriter, loc, op.getOperation()->getResult(0));
-      if (failed(output)) {
-        op.emitError() << "unable to get/create destination tensor";
-      }
-      Value outTensor = output.value();
-
       SmallVector<Value> destSizes;
-      sizesForTensor(rewriter, destSizes, loc, resultType, outTensor);
+      for (int i = 0; i < shapeOperandType.getShape()[0]; i++) {
+        Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
+        Value element = rewriter.create<tensor::ExtractOp>(
+          loc, op.getShape(), ValueRange({idx}));
+        destSizes.push_back(element);
+      }
 
       rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         op, resultType, input, srcSizes, destSizes);
