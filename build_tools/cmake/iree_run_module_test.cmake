@@ -97,6 +97,11 @@ function(iree_run_module_test)
   # the portability is handled by `iree_native_test`.
   list(APPEND _RUNNER_FILE_ARGS "--module={{${_RULE_MODULE_SRC}}}")
 
+  # A target specifically for the test.
+  iree_package_name(_PACKAGE_NAME)
+  set(_TARGET_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  add_custom_target("${_TARGET_NAME}" ALL)
+
   if(_RULE_EXPECTED_OUTPUT)
     # this may be a file or a literal output. In the latter case, the
     # extension variable will be empty.
@@ -124,15 +129,17 @@ function(iree_run_module_test)
         NO_CACHE
         NO_DEFAULT_PATH
       )
-      # If the expected output npy file is not found (the large file is not
-      # loaded from GCS to `IREE_E2E_TEST_ARTIFACTS_DIR` benchmark suite test),
-      # report error.
+      # If the expected output npy file is not found, try to fetch it.
       if(NOT _OUTPUT_FILE_ABS_PATH)
-        message(SEND_ERROR "${_RULE_EXPECTED_OUTPUT} is not found in\n\
-          ${CMAKE_CURRENT_SOURCE_DIR}\n\
-          ${CMAKE_CURRENT_BINARY_DIR}\n\
-          ${IREE_E2E_TEST_ARTIFACTS_DIR}\n\
-          Please check if you need to download it first.")
+        set(_FETCH_NAME "model-expected-output-${_RULE_NAME}")
+        iree_fetch_artifact(
+          NAME "${_FETCH_NAME}"
+          SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/${_RULE_EXPECTED_OUTPUT}"
+          OUTPUT "${IREE_E2E_TEST_ARTIFACTS_DIR}/${_RULE_EXPECTED_OUTPUT}"
+        )
+        add_dependencies(${_TARGET_NAME}
+          "${_PACKAGE_NAME}_${_FETCH_NAME}"
+        )
       else()
         list(APPEND _RUNNER_FILE_ARGS
           "--expected_output=@{{${_OUTPUT_FILE_ABS_PATH}}}")
@@ -156,12 +163,6 @@ function(iree_run_module_test)
     list(APPEND _RUNNER_FILE_ARGS
       "--flagfile={{${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile}}")
   endif()
-
-  # A target specifically for the test.
-  iree_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
-
-  add_custom_target("${_NAME}" ALL)
 
   # Set expect failure cases.
   set(_TEST_XFAIL FALSE)
@@ -191,13 +192,13 @@ function(iree_run_module_test)
   )
 
   if(_RULE_DEPS)
-    add_dependencies(${_NAME}
+    add_dependencies(${_TARGET_NAME}
       ${_RULE_DEPS}
     )
   endif()
 
-  add_dependencies(iree-test-deps "${_NAME}")
-  add_dependencies(iree-run-module-test-deps "${_NAME}")
+  add_dependencies(iree-test-deps "${_TARGET_NAME}")
+  add_dependencies(iree-run-module-test-deps "${_TARGET_NAME}")
 endfunction()
 
 # iree_benchmark_suite_module_test()
@@ -232,8 +233,8 @@ endfunction()
 #   DRIVER
 #     "local-sync"
 #   MODULES
-#     "riscv32-Linux=EfficientNet_int8_riscv32_module.vmfb"
-#     "x86_64=EfficientNet_int8_x86_64_module.vmfb"
+#     "riscv32-Linux=iree_module_EfficientNet_int8_riscv32/module.vmfb"
+#     "x86_64=iree_module_EfficientNet_int8_x86_64/module.vmfb"
 #   RUNNER_ARGS
 #     "--function=main"
 #     "--input=1x224x224x3xf32=0"
@@ -255,7 +256,7 @@ function(iree_benchmark_suite_module_test)
 
   # Benchmark artifacts needs to be stored at the location of
   # `IREE_E2E_TEST_ARTIFACTS_DIR` or the test target is bypassed.
-  if(NOT DEFINED IREE_E2E_TEST_ARTIFACTS_DIR)
+  if("${IREE_E2E_TEST_ARTIFACTS_DIR}" STREQUAL "")
     return()
   endif()
 
@@ -272,6 +273,20 @@ function(iree_benchmark_suite_module_test)
   # Platform is not in the supported module list, skip the test.
   if (NOT _MODULE_PATH)
     return()
+  endif()
+
+  # Build module locally if IREE_BUILD_E2E_TEST_ARTIFACTS is set.
+  if (IREE_BUILD_E2E_TEST_ARTIFACTS)
+    # The module path follows the format:
+    # iree_module_abc/module.vmfb
+    # Ane the corresponding build target from e2e test artifacts is:
+    # iree-module-abc
+    cmake_path(GET _MODULE_PATH PARENT_PATH _MODULE_DIR)
+    string(REGEX REPLACE "^iree_module_" "iree-module-" _DEP_NAME "${_MODULE_DIR}")
+    # Append the prefix of package name.
+    set(_MODULE_DEP_TARGET "iree_tests_e2e_test_artifacts_${_DEP_NAME}")
+  else()
+    set(_MODULE_DEP_TARGET "")
   endif()
 
   iree_run_module_test(
@@ -293,5 +308,7 @@ function(iree_benchmark_suite_module_test)
       ${_RULE_LABELS}
     TIMEOUT
       ${_RULE_TIMEOUT}
+    DEPS
+      "${_MODULE_DEP_TARGET}"
   )
 endfunction()
