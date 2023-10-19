@@ -3273,7 +3273,8 @@ along with the contents.</p>
 <h4 id="hal_inlinebuffer_viewtrace-halinlinebufferviewtraceop"><code>hal_inline.buffer_view.trace</code> (HAL::Inline::BufferViewTraceOp)<a class="headerlink" href="#hal_inlinebuffer_viewtrace-halinlinebufferviewtraceop" title="Permanent link">link</a></h4>
 <p><em>Trace value(s) operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.trace` $operands `:` type($operands)
+<div class="highlight"><pre><span></span><code>operation ::= `hal_inline.buffer_view.trace` $key `=`
+              $operands `:` type($operands)
               attr-dict-with-keyword
 </code></pre></div>
 <p>Traces out to a runtime trace sink (console, log file, etc) the given buffer

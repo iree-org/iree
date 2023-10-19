@@ -8093,18 +8093,24 @@ copy-on-write operation.</p>
 </tbody>
 </table>
 <h4 id="streamtensortrace-streamtensortraceop"><code>stream.tensor.trace</code> (Stream::TensorTraceOp)<a class="headerlink" href="#streamtensortrace-streamtensortraceop" title="Permanent link">link</a></h4>
-<p><em>Trace value(s) operation</em></p>
+<p><em>Traces one or more tensor values at runtime</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.trace` attr-dict ($operands^ `:` type($operands))?
+<div class="highlight"><pre><span></span><code>operation ::= `stream.tensor.trace` $key `=` `[`
+              custom&lt;EncodedResourceOperands&gt;(
+              $resources, type($resources), $resource_sizes,
+              $resource_encodings, $resource_encoding_dims)
+              `]` attr-dict-with-keyword
 </code></pre></div>
 <p>Traces out to a runtime trace sink (console, log file, etc) the given
-tensors and titles them with the given key. The key is informational only
-and useful for titling/marking specific sets of tensors for easier
-searching.</p>
+tensors. The key is arbitrary and can be used for identifying the set of
+values being traced.</p>
+<p>Traits: AttrSizedOperandSegments</p>
+<p>Interfaces: ShapeAwareOpInterface, Util_SizeAwareOp</p>
 <h5 id="attributes_51">Attributes:<a class="headerlink" href="#attributes_51" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>resource_encodings</code></td><td>::mlir::ArrayAttr</td><td>type array attribute</td></tr>
 </table>
 
 <h5 id="operands_62">Operands:<a class="headerlink" href="#operands_62" title="Permanent link">link</a></h5>
@@ -8117,8 +8123,16 @@ searching.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>operands</code></td>
-<td>tensor of any type values</td>
+<td style="text-align: center;"><code>resources</code></td>
+<td>staging resource</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>resource_sizes</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>resource_encoding_dims</code></td>
+<td>index</td>
 </tr>
 </tbody>
 </table>

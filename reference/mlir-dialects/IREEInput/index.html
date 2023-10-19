@@ -4647,14 +4647,16 @@ with the default list value of the element type.</p>
 </tbody>
 </table>
 <h4 id="iree_inputtensortrace-inputtensortraceop"><code>iree_input.tensor.trace</code> (Input::TensorTraceOp)<a class="headerlink" href="#iree_inputtensortrace-inputtensortraceop" title="Permanent link">link</a></h4>
-<p><em>Trace value(s) operation</em></p>
+<p><em>Traces one or more tensor values at runtime</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_input.tensor.trace` $key attr-dict ($operands^ `:` type($operands))?
+<div class="highlight"><pre><span></span><code>operation ::= `iree_input.tensor.trace` $key `=` `[`
+              custom&lt;ShapedOperandList&gt;($values, type($values), $value_dims)
+              `]` attr-dict-with-keyword
 </code></pre></div>
 <p>Traces out to a runtime trace sink (console, log file, etc) the given
-tensors and titles them with the given key. The key is informational only
-and useful for titling/marking specific sets of tensors for easier
-searching.</p>
+tensors. The key is arbitrary and can be used for identifying the set of
+values being traced.</p>
+<p>Traits: AttrSizedOperandSegments</p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4671,8 +4673,12 @@ searching.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>operands</code></td>
+<td style="text-align: center;"><code>values</code></td>
 <td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>value_dims</code></td>
+<td>index</td>
 </tr>
 </tbody>
 </table>
