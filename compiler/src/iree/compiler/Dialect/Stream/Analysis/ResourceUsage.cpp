@@ -586,7 +586,7 @@ private:
                 DFX::Resolution::REQUIRED);
             getState() ^= parentUsage.getState();
           } else {
-            assert("Unsupported test case");
+            assert(false && "Unsupported test case");
           }
         })
         .Case([&](mlir::func::ReturnOp op) {
