@@ -22,10 +22,12 @@ import itertools
 # as this also includes accumulator-specific types like i32.
 @enum.unique
 class MatrixElemTypeId(enum.Enum):
+    NONE = ""
     I8 = "i8"
     I32 = "i32"
     F32 = "f32"
     F16 = "f16"
+    BF16 = "bf16"
 
 
 # Enumerates of the collections of shapes that we can generate tests for.
@@ -613,10 +615,19 @@ def parse_arguments():
     parser.add_argument(
         "--lhs_rhs_type",
         type=str,
-        choices=["i8", "f32", "f16"],
+        choices=["i8", "f32", "f16", "bf16"],
         help="Numeric type of input matrices",
         required=True,
     )
+    parser.add_argument(
+        "--acc_type",
+        type=str,
+        choices=["i32", "f32", "f16", "bf16"],
+        help="Numeric type of input matrices",
+        default="",
+        required=False,
+    )
+    
     parser.add_argument(
         "--shapes",
         type=str,
@@ -704,16 +715,18 @@ def write_trace_file(traces, filename, module_path, requirements):
 # type, so we do that. That is temporary: eventually there will be cases
 # where the same input types are used with different accumulator types, e.g.
 # f16 inputs with both f16 and f32 accumulator.
-def infer_acc_type(lhs_rhs_type: MatrixElemTypeId):
+def infer_acc_type(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId):
+    if acc_type != MatrixElemTypeId.NONE:
+        return acc_type
     if lhs_rhs_type == MatrixElemTypeId.I8:
         return MatrixElemTypeId.I32
-    else:
-        return lhs_rhs_type
+    return lhs_rhs_type
 
 
 def main(args):
     lhs_rhs_type = MatrixElemTypeId(args.lhs_rhs_type)
-    acc_type = infer_acc_type(lhs_rhs_type)
+    acc_type = MatrixElemTypeId(args.acc_type)
+    acc_type = infer_acc_type(lhs_rhs_type, acc_type)
     shapes_id = ShapesId(args.shapes)
     compilation_info_id = CompilationInfoId(args.compilation_info)
     (function_definitions, traces) = generate(

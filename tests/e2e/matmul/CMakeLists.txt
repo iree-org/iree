@@ -12,11 +12,12 @@ iree_add_all_subdirs()
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_i8_small
+    e2e_matmul_nondt_i8_i32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
+    "--acc_type=i32"
     "--shapes=small"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -24,15 +25,18 @@ iree_generated_trace_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_small
+    e2e_matmul_nondt_f32_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
     "--shapes=small"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -40,15 +44,94 @@ iree_generated_trace_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_mmt4d_i8_small
+    e2e_matmul_nondt_f16_f16_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f16"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_nondt_f16_f32_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_nondt_bf16_bf16_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=bf16"
+    "--acc_type=bf16"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_nondt_bf16_f32_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=bf16"
+    "--acc_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_dt_uk_i8_i32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
+    "--acc_type=i32"
     "--shapes=small"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -58,39 +141,24 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
+    "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_mmt4d_f32_small
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-opt-data-tiling"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_mmt4d_i8_large
+    e2e_matmul_dt_uk_i8_i32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
+    "--acc_type=i32"
     "--shapes=large"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -100,6 +168,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
   LABELS
     "noriscv"
     "noasan"
@@ -108,15 +177,43 @@ iree_generated_trace_runner_test(
     "default"
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
+    "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_mmt4d_f32_large
+    e2e_matmul_dt_uk_f32_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_dt_uk_f32_f32_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
     "--shapes=large"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -126,21 +223,25 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
   LABELS
     "noriscv"
     "noasan"
     "notsan"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_mmt4d_i8_intrinsics_small
+    e2e_matmul_dt_uk_f16_f16_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
-    "--lhs_rhs_type=i8"
+    "--lhs_rhs_type=f16"
+    "--acc_type=f16"
     "--shapes=small"
   TRACE_RUNNER
     iree-e2e-matmul-test
@@ -149,17 +250,221 @@ iree_generated_trace_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-codegen-mmt4d-use-intrinsics"
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+
   TARGET_CPU_FEATURES_VARIANTS
     "default"
-    "arm_64:dotprod:+dotprod"
-    "arm_64:i8mm:+i8mm"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+    "arm_64:fp16:+fp16"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_mmt4d_f32_intrinsics_small
+    e2e_matmul_dt_uk_f16_f16_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f16"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+    "noriscv"
+    "noasan"
+    "notsan"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+    "arm_64:fp16:+fp16"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_dt_uk_f16_f32_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+    "arm_64:fp16:+fp16fml"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_dt_uk_f16_f32_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+    "noriscv"
+    "noasan"
+    "notsan"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+    "arm_64:fp16:+fp16fml"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_dt_uk_bf16_bf16_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=bf16"
+    "--acc_type=bf16"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+    "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
+    "arm_64:fp16:+bf16"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_dt_uk_bf16_bf16_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=bf16"
+    "--acc_type=bf16"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+    "noriscv"
+    "noasan"
+    "notsan"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+    "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
+    "arm_64:fp16:+bf16"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_dt_uk_bf16_f32_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=bf16"
+    "--acc_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+    "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
+    "arm_64:fp16:+bf16"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_dt_uk_bf16_f32_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=bf16"
+    "--acc_type=f32"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-microkernels"
+  LABELS
+    "noriscv"
+    "noasan"
+    "notsan"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "x86_64:avx2:+avx,+avx2,+fma,+f16c"
+    "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
+    "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
+    "arm_64:fp16:+bf16"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_nondt_f32_small_no_padding
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -172,15 +477,12 @@ iree_generated_trace_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-codegen-mmt4d-use-intrinsics"
-    "--iree-opt-data-tiling"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
+    "--iree-codegen-enable-vector-padding=false"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_i8_small_ukernel
+    e2e_matmul_dt_uk_i8_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -194,48 +496,12 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_direct_f32_small_ukernel
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "vmvx"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-vmvx-enable-microkernels"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_mmt4d_i8_small_vmvx_ukernel
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=i8"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "vmvx"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-vmvx-enable-microkernels"
     "--iree-opt-data-tiling"
 )
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_mmt4d_f32_small_vmvx_ukernel
+    e2e_matmul_dt_uk_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -250,116 +516,6 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
     "--iree-opt-data-tiling"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_mmt4d_i8_small_ukernel
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=i8"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-enable-microkernels"
-    "--iree-opt-data-tiling"
-  LABELS
-
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "x86_64:avx2_fma:+avx,+avx2,+fma"
-    "x86_64:avx512_base:+avx,+avx2,+fma,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
-    "x86_64:avx512_vnni:+avx,+avx2,+fma,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
-    "arm_64:dotprod:+dotprod"
-    "arm_64:i8mm:+i8mm"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_mmt4d_i8_large_ukernel
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=i8"
-    "--shapes=large"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-enable-microkernels"
-    "--iree-opt-data-tiling"
-  LABELS
-    "noriscv"
-    "noasan"
-    "notsan"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "x86_64:avx2_fma:+avx,+avx2,+fma"
-    "x86_64:avx512_base:+avx,+avx2,+fma,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
-    "x86_64:avx512_vnni:+avx,+avx2,+fma,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
-    "arm_64:dotprod:+dotprod"
-    "arm_64:i8mm:+i8mm"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_mmt4d_f32_small_ukernel
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-enable-microkernels"
-    "--iree-opt-data-tiling"
-  LABELS
-
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "x86_64:avx2_fma:+avx,+avx2,+fma"
-    "x86_64:avx512_base:+avx,+avx2,+fma,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_mmt4d_f32_large_ukernel
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=large"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-enable-microkernels"
-    "--iree-opt-data-tiling"
-  LABELS
-    "noriscv"
-    "noasan"
-    "notsan"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "x86_64:avx2_fma:+avx,+avx2,+fma"
-    "x86_64:avx512_base:+avx,+avx2,+fma,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
 
 iree_generated_trace_runner_test(
@@ -545,10 +701,8 @@ iree_generated_trace_runner_test(
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
-    "llvm-cpu"
   DRIVERS
     "cuda"
-    "local-task"
   COMPILER_FLAGS
     "--iree-flow-split-matmul-reduction=4"
   LABELS
@@ -690,24 +844,6 @@ iree_generated_trace_runner_test(
   LABELS
     "requires-gpu-sm80"
     "vulkan_uses_vk_khr_shader_float16_int8"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_direct_f32_small_no_padding
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-codegen-enable-vector-padding=false"
 )
 
 iree_generated_trace_runner_test(
