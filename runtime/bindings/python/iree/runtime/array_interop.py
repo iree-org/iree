@@ -17,6 +17,7 @@ from ._binding import (
     HalElementType,
     MappedMemory,
     MemoryType,
+    HalFence,
 )
 
 __all__ = [
@@ -106,6 +107,20 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         self._transfer_to_host(False)
         return self._host_array
 
+    def _is_mappable(self) -> bool:
+        buffer = self._buffer_view.get_buffer()
+        if (
+            buffer.memory_type() & int(MemoryType.HOST_VISIBLE)
+            != MemoryType.HOST_VISIBLE
+        ):
+            return False
+        if (
+            buffer.allowed_usage() & int(BufferUsage.MAPPING_SCOPED)
+            != BufferUsage.MAPPING_SCOPED
+        ):
+            return False
+        return True
+
     def _transfer_to_host(self, implicit):
         if self._host_array is not None:
             return
@@ -114,7 +129,10 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
                 "DeviceArray cannot be implicitly transferred to the host: "
                 "if necessary, do an explicit transfer via .to_host()"
             )
-        self._mapped_memory, self._host_array = self._map_to_host()
+        if self._is_mappable():
+            self._mapped_memory, self._host_array = self._map_to_host()
+        else:
+            self._host_array = self._copy_to_host()
 
     def _map_to_host(self) -> Tuple[MappedMemory, np.ndarray]:
         # TODO: When synchronization is enabled, need to block here.
@@ -128,6 +146,35 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         if self._override_dtype is not None and self._override_dtype != raw_dtype:
             host_array = host_array.astype(self._override_dtype)
         return mapped_memory, host_array
+
+    def _copy_to_host(self) -> np.ndarray:
+        # TODO: When synchronization is enabled, need to block here.
+        source_buffer = self._buffer_view.get_buffer()
+        host_buffer = self._device.allocator.allocate_buffer(
+            memory_type=(MemoryType.HOST_LOCAL | MemoryType.DEVICE_VISIBLE),
+            allowed_usage=(BufferUsage.TRANSFER_TARGET | BufferUsage.MAPPING_SCOPED),
+            allocation_size=source_buffer.byte_length(),
+        )
+        # Copy and wait for buffer to be copied from source buffer.
+        sem = self._device.create_semaphore(0)
+        self._device.queue_copy(
+            source_buffer,
+            host_buffer,
+            wait_semaphores=HalFence.create_at(sem, 0),
+            signal_semaphores=HalFence.create_at(sem, 1),
+        )
+        HalFence.create_at(sem, 1).wait()
+        # Map and reformat buffer as np.array.
+        raw_dtype = self._get_raw_dtype()
+        mapped_memory = host_buffer.map()
+        host_array = mapped_memory.asarray(self._buffer_view.shape, raw_dtype)
+        # Detect if we need to force an explicit conversion. This happens when
+        # we were requested to pretend that the array is in a specific dtype,
+        # even if that is not representable on the device. You guessed it:
+        # this is to support bools.
+        if self._override_dtype is not None and self._override_dtype != raw_dtype:
+            host_array = host_array.astype(self._override_dtype)
+        return host_array
 
     def _get_raw_dtype(self):
         return HalElementType.map_to_dtype(self._buffer_view.element_type)

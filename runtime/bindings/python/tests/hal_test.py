@@ -265,6 +265,52 @@ class DeviceHalTest(unittest.TestCase):
         fence.extend(iree.runtime.HalFence.create_at(sem2, 2))
         self.assertEqual(fence.timepoint_count, 2)
 
+    def testRoundTripQueueCopy(self):
+        original_ary = np.zeros([3, 4], dtype=np.int32) + 2
+        source_bv = self.allocator.allocate_buffer_copy(
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            device=self.device,
+            buffer=original_ary,
+            element_type=iree.runtime.HalElementType.SINT_32,
+        )
+        source_buffer = source_bv.get_buffer()
+        target_buffer = self.allocator.allocate_buffer(
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            allocation_size=source_buffer.byte_length(),
+        )
+        sem = self.device.create_semaphore(0)
+        self.device.queue_copy(
+            source_buffer,
+            target_buffer,
+            wait_semaphores=iree.runtime.HalFence.create_at(sem, 0),
+            signal_semaphores=iree.runtime.HalFence.create_at(sem, 1),
+        )
+        iree.runtime.HalFence.create_at(sem, 1).wait()
+        copy_ary = target_buffer.map().asarray(original_ary.shape, original_ary.dtype)
+        np.testing.assert_array_equal(original_ary, copy_ary)
+
+    def testDifferentSizeQueueCopy(self):
+        source_buffer = self.allocator.allocate_buffer(
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            allocation_size=12,
+        )
+        target_buffer = self.allocator.allocate_buffer(
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            allocation_size=13,
+        )
+        sem = self.device.create_semaphore(0)
+        with self.assertRaisesRegex(ValueError, "length must match"):
+            self.device.queue_copy(
+                source_buffer,
+                target_buffer,
+                wait_semaphores=iree.runtime.HalFence.create_at(sem, 0),
+                signal_semaphores=iree.runtime.HalFence.create_at(sem, 1),
+            )
+
     def testCommandBufferStartsByDefault(self):
         cb = iree.runtime.HalCommandBuffer(self.device)
         with self.assertRaisesRegex(RuntimeError, "FAILED_PRECONDITION"):
