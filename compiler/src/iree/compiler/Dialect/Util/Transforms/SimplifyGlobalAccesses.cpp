@@ -87,11 +87,21 @@ static bool doesOpBlockMotion(Operation *op) {
          op->hasTrait<OpTrait::IsTerminator>();
 }
 
-static void moveOpUpInBlock(Block &block, Operation *op) {
+static SetVector<Operation *> getOpsThatBlockMotion(Block &block) {
+  SetVector<Operation *> ops;
+  for (auto &op : block.getOperations()) {
+    if (doesOpBlockMotion(&op))
+      ops.insert(&op);
+  }
+  return ops;
+}
+
+static void moveOpUpInBlock(Block &block, Operation *op,
+                            const SetVector<Operation *> &opsThatBlockMotion) {
   // Find the earliest node that does not block op motion then move before it.
   mlir::Operation *earliestValidNode = op;
   while (earliestValidNode->getPrevNode()) {
-    if (doesOpBlockMotion(earliestValidNode->getPrevNode()))
+    if (opsThatBlockMotion.contains(earliestValidNode->getPrevNode()))
       break;
     earliestValidNode = earliestValidNode->getPrevNode();
   }
@@ -99,11 +109,13 @@ static void moveOpUpInBlock(Block &block, Operation *op) {
     op->moveBefore(earliestValidNode);
 }
 
-static void moveOpDownInBlock(Block &block, Operation *op) {
+static void
+moveOpDownInBlock(Block &block, Operation *op,
+                  const SetVector<Operation *> &opsThatBlockMotion) {
   // Find the latest node that does not block op motion then move after it.
   mlir::Operation *latestValidNode = op;
   while (latestValidNode->getNextNode()) {
-    if (doesOpBlockMotion(latestValidNode->getNextNode()))
+    if (opsThatBlockMotion.contains(latestValidNode->getNextNode()))
       break;
     latestValidNode = latestValidNode->getNextNode();
   }
@@ -117,6 +129,7 @@ static bool
 optimizeBuckets(Block &block,
                 std::map<StringRef, SmallVector<Operation *>> &buckets) {
   bool didRemoveAny = false;
+  auto opsThatBlockMotion = getOpsThatBlockMotion(block);
   for (auto &bucket : buckets) {
     // First perform basic load-store forwarding and such.
     auto &ops = bucket.second;
@@ -172,7 +185,7 @@ optimizeBuckets(Block &block,
       // If the head op is a load we can move that to the top of the block.
       LLVM_DEBUG(llvm::dbgs() << "moving mutable global "
                               << loadOp.getGlobalName() << " load upward\n");
-      moveOpUpInBlock(block, ops.front());
+      moveOpUpInBlock(block, ops.front(), opsThatBlockMotion);
     }
     if (auto storeOp =
             dyn_cast<IREE::Util::GlobalStoreOpInterface>(ops.back())) {
@@ -180,7 +193,7 @@ optimizeBuckets(Block &block,
       LLVM_DEBUG(llvm::dbgs()
                  << "moving mutable global " << storeOp.getGlobalName()
                  << " store downward\n");
-      moveOpDownInBlock(block, ops.back());
+      moveOpDownInBlock(block, ops.back(), opsThatBlockMotion);
     }
   }
   return didRemoveAny;
