@@ -36,7 +36,6 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
   let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
 }
 
-
 def CHECK_ExpectFalseOp : Op<CHECK_Dialect, "expect_false"> {
   let summary = [{Checks that the operand is false}];
   let description = [{
@@ -64,18 +63,24 @@ def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
     Issues a non-fatal failure if the verification fails.
 
     ```mlir
-    check.expect_all_true(%arg0) : !hal.buffer_view
+    check.expect_all_true<%device>(%arg0) : !hal.buffer_view
     check.expect_all_true(%arg1) : tensor<2x2xi32>
     ```
   }];
 
-  let arguments =
-    (ins AnyTypeOf<[HAL_BufferView, TensorOf<[AnySignlessInteger]>]>:$operand);
+  let arguments = (ins
+    Optional<HAL_Device>:$device,
+    AnyTypeOf<[HAL_BufferView, TensorOf<[AnySignlessInteger]>]>:$operand
+  );
 
-  let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
+  let assemblyFormat = [{
+    (`` `<` $device^ `>`)?
+    `` `(` $operand `)` attr-dict `:` type($operand)
+  }];
 }
 
-def CHECK_ExpectEqOp : Op<CHECK_Dialect, "expect_eq", [SameTypeOperands]> {
+def CHECK_ExpectEqOp :
+    Op<CHECK_Dialect, "expect_eq", [AllTypesMatch<["lhs", "rhs"]>]> {
   let summary = [{Checks that the tensor or buffer view operands are equal}];
   let description = [{
     Verifies that the operands are exactly equal.
@@ -88,11 +93,15 @@ def CHECK_ExpectEqOp : Op<CHECK_Dialect, "expect_eq", [SameTypeOperands]> {
   }];
 
   let arguments = (ins
-      AnyTypeOf<[HAL_BufferView, AnyTensor]>:$lhs,
-      AnyTypeOf<[HAL_BufferView, AnyTensor]>:$rhs
+    Optional<HAL_Device>:$device,
+    AnyTypeOf<[HAL_BufferView, AnyTensor]>:$lhs,
+    AnyTypeOf<[HAL_BufferView, AnyTensor]>:$rhs
   );
 
-  let assemblyFormat = "`(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)";
+  let assemblyFormat = [{
+    (`` `<` $device^ `>`)?
+    `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+  }];
 }
 
 def CHECK_ExpectEqConstOp :
@@ -111,17 +120,21 @@ def CHECK_ExpectEqConstOp :
   }];
 
   let arguments = (ins
+    Optional<HAL_Device>:$device,
     AnyTensor:$lhs,
     ElementsAttr:$value
   );
 
   let hasCanonicalizer = 1;
 
-  let assemblyFormat = "`(` $lhs `,` $value `)` attr-dict `:` type($lhs)";
+  let assemblyFormat = [{
+    (`` `<` $device^ `>`)?
+    `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+  }];
 }
 
 def CHECK_ExpectAlmostEqOp :
-    Op<CHECK_Dialect, "expect_almost_eq", [SameTypeOperands]> {
+    Op<CHECK_Dialect, "expect_almost_eq", [AllTypesMatch<["lhs", "rhs"]>]> {
   let summary = [{Checks that the operands are almost equal}];
   let description = [{
     Verifies that the buffer view or tensor operands with float elements are
@@ -135,11 +148,15 @@ def CHECK_ExpectAlmostEqOp :
   }];
 
   let arguments = (ins
-      AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$lhs,
-      AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs
+    Optional<HAL_Device>:$device,
+    AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$lhs,
+    AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs
   );
 
-  let assemblyFormat = "`(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)";
+  let assemblyFormat = [{
+    (`` `<` $device^ `>`)?
+    `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+  }];
 }
 
 def CHECK_ExpectAlmostEqConstOp :
@@ -160,13 +177,17 @@ def CHECK_ExpectAlmostEqConstOp :
   }];
 
   let arguments = (ins
+    Optional<HAL_Device>:$device,
     TensorOf<[AnyFloat]>:$lhs,
     ElementsAttr:$value
   );
 
   let hasCanonicalizer = 1;
 
-  let assemblyFormat = "`(` $lhs `,` $value `)` attr-dict `:` type($lhs)";
+  let assemblyFormat = [{
+    (`` `<` $device^ `>`)?
+    `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+  }];
 }
 
 #endif  // IREE_MODULES_CHECK_DIALECT_CHECK_OPS

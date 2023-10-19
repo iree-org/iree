@@ -215,6 +215,7 @@ iree_cc_binary(
     iree::modules::hal
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml

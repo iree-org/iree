@@ -560,7 +560,7 @@ static iree_status_t iree_hal_cuda_device_queue_alloca(
   // allocator is set on the device.
   iree_status_t status = iree_ok_status();
   if (device->supports_memory_pools &&
-      !iree_any_bit_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+      !iree_all_bits_set(params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
     status = iree_hal_cuda_memory_pools_alloca(&device->memory_pools,
                                                device->stream, pool, params,
                                                allocation_size, out_buffer);

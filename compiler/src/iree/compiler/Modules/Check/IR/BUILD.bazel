@@ -57,6 +57,7 @@ iree_compiler_cc_library(
         ":IR",
         ":check_ops_gen",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "//compiler/src/iree/compiler/Modules/Check:check_imports",
         "//compiler/src/iree/compiler/Modules/Check/Conversion",

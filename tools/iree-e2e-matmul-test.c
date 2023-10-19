@@ -19,6 +19,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/trace_replay.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
@@ -200,10 +201,8 @@ static iree_status_t map_host_local_row_major_data(
     iree_hal_buffer_view_t* buffer_view,
     enum iree_hal_memory_access_bits_t access,
     iree_hal_buffer_mapping_t* mapping) {
-  // Really validate host-local, not just host-visible: callers may rely on
-  // host-coherency.
   IREE_RETURN_IF_ERROR(
-      validate_memory_type(buffer_view, IREE_HAL_MEMORY_TYPE_HOST_LOCAL));
+      validate_memory_type(buffer_view, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
   if (iree_hal_buffer_view_encoding_type(buffer_view) !=
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -1055,39 +1054,43 @@ static iree_status_t do_matmul_and_check_results(
       replay->device, device_allocator, device_inputs, &host_inputs));
 
   // Invoke the function to produce the actual result.
-  iree_vm_list_t* device_outputs = NULL;
+  iree_vm_list_t* outputs = NULL;
   IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                     /*initial_capacity=*/8,
-                                    replay->host_allocator, &device_outputs));
+                                    replay->host_allocator, &outputs));
   IREE_CHECK_OK(iree_vm_invoke(
       replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
-      /*policy=*/NULL, device_inputs, device_outputs, replay->host_allocator));
+      /*policy=*/NULL, device_inputs, outputs, replay->host_allocator));
   iree_vm_list_release(device_inputs);
 
-  // Get the device_actual_result from the device_outputs.
-  iree_hal_buffer_view_t* device_actual_result;
-  IREE_CHECK_OK(
-      get_item_as_buffer_view(device_outputs, 0, &device_actual_result));
+  // Transfer device buffers to host buffers.
+  iree_hal_buffer_params_t host_params = {
+      .usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+      .access = IREE_HAL_MEMORY_ACCESS_ALL,
+      .type =
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
+      .min_alignment = 0,
+  };
+  IREE_CHECK_OK(iree_tooling_transfer_variant_list(
+      replay->device, outputs, device_allocator, host_params,
+      /*wait_fence=*/NULL, /*signal_fence=*/NULL));
 
-  // Copy the results to a host local buffer to be able to map it.
-  iree_hal_buffer_view_t* host_actual_result = NULL;
-  IREE_CHECK_OK(copy_device_buffer_view_to_host(
-      replay->device, device_allocator, device_actual_result,
-      &host_actual_result));
+  // Get the actual result computed by the program.
+  iree_hal_buffer_view_t* actual_result;
+  IREE_CHECK_OK(get_item_as_buffer_view(outputs, 0, &actual_result));
 
-  // Allocate host_expected_result with same shape as host_actual_result.
+  // Allocate host_expected_result with same shape as actual_result.
   iree_hal_buffer_view_t* host_expected_result = NULL;
-  IREE_CHECK_OK(allocate_host_buffer_view_like(replay->device, device_allocator,
-                                               host_actual_result,
-                                               &host_expected_result));
+  IREE_CHECK_OK(allocate_host_buffer_view_like(
+      replay->device, device_allocator, actual_result, &host_expected_result));
 
-  // Check that host_actual_result and host_expected_result agree.
-  iree_status_t status = check_matmul_results(
-      file, host_inputs, host_actual_result, host_expected_result);
+  // Check that actual_result and host_expected_result agree.
+  iree_status_t status = check_matmul_results(file, host_inputs, actual_result,
+                                              host_expected_result);
 
-  iree_vm_list_release(device_outputs);  // releases device_actual_result
+  iree_vm_list_release(outputs);  // releases actual_result
   iree_vm_list_release(host_inputs);
-  iree_hal_buffer_view_release(host_actual_result);
   iree_hal_buffer_view_release(host_expected_result);
   return status;
 }

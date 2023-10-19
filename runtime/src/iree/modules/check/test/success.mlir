@@ -14,9 +14,10 @@ func.func @expect_false() {
 }
 
 func.func @expect_all_true() {
+  %device = hal.ex.shared_device : !hal.device
   %all_true = util.unfoldable_constant dense<1> : tensor<2x2xi32>
   %all_true_view = hal.tensor.export %all_true : tensor<2x2xi32> -> !hal.buffer_view
-  check.expect_all_true(%all_true_view) : !hal.buffer_view
+  check.expect_all_true<%device>(%all_true_view) : !hal.buffer_view
   return
 }
 

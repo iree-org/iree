@@ -80,8 +80,8 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     %arg1_resource = stream.tensor.import %arg1 : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%c16}
 
     // CHECK: %[[RESULT_BUFFER:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
-    // CHECK-SAME: type("HostVisible|DeviceVisible|DeviceLocal")
-    // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}Mapping{{.+}}")
+    // CHECK-SAME: type("DeviceVisible|DeviceLocal")
+    // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
     // CHECK-SAME: : !hal.buffer{%c16}
     %result_resource = stream.resource.alloc uninitialized : !stream.resource<external>{%c16}
 
