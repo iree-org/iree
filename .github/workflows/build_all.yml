@@ -21,6 +21,10 @@ on:
       write-caches:
         required: true
         type: string
+      machine-type:
+        required: false
+        type: string
+        default: cpu
     outputs:
       build-dir:
         description: |
@@ -45,14 +49,19 @@ env:
 
 jobs:
   build_all:
+    env:
+      MACHINE_TYPE: ${{ inputs.machine-type }}
+      BUILD_DIR: >-
+        ${{
+          (env.MACHINE_TYPE == 'arm64' && 'full-build-dir-arm64') ||
+                                          'full-build-dir'
+        }}
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ inputs.runner-group }}
       - environment=${{ inputs.runner-env }}
-      - cpu
+      - ${{ env.MACHINE_TYPE }}
       - os-family=Linux
-    env:
-      BUILD_DIR: full-build-dir
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
@@ -68,11 +77,18 @@ jobs:
         env:
           IREE_WRITE_REMOTE_CCACHE: ${{ inputs.write-caches }}
         run: |
+          set -eou pipefail
+          if [[ "${MACHINE_TYPE}" == "arm64" ]]; then
+            BASE_DOCKER_IMAGE="gcr.io/iree-oss/base-arm64@sha256:31cdb58f556e415c3c65afae31ae9c54e43c1eb3dcd845f3d107abd9b368ff3d"
+          else
+            BASE_DOCKER_IMAGE="gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33"
+          fi
+
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33" \
-            gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33 \
+            --env "CCACHE_NAMESPACE=${BASE_DOCKER_IMAGE}" \
+            "${BASE_DOCKER_IMAGE}" \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       # The archive step below doesn't include these files. Remove them first to

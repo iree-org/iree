@@ -73,6 +73,16 @@ jobs:
       runner-env: ${{ needs.setup.outputs.runner-env }}
       write-caches: ${{ needs.setup.outputs.write-caches }}
 
+  build_all_arm64:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all_arm64')
+    uses: ./.github/workflows/build_all.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      write-caches: ${{ needs.setup.outputs.write-caches }}
+      machine-type: arm64
+
   build_test_all_windows:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_windows')
@@ -269,6 +279,37 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
             gcr.io/iree-oss/swiftshader@sha256:035ac89d3c357787052a836f4cbd227035260c05c95fa9a53d809600c454e819 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+
+  test_all_arm64:
+    needs: [setup, build_all_arm64]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_all_arm64')
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - arm64
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all_arm64.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all_arm64.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all_arm64.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Downloading build dir archive"
+        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Testing all"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_CUDA_DISABLE=1 \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base-arm64@sha256:31cdb58f556e415c3c65afae31ae9c54e43c1eb3dcd845f3d107abd9b368ff3d \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
