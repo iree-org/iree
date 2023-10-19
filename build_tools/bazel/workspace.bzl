@@ -50,7 +50,7 @@ def cuda_auto_configure_impl(repository_ctx):
         Label("%s//:build_tools/third_party/cuda/BUILD.template" % iree_repo_alias),
         {
             "%ENABLED%": "True" if cuda_toolkit_root else "False",
-            "%LIBDEVICE_REL_PATH%": libdevice_rel_path,
+            "%LIBDEVICE_REL_PATH%": libdevice_rel_path if cuda_toolkit_root else "BUILD",
             "%IREE_REPO_ALIAS%": iree_repo_alias,
         },
     )
