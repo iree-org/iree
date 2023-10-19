@@ -356,98 +356,6 @@ serializeGenericFloatElements(DenseFPElementsAttr attr,
   return success();
 }
 
-template <typename elementType>
-static void serializeGenericIntegerResourcElementsAPInt(std::optional<ArrayRef<elementType>> attrData,
-                                                        unsigned numBits,
-                                                        llvm::support::endianness endian,
-                                                        llvm::raw_ostream &os) {
-  for (int i = 0; i < attrData->size(); i++) {
-    auto val = (*attrData)[i];
-    APInt newVal(numBits, val);
-    elementType rawValue = llvm::support::endian::byte_swap<elementType>(
-        newVal.extractBitsAsZExtValue(numBits, 0), endian);
-    os.write((const char *)&rawValue, sizeof(rawValue));
-  }
-}
-
-template <typename elementType>
-static void serializeGenericFloatResourcElementsAPFloat(std::optional<ArrayRef<elementType>> attrData,
-                                                        unsigned numBits,
-                                                        llvm::support::endianness endian,
-                                                        llvm::raw_ostream &os) {
-  for (int i = 0; i < attrData->size(); i++) {
-    auto val = (*attrData)[i];
-    APFloat newVal(numBits, val);
-    elementType rawValue = llvm::support::endian::byte_swap<elementType>(
-        newVal.bitcastToAPInt().extractBitsAsZExtValue(numBits, 0), endian);
-    os.write((const char *)&rawValue, sizeof(rawValue));
-  }
-}
-
-template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
-static LogicalResult
-serializeGenericIntegerResourceElements(Location loc,
-                                DenseResourceElementsAttr attr,
-                                llvm::support::endianness endian,
-                                llvm::raw_ostream &os) {
-  unsigned bitWidth = attr.getType().getElementTypeBitWidth();
-  switch (bitWidth) {
-    case 16:
-      {
-        auto denseI16ResourceAttr = dyn_cast<DenseI16ResourceElementsAttr>(attr);
-        std::optional<ArrayRef<int16_t>> attrData =
-          denseI16ResourceAttr.tryGetAsArrayRef();
-        serializeGenericIntegerResourcElementsAPInt<int16_t>(attrData, numBits, endian, os);
-        break;
-      }
-    case 32:
-      {
-        auto denseI32ResourceAttr = dyn_cast<DenseI32ResourceElementsAttr>(attr);
-        std::optional<ArrayRef<int32_t>> attrData =
-          denseI32ResourceAttr.tryGetAsArrayRef();
-        serializeGenericIntegerResourcElementsAPInt<int32_t>(attrData, numBits, endian, os);
-        break;
-      }
-    case 64:
-      {
-        auto denseI64ResourceAttr = dyn_cast<DenseI64ResourceElementsAttr>(attr);
-        std::optional<ArrayRef<int64_t>> attrData =
-          denseI64ResourceAttr.tryGetAsArrayRef();
-        serializeGenericIntegerResourcElementsAPInt<int64_t>(attrData, numBits, endian, os);
-        break;
-      }
-    default:
-      return emitError(loc)
-             << "unhandled integer element bit width " << bitWidth
-             << " for type " << attr.getType();
-  }
-  return success();
-}
-
-template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
-static LogicalResult
-serializeGenericFloatResourceElements(Location loc,
-                                DenseResourceElementsAttr attr,
-                                llvm::support::endianness endian,
-                                llvm::raw_ostream &os) {
-  //TODO for float64 support
-  unsigned bitWidth = attr.getType().getElementTypeBitWidth();
-  switch (bitWidth) {
-    case 32:
-      {
-        auto denseF32ResourceAttr = dyn_cast<DenseF32ResourceElementsAttr>(attr);
-        std::optional<ArrayRef<float>> attrData =
-          denseF32ResourceAttr.tryGetAsArrayRef();
-        serializeGenericFloatResourcElementsAPFloat<float>(attrData, numBits, endian, os);
-        break;
-      }
-    default:
-      return emitError(loc)
-             << "unhandled integer element bit width " << bitWidth
-             << " for type " << attr.getType();
-  }
-  return success();
-}
 
 // Expands 8-values per byte raw data from DenseIntElementsAttr to 0/1 byte
 // values in the output.
@@ -537,41 +445,38 @@ static LogicalResult
 serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr resourceElementsAttr,
                             llvm::support::endianness endian,
                             llvm::raw_ostream &os) {
-  bool isDenseIntegerResource = isa<DenseBoolResourceElementsAttr,
-                                    DenseI8ResourceElementsAttr,
-                                    DenseI16ResourceElementsAttr,
-                                    DenseI32ResourceElementsAttr,
-                                    DenseI64ResourceElementsAttr>(resourceElementsAttr);
-  bool isDenseFloatResource = isa<DenseF32ResourceElementsAttr, DenseF64ResourceElementsAttr>(resourceElementsAttr);
-  if (isDenseIntegerResource) {
+  if (llvm::isa<IntegerType>(resourceElementsAttr.getType().getElementType())) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
+    // TODO(aviator19941): test i1
     unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
-    case 1:
-      return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 8:
       return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 16:
-      return serializeGenericIntegerResourceElements<uint16_t>(loc, resourceElementsAttr, endian, os);
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 32:
-      return serializeGenericIntegerResourceElements<uint32_t>(loc, resourceElementsAttr, endian, os);
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 64:
-      return serializeGenericIntegerResourceElements<uint64_t>(loc, resourceElementsAttr, endian, os);
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
     default:
       return emitError(loc)
              << "unhandled integer element bit width " << bitWidth
              << " for type " << resourceElementsAttr.getType();
     }
   }
-  else if (isDenseFloatResource) {
+  else if (llvm::isa<FloatType>(resourceElementsAttr.getType().getElementType())) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
-    // TODO for float64 support
+    // TODO(saienduri): implement float64 support (not neccesary now)
     unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
       case 32:
         return serializeResourceRawData(loc, resourceElementsAttr, os);
+       default:
+        return emitError(loc)
+              << "unhandled float element bit width " << bitWidth
+              << " for type " << resourceElementsAttr.getType();
     }
   }
   return emitError(loc) << "unhandled constant type " << resourceElementsAttr.getType();
@@ -892,7 +797,6 @@ struct SerializableDenseResourceElementsAttrModel
                                   llvm::raw_ostream &os) const {
     auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
     auto handle = attr.getRawHandle();
-    //auto test = attr.isSplat();
 
     // Special testing path for elided attributes. We want this to be an
     // error in normal circumstances as the output will produce garbage
