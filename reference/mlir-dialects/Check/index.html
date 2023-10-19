@@ -2440,12 +2440,13 @@
 <h3 id="checkexpect_all_true-checkexpectalltrueop"><code>check.expect_all_true</code> (Check::ExpectAllTrueOp)<a class="headerlink" href="#checkexpect_all_true-checkexpectalltrueop" title="Permanent link">link</a></h3>
 <p><em>Checks that the operand contains only values that are true</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_all_true` `(` $operand `)` attr-dict `:` type($operand)
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_all_true` (`` `&lt;` $device^ `&gt;`)?
+              `` `(` $operand `)` attr-dict `:` type($operand)
 </code></pre></div>
 <p>Verifies that the operand contains true values, which are represented by any
 non-zero integer.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
-<div class="highlight"><pre><span></span><code>check.expect_all_true(%arg0) : !hal.buffer_view
+<div class="highlight"><pre><span></span><code>check.expect_all_true&lt;%device&gt;(%arg0) : !hal.buffer_view
 check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
 </code></pre></div>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
@@ -2458,6 +2459,10 @@ check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
 </thead>
 <tbody>
 <tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
+<tr>
 <td style="text-align: center;"><code>operand</code></td>
 <td>buffer_view or tensor of signless integer values</td>
 </tr>
@@ -2466,14 +2471,14 @@ check.expect_all_true(%arg1) : tensor&lt;2x2xi32&gt;
 <h3 id="checkexpect_almost_eq-checkexpectalmosteqop"><code>check.expect_almost_eq</code> (Check::ExpectAlmostEqOp)<a class="headerlink" href="#checkexpect_almost_eq-checkexpectalmosteqop" title="Permanent link">link</a></h3>
 <p><em>Checks that the operands are almost equal</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq` (`` `&lt;` $device^ `&gt;`)?
+              `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Verifies that the buffer view or tensor operands with float elements are
 almost equal to within an implementation-defined "reasonable" tolerance.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <div class="highlight"><pre><span></span><code>check.expect_almost_eq(%arg0, %arg1) : tensor&lt;5xf32&gt;
 </code></pre></div>
-<p>Traits: SameTypeOperands</p>
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -2483,6 +2488,10 @@ almost equal to within an implementation-defined "reasonable" tolerance.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
 <tr>
 <td style="text-align: center;"><code>lhs</code></td>
 <td>buffer_view or tensor of floating-point values</td>
@@ -2496,7 +2505,8 @@ almost equal to within an implementation-defined "reasonable" tolerance.</p>
 <h3 id="checkexpect_almost_eq_const-checkexpectalmosteqconstop"><code>check.expect_almost_eq_const</code> (Check::ExpectAlmostEqConstOp)<a class="headerlink" href="#checkexpect_almost_eq_const-checkexpectalmosteqconstop" title="Permanent link">link</a></h3>
 <p><em>Checks that the tensor operand is almost equal to some constant</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_almost_eq_const` (`` `&lt;` $device^ `&gt;`)?
+              `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Verifies that the tensor operand with float elements is almost equal to the
 constant attribute within an implementation-defined "reasonable" tolerance.</p>
@@ -2520,6 +2530,10 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 </thead>
 <tbody>
 <tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
+<tr>
 <td style="text-align: center;"><code>lhs</code></td>
 <td>tensor of floating-point values</td>
 </tr>
@@ -2528,13 +2542,13 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 <h3 id="checkexpect_eq-checkexpecteqop"><code>check.expect_eq</code> (Check::ExpectEqOp)<a class="headerlink" href="#checkexpect_eq-checkexpecteqop" title="Permanent link">link</a></h3>
 <p><em>Checks that the tensor or buffer view operands are equal</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq` (`` `&lt;` $device^ `&gt;`)?
+              `` `(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Verifies that the operands are exactly equal.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
 <div class="highlight"><pre><span></span><code>check.expect_eq(%arg0, %arg1) : tensor&lt;5xi32&gt;
 </code></pre></div>
-<p>Traits: SameTypeOperands</p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -2544,6 +2558,10 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
 <tr>
 <td style="text-align: center;"><code>lhs</code></td>
 <td>buffer_view or tensor of any type values</td>
@@ -2557,7 +2575,8 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 <h3 id="checkexpect_eq_const-checkexpecteqconstop"><code>check.expect_eq_const</code> (Check::ExpectEqConstOp)<a class="headerlink" href="#checkexpect_eq_const-checkexpecteqconstop" title="Permanent link">link</a></h3>
 <p><em>Checks that the tensor operand is equal to some constant</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+<div class="highlight"><pre><span></span><code>operation ::= `check.expect_eq_const` (`` `&lt;` $device^ `&gt;`)?
+              `` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
 </code></pre></div>
 <p>Verifies that the tensor operand is exactly equal to a constant attribute.</p>
 <p>Issues a non-fatal failure if the verification fails.</p>
@@ -2579,6 +2598,10 @@ constant attribute within an implementation-defined "reasonable" tolerance.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: center;"><code>device</code></td>
+<td>device</td>
+</tr>
 <tr>
 <td style="text-align: center;"><code>lhs</code></td>
 <td>tensor of any type values</td>
