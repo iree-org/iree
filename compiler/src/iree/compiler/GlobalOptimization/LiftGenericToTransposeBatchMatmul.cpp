@@ -10,15 +10,28 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+
+#include <sstream>
 
 namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
 
 namespace {
+
+template <typename T, unsigned int N>
+mlir::raw_ostream& operator<< (mlir::raw_ostream& s, const SmallVector<T, N>& v) {
+  s << "[ ";
+  for (const auto& e : v) {
+    s << e << " ";
+  }
+  s << "]";
+  return s;
+}
 
 // Converts linalg.conv_2d_input_nhwc_filter_nhwc op to linalg.matmul
 class LiftGenericToTransposeBatchMatmul
@@ -32,10 +45,14 @@ public:
 
     FailureOr<linalg::ContractionDimensions> contractionDims = linalg::inferContractionDims(genericOp);
     if (failed(contractionDims)) {
-      llvm::dbgs() << "failed to infer contraction dims\n";
+      llvm::dbgs() << "failed to infer contraction dims\n\n";
       return failure();
     }
-    llvm::dbgs() << 
+
+    llvm::dbgs() << "batch: " << contractionDims->batch << "\n";
+    llvm::dbgs() << "m: " << contractionDims->m << "\n";
+    llvm::dbgs() << "n: " << contractionDims->n << "\n";
+    llvm::dbgs() << "k: " << contractionDims->k << "\n";
 
     return failure();
   }
