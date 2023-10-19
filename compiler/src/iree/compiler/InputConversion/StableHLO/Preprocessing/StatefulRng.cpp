@@ -78,9 +78,9 @@ public:
       auto range =
           b.create<::mlir::stablehlo::SubtractOp>(op.getB(), op.getA());
       auto dist = b.create<::mlir::chlo::BroadcastRemOp>(bits, range, nullptr);
-      auto div_2 = b.create<::mlir::stablehlo::ShiftRightLogicalOp>(
+      auto div_2 = b.create<::mlir::chlo::BroadcastShiftRightLogicalOp>(
           dist,
-          b.create<::mlir::stablehlo::ConstantOp>(b.getI32TensorAttr({1})));
+          b.create<::mlir::stablehlo::ConstantOp>(b.getI32TensorAttr({1})), nullptr);
       out = b.create<::mlir::stablehlo::SubtractOp>(dist, div_2);
       out = b.create<::mlir::stablehlo::AddOp>(out, div_2);
       out = b.create<::mlir::chlo::BroadcastAddOp>(out, op.getA(), nullptr);
@@ -106,7 +106,7 @@ public:
       out = b.create<::mlir::chlo::BroadcastMulOp>(out, range, nullptr);
       out = b.create<::mlir::chlo::BroadcastAddOp>(out, op.getA(), nullptr);
     }
-    // b.create<ml_program::GlobalStoreOp>(symbol, rngOp.getOutputState());
+    b.create<ml_program::GlobalStoreOp>(symbol, rngOp.getOutputState());
 
     rewriter.replaceOp(op, out);
     return success();
@@ -117,7 +117,7 @@ public:
 
 struct StatefulRngPass : public impl::StatefulRngBase<StatefulRngPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<ml_program::MLProgramDialect>();
+    registry.insert<chlo::ChloDialect, ml_program::MLProgramDialect>();
   }
 
   void runOnOperation() override {
