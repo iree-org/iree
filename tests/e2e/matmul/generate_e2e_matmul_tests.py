@@ -635,6 +635,7 @@ def parse_arguments():
         help="Collection of matrix shapes to test",
         required=True,
     )
+
     parser.add_argument(
         "--compilation_info",
         type=str,
