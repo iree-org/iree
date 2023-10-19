@@ -88,19 +88,27 @@ static bool doesOpBlockMotion(Operation *op) {
 }
 
 static void moveOpUpInBlock(Block &block, Operation *op) {
-  while (op->getPrevNode()) {
-    if (doesOpBlockMotion(op->getPrevNode()))
+  // Find the earliest node that does not block op motion then move before it.
+  mlir::Operation *earliestValidNode = op;
+  while (earliestValidNode->getPrevNode()) {
+    if (doesOpBlockMotion(earliestValidNode->getPrevNode()))
       break;
-    op->moveBefore(op->getPrevNode());
+    earliestValidNode = earliestValidNode->getPrevNode();
   }
+  if (earliestValidNode != op)
+    op->moveBefore(earliestValidNode);
 }
 
 static void moveOpDownInBlock(Block &block, Operation *op) {
-  while (op->getNextNode()) {
-    if (doesOpBlockMotion(op->getNextNode()))
+  // Find the latest node that does not block op motion then move after it.
+  mlir::Operation *latestValidNode = op;
+  while (latestValidNode->getNextNode()) {
+    if (doesOpBlockMotion(latestValidNode->getNextNode()))
       break;
-    op->moveAfter(op->getNextNode());
+    latestValidNode = latestValidNode->getNextNode();
   }
+  if (latestValidNode != op)
+    op->moveAfter(latestValidNode);
 }
 
 // Optimizes the load/store ops for each given bucket.
