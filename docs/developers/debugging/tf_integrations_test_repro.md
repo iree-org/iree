@@ -1,4 +1,4 @@
-# Debugging failures in TF/TFLite integration tests.
+# Debugging failures in TF/TFLite integration tests
 
 These are steps to reproduce/address failures in TF/TFLite integration tests.
 These instructions are most stable on Linux, though they may work with a few
