@@ -2328,8 +2328,8 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
     maxLoopNums = std::max(maxLoopNums, iterTypes.size());
   }
 
-  // Adjust the distribution tile sizes and union parallel vector tile sizes
-  // from other ops. The results of parallel vector tile sizes might overlap
+  // Adjust the distribution tile sizes and join parallel vector tile sizes from
+  // other ops. The results of parallel vector tile sizes might overlap
   // reduction dimensions on some ops, so it will be splitted into common vector
   // tile sizes and inner vector tile sizes later.
   //
@@ -2337,8 +2337,8 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   // sizes.
   //
   // Here we use the assumption in FormDispatchRegions that all ops in a
-  // dispatch have identity maps between producer-consumer relations. So we
-  // don't need to handle the permutation of dimensions between ops except for
+  // dispatch have identity mapping between their parallel dimensions. So we
+  // don't need to handle the permutation on dimensions between ops except for
   // the pack op.
   llvm::SmallDenseMap<Operation *, SmallVector<int64_t>> reductionTileSizeMap;
   distTileSizes.resize(maxLoopNums);
