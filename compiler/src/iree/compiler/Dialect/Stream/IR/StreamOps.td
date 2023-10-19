@@ -1383,22 +1383,40 @@ def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_TensorTraceOp : Stream_Op<"tensor.trace", []> {
-  let summary = [{trace value(s) operation}];
+def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_ShapeAwareOp>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{traces one or more tensor values at runtime}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given
-    tensors and titles them with the given key. The key is informational only
-    and useful for titling/marking specific sets of tensors for easier
-    searching.
+    tensors. The key is arbitrary and can be used for identifying the set of
+    values being traced.
   }];
 
   let arguments = (ins
     StrAttr:$key,
-    Variadic<AnyTensor>:$operands
+    Variadic<Stream_StagingResource>:$resources,
+    Variadic<Stream_Size>:$resource_sizes,
+    TypeArrayAttr:$resource_encodings,
+    Stream_ShapeDynamicDims:$resource_encoding_dims
   );
 
-  // TODO(benvanik): stream.tensor.trace assembly format (custom).
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = [{
+    $key `=` `[`
+    custom<EncodedResourceOperands>(
+        $resources, type($resources), $resource_sizes,
+        $resource_encodings, $resource_encoding_dims)
+    `]` attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getResourceSizes()[idx]; }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasVerifier = 1;
 }
 
 } // OpGroupTensorOps

@@ -2,17 +2,17 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-flow-insert-debug-target-at-ordinal{break-debug-target=@target_func:0 trace-debug-target=@target_func:0})" %s | FileCheck %s --check-prefixes=ORDINAL_0
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-flow-insert-debug-target-at-symbol{break-debug-target=dispatch_1 trace-debug-target=dispatch_1[^0-9]})" %s | FileCheck %s --check-prefixes=CHECK,SYMBOL
 
-/// Multiple functions
+// Multiple functions.
 
 // CHECK-LABEL: func.func @target_func
 // ORDINAL_0-LABEL: func.func @target_func
 func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
   %c4 = arith.constant 4 : index
   // CHECK: %[[D0:.+]] = flow.dispatch @dispatch_0::@dispatch_0_entry
-  //      ORDINAL_0: flow.tensor.trace {key = "dispatch_0::dispatch_0_entry::0 inputs"}
+  //      ORDINAL_0: flow.tensor.trace "dispatch_0::dispatch_0_entry::0 inputs"
   // ORDINAL_0-NEXT: %[[D0:.+]] = flow.dispatch @dispatch_0::@dispatch_0_entry
   %0 = flow.dispatch @dispatch_0::@dispatch_0_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // ORDINAL_0-NEXT: flow.tensor.trace {key = "dispatch_0::dispatch_0_entry::0 outputs"}
+  // ORDINAL_0-NEXT: flow.tensor.trace "dispatch_0::dispatch_0_entry::0 outputs"
   // CHECK: %[[D1:.+]] = flow.dispatch @dispatch_1::@dispatch_1_entry
   %1 = flow.dispatch @dispatch_1::@dispatch_1_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %2 = flow.dispatch @dispatch_2::@dispatch_2_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
@@ -22,23 +22,22 @@ func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
   return %3 : !hal.buffer_view
 }
 
-
 // CHECK-LABEL: func.func @other_func
 func.func @other_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
   %c4 = arith.constant 4 : index
-  // CHECK: %[[D0:.+]] = flow.dispatch @dispatch_1::@dispatch_1_entry
-  %0 = flow.dispatch @dispatch_1::@dispatch_1_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: %[[D3:.+]] = flow.dispatch @dispatch_3::@dispatch_3_entry
+  %0 = flow.dispatch @dispatch_3::@dispatch_3_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
 
-  // CHECK: %[[D1:.+]] = flow.dispatch @dispatch_2::@dispatch_2_entry
-  %1 = flow.dispatch @dispatch_2::@dispatch_2_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %[[D2:.+]] = flow.dispatch @dispatch_3::@dispatch_3_entry
-  %2 = flow.dispatch @dispatch_3::@dispatch_3_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: %[[D4:.+]] = flow.dispatch @dispatch_4::@dispatch_4_entry
+  %1 = flow.dispatch @dispatch_4::@dispatch_4_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: %[[D5:.+]] = flow.dispatch @dispatch_5::@dispatch_5_entry
+  %2 = flow.dispatch @dispatch_5::@dispatch_5_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
 
-  // ORDINAL: %[[ORIGINAL_EXPORT:.+]] = hal.tensor.export %[[D2]] : tensor<4xf32> -> !hal.buffer_view
-  // SYMBOL:  %[[BREAK_EXPORT:.+]] = hal.tensor.export %[[D0]] : tensor<4xf32> -> !hal.buffer_view
+  // ORDINAL: %[[ORIGINAL_EXPORT:.+]] = hal.tensor.export %[[D5]] : tensor<4xf32> -> !hal.buffer_view
+  // SYMBOL:  %[[BREAK_EXPORT:.+]] = hal.tensor.export %[[D5]] : tensor<4xf32> -> !hal.buffer_view
   %3 = hal.tensor.export %2 : tensor<4xf32> -> !hal.buffer_view
 
-  /// Only break on the symbol as the ordinal specifies a different function
+  // Only break on the symbol as the ordinal specifies a different function.
   // SYMBOL:  return %[[BREAK_EXPORT]] : !hal.buffer_view
   // ORDINAL: return %[[ORIGINAL_EXPORT]] : !hal.buffer_view
   return %3 : !hal.buffer_view
@@ -46,7 +45,8 @@ func.func @other_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
 
 // -----
 
-// Break on a dispatch with a different number of results
+// Break on a dispatch with a different number of results.
+
 // CHECK-LABEL: func.func @target_func
 func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
   %c4 = arith.constant 4 : index
@@ -64,7 +64,8 @@ func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
 
 // -----
 
-// Break/trace on a dispatch not found in the target function should do nothing
+// Break/trace on a dispatch not found in the target function should do nothing.
+
 // CHECK-LABEL: func.func @target_func
 func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
   %c4 = arith.constant 4 : index
@@ -78,7 +79,8 @@ func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
 
 // -----
 
-/// Combine tracing and breaking on the same dispatch
+// Combines tracing and breaking on the same dispatch.
+
 // CHECK-LABEL: func.func @target_func
 // CHECK-SAME:       %[[ARG0:.+]]: tensor<4xf32>
 func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
@@ -86,12 +88,12 @@ func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
   // CHECK: %[[D0:.+]] = flow.dispatch @dispatch_0::@dispatch_0_entry
   %0 = flow.dispatch @dispatch_0::@dispatch_0_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
 
-  // ORDINAL: flow.tensor.trace {key = "dispatch_1::dispatch_1_entry::1 inputs"} %[[ARG0]] : tensor<4xf32>
-  // SYMBOL:  flow.tensor.trace {key = "dispatch_1::dispatch_1_entry inputs"} %[[ARG0]] : tensor<4xf32>
+  // ORDINAL: flow.tensor.trace "dispatch_1::dispatch_1_entry::1 inputs" = [%[[ARG0]] : tensor<4xf32>]
+  // SYMBOL:  flow.tensor.trace "dispatch_1::dispatch_1_entry inputs" = [%[[ARG0]] : tensor<4xf32>]
   // CHECK: %[[D1:.+]] = flow.dispatch @dispatch_1::@dispatch_1_entry
   %1 = flow.dispatch @dispatch_1::@dispatch_1_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // ORDINAL: flow.tensor.trace {key = "dispatch_1::dispatch_1_entry::1 outputs"} %[[D1]] : tensor<4xf32>
-  // SYMBOL:  flow.tensor.trace {key = "dispatch_1::dispatch_1_entry outputs"} %[[D1]] : tensor<4xf32>
+  // ORDINAL: flow.tensor.trace "dispatch_1::dispatch_1_entry::1 outputs" = [%[[D1]] : tensor<4xf32>]
+  // SYMBOL:  flow.tensor.trace "dispatch_1::dispatch_1_entry outputs" = [%[[D1]] : tensor<4xf32>]
 
   %2 = flow.dispatch @dispatch_2::@dispatch_2_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %3 = hal.tensor.export %2 : tensor<4xf32> -> !hal.buffer_view
@@ -103,19 +105,21 @@ func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
 
 // -----
 
-/// Check regex matching on symbol
+// Checks regex matching on a dispatch symbol.
+
 // CHECK-LABEL: func.func @target_func
 func.func @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
   %c4 = arith.constant 4 : index
-  // SYMBOL: flow.tensor.trace {key = "dispatch_1::dispatch_1_entry inputs"}
+
+  // SYMBOL: flow.tensor.trace "dispatch_1::dispatch_1_entry inputs"
   // CHECK:  flow.dispatch @dispatch_1::@dispatch_1_entry
   %0 = flow.dispatch @dispatch_1::@dispatch_1_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // SYMBOL: flow.tensor.trace {key = "dispatch_1::dispatch_1_entry outputs"}
+  // SYMBOL: flow.tensor.trace "dispatch_1::dispatch_1_entry outputs"
 
-  // SYMBOL-NOT: flow.tensor.trace {key = "dispatch_11::dispatch_11_entry inputs"}
+  // SYMBOL-NOT: flow.tensor.trace "dispatch_11::dispatch_11_entry inputs"
   // CHECK:      flow.dispatch @dispatch_11::@dispatch_11_entry
   %1 = flow.dispatch @dispatch_11::@dispatch_11_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // SYMBOL-NOT: flow.tensor.trace {key = "dispatch_11::dispatch_11_entry outputs"}
+  // SYMBOL-NOT: flow.tensor.trace "dispatch_11::dispatch_11_entry outputs"
 
   %2 = hal.tensor.export %1 : tensor<4xf32> -> !hal.buffer_view
   return %2 : !hal.buffer_view

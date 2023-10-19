@@ -244,30 +244,30 @@ struct ConvertTensorTraceOp
   LogicalResult
   matchAndRewrite(IREE::Flow::TensorTraceOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Value> exportedTensors;
+    SmallVector<Value> resources;
+    SmallVector<Value> resourceSizes;
+    SmallVector<Attribute> resourceEncodings;
     for (auto [tensorOperand, resourceOperand] :
-         llvm::zip_equal(op.getOperands(), adaptor.getOperands())) {
+         llvm::zip_equal(op.getValues(), adaptor.getValues())) {
       auto source =
           consumeTensorOperand(op.getLoc(), resourceOperand, rewriter);
-      auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
-          IREE::Stream::Lifetime::External);
-      auto exportSource = resourceOperand;
-      if (source.resource.getType() != externalType) {
-        exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
-            op.getLoc(), externalType, source.resource, source.resourceSize,
+      auto stagingType = rewriter.getType<IREE::Stream::ResourceType>(
+          IREE::Stream::Lifetime::Staging);
+      auto traceSource = source.resource;
+      if (source.resource.getType() != stagingType) {
+        traceSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
+            op.getLoc(), stagingType, source.resource, source.resourceSize,
             source.resourceSize,
             /*source_affinity=*/getAffinityFor(op),
             /*result_affinity=*/nullptr);
       }
-      auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
-          op.getLoc(), tensorOperand, rewriter);
-      exportedTensors.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
-          op.getLoc(), tensorOperand.getType(), exportSource,
-          TypeAttr::get(tensorOperand.getType()), dynamicDims,
-          source.resourceSize, getAffinityFor(op)));
+      resources.push_back(traceSource);
+      resourceSizes.push_back(source.resourceSize);
+      resourceEncodings.push_back(TypeAttr::get(tensorOperand.getType()));
     }
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorTraceOp>(
-        op, adaptor.getKey(), exportedTensors);
+        op, adaptor.getKey(), resources, resourceSizes,
+        rewriter.getArrayAttr(resourceEncodings), adaptor.getValueDims());
     return success();
   }
 };

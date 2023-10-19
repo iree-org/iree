@@ -62,7 +62,7 @@ func.func @null_op() -> !iree_input.variant {
 // CHECK: %buffer = hal.buffer.subspan
 // CHECK-SAME: <%arg0 : !hal.buffer>[%[[OFFSET]], %[[LENGTH]]] : !hal.buffer
 
-func.func @buffer_subspan(%arg0: !iree_input.buffer) -> !iree_input.buffer {  
+func.func @buffer_subspan(%arg0: !iree_input.buffer) -> !iree_input.buffer {
   %offset = arith.constant 100 : index
   %length = arith.constant 200 : index
   %buffer = iree_input.buffer.subspan<%arg0 : !iree_input.buffer>[%offset, %length] : !iree_input.buffer
@@ -275,9 +275,15 @@ func.func @tensor_update(%arg0 : tensor<?xf32>, %arg1 : index, %arg2 : index, %a
 
 // -----
 // CHECK-LABEL: func.func @tensor_trace
-// CHECK: flow.tensor.trace {key = "FOOBAR"} %arg0, %arg1 : tensor<5xf32>, tensor<3xf32>
-func.func @tensor_trace(%arg0 : tensor<5xf32>, %arg1 : tensor<3xf32>) {
-  iree_input.tensor.trace "FOOBAR" %arg0, %arg1 : tensor<5xf32>, tensor<3xf32>
+//      CHECK: flow.tensor.trace "FOOBAR" = [
+// CHECK-SAME:   %arg0 : tensor<5xf32>,
+// CHECK-SAME:   %arg1 : tensor<?x3xf32>{%arg2}
+// CHECK-SAME: ]
+func.func @tensor_trace(%arg0: tensor<5xf32>, %arg1: tensor<?x3xf32>, %arg2: index) {
+  iree_input.tensor.trace "FOOBAR" = [
+    %arg0 : tensor<5xf32>,
+    %arg1 : tensor<?x3xf32>{%arg2}
+  ]
   return
 }
 

@@ -1509,21 +1509,37 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let hasFolder = 1;
 }
 
-def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
-  let summary = [{trace value(s) operation}];
+def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_ShapeAwareOp>,
+]> {
+  let summary = [{traces one or more tensor values at runtime}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given
-    tensors and titles them with the given key. The key is informational only
-    and useful for titling/marking specific sets of tensors for easier
-    searching.
+    tensors. The key is arbitrary and can be used for identifying the set of
+    values being traced.
   }];
 
   let arguments = (ins
     StrAttr:$key,
-    Variadic<FLOW_Tensor>:$operands
+    Variadic<FLOW_Tensor>:$values,
+    FLOW_ShapeDynamicDims:$value_dims
   );
 
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = [{
+    $key `=` `[`
+    custom<ShapedOperandList>($values, type($values), $value_dims)
+    `]` attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins "StringRef":$key, "ValueRange":$values), [{
+      build($_builder, $_state, key, values,
+            IREE::Util::buildDynamicDimsForValues($_state.location, values, $_builder));
+    }]>,
+  ];
+
+  let hasVerifier = 1;
 }
 
 //===---------------------------------------------------------------------===//
