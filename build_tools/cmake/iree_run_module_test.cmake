@@ -26,7 +26,7 @@ endfunction()
 #       and input file are passed automatically.
 #   EXPECTED_OUTPUT: A string representing the expected output from executing
 #       the module in the format accepted by `iree-run-module` or a file
-#       containing the same.
+#       containing the same. Can also be an HTTPS URL to download large npy.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   XFAIL_PLATFORMS: List of platforms (see iree_get_platform) for which the
@@ -118,7 +118,7 @@ function(iree_run_module_test)
       list(APPEND _RULE_RUNNER_ARGS ${_EXPECTED_OUTPUT_STR})
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".npy")
       # Large npy files are not stored in the codebase. Need to download them
-      # from HTTPS link first and store them in the following possible paths.
+      # from the URL first and store them in the following possible paths.
       if(_RULE_EXPECTED_OUTPUT MATCHES "^https://.+/([^/]+)$")
         set(_EXPECTED_OUTPUT_URL "${_RULE_EXPECTED_OUTPUT}")
         set(_RULE_EXPECTED_OUTPUT "${CMAKE_MATCH_1}")
