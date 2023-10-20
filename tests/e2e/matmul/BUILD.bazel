@@ -18,156 +18,50 @@ py_binary(
     srcs = ["generate_e2e_matmul_tests.py"],
 )
 
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_%s_small" % lhs_rhs_type,
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=small",
-    ],
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
-) for lhs_rhs_type in [
-    "i8",
-    "f32",
-]]
+###########################################################################
+##
+## LLVMCPU backend
+##
+###########################################################################
 
-# Test asm
+# LLVMCPU, non-data-tiling, no microkernels
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_mmt4d_%s_small" % lhs_rhs_type,
+    name = "e2e_matmul_nondt_%s_%s_small" % (lhs_rhs_type, acc_type),
     compiler_flags = [
-        "--iree-opt-data-tiling",
+        "--iree-opt-data-tiling=false",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
         "--shapes=small",
-    ],
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    target_cpu_features_variants = ["default"] +
-                                   ([
-                                       "arm_64:dotprod:+dotprod",
-                                       "arm_64:i8mm:+i8mm",
-                                   ] if lhs_rhs_type == "i8" else []),
-    trace_runner = "//tools:iree-e2e-matmul-test",
-) for lhs_rhs_type in [
-    "i8",
-    "f32",
-]]
-
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
-    compiler_flags = [
-        "--iree-opt-data-tiling",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=large",
     ],
     tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator and sanitizers.
+        # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
-        "noasan",
-        "notsan",
-    ],
+        "nowasm",
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else [],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    target_cpu_features_variants = ["default"] +
-                                   ([
-                                       "arm_64:dotprod:+dotprod",
-                                       "arm_64:i8mm:+i8mm",
-                                   ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for lhs_rhs_type in [
-    "i8",
-    "f32",
+) for (lhs_rhs_type, acc_type) in [
+    ("i8", "i32"),
+    ("f32", "f32"),
+    ("f16", "f16"),
+    ("f16", "f32"),
+    ("bf16", "bf16"),
+    ("bf16", "f32"),
 ]]
 
-# Test intrinsics. No need to run vmvx again, since it isn't affected by this
-# codegen flag. No need to run "large" sizes, since this only differs from other
-# tests in ways that are orthogonal to problem sizes.
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_mmt4d_%s_intrinsics_%s" % (lhs_rhs_type, size),
-    compiler_flags = [
-        "--iree-codegen-mmt4d-use-intrinsics",
-        "--iree-opt-data-tiling",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=%s" % size,
-    ],
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    target_cpu_features_variants = ["default"] +
-                                   ([
-                                       "arm_64:dotprod:+dotprod",
-                                       "arm_64:i8mm:+i8mm",
-                                   ] if lhs_rhs_type == "i8" else []),
-    trace_runner = "//tools:iree-e2e-matmul-test",
-) for lhs_rhs_type in [
-    "i8",
-    "f32",
-] for size in [
-    "small",
-]]
-
-# Test VMVX+ukernel, direct (not mmt4d)
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_%s_small_ukernel" % lhs_rhs_type,
-    compiler_flags = [
-        "--iree-vmvx-enable-microkernels",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=small",
-    ],
-    target_backends_and_drivers = [
-        ("vmvx", "local-task"),
-    ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
-) for lhs_rhs_type in [
-    "i8",
-    "f32",
-]]
-
-# Test VMVX+ukernel, mmt4d, with target CPU features variants relevant to each
-# lhs_rhs_type.
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_mmt4d_%s_small_vmvx_ukernel" % lhs_rhs_type,
-    compiler_flags = [
-        "--iree-vmvx-enable-microkernels",
-        "--iree-opt-data-tiling",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=small",
-    ],
-    target_backends_and_drivers = [
-        ("vmvx", "local-task"),
-    ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
-) for lhs_rhs_type in [
-    "i8",
-    "f32",
-]]
-
-X86_64_AVX2_FMA = [
+X86_64_AVX2 = [
     "+avx",
     "+avx2",
     "+fma",
+    "+f16c",
 ]
 
-X86_64_AVX512_BASE = X86_64_AVX2_FMA + [
+X86_64_AVX512 = X86_64_AVX2 + [
     "+avx512f",
     "+avx512vl",
     "+avx512cd",
@@ -175,48 +69,131 @@ X86_64_AVX512_BASE = X86_64_AVX2_FMA + [
     "+avx512dq",
 ]
 
-X86_64_AVX512_VNNI = X86_64_AVX512_BASE + [
+X86_64_AVX512_VNNI = X86_64_AVX512 + [
     "+avx512vnni",
 ]
 
-# Test mmt4d with --iree-llvmcpu-enable-microkernels.
+X86_64_AVX512_BF16 = X86_64_AVX512 + [
+    "+avx512bf16",
+]
+
+# LLVMCPU, data-tiling + microkernels.
+# TODO(#15241, #15215): also test data-tiling alone without microkernels. This currently
+# fails (#15241), which needs to be resolved to unblock data-tiling-by-default (#15215).
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_mmt4d_%s_%s_ukernel" % (lhs_rhs_type, size),
+    name = "e2e_matmul_dt_uk_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
     compiler_flags = [
+        "--iree-opt-data-tiling",
         "--iree-llvmcpu-enable-microkernels",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
+        "--shapes=%s" % size,
+    ],
+    tags = ([
+        # "--shapes=large" can cause timeouts on sanitizers.
+        "noasan",
+        "notsan",
+    ] if size == "large" else []) + ([
+        # "--shapes=large" can cause timeouts on RISC-V emulator.
+        # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
+        "noriscv",
+        "nowasm",
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []),
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = ["default"] +
+                                   ([
+                                       "arm_64:dotprod:+dotprod",
+                                       "arm_64:i8mm:+i8mm",
+                                       "x86_64:avx512vnni:" + ",".join(X86_64_AVX512_VNNI),
+                                   ] if lhs_rhs_type == "i8" and acc_type == "i32" else [
+                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
+                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
+                                   ] if lhs_rhs_type == "f32" and acc_type == "f32" else [
+                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
+                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
+                                       "arm_64:fp16:+fp16",
+                                   ] if lhs_rhs_type == "f16" and acc_type == "f16" else [
+                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
+                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
+                                       "arm_64:fp16:+fp16fml",
+                                   ] if lhs_rhs_type == "f16" and acc_type == "f32" else [
+                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
+                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
+                                       "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
+                                       "arm_64:fp16:+bf16",
+                                   ] if lhs_rhs_type == "bf16" and acc_type == "bf16" else [
+                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
+                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
+                                       "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
+                                       "arm_64:fp16:+bf16",
+                                   ] if lhs_rhs_type == "bf16" and acc_type == "f32" else []),
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for (lhs_rhs_type, acc_type) in [
+    ("i8", "i32"),
+    ("f32", "f32"),
+    ("f16", "f16"),
+    ("f16", "f32"),
+    ("bf16", "bf16"),
+    ("bf16", "f32"),
+] for size in [
+    "small",
+    "large",
+]]
+
+# Some e2e testing for --iree-codegen-enable-vector-padding=false.
+iree_generated_trace_runner_test(
+    name = "e2e_matmul_nondt_f32_small_no_padding",
+    compiler_flags = [
+        "--iree-codegen-enable-vector-padding=false",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--shapes=small",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+)
+
+###########################################################################
+##
+## VMVX backend
+##
+###########################################################################
+
+# VMVX, data-tiling + microkernels.
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_dt_uk_%s_small" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-vmvx-enable-microkernels",
         "--iree-opt-data-tiling",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=%s" % size,
+        "--shapes=small",
     ],
-    tags = [
-        # "--shapes=large" can cause timeouts on riscv emulator and sanitizers.
-        "noriscv",
-        "noasan",
-        "notsan",
-    ] if size == "large" else [],
     target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
+        ("vmvx", "local-task"),
     ],
-    target_cpu_features_variants = [
-        "default",
-        "x86_64:avx2_fma:" + ",".join(X86_64_AVX2_FMA),
-        "x86_64:avx512_base:" + ",".join(X86_64_AVX512_BASE),
-    ] + ([
-        "x86_64:avx512_vnni:" + ",".join(X86_64_AVX512_VNNI),
-        "arm_64:dotprod:+dotprod",
-        "arm_64:i8mm:+i8mm",
-    ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
-] for size in [
-    "small",
-    "large",
 ]]
+
+###########################################################################
+##
+## CUDA backend
+##
+###########################################################################
 
 iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulSimt",
@@ -415,12 +392,17 @@ iree_generated_trace_runner_test(
     ],
     target_backends_and_drivers = [
         ("cuda", "cuda"),
-        ("llvm-cpu", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "f32",
 ]]
+
+###########################################################################
+##
+## Vulkan backend
+##
+###########################################################################
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_{0}_gpu_large_valhall".format(lhs_rhs_type),
@@ -472,22 +454,6 @@ iree_generated_trace_runner_test(
     "f16",
     "f32",
 ]]
-
-iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f32_small_no_padding",
-    compiler_flags = [
-        "--iree-codegen-enable-vector-padding=false",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=f32",
-        "--shapes=small",
-    ],
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
-)
 
 iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_f16_gpu_large_rdna3",
