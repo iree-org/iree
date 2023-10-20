@@ -59,3 +59,13 @@ func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<
 //  CHECK-SAME:       step %[[SCALABLE_TILE_SIZE]]
 //       CHECK:     scf.for
 //  CHECK-SAME:         step %[[C1]]
+
+// -----
+
+// CHECK-LABEL: scalable_lowering_config_with_no_1s
+// CHECK: vector.vscale
+func.func @scalable_lowering_config_with_no_1s(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[8, [32], 0]]>} ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)
+            outs(%C: tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
