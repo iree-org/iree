@@ -36,6 +36,10 @@ py_binary(
         "--acc_type=%s" % acc_type,
         "--shapes=small",
     ],
+    tags = [
+        # "--lhs_rhs_type=bf16" triggers internel LLVM assertion errors on RISC-V target.
+        "noriscv",
+    ] if lhs_rhs_type == "bf16" else [],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],

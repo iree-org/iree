@@ -27,6 +27,8 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+  LABELS
+
 )
 
 iree_generated_trace_runner_test(
@@ -46,6 +48,8 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+  LABELS
+
 )
 
 iree_generated_trace_runner_test(
@@ -65,6 +69,8 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+  LABELS
+
 )
 
 iree_generated_trace_runner_test(
@@ -84,6 +90,8 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+  LABELS
+
 )
 
 iree_generated_trace_runner_test(
@@ -103,6 +111,8 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+  LABELS
+    "noriscv"
 )
 
 iree_generated_trace_runner_test(
@@ -122,6 +132,8 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+  LABELS
+    "noriscv"
 )
 
 iree_generated_trace_runner_test(
