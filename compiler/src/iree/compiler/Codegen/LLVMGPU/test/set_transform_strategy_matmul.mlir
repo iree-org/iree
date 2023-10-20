@@ -40,7 +40,7 @@
 // RUN: | FileCheck --check-prefix=SMALL %s
 
 hal.executable @matmul_1 {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @matmul_1 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -102,7 +102,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // CHECK: apply_patterns to %{{.*}} {
 // CHECK:   transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
 // CHECK: } : !transform.any_op
-// CHECK: transform.structured.match ops{["scf.for"]} in %{{.*}} 
+// CHECK: transform.structured.match ops{["scf.for"]} in %{{.*}}
 // CHECK: transform.iree.synchronize_loop %{{.*}}
 // CHECK: transform.structured.hoist_redundant_vector_transfers %{{.*}}
 // CHECK: transform.memref.erase_dead_alloc_and_stores %{{.*}}
@@ -168,7 +168,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // WITH_OPTIONS: apply_patterns to %{{.*}} {
 // WITH_OPTIONS:   transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
 // WITH_OPTIONS: }
-// WITH_OPTIONS: transform.structured.match ops{["scf.for"]} in %{{.*}} 
+// WITH_OPTIONS: transform.structured.match ops{["scf.for"]} in %{{.*}}
 // WITH_OPTIONS: transform.iree.synchronize_loop %{{.*}}
 // WITH_OPTIONS: transform.structured.hoist_redundant_vector_transfers %{{.*}}
 // WITH_OPTIONS: transform.memref.erase_dead_alloc_and_stores %{{.*}}
@@ -206,7 +206,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // -----
 
 hal.executable @matmul_2 {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @matmul_2 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -260,7 +260,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // -----
 
 hal.executable @matmul_3 {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @matmul_3 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -295,7 +295,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // -----
 hal.executable @matmul_4_partially_unaligned {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @matmul_4_partially_unaligned ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -366,7 +366,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 
 // -----
 hal.executable @aligned_matmul {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @aligned_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -436,7 +436,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // -----
 
 hal.executable @matmul_5_small {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @matmul_5_small ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -479,7 +479,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // -----
 
 hal.executable @f16_matmul {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @f16_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -516,7 +516,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // -----
 
 hal.executable @int8_matmul {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @int8_matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

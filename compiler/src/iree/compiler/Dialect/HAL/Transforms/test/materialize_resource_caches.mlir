@@ -121,7 +121,7 @@ module attributes {hal.device.targets = [#hal.device.target<"llvm-cpu">]} {
 // TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
 //   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
-  hal.executable.variant @vmvx, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
     hal.executable.export @entry0 ordinal(0) layout(#pipeline_layout_0) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
@@ -262,7 +262,7 @@ util.initializer {
 }
 
 hal.executable @exe {
-  hal.executable.variant @vmvx, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
     hal.executable.export @entry ordinal(0) layout(#pipeline_layout_0) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }

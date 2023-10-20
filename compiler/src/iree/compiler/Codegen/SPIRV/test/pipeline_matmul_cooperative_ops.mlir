@@ -13,7 +13,7 @@
 ]>
 
 hal.executable public @matmul_256x1024x128_div_exp {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -34,7 +34,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x128_div_exp layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -217,7 +217,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
   ]>
 ]>
 hal.executable public @batch_matmul_16x128x256x512_div {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -238,7 +238,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_16x128x256x512_div layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -341,7 +341,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 ]>
 
 hal.executable public @matmul_32x32x32_div {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -362,7 +362,7 @@ hal.executable public @matmul_32x32x32_div {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_32x32x32_div layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -415,7 +415,7 @@ hal.executable public @matmul_32x32x32_div {
 ]>
 
 hal.executable public @generic_batch_matmul_32x128x512x64 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -436,7 +436,7 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @generic_batch_matmul_32x128x512x64 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -529,7 +529,7 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 ]>
 
 hal.executable public @matmul_256x1024x128_div_exp {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -544,7 +544,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x128_div_exp layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -658,7 +658,7 @@ hal.executable public @matmul_256x1024x128_div_exp {
   ]>
 ]>
 hal.executable public @batch_matmul_16x128x256x512_div {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -673,7 +673,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_16x128x256x512_div layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -766,7 +766,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 ]>
 
 hal.executable public @generic_batch_matmul_32x128x512x64 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -781,7 +781,7 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @generic_batch_matmul_32x128x512x64 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -870,7 +870,7 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
     workgroup_size = [32, 4, 1], subgroup_size = 32>
 
 hal.executable public @batch_matmul_f16_16x4096x4096x64_truncf_mulf {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -885,7 +885,7 @@ hal.executable public @batch_matmul_f16_16x4096x4096x64_truncf_mulf {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_f16_16x4096x4096x64_truncf_mulf layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

@@ -16,7 +16,7 @@
 #map3 = affine_map<(d0) -> (256, -d0 + 1024)>
 #map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 hal.executable private @dot_dispatch_0  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 1 : index, 1 : index]
@@ -99,7 +99,7 @@ hal.executable private @dot_dispatch_0  {
   ]>
 ]>
 hal.executable private @batch_matmul_func  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @batch_matmul_func layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [8 : index, 8 : index, 1 : index]
@@ -184,7 +184,7 @@ builtin.module {
 #map3 = affine_map<(d0) -> (32, -d0 + 1024)>
 #map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 hal.executable private @dot_dispatch_0  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 8 : index, 1 : index]
@@ -270,7 +270,7 @@ hal.executable private @dot_dispatch_0  {
 ]>
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @predict_dispatch_153 layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [1: index, 1: index, 1: index]
@@ -317,7 +317,7 @@ hal.executable @reduction_dispatch {
   ]>
 ]>
 hal.executable private @conv_dispatch  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @conv_dispatch layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 1 : index, 1 : index]
@@ -388,7 +388,7 @@ hal.executable private @conv_dispatch  {
   ]>
 ]>
 hal.executable private @contract_4d  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @contract_4d layout(#pipeline_layout) attributes {
       workgroup_size = [64 : index, 8 : index, 1 : index]
     }

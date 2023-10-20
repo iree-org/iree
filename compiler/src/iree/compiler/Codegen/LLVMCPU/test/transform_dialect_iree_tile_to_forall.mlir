@@ -12,7 +12,7 @@
 // CHECK: #[[$NUM_THREADS_MAP:.*]] = affine_map<(d0) -> (d0 * 32)>
 
 hal.executable private @matmul_static_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
 
     hal.executable.export public @matmul_static_dispatch_0_matmul_1024x4096x12345 ordinal(0) layout(#pipeline_layout) {
     // Check that num_threads is reflected in the workgroup size.
@@ -69,8 +69,8 @@ transform.sequence failures(propagate) {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 
 hal.executable private @matmul_static_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-  
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
+
     hal.executable.export public @elementwise_out_of_order_block_id ordinal(0) layout(#pipeline_layout) {
     // Check that num_threads is consistent with the specified mapping
     // CHECK-LABEL: hal.executable.export public @elementwise_out_of_order_block_id
@@ -82,8 +82,8 @@ hal.executable private @matmul_static_dispatch_0 {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
-    }   
-  
+    }
+
     builtin.module {
       func.func @elementwise_out_of_order_block_id() {
         // CHECK-LABEL: func.func @elementwise_out_of_order_block_id
@@ -98,15 +98,15 @@ hal.executable private @matmul_static_dispatch_0 {
           indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                            affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
           iterator_types = ["parallel", "parallel", "parallel"]}
-          ins(%2 : tensor<3x5x8xf32>) outs(%empty : tensor<3x5x8xf32>) {   
+          ins(%2 : tensor<3x5x8xf32>) outs(%empty : tensor<3x5x8xf32>) {
           ^bb0(%in: f32, %in_0: f32):
-            %4 = math.sqrt %in : f32 
-            linalg.yield %4 : f32 
+            %4 = math.sqrt %in : f32
+            linalg.yield %4 : f32
           } -> tensor<3x5x8xf32>
         flow.dispatch.tensor.store %3, %1, offsets = [0, 0, 0], sizes = [3, 5, 8], strides = [1, 1, 1] : tensor<3x5x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<3x5x8xf32>>
         return
-      }   
-    }   
+      }
+    }
   }
 }
 
@@ -123,8 +123,8 @@ transform.sequence failures(propagate) {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable private @matmul_static_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-  
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
+
     hal.executable.export public @vecadd2d_dispatch_0_generic_9x512_f32 ordinal(0) layout(#pipeline_layout) {
     // Check that num_threads is consistent with the specified mapping
     // CHECK-LABEL: hal.executable.export public @vecadd2d_dispatch_0_generic_9x512_f32
@@ -136,8 +136,8 @@ hal.executable private @matmul_static_dispatch_0 {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
-    }   
-  
+    }
+
     builtin.module {
       func.func @vecadd2d_dispatch_0_generic_9x512_f32() {
         %c18432 = arith.constant 18432 : index

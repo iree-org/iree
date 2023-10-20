@@ -20,7 +20,7 @@ module attributes {hal.device.targets = [
   // CHECK-SAME:     <2, storage_buffer>
 
   // CHECK: hal.executable private @ex_workgroups
-  // CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
+  // CHECK:   hal.executable.variant public @embedded_elf_arm_64 target(#executable_target_embedded_elf_arm_64
   // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
   // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
   // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
@@ -28,7 +28,7 @@ module attributes {hal.device.targets = [
   // CHECK:     builtin.module
   // CHECK-NEXT:  func.func private @extern_func()
   // CHECK-NEXT:  func.func @entry
-  // CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
+  // CHECK:   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64
   // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
   // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
   // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
@@ -113,11 +113,11 @@ hal.executable.source public @ex {
 }
 
 // CHECK: hal.executable public @ex
-// CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
+// CHECK:   hal.executable.variant public @embedded_elf_arm_64 target(#executable_target_embedded_elf_arm_64
 // CHECK:     hal.executable.export public @entry layout(#pipeline_layout)
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()
-// CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
+// CHECK:   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64
 // CHECK:     hal.executable.export public @entry layout(#pipeline_layout)
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()

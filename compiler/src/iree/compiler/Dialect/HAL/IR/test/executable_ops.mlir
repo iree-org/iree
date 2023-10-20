@@ -3,8 +3,13 @@
 #executable_target_format = #hal.executable.target<"backend", "format">
 // CHECK-LABEL: @ex
 hal.executable @ex {
-  // CHECK: hal.executable.variant public @backend, target = #executable_target_format
-  hal.executable.variant @backend, target = #executable_target_format {
+  // CHECK: hal.executable.variant public @backend
+  // CHECK-SAME: target(#executable_target_format)
+  // CHECK-SAME: objects([#hal.executable.object<{path = "foo.bin"}>, #hal.executable.object<{path = "bar.bin"}>])
+  hal.executable.variant @backend target(#executable_target_format) objects([
+    #hal.executable.object<{path = "foo.bin"}>,
+    #hal.executable.object<{path = "bar.bin"}>
+  ]) {
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
     hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
@@ -31,8 +36,8 @@ hal.executable @ex {
 
 // CHECK-LABEL: @ex_with_workgroup_count_region
 hal.executable @ex_with_workgroup_count_region {
-  // CHECK: hal.executable.variant public @backend, target = #executable_target_format
-  hal.executable.variant @backend, target = #executable_target_format {
+  // CHECK: hal.executable.variant public @backend target(#executable_target_format
+  hal.executable.variant @backend target(#executable_target_format) {
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
     // CHECK-SAME:     subgroup_size = 64 : index
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
@@ -65,7 +70,7 @@ hal.executable @ex_with_workgroup_count_region {
 // CHECK-LABEL: @ex_with_constants
 hal.executable @ex_with_constants {
   // CHECK: hal.executable.variant public @backend
-  hal.executable.variant @backend, target = #executable_target_format {
+  hal.executable.variant @backend target(#executable_target_format) {
     // CHECK: hal.executable.constant.block(%{{.+}}: !hal.device) -> (i32, i32) as ("foo", "bar")
     hal.executable.constant.block(%device: !hal.device) -> (i32, i32) as ("foo", "bar") {
       %c0 = arith.constant 0 : i32
@@ -134,7 +139,7 @@ func.func @pipeline_layout_create(%device: !hal.device,
 // CHECK-LABEL: @unresolved_workload_ex
 hal.executable @unresolved_workload_ex {
   // CHECK: hal.executable.variant public @backend
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // CHECK: hal.executable.export public @entry0
     hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
       #hal.descriptor_set.layout<0, bindings = [

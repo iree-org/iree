@@ -12,7 +12,7 @@
   ]>
 ]>
 hal.executable private @ex {
-  hal.executable.variant public @variant, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
+  hal.executable.variant public @variant target(#hal.executable.target<"llvm", "embedded-elf-x86_64">) {
     hal.executable.export public @dispatch ordinal(16) layout(#pipeline_layout) {
     ^bb0(%device: !hal.device, %workload_x: index, %workload_y: index):
       %count_x = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%workload_x]

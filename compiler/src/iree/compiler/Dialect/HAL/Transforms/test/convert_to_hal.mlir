@@ -2,10 +2,10 @@
 
 // Tests an end-to-end simple single-dispatch `dispatch(arg0, arg1) -> result`.
 
-#executable_target_embedded_elf_aarch64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
+#executable_target_embedded_elf_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 #device_target_cpu = #hal.device.target<"llvm-cpu", {
-  executable_targets = [#executable_target_embedded_elf_x86_64_]
+  executable_targets = [#executable_target_embedded_elf_x86_64]
 }>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -20,7 +20,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
   // CHECK: hal.executable private @ex
   hal.executable private @ex {
-    hal.executable.variant public @embedded_elf_aarch64, target = #executable_target_embedded_elf_aarch64_ {
+    hal.executable.variant public @embedded_elf_aarch64 target(#executable_target_embedded_elf_aarch64) {
       hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault>
       } {
@@ -33,7 +33,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
         // Opaque at this point (in some target-specific dialects).
       }
     }
-    hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
       hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault>
       } {

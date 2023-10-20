@@ -7,7 +7,7 @@
 #map2 = affine_map<(d0, d1) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 hal.executable private @split_reduction_pass1_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_supported ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -60,7 +60,7 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
 #map2 = affine_map<(d0, d1) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 hal.executable private @split_reduction_pass1_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @split_reduction_innermost_reduction_no_dynamic_perfect_tiling_float_supported_with_flag ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -115,7 +115,7 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 hal.executable private @split_reduction_pass2_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @split_reduction_innermost_reduction_next_dynamic_supported ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -163,7 +163,7 @@ hal.executable private @split_reduction_pass2_dispatch_0 {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 hal.executable private @split_reduction_pass3_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @split_reduction_innermost_reduction_next_imperfect_tiling_supported ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -207,7 +207,7 @@ hal.executable private @split_reduction_pass3_dispatch_0 {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 hal.executable private @split_reduction_fail1_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @split_reduction_innermost_dynamic_reduction_unsupported ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -244,7 +244,7 @@ hal.executable private @split_reduction_fail1_dispatch_0 {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 hal.executable private @split_reduction_fail2_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @split_reduction_innermost_imperfect_reduction_unsupported ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -279,7 +279,7 @@ hal.executable private @split_reduction_fail2_dispatch_0 {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 hal.executable private @split_reduction_fail3_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @split_reduction_not_innermost_reduction_unsupported ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -315,7 +315,7 @@ hal.executable private @split_reduction_fail3_dispatch_0 {
 #map1 = affine_map<(d0, d1, d2) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 hal.executable private @split_reduction_fail4_dispatch_0 {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @split_reduction_double_reduction_unsupported ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
