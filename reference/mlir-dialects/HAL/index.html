@@ -7103,8 +7103,8 @@ executables prior to device specification.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.variant` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
-              `,` `target` `=` $target
-              (`,` `objects` `=` $objects^ )?
+              `target` `(` $target `)`
+              (`objects` `(` $objects^ `)` )?
               attr-dict-with-keyword
               regions
 </code></pre></div>

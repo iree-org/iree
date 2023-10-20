@@ -2,252 +2,252 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://openxla.github.io/iree/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/building-from-source/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/building-from-source/android/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/building-from-source/getting-started/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/building-from-source/ios/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/building-from-source/riscv/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/tags/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/blog/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/blog/2021-10-15-cuda-backend/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/blog/2021-10-13-matrix-multiplication-with-mmt4d/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/blog/2021-07-19-tflite-support-via-tosa/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/developer-tips/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/bare-metal/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/cpu/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-cuda/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-metal/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-rocm/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/deployment-configurations/gpu-vulkan/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/ml-frameworks/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/ml-frameworks/jax/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/ml-frameworks/pytorch/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/ml-frameworks/tensorflow/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/guides/ml-frameworks/tflite/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/extensions/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/glossary/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/optimization-options/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/bindings/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/bindings/c-api/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/bindings/python/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/Check/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/Flow/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/HAL/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/HALInline/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/HALLoader/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/IREEInput/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/IREELinalgExt/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/Stream/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/Util/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/VM/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/reference/mlir-dialects/VMVX/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/tags/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/blog/archive/2021/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/blog/category/platforms/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/blog/category/performance/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://openxla.github.io/iree/community/blog/category/frontends/</loc>
-         <lastmod>2023-10-19</lastmod>
+         <lastmod>2023-10-20</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>
