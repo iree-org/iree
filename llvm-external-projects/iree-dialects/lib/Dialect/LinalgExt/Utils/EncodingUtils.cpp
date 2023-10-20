@@ -19,11 +19,112 @@ bool isBatchMatmulEncodingUser(EncodingUser user) {
   return user == EncodingUser::BATCH_MATMUL;
 }
 
+bool isVecmatEncodingUser(EncodingUser user) {
+  return user == EncodingUser::VECMAT;
+}
+
+bool isMatvecEncodingUser(EncodingUser user) {
+  return user == EncodingUser::MATVEC;
+}
+
+bool isBatchMatvecEncodingUser(EncodingUser user) {
+  return user == EncodingUser::BATCH_MATVEC;
+}
+
+bool isVectorEncoding(EncodingAttr encoding) {
+  return (isVecmatVector(encoding) || isMatvecVector(encoding) ||
+          isBatchMatvecVector(encoding));
+}
+
+bool isVecmatVector(EncodingAttr encoding) {
+  if (!encoding)
+    return false;
+  auto user = encoding.getUser().getValue();
+  auto role = encoding.getRole().getValue();
+  if (user == EncodingUser::VECMAT &&
+      (role == EncodingRole::LHS || role == EncodingRole::RESULT)) {
+    return true;
+  }
+  return false;
+}
+
+bool isMatvecVector(EncodingAttr encoding) {
+  if (!encoding)
+    return false;
+  auto user = encoding.getUser().getValue();
+  auto role = encoding.getRole().getValue();
+  if (user == EncodingUser::MATVEC &&
+      (role == EncodingRole::RHS || role == EncodingRole::RESULT)) {
+    return true;
+  }
+  return false;
+}
+
+bool isBatchMatvecVector(EncodingAttr encoding) {
+  if (!encoding)
+    return false;
+  auto user = encoding.getUser().getValue();
+  auto role = encoding.getRole().getValue();
+  if (user == EncodingUser::BATCH_MATVEC &&
+      (role == EncodingRole::RHS || role == EncodingRole::RESULT)) {
+    return true;
+  }
+  return false;
+}
+
+int64_t getExpandedDimIndex(EncodingAttr encoding) {
+  if (isVecmatVector(encoding))
+    return 0;
+  if (isMatvecVector(encoding))
+    return 1;
+  if (isBatchMatvecVector(encoding))
+    return 2;
+  return -1;
+}
+
+SmallVector<ReassociationIndices>
+getReassociationMapsForVectors(EncodingAttr encoding) {
+  SmallVector<ReassociationIndices> ri = {};
+  if (isVecmatVector(encoding) || isMatvecVector(encoding))
+    ri = {{0, 1}};
+  else if (isBatchMatvecVector(encoding))
+    ri = {{0}, {1, 2}};
+  return ri;
+}
+
+RankedTensorType createNewTypeForVectors(RankedTensorType inputType,
+                                         EncodingAttr encoding,
+                                         bool expanding) {
+  RankedTensorType newType = inputType;
+  Type eType = inputType.getElementType();
+  if (isVecmatVector(encoding)) {
+    if (expanding)
+      newType = RankedTensorType::get({1, inputType.getDimSize(0)}, eType);
+    else
+      newType = RankedTensorType::get({inputType.getDimSize(1)}, eType);
+  } else if (isMatvecVector(encoding)) {
+    if (expanding)
+      newType = RankedTensorType::get({inputType.getDimSize(0), 1}, eType);
+    else
+      newType = RankedTensorType::get({inputType.getDimSize(0)}, eType);
+  } else if (isBatchMatvecVector(encoding)) {
+    if (expanding)
+      newType = RankedTensorType::get(
+          {inputType.getDimSize(0), inputType.getDimSize(1), 1}, eType);
+    else
+      newType = RankedTensorType::get(
+          {inputType.getDimSize(0), inputType.getDimSize(1)}, eType);
+  }
+  return newType;
+}
+
 MaterializeEncodingInfo
 chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
                             MatmulTileParams tileParams) {
   // Start dim of the MxK (LHS), KxN (RHS), or MxN (RESULT) 2D matrix.
-  int64_t matmulDimBase = isBatchMatmulEncodingUser(user) ? 1 : 0;
+  int64_t matmulDimBase =
+      (isBatchMatmulEncodingUser(user) || isBatchMatvecEncodingUser(user)) ? 1
+                                                                           : 0;
 
   MaterializeEncodingInfo encodingInfo;
   encodingInfo.innerDimsPos = {matmulDimBase, matmulDimBase + 1};

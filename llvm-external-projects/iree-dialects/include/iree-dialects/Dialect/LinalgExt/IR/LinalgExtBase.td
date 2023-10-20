@@ -57,11 +57,17 @@ class IREELinalgExt_EnumAttr<EnumAttrInfo enumInfo, string name = "">
 
 def MATMUL : I32EnumAttrCase<"MATMUL", 0>;
 def BATCH_MATMUL : I32EnumAttrCase<"BATCH_MATMUL", 1>;
+def VECMAT : I32EnumAttrCase<"VECMAT", 2>;
+def MATVEC : I32EnumAttrCase<"MATVEC", 3>;
+def BATCH_MATVEC : I32EnumAttrCase<"BATCH_MATVEC", 4>;
 
 def EncodingUser : IREELinalgExt_I32EnumAttr<"EncodingUser",
     "Describes the operation that a tensor is an operand or a result of.", [
       MATMUL,
       BATCH_MATMUL,
+      VECMAT,
+      MATVEC,
+      BATCH_MATVEC,
     ]>;
 
 def EncodingUserAttr :
