@@ -100,7 +100,7 @@ public:
     auto indexType = innerModuleBuilder.getIndexType();
     auto i32Type = innerModuleBuilder.getI32Type();
     auto bufferType = innerModuleBuilder.getType<IREE::Util::BufferType>();
-    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    for (auto exportOp : variantOp.getExportOps()) {
       // Build dispatch function signature that the stream.cmd.dispatch ops will
       // map to.
       auto layoutAttr = exportOp.getLayout();

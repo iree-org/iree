@@ -408,7 +408,7 @@ buildBenchmarkModule(IREE::HAL::ExecutableOp sourceExecutableOp,
   // Add functions to test each entry point with its various dispatch
   // parameters.
   bool hasAnyBenchmarks = false;
-  for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+  for (auto exportOp : variantOp.getExportOps()) {
     auto symbolRefAttr =
         SymbolRefAttr::get(executableOp.getNameAttr(),
                            {

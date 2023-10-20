@@ -1,6 +1,7 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
 
 #executable_target_format = #hal.executable.target<"backend", "format">
+
 // CHECK-LABEL: @ex
 hal.executable @ex {
   // CHECK: hal.executable.variant public @backend
@@ -38,6 +39,47 @@ hal.executable @ex {
 hal.executable @ex_with_workgroup_count_region {
   // CHECK: hal.executable.variant public @backend target(#executable_target_format
   hal.executable.variant @backend target(#executable_target_format) {
+    // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
+    // CHECK-SAME:     subgroup_size = 64 : index
+    // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
+      #hal.descriptor_set.layout<0, bindings = [
+        #hal.descriptor_set.binding<0, storage_buffer>,
+        #hal.descriptor_set.binding<1, storage_buffer>
+      ]>
+    ]>) attributes {
+      subgroup_size = 64 : index,
+      workgroup_size = [4 : index, 1 : index, 1 : index]
+    } {
+    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):
+      hal.return %arg0, %arg1, %arg2 : index, index, index
+    }
+  }
+  // CHECK: hal.executable.binary
+  hal.executable.binary @backend_binary attributes {
+    // CHECK-SAME: data = dense<1> : vector<128xi8>,
+    data = dense<1> : vector<128xi8>,
+    // CHECK-SAME: format = "some_format"
+    format = "some_format"
+  }
+}
+
+// -----
+
+#executable_target_format = #hal.executable.target<"backend", "format">
+
+// CHECK-LABEL: @ex_with_condition
+hal.executable @ex_with_condition {
+  // CHECK: hal.executable.variant public @backend target(#executable_target_format
+  hal.executable.variant @backend target(#executable_target_format) {
+    // CHECK: hal.executable.condition(%[[DEVICE:.+]]: !hal.device) -> i1 {
+    hal.executable.condition(%device: !hal.device) -> i1 {
+      // CHECK-NEXT: %[[OK:.+]], %[[VALUE:.+]] = hal.device.query<%[[DEVICE]]
+      %ok, %value = hal.device.query<%device : !hal.device> key("some" :: "value") : i1, i32
+      // CHECK-NEXT: return %[[OK]]
+      hal.return %ok : i1
+    }
+
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout) attributes {
     // CHECK-SAME:     subgroup_size = 64 : index
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]

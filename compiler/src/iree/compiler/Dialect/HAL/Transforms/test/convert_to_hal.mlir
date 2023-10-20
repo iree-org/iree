@@ -94,8 +94,12 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
              %arg1_resource as %arg1_capture: !stream.resource<external>{%c16},
              %result_resource as %result_capture: !stream.resource<external>{%c16}) {
 
-      // CHECK: hal.device.switch<%[[DEVICE]] : !hal.device>
-      // CHECK: #hal.device.match.executable.format<"embedded-elf-x86_64"> {
+      // CHECK-DAG: %{{.+}}, %[[FORMAT_AARCH64:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.executable.format" :: "embedded-elf-aarch64")
+      // CHECK-DAG: %{{.+}}, %[[FORMAT_X86_64:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.executable.format" :: "embedded-elf-x86_64")
+      // CHECK-DAG: %[[SWITCH1:.+]] = arith.select %[[FORMAT_X86_64]], %c1, %c-1
+      // CHECK-DAG: %[[SWITCH0:.+]] = arith.select %[[FORMAT_AARCH64]], %c0, %[[SWITCH1]]
+      // CHECK: scf.index_switch %[[SWITCH0]]
+      // CHECK: case 0 {
       // CHECK:   %[[PIPELINE_LAYOUT:.+]] = hal.pipeline_layout.lookup
       // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
       // CHECK-SAME: layout(#pipeline_layout) : !hal.pipeline_layout
@@ -107,9 +111,14 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       // CHECK:     %c2 = (%[[RESULT_BUFFER]] : !hal.buffer)[%c0, %c16]
       // CHECK:   ])
       // CHECK:   hal.command_buffer.dispatch.symbol<%[[CMD]] : !hal.command_buffer>
-      // CHECK-SAME: target(@ex::@embedded_elf_x86_64::@dispatch)
+      // CHECK-SAME: target(@ex::@embedded_elf_aarch64::@dispatch)
       // CHECK-SAME: workgroups([%c1, %c1, %c1])
-      // CHECK:   hal.return
+      // CHECK:   scf.yield
+      // CHECK: }
+      // CHECK: case 1 {
+      // CHECK:   hal.command_buffer.dispatch.symbol<%[[CMD]] : !hal.command_buffer>
+      // CHECK-SAME: target(@ex::@embedded_elf_x86_64::@dispatch)
+      // CHECK:   scf.yield
       // CHECK: }
       stream.cmd.dispatch {@ex::@embedded_elf_aarch64::@dispatch, @ex::@embedded_elf_x86_64::@dispatch}[%c4, %c1, %c1] {
         ro %arg0_capture[%c0 for %c16] : !stream.resource<external>{%c16},

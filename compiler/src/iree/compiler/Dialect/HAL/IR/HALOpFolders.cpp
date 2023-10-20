@@ -351,16 +351,6 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.device.switch
-//===----------------------------------------------------------------------===//
-
-// TODO(benvanik): fold conditions with the same IR tree.
-// TODO(benvanik): remove duplicate conditions.
-// TODO(benvanik): fold condition expressions (any(always, ...) -> always, etc).
-// TODO(benvanik): completely replace switches with just one always block.
-// TODO(benvanik): remove conditions with no side-effects.
-
-//===----------------------------------------------------------------------===//
 // hal.device.match.id
 //===----------------------------------------------------------------------===//
 
@@ -682,8 +672,7 @@ struct MergeExecutableConstantBlocks
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ExecutableVariantOp variantOp,
                                 PatternRewriter &rewriter) const override {
-    auto blockOps =
-        llvm::to_vector(variantOp.getOps<ExecutableConstantBlockOp>());
+    auto blockOps = llvm::to_vector(variantOp.getConstantBlockOps());
     if (blockOps.size() <= 1) {
       return rewriter.notifyMatchFailure(variantOp,
                                          "not enough blocks to merge");

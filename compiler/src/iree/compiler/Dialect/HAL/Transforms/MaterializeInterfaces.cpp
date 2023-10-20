@@ -35,7 +35,7 @@ namespace HAL {
 namespace {
 
 // Map of original SymbolRefAttr to a list of SymbolRefAttrs in variants.
-using EntryPointExpansions = DenseMap<Attribute, SmallVector<Attribute>>;
+using ExportExpansions = DenseMap<Attribute, SmallVector<Attribute>>;
 
 //===----------------------------------------------------------------------===//
 // Linkage utilities
@@ -70,7 +70,7 @@ SymbolRefAttr makeExportSymbolRefAttr(IREE::HAL::ExecutableOp executableOp,
 static LogicalResult materializeExecutableFromSourceOp(
     IREE::HAL::ExecutableSourceOp sourceOp,
     ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs,
-    EntryPointExpansions &entryPointExpansions) {
+    ExportExpansions &exportExpansions) {
   OpBuilder moduleBuilder(sourceOp);
 
   // Create the op that will contain the translated executable.
@@ -80,7 +80,7 @@ static LogicalResult materializeExecutableFromSourceOp(
 
   // With this hand-authored path all variants have the same layout and entry
   // points and we can just clone them.
-  auto sourceEntryPointOps = sourceOp.getOps<IREE::HAL::ExecutableExportOp>();
+  auto sourceExportOps = sourceOp.getExportOps();
 
   // Materialize all of the hal.executable.variant ops for all backends we are
   // targeting.
@@ -92,16 +92,15 @@ static LogicalResult materializeExecutableFromSourceOp(
         sourceOp->getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
     targetSymbolTable.insert(targetVariantOp);
     OpBuilder variantBuilder(&targetVariantOp.getBlock().back());
-    for (auto sourceEntryPointOp : sourceEntryPointOps) {
-      variantBuilder.clone(*sourceEntryPointOp);
+    for (auto sourceExportOp : sourceExportOps) {
+      variantBuilder.clone(*sourceExportOp);
 
       // Map the original export names to the new variant exports.
-      entryPointExpansions[SymbolRefAttr::get(
-                               executableOp.getNameAttr(),
-                               {FlatSymbolRefAttr::get(
-                                   sourceEntryPointOp.getNameAttr())})]
+      exportExpansions[SymbolRefAttr::get(executableOp.getNameAttr(),
+                                          {FlatSymbolRefAttr::get(
+                                              sourceExportOp.getNameAttr())})]
           .push_back(makeExportSymbolRefAttr(executableOp, targetVariantOp,
-                                             sourceEntryPointOp));
+                                             sourceExportOp));
     }
 
     // Clone any target-specific object files specified.
@@ -124,8 +123,9 @@ static LogicalResult materializeExecutableFromSourceOp(
   return success();
 }
 
-static LogicalResult materializeExecutablesFromSourceOps(
-    mlir::ModuleOp moduleOp, EntryPointExpansions &entryPointExpansions) {
+static LogicalResult
+materializeExecutablesFromSourceOps(mlir::ModuleOp moduleOp,
+                                    ExportExpansions &exportExpansions) {
   auto sourceOps =
       llvm::to_vector<32>(moduleOp.getOps<IREE::HAL::ExecutableSourceOp>());
   for (auto sourceOp : sourceOps) {
@@ -139,7 +139,7 @@ static LogicalResult materializeExecutablesFromSourceOps(
     }
 
     if (failed(materializeExecutableFromSourceOp(sourceOp, targetAttrs,
-                                                 entryPointExpansions))) {
+                                                 exportExpansions))) {
       return failure();
     }
   }
@@ -271,14 +271,13 @@ cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
 }
 
 // Updates the target entry point symbols of |dispatchOp| to the expanded set of
-// variant exports in |entryPointExpansions|.
-static void
-updateDispatchTargets(IREE::Stream::CmdDispatchOp dispatchOp,
-                      const EntryPointExpansions &entryPointExpansions) {
+// variant exports in |exportExpansions|.
+static void updateDispatchTargets(IREE::Stream::CmdDispatchOp dispatchOp,
+                                  const ExportExpansions &exportExpansions) {
   SmallVector<Attribute> newAttrs;
   for (auto oldAttr : dispatchOp.getEntryPointRefs()) {
-    auto it = entryPointExpansions.find(oldAttr);
-    if (it == entryPointExpansions.end()) {
+    auto it = exportExpansions.find(oldAttr);
+    if (it == exportExpansions.end()) {
       newAttrs.push_back(oldAttr); // preserve existing
       continue;
     }
@@ -313,7 +312,7 @@ static LogicalResult
 declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
                      IREE::HAL::ExecutableOp targetExecutableOp,
                      const BindingLayoutAnalysis &layoutAnalysis,
-                     EntryPointExpansions &entryPointExpansions) {
+                     ExportExpansions &exportExpansions) {
   auto variantOps =
       targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>();
   OpBuilder executableBuilder(&targetExecutableOp.getBlock().front());
@@ -387,9 +386,9 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
           /*workgroup_local_memory=*/IntegerAttr{});
 
       // Map the original export name to the new variant export.
-      entryPointExpansions[SymbolRefAttr::get(sourceExecutableOp.getNameAttr(),
-                                              {FlatSymbolRefAttr::get(
-                                                  exportOp.getNameAttr())})]
+      exportExpansions[SymbolRefAttr::get(
+                           sourceExecutableOp.getNameAttr(),
+                           {FlatSymbolRefAttr::get(exportOp.getNameAttr())})]
           .push_back(makeExportSymbolRefAttr(targetExecutableOp, variantOp,
                                              newExportOp));
 
@@ -537,12 +536,12 @@ public:
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
 
-    EntryPointExpansions entryPointExpansions;
+    ExportExpansions exportExpansions;
 
     // Handle any hand-authored executables; these only need variant expansion
     // and no layout analysis as the user specified the layout themselves.
     if (failed(materializeExecutablesFromSourceOps(getOperation(),
-                                                   entryPointExpansions))) {
+                                                   exportExpansions))) {
       return signalPassFailure();
     }
 
@@ -595,7 +594,7 @@ public:
 
       // Define interfaces for each exported function based on analysis.
       if (failed(declareEntryPointOps(sourceOp, executableOp, layoutAnalysis,
-                                      entryPointExpansions))) {
+                                      exportExpansions))) {
         return signalPassFailure();
       }
 
@@ -615,7 +614,7 @@ public:
     // pipeline layout, though, and any that fall through are errors.
     auto updateDispatchSites = [&](IREE::Stream::CmdDispatchOp dispatchOp) {
       // Update the export targets to point at the new variants.
-      updateDispatchTargets(dispatchOp, entryPointExpansions);
+      updateDispatchTargets(dispatchOp, exportExpansions);
 
       // Annotate the dispatch site with binding information if required.
       // TODO(benvanik): remove this path; shouldn't be needed in real usage.

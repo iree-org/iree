@@ -250,7 +250,7 @@ public:
 
     // Take exported names verbatim for passing into VkShaderModuleCreateInfo.
     SmallVector<StringRef, 8> entryPointNames;
-    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    for (auto exportOp : variantOp.getExportOps()) {
       entryPointNames.emplace_back(exportOp.getSymName());
     }
 

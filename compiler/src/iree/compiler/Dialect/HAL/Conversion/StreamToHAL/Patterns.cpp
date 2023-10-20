@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -920,16 +919,6 @@ struct CmdCollectiveOpPattern
   }
 };
 
-// Returns a hal.device.switch match expression that selects the given export.
-static Attribute
-getExportConditionAttr(IREE::HAL::ExecutableExportOp exportOp) {
-  // TODO(benvanik): customizable selection logic. Today this just checks
-  // whether the variant target is supported but we can also allow
-  // specialization of entry points based on dispatch site parameters.
-  auto variantOp = exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  return variantOp.getTarget().getMatchExpression();
-}
-
 struct CmdDispatchOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -942,42 +931,65 @@ struct CmdDispatchOpPattern
     // Get the device handle we're executing against in this execution region.
     // Note that this is a dynamic value: we have to treat the device as unknown
     // here.
-    auto device = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
+    auto deviceValue = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
         loc, rewriter.getType<IREE::HAL::DeviceType>(), commandBuffer);
 
-    // Ask each target backend to record their dispatch logic.
-    IREE::HAL::DeviceSwitchRewriter switchRewriter(loc,
-                                                   /*resultTypes=*/TypeRange{},
-                                                   device, rewriter);
+    // Prepare for variant switch table by gathering the conditions selecting
+    // each variant.
+    SmallVector<int64_t> caseIndices;
+    SmallVector<std::pair<SymbolRefAttr, IREE::HAL::ExecutableExportOp>>
+        caseExportOps;
     dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
       // NOTE: slow lookup!
       auto exportOp =
           SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
               dispatchOp, entryPointAttr);
       assert(exportOp && "dispatch target export not found");
+      caseIndices.push_back(caseIndices.size());
+      caseExportOps.push_back(std::make_pair(entryPointAttr, exportOp));
+    });
 
-      // Setup the case condition for the entry point.
-      auto *caseRegion =
-          switchRewriter.addConditionRegion(getExportConditionAttr(exportOp));
-      auto &entryBlock = caseRegion->front();
-      auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
+    // Select the variant index.
+    Value selectedIndex = buildIfElseTree(
+        loc, caseExportOps.size(),
+        [&](Location loc, size_t i, OpBuilder &builder) {
+          auto exportOp = caseExportOps[i].second;
+          auto variantOp =
+              exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+          return variantOp.buildCondition(deviceValue, rewriter);
+        },
+        rewriter);
+
+    // Allow each variant to define how it is dispatched.
+    auto switchOp = rewriter.replaceOpWithNewOp<scf::IndexSwitchOp>(
+        dispatchOp, TypeRange{}, selectedIndex, caseIndices,
+        caseIndices.size());
+    for (size_t i = 0; i < caseExportOps.size(); ++i) {
+      auto entryPointAttr = caseExportOps[i].first;
+      auto exportOp = caseExportOps[i].second;
+      auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
+      auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
 
       // Record push constants and buffer bindings.
-      recordParameters(loc, device, commandBuffer, dispatchOp, adaptor,
+      recordParameters(loc, deviceValue, commandBuffer, dispatchOp, adaptor,
                        exportOp.getLayout(), caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
       auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
-          loc, device, adaptor.getWorkload(), caseBuilder);
+          loc, deviceValue, adaptor.getWorkload(), caseBuilder);
       caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
           loc, commandBuffer, entryPointAttr, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);
 
-      caseBuilder.create<IREE::HAL::ReturnOp>(loc);
-    });
-    switchRewriter.build();
+      caseBuilder.create<scf::YieldOp>(loc);
+    }
 
-    rewriter.eraseOp(dispatchOp);
+    // Fallback for no available variant. Today we just no-op as executable
+    // loading should have already failed.
+    auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
+    auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
+    defaultBuilder.create<scf::YieldOp>(loc);
+
     return success();
   }
 

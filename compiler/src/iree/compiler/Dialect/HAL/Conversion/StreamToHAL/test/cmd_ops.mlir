@@ -164,9 +164,10 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
 
 // -----
 
-#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
+#executable_target_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
+#executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 #device_target_cpu = #hal.device.target<"llvm-cpu", {
-  executable_targets = [#executable_target_embedded_elf_x86_64]
+  executable_targets = [#executable_target_aarch64, #executable_target_x86_64]
 }>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -177,7 +178,24 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
   ]>
 ]>
 hal.executable private @ex {
-  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
+  hal.executable.variant public @aarch64 target(#executable_target_aarch64) {
+    hal.executable.condition(%device: !hal.device) -> i1 {
+      %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
+      hal.return %selected : i1
+    }
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+      translation_info = #iree_codegen.translation_info<CPUDefault>
+    } {
+    ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
+      %c1 = arith.constant 1 : index
+      %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
+      hal.return %0, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      // Opaque at this point (in some target-specific dialects).
+    }
+  }
+  hal.executable.variant public @x86_64 target(#executable_target_x86_64) {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<CPUDefault>
     } {
@@ -203,9 +221,19 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   %0 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<transient>{%arg1}, %arg2 as %arg5: !stream.resource<external>{%arg3}) {
-    // Switch for each executable variant:
-    // CHECK: hal.device.switch
-    // CHECK-NEXT: #hal.device.match.executable.format<"embedded-elf-x86_64">
+    // Switch for each executable variant by checking conditions and ranking:
+    // CHECK: %[[DEVICE:.+]] = hal.command_buffer.device<%[[CMD]] : !hal.command_buffer>
+    //  CHECK-DAG: %{{.+}}, %[[AARCH64_FORMAT:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.executable.format" :: "embedded-elf-aarch64")
+    //  CHECK-DAG: %[[AARCH64_FEATURE:.+]] = scf.execute_region -> i1 {
+    // CHECK-NEXT:   %{{.+}}, %[[FEATURE:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("some" :: "feature")
+    // CHECK-NEXT:   scf.yield %[[FEATURE]]
+    // CHECK-NEXT: }
+    //  CHECK-DAG: %[[AARCH64_SELECTED:.+]] = arith.andi %[[AARCH64_FORMAT]], %[[AARCH64_FEATURE]]
+    //  CHECK-DAG: %{{.+}}, %[[X86_64_SELECTED:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.executable.format" :: "embedded-elf-x86_64")
+    // CHECK: %[[VARIANT1:.+]] = arith.select %[[X86_64_SELECTED]], %c1
+    // CHECK: %[[VARIANT0:.+]] = arith.select %[[AARCH64_SELECTED]], %c0{{.+}}, %[[VARIANT1]]
+    // CHECK: scf.index_switch %[[VARIANT0]]
+    // CHECK-NEXT: case 0 {
 
     // Cache queries:
     //  CHECK-DAG:   %[[LAYOUT:.+]] = hal.pipeline_layout.lookup {{.+}} layout(#pipeline_layout)
@@ -230,9 +258,14 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
 
     // Dispatch:
     // CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]]
-    // CHECK-SAME: target(@ex::@embedded_elf_x86_64::@dispatch)
+    // CHECK-SAME: target(@ex::@aarch64::@dispatch)
     // CHECK-SAME: workgroups([%[[X]], %[[YZ]], %[[YZ]]])
-    stream.cmd.dispatch @ex::@embedded_elf_x86_64::@dispatch[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
+
+    // Other variant, when selected:
+    // CHECK: case 1 {
+    // CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]]
+    // CHECK-SAME: target(@ex::@x86_64::@dispatch)
+    stream.cmd.dispatch {@ex::@aarch64::@dispatch, @ex::@x86_64::@dispatch}[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
       ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
       wo %arg5[%c0 for %c128] : !stream.resource<external>{%arg3}
     } attributes {
