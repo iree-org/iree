@@ -2128,8 +2128,8 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
-    `,` `target` `=` $target
-    (`,` `objects` `=` $objects^ )?
+    `target` `(` $target `)`
+    (`objects` `(` $objects^ `)` )?
     attr-dict-with-keyword
     regions
   }];

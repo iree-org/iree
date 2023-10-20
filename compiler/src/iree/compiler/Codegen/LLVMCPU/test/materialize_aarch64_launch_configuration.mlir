@@ -9,11 +9,11 @@
   ]>
 ]>
 hal.executable private @matmul_tensors  {
-  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-arm_64", {
+  hal.executable.variant @llvm target(<"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
-  }> {
+  }>) {
     hal.executable.export @matmul_tensors layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_tensors() {
@@ -62,12 +62,12 @@ hal.executable private @matmul_tensors  {
   ]>
 ]>
 hal.executable private @matmul_tensors_sve  {
-  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-arm_64", {
+  hal.executable.variant @llvm target(<"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     cpu_features = "+sve",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
-  }> {
+  }>) {
     hal.executable.export @matmul_tensors layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_tensors() {
@@ -115,11 +115,11 @@ hal.executable private @matmul_tensors_sve  {
   ]>
 ]>
 hal.executable private @batch_matmul_tensors {
-  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-arm_64", {
+  hal.executable.variant @llvm target(<"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
-  }> {
+  }>) {
     hal.executable.export @batch_matmul_tensors layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_tensors() {
@@ -166,11 +166,11 @@ hal.executable private @batch_matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_static {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+  hal.executable.variant public @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
-  }> {
+  }>) {
     hal.executable.export public @matmul_static layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_static() {
@@ -214,11 +214,11 @@ hal.executable private @matmul_static {
   ]>
 ]>
 hal.executable private @conv_static {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+  hal.executable.variant public @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
-  }> {
+  }>) {
     hal.executable.export public @conv_static layout(#pipeline_layout)
     builtin.module {
       func.func @conv_static() {
@@ -255,11 +255,11 @@ hal.executable private @conv_static {
   ]>
 ]>
 hal.executable private @restrict_num_workgroups {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+  hal.executable.variant public @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
-  }> {
+  }>) {
     hal.executable.export public @restrict_num_workgroups layout(#pipeline_layout)
     builtin.module {
       func.func @restrict_num_workgroups() {
@@ -304,11 +304,11 @@ hal.executable private @restrict_num_workgroups {
   ]>
 ]>
 hal.executable private @matmul_aarch_i8_i8_i32_static  {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+  hal.executable.variant public @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
-  }> {
+  }>) {
   hal.executable.export public @matmul_aarch_i8_i8_i32_static layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_aarch_i8_i8_i32_static() {
@@ -346,11 +346,11 @@ hal.executable private @matmul_aarch_i8_i8_i32_static  {
   ]>
 ]>
 hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+  hal.executable.variant public @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
-  }> {
+  }>) {
   hal.executable.export public @matmul_aarch_i8_i8_i32_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_aarch_i8_i8_i32_dynamic() {
@@ -395,11 +395,11 @@ hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
   ]>
 ]>
 hal.executable private @pack  {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+  hal.executable.variant public @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
-  }> {
+  }>) {
   hal.executable.export public @pack layout(#pipeline_layout)
     builtin.module {
       func.func @pack() {
@@ -432,11 +432,11 @@ hal.executable private @pack  {
   ]>
 ]>
 hal.executable private @unpack_outer_dynamic  {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {
+  hal.executable.variant public @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
-  }> {
+  }>) {
   hal.executable.export public @unpack_outer_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @unpack_outer_dynamic() {

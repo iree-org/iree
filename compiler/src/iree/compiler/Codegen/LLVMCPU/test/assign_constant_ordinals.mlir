@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-assign-constant-ordinals)))" --split-input-file %s | FileCheck %s
 
 hal.executable private @executable {
-  hal.executable.variant public @variant, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64"> {
+  hal.executable.variant public @variant target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">) {
     hal.executable.constant.block(%device: !hal.device) -> i32 as "foo" {
       %c0 = arith.constant 0 : i32
       hal.return %c0 : i32

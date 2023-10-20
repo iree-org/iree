@@ -6,7 +6,7 @@
 
 // CHECK-NOT: hal.executable
 hal.executable private @ex {
-  hal.executable.variant public @vmvx_ir, target = <"vmvx-inline", "vmvx-ir"> {
+  hal.executable.variant public @vmvx_ir target(<"vmvx-inline", "vmvx-ir">) {
     hal.executable.export public @dispatch_0 ordinal(0) layout(
          #hal.pipeline.layout<push_constants = 2,
                                 sets = [

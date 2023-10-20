@@ -10,7 +10,7 @@
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
+  hal.executable.variant @llvm target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
@@ -39,7 +39,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
+  hal.executable.variant @llvm target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
@@ -68,7 +68,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
+  hal.executable.variant @llvm target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
@@ -97,7 +97,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
+  hal.executable.variant @llvm target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
@@ -126,7 +126,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
+  hal.executable.variant @llvm target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
@@ -157,7 +157,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
+  hal.executable.variant @llvm target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
@@ -186,7 +186,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @conv_2d_nhwc_hwcf {
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
+  hal.executable.variant @llvm target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
@@ -216,7 +216,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
   ]>
 ]>
 hal.executable private @depthwise_conv_2d_nhwc_hwc {
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
+  hal.executable.variant @llvm target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}>) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {

@@ -6,7 +6,7 @@
 hal.executable private @executable {
   // CHECK: hal.executable.variant
   // CHECK-SAME: hal.executable.imports = {{.+}}["bar", true], ["foo", false]{{.+}}
-  hal.executable.variant public @variant, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64"> {
+  hal.executable.variant public @variant target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">) {
     builtin.module {
       // CHECK: llvm.mlir.global internal constant @__import_ordinal_foo_a(1 : i32)
       llvm.mlir.global internal @__import_ordinal_foo_a() {

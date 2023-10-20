@@ -10,7 +10,7 @@
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 
 hal.executable private @reduce_dispatch_0 {
-  hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export public @reduce_dispatch_0 ordinal(0) layout(#pipeline_layout) attributes { workgroup_size = [64: index, 1: index, 1: index], subgroup_size = 32 : index }
     builtin.module {
       func.func @reduce_dispatch_0() {

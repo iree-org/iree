@@ -11,7 +11,7 @@
   ]>
 ]>
 hal.executable @abs_ex_dispatch_0 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
@@ -54,7 +54,7 @@ hal.executable @abs_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @abs_dynamic {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @abs_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @abs_dynamic() {
@@ -115,7 +115,7 @@ hal.executable @abs_dynamic {
   ]>
 ]>
 hal.executable @dead_symbol {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @dead_symbol layout(#pipeline_layout)
     builtin.module {
       func.func @dead_symbol() {
@@ -153,7 +153,7 @@ hal.executable @dead_symbol {
   ]>
 ]>
 hal.executable @mixed_type {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @mixed_type layout(#pipeline_layout)
     builtin.module {
       func.func @mixed_type() {
@@ -193,7 +193,7 @@ hal.executable @mixed_type {
   ]>
 ]>
 hal.executable @shared_memory_lowering {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @shared_memory_lowering layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering() {
@@ -233,7 +233,7 @@ hal.executable @shared_memory_lowering {
   ]>
 ]>
 hal.executable @shared_memory_dealloc_elision {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @shared_memory_dealloc_elision layout(#pipeline_layout)
     builtin.module {
 // CHECK-LABEL: llvm.func @shared_memory_dealloc_elision() {
@@ -259,7 +259,7 @@ hal.executable @shared_memory_dealloc_elision {
   ]>
 ]>
 hal.executable @shared_memory_lowering_aligned_alloc {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @shared_memory_lowering_aligned_alloc layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering_aligned_alloc() {
@@ -298,18 +298,18 @@ hal.executable @shared_memory_lowering_aligned_alloc {
   ]>
 ]>
 hal.executable @check_not_readonly {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @check_not_readonly layout(#pipeline_layout)
     builtin.module {
       func.func @check_not_readonly() {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
         %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<16xi32>
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>        
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
         %b11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) flags(ReadOnly) : memref<16xi32>
-        %b12 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c128) : memref<16xf32, strided<[1], offset: 32>>        
+        %b12 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c128) : memref<16xf32, strided<[1], offset: 32>>
         %b21 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) flags(ReadOnly) : memref<16xi32>
-        %b22 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>        
+        %b22 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: 32>>
         %2 = hal.interface.binding.subspan set(1) binding(3) type(storage_buffer) : memref<16xf32>
         %3 = gpu.block_id x
         %4 = gpu.block_dim x
@@ -341,7 +341,7 @@ hal.executable @check_not_readonly {
   ]>
 ]>
 hal.executable @complex {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @complex layout(#pipeline_layout)
     builtin.module {
       func.func @complex() {
@@ -377,7 +377,7 @@ hal.executable @complex {
   ]>
 ]>
 hal.executable @shared_memory_lowering_index {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @shared_memory_lowering_index layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering_index() {
