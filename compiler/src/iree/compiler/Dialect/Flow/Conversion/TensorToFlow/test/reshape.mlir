@@ -31,3 +31,25 @@ func.func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg
 //   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP]](%[[D1]])[%[[ARG3]], %[[ARG5]]]
 //       CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[VAL]] : tensor<?x?xf32>{%[[RD0]], %[[RD1]]}
 //       CHECK:   flow.tensor.update %[[ARG0]], %[[SPLAT]]
+
+// -----
+
+func.func @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x8xf32> {
+  // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<2x4xf32> -> tensor<1x8xf32>
+  // CHECK: return %[[RESULT]]
+  %0 = tensor.reshape %arg0(%arg1)
+             : (tensor<2x4xf32>, tensor<2xindex>) -> tensor<1x8xf32>
+  return %0 : tensor<1x8xf32> }
+
+// -----
+
+  func.func @dynamic_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<?x?xf32> {
+  // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[D0:.*]] = tensor.extract %arg1[%[[C0]]] : tensor<2xindex>
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[D1:.*]] = tensor.extract %arg1[%[[C1]]] : tensor<2xindex>
+  // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<2x4xf32> -> tensor<?x?xf32>{%[[D0]], %[[D1]]}
+  // CHECK: return %[[RESULT]]
+  %0 = tensor.reshape %arg0(%arg1)
+             : (tensor<2x4xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32> }
