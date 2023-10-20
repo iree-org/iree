@@ -103,9 +103,10 @@ function(iree_run_module_test)
   add_custom_target("${_TARGET_NAME}" ALL)
 
   if(_RULE_EXPECTED_OUTPUT)
-    # this may be a file or a literal output. In the latter case, the
+    # Get the extension (.xyz) from either a file path or an URL.
+    # This may be a file or a literal output. In the latter case, the
     # extension variable will be empty.
-    cmake_path(GET _RULE_EXPECTED_OUTPUT EXTENSION LAST_ONLY _OUTPUT_FILE_TYPE)
+    string(REGEX MATCH "\\.[A-Za-z0-9_]+$" _OUTPUT_FILE_TYPE "${_RULE_EXPECTED_OUTPUT}")
     if(NOT _OUTPUT_FILE_TYPE)  # The expected output is listed in the field.
       list(APPEND _RULE_RUNNER_ARGS "--expected_output=\"${_RULE_EXPECTED_OUTPUT}\"")
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".txt")
@@ -117,33 +118,46 @@ function(iree_run_module_test)
       list(APPEND _RULE_RUNNER_ARGS ${_EXPECTED_OUTPUT_STR})
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".npy")
       # Large npy files are not stored in the codebase. Need to download them
-      # from GCS iree-model-artifacts first and store them in the following possible
-      # paths.
-      find_file(_OUTPUT_FILE_ABS_PATH
-        NAME
-          "${_RULE_EXPECTED_OUTPUT}"
-        PATHS
-          "${CMAKE_CURRENT_SOURCE_DIR}"
-          "${CMAKE_CURRENT_BINARY_DIR}"
-          "${IREE_E2E_TEST_ARTIFACTS_DIR}"
-        NO_CACHE
-        NO_DEFAULT_PATH
-      )
-      # If the expected output npy file is not found, try to fetch it.
-      if(NOT _OUTPUT_FILE_ABS_PATH)
+      # from HTTPS link first and store them in the following possible paths.
+      if(_RULE_EXPECTED_OUTPUT MATCHES "^https://.+/([^/]+)$")
+        set(_EXPECTED_OUTPUT_URL "${_RULE_EXPECTED_OUTPUT}")
+        set(_RULE_EXPECTED_OUTPUT "${CMAKE_MATCH_1}")
+
+        cmake_path(ABSOLUTE_PATH
+          _RULE_EXPECTED_OUTPUT
+          BASE_DIRECTORY "${IREE_E2E_TEST_ARTIFACTS_DIR}"
+          NORMALIZE
+          OUTPUT_VARIABLE _OUTPUT_FILE_ABS_PATH)
+
         set(_FETCH_NAME "model-expected-output-${_RULE_NAME}")
         iree_fetch_artifact(
           NAME "${_FETCH_NAME}"
-          SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/${_RULE_EXPECTED_OUTPUT}"
-          OUTPUT "${IREE_E2E_TEST_ARTIFACTS_DIR}/${_RULE_EXPECTED_OUTPUT}"
+          SOURCE_URL "${_EXPECTED_OUTPUT_URL}"
+          OUTPUT "${_OUTPUT_FILE_ABS_PATH}"
         )
         add_dependencies(${_TARGET_NAME}
           "${_PACKAGE_NAME}_${_FETCH_NAME}"
         )
       else()
-        list(APPEND _RUNNER_FILE_ARGS
-          "--expected_output=@{{${_OUTPUT_FILE_ABS_PATH}}}")
+        find_file(_OUTPUT_FILE_ABS_PATH
+          NAME
+            "${_RULE_EXPECTED_OUTPUT}"
+          PATHS
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+            "${CMAKE_CURRENT_BINARY_DIR}"
+            "${IREE_E2E_TEST_ARTIFACTS_DIR}"
+          NO_CACHE
+          NO_DEFAULT_PATH
+        )
+        if(NOT _OUTPUT_FILE_ABS_PATH)
+          message(SEND_ERROR "${_RULE_EXPECTED_OUTPUT} is not found in\n\
+            ${CMAKE_CURRENT_SOURCE_DIR}\n\
+            ${CMAKE_CURRENT_BINARY_DIR}\n\
+            ${IREE_E2E_TEST_ARTIFACTS_DIR}")
+        endif()
       endif()
+      list(APPEND _RUNNER_FILE_ARGS
+        "--expected_output=@{{${_OUTPUT_FILE_ABS_PATH}}}")
     else()
       message(SEND_ERROR "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}")
     endif(NOT _OUTPUT_FILE_TYPE)
