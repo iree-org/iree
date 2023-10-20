@@ -52,13 +52,15 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
     %dim_i32 = arith.index_cast %dim : index to i32
 
     // Dispatch a basic `ret = lhs * rhs` shader.
+    // Note that not all backends use names or the names are derived from
+    // ordinals so we include that (`:ordinal`).
     %0 = hal.dispatch.extern "main"[%dim](%dim_i32, %arg0, %arg1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> tensor<?xf32>{%dim}
+      // This host function is used to compute the XYZ workgroup count
+      // dispatched at runtime. It can query the %device for capabilities
+      // and limits (shared memory size, etc). The other arguments are the
+      // values passed in the dispatch operation (usually things like root
+      // output op tensor dimensions and other abstract values).
       count(%device: !hal.device, %workload: index) -> (index, index, index) {
-        // This host function is used to compute the XYZ workgroup count
-        // dispatched at runtime. It can query the %device for capabilities
-        // and limits (shared memory size, etc). The other arguments are the
-        // values passed in the dispatch operation (usually things like root
-        // output op tensor dimensions and other abstract values).
         %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
         %c1 = arith.constant 1 : index
         hal.return %x, %c1, %c1 : index, index, index
@@ -90,8 +92,8 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
       // keys can be generic. This allows for an object file to be linked in based
       // only on the target triple while allowing for more specialized ones
       // requiring certain CPU features to be only included when building those.
-      objects(#hal.executable.objects<{
-        #spirv_target = [
+      objects({
+        #spirv_target ordinal(0) = [
           #hal.executable.object<{
             // Referencing a file path on disk but could also have the data
             // embedded in order to make the MLIR file hermetic/portable across
@@ -103,7 +105,7 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
             path = "samples/custom_dispatch/vulkan/shaders/simple_mul.spv"
           }>
         ]
-      }>)
+      })
 
     // Code gen some other ops - these will interleave with the hand-authored
     // ones but naturally won't be able to fuse with them.

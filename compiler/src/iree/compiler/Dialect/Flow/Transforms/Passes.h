@@ -153,6 +153,10 @@ createDispatchWithTransformDialect(
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
 
+// Outlines external dispatches into executables.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOutlineDispatchExternsPass();
+
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createOutlineDispatchRegionsPass();
