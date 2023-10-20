@@ -188,14 +188,10 @@ struct ConvertTensorFromElementsPattern
 static void sizesForTensor(OpBuilder &builder, SmallVectorImpl<Value> &sizes,
                            Location loc, ShapedType stp, Value tensor) {
   for (const auto &d : enumerate(stp.getShape())) {
-    Value dim;
     if (d.value() == ShapedType::kDynamic) {
-      dim = builder.create<tensor::DimOp>(loc, tensor, d.index());
-    }    
-    else {
-      dim = builder.create<arith::ConstantIndexOp>(loc, d.value());
-    }   
-    sizes.push_back(dim);
+      Value dim = builder.create<tensor::DimOp>(loc, tensor, d.index());
+      sizes.push_back(dim);
+    }
   }
 }
 
@@ -218,6 +214,9 @@ struct ConvertTensorDialectReshapeOpPattern
         return rewriter.notifyMatchFailure(op, "not ranked shaped types");
       }
 
+      SmallVector<Value> srcSizes;
+      sizesForTensor(rewriter, srcSizes, loc, inputType, input);
+
       //flow.reshape only takes dynamic dims for the result dims
       SmallVector<Value> destSizes;
       for (int i = 0; i < shapeOperandType.getShape()[0]; i++) {
@@ -230,7 +229,7 @@ struct ConvertTensorDialectReshapeOpPattern
       }
 
       rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
-        op, resultType, input, destSizes);
+        op, resultType, input, srcSizes, destSizes);
       return success();
   }
 };

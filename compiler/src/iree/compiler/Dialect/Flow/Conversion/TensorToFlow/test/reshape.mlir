@@ -53,3 +53,14 @@ func.func @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>)
   %0 = tensor.reshape %arg0(%arg1)
              : (tensor<2x4xf32>, tensor<2xindex>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32> }
+
+  // -----
+
+  func.func @mix_dynamic_and_static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[D1:.*]] = tensor.extract %arg1[%[[C1]]] : tensor<2xindex>
+  // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<2x4xf32> -> tensor<?x?xf32>{%[[C1]], %[[D1]]}
+  // CHECK: return %[[RESULT]]
+  %0 = tensor.reshape %arg0(%arg1)
+             : (tensor<2x4xf32>, tensor<2xindex>) -> tensor<1x?xf32>
+  return %0 : tensor<1x?xf32> }
