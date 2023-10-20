@@ -70,7 +70,8 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
   LABELS
-
+    "noriscv"
+    "nowasm"
 )
 
 iree_generated_trace_runner_test(
@@ -91,7 +92,8 @@ iree_generated_trace_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
   LABELS
-
+    "noriscv"
+    "nowasm"
 )
 
 iree_generated_trace_runner_test(
@@ -113,6 +115,7 @@ iree_generated_trace_runner_test(
     "--iree-opt-data-tiling=false"
   LABELS
     "noriscv"
+    "nowasm"
 )
 
 iree_generated_trace_runner_test(
@@ -134,6 +137,7 @@ iree_generated_trace_runner_test(
     "--iree-opt-data-tiling=false"
   LABELS
     "noriscv"
+    "nowasm"
 )
 
 iree_generated_trace_runner_test(
@@ -184,7 +188,6 @@ iree_generated_trace_runner_test(
   LABELS
     "noasan"
     "notsan"
-    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "arm_64:dotprod:+dotprod"
@@ -239,7 +242,6 @@ iree_generated_trace_runner_test(
   LABELS
     "noasan"
     "notsan"
-    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -265,7 +267,8 @@ iree_generated_trace_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
   LABELS
-
+    "noriscv"
+    "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -295,6 +298,7 @@ iree_generated_trace_runner_test(
     "noasan"
     "notsan"
     "noriscv"
+    "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -321,7 +325,8 @@ iree_generated_trace_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-microkernels"
   LABELS
-
+    "noriscv"
+    "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -351,6 +356,7 @@ iree_generated_trace_runner_test(
     "noasan"
     "notsan"
     "noriscv"
+    "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -378,6 +384,7 @@ iree_generated_trace_runner_test(
     "--iree-llvmcpu-enable-microkernels"
   LABELS
     "noriscv"
+    "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -408,6 +415,7 @@ iree_generated_trace_runner_test(
     "noasan"
     "notsan"
     "noriscv"
+    "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -436,6 +444,7 @@ iree_generated_trace_runner_test(
     "--iree-llvmcpu-enable-microkernels"
   LABELS
     "noriscv"
+    "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -466,6 +475,7 @@ iree_generated_trace_runner_test(
     "noasan"
     "notsan"
     "noriscv"
+    "nowasm"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"

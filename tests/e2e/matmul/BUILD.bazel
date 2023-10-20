@@ -37,9 +37,10 @@ py_binary(
         "--shapes=small",
     ],
     tags = [
-        # "--lhs_rhs_type=bf16" triggers internel LLVM assertion errors on RISC-V target.
+        # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
-    ] if lhs_rhs_type == "bf16" else [],
+        "nowasm",
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else [],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
@@ -97,9 +98,10 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         "notsan",
     ] if size == "large" else []) + ([
         # "--shapes=large" can cause timeouts on RISC-V emulator.
-        # "--lhs_rhs_type=bf16" triggers internel LLVM assertion errors on RISC-V target.
+        # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
-    ] if size == "large" or lhs_rhs_type == "bf16" else []),
+        "nowasm",
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []),
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
