@@ -42,8 +42,7 @@ void createTorchToIREEPipeline(
     // now be simplified.
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   }
-  pm.addNestedPass<func::FuncOp>(
-      torch::TorchConversion::createUnpackQuantTensorPass());
+  pm.addNestedPass<func::FuncOp>(createBitCastQuantTensorPass());
   pm.addNestedPass<func::FuncOp>(
       mlir::torch::TorchConversion::createConvertCustomQuantOpPass());
   pm.addNestedPass<func::FuncOp>(

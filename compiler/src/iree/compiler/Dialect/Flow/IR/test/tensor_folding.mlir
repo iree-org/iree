@@ -146,6 +146,34 @@ func.func @flattenReshapeBitcastChain(%arg0: tensor<4x?xi16>, %dim0: index, %dim
 
 // -----
 
+// CHECK-LABEL: @flattenBitCastChain
+// CHECK-SAME: %[[ARG:.+]]: tensor<?x4xi16>,
+// CHECK-SAME: %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index
+func.func @flattenBitCastChain(%arg0: tensor<?x4xi16>, %dim0: index, %dim1: index, %dim2: index) -> tensor<?x8xi8> {
+  // CHECK-NEXT: %[[RET:.+]] = flow.tensor.bitcast %[[ARG]] : tensor<?x4xi16>{%[[DIM0]]} -> tensor<?x8xi8>{%[[DIM2]]}
+  %0 = flow.tensor.bitcast %arg0 : tensor<?x4xi16>{%dim0} -> tensor<?x2xi32>{%dim1}
+  %1 = flow.tensor.bitcast %0 : tensor<?x2xi32>{%dim1} -> tensor<?x8xi8>{%dim2}
+  // CHECK-NEXT: return %[[RET]]
+  return %1 : tensor<?x8xi8>
+}
+
+// -----
+
+// CHECK-LABEL: @flattenBitCastReshapeBitCast
+// CHECK-SAME: %[[ARG:.+]]: tensor<?x16xi16>,
+// CHECK-SAME: %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index, %[[DIM3:.+]]: index
+func.func @flattenBitCastReshapeBitCast(%arg0: tensor<?x16xi16>, %dim0: index, %dim1: index, %dim2: index, %dim3: index) -> tensor<?x4x4xi16> {
+  // CHECK-NEXT: %[[RET:.+]] = flow.tensor.reshape %[[ARG]] : tensor<?x16xi16>{%[[DIM0]]} -> tensor<?x4x4xi16>{%[[DIM3]]}
+  %0 = flow.tensor.bitcast %arg0 : tensor<?x16xi16>{%dim0} -> tensor<?x8xi32>{%dim1}
+  %1 = flow.tensor.reshape %0 : tensor<?x8xi32>{%dim1} -> tensor<?x4x2xf32>{%dim2}
+  %2 = flow.tensor.bitcast %1 : tensor<?x4x2xf32>{%dim2} -> tensor<?x4x4xi16>{%dim3}
+  // CHECK-NEXT: return %[[RET]]
+  return %2 : tensor<?x4x4xi16>
+}
+
+
+// -----
+
 // CHECK-LABEL: @reshapeFromStaticZeroElements
 // CHECK-SAME: (%[[OPERAND:.+]]: tensor<4x0xf32>, %[[DIM:.+]]: index)
 func.func @reshapeFromStaticZeroElements(%arg0: tensor<4x0xf32>, %dim: index) -> tensor<4x?xf32> {

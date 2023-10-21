@@ -21,6 +21,8 @@ struct TorchToIREELoweringPipelineOptions
       llvm::cl::desc("Use strict symbolic shapes."), llvm::cl::init(true)};
 };
 
+std::unique_ptr<OperationPass<func::FuncOp>> createBitCastQuantTensorPass();
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertTMTensorToLinalgExtPass();
 
