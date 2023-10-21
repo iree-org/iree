@@ -2417,12 +2417,43 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 // AttentionOp
 //===----------------------------------------------------------------------===//
 
+/// Utility function to check whether a given ShapedType has the expected rank.
+static LogicalResult checkShapeRank(Operation *op, StringRef operandName,
+                                    ShapedType shapedType,
+                                    unsigned rankToCompareWith) {
+  unsigned opRank = shapedType.getRank();
+  if (opRank != rankToCompareWith)
+    return op->emitOpError("expected ")
+           << operandName << " to have rank " << rankToCompareWith
+           << " but found " << opRank;
+  return success();
+}
+
 LogicalResult AttentionOp::verify() {
   Operation *op = getOperation();
+  unsigned numOperands = getNumOperands();
+  unsigned rankToCompareWith = 3;
+  if (numOperands == 6)
+    rankToCompareWith = 2;
+  else if (numOperands != 4)
+    return op->emitOpError("expected operand count 4 or 6, but got")
+           << numOperands;
   ShapedType queryType = getQueryType();
   ShapedType keyType = getKeyType();
   ShapedType valueType = getValueType();
   ShapedType outputType = getOutputType();
+  Type queryElementType = queryType.getElementType();
+  Type keyElementType = keyType.getElementType();
+  Type valueElementType = valueType.getElementType();
+  Type outputElementType = outputType.getElementType();
+  if (failed(checkShapeRank(op, "query", queryType, rankToCompareWith)))
+    return failure();
+  if (failed(checkShapeRank(op, "key", keyType, rankToCompareWith)))
+    return failure();
+  if (failed(checkShapeRank(op, "value", valueType, rankToCompareWith)))
+    return failure();
+  if (failed(checkShapeRank(op, "output", outputType, rankToCompareWith)))
+    return failure();
   ArrayRef<int64_t> queryShape = queryType.getShape();
   ArrayRef<int64_t> keyShape = keyType.getShape();
   ArrayRef<int64_t> valueShape = valueType.getShape();
@@ -2431,10 +2462,38 @@ LogicalResult AttentionOp::verify() {
     return op->emitOpError("incompatible value shape");
   if (failed(verifyCompatibleShape(queryShape, outputShape)))
     return op->emitOpError("incompatible output shape");
-  if (keyShape[0] != queryShape[0])
-    return op->emitOpError("query and key batch mismatch");
-  if (keyShape[2] != queryShape[2])
-    return op->emitOpError("query and key head dimension mismatch");
+  if (queryElementType != keyElementType || keyElementType != valueElementType)
+    return op->emitOpError(
+        "element types of (Q)uery, (K)ey and (V)value should be same");
+  if (numOperands == 4) {
+    // Vanilla attention.
+    if (queryElementType != outputElementType)
+      return op->emitOpError("expected element type for Output ")
+             << queryElementType << "but found " << outputElementType
+             << " instead";
+    if (keyShape[2] != queryShape[2])
+      return op->emitOpError("query and key head dimension mismatch");
+  }
+  if (numOperands == 6) {
+    // Tiled/Flash attention.
+    ShapedType maxType = *getMaxType();
+    ShapedType sumType = *getSumType();
+    if (failed(checkShapeRank(op, "max", maxType, 1)))
+      return failure();
+    if (failed(checkShapeRank(op, "sum", sumType, 1)))
+      return failure();
+    Type maxElementType = maxType.getElementType();
+    Type sumElementType = sumType.getElementType();
+    ArrayRef<int64_t> maxShape = maxType.getShape();
+    ArrayRef<int64_t> sumShape = sumType.getShape();
+    if (outputElementType != maxElementType || maxElementType != sumElementType)
+      return op->emitOpError(
+          "element types of tiled output, max and sum should be same");
+    if (failed(verifyCompatibleShape(maxShape, sumShape)))
+      return op->emitOpError("incompatible sum shape");
+    if (maxShape[0] != queryShape[0])
+      return op->emitOpError("Query and max dimension-0 mismatch");
+  }
   return success();
 }
 
