@@ -3062,7 +3062,7 @@ MaterializeUpperBoundTileSize pass.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.attention` attr-dict
               `ins` `(` $inputs `:` type($inputs) `)`
               `outs` `(` $outputs `:` type($outputs) `)`
-              (`-&gt;` type($result)^)?
+              (`-&gt;` type($results)^)?
 </code></pre></div>
 <p>This operator takes in 3 tensors: query(Q), key(K) and value(V) and computes
 the attention. For self-attention, all inputs have the same shape BxNxd where B is the
@@ -3072,7 +3072,9 @@ matmul(softmax(matmul(Q, transpose(K))), V) and has shape BxNxd. Usually,
 this operator also performs scaling, masking and dropout, but we leave
 that out of the current implementation. For cross-attention, the query and output
 have the same shape (BxNxd), while the key and value differ in sequence length
-(they have shape BxLxd, where L != N).</p>
+(they have shape BxLxd, where L != N).
+This operator after tiling results in a tiled result as per flash attention and results
+in the current <code>max</code> and <code>sum</code> statistics while processing the current tile.</p>
 <p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
 <p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
@@ -3104,7 +3106,7 @@ have the same shape (BxNxd), while the key and value differ in sequence length
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>result</code></td>
+<td style="text-align: center;"><code>results</code></td>
 <td>ranked tensor of any type values</td>
 </tr>
 </tbody>
