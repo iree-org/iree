@@ -787,7 +787,9 @@ static bool matmul_result_elements_agree(iree_e2e_test_value_t expected,
              FLAG_acceptable_fp_delta;
     case IREE_E2E_TEST_VALUE_TYPE_BF16:
       if (actual.bf16_u16 == expected.bf16_u16) return true;
-      fprintf(stderr, "actual (%x) %g ; expected (%x) %g\n", actual.bf16_u16, iree_math_bf16_to_f32(actual.bf16_u16), expected.bf16_u16, iree_math_bf16_to_f32(expected.bf16_u16));
+      fprintf(stderr, "actual (%x) %g ; expected (%x) %g\n", actual.bf16_u16,
+              iree_math_bf16_to_f32(actual.bf16_u16), expected.bf16_u16,
+              iree_math_bf16_to_f32(expected.bf16_u16));
       if (FLAG_require_exact_results) return false;
       return fabsf(iree_math_bf16_to_f32(actual.bf16_u16) -
                    iree_math_bf16_to_f32(expected.bf16_u16)) <
