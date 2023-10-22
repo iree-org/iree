@@ -9,13 +9,13 @@
 ]>
 
 hal.executable private @nhwc_conv_pointwise_2x64x64x320 {
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader], []>, AMD:DiscreteGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export public @nhwc_conv_pointwise_2x64x64x320 layout(#pipeline_layout)
     builtin.module {
       func.func @nhwc_conv_pointwise_2x64x64x320() {

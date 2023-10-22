@@ -7,7 +7,7 @@
   ]>
 ]>
 hal.executable @warp_reduction_dispatch {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @warp_reduction_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -108,7 +108,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @warp_reduction_broadcast_dispatch {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @warp_reduction_broadcast_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -199,7 +199,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @softmax {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @softmax layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2

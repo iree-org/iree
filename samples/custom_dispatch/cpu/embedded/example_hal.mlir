@@ -58,7 +58,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
   hal.executable private @executable {
 
     // Variant linking in an x86-64 object file containing external functions.
-    hal.executable.variant public @x86_64, target = #x86_64_target, objects = [
+    hal.executable.variant public @x86_64 target(#x86_64_target) objects([
       // Object files linked into the executable.
       // These object files are linked into the dynamic library and must meet
       // the requirements for embedded ELF linkage (no TLS, no globals, no
@@ -73,7 +73,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
         // part of the overall compilation.
         path = "samples/custom_dispatch/cpu/embedded/functions_x86_64.o"
       }>
-    ] {
+    ]) {
 
       // TODO(benvanik): demonstrate hal.executable.constant.block for
       // specialization via host logic and hal.executable.constant.load for

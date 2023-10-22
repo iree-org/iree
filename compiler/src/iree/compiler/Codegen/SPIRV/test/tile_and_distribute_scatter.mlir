@@ -10,7 +10,7 @@
   ]>
 ]>
 hal.executable private @static_scatter_update_slice  {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb">) {
     hal.executable.export @static_scatter_update_slice layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]

@@ -7,7 +7,7 @@
   ]>
 ]>
 hal.executable @softmax {
-hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}> {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>) {
   hal.executable.export @softmax layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2

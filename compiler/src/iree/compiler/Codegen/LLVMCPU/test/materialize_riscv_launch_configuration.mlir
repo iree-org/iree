@@ -8,14 +8,14 @@
   ]>
 ]>
 hal.executable private @matmul_riscv  {
-  hal.executable.variant public @embedded_elf_x86_64, target = #hal.executable.target<
+  hal.executable.variant public @embedded_elf_x86_64 target(#hal.executable.target<
     "llvm-cpu",
     "embedded-elf-riscv_32", {
       cpu_features = "+m,+f",
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",
       native_vector_size = 16 : index,
       target_triple = "riscv32-none-elf"
-    }> {
+    }>) {
     hal.executable.export public @matmul_riscv layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_riscv() {
@@ -56,14 +56,14 @@ hal.executable private @matmul_riscv  {
   ]>
 ]>
 hal.executable private @thin_depthwise_conv_static {
-  hal.executable.variant public @embedded_elf_x86_64, target = #hal.executable.target<
+  hal.executable.variant public @embedded_elf_x86_64 target(#hal.executable.target<
     "llvm-cpu",
     "embedded-elf-riscv_32", {
       cpu_features = "+m,+f",
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",
       native_vector_size = 16 : index,
       target_triple = "riscv32-none-elf"
-    }> {
+    }>) {
     hal.executable.export public @thin_depthwise_conv_static layout(#pipeline_layout)
     builtin.module {
       func.func @thin_depthwise_conv_static() {

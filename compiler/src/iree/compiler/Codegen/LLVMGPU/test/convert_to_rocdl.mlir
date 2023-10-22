@@ -11,7 +11,7 @@
   ]>
 ]>
 hal.executable @abs_ex_dispatch_0 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
@@ -53,21 +53,21 @@ hal.executable @abs_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @abs_ex_dispatch_0 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @reduction_maximum() {
-      %c0 = arith.constant 0 : index 
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : 
-            memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>> 
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x64x64xf32, 
-            strided<[4096, 64, 1], offset: ?>> 
-      %2 = vector.load %0[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32> 
-      %3 = vector.reduction <maximumf>, %2 : vector<2xf32> into f32 
-      %4 = vector.splat %3 : vector<2xf32> 
-      vector.store %4, %1[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32> 
-      return 
-      } 
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) :
+            memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<32x64x64xf32,
+            strided<[4096, 64, 1], offset: ?>>
+      %2 = vector.load %0[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
+      %3 = vector.reduction <maximumf>, %2 : vector<2xf32> into f32
+      %4 = vector.splat %3 : vector<2xf32>
+      vector.store %4, %1[%c0, %c0, %c0] : memref<32x64x64xf32, strided<[4096, 64, 1], offset: ?>>, vector<2xf32>
+      return
+      }
     }
   }
 }

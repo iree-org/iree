@@ -28,7 +28,7 @@ and the Python API:
 ```shell
 python -c "import iree.compiler.version as v; print(v.REVISIONS['IREE'])"
 f1cb2692a086738d7f16274b9b3af6d2c15ef133
-``` 
+```
 
 ## Manylinux releases
 
@@ -54,7 +54,6 @@ ones:
 ```shell
 export PATH=/opt/python/cp39-cp39/bin:$PATH
 ```
-
 
 Build core installation:
 

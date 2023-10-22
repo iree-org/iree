@@ -137,14 +137,6 @@ def PackConstants :
   }];
 }
 
-def PackAllocations :
-    InterfacePass<"iree-stream-pack-allocations", "mlir::CallableOpInterface"> {
-  let summary = "Packs fused allocations based on lifetime.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Stream::createPackAllocationsPass()
-  }];
-}
-
 def LayoutSlices :
     InterfacePass<"iree-stream-layout-slices", "mlir::CallableOpInterface"> {
   let summary = "Lays out packed slices and produces arithmetic required for all offsets.";

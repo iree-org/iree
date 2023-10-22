@@ -11,7 +11,7 @@
   ]>
 ]>
 hal.executable private @matmul_static_shape_f16 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @matmul_static_shape_f16 layout(#pipeline_layout) attributes {
       workgroup_size = [16: index, 1: index, 1: index],
       translation_info = #translation
@@ -73,7 +73,7 @@ hal.executable private @matmul_static_shape_f16 {
   ]>
 ]>
 hal.executable private @matmul_static_shape_f32 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @matmul_static_shape_f32 layout(#pipeline_layout) attributes {
       workgroup_size = [16: index, 1: index, 1: index],
       translation_info = #translation

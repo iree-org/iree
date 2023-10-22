@@ -57,6 +57,12 @@ chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
   Type out = elementTypes[2];
 
   if (out.isF32() || out.isF16() || out.isBF16()) {
+    if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
+      if (hasFeature(target, "+bf16")) {
+        // Aim to use BFMMLA.
+        return MatmulTileParams{8, 4, 8};
+      }
+    }
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
@@ -94,6 +100,11 @@ chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
   Type out = elementTypes[2];
 
   if (out.isF32() || out.isF16() || out.isBF16()) {
+    if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
+      if (hasFeature(target, "+avx512bf16")) {
+        return MatmulTileParams{16, 2, 16};
+      }
+    }
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may

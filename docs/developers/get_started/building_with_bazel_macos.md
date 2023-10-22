@@ -18,7 +18,7 @@ Contributions related to macOS support and documentation are welcome however.
 This guide uses [Homebrew](https://brew.sh/) to install IREE's dependencies.
 
 ```shell
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 ```
 
 ### Install Bazel
@@ -26,7 +26,7 @@ $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/
 Install Bazel via Homebrew:
 
 ```shell
-$ brew install bazel
+brew install bazel
 ```
 
 Note: when you first run `bazel` to build IREE, it will prompt you to copy and
@@ -35,7 +35,7 @@ run a shell command to select the right version.
 ### Install python3 numpy
 
 ```shell
-$ python3 -m pip install numpy --user
+python3 -m pip install numpy --user
 ```
 
 ## Clone and Build
@@ -45,10 +45,10 @@ $ python3 -m pip install numpy --user
 Clone the repository, initialize its submodules and configure:
 
 ```shell
-$ git clone https://github.com/openxla/iree.git
-$ cd iree
-$ git submodule update --init
-$ python3 configure_bazel.py
+git clone https://github.com/openxla/iree.git
+cd iree
+git submodule update --init
+python3 configure_bazel.py
 ```
 
 > Tip:<br>
@@ -97,14 +97,14 @@ build:asserts --compilation_mode=opt '--copt=-UNDEBUG'
 Build all of IREE's 'tools' directory:
 
 ```shell
-$ bazel build tools/...
+bazel build tools/...
 ```
 
 Check out what was built:
 
 ```shell
-$ ls bazel-bin/tools/
-$ ./bazel-bin/tools/iree-compile --help
+ls bazel-bin/tools/
+./bazel-bin/tools/iree-compile --help
 ```
 
 Translate a

@@ -12,7 +12,7 @@
 ]>
 
 hal.executable private @pooling_nhwc_sum_f32 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @pooling_nhwc_sum_f32 layout(#pipeline_layout) attributes {
       workgroup_size = [2: index, 2: index, 2: index],
       translation_info = #translation

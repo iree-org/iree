@@ -1058,12 +1058,6 @@ jobs:
         run: |
           mkdir -p ${E2E_TEST_ARTIFACTS_DIR}
           gcloud storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" "${E2E_TEST_ARTIFACTS_DIR}"
-      - name: "Download benchmark expected output"
-        env:
-          EXPECTED_OUTPUT_GSC_ARTIFACT: gs://iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy
-          EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy
-        run: |
-          gcloud storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${E2E_TEST_ARTIFACTS_DIR}/${EXPECTED_OUTPUT_FILE}"
       - name: "Build iree-run-module and test benchmark suite modules"
         run: |
           ./build_tools/github_actions/docker_run.sh \

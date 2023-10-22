@@ -14,6 +14,7 @@ add_mlir_library(IREEInputDialect
   MLIRIR
   MLIRInferTypeOpInterface
   MLIRSideEffectInterfaces
+  MLIRTensorDialect
 )
 
 iree_dialects_target_includes(IREEInputDialect)

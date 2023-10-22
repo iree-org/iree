@@ -423,6 +423,7 @@ def HALInline_BufferViewTraceOp : HALInline_Op<"buffer_view.trace", []> {
   );
 
   let assemblyFormat = [{
+    $key `=`
     $operands `:` type($operands)
     attr-dict-with-keyword
   }];

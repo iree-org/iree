@@ -43,6 +43,13 @@ iree_status_t iree_hal_cuda2_buffer_wrap(
     void* host_ptr, iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(out_buffer);
+  if (!host_ptr && iree_any_bit_set(allowed_usage,
+                                    IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
+                                        IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "mappable buffers require host pointers");
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_cuda2_buffer_t* buffer = NULL;
@@ -95,6 +102,7 @@ static iree_status_t iree_hal_cuda2_buffer_map_range(
           ? IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT
           : IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
 
+  IREE_ASSERT(buffer->host_ptr, "mappable buffers require host pointers");
   uint8_t* data_ptr = (uint8_t*)(buffer->host_ptr) + local_byte_offset;
   // If we mapped for discard scribble over the bytes. This is not a mandated
   // behavior but it will make debugging issues easier. Alternatively for

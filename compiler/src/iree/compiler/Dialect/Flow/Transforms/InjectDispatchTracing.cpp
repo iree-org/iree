@@ -46,14 +46,14 @@ public:
 
       // Input tensors:
       OpBuilder builder(dispatchOp);
-      builder.create<TensorTraceOp>(
+      builder.create<IREE::Flow::TensorTraceOp>(
           dispatchOp.getLoc(),
           builder.getStringAttr(entryPointName + " inputs"),
           filterTensorValues(dispatchOp.getArguments()));
 
       // Output tensors:
       builder.setInsertionPointAfter(dispatchOp);
-      builder.create<TensorTraceOp>(
+      builder.create<IREE::Flow::TensorTraceOp>(
           dispatchOp.getLoc(),
           builder.getStringAttr(entryPointName + " outputs"),
           filterTensorValues(dispatchOp.getResults()));

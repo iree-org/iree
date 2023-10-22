@@ -191,6 +191,51 @@ static bool doesSliceSpanWholeTarget(
 }
 
 //===----------------------------------------------------------------------===//
+// custom<ShapedOperandList>($values, type($values), $value_dims)
+//===----------------------------------------------------------------------===//
+// %value : type{%dynamic_dims}, ...
+
+static ParseResult parseShapedOperandList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+    SmallVectorImpl<Type> &valueTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &valueDims) {
+  do {
+    values.emplace_back();
+    valueTypes.emplace_back();
+    if (failed(parser.parseOperand(values.back())) ||
+        failed(parser.parseColon()) ||
+        failed(parser.parseType(valueTypes.back())))
+      return failure();
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(valueTypes.back()).getNumDynamicDims()) {
+      if (failed(parser.parseOperandList(valueDims, dynamicDimCount,
+                                         AsmParser::Delimiter::Braces)))
+        return failure();
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printShapedOperandList(OpAsmPrinter &p, Operation *op,
+                                   ValueRange values, TypeRange valueTypes,
+                                   ValueRange valueDims) {
+  llvm::interleaveComma(llvm::zip_equal(values, valueTypes), p, [&](auto it) {
+    auto [value, valueType] = it;
+    p << value;
+    p << " : ";
+    p << valueType;
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(valueType).getNumDynamicDims()) {
+      p << "{";
+      llvm::interleaveComma(valueDims.take_front(dynamicDimCount), p);
+      valueDims = valueDims.drop_front(dynamicDimCount);
+      p << "}";
+    }
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
 
@@ -1646,6 +1691,35 @@ TensorUpdateOp::getTiedResultOperandIndex(unsigned resultIndex) {
 
 SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0}; // target
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.trace
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorTraceOp::verify() {
+  TensorTraceOp op = *this;
+  if (failed(verifyOpDynamicDims(op, op.getValues(), op.getValueDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+ValueRange TensorTraceOp::getOperandDynamicDims(unsigned idx) {
+  auto valueDims = getValueDims();
+  for (unsigned i = 0; i <= idx; ++i) {
+    auto valueType = cast<ShapedType>(getValues()[i].getType());
+    int64_t dynamicDimCount = valueType.getNumDynamicDims();
+    if (i == idx) {
+      return valueDims.take_front(dynamicDimCount);
+    }
+    valueDims = valueDims.drop_front(dynamicDimCount);
+  }
+  return ValueRange{};
+}
+
+ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
+  return ValueRange{};
 }
 
 //===----------------------------------------------------------------------===//

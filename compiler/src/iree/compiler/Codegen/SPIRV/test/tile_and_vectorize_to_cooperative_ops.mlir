@@ -14,7 +14,7 @@
   ]>
 ]>
 hal.executable public @matmul_256x1024x128_div_add {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -35,7 +35,7 @@ hal.executable public @matmul_256x1024x128_div_add {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x128_div_add layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]
@@ -183,7 +183,7 @@ hal.executable public @matmul_256x1024x128_div_add {
   ]>
 ]>
 hal.executable public @matmul_256x1024x128_div_add {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -204,7 +204,7 @@ hal.executable public @matmul_256x1024x128_div_add {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x128_div_add layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]
@@ -358,7 +358,7 @@ hal.executable public @matmul_256x1024x128_div_add {
   ]>
 ]>
 hal.executable public @matmul_256x1024x128_mixed_signedness_int8 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -379,7 +379,7 @@ hal.executable public @matmul_256x1024x128_mixed_signedness_int8 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x128_mixed_signedness_int8 layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]

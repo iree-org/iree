@@ -1,10 +1,10 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @resourceAlloc
-func.func @resourceAlloc(%arg0: index, %arg1: index) -> (!stream.resource<*>, !stream.resource<*>) {
-  // CHECK: = stream.resource.alloc uninitialized : !stream.resource<*>{%arg0}, !stream.resource<*>{%arg1}
-  %0:2 = stream.resource.alloc uninitialized : !stream.resource<*>{%arg0}, !stream.resource<*>{%arg1}
-  return %0#0, %0#1 : !stream.resource<*>, !stream.resource<*>
+func.func @resourceAlloc(%arg0: index) -> !stream.resource<*> {
+  // CHECK: = stream.resource.alloc uninitialized : !stream.resource<*>{%arg0}
+  %0 = stream.resource.alloc uninitialized : !stream.resource<*>{%arg0}
+  return %0 : !stream.resource<*>
 }
 
 // -----

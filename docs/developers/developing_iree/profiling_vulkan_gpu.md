@@ -29,10 +29,10 @@ Capturing from the command line can be done using `renderdoccmd` with the
 specified file appearing (by default) in the executable directory:
 
 ```shell
-$ renderdoccmd capture tools/iree-run-module --device_profiling_mode=queue --device_profiling_file=foo.rdc ...
-$ stat tools/foo.rdc
-$ renderdoccmd capture tools/iree-run-module --device_profiling_mode=queue --device_profiling_file=/some/path/foo.rdc ...
-$ stat /some/path/foo.rdc
+renderdoccmd capture tools/iree-run-module --device_profiling_mode=queue --device_profiling_file=foo.rdc ...
+stat tools/foo.rdc
+renderdoccmd capture tools/iree-run-module --device_profiling_mode=queue --device_profiling_file=/some/path/foo.rdc ...
+stat /some/path/foo.rdc
 ```
 
 ## Android GPUs
@@ -50,8 +50,8 @@ IREE core libraries together with a specific VM bytecode invocation into an
 Android app. The wrapper and its documentation are placed at
 [`tools/android/run_module_app/`](https://github.com/openxla/iree/tree/main/tools/android/run_module_app).
 
-For example, to package a module compiled from the following `stablehlo-dot.mlir` as
-an Android app:
+For example, to package a module compiled from the following
+`stablehlo-dot.mlir` as an Android app:
 
 ```mlir
 func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32> {
@@ -79,7 +79,7 @@ $ /path/to/iree/source/tools/android/run_module_app/build_apk.sh \
 
 Where `/path/to/input/file` is a file containing inputs to `dot`, for example:
 
-```
+``` text
 2x4xf32=[[1.0 2.0 3.0 4.0][5.0 6.0 7.0 8.0]]
 4x2xf32=[[9.0 10.0][11.0 12.0][13.0 14.0][15.0 16.0]]
 ```
@@ -98,7 +98,7 @@ You can follow AGI's
 [Getting Started](https://gpuinspector.dev/docs/getting-started) page to learn
 how to use it. In general the steps are:
 
-* Install the latest AGI from https://github.com/google/agi/releases and launch.
+* Install the latest AGI from <https://github.com/google/agi/releases> and launch.
 * Fill in the "Application" field by searching the app. The line should read
   like `android.intent.action.MAIN:dev.iree.run_module/android.app.NativeActivity`.
 * Select start at beginning and choose a proper duration.
@@ -107,7 +107,7 @@ how to use it. In general the steps are:
 
 Generated traces are in the [perfetto](https://perfetto.dev/) format. They can
 be viewed directly within AGI and also online in a browser at
-https://ui.perfetto.dev/, without needing an Android device.
+<https://ui.perfetto.dev/>, without needing an Android device.
 
 ## Desktop GPUs
 

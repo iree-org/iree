@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRParser
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Modules::Check::Conversion
     iree::compiler::Modules::Check::check_imports

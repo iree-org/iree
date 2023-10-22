@@ -8,7 +8,7 @@
   ]>
 ]>
 hal.executable private @simple_reduce  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @simple_reduce layout(#pipeline_layout) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
@@ -89,7 +89,7 @@ hal.executable private @simple_reduce  {
   ]>
 ]>
 hal.executable private @reduce_uniform_buffer_offset  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @reduce_uniform_buffer_offset layout(#pipeline_layout) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
@@ -158,7 +158,7 @@ hal.executable private @reduce_uniform_buffer_offset  {
   ]>
 ]>
 hal.executable private @reduce_storage_buffer_offset  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @reduce_storage_buffer_offset layout(#pipeline_layout) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }

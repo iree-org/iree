@@ -1,6 +1,7 @@
 # Benchmark IREE and TFLite
 
-<!-- TODO(meadowlark): Update this doc once the API is stable and change default to cmake. -->
+<!-- TODO(meadowlark): Update this doc once the API is stable and change
+                       default to cmake. -->
 
 We use our end-to-end TensorFlow integration tests to test compilation and
 numerical accuracy, and to generate compilation and benchmarking artifacts.
@@ -126,8 +127,6 @@ specification will not work well.
 
 TODO(#6688): Discuss new yaml trace files.
 
-
-
 ## 3. Benchmarking TFLite on desktop
 
 ### 3.1 Build TFLite's `benchmark_model` binary
@@ -238,7 +237,7 @@ To build TensorFlow tools with Android:
 - Run `./configure` under TensorFlow repo.
 - Add the following section to the TensorFlow WORKSPACE file.
 
-```
+``` starlark
 android_ndk_repository(
     name="androidndk",
     path="/full/path/to/android_ndk",
@@ -299,8 +298,9 @@ $ adb shell chmod +x /data/local/tmp/benchmark_model_plus_flex
 ```
 
 Alternatively, you can download and install the
-[Android Benchmark App](https://www.tensorflow.org/lite/performance/measurement#android_benchmark_app). If you choose to install the app then
-you'll have to modify the benchmarking commands below slightly, as shown in
+[Android Benchmark App](https://www.tensorflow.org/lite/performance/measurement#android_benchmark_app).
+If you choose to install the app then you'll have to modify the benchmarking
+commands below slightly, as shown in
 [this example](https://www.tensorflow.org/lite/performance/measurement#run_benchmark).
 
 ### 5.2 Run the benchmark
@@ -379,7 +379,7 @@ purpose of measuring a latency.
 The first is `enable_op_profiling`. It's based on timestamps before and after
 each op. It's a runtime command-line flag taken by `benchmark_model`. Example:
 
-```
+``` bash
 $ adb shell taskset f0 /data/local/tmp/benchmark_model \
   --graph=/data/local/tmp/MatrixOpsStaticModule/tflite/matmul_lhs_batch.tflite \
   --warmup_runs=1 \
@@ -393,7 +393,7 @@ whether `ruy` is used for the matrix multiplications. It's a sampling profiler,
 which allows it to provide some more detailed information, particularly on
 matrix multiplications. It's a build-time switch:
 
-```
+``` bash
 $ bazel build \
   --define=ruy_profiler=true \
   -c opt \
