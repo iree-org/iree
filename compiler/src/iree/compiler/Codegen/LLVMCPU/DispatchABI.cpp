@@ -1011,7 +1011,8 @@ Value HALDispatchABI::loadExecutableConstant(Operation *forOp, StringRef key,
 
   // Load the placeholder global ordinal.
   Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
-  Value ordinalValue = builder.create<LLVM::LoadOp>(loc, globalPtr);
+  Value ordinalValue =
+      builder.create<LLVM::LoadOp>(loc, globalOp.getType(), globalPtr);
 
   // Load constant from the executable constants struct.
   auto constantsPtrValue =

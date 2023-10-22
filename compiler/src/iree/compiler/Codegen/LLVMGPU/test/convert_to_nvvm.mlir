@@ -212,18 +212,18 @@ hal.executable @shared_memory_lowering {
 }
 //       CHECK: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
 // CHECK-LABEL: llvm.func @shared_memory_lowering() {
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(2048 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4096 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
 
 // -----
 
@@ -240,7 +240,7 @@ hal.executable @shared_memory_dealloc_elision {
       func.func @shared_memory_dealloc_elision() {
         %f0 = arith.constant 0.0 : f32
         %c0 = arith.constant 0 : index
-        //     CHECK: llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+        //     CHECK: llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
         %0 = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
         memref.store %f0, %0[%c0] : memref<1xf32, #gpu.address_space<workgroup>>
         // CHECK-NOT: free
@@ -277,14 +277,14 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 }
 // CHECK-LABEL: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
 // CHECK-LABEL: llvm.func @shared_memory_lowering_aligned_alloc() {
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
 
 // -----
 
@@ -392,7 +392,7 @@ hal.executable @shared_memory_lowering_index {
 }
 //       CHECK: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
 // CHECK-LABEL: llvm.func @shared_memory_lowering_index() {
-//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
