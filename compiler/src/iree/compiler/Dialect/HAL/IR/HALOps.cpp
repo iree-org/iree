@@ -409,17 +409,6 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
                          static_cast<int32_t>(resultDims.size()),
                      }));
 
-  llvm::BitVector operandAliases(llvm::size(arguments), false);
-  llvm::BitVector resultAliases(llvm::size(resultTypes), false);
-  for (unsigned resultIndex = 0; resultIndex < tiedOperands.size();
-       ++resultIndex) {
-    int64_t tiedOperandIndex = tiedOperands[resultIndex];
-    if (tiedOperandIndex != IREE::Util::TiedOpInterface::kUntiedIndex) {
-      operandAliases[tiedOperandIndex] = true;
-      resultAliases[resultIndex] = true;
-    }
-  }
-
   // NOTE: workgroup count region is empty; callers are expected to populate it.
   state.addRegion();
 }
