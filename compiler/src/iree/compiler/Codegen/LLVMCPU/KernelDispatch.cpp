@@ -802,7 +802,8 @@ setDefaultRootConfig(func::FuncOp entryPointFn,
   return success();
 }
 
-// TODO.
+/// Returns the default cache-level tile sizes for a matmul op and a specific
+/// target. There shouldn't be proper heuristics here, just fixed values.
 static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
                                                        bool isQuantized) {
   unsigned numLoops = op.getNumLoops();
@@ -827,12 +828,10 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
   return noCacheLevelTiling;
 }
 
-static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
-                                            linalg::ContractionOpInterface op,
-                                            ArrayRef<int64_t> distTileSizes,
-                                            ArrayRef<int64_t> cacheTileSizes,
-                                            ArrayRef<int64_t> vecTileSizes,
-                                            int vectorSize) {
+static LogicalResult setMatmulPeelingRootConfig(
+    func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
+    ArrayRef<int64_t> vecTileSizes, int vectorSize) {
   // The tiling for parallel dims and reduction dims should be separated.
   SmallVector<int64_t> parallelTileSizes(vecTileSizes.begin(),
                                          vecTileSizes.end());
@@ -1202,13 +1201,13 @@ setRootConfig(func::FuncOp entryPointFn,
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> distTileSizes;
   auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
-  bool usePaddingPipeline =
-      vecPreProcStrategy == VectorPreProcStrategy::Padding;
+  bool usePeelingPipeline =
+      vecPreProcStrategy == VectorPreProcStrategy::Peeling;
 
   LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
                        << vecPreProcStrategy << "\n");
 
-  if (usePaddingPipeline) {
+  if (usePeelingPipeline) {
     // It's inspired from https://github.com/iree-org/iree-llvm-sandbox repo.
     // Sandbox has [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192
     // because 288/12*8=192
@@ -1224,12 +1223,14 @@ setRootConfig(func::FuncOp entryPointFn,
                                                         maxTileSizes);
   }
 
-  // Unfortunately, `getDefaultDistributedLevelTileSizes` may return sizes
-  // that are smaller than `minTileSizes` so we have to adjust the cache sizes
-  // again.
+  // TODO: We set cache tile sizes to the distribution sizes for now (no-op) to
+  // make sure there are no performance changes for now. This will let us change
+  // the distribution sizes while still preserving the cache behavior of the
+  // original sizes. When we set proper sizes, we should call again
+  // `getMatmulCacheTileSizesForShape(cacheTileSizes, distTileSizes);` here as
+  // the `getDefaultDistributedLevelTileSizes` above may return sizes that are
+  // smaller than `minTileSizes`, so we have to adjust the cache sizes again.
   cacheTileSizes = distTileSizes;
-  // TODO:
-  // getMatmulCacheTileSizesForShape(cacheTileSizes, distTileSizes);
 
   LLVM_DEBUG(KD_DBGS() << "Distribution tile sizes: " << distTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Cache tile sizes: " << cacheTileSizes << "\n");
@@ -1246,10 +1247,11 @@ setRootConfig(func::FuncOp entryPointFn,
                                      vecTileSizes, vectorSize);
   }
 
-  if (usePaddingPipeline) {
+  if (usePeelingPipeline) {
     // TODO: Use scalable vector sizes.
-    return setMatmulPadRootConfig(entryPointFn, contractionOp, distTileSizes,
-                                  cacheTileSizes, vecTileSizes, vectorSize);
+    return setMatmulPeelingRootConfig(entryPointFn, contractionOp,
+                                      distTileSizes, cacheTileSizes,
+                                      vecTileSizes, vectorSize);
   }
 
   SmallVector<bool> distScalableTileFlags(distTileSizes.size(), false);
