@@ -1250,8 +1250,8 @@ public:
   using OpConversionPattern<OpTy>::OpConversionPattern;
 
   EmitCConversionPattern(const TypeConverter &typeConverter,
-                         MLIRContext *context)
-      : OpConversionPattern<OpTy>(typeConverter, context) {}
+                         MLIRContext *context, PatternBenefit benefit = 1)
+      : OpConversionPattern<OpTy>(typeConverter, context, benefit) {}
 };
 
 // Convert vm operations to emitc calls. The resultiong call has the ops
