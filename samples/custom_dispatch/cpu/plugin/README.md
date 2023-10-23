@@ -161,7 +161,7 @@ and the required one will be loaded at runtime.
 ## Instructions
 
 This presumes that `iree-compile` and `iree-run-module` have been installed or
-built. [See here](https://www.iree.dev/building-from-source/getting-started/)
+built. [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
 for instructions for CMake setup and building from source.
 
 1. Build the `iree-sample-deps` CMake target to compile

@@ -31,7 +31,7 @@ dynamic modules should be carefully considered.
     python -m pip install iree-compiler
     ```
 
-    [See here](https://www.iree.dev/reference/bindings/python/)
+    [See here](https://openxla.github.io/iree/reference/bindings/python/)
     for general instructions on installing the compiler.
 
 3. Compile the [example module](./test/example.mlir) to a .vmfb file:
@@ -53,7 +53,7 @@ dynamic modules should be carefully considered.
     ```
     (here we force runtime execution tracing for demonstration purposes)
 
-    [See here](https://www.iree.dev/building-from-source/getting-started/)
+    [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
     for general instructions on building using CMake.
 
 4. Run the example program using the main `iree-run-module` tool:

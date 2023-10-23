@@ -101,7 +101,7 @@ nvcc ... (TODO, see CMakeLists.txt) -o kernels_sm_80.ptx
 ## Instructions
 
 This presumes that `iree-compile` and `iree-run-module` have been installed or
-built. [See here](https://www.iree.dev/building-from-source/getting-started/)
+built. [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
 for instructions for CMake setup and building from source.
 
 0. Ensure that the [CUDA SDK](https://developer.nvidia.com/cuda-downloads) and `nvcc` is on your PATH:

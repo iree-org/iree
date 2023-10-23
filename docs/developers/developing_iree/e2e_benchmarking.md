@@ -8,7 +8,7 @@ This allows us to validate that our benchmarks are behaving as we expect them
 to, and to run them using valid inputs for each model.
 
 This guide assumes that you can run the tensorflow integration tests. See
-[this doc](https://www.iree.dev/building-from-source/getting-started/#python-bindings)
+[this doc](https://openxla.github.io/iree/building-from-source/getting-started/#python-bindings)
 for more information. That doc also covers writing new tests, which you'll need
 to do if you'd like to benchmark a new TensorFlow model.
 
@@ -181,7 +181,7 @@ $ ./bazel-bin/tensorflow/lite/tools/benchmark/benchmark_model \
 
 IREE only supports compiling to Android with CMake. Documentation on setting up
 your environment to cross-compile to Android can be found
-[here](https://www.iree.dev/building-from-source/android/).
+[here](https://openxla.github.io/iree/building-from-source/android/).
 
 ```shell
 # After following the instructions above up to 'Build all targets', the

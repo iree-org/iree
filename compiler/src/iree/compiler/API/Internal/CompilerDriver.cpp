@@ -930,7 +930,7 @@ GlobalInit *globalInit = nullptr;
 bool isShutdown = false;
 
 void llvmVersionPrinter(llvm::raw_ostream &os) {
-  os << "IREE (https://www.iree.dev):\n  ";
+  os << "IREE (https://openxla.github.io/iree):\n  ";
   std::string version = mlir::iree_compiler::getIreeRevision();
   if (version.empty()) {
     version = "(unknown)";

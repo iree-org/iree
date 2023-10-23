@@ -86,7 +86,7 @@ To use IREE's Python bindings, you will first need to install
 
     ``` shell
     python -m pip install \
-      --find-links https://www.iree.dev/pip-release-links.html \
+      --find-links https://openxla.github.io/iree/pip-release-links.html \
       --upgrade \
       iree-compiler \
       iree-runtime

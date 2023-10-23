@@ -8,7 +8,7 @@ To regenerate the model together with the test data use
 python -m venv generate_mnist.venv
 source generate_mnist.venv/bin/activate
 # Add IREE Python to your PYTHONPATH, following
-# https://www.iree.dev/building-from-source/getting-started/#python-bindings
+# https://openxla.github.io/iree/building-from-source/getting-started/#python-bindings
 pip install -r generate_test_data_requirements.txt
 python ./generate_test_data.py
 ```

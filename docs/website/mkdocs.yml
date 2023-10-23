@@ -1,5 +1,5 @@
 site_name: IREE
-site_url: https://www.iree.dev/
+site_url: https://openxla.github.io/iree/
 repo_url: https://github.com/openxla/iree
 repo_name: openxla/iree
 
@@ -52,7 +52,7 @@ extra:
   community_homepage: https://github.com/openxla/community
   community_site_name: OpenXLA
 
-  homepage: https://www.iree.dev/
+  homepage: https://openxla.github.io/iree/
 
   # TODO(scotttodd): join mkdocs-material insiders and remove notice?
   #   (we *can* remove the notice without joining)

@@ -6,6 +6,6 @@ enum_tools==0.6.4
 sphinx_toolbox==2.15.0
 
 # IREE Python API
--f https://www.iree.dev/pip-release-links.html
+-f https://openxla.github.io/iree/pip-release-links.html
 iree-compiler
 iree-runtime

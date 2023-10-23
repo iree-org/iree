@@ -14,7 +14,7 @@ C++ module wrapper layer in [`module.cc`](./module.cc), and called by example in
 
 This document uses terminology that can be found in the documentation of
 [IREE's execution model](https://github.com/openxla/iree/blob/main/docs/developers/design_docs/execution_model.md).
-See [IREE's extensibility mechanisms](https://www.iree.dev/reference/extensions/)
+See [IREE's extensibility mechanisms](https://openxla.github.io/iree/reference/extensions/)
 documentation for more information specific to extenting IREE and
 alternative approaches to doing so.
 
@@ -36,7 +36,7 @@ are implemented using this mechanism.
     python -m pip install iree-compiler
     ```
 
-    [See here](https://www.iree.dev/reference/bindings/python/)
+    [See here](https://openxla.github.io/iree/reference/bindings/python/)
     for general instructions on installing the compiler.
 
 3. Compile the [example module](./test/example.mlir) to a .vmfb file:
@@ -56,7 +56,7 @@ are implemented using this mechanism.
     ```
     (here we force runtime execution tracing for demonstration purposes)
 
-    [See here](https://www.iree.dev/building-from-source/getting-started/)
+    [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
     for general instructions on building using CMake.
 
 4. Run the example program to call the main function:
