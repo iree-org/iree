@@ -25,6 +25,10 @@ build-*/
 # Bazel artifacts
 **/bazel-*
 
+# Executables
+*.exe
+*.out
+
 # Local-only config options
 configured.bazelrc
 user.bazelrc
