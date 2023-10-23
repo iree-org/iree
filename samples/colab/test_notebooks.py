@@ -12,6 +12,10 @@ import subprocess
 import unittest
 
 NOTEBOOKS_TO_SKIP = [
+    # matplotlib error when testing:
+    #   FileNotFoundError: [Errno 2] No such file or directory: 'seaborn-whitegrid'
+    # support level for TF-code and samples is also low
+    "tensorflow_mnist_training.ipynb",
     # tflite_runtime requires some deps ("version `GLIBC_2.29' not found") that
     # samples.Dockerfile does not currently include.
     "tflite_text_classification.ipynb",
