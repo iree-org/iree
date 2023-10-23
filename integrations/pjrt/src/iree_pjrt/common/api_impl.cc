@@ -6,7 +6,6 @@
 
 #include "iree_pjrt/common/api_impl.h"
 
-#include <iostream>
 #include <optional>
 
 #include "iree/hal/api.h"
