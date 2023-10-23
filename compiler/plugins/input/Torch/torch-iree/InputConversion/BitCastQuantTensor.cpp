@@ -23,27 +23,15 @@ namespace iree_compiler {
 namespace TorchInput {
 
 namespace {
-class BitCastQuantizedMatmulWeights
-    : public OpRewritePattern<torch::Torch::ValueTensorLiteralOp> {
+
+class BitCastQuantizedMatmul
+    : public OpRewritePattern<torch::Torch::OperatorOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(torch::Torch::ValueTensorLiteralOp constOp,
+  LogicalResult matchAndRewrite(torch::Torch::OperatorOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!constOp->hasOneUse())
-      return failure();
-
-    OpOperand *use = constOp.getResult().use_begin().getOperand();
-    auto op = dyn_cast<torch::Torch::OperatorOp>(use->getOwner());
-
-    // Verify that the user of the constant is the right hand side of a group
-    // quantized matrix multiplication.
-    if (!op) {
-      return failure();
-    }
+    // Check for group quantized matrix multiplications.
     if (op.getName().str() != "quant.matmul_rhs_group_quant") {
-      return failure();
-    }
-    if (use->getOperandNumber() != 1) {
       return failure();
     }
 
@@ -90,13 +78,13 @@ public:
 
     tensorShape[tensorShape.size() - 1] *= packRatio;
 
-    Location loc = constOp.getLoc();
+    Location loc = op.getLoc();
     auto bitCastTargetType = RankedTensorType::get(
         tensorShape, rewriter.getIntegerType(unpackedBitWidth));
+
     // Cast to the builtin tensor type.
     auto builtinCast =
-        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc,
-                                                                   constOp);
+        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc, rhs);
 
     // No dynamic dims because we are bitcasting a constant.
     auto flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
@@ -114,8 +102,7 @@ public:
     auto torchCast =
         rewriter.create<torch::TorchConversion::FromBuiltinTensorOp>(
             loc, newRhsType, flowBitcast);
-    rewriter.replaceAllUsesExcept(constOp.getResult(), torchCast.getResult(),
-                                  builtinCast);
+    op->replaceUsesOfWith(rhs, torchCast);
     return success();
   }
 };
@@ -133,8 +120,7 @@ class BitCastQuantTensorPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<BitCastQuantizedMatmulWeights>(context);
-
+    patterns.add<BitCastQuantizedMatmul>(context);
     if (failed(
             applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
       signalPassFailure();
