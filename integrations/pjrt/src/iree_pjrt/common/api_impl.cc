@@ -6,6 +6,7 @@
 
 #include "iree_pjrt/common/api_impl.h"
 
+#include <iostream>
 #include <optional>
 
 #include "iree/hal/api.h"
@@ -1817,19 +1818,144 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
   return status;
 }
 
+static void BindUndefineds(PJRT_Api* api) {
+#define _STUB(API)                                                       \
+  api->API = +[](API##_Args* args) -> PJRT_Error* {                      \
+    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED, #API)); \
+  }
+
+  _STUB(PJRT_Plugin_Initialize);
+  _STUB(PJRT_Plugin_Attributes);
+
+  _STUB(PJRT_Event_Destroy);
+  _STUB(PJRT_Event_IsReady);
+  _STUB(PJRT_Event_Error);
+  _STUB(PJRT_Event_Await);
+  _STUB(PJRT_Event_OnReady);
+
+  _STUB(PJRT_Client_Create);
+  _STUB(PJRT_Client_Destroy);
+  _STUB(PJRT_Client_PlatformName);
+  _STUB(PJRT_Client_ProcessIndex);
+  _STUB(PJRT_Client_PlatformVersion);
+  _STUB(PJRT_Client_Devices);
+  _STUB(PJRT_Client_AddressableDevices);
+  _STUB(PJRT_Client_LookupDevice);
+  _STUB(PJRT_Client_LookupAddressableDevice);
+  _STUB(PJRT_Client_AddressableMemories);
+  _STUB(PJRT_Client_Compile);
+  _STUB(PJRT_Client_DefaultDeviceAssignment);
+  _STUB(PJRT_Client_BufferFromHostBuffer);
+
+  _STUB(PJRT_DeviceDescription_Id);
+  _STUB(PJRT_DeviceDescription_ProcessIndex);
+  _STUB(PJRT_DeviceDescription_Attributes);
+  _STUB(PJRT_DeviceDescription_Kind);
+  _STUB(PJRT_DeviceDescription_DebugString);
+  _STUB(PJRT_DeviceDescription_ToString);
+
+  _STUB(PJRT_Device_GetDescription);
+  _STUB(PJRT_Device_IsAddressable);
+  _STUB(PJRT_Device_LocalHardwareId);
+  _STUB(PJRT_Device_AddressableMemories);
+  _STUB(PJRT_Device_DefaultMemory);
+  _STUB(PJRT_Device_MemoryStats);
+
+  _STUB(PJRT_Memory_Id);
+  _STUB(PJRT_Memory_Kind);
+  _STUB(PJRT_Memory_DebugString);
+  _STUB(PJRT_Memory_ToString);
+  _STUB(PJRT_Memory_AddressableByDevices);
+
+  _STUB(PJRT_Executable_Destroy);
+  _STUB(PJRT_Executable_Name);
+  _STUB(PJRT_Executable_NumReplicas);
+  _STUB(PJRT_Executable_NumPartitions);
+  _STUB(PJRT_Executable_NumOutputs);
+  _STUB(PJRT_Executable_SizeOfGeneratedCodeInBytes);
+  _STUB(PJRT_Executable_GetCostAnalysis);
+  _STUB(PJRT_Executable_OutputMemoryKinds);
+  _STUB(PJRT_Executable_OptimizedProgram);
+  _STUB(PJRT_Executable_Serialize);
+
+  _STUB(PJRT_LoadedExecutable_Destroy);
+  _STUB(PJRT_LoadedExecutable_GetExecutable);
+  _STUB(PJRT_LoadedExecutable_AddressableDevices);
+  _STUB(PJRT_LoadedExecutable_Delete);
+  _STUB(PJRT_LoadedExecutable_IsDeleted);
+  _STUB(PJRT_LoadedExecutable_Execute);
+  _STUB(PJRT_Executable_DeserializeAndLoad);
+  _STUB(PJRT_LoadedExecutable_Fingerprint);
+
+  _STUB(PJRT_Buffer_Destroy);
+  _STUB(PJRT_Buffer_ElementType);
+  _STUB(PJRT_Buffer_Dimensions);
+  _STUB(PJRT_Buffer_UnpaddedDimensions);
+  _STUB(PJRT_Buffer_DynamicDimensionIndices);
+  _STUB(PJRT_Buffer_GetMemoryLayout);
+  _STUB(PJRT_Buffer_OnDeviceSizeInBytes);
+  _STUB(PJRT_Buffer_Device);
+  _STUB(PJRT_Buffer_Memory);
+  _STUB(PJRT_Buffer_Delete);
+  _STUB(PJRT_Buffer_IsDeleted);
+  _STUB(PJRT_Buffer_CopyToDevice);
+  _STUB(PJRT_Buffer_ToHostBuffer);
+  _STUB(PJRT_Buffer_IsOnCpu);
+  _STUB(PJRT_Buffer_ReadyEvent);
+  _STUB(PJRT_Buffer_UnsafePointer);
+  _STUB(PJRT_Buffer_IncreaseExternalReferenceCount);
+  _STUB(PJRT_Buffer_DecreaseExternalReferenceCount);
+  _STUB(PJRT_Buffer_OpaqueDeviceMemoryDataPointer);
+
+  _STUB(PJRT_CopyToDeviceStream_Destroy);
+  _STUB(PJRT_CopyToDeviceStream_AddChunk);
+  _STUB(PJRT_CopyToDeviceStream_TotalBytes);
+  _STUB(PJRT_CopyToDeviceStream_GranuleSize);
+  _STUB(PJRT_CopyToDeviceStream_CurrentBytes);
+
+  _STUB(PJRT_TopologyDescription_Create);
+  _STUB(PJRT_TopologyDescription_Destroy);
+  _STUB(PJRT_TopologyDescription_PlatformName);
+  _STUB(PJRT_TopologyDescription_PlatformVersion);
+  _STUB(PJRT_TopologyDescription_GetDeviceDescriptions);
+  _STUB(PJRT_TopologyDescription_Serialize);
+  _STUB(PJRT_TopologyDescription_Attributes);
+
+  _STUB(PJRT_Compile);
+
+  // Always add new fields to the end of the struct. Move fields below to their
+  // corresponding places after each major version bump.
+  _STUB(PJRT_Executable_OutputElementTypes);
+  _STUB(PJRT_Executable_OutputDimensions);
+
+  _STUB(PJRT_Buffer_CopyToMemory);
+
+  _STUB(PJRT_Client_CreateViewOfDeviceBuffer);
+}
+
 //===----------------------------------------------------------------------===//
 // Top-level API binding.
 //===----------------------------------------------------------------------===//
 
 void BindMonomorphicApi(PJRT_Api* api) {
   api->struct_size = PJRT_Api_STRUCT_SIZE;
+  api->extension_start = nullptr;
+  api->pjrt_api_version.major_version = PJRT_API_MAJOR;
+  api->pjrt_api_version.minor_version = PJRT_API_MINOR;
+
+  // This is a bare implementation throwing UNDEFINED errors. This way new
+  // functions will not segmentation fault on invocation.
+  BindUndefineds(api);
+  ErrorInstance::BindApi(api);
+
+  api->PJRT_Plugin_Initialize =
+      +[](PJRT_Plugin_Initialize_Args* args) -> PJRT_Error* { return nullptr; };
 
   // Bind by object types.
   BufferInstance::BindApi(api);
   ClientInstance::BindApi(api);
   DeviceDescription::BindApi(api);
   DeviceInstance::BindApi(api);
-  ErrorInstance::BindApi(api);
   EventInstance::BindApi(api);
   ExecutableImage::BindApi(api);
   LoadedExecutableInstance::BindApi(api);
