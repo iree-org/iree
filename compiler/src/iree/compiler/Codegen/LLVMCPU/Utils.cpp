@@ -115,7 +115,7 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
   int numLoops = consumerOp.getLoopIteratorTypes().size();
   tileSizes.resize(numLoops, /*default=*/0);
   tileScalableFlags.resize(numLoops, /*default=*/false);
-  if (!llvm::is_contained(tileSizes, 1)) {
+  if (!llvm::is_contained(tileScalableFlags, true)) {
     // Non-scalable case: All constant tile sizes.
     options.setTileSizes(
         getAsIndexOpFoldResult(consumerOp.getContext(), tileSizes));
