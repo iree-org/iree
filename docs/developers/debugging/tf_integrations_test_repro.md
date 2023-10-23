@@ -25,7 +25,7 @@ All steps here assume starting from the IREE root directory.
     # This should work for most cases, as the importers change infrequently
     python -m pip install \
       iree-compiler iree-runtime iree-tools-tf iree-tools-tflite \
-      --find-links https://openxla.github.io/iree/pip-release-links.html
+      --find-links https://iree.dev/pip-release-links.html
     ```
 
     _OR_ build from source

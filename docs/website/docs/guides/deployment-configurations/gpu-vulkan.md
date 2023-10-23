@@ -99,7 +99,7 @@ The core `iree-compiler` package includes the SPIR-V compiler:
 
     ``` shell
     python -m pip install \
-      --find-links https://openxla.github.io/iree/pip-release-links.html \
+      --find-links https://iree.dev/pip-release-links.html \
       --upgrade iree-compiler
     ```
 

@@ -6,7 +6,7 @@ compiler and runtime that lowers Machine Learning (ML) models to a unified IR
 that scales up to meet the needs of the datacenter and down to satisfy the
 constraints and special considerations of mobile and edge deployments.
 
-See [our website](https://openxla.github.io/iree/) for project details, user
+See [our website](https://iree.dev/) for project details, user
 guides, and instructions on building from source.
 
 [![CI Status](https://github.com/openxla/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/openxla/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
@@ -41,7 +41,7 @@ of feedback on any [communication channels](#communication-channels)!
 ![IREE Architecture](docs/website/docs/assets/images/iree_architecture_dark.svg#gh-dark-mode-only)
 ![IREE Architecture](docs/website/docs/assets/images/iree_architecture.svg#gh-light-mode-only)
 
-See [our website](https://openxla.github.io/iree/) for more information.
+See [our website](https://iree.dev/) for more information.
 
 ## Presentations and Talks
 
