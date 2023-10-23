@@ -216,14 +216,8 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
+    if (enableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
-    }
-
-    if (enableVectorPadding) {
-      // Padding is only enabled on x86. It leads to too much overhead on
-      // RISC-V and ARM.
-      return VectorPreProcStrategy::Padding;
     }
   }
 
@@ -722,16 +716,6 @@ setVectorSizesForDynamicShapes(linalg::LinalgOp op,
                                           reductionSizes.end());
   setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
 
-  // If peeling is enabled and the 'op' is fully dynamic, we only vectorize the
-  // lowest order parallel dimension for now to avoid peeling higher level
-  // dimensions. If no parallel dimension is found to be vectorized, we try to
-  // vectorize the lowest order reduction dimension.
-
-  if (!isFullyDynamicOp(op) ||
-      vecPreProcStrategy != VectorPreProcStrategy::Peeling) {
-    return;
-  }
-
   bool isParallelDimVectorized = false;
   for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
     if (origParallelSizes[i] > 1) {
@@ -1207,7 +1191,7 @@ setRootConfig(func::FuncOp entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
                        << vecPreProcStrategy << "\n");
 
-  if (usePeelingPipeline) {
+  if (usePeelingPipeline && isX86(targetAttr)) {
     // It's inspired from https://github.com/iree-org/iree-llvm-sandbox repo.
     // Sandbox has [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192
     // because 288/12*8=192

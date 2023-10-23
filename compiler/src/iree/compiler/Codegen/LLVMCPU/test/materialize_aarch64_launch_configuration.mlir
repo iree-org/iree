@@ -149,12 +149,14 @@ hal.executable private @batch_matmul_tensors {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64, 0], [1, 16, 4, 0], [0, 0, 0, 64], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64], [1, 16, 4], [0, 0, 0], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64, 0], [1, 16, 4, 0], [0, 0, 0, 64], [0, 0, 0, 0]]>
+
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<Mmt4dTilingExpert>
 //      CHECK: hal.executable.export public @batch_matmul_tensors
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:  linalg.batch_matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG2]]
 
 // -----
 
@@ -197,12 +199,13 @@ hal.executable private @matmul_static {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[49, 8, 0], [7, 4, 0], [0, 0, 60], [0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[49, 8], [7, 4], [0, 0], [0, 0]]>
+//   CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[49, 8, 0], [7, 4, 0], [0, 0, 60], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<Mmt4dTilingExpert>
 //       CHECK: hal.executable.export public @matmul_static
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
-//  CHECK-SAME:     lowering_config = #[[CONFIG]]
+//  CHECK-SAME:     lowering_config = #[[CONFIG2]]
 
 // -----
 
@@ -379,7 +382,7 @@ hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [1, 16, 0], [0, 0, 1], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [4, 16, 0], [0, 0, 4], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //      CHECK: hal.executable.export public @matmul_aarch_i8_i8_i32_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
