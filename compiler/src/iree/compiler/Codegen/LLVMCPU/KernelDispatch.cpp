@@ -882,14 +882,16 @@ static LogicalResult setMatmulNoPadRootConfig(
     bool allowIncompleteTile =
         vecPreProcStrategy == VectorPreProcStrategy::Peeling ||
         vecPreProcStrategy == VectorPreProcStrategy::Masking;
+    // The backend struggles to legalize non-power-of-two scalable vectors.
+    bool enforcePowerOfTwo = vecScalableDims[index];
 
     if (sz != 0) {
       sz = getMaxVectorTileSize(
           /*lb=*/0, /*ub=*/shape[index],
-          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile);
+          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile,
+          enforcePowerOfTwo);
     }
     parallelTileSizes.push_back(sz);
-    // TODO: How to handle scalable sizes with getMaxVectorTileSize()?
     parallelScalableFlags.push_back(vecScalableDims[index]);
   }
   SmallVector<int64_t> reductionTileSizes;
