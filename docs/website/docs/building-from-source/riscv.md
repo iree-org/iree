@@ -51,6 +51,11 @@ from the IREE root directory:
 ./build_tools/riscv/riscv_bootstrap.sh
 ```
 
+!!! note
+    The prebuilt toolchain is built with AlmaLinux release 8.8
+    [docker](https://quay.io/pypa/manylinux_2_28_x86_64)
+    It requires glibc >= 2.28 for your host machine.
+
 #### Support vector extension
 
 For RISC-V vector extensions support, see

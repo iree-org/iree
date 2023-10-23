@@ -16,8 +16,8 @@ transform.sequence failures(propagate) {
 
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ==============================================================
-  %forall, %_ =
-    transform.structured.tile_to_forall_op %div tile_sizes [1, 4]
+  %_, %forall =
+    transform.structured.tile_using_forall %div tile_sizes [1, 4]
       ( mapping = [#gpu.block<x>, #gpu.block<y>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall : (!transform.any_op) -> ()
@@ -60,7 +60,7 @@ transform.sequence failures(propagate) {
                                                   %tiled_exp_and_exps_sum,
                                                   %tiled_exp_and_exps_sum_2
     : !transform.any_op
-  transform.structured.tile_to_forall_op %reduction_linalg_ops tile_sizes [1, 1]
+  transform.structured.tile_using_forall %reduction_linalg_ops tile_sizes [1, 1]
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   // Fully parallel ops are tiled and mapped.
@@ -68,7 +68,7 @@ transform.sequence failures(propagate) {
                                                  %tiled_exps_sum_fill,
                                                  %tiled_div
     : !transform.any_op
-  transform.structured.tile_to_forall_op %parallel_linalg_ops num_threads [1, 4, 32]
+  transform.structured.tile_using_forall %parallel_linalg_ops num_threads [1, 4, 32]
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
@@ -80,7 +80,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
+  transform.structured.vectorize_children_and_apply_patterns %func : (!transform.any_op) -> !transform.any_op
 
   // Step 4. Bufferize and drop HAL decriptor from memref ops.
   // =========================================================

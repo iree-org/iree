@@ -38,6 +38,9 @@ fi
 if ! [[ -v IREE_NVIDIA_GPU_TESTS_DISABLE ]]; then
   IREE_NVIDIA_GPU_TESTS_DISABLE=1
 fi
+if ! [[ -v IREE_AMD_RDNA3_GPU_TESTS_DISABLE ]]; then
+  IREE_AMD_RDNA3_GPU_TESTS_DISABLE=1
+fi
 
 declare -a test_env_args=(
   --test_env="LD_PRELOAD=libvulkan.so.1"
@@ -68,6 +71,9 @@ if (( IREE_VULKAN_DISABLE == 1 )); then
 fi
 if (( IREE_NVIDIA_GPU_TESTS_DISABLE == 1 )); then
   default_test_tag_filters+=("-requires-gpu-nvidia" "-requires-gpu-sm80")
+fi
+if (( IREE_AMD_RDNA3_GPU_TESTS_DISABLE == 1 )); then
+  default_test_tag_filters+=("-requires-gpu-rdna3")
 fi
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.

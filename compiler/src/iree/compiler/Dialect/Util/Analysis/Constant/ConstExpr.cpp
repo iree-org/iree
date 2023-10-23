@@ -9,12 +9,16 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
 #define DEBUG_TYPE "iree-constexpr"
 
 using llvm::dbgs;
+
+using namespace mlir::iree_compiler::IREE::Util;
 
 namespace mlir {
 namespace iree_compiler {
@@ -238,8 +242,9 @@ void ConstExprAnalysis::dump() const { print(llvm::errs()); }
 //===----------------------------------------------------------------------===//
 
 ConstExprHoistingPolicy::ConstExprHoistingPolicy(
-    const ConstExprAnalysis &analysis)
-    : analysis(analysis), decisions(analysis.allocedConstInfos.size()) {
+    const ConstExprAnalysis &analysis, int64_t threshold)
+    : analysis(analysis), constExprMaxSizeIncreaseThreshold(threshold),
+      decisions(analysis.allocedConstInfos.size()) {
   for (auto &it : analysis.allocedConstInfos) {
     decisions[it.get()] = {};
   }
@@ -309,6 +314,44 @@ void ConstExprHoistingPolicy::initialize() {
   }
 }
 
+static bool doesHoistingIncreaseSizeSignificantly(
+    const ConstExprAnalysis::ConstValueInfo *info, int64_t threshold) {
+
+  int64_t inSize = 0;
+  for (Value root : info->roots) {
+    // TODO: Are there any other types we care about here?
+    if (auto type = dyn_cast<ShapedType>(root.getType())) {
+      int64_t elementCount = 1;
+      for (int64_t dim : type.getShape()) {
+        // Conservatively treat dynamic values as 1, to find a lower bound on
+        // input size.
+        if (dim != ShapedType::kDynamic) {
+          elementCount *= dim;
+        }
+      }
+      inSize +=
+          getRoundedPhysicalStorageSize(elementCount, type.getElementType());
+    }
+  }
+
+  int64_t outSize = 0;
+  if (auto type = dyn_cast<ShapedType>(info->constValue.getType())) {
+    int64_t elementCount = 1;
+    for (int64_t dim : type.getShape()) {
+      if (dim == ShapedType::kDynamic) {
+        // Dynamic values can lead to an unbounded increase in size, treat this
+        // as a significant increase.
+        return true;
+      }
+      elementCount *= dim;
+    }
+    outSize =
+        getRoundedPhysicalStorageSize(elementCount, type.getElementType());
+  }
+
+  return outSize > inSize + threshold;
+}
+
 void ConstExprHoistingPolicy::makeInvariantDecision(
     const ConstExprAnalysis::ConstValueInfo *info, Decision *decision) {
   // Check 1: Is it not const-expr.
@@ -323,6 +366,13 @@ void ConstExprHoistingPolicy::makeInvariantDecision(
 
   // Check 3: Is the op itself a valid "leaf" that can become a global.
   if (!isHoistableConstExprLeaf(info)) {
+    return decision->disableHoist();
+  }
+
+  // Check 4: Does hoisting this value significantly increase the size of the
+  // module?
+  if (doesHoistingIncreaseSizeSignificantly(
+          info, constExprMaxSizeIncreaseThreshold)) {
     return decision->disableHoist();
   }
 }
@@ -366,7 +416,57 @@ void ConstExprHoistingPolicy::makeDecision(
   decision->enableHoist();
 }
 
+void ConstExprHoistingPolicy::printDotGraph(raw_ostream &os) const {
+  WriteGraph(os, this);
+}
+
+void ConstExprHoistingPolicy::dumpDotGraph() const {
+  printDotGraph(llvm::errs());
+}
+
 } // namespace Util
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
+
+namespace llvm {
+template <>
+struct DOTGraphTraits<const ConstExprHoistingPolicy *>
+    : public DefaultDOTGraphTraits {
+  explicit DOTGraphTraits(bool isSimple = false)
+      : DefaultDOTGraphTraits(isSimple) {}
+
+  std::string getNodeLabel(const ConstExprAnalysis::ConstValueInfo *Node,
+                           const ConstExprHoistingPolicy *g) {
+    std::string label;
+    llvm::raw_string_ostream os(label);
+    os << Node->constValue.getType();
+    return label;
+  }
+
+  static bool isNodeHidden(const ConstExprAnalysis::ConstValueInfo *Node,
+                           const ConstExprHoistingPolicy *g) {
+    // Only display nodes that the analysis has determined to be const-expr.
+    return !Node->isConstExpr();
+  }
+
+  static std::string
+  getNodeAttributes(const ConstExprAnalysis::ConstValueInfo *Node,
+                    const ConstExprHoistingPolicy *g) {
+    // Roots are colored red.
+    if (Node->isRoot)
+      return "fillcolor=red,style=filled";
+
+    // Hoisted values are colored green.
+    ConstExprHoistingPolicy::Outcome outcome = g->getOutcome(Node);
+    if (outcome == ConstExprHoistingPolicy::Outcome::ENABLE_HOIST)
+      return "fillcolor=green,style=filled";
+
+    return "";
+  }
+
+  static void
+  addCustomGraphFeatures(const ConstExprHoistingPolicy *g,
+                         GraphWriter<const ConstExprHoistingPolicy *> &GW) {}
+};
+}; // namespace llvm

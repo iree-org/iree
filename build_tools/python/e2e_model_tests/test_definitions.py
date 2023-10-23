@@ -96,7 +96,7 @@ TEST_CONFIGS = [
             tflite_models.DEEPLABV3_FP32
         ),
         execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
-        expected_output="deeplab_v3_fp32_input_0_expected_output.npy",
+        expected_output="https://storage.googleapis.com/iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy",
         extra_test_flags=["--expected_f32_threshold=0.001"],
         unsupported_platforms=[
             CMakePlatform.LINUX_RISCV32,

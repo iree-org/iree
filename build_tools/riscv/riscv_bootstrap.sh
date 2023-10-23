@@ -23,8 +23,8 @@ echo "The riscv tool prefix path: ${PREBUILT_DIR}"
 BOOTSTRAP_WORK_DIR="${PREBUILT_DIR}/.bootstrap"
 
 if [[ "${OSTYPE}" == "linux-gnu" ]]; then
-  RISCV_CLANG_TOOLCHAIN_FILE_NAME="toolchain_iree_20220918.tar.gz"
-  RISCV_CLANG_TOOLCHAIN_FILE_SHA="f73ae47b7f04df37e53c1737b5baa93f8e063a6602f6e5a022df3e3ae7af11e6"
+  RISCV_CLANG_TOOLCHAIN_FILE_NAME="toolchain_iree_manylinux_2_28_20231012.tar.gz"
+  RISCV_CLANG_TOOLCHAIN_FILE_SHA="3af56a58551ed5ae7441214822461a5368fee9403d7c883762fa902489bfbff0"
 
   QEMU_FILE_NAME="qemu-riscv.tar.gz"
   QEMU_FILE_SHA="6e0bca77408e606add8577d6f1b6709f6ef3165b0e241ed2ba191183dfc931ec"

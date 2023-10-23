@@ -347,7 +347,6 @@ extern void mlirFunctionTypeGetResult();
 extern void mlirFunctionTypeGetTypeID();
 extern void mlirGetDialectHandle__iree_input__();
 extern void mlirGetDialectHandle__iree_linalg_ext__();
-extern void mlirGetDialectHandle__iree_linalg_transform__();
 extern void mlirGetDialectHandle__transform__();
 extern void mlirIREELinalgTransformRegisterPasses();
 extern void mlirIREETransformRegisterPasses();
@@ -997,7 +996,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirFunctionTypeGetTypeID;
   x += (uintptr_t)&mlirGetDialectHandle__iree_input__;
   x += (uintptr_t)&mlirGetDialectHandle__iree_linalg_ext__;
-  x += (uintptr_t)&mlirGetDialectHandle__iree_linalg_transform__;
   x += (uintptr_t)&mlirGetDialectHandle__transform__;
   x += (uintptr_t)&mlirIREELinalgTransformRegisterPasses;
   x += (uintptr_t)&mlirIREETransformRegisterPasses;

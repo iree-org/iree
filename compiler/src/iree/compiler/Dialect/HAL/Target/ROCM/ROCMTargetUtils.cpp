@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
+#include "iree/compiler/Utils/ToolUtils.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
@@ -95,13 +97,8 @@ linkWithBitcodeVector(llvm::Module *module,
 static std::vector<std::string> getROCDLPaths(std::string targetChip,
                                               std::string bitCodeDir) {
   // AMDGPU bitcodes.
-  int lenOfChipPrefix = 3;
-  std::string chipId = targetChip.substr(lenOfChipPrefix);
-  std::string chipISABC = "oclc_isa_version_" + chipId + ".bc";
   static const std::vector<std::string> rocdlFilenames(
-      {"opencl.bc", "ocml.bc", "ockl.bc", "oclc_finite_only_off.bc",
-       "oclc_daz_opt_off.bc", "oclc_correctly_rounded_sqrt_on.bc",
-       "oclc_unsafe_math_off.bc", "oclc_wavefrontsize64_on.bc", chipISABC});
+      {"opencl.bc", "ocml.bc", "ockl.bc"});
 
   // Construct full path to ROCDL bitcode libraries.
   std::vector<std::string> result;
@@ -110,6 +107,64 @@ static std::vector<std::string> getROCDLPaths(std::string targetChip,
     result.push_back(bitCodeDir + app + filename);
   }
   return result;
+}
+
+static void overridePlatformGlobal(llvm::Module *module, StringRef globalName,
+                                   uint32_t newValue, llvm::Type *globalTy) {
+  // NOTE: the global will not be defined if it is not used in the module.
+  auto *globalValue = module->getNamedGlobal(globalName);
+  if (!globalValue)
+    return;
+  globalValue->setDSOLocal(true);
+  globalValue->setConstant(true);
+  globalValue->setInitializer(llvm::ConstantInt::get(
+      globalValue->getValueType(),
+      APInt(globalValue->getValueType()->getIntegerBitWidth(), newValue)));
+}
+
+static LogicalResult linkModuleWithGlobal(llvm::Module *module,
+                                          std::string &targetChip) {
+  // Link target chip ISA version as global.
+  const int kLenOfChipPrefix = 3;
+  std::string chipId = targetChip.substr(kLenOfChipPrefix);
+  // i.e gfx90a -> 9000 series.
+  int chipArch = stoi(chipId.substr(0, chipId.length() - 1)) * 100;
+  // Oldest GFX arch supported is gfx60x.
+  if (chipArch < 6000)
+    return failure();
+  // Latest GFX arch supported is gfx115x.
+  if (chipArch > 11000)
+    return failure();
+  // Get chip code from suffix. i.e gfx1103 -> `3`.
+  // gfx90a -> `a` == `10`.
+  // gfx90c -> `c` == `12`.
+  std::string chipSuffix = chipId.substr(chipId.length() - 1);
+  uint32_t chipCode;
+  if (chipSuffix == "a") {
+    chipCode = chipArch + 10;
+  } else if (chipSuffix == "c") {
+    chipCode = chipArch + 12;
+  } else {
+    if (!std::isdigit(chipSuffix[0]))
+      return failure();
+    chipCode = chipArch + stoi(chipSuffix);
+  }
+  auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
+  overridePlatformGlobal(module, "__oclc_ISA_version", chipCode, int32Type);
+
+  // Link oclc configurations as globals.
+  auto *boolType = llvm::Type::getInt8Ty(module->getContext());
+  static const std::vector<std::pair<std::string, bool>> rocdlGlobalParams(
+      {{"__oclc_finite_only_opt", false},
+       {"__oclc_daz_opt", false},
+       {"__oclc_correctly_rounded_sqrt32", true},
+       {"__oclc_unsafe_math_opt", false},
+       {"__oclc_wavefrontsize64", true}});
+  for (auto &globalParam : rocdlGlobalParams) {
+    overridePlatformGlobal(module, globalParam.first, globalParam.second,
+                           boolType);
+  }
+  return success();
 }
 
 // Links ROCm-Device-Libs into the given module if the module needs it.
@@ -121,25 +176,27 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
   if (!succeeded(HAL::linkWithBitcodeVector(
           module, getROCDLPaths(targetChip, bitCodeDir)))) {
     llvm::WithColor::error(llvm::errs()) << "Fail to Link ROCDL.\n";
+  }
+  if (!succeeded(HAL::linkModuleWithGlobal(module, targetChip))) {
+    llvm::WithColor::error(llvm::errs()) << "Fail to Link with Globals.\n";
   };
 }
 
 //===========Link LLVM Module to ROCDL End===================/
 
 //=====================Create HSACO Begin=============//
-// Link object file using ld.lld lnker to generate code object
+// Link object file using lld lnker to generate code object
 // Inspiration from this section comes from LLVM-PROJECT-MLIR by
 // ROCmSoftwarePlatform
 // https://github.com/ROCmSoftwarePlatform/llvm-project-mlir/blob/miopen-dialect/mlir/lib/ExecutionEngine/ROCm/BackendUtils.cpp
-std::string createHsaco(const std::string isa, StringRef name) {
+std::string createHsaco(Location loc, const std::string isa, StringRef name) {
   // Save the ISA binary to a temp file.
   int tempIsaBinaryFd = -1;
   SmallString<128> tempIsaBinaryFilename;
   std::error_code ec = llvm::sys::fs::createTemporaryFile(
       "kernel", "o", tempIsaBinaryFd, tempIsaBinaryFilename);
   if (ec) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "temporary file for ISA binary creation error.\n";
+    mlir::emitError(loc) << "temporary file for ISA binary creation error";
     return {};
   }
   llvm::FileRemover cleanupIsaBinary(tempIsaBinaryFilename);
@@ -153,56 +210,45 @@ std::string createHsaco(const std::string isa, StringRef name) {
   ec = llvm::sys::fs::createTemporaryFile("kernel", "hsaco", tempHsacoFD,
                                           tempHsacoFilename);
   if (ec) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "temporary file for HSA code object creation error.\n";
+    mlir::emitError(loc) << "temporary file for HSA code object creation error";
     return {};
   }
   llvm::FileRemover cleanupHsaco(tempHsacoFilename);
 
   // Invoke lld. Expect a true return value from lld.
   // Searching for LLD
-  std::string lldProgram;
-  std::string toolName = "ld.lld";
-  if (llvm::sys::fs::exists(toolName)) {
-    llvm::SmallString<256> absolutePath(toolName);
-    llvm::sys::fs::make_absolute(absolutePath);
-    lldProgram = std::string(absolutePath);
-  } else {
-    // Next search the environment path.
-    if (auto result = llvm::sys::Process::FindInEnvPath("PATH", toolName)) {
-      lldProgram = std::string(*result);
-    }
-  }
+  const SmallVector<std::string> &toolNames{"iree-lld", "lld"};
+  std::string lldProgram = findTool(toolNames);
   if (lldProgram.empty()) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "unable to find ld.lld in PATH\n";
+    mlir::emitError(loc) << "unable to find iree-lld";
     return {};
   }
-  // Setting Up LLD Args
   std::vector<llvm::StringRef> lldArgs{
-      llvm::StringRef("ld.lld"),   llvm::StringRef("-flavor"),
-      llvm::StringRef("gnu"),      llvm::StringRef("-shared"),
-      tempIsaBinaryFilename.str(), llvm::StringRef("-o"),
+      lldProgram,
+      llvm::StringRef("-flavor"),
+      llvm::StringRef("gnu"),
+      llvm::StringRef("-shared"),
+      tempIsaBinaryFilename.str(),
+      llvm::StringRef("-o"),
       tempHsacoFilename.str(),
   };
 
   // Executing LLD
   std::string errorMessage;
   int lldResult = llvm::sys::ExecuteAndWait(
-      lldProgram, llvm::ArrayRef<llvm::StringRef>(lldArgs), std::nullopt, {}, 5,
-      0, &errorMessage);
+      unescapeCommandLineComponent(lldProgram),
+      llvm::ArrayRef<llvm::StringRef>(lldArgs),
+      llvm::StringRef("LLD_VERSION=IREE"), {}, 0, 0, &errorMessage);
   if (lldResult) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "ld.lld execute fail:" << errorMessage << "Error Code:" << lldResult
-        << "\n";
+    mlir::emitError(loc) << "iree-lld execute fail:" << errorMessage
+                         << "Error Code:" << lldResult;
     return {};
   }
 
   // Load the HSA code object.
   auto hsacoFile = mlir::openInputFile(tempHsacoFilename);
   if (!hsacoFile) {
-    llvm::WithColor::error(llvm::errs(), name)
-        << "read HSA code object from temp file error.\n";
+    mlir::emitError(loc) << "read HSA code object from temp file error";
     return {};
   }
   std::string strHSACO(hsacoFile->getBuffer().begin(),

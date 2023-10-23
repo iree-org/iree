@@ -18,7 +18,14 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct TorchOptions {
-  void bindOptions(OptionsBinder &binder) {}
+  bool strictSymbolicShapes = true;
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("Torch Input");
+    binder.opt<bool>(
+        "iree-torch-use-strict-symbolic-shapes", strictSymbolicShapes,
+        llvm::cl::cat(category),
+        llvm::cl::desc("Forces dynamic shapes to be treated as strict"));
+  }
 };
 
 // The shark-turbine plugin provides dialects, passes and opt-in options.
@@ -41,6 +48,18 @@ struct TorchSession
 
   bool extendCustomInputConversionPassPipeline(
       OpPassManager &passManager, std::string_view typeMnemonic) override {
+    if (typeMnemonic == "torch") {
+      TorchInput::TorchToIREELoweringPipelineOptions torchOptions;
+      torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
+      TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
+      passManager.addNestedPass<func::FuncOp>(
+          TorchInput::createConvertTMTensorToLinalgExtPass());
+      return true;
+    }
+    // TODO: Retire the tm_tensor input pipeline once we are fully switched
+    // to the 'torch' pipeline, which handles everything from the 'torch'
+    // dialect down (vs just 'tm_tensor' which was converting a couple of
+    // ops to linalg).
     if (typeMnemonic == "tm_tensor") {
       passManager.addNestedPass<func::FuncOp>(
           TorchInput::createConvertTMTensorToLinalgExtPass());
@@ -51,6 +70,7 @@ struct TorchSession
 
   void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
     typeMnemonics.insert("tm_tensor");
+    typeMnemonics.insert("torch");
   }
 };
 

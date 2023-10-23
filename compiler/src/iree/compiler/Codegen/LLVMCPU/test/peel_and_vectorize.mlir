@@ -4,8 +4,7 @@
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPeelingExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingPeelingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -14,7 +13,7 @@
   ]>
 ]>
 hal.executable private @preset_config_matmul  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64">) {
     hal.executable.export @no_peel_static_matmul layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -60,8 +59,7 @@ hal.executable private @preset_config_matmul  {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPeelingExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingPeelingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -70,7 +68,7 @@ hal.executable private @preset_config_matmul  {
   ]>
 ]>
 hal.executable private @preset_config_matmul  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64">) {
     hal.executable.export @peel_static_matmul layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -128,8 +126,7 @@ hal.executable private @preset_config_matmul  {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPeelingExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingPeelingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -138,7 +135,7 @@ hal.executable private @preset_config_matmul  {
   ]>
 ]>
 hal.executable private @preset_config_matmul  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64">) {
     hal.executable.export @peel_dynamic_matmul layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

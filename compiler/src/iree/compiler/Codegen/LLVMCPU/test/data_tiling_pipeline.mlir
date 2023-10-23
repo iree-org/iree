@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' --split-input-file %s | FileCheck %s
 
 hal.executable private @aligned_generic_pack {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>) {
     hal.executable.export public @aligned_generic_pack ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device):
       %c1 = arith.constant 1 : index
@@ -33,20 +33,20 @@ hal.executable private @aligned_generic_pack {
     }
   }
 }
-// CHECK:         func.func @aligned_generic_pack
-// CHECK:           %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
-// CHECK-COUNT-15:  %{{.+}} = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
-// CHECK:           %[[IN_1:.+]] = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
-// CHECK:           %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
-// CHECK:           %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
-// CHECK:           %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>
-// CHECK-COUNT-16:  vector.extract %[[T2]]
-// CHECK-COUNT-64:  vector.shuffle
+// CHECK-LABEL:     func.func @aligned_generic_pack
+// CHECK:             %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
+// CHECK-COUNT-15:    %{{.+}} = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
+// CHECK:             %[[IN_1:.+]] = vector.insert {{.+}} : vector<16xf32> into vector<16x16xf32>
+// CHECK:             %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
+// CHECK:             %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
+// CHECK:             %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>
+// CHECK-COUNT-16:    vector.extract %[[T2]]
+// CHECK-COUNT-64:    vector.shuffle
 
 // -----
 
 hal.executable private @aligned_unpack_generic {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}> {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>) {
     hal.executable.export public @aligned_unpack_generic ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %c1 = arith.constant 1 : index
@@ -77,16 +77,16 @@ hal.executable private @aligned_unpack_generic {
     }
   }
 }
-// CHECK:         func.func @aligned_unpack_generic
-// CHECK:           %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>>
-// CHECK:             %[[SUBVIEW:.+]] = memref.subview %{{.*}} memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>> to memref<
-// CHECK-COUNT-15:      vector.load %[[SUBVIEW]]
-// CHECK:               %[[LAST_LOAD:.+]] = vector.load %[[SUBVIEW]]
-// CHECK-NEXT:          %[[IN_1:.+]] = vector.insert %[[LAST_LOAD]], %{{.*}}
-// CHECK:               %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
-// CHECK:               %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
-// CHECK:               %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
-// CHECK:               %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>
+// CHECK-LABEL:     func.func @aligned_unpack_generic
+// CHECK:             %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>>
+// CHECK:               %[[SUBVIEW:.+]] = memref.subview %{{.*}} memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>> to memref<
+// CHECK-COUNT-15:        vector.load %[[SUBVIEW]]
+// CHECK:                 %[[LAST_LOAD:.+]] = vector.load %[[SUBVIEW]]
+// CHECK-NEXT:            %[[IN_1:.+]] = vector.insert %[[LAST_LOAD]], %{{.*}}
+// CHECK:                 %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
+// CHECK:                 %[[T0:.+]] = arith.addf %[[IN_0]], %[[IN_1]] : vector<16x16xf32>
+// CHECK:                 %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
+// CHECK:                 %[[T2:.+]] = arith.maximumf %[[T1]], %{{.+}} : vector<16x16xf32>
 
 // -----
 
@@ -97,12 +97,12 @@ hal.executable private @aligned_unpack_generic {
   ]>
 ]>
 hal.executable private @unaligned_pack  {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
     cpu_features = "+avx512f",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 64 : index,
     target_triple = "x86_64-none-elf"
-  }> {
+  }>) {
   hal.executable.export public @unaligned_pack layout(#pipeline_layout) {
   ^bb0(%arg0: !hal.device):
     %c1 = arith.constant 1 : index
@@ -123,6 +123,6 @@ hal.executable private @unaligned_pack  {
     }
   }
 }
-// CHECK:          func.func @unaligned_pack
-// CHECK-COUNT-16:   vector.maskedload {{.+}} vector<16xf32>
-// CHECK-COUNT-64:   vector.shuffle
+// CHECK-LABEL:     func.func @unaligned_pack
+// CHECK-COUNT-16:    vector.maskedload {{.+}} vector<16xf32>
+// CHECK-COUNT-64:    vector.shuffle

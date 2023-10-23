@@ -53,6 +53,9 @@ no-inline-html: false
 no-duplicate-heading:
   siblings_only: true
 
+# Allow headers to end with punctuation for icons (e.g. `:icon-name:`)
+no-trailing-punctuation: false
+
 # Allow images w/o alt-text
 no-alt-text: false
 
@@ -87,3 +90,8 @@ link-fragments: false
 #   https://github.com/DavidAnson/markdownlint/issues/40 may add one.
 #
 # TLDR: Add your links inline, as in [text](www.example.com).
+
+# Blockquotes are used for alerts in some flavors of markdown.
+# Allow weird formatting inside them.
+# https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts
+no-blanks-blockquote: false

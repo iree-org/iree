@@ -68,13 +68,13 @@ struct LinalgOpTiedOpInterface
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
-        linalgOp.getDpsInitOperands()[resultIndex]->get());
+        linalgOp.getDpsInits()[resultIndex]);
   }
 
   ::std::optional<unsigned>
   getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
-    return {linalgOp.getDpsInitOperands()[resultIndex]->getOperandNumber()};
+    return {linalgOp.getDpsInitsMutable()[resultIndex].getOperandNumber()};
   }
 
   SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
@@ -168,8 +168,6 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         LinalgOpTiedOpInterface<LinalgExt::WinogradInputTransformOp>>(*ctx);
     LinalgExt::WinogradOutputTransformOp::attachInterface<
         LinalgOpTiedOpInterface<LinalgExt::WinogradOutputTransformOp>>(*ctx);
-    LinalgExt::SoftmaxOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::SoftmaxOp>>(*ctx);
     LinalgExt::AttentionOp::attachInterface<
         LinalgOpTiedOpInterface<LinalgExt::AttentionOp>>(*ctx);
   });

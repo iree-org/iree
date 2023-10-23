@@ -203,7 +203,7 @@ class EmitMatmulCompilationInfo:
 #${compilation_info_name} = #iree_codegen.compilation_info<
   lowering_config = <tile_sizes = [[${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
   translation_info = <${translation_info} pipeline_depth = ${stages}>,
-  workgroup_size = [${block_dim_x} : index, ${block_dim_y} : index, ${block_dim_z} : index]
+  workgroup_size = [${block_dim_x}, ${block_dim_y}, ${block_dim_z}]
 >
 """
         # batch matmul and split-k matmul compilation info template
@@ -212,7 +212,7 @@ class EmitMatmulCompilationInfo:
 #${compilation_info_name} = #iree_codegen.compilation_info<
   lowering_config = <tile_sizes = [[1, ${threadblock_shape_m}, ${threadblock_shape_n}, ${threadblock_shape_k}]]>,
   translation_info = <${translation_info} pipeline_depth = ${stages}>,
-  workgroup_size = [${block_dim_x} : index, ${block_dim_y} : index, ${block_dim_z} : index]
+  workgroup_size = [${block_dim_x}, ${block_dim_y}, ${block_dim_z}]
 >
 """
 
@@ -262,7 +262,7 @@ class EmitLinalgMatmulDispatch:
 
         # linalg.matmul mlir template
         self.linalg_row_row_matmul_template = """
-// Dispatch linalg.matmul row-row layout 
+// Dispatch linalg.matmul row-row layout
 func.func @${operation_name}_${compilation_info_name}(
   %lhs: tensor<${problem_m}x${problem_k}x${datatype_lhs}>,
   %rhs: tensor<${problem_k}x${problem_n}x${datatype_rhs}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
@@ -270,7 +270,7 @@ func.func @${operation_name}_${compilation_info_name}(
   %c0 = arith.constant 0.0 : ${datatype_result}
   %init = tensor.empty() : tensor<${problem_m}x${problem_n}x${datatype_result}>
   %inital_result = linalg.fill ins(%c0 : ${datatype_result}) outs(%init : tensor<${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
-  %result = linalg.matmul ${compilation_info_attribute} 
+  %result = linalg.matmul ${compilation_info_attribute}
                      ins(%lhs, %rhs: tensor<${problem_m}x${problem_k}x${datatype_lhs}>, tensor<${problem_k}x${problem_n}x${datatype_rhs}>)
                      outs(%inital_result: tensor<${problem_m}x${problem_n}x${datatype_result}>) -> tensor<${problem_m}x${problem_n}x${datatype_result}>
   return %result : tensor<${problem_m}x${problem_n}x${datatype_result}>

@@ -57,14 +57,19 @@ verifyDispatchWorkload(Operation *op, IREE::Stream::ExecutableExportOp exportOp,
   // the workload here matches what is expected.
   if (!exportOp.getWorkgroupCount().empty()) {
     auto &workgroupCount = exportOp.getWorkgroupCount();
-    if (workgroupCount.getNumArguments() != workload.size()) {
+    auto explicitArgs = llvm::make_filter_range(
+        workgroupCount.getArgumentTypes(), [](Type type) {
+          return !type.hasTrait<
+              mlir::OpTrait::IREE::Util::ImplicitlyCaptured>();
+        });
+    if (llvm::range_size(explicitArgs) != workload.size()) {
       return op->emitOpError()
              << "workload mismatch; entry point expects "
-             << workgroupCount.getNumArguments()
+             << llvm::range_size(explicitArgs)
              << " arguments but dispatch provides " << workload.size();
     }
-    for (auto [idx, expectedType, actualType] : llvm::enumerate(
-             workgroupCount.getArgumentTypes(), workload.getTypes())) {
+    for (auto [idx, expectedType, actualType] :
+         llvm::enumerate(explicitArgs, workload.getTypes())) {
       if (expectedType != actualType) {
         return op->emitOpError()
                << "workload operand " << idx << " type mismatch; expected "
@@ -187,6 +192,20 @@ static LogicalResult verifyEscapingResources(Region &region,
   return success();
 }
 
+static void eraseStreamRegionResults(Region &region,
+                                     ArrayRef<unsigned> excludedResultIndices) {
+  for (auto &block : region.getBlocks()) {
+    auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
+    if (!yieldOp)
+      continue;
+    llvm::SmallVector<Value> newOperands;
+    for (auto i : llvm::reverse(excludedResultIndices)) {
+      yieldOp.getResourceOperandsMutable().erase(i);
+      yieldOp.getResourceOperandSizesMutable().erase(i);
+    }
+  }
+}
+
 // Computes the value access bits starting from |rootValue|.
 // Traverses the IR graph along tied ops but does not handle branches.
 static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
@@ -255,18 +274,82 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
   return access;
 }
 
-static void eraseStreamRegionResults(Region &region,
-                                     ArrayRef<unsigned> excludedResultIndices) {
-  for (auto &block : region.getBlocks()) {
-    auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
-    if (!yieldOp)
-      continue;
-    llvm::SmallVector<Value> newOperands;
-    for (auto i : llvm::reverse(excludedResultIndices)) {
-      yieldOp.getResourceOperandsMutable().erase(i);
-      yieldOp.getResourceOperandSizesMutable().erase(i);
+//===----------------------------------------------------------------------===//
+// custom<EncodedResourceOperands>(
+//     $resources, type($resources), $resource_sizes,
+//     $resource_encodings, $resource_encoding_dims)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseEncodedResourceOperands(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resources,
+    SmallVectorImpl<Type> &resourceTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceSizes,
+    ArrayAttr &resourceEncodings,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceEncodingDims) {
+  SmallVector<Attribute> resourceEncodingAttrs;
+  do {
+    resources.emplace_back();
+    TypeAttr resourceEncoding;
+    if (failed(parser.parseOperand(resources.back())) ||
+        failed(parser.parseColon()) ||
+        failed(parser.parseAttribute(resourceEncoding)))
+      return failure();
+    resourceEncodingAttrs.push_back(resourceEncoding);
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims()) {
+      if (failed(parser.parseOperandList(resourceEncodingDims, dynamicDimCount,
+                                         AsmParser::Delimiter::Braces)))
+        return failure();
     }
-  }
+    resourceTypes.emplace_back();
+    resourceSizes.emplace_back();
+    if (failed(parser.parseKeyword("in")) ||
+        failed(parseSizeAwareType(parser, resourceTypes.back(),
+                                  resourceSizes.back())))
+      return failure();
+  } while (succeeded(parser.parseOptionalComma()));
+  resourceEncodings = parser.getBuilder().getArrayAttr(resourceEncodingAttrs);
+  return success();
+}
+
+static void printEncodedResourceOperands(OpAsmPrinter &p, Operation *op,
+                                         ValueRange resources,
+                                         TypeRange resourceTypes,
+                                         ValueRange resourceSizes,
+                                         ArrayAttr resourceEncodings,
+                                         ValueRange resourceEncodingDims) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(resources, resourceTypes, resourceSizes,
+                      resourceEncodings.getAsValueRange<TypeAttr>()),
+      [&](auto it) {
+        auto [resource, resourceType, resourceSize, resourceEncoding] = it;
+        p << resource;
+        p << " : ";
+        p << resourceEncoding;
+        if (int64_t dynamicDimCount =
+                cast<ShapedType>(resourceEncoding).getNumDynamicDims()) {
+          p << "{";
+          llvm::interleaveComma(
+              resourceEncodingDims.take_front(dynamicDimCount), p);
+          resourceEncodingDims =
+              resourceEncodingDims.drop_front(dynamicDimCount);
+          p << "}";
+        }
+        p << " in ";
+        p << resourceType;
+        p << "{";
+        p << resourceSize;
+        p << "}";
+      },
+      [&]() {
+        p << ",";
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
 }
 
 //===----------------------------------------------------------------------===//
@@ -615,22 +698,124 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 // stream.resource.alloc
 //===----------------------------------------------------------------------===//
 
-LogicalResult ResourceAllocOp::verify() {
-  ResourceAllocOp op = *this;
-  if (failed(verifyOpValueSizes(op, op.getResults(), op.getStorageSizes()))) {
-    return failure();
+// static
+std::pair<IREE::Stream::ResourceAllocOp, SmallVector<Value>>
+ResourceAllocOp::createSuballocations(
+    Type resourceType, ArrayRef<Location> locs, ValueRange storageSizes,
+    bool uninitialized, AffinityAttr affinityAttr, OpBuilder &builder) {
+  assert(locs.size() == storageSizes.size() &&
+         "expect locs and storageSizes to match");
+  if (locs.empty())
+    return {};
+  if (locs.size() == 1) {
+    auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
+        locs.front(), resourceType, storageSizes.front(), uninitialized,
+        affinityAttr);
+    return {allocOp, {allocOp.getResult()}};
   }
+  auto fusedLoc = builder.getFusedLoc(locs);
 
-  // All allocated resources must have the same lifetime.
-  auto anyType = op.getResults().front().getType();
-  for (auto type : op.getResultTypes()) {
-    if (type != anyType) {
-      return op.emitError()
-             << "all allocated resources must have the same lifetime";
-    }
+  // NOTE: this is risky: we are assuming right now that all of the
+  // allocations will fit within the constraints of the system. This is not
+  // guaranteed: a very low maximum buffer range may lead to packed slabs
+  // that are not fully addressable. For now we are processing models with
+  // small enough workloads and our target devices are relatively lax on
+  // things so long as we stay under UINT32_MAX boundaries.
+
+  // All slices are 0-0 (overlapping).
+  size_t sliceCount = locs.size();
+  SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
+
+  // Compute total size and the offsets of all suballocated resources via the
+  // pack op.
+  auto indexType = builder.getIndexType();
+  SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
+  auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
+      fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
+      builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
+
+  // Create the new alloca based on the total required size.
+  auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
+      fusedLoc, resourceType, packOp.getTotalLength(), uninitialized,
+      affinityAttr);
+  auto slab = allocOp.getResult();
+  auto slabSize = packOp.getTotalLength();
+
+  // Create subviews for all of the suballocated resources.
+  SmallVector<Value> results;
+  for (auto [loc, subviewOffset, subviewLength] :
+       llvm::zip_equal(locs, packOp.getPackedOffsets(), storageSizes)) {
+    results.push_back(builder
+                          .create<IREE::Stream::ResourceSubviewOp>(
+                              loc, slab, slabSize, subviewOffset, subviewLength)
+                          .getResult());
   }
+  return {allocOp, results};
+}
 
-  return success();
+//===----------------------------------------------------------------------===//
+// stream.resource.alloca
+//===----------------------------------------------------------------------===//
+
+// static
+std::pair<IREE::Stream::ResourceAllocaOp, SmallVector<Value>>
+ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
+                                       ArrayRef<Location> locs,
+                                       ValueRange storageSizes,
+                                       Value awaitTimepoint,
+                                       AffinityAttr affinityAttr,
+                                       OpBuilder &builder) {
+  assert(locs.size() == storageSizes.size() &&
+         "expect locs and storageSizes to match");
+  if (locs.empty())
+    return {};
+  if (locs.size() == 1) {
+    auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
+        locs.front(), resourceType, timepointType, storageSizes.front(),
+        awaitTimepoint, affinityAttr);
+    return {allocaOp, {allocaOp.getResult()}};
+  }
+  auto fusedLoc = builder.getFusedLoc(locs);
+
+  // NOTE: this is risky: we are assuming right now that all of the
+  // allocations will fit within the constraints of the system. This is not
+  // guaranteed: a very low maximum buffer range may lead to packed slabs
+  // that are not fully addressable. For now we are processing models with
+  // small enough workloads and our target devices are relatively lax on
+  // things so long as we stay under UINT32_MAX boundaries. If a user starts
+  // hitting this the solution is to do in-place outputs such that we don't
+  // need to allocate them; when possible that's always going to be better than
+  // leaving them to the IREE compiled program to deal with.
+
+  // All slices are 0-0 (overlapping).
+  size_t sliceCount = locs.size();
+  SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
+
+  // Compute total size and the offsets of all suballocated resources via the
+  // pack op.
+  auto indexType = builder.getIndexType();
+  SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
+  auto packOp = builder.create<IREE::Stream::ResourcePackOp>(
+      fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
+      builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
+
+  // Create the new alloca based on the total required size.
+  auto allocaOp = builder.create<IREE::Stream::ResourceAllocaOp>(
+      fusedLoc, resourceType, timepointType, packOp.getTotalLength(),
+      awaitTimepoint, affinityAttr);
+  auto slab = allocaOp.getResult();
+  auto slabSize = packOp.getTotalLength();
+
+  // Create subviews for all of the suballocated resources.
+  SmallVector<Value> results;
+  for (auto [loc, subviewOffset, subviewLength] :
+       llvm::zip_equal(locs, packOp.getPackedOffsets(), storageSizes)) {
+    results.push_back(builder
+                          .create<IREE::Stream::ResourceSubviewOp>(
+                              loc, slab, slabSize, subviewOffset, subviewLength)
+                          .getResult());
+  }
+  return {allocaOp, results};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1102,6 +1287,54 @@ TensorStoreOp::getTiedResultOperandIndex(unsigned resultIndex) {
 
 SmallVector<int64_t> TensorStoreOp::getTiedResultOperandIndices() {
   return {0}; // target
+}
+
+//===----------------------------------------------------------------------===//
+// stream.tensor.trace
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorTraceOp::verify() {
+  TensorTraceOp op = *this;
+  if (op.getResources().size() != op.getResourceEncodings().size() ||
+      op.getResources().size() != op.getResourceSizes().size()) {
+    return op.emitOpError(
+        "each resource needs a matching resource encoding and size "
+        "(array length mismatch)");
+  }
+  auto resourceEncodingDims = op.getResourceEncodingDims();
+  for (auto [resource, resourceSize, resourceEncoding] :
+       llvm::zip_equal(op.getResources(), op.getResourceSizes(),
+                       op.getResourceEncodings().getAsValueRange<TypeAttr>())) {
+    int64_t dynamicDimCount =
+        cast<ShapedType>(resourceEncoding).getNumDynamicDims();
+    if (failed(verifyOpDynamicDims(
+            op, resourceEncoding,
+            resourceEncodingDims.take_front(dynamicDimCount))) ||
+        failed(verifyOpValueSizes(op, resource, resourceSize))) {
+      return failure();
+    }
+    resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
+  }
+  return success();
+}
+
+ValueRange TensorTraceOp::getOperandDynamicDims(unsigned idx) {
+  auto resourceEncodings = getResourceEncodings().getValue();
+  auto resourceEncodingDims = getResourceEncodingDims();
+  for (unsigned i = 0; i <= idx; ++i) {
+    auto resourceEncoding = resourceEncodings[i].cast<TypeAttr>().getValue();
+    int64_t dynamicDimCount =
+        cast<ShapedType>(resourceEncoding).getNumDynamicDims();
+    if (i == idx) {
+      return resourceEncodingDims.take_front(dynamicDimCount);
+    }
+    resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
+  }
+  return ValueRange{};
+}
+
+ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
+  return ValueRange{};
 }
 
 //===----------------------------------------------------------------------===//
@@ -3104,8 +3337,10 @@ LogicalResult ExecutableExportOp::verify() {
       this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
   if (!executableOp)
     return {};
-  return executableOp.getInnerModule().lookupSymbol<::mlir::func::FuncOp>(
-      getFunctionRef());
+  auto innerModuleOp = executableOp.getInnerModule();
+  if (!innerModuleOp)
+    return {};
+  return innerModuleOp.lookupSymbol<::mlir::func::FuncOp>(getFunctionRef());
 }
 
 //===----------------------------------------------------------------------===//

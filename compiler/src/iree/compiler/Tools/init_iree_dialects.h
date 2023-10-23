@@ -15,7 +15,6 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
@@ -43,7 +42,6 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::HAL::Inline::HALInlineDialect,
                   IREE::HAL::Loader::HALLoaderDialect,
                   IREE::LinalgExt::IREELinalgExtDialect,
-                  mlir::linalg::transform::LinalgTransformDialect,
                   IREE::Stream::StreamDialect,
                   IREE::Util::UtilDialect,
                   IREE::VM::VMDialect,

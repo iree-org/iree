@@ -9,8 +9,6 @@
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
@@ -41,40 +39,6 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
     return !(llvm::any_of(op->getOperandTypes(), isTypeIllegal) ||
              llvm::any_of(op->getResultTypes(), isTypeIllegal));
   });
-}
-
-// static
-LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
-    Operation *srcOp, ValueRange operands, StringRef dstOpName,
-    TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
-  OperationState state{srcOp->getLoc(), dstOpName};
-  state.addAttributes(srcOp->getAttrs());
-
-  for (auto [srcOperand, dstOperand] :
-       llvm::zip_equal(srcOp->getOperands(), operands)) {
-    // Check that any type that should have been mapped to buffer view was.
-    // This is just to catch conflicts in type conversions that may sneak in
-    // during development.
-    assert(
-        (!HALTypeConverter::shouldConvertToBufferView(srcOperand.getType()) ||
-         dstOperand.getType().isa<IREE::HAL::BufferViewType>()) &&
-        "expect that tensors have been mapped to buffer views");
-    state.addOperands({dstOperand});
-  }
-  for (auto resultType : srcOp->getResultTypes()) {
-    if (HALTypeConverter::shouldConvertToBufferView(resultType)) {
-      state.addTypes(IREE::HAL::BufferViewType::get(rewriter.getContext()));
-    } else {
-      // Normal pass-through result.
-      if (failed(typeConverter.convertType(resultType, state.types))) {
-        return failure();
-      }
-    }
-  }
-
-  auto *dstOp = rewriter.create(state);
-  rewriter.replaceOp(srcOp, dstOp->getResults());
-  return success();
 }
 
 } // namespace iree_compiler

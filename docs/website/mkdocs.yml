@@ -70,7 +70,7 @@ extra:
       name: IREE Discuss Google Group
 
   status:
-    new: Recently added
+    new: Recently updated
 
 extra_css:
   - assets/stylesheets/extra.css
@@ -133,7 +133,8 @@ nav:
           - CPU: "guides/deployment-configurations/cpu.md"
           - CPU - Bare-Metal: "guides/deployment-configurations/bare-metal.md"
           - GPU - Vulkan: "guides/deployment-configurations/gpu-vulkan.md"
-          - GPU - CUDA/ROCm: "guides/deployment-configurations/gpu-cuda-rocm.md"
+          - GPU - CUDA: "guides/deployment-configurations/gpu-cuda.md"
+          - GPU - ROCm: "guides/deployment-configurations/gpu-rocm.md"
           - GPU - Metal: "guides/deployment-configurations/gpu-metal.md"
       - "Other topics":
           - Developer tips and tricks: "guides/developer-tips.md"
@@ -201,7 +202,9 @@ plugins:
         "deployment-configurations/cpu.md": "guides/deployment-configurations/cpu.md"
         "deployment-configurations/bare-metal.md": "guides/deployment-configurations/bare-metal.md"
         "deployment-configurations/gpu-vulkan.md": "guides/deployment-configurations/gpu-vulkan.md"
-        "deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda-rocm.md"
+        "deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda.md"
+        # The CUDA/ROCm page split into two pages
+        "guides/deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda.md"
 
         # "bindings/" moved under "reference/"
         "bindings/index.md": "reference/bindings/index.md"

@@ -170,6 +170,12 @@ ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
 SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
                                             OpBuilder &builder);
 
+// Returns dimension values for each dynamic dimension of the given |values|.
+// |values| must all have ShapedTypes. The returned value range will be empty if
+// all shapes are fully static.
+SmallVector<Value> buildDynamicDimsForValues(Location loc, ValueRange values,
+                                             OpBuilder &builder);
+
 // Builds a ranked shape with all dimension values for the given operand.
 SmallVector<Value> buildOperandShape(ShapeAwareOpInterface op,
                                      unsigned operandIdx, OpBuilder &builder);

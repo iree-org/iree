@@ -6,7 +6,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -60,15 +59,14 @@ public:
                     bufferization::BufferizationDialect,
                     func::FuncDialect,
                     linalg::LinalgDialect,
-                    linalg::transform::LinalgTransformDialect,
                     LLVM::LLVMDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
                     scf::SCFDialect,
                     tensor::TensorDialect,
                     vector::VectorDialect
-        // clang-format on
-        >();
+                    // clang-format on
+                    >();
 
     // TODO: these should be registered by the extension instead, but there is
     // no support for it in core currently.
@@ -121,12 +119,11 @@ public:
           "Select the operation with 'transform.target_tag' attribute having "
           "the given value as container IR for top-level transform ops."),
       ::llvm::cl::init("")};
-  Pass::Option<std::string> transformLibraryFileName{
-      *this, "transform-library-file-name",
+  Pass::ListOption<std::string> transformLibraryPaths{
+      *this, "transform-library-paths", llvm::cl::ZeroOrMore,
       llvm::cl::desc(
           "Optional name of the file containing transform dialect symbol "
-          "definitions to be injected into the transform module."),
-      llvm::cl::init("")};
+          "definitions to be injected into the transform module.")};
 };
 
 struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {

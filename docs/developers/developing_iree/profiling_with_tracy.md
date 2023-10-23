@@ -3,6 +3,7 @@
 [Tracy](https://github.com/wolfpld/tracy) is a profiler that puts together in a
 single view both instrumentation and system profiling (sampling, systrace). It's
 key to understand the nuance here.
+
 * *Instrumentation* is code built into the process being profiled, collecting
   timestamps at the start and end of "zones". Once it's enabled at build time,
   it typically just works &mdash; it is a part of our application logic just
@@ -14,10 +15,10 @@ key to understand the nuance here.
 
 There are two components to Tracy. They communicate over a TCP socket.
 
-*   The "client" is the program being profiled.
-*   The "server" is:
-    *   Either the Tracy profiler UI (which we build as `iree-tracy-profiler`),
-    *   Or the Tracy command-line capture tool (`iree-tracy-capture`) that can
+* The "client" is the program being profiled.
+* The "server" is:
+    * Either the Tracy profiler UI (which we build as `iree-tracy-profiler`),
+    * Or the Tracy command-line capture tool (`iree-tracy-capture`) that can
         save a trace for later loading in the Tracy profiler UI.
 
 ## The Tracy manual
@@ -30,7 +31,9 @@ or
 
 ## Overview
 
-We will go through each steps below, but here is an overview. It highlights the simpler subset of instructions when only instrumentation is needed, vs. the additional steps needed when Sampling is also wanted.
+We will go through each steps below, but here is an overview. It highlights the
+simpler subset of instructions when only instrumentation is needed, vs. the
+additional steps needed when Sampling is also wanted.
 
 Component | Instrumentation only | Instrumentation and Sampling
 --- | --- | ---
@@ -85,7 +88,7 @@ sudo apt install libtbb-dev libzstd-dev
 ```
 
 The zstd version on Ubuntu 18.04 is old. You will need to install it from source
-from https://github.com/facebook/zstd.git
+from <https://github.com/facebook/zstd.git>
 
 ### Mac
 
@@ -99,7 +102,7 @@ brew install capstone
 Install other dependencies:
 
 ```shell
-brew install glfw freetype
+brew install pkg-config glfw freetype tbb zstd
 ```
 
 ## Build the Tracy tools
@@ -108,7 +111,7 @@ A CMake-based build system for Tracy is maintained as part of IREE. In your IREE
 desktop build directory, set the following CMake option:
 
 ```shell
-$ cmake -DIREE_BUILD_TRACY=ON -DIREE_ENABLE_LLD=ON .
+cmake -DIREE_BUILD_TRACY=ON -DIREE_ENABLE_LLD=ON .
 ```
 
 That enables building the Tracy server tools, `iree-tracy-profiler` and
@@ -142,27 +145,39 @@ $ find . -name iree-tracy-*
 
 ## Build the IREE compiler (`iree-compile`)
 
-Most people don't need to rebuild `iree-compile` at all for Tracy and can skip this section.
+Most people don't need to rebuild `iree-compile` at all for Tracy and can skip
+this section.
 
-If you want to profile `iree-compile` itself as opposed to just profiling modules compiled with it, then rebuild it with the CMake setting `IREE_ENABLE_COMPILER_TRACING` set to `ON`.
+If you want to profile `iree-compile` itself as opposed to just profiling
+modules compiled with it, then rebuild it with the CMake setting
+`IREE_ENABLE_COMPILER_TRACING` set to `ON`.
 
 ## Compile your IREE module (run `iree-compile`)
 
-If you only want Instrumentation and not Sampling then you don't need anything particular here. Just run `iree-compile` as usual.
+If you only want Instrumentation and not Sampling then you don't need anything
+particular here. Just run `iree-compile` as usual.
 
 ### Additional steps for Sampling
 
-In order for Sampling to work with your compiled modules, add this flag to your `iree-compile` command line: `--iree-llvmcpu-link-embedded=false`.
+In order for Sampling to work with your compiled modules, add this flag to your
+`iree-compile` command line: `--iree-llvmcpu-link-embedded=false`.
 
-For the `llvm-cpu` target backend, sampling features also rely on debug information in the compiled module, enabled by `--iree-llvmcpu-debug-symbols=true`, but that is currently the default.
+For the `llvm-cpu` target backend, sampling features also rely on debug
+information in the compiled module, enabled by
+`--iree-llvmcpu-debug-symbols=true`, but that is currently the default.
 
-When building IREE's own test and benchmark suites, if Tracy Sampling support is wanted, set the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` to `ON`. It has the effect of passing that `--iree-llvmcpu-link-embedded=false` when compiling test/benchmark modules.
+When building IREE's own test and benchmark suites, if Tracy Sampling support
+is wanted, set the CMake setting
+`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` to `ON`. It has the effect of
+passing that `--iree-llvmcpu-link-embedded=false` when compiling test/benchmark
+modules.
 
 ## Build IREE device binaries with Tracy instrumentation ("clients")
 
-Set the CMake setting `IREE_ENABLE_RUNTIME_TRACING` to `ON` and rebuild IREE device binaries, e.g.
+Set the CMake setting `IREE_ENABLE_RUNTIME_TRACING` to `ON` and rebuild IREE
+device binaries, e.g.
 
-```
+```shell
 cd iree-device-build-dir
 cmake -DIREE_ENABLE_RUNTIME_TRACING=ON .
 cmake --build .
@@ -170,20 +185,25 @@ cmake --build .
 
 ### Additional steps for Sampling
 
-In order for Sampling features to work, make sure that binaries contain debug information. That usually means changing the `CMAKE_BUILD_TYPE` to `RelWithDebInfo` instead of `Release`.
+In order for Sampling features to work, make sure that binaries contain debug
+information. That usually means changing the `CMAKE_BUILD_TYPE` to
+`RelWithDebInfo` instead of `Release`.
 
 In your IREE device build directory, set the following CMake options:
 
-```
+```shell
 cd iree-device-build-dir
 cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo .
 ```
 
 ## Running the profiled program
 
-The basic recipe is to just run your program as usual on the device and, while it is running, run `iree-tracy-capture` on the host to connect to it.
+The basic recipe is to just run your program as usual on the device and, while
+it is running, run `iree-tracy-capture` on the host to connect to it.
 
-In the typical case of a short-running benchmark, one usually runs with the environment variable `TRACY_NO_EXIT` defined so that the benchmark does not exit until `iree-tracy-capture` has connected to it.
+In the typical case of a short-running benchmark, one usually runs with the
+environment variable `TRACY_NO_EXIT` defined so that the benchmark does not
+exit until `iree-tracy-capture` has connected to it.
 
 Example:
 
@@ -193,8 +213,11 @@ TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module ... (usual flags)
 
 ### Additional steps for Sampling
 
-In order for Sampling to work, the IREE compiled module code mapping must still be
-accessible by the time Tracy tries to read symbols code. This requires setting the environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES`. It is easiest to set it to `1` but one may also set it to an explicit path where to preserve the temporary files.
+In order for Sampling to work, the IREE compiled module code mapping must still
+be accessible by the time Tracy tries to read symbols code. This requires
+setting the environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES`. It is
+easiest to set it to `1` but one may also set it to an explicit path where to
+preserve the temporary files.
 
 Example:
 
@@ -235,7 +258,7 @@ $ su
 
 Now run the following commands as root on the Android device:
 
-```
+```shell
 setenforce 0
 mount -o remount,hidepid=0 /proc
 echo 0 > /proc/sys/kernel/perf_event_paranoid
@@ -260,7 +283,8 @@ This is a
 One way to workaround it is to manually increase the total number of files
 that can be kept opened simultaneously and run the benchmark command with that
 setting:
-```
+
+```shell
 sudo sh -c "ulimit -n <bigNum> && <myTracyInstrumentedProgram>"
 ```
 
@@ -318,12 +342,12 @@ should show a dialog offering to connect to a client i.e. a profiled program:
 
 If connecting doesn't work:
 
-*   If the profiled program is on a separate machine, make sure you've correctly
+* If the profiled program is on a separate machine, make sure you've correctly
     set up port forwarding.
-*   On Android, the `adb forward` may need to be run again.
-*   Make sure that the profiled program is still running. Do you need
+* On Android, the `adb forward` may need to be run again.
+* Make sure that the profiled program is still running. Do you need
     `TRACY_NO_EXIT=1`?
-*   Kill the profiled program and restart it.
+* Kill the profiled program and restart it.
 
 You should now start seeing a profile. The initial view should look like this:
 
@@ -340,9 +364,9 @@ explained above):
 
 Notice how the latter screenshot is lacking the following elements:
 
-*   No 'CPU data' header on the left side, with the list of all CPU cores. The
+* No 'CPU data' header on the left side, with the list of all CPU cores. The
     'CPU usage' graph is something else.
-*   No 'ghost' icon next to the 'Main thread' header.
+* No 'ghost' icon next to the 'Main thread' header.
 
 Click the 'Statistics' button at the top. It will open a window like this:
 

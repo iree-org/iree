@@ -74,6 +74,7 @@ class CompilerToolError(Exception):
         tool_name = os.path.basename(process.args[0])
         super().__init__(
             f"Error invoking IREE compiler tool {tool_name}\n"
+            f"Error code: {process.returncode}\n"
             f"Diagnostics:\n{errs}\n\n"
             f"Invoked with:\n {tool_name} {' '.join(process.args)}\n\n"
             f"Need more information? Set IREE_SAVE_TEMPS=/some/dir "

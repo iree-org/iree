@@ -254,6 +254,12 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
           VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
 
+  // VK_KHR_cooperative_matrix:
+  // This extension exposes SIMD matrix-matrix multiply accumulate operations.
+  // It's available in Vulkan 1.3.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+
   //===--------------------------------------------------------------------===//
   // Optional debugging features
   //===--------------------------------------------------------------------===//
@@ -961,6 +967,15 @@ iree_status_t iree_hal_vulkan_device_create(
   available_shader_float16_int8_features.pNext = available_features2.pNext;
   available_features2.pNext = &available_shader_float16_int8_features;
 
+  // + Cooperative matrix features.
+  VkPhysicalDeviceCooperativeMatrixFeaturesKHR available_coop_matrix_features;
+  memset(&available_coop_matrix_features, 0,
+         sizeof(available_coop_matrix_features));
+  available_coop_matrix_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR;
+  available_coop_matrix_features.pNext = available_features2.pNext;
+  available_features2.pNext = &available_coop_matrix_features;
+
   instance_syms->vkGetPhysicalDeviceFeatures2(physical_device,
                                               &available_features2);
   const VkPhysicalDeviceFeatures* available_features =
@@ -1036,7 +1051,7 @@ iree_status_t iree_hal_vulkan_device_create(
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
     buffer_device_address_features.pNext = enabled_features2.pNext;
     enabled_features2.pNext = &buffer_device_address_features;
-    buffer_device_address_features.bufferDeviceAddress = true;
+    buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES;
   }
 
@@ -1078,6 +1093,12 @@ iree_status_t iree_hal_vulkan_device_create(
   if (enabled_device_extensions.shader_float16_int8) {
     available_shader_float16_int8_features.pNext = enabled_features2.pNext;
     enabled_features2.pNext = &available_shader_float16_int8_features;
+  }
+
+  // Enable all available coop matrix features.
+  if (enabled_device_extensions.cooperative_matrix) {
+    available_coop_matrix_features.pNext = enabled_features2.pNext;
+    enabled_features2.pNext = &available_coop_matrix_features;
   }
 
   auto logical_device = new VkDeviceHandle(
@@ -1343,18 +1364,16 @@ static iree_status_t iree_hal_vulkan_device_create_executable_cache(
 
 static iree_status_t iree_hal_vulkan_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_memory_access_t access,
-    iree_hal_external_file_t* IREE_RESTRICT external_file,
-    iree_hal_file_release_callback_t release_callback,
-    iree_hal_file_t** out_file) {
-  if (external_file->type != IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION) {
+    iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
+    iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
+  if (iree_io_file_handle_type(handle) !=
+      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
         "implementation does not support the external file type");
   }
   return iree_hal_memory_file_wrap(
-      queue_affinity, access, external_file->handle.host_allocation,
-      release_callback, iree_hal_device_allocator(base_device),
+      queue_affinity, access, handle, iree_hal_device_allocator(base_device),
       iree_hal_device_host_allocator(base_device), out_file);
 }
 

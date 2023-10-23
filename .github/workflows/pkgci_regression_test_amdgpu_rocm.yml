@@ -1,0 +1,52 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: PkgCI Regression Test (AMDGPU)
+on:
+  workflow_call:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      artifact_run_id:
+        type: string
+        default: ""
+
+jobs:
+  linux_x86_64:
+    name: Linux (x86_64)
+    runs-on: nodai-amdgpu-w7900-x86-64
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+      VENV_DIR: ${{ github.workspace }}/venv
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          submodules: false
+      - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1  # v4.7.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: '3.11'
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a  # v3.0.2
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py $VENV_DIR \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+      - name: Run Tests
+        run: |
+          source $VENV_DIR/bin/activate
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib:/opt/rocm/hip/lib
+          pytest \
+            -s -m "plat_rdna3_rocm and presubmit" \
+            experimental/regression_suite

@@ -46,6 +46,16 @@ IREE_UK_MMT4D_TILE_FUNC_DECL(
 IREE_UK_MMT4D_TILE_FUNC_DECL(
     iree_uk_mmt4d_tile_f16f16f32_16x16x1_x86_64_avx512_base)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
+    iree_uk_mmt4d_tile_bf16bf16f32_1x16x2_x86_64_avx512_bf16)
+IREE_UK_MMT4D_TILE_FUNC_DECL(
+    iree_uk_mmt4d_tile_bf16bf16f32_2x16x2_x86_64_avx512_bf16)
+IREE_UK_MMT4D_TILE_FUNC_DECL(
+    iree_uk_mmt4d_tile_bf16bf16f32_4x16x2_x86_64_avx512_bf16)
+IREE_UK_MMT4D_TILE_FUNC_DECL(
+    iree_uk_mmt4d_tile_bf16bf16f32_8x16x2_x86_64_avx512_bf16)
+IREE_UK_MMT4D_TILE_FUNC_DECL(
+    iree_uk_mmt4d_tile_bf16bf16f32_16x16x2_x86_64_avx512_bf16)
+IREE_UK_MMT4D_TILE_FUNC_DECL(
     iree_uk_mmt4d_tile_f16f16f16_1x16x1_x86_64_avx512_base)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
     iree_uk_mmt4d_tile_f16f16f16_2x16x1_x86_64_avx512_base)

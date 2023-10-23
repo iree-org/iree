@@ -7,7 +7,7 @@
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable @scalar_dispatch {
-  hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export public @scalar_dispatch ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %c1 = arith.constant 1 : index

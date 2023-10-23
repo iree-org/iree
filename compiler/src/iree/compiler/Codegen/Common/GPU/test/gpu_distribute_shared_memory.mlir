@@ -16,7 +16,7 @@
   ]>
 ]>
 hal.executable private @shared_mem_cpy  {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @shared_mem_cpy layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 4: index, 1:index]
     } {
@@ -110,7 +110,7 @@ hal.executable private @shared_mem_cpy  {
 ]>
 
 hal.executable private @unaligned_shared_memory_copy  {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @unaligned_shared_memory_copy layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 8: index, 1:index]
     } {
@@ -166,7 +166,7 @@ hal.executable private @unaligned_shared_memory_copy  {
 ]>
 
 hal.executable private @zero_dim_shared_memory_copy  {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @zero_dim_shared_memory_copy layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 8: index, 1:index]
     } {
@@ -204,7 +204,7 @@ hal.executable private @zero_dim_shared_memory_copy  {
 ]>
 
 hal.executable private @zero_dim_shared_memory_copy  {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @zero_dim_shared_memory_copy layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 8: index, 1:index]
     } {

@@ -95,6 +95,10 @@ struct GlobalOptimizationOptions {
   // Strips debug assertions after any useful information has been extracted.
   bool stripAssertions = false;
 
+  // Maximum byte size increase allowed for constant expr hoisting policy to
+  // allow hoisting. The threshold is 1MB by default.
+  int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };

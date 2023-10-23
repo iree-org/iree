@@ -44,3 +44,9 @@
 [submodule "third_party/torch-mlir"]
 	path = third_party/torch-mlir
 	url = https://github.com/shark-infra/torch-mlir.git
+[submodule "third_party/ROCm-Device-Libs"]
+	path = third_party/ROCm-Device-Libs
+	url = https://github.com/shark-infra/ROCm-Device-Libs
+[submodule "third_party/hip-build-deps"]
+	path = third_party/hip-build-deps
+	url = https://github.com/shark-infra/hip-build-deps.git

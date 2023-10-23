@@ -206,9 +206,6 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
       // storage buffers and upload logic.
       .addPass(IREE::Stream::createPackConstantsPass)
 
-      // Pack fused allocations based on lifetime.
-      .addPass(IREE::Stream::createPackAllocationsPass)
-
       // Layout packed slices to emit the arithmetic required for all resource
       // offsets. This enables us to propagate the subviews across the program
       // below.

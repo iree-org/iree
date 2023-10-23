@@ -9,13 +9,13 @@
   ]>
 ]>
 hal.executable @i4_dequant {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant layout(#pipeline_layout)
     builtin.module {
       func.func @i4_dequant() {

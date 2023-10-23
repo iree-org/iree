@@ -49,6 +49,6 @@ module @module {
   // CHECK-NEXT: hal.executable private @exe
   hal.executable private @exe {
     // CHECK-NEXT: hal.executable.variant public @embedded_elf_arm_64
-    hal.executable.variant public @embedded_elf_arm_64, target = #executable_target {}
+    hal.executable.variant public @embedded_elf_arm_64 target(#executable_target) {}
   }
 }

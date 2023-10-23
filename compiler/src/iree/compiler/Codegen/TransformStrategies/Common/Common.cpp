@@ -27,7 +27,6 @@ using namespace mlir;
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 // TODO: significantly better namespacing.
-using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
@@ -36,13 +35,14 @@ using iree_compiler::IREE::transform_dialect::
 using transform::FuseIntoContainingOp;
 using transform::HoistRedundantTensorSubsetsOp;
 using transform::MatchOp;
+using transform::MemRefEraseDeadAllocAndStoresOp;
 using transform::MergeHandlesOp;
 using transform::PrintOp;
 using transform::SequenceOp;
 using transform::SplitHandleOp;
 using transform::SplitReductionOp;
-using transform::TileToForallOp;
-using transform::VectorizeOp;
+using transform::TileUsingForallOp;
+using transform::VectorizeChildrenAndApplyPatternsOp;
 using transform_ext::RegisterMatchCallbacksOp;
 using transform_ext::TakeFirstOp;
 
@@ -170,7 +170,7 @@ mlir::iree_compiler::buildTileFuseToScfFor(ImplicitLocOpBuilder &b,
                                            bool canonicalize) {
   assert(opsHToFuse.empty() && "No fusion supported yet");
   iree_compiler::TileToScfForAndFuseResult result;
-  auto tiletoScfForOp = b.create<transform::TileOp>(rootH, tileSizes);
+  auto tiletoScfForOp = b.create<transform::TileUsingForOp>(rootH, tileSizes);
   result.forLoops = tiletoScfForOp.getLoops();
   result.tiledOpH = tiletoScfForOp.getTiledLinalgOp();
 
@@ -213,7 +213,7 @@ buildTileAndFuseAndDistributeImpl(ImplicitLocOpBuilder &b, Value variantH,
                                   ArrayRef<OpFoldResult> tileSizesOrNumThreads,
                                   ArrayAttr threadDimMapping) {
   iree_compiler::TileToForallAndFuseAndDistributeResult result;
-  auto tileToForeachOp = b.create<TileToForallOp>(
+  auto tileToForeachOp = b.create<TileUsingForallOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
 
   result.forallH = tileToForeachOp.getForallOp();
@@ -291,7 +291,8 @@ Value mlir::iree_compiler::buildVectorize(ImplicitLocOpBuilder &b, Value funcH,
                                           bool applyCleanups,
                                           bool vectorizePadding,
                                           bool vectorizeNdExtract) {
-  funcH = b.create<VectorizeOp>(funcH, vectorizePadding, vectorizeNdExtract);
+  funcH = b.create<VectorizeChildrenAndApplyPatternsOp>(funcH, vectorizePadding,
+                                                        vectorizeNdExtract);
   if (applyCleanups) {
     iree_compiler::buildCanonicalizationAndEnablingTransforms(b, funcH);
   }
@@ -502,6 +503,6 @@ Value mlir::iree_compiler::buildMemoryOptimizations(ImplicitLocOpBuilder &b,
           b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
         });
   }
-  b.create<ApplyBufferOptimizationsOp>(funcH);
+  b.create<MemRefEraseDeadAllocAndStoresOp>(funcH);
   return funcH;
 }

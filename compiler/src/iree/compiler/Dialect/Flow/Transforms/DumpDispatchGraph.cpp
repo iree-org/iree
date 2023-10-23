@@ -385,6 +385,8 @@ private:
 
     auto calleeNameAttr = entryPoint.getLeafReference();
     auto innerModule = executableOp.getInnerModule();
+    if (!innerModule)
+      return;
     auto funcOps = innerModule.getOps<func::FuncOp>();
     auto funcIt = llvm::find_if(funcOps, [&](func::FuncOp op) {
       return op.getNameAttr() == calleeNameAttr;

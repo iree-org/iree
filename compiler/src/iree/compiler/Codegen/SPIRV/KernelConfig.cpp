@@ -881,8 +881,9 @@ getCooperativeMatrixSize(spirv::ResourceLimitsAttr resourceLimits,
                          const unsigned numMNTilesPerSubgroup, Type aType,
                          Type bType, Type cType, int64_t m, int64_t n,
                          int64_t k) {
-  auto properties = resourceLimits.getCooperativeMatrixPropertiesNv()
-                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  auto properties =
+      resourceLimits.getCooperativeMatrixPropertiesKhr()
+          .getAsRange<spirv::CooperativeMatrixPropertiesKHRAttr>();
   for (auto property : properties) {
     if (property.getAType() != aType || property.getBType() != bType ||
         property.getCType() != cType || property.getResultType() != cType ||
@@ -982,8 +983,8 @@ LogicalResult setCooperativeMatrixConfig(
     unsigned softwarePipelineStoreStage) {
   LLVM_DEBUG(llvm::dbgs() << "trying to matmul tensorcore config...\n");
   // This configuration is only for cooperative matrix.
-  if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
-      !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
+  if (!targetEnv.allows(spirv::Capability::CooperativeMatrixKHR) ||
+      !targetEnv.allows(spirv::Extension::SPV_KHR_cooperative_matrix)) {
     return failure();
   }
 
@@ -1014,7 +1015,7 @@ LogicalResult setCooperativeMatrixConfig(
 
   // TODO: Cooperative matrix support is fairly restricted. We can only have
   // a curated list of fused element wise ops as defined in the extension
-  // SPV_NV_cooperative_matrix. Check that once we move bufferization after
+  // SPV_KHR_cooperative_matrix. Check that once we move bufferization after
   // vectorization.
 
   auto getElementType = [](Value v) {
@@ -1174,39 +1175,35 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
 
-  auto funcOp = op->getParentOfType<FunctionOpInterface>();
-  auto walkResult = funcOp.walk([](linalg::LinalgOp op) {
-    using utils::IteratorType;
-    SmallVector<IteratorType, 4> kinds = op.getIteratorTypesArray();
-    SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-    for (auto [kind, bound] : llvm::zip_equal(kinds, bounds)) {
-      if (kind == IteratorType::reduction && ShapedType::isDynamic(bound))
-        return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  if (walkResult.wasInterrupted()) {
-    LLVM_DEBUG(llvm::dbgs() << "failed: dynamic shapes in reduction dims\n");
-    return failure();
-  }
-
   // This pipeline eventually generates non-uniform group shuffle ops, which
   // requires special capability.
   if (!targetEnv.allows(spirv::Capability::GroupNonUniformShuffle))
     return failure();
 
+  SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+
+  // We should have reduction dimensions.
   if (reductionDims.empty())
     return failure();
 
-  // Make sure reduction dimensions are the innermost ones.
-  for (int i = 0; i < reductionDims.size(); ++i) {
-    if (reductionDims[reductionDims.size() - 1 - i] !=
-        op.getNumLoops() - 1 - i) {
+  // Make sure reduction dimensions are static and innermost ones.
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      LLVM_DEBUG(llvm::dbgs() << "failed: dynamic shapes in reduction dims\n");
+      return failure();
+    }
+    if (dim < numParallelDims) {
+      LLVM_DEBUG(llvm::dbgs() << "failed: non-innermost reduction dims\n");
       return failure();
     }
   }
+
   if (op.getRegionOutputArgs().size() != 1)
     return failure();
 
@@ -1219,7 +1216,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   }
 
   bool foundSingleReductionOutput = false;
-  for (int64_t i = 0, e = op.getDpsInitOperands().size(); i < e; i++) {
+  for (int64_t i = 0, e = op.getDpsInits().size(); i < e; i++) {
     // Only single combiner operations are supported for now.
     SmallVector<Operation *> combinerOps;
     if (matchReduction(op.getRegionOutputArgs(), i, combinerOps) &&
@@ -1237,11 +1234,10 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-  int64_t dimSize = 1;
+  int64_t reductionSize = 1;
   for (int64_t dim : reductionDims)
-    dimSize *= bounds[dim];
-  if (dimSize % subgroupSize != 0)
+    reductionSize *= bounds[dim];
+  if (reductionSize % subgroupSize != 0)
     return failure();
 
   const Type elementType =
@@ -1255,28 +1251,56 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   // Let each thread handle `vectorSize` elements.
   unsigned vectorSize = kMaxVectorNumBits / bitWidth;
-  while ((dimSize / vectorSize) % subgroupSize != 0)
+  while ((reductionSize / vectorSize) % subgroupSize != 0)
     vectorSize /= 2;
 
-  // TODO: Add reduction tiling to handle larger reductions.
+  // Deduce the workgroup size we should use for reduction. Currently a
+  // workgroup processes all elements in reduction dimensions. Need to make sure
+  // the workgroup size we use can divide the total reduction size, and it's
+  // also within hardware limitations.
   const int64_t maxWorkgroupSize =
       targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
-  int64_t groupSize = dimSize / vectorSize;
+  int64_t groupSize = reductionSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
     groupSize = GreatestCommonDivisor(APInt(64, uint64_t(groupSize)),
                                       APInt(64, uint64_t(maxWorkgroupSize)))
                     .getZExtValue();
   }
+
+  // Then we need to strike a balance--
+  // 1) parallel dimensions are distributed to workgroups. If there are many
+  //    workgroups dispatched, we'd want to have each GPU core hosting multiple
+  //    of them for occupancy.
+  // 2) we want each thread to read quite a few 128-bit vectors for better
+  //    memory cache behavior.
+  // Both means we cannot use a too large workgroup size.
+
+  int64_t parallelSize = 1;
+  for (int64_t dim : parallelDims) {
+    if (!ShapedType::isDynamic(bounds[dim]))
+      parallelSize *= bounds[dim];
+  }
+  // Total parallel size that can fill the GPU with enough workgorups.
+  // TODO: query from the target device; roughly 2x hardware compute unit.
+  int parallelThreshold = 256;
+  // How many 128-bit vectors each thread should at least read.
+  const int targetVectorCount = 8;
+  while (parallelSize > parallelThreshold &&
+         (groupSize / 2) % subgroupSize == 0 &&
+         reductionSize / (groupSize * vectorSize) < targetVectorCount) {
+    // Use less subgroups per workgroup..
+    groupSize /= 2;
+    // in order to host more workgroups per hardware compute unit.
+    parallelSize /= 2;
+  }
+
   // Current warp reduction pattern is a two step butterfly warp reduce.
   // First, do warp reductions along multiple subgroups.
   // Second, reduce results from multiple subgroups using single warp reduce.
-  // The final warp reduce requires numSubgroupUsed > subgroupSize to work.
-  // TODO(raikonenfnu): Add flexible num of warp reduce to handle more configs.
-  // TT::CPU and TT::ARM_Valhall is not going through warp reduce.
-  const int64_t numSubgroupsUsed = groupSize / subgroupSize;
-  if (numSubgroupsUsed > subgroupSize) {
+  // The final warp reduce requires subgroup count <= subgroup size to work.
+  if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
-  }
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
@@ -1313,7 +1337,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   // Set lowering configuration to drive tiling for other Linalg ops too---the
   // pipeline expects it.
-  funcOp.walk([&](linalg::LinalgOp op) {
+  op->getParentOfType<FunctionOpInterface>().walk([&](linalg::LinalgOp op) {
     setLoweringConfig(
         op, IREE::Codegen::LoweringConfigAttr::get(op.getContext(), tileSizes));
   });
@@ -1351,8 +1375,8 @@ static int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
     unsigned b = getElementTypeOrSelf(operand->get()).getIntOrFloatBitWidth();
     bitwidth = std::min(bitwidth, b);
   }
-  for (OpOperand *result : linalgOp.getDpsInitOperands()) {
-    unsigned b = getElementTypeOrSelf(result->get()).getIntOrFloatBitWidth();
+  for (Value result : linalgOp.getDpsInits()) {
+    unsigned b = getElementTypeOrSelf(result).getIntOrFloatBitWidth();
     bitwidth = std::min(bitwidth, b);
   }
   return bitwidth;
@@ -1623,8 +1647,9 @@ setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
 
   // Populates the supported WMMA fragment combinations from the target
   // environment. Infer tf32 support from the list of supported fragment types.
-  auto properties = limits.getCooperativeMatrixPropertiesNv()
-                        .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
+  auto properties =
+      limits.getCooperativeMatrixPropertiesKhr()
+          .getAsRange<spirv::CooperativeMatrixPropertiesKHRAttr>();
   for (auto property : properties) {
     if (property.getScope().getValue() != spirv::Scope::Subgroup)
       continue;

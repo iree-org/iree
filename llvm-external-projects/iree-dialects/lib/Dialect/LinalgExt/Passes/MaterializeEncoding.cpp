@@ -94,18 +94,8 @@ chooseEncodingInfo(RankedTensorType tensorType) {
   auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
   switch (user) {
-  case EncodingUser::MATMUL_F32F32F32:
-  case EncodingUser::MATMUL_F16F16F32:
-  case EncodingUser::MATMUL_F16F16F16:
-  case EncodingUser::MATMUL_BF16BF16F32:
-  case EncodingUser::MATMUL_BF16BF16BF16:
-  case EncodingUser::MATMUL_I8I8I32:
-  case EncodingUser::BATCH_MATMUL_F32F32F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F16:
-  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
-  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
-  case EncodingUser::BATCH_MATMUL_I8I8I32:
+  case EncodingUser::MATMUL:
+  case EncodingUser::BATCH_MATMUL:
     return chooseEncodingInfoForMatmul(user, role, /*tileParams=*/{8, 4, 8});
   }
   llvm_unreachable("unhandled EncodingUser case");
@@ -245,13 +235,13 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::MatmulOp matmulOp,
   if (!matmulOp.hasTensorSemantics())
     return failure();
   auto inputs = matmulOp.getDpsInputOperands();
-  auto outputs = matmulOp.getDpsInitOperands();
+  auto outputs = matmulOp.getDpsInits();
   auto lhsEncoding =
       getEncodingAttr(inputs[0]->get().getType().cast<RankedTensorType>());
   auto rhsEncoding =
       getEncodingAttr(inputs[1]->get().getType().cast<RankedTensorType>());
   auto resultEncoding =
-      getEncodingAttr(outputs[0]->get().getType().cast<RankedTensorType>());
+      getEncodingAttr(outputs[0].getType().cast<RankedTensorType>());
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }
@@ -285,13 +275,13 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::BatchMatmulOp batchMatmulOp,
   if (!batchMatmulOp.hasTensorSemantics())
     return failure();
   auto inputs = batchMatmulOp.getDpsInputOperands();
-  auto outputs = batchMatmulOp.getDpsInitOperands();
+  auto outputs = batchMatmulOp.getDpsInits();
   auto lhsEncoding =
       getEncodingAttr(inputs[0]->get().getType().cast<RankedTensorType>());
   auto rhsEncoding =
       getEncodingAttr(inputs[1]->get().getType().cast<RankedTensorType>());
   auto resultEncoding =
-      getEncodingAttr(outputs[0]->get().getType().cast<RankedTensorType>());
+      getEncodingAttr(outputs[0].getType().cast<RankedTensorType>());
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }

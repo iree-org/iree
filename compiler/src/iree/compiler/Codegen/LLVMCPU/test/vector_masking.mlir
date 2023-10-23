@@ -3,8 +3,7 @@
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[127, 255], [8, 32], [0, 0]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -13,11 +12,11 @@
   ]>
 ]>
 hal.executable private @preset_config_generic_add  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+  hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
     target_triple = "x86_64-unknown-linux-gnu"
-  }> {
+  }>) {
     hal.executable.export @mask_dynamic_generic_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -73,8 +72,7 @@ hal.executable private @preset_config_generic_add  {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[127, 255], [8, 0], [0, 32]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -82,11 +80,11 @@ hal.executable private @preset_config_generic_add  {
   ]>
 ]>
 hal.executable private @preset_config_reduction  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+  hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 32 : index,
     target_triple = "x86_64-unknown-linux-gnu"
-  }> {
+  }>) {
     hal.executable.export @mask_dynamic_reduction layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -131,8 +129,7 @@ hal.executable private @preset_config_reduction  {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[127, 255], [8, 32], [0, 0]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -141,11 +138,11 @@ hal.executable private @preset_config_reduction  {
   ]>
 ]>
 hal.executable private @preset_config_generic_add  {
-  hal.executable.variant @embedded_elf_rv32, target = <"llvm-cpu", "embedded-elf-riscv_32", {
+  hal.executable.variant @embedded_elf_rv32 target(<"llvm-cpu", "embedded-elf-riscv_32", {
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",
       native_vector_size = 32 : index,
       target_triple = "riscv32-none-elf"
-    }> {
+    }>) {
     hal.executable.export @mask_dynamic_generic_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -201,8 +198,7 @@ hal.executable private @preset_config_generic_add  {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[127, 255], [8, 32], [0, 0]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -211,11 +207,11 @@ hal.executable private @preset_config_generic_add  {
   ]>
 ]>
 hal.executable private @preset_config_generic_add  {
-  hal.executable.variant @embedded_elf_rv32, target = <"llvm-cpu", "embedded-elf-arm_64", {
+  hal.executable.variant @embedded_elf_rv32 target(<"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
-  }> {
+  }>) {
     hal.executable.export @mask_dynamic_generic_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -273,12 +269,12 @@ hal.executable private @preset_config_generic_add  {
   ]>
 ]>
 hal.executable private @preset_config_matmul  {
-  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-arm_64", {
+  hal.executable.variant @llvm target(<"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     cpu_features = "+sve",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
-  }> {
+  }>) {
     hal.executable.export @mask_matmul_sve layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -323,8 +319,7 @@ hal.executable private @preset_config_matmul  {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[127, 255], [8, 32], [0, 0]]>,
-    translation_info  = <CPUDoubleTilingExpert>,
-    workgroup_size = []>
+    translation_info  = <CPUDoubleTilingExpert>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -333,12 +328,12 @@ hal.executable private @preset_config_matmul  {
   ]>
 ]>
 hal.executable private @preset_config_generic_add  {
-  hal.executable.variant @embedded_elf_arm_64, target = <"llvm-cpu", "embedded-elf-arm_64", {
+  hal.executable.variant @embedded_elf_arm_64 target(<"llvm-cpu", "embedded-elf-arm_64", {
     cpu_features = "+sve",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
-  }> {
+  }>) {
     hal.executable.export @mask_dynamic_generic_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

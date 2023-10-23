@@ -26,7 +26,7 @@ transform.with_pdl_patterns {
   transform.sequence %arg0: !pdl.operation failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1 : (!pdl.operation) -> !pdl.operation
-    transform.structured.tile %0 [4, 4, 4]
+    transform.structured.tile_using_for %0 [4, 4, 4]
       : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation, !pdl.operation)
   }
 }

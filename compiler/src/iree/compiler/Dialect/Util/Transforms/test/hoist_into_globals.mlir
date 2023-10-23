@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals --allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals="max-size-increase-threshold=64" --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @hoist_simple_const_expr
 module @hoist_simple_const_expr {
@@ -276,3 +276,40 @@ module @do_not_hoist_uses_within_dispatches {
 //  CHECK-SAME:     %[[EXPANDED]]
 //       CHECK:     flow.return %[[ADD]]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+// The --iree-util-const-expr-max-size-increase-threshold flag controls the
+// maximum size increase (vs sum of size of it's roots) allowed for hoisting a
+// constant expression. The threshold is set to 64 bytes in this test suite.
+// In this test, the size increase is exactly 64 bytes, so the constant
+// expression is hoisted.
+// CHECK-LABEL: @hoist_no_significant_size_increase_const_expr
+// CHECK: util.global
+// CHECK: util.initializer
+module @hoist_no_significant_size_increase_const_expr {
+  func.func @main() -> (tensor<128xi8>) {
+    %0 = arith.constant dense<0> : tensor<32xi8>
+    %1 = arith.constant dense<0> : tensor<32xi8>
+    %2 = "iree_unregistered.const_expr"(%0, %1) 
+    : (tensor<32xi8>, tensor<32xi8>) -> tensor<128xi8>
+    return %2 : tensor<128xi8>
+  }
+}
+
+// -----
+
+// In this test, the size increase is 65 bytes, so the constant expression is
+// not hoisted.
+// CHECK-LABEL: @do_not_hoist_significant_size_increase_const_expr
+// CHECK-NOT: util.global
+// CHECK-NOT: util.initializer
+module @do_not_hoist_significant_size_increase_const_expr {
+  func.func @main() -> (tensor<129xi8>) {
+    %0 = arith.constant dense<0> : tensor<32xi8>
+    %1 = arith.constant dense<0> : tensor<32xi8>
+    %2 = "iree_unregistered.const_expr"(%0, %1) 
+    : (tensor<32xi8>, tensor<32xi8>) -> tensor<129xi8>
+    return %2 : tensor<129xi8>
+  }
+}

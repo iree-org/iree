@@ -4,7 +4,7 @@
 // RUN: FileCheck --check-prefix=CHECK %s
 
 hal.executable @_attention_dispatch_0 {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @_attention_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -38,15 +38,15 @@ transform.sequence failures(propagate) {
 
   // Tile and distribute to workgroups
   // ==========================================
-  %forall_grid, %tiled_attention =
-  transform.structured.tile_to_forall_op %attention tile_sizes [1, 128]
+  %tiled_attention, %forall_grid =
+  transform.structured.tile_using_forall %attention tile_sizes [1, 128]
     ( mapping = [#gpu.block<x>, #gpu.block<y>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
 
   // Tile batch dimensions of attention
   // ==========================================
   %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %batch_tiled_attn, %loop = transform.structured.tile %attention2 [1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %batch_tiled_attn, %loop = transform.structured.tile_using_for %attention2 [1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   transform.apply_patterns to %top_level_func {
     transform.apply_patterns.canonicalization
@@ -76,7 +76,7 @@ transform.sequence failures(propagate) {
 
   // Tile and fuse attention ops
   // ==========================================
-  %forall, %tiled_matmul = transform.structured.tile_to_forall_op %promoted_second_matmul tile_sizes [32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_matmul, %forall = transform.structured.tile_using_forall %promoted_second_matmul tile_sizes [32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   %f0, %loop0 = transform.structured.fuse_into_containing_op %scale_acc into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
   %f1, %loop1 = transform.structured.fuse_into_containing_op %truncate into %loop0 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -101,7 +101,7 @@ transform.sequence failures(propagate) {
   // Distribute fills and last truncate
   // ==========================================
   %fills = transform.merge_handles %acc_fill, %max_fill, %sum_fill, %last_truncate : !transform.any_op
-  %fill_grid, %tiled_fill = transform.structured.tile_to_forall_op %fills tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_fill, %fill_grid = transform.structured.tile_using_forall %fills tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Vectorize function
   // ==========================================
@@ -110,7 +110,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> (!transform.any_op)
+  %func_3 = transform.structured.vectorize_children_and_apply_patterns %func : (!transform.any_op) -> (!transform.any_op)
 
   // Bufferization
   // ==========================================
@@ -153,7 +153,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.canonicalization
   } : !transform.any_op
   transform.iree.apply_cse %func_8 : !transform.any_op
-  transform.iree.apply_buffer_optimizations %func_8 : (!transform.any_op) -> ()
+  transform.memref.erase_dead_alloc_and_stores %func_8 : (!transform.any_op) -> ()
 }
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 128)>

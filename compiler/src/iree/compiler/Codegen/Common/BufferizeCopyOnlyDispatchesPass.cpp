@@ -97,11 +97,6 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     return emitError(
         loc, "unexpected allocation while bufferizing copy only dispatches");
   };
-  bufferization::BufferizationOptions::DeallocationFn deallocationFn =
-      [](OpBuilder &, Location loc, Value) -> LogicalResult {
-    return emitError(
-        loc, "unexpected deallocation while bufferizing copy only dispatches");
-  };
   bufferization::BufferizationOptions::MemCpyFn memcpyFn =
       [](OpBuilder &builder, Location loc, Value from,
          Value to) -> LogicalResult {
@@ -110,7 +105,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   };
 
   addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
-                                      deallocationFn, memcpyFn);
+                                      memcpyFn);
   if (failed(runPipeline(bufferizationPipeline, module))) {
     return signalPassFailure();
   }

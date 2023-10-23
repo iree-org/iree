@@ -13,7 +13,7 @@
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @matmul_static_dispatch_0 {
-    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @matmul_static_dispatch_0 ordinal(0) layout(#pipeline_layout)
       builtin.module {
         func.func @matmul_static_dispatch_0() {

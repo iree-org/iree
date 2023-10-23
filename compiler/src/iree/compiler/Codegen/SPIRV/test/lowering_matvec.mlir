@@ -10,13 +10,13 @@
   ]>
 ]>
 hal.executable @i4_dequant_matvec_f32 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant_matvec_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -67,14 +67,14 @@ hal.executable @i4_dequant_matvec_f32 {
 //         CHECK:     %[[READ3:.+]] = vector.transfer_read {{.+}} : memref<86x128xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:     %[[EXTEND:.+]] = arith.extui %[[READ0]] : vector<4xi4> to vector<4xi32>
 //         CHECK:     %[[CVT:.+]] = arith.uitofp %[[EXTEND]] : vector<4xi32> to vector<4xf32>
-//         CHECK:     %[[EXTRACT0:.+]] = vector.extract %[[READ1]][0] : vector<1xf32>
+//         CHECK:     %[[EXTRACT0:.+]] = vector.extract %[[READ1]][0] : f32 from vector<1xf32>
 //         CHECK:     %[[SPLAT0:.+]] = vector.splat %[[EXTRACT0]] : vector<4xf32>
 //         CHECK:     %[[SUB:.+]] = arith.subf %[[CVT]], %[[SPLAT0]] : vector<4xf32>
-//         CHECK:     %[[EXTRACT1:.+]] = vector.extract %[[READ2]][0] : vector<1xf32>
+//         CHECK:     %[[EXTRACT1:.+]] = vector.extract %[[READ2]][0] : f32 from vector<1xf32>
 //         CHECK:     %[[SPLAT1:.+]] = vector.splat %[[EXTRACT1]] : vector<4xf32>
 //         CHECK:     %[[MUL0:.+]] = arith.mulf %[[SUB]], %[[SPLAT1]] : vector<4xf32>
 //         CHECK:     %[[MUL1:.+]] = arith.mulf %[[READ3]], %[[MUL0]] : vector<4xf32>
-//         CHECK:     %[[EXTRACT2:.+]] = vector.extract %arg1[0] : vector<1x4xf32>
+//         CHECK:     %[[EXTRACT2:.+]] = vector.extract %arg1[0] : vector<4xf32> from vector<1x4xf32>
 //         CHECK:     %[[ADD:.+]] = arith.addf %[[MUL1]], %[[EXTRACT2]] : vector<4xf32>
 //         CHECK:     %[[BCAST:.+]] = vector.broadcast %[[ADD]] : vector<4xf32> to vector<1x4xf32>
 //         CHECK:     scf.yield %[[BCAST]] : vector<1x4xf32>

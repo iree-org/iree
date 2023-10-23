@@ -97,6 +97,22 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    file_cache
+  HDRS
+    "file_cache.h"
+  SRCS
+    "file_cache.c"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::base::internal::synchronization
+    iree::hal
+    iree::io::file_handle
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     file_transfer
   HDRS
     "file_transfer.h"
@@ -147,6 +163,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::hal
+    iree::io::file_handle
   PUBLIC
 )
 

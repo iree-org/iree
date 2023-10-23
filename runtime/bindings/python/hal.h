@@ -119,6 +119,7 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
 
   void BeginProfiling(std::optional<std::string> mode,
                       std::optional<std::string> file_path);
+  void FlushProfiling();
   void EndProfiling();
   HalSemaphore CreateSemaphore(uint64_t initial_value);
   HalBuffer QueueAlloca(uint64_t allocation_size, py::handle wait_semaphores,
@@ -127,6 +128,8 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
                      py::handle signal_semaphores);
   void QueueExecute(py::handle command_buffers, py::handle wait_semaphores,
                     py::handle signal_semaphores);
+  void QueueCopy(HalBuffer& src_buffer, HalBuffer& dst_buffer,
+                 py::handle wait_semaphores, py::handle signal_semaphores);
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
@@ -175,6 +178,10 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
     return iree_hal_buffer_byte_length(raw_ptr());
   }
 
+  int memory_type() const { return iree_hal_buffer_memory_type(raw_ptr()); }
+
+  int allowed_usage() const { return iree_hal_buffer_allowed_usage(raw_ptr()); }
+
   void FillZero(iree_device_size_t byte_offset,
                 iree_device_size_t byte_length) {
     CheckApiStatus(
@@ -194,6 +201,11 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
                        encoding_type, iree_allocator_system(), &bv),
                    "Error creating buffer view");
     return HalBufferView::StealFromRawPtr(bv);
+  }
+
+  static HalBuffer CreateFromBufferView(HalBufferView& bv) {
+    return HalBuffer::BorrowFromRawPtr(
+        iree_hal_buffer_view_buffer(bv.raw_ptr()));
   }
 
   py::str Repr();

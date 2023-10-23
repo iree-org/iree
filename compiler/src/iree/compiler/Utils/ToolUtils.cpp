@@ -262,5 +262,22 @@ std::string findTool(std::string toolName) {
   return findTool(toolNames);
 }
 
+std::string findPlatformLibDirectory(StringRef platformName) {
+  std::string dylibPath = getCurrentDylibPath();
+  if (dylibPath.empty())
+    return {};
+
+  SmallString<256> path(dylibPath);
+  llvm::sys::path::remove_filename(path);
+  llvm::sys::path::append(path, "iree_platform_libs", platformName);
+  if (!llvm::sys::fs::is_directory(path))
+    return {};
+  llvm::sys::fs::make_absolute(path);
+  (void)llvm::sys::path::remove_dots(path, /*remove_dot_dot=*/true);
+
+  std::string pathStr(path);
+  return pathStr;
+}
+
 } // namespace iree_compiler
 } // namespace mlir

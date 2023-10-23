@@ -69,7 +69,7 @@ jobs:
             tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
           - platform: "linux"
             arch: "riscv_64"
-            docker_image: "gcr.io/iree-oss/riscv@sha256:e3b68a91018ada9d1cb3829a1de846e8d737e1575c528cea5a21a770bd02d2a7"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
             build_script: "./build_tools/cmake/build_riscv.sh"
             tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
           - platform: "android"

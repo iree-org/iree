@@ -1578,28 +1578,28 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   auto resultAllocation = reserveResultAllocation(resultReservations);
   for (auto &reservationSet : resultAllocation.reservationSets) {
     // Allocate and tie an operand to the result.
-    // TODO(benvanik): change this to an alloca. We may need a higher-level
-    // analysis to decide when to deallocate, or just leave it to be deallocated
-    // as part of garbage collection.
-    auto allocOp = externalBuilder.create<IREE::Stream::ResourceAllocOp>(
-        externalBuilder.getFusedLoc(reservationSet.reservationLocs),
-        reservationSet.reservationTypes, reservationSet.reservationSizes,
-        /*uninitialized=*/externalBuilder.getUnitAttr(),
-        executeOp.getAffinityAttr());
+    auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
+    auto [allocaOp, suballocations] =
+        IREE::Stream::ResourceAllocaOp::createSuballocations(
+            timepointType, reservationSet.reservationTypes.front(),
+            reservationSet.reservationLocs, reservationSet.reservationSizes,
+            executeOp.getAwaitTimepoint(), executeOp.getAffinityAttr(),
+            externalBuilder);
+    newAwaitTimepoints.push_back(allocaOp.getResultTimepoint());
 
     auto asmState = getRootAsmState(executeOp->getParentOp());
     LLVM_DEBUG({
       llvm::dbgs() << "  + alloc for result reservation set: ";
-      allocOp.print(llvm::dbgs(), *asmState);
+      allocaOp.print(llvm::dbgs(), *asmState);
       llvm::dbgs() << ":\n";
     });
 
-    for (auto [reservation, allocResult] :
-         llvm::zip_equal(reservationSet.reservations, allocOp.getResults())) {
-      newOperands.push_back(allocResult);
+    for (auto [reservation, suballocation] :
+         llvm::zip_equal(reservationSet.reservations, suballocations)) {
+      newOperands.push_back(suballocation);
       newOperandSizes.push_back(reservation.resultSize);
       resultReplacements.push_back(
-          std::make_pair(reservation.result, allocResult));
+          std::make_pair(reservation.result, suballocation));
 
       // Insert entry arg for the new operand tied all the way to the yield.
       auto arg =

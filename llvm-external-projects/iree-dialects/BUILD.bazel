@@ -142,6 +142,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
     ],
 )
 
@@ -495,41 +496,6 @@ cc_library(
 ################################################################################
 
 gentbl_cc_library(
-    name = "IREELinalgTransformIncGen",
-    strip_include_prefix = "include",
-    tbl_outs = [
-        (
-            [
-                "--dialect=iree_linalg_transform",
-                "--gen-dialect-decls",
-            ],
-            "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.h.inc",
-        ),
-        (
-            [
-                "--dialect=iree_linalg_transform",
-                "--gen-dialect-defs",
-            ],
-            "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformDialect.cpp.inc",
-        ),
-        (
-            ["--gen-op-decls"],
-            "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h.inc",
-        ),
-        (
-            ["--gen-op-defs"],
-            "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "include/iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.td",
-    deps = [
-        ":TdFiles",
-        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
-    ],
-)
-
-gentbl_cc_library(
     name = "IREELinalgTransformStructuredIncGen",
     strip_include_prefix = "include",
     tbl_outs = [
@@ -564,7 +530,6 @@ cc_library(
         ":IREELinalgExtDialect",
         ":IREELinalgExtPasses",
         ":IREELinalgExtTransforms",
-        ":IREELinalgTransformIncGen",
         ":IREELinalgTransformStructuredIncGen",
         "@llvm-project//llvm:Support",
 

@@ -81,11 +81,6 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
       .getResult();
 }
 
-static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
-                                       Value allocation) {
-  return success();
-}
-
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   auto fromType = llvm::cast<MemRefType>(from.getType());
@@ -106,10 +101,8 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
 static void addBufferizePasses(OpPassManager &passManager,
                                BufferizationOptions::AllocationFn fn) {
   BufferizationOptions::AllocationFn allocationFn = fn;
-  BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
 }
 
 //===----------------------------------------------------------------------===//
@@ -132,6 +125,14 @@ static void addTileAndDistributeToWorkgroupsPasses(
           useWARForCooperativeMatrixCodegen));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+}
+
+/// Adds passes to lower vector ops to meet SPIR-V requirements.
+static void addSPIRVVectorLoweringPasses(OpPassManager &modulePM) {
+  modulePM.addNestedPass<func::FuncOp>(createSPIRVInitialVectorLoweringPass());
+  modulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
+  modulePM.addNestedPass<func::FuncOp>(createSPIRVFinalVectorLoweringPass());
 }
 
 static void
@@ -305,7 +306,7 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
   }
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
+  addSPIRVVectorLoweringPasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -352,9 +353,10 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCSEPass());
 
   // Multi-buffer depending on pipeline depth and distribute to shared memory.
-  if (pipelineDepth > 0)
+  if (pipelineDepth > 0) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGPUMultiBuffering(pipelineDepth + 1));
+  }
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
@@ -364,9 +366,25 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
       createGPUReduceSharedMemoryBankConflicts(
           detail::bankConflictReductionPaddingBits));
 
+  // Performs high-level n-D mechanical vectorization. This does not perform
+  // unrolling or lowering, which is done later.
+  {
+    GenericVectorizationPassOptions options;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+  }
+
+  // With subview ops, vector hoisting won't kick in. So fold memref subview ops
+  // before performing vector unrolling and hoisting.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+
   // Vectorize to cooperative ops.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVVectorizeToCooperativeOpsPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
@@ -380,10 +398,6 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
       /*flatten=*/false, /*dropUnitDims=*/false));
 
-  // Fold subview ops is reqiured for converting vector transfer ops into SPIR-V
-  // cooperative ops in the next step.
-  nestedModulePM.addPass(memref::createFoldMemRefAliasOpsPass());
-
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -391,7 +405,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
       createSPIRVVectorToGPUSubgroupMMAOpsPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
+  addSPIRVVectorLoweringPasses(nestedModulePM);
 
   if (pipelineDepth > 0) {
     PipeliningSchedulingStrategy schedule =
@@ -419,7 +433,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
   nestedPM.addNestedPass<func::FuncOp>(
       createGPUTensorTile(/*distributeToWarp=*/false));
 
-  // High-level n-D vectorization.
+  // Performs high-level n-D mechanical vectorization. This does not perform
+  // unrolling or lowering, which is done later.
   {
     GenericVectorizationPassOptions options;
     options.vectorizePadding = true;
@@ -453,19 +468,19 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
   nestedPM.addNestedPass<func::FuncOp>(createGPUReduceSharedMemoryBankConflicts(
       detail::bankConflictReductionPaddingBits));
 
-  nestedPM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
+  // With subview ops, vector hoisting won't kick in. So fold memref subview ops
+  // before performing vector unrolling and hoisting.
+  nestedPM.addNestedPass<func::FuncOp>(memref::createFoldMemRefAliasOpsPass());
+
+  nestedPM.addNestedPass<func::FuncOp>(createSPIRVInitialVectorLoweringPass());
+  nestedPM.addPass(createCSEPass());
+  nestedPM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
+  nestedPM.addNestedPass<func::FuncOp>(createSPIRVFinalVectorLoweringPass());
+
   nestedPM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedPM.addPass(createCanonicalizerPass());
   nestedPM.addPass(createCSEPass());
-  // After vectorization and some basic cleanup, optimize vector transfer ops.
-  // Here we won't have large n-D vectors being put as loop carried values due
-  // to hoisting. Because this is before folding all memref subview ops away, we
-  // still have subview ops using the same indices, which allows for transfer
-  // read/write forwarding.
-  nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
-      /*flatten=*/false, /*dropUnitDims=*/false));
-
-  nestedPM.addNestedPass<func::FuncOp>(memref::createFoldMemRefAliasOpsPass());
   nestedPM.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass(
       /*flatten=*/false, /*dropUnitDims=*/false));
 
@@ -530,8 +545,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
-  // Performs mechanical vectorization. This does not perform unrolling or
-  // lowering, which is done later.
+  // Performs high-level n-D mechanical vectorization. This does not perform
+  // unrolling or lowering, which is done later.
   {
     GenericVectorizationPassOptions options;
     options.vectorizePadding = true;
@@ -581,7 +596,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
       createConvertVectorReductionToGPUPass(getWarpSize));
   // Perform normal vector unrolling and lowering transformations. This breaks
   // vectors down to native machine size.
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
+  addSPIRVVectorLoweringPasses(nestedModulePM);
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
@@ -612,7 +627,7 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
   }
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
+  addSPIRVVectorLoweringPasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -632,11 +647,11 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
 void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
   addSPIRVTransformDialectPasses(pm);
 
-  // Run SPIRVVectorize pass additionally to convert vectors into forms needed
-  // for SPIR-V.
+  // Run GenericVectorization pass additionally to convert vectors into forms
+  // needed for SPIR-V.
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorLoweringPass());
+  addSPIRVVectorLoweringPasses(nestedModulePM);
 }
 
 //===----------------------------------------------------------------------===//

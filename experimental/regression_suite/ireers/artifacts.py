@@ -7,8 +7,21 @@
 from typing import Any, Callable, Collection, Dict, Union
 import functools
 from pathlib import Path
+from tqdm import tqdm
 import urllib.parse
 import urllib.request
+
+
+def show_progress(t):
+    last_b = [0]
+
+    def update_to(b=1, bsize=1, tsize=None):
+        if tsize is not None:
+            t.total = tsize
+        t.update((b - last_b[0]) * bsize)
+        last_b[0] = b
+
+    return update_to
 
 
 @functools.cache
@@ -117,7 +130,14 @@ class FetchedArtifact(ProducedArtifact):
     @staticmethod
     def _callback(self: "FetchedArtifact"):
         print(f"Downloading {self.url} -> {self.path}", flush=True, end="")
-        urllib.request.urlretrieve(self.url, self.path)
+        with tqdm(
+            unit="B",
+            unit_scale=True,
+            unit_divisor=1024,
+            miniters=1,
+            desc=str(self.path),
+        ) as t:
+            urllib.request.urlretrieve(self.url, self.path, reporthook=show_progress(t))
         print(f": Retrieved {self.path.stat().st_size} bytes")
 
 

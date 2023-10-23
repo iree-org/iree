@@ -367,6 +367,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
 
+  if (moduleOp.getBody()->empty())
+    return;
+
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
@@ -412,7 +415,10 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// rely on this rewrite for the cases seen today.
   /// TODO: Support general emulation of compute on sub-byte types. This is
   /// not mutually exclusive with this pattern, but does mean it is no longer
-  /// load bearing.
+  /// load bearing.  Also these patterns are already run during
+  /// `EmulateNarrotType` pass but dont trigger there due to missing support for
+  /// emulation of `vector.transfer_read` in the emulation path. Remove the
+  /// patterns from here after that is done.
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     RewritePatternSet narrowingPatterns(context);
     vector::populateVectorNarrowTypeRewritePatterns(narrowingPatterns);
@@ -447,15 +453,14 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
-  typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
-    return convertMMAToSPIRVCoopMatrixNVType(type);
-  });
+  populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter);
   RewritePatternSet patterns(&getContext());
   ScfToSPIRVContext scfToSPIRVContext;
 
   // Pull in GPU patterns to convert processor ID ops and loop ops.
   populateGPUToSPIRVPatterns(typeConverter, patterns);
-  populateGpuWMMAToSPIRVCoopMatrixNVConversionPatterns(typeConverter, patterns);
+  populateGpuWMMAToSPIRVCoopMatrixKHRConversionPatterns(typeConverter,
+                                                        patterns);
 
   // Pull in SCF patterns to convert control flow ops.
   populateSCFToSPIRVPatterns(typeConverter, scfToSPIRVContext, patterns);

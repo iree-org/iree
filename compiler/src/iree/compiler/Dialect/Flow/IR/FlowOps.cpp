@@ -63,14 +63,19 @@ verifyDispatchWorkload(Operation *op, IREE::Flow::ExecutableExportOp exportOp,
   // the workload here matches what is expected.
   if (!exportOp.getWorkgroupCount().empty()) {
     auto &workgroupCount = exportOp.getWorkgroupCount();
-    if (workgroupCount.getNumArguments() != workload.size()) {
+    auto explicitArgs = llvm::make_filter_range(
+        workgroupCount.getArgumentTypes(), [](Type type) {
+          return !type.hasTrait<
+              mlir::OpTrait::IREE::Util::ImplicitlyCaptured>();
+        });
+    if (llvm::range_size(explicitArgs) != workload.size()) {
       return op->emitOpError()
              << "workload mismatch; entry point expects "
-             << workgroupCount.getNumArguments()
+             << llvm::range_size(explicitArgs)
              << " arguments but dispatch provides " << workload.size();
     }
-    for (auto [index, expectedType, actualType] : llvm::enumerate(
-             workgroupCount.getArgumentTypes(), workload.getTypes())) {
+    for (auto [index, expectedType, actualType] :
+         llvm::enumerate(explicitArgs, workload.getTypes())) {
       if (expectedType != actualType) {
         return op->emitOpError()
                << "workload operand " << index << " type mismatch; expected "
@@ -109,10 +114,12 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
                    ArrayRef<OpFoldResult> mixedSizes) {
   ArrayRef<int64_t> resultShape = slicedObjectType.getShape();
   llvm::SmallBitVector droppedDims(mixedSizes.size());
-  if (slicedObjectType.getRank() == mixedSizes.size()) {
+  size_t maxDroppedDims = mixedSizes.size() - resultShape.size();
+  if (maxDroppedDims == 0) {
     return droppedDims;
   }
   unsigned shapePos = 0;
+  int numSet = 0;
   for (const auto &size : llvm::enumerate(mixedSizes)) {
     std::optional<int64_t> sizeVal = getConstantIntValue(size.value());
     // If the size is not 1, or if the current matched dimension of the result
@@ -124,6 +131,10 @@ getDroppedDimsImpl(RankedTensorType slicedObjectType,
       continue;
     }
     droppedDims.set(size.index());
+    numSet++;
+    if (numSet == maxDroppedDims) {
+      break;
+    }
   }
   return droppedDims;
 }
@@ -177,6 +188,51 @@ static bool doesSliceSpanWholeTarget(
     return false;
   }
   return true;
+}
+
+//===----------------------------------------------------------------------===//
+// custom<ShapedOperandList>($values, type($values), $value_dims)
+//===----------------------------------------------------------------------===//
+// %value : type{%dynamic_dims}, ...
+
+static ParseResult parseShapedOperandList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+    SmallVectorImpl<Type> &valueTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &valueDims) {
+  do {
+    values.emplace_back();
+    valueTypes.emplace_back();
+    if (failed(parser.parseOperand(values.back())) ||
+        failed(parser.parseColon()) ||
+        failed(parser.parseType(valueTypes.back())))
+      return failure();
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(valueTypes.back()).getNumDynamicDims()) {
+      if (failed(parser.parseOperandList(valueDims, dynamicDimCount,
+                                         AsmParser::Delimiter::Braces)))
+        return failure();
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printShapedOperandList(OpAsmPrinter &p, Operation *op,
+                                   ValueRange values, TypeRange valueTypes,
+                                   ValueRange valueDims) {
+  llvm::interleaveComma(llvm::zip_equal(values, valueTypes), p, [&](auto it) {
+    auto [value, valueType] = it;
+    p << value;
+    p << " : ";
+    p << valueType;
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(valueType).getNumDynamicDims()) {
+      p << "{";
+      llvm::interleaveComma(valueDims.take_front(dynamicDimCount), p);
+      valueDims = valueDims.drop_front(dynamicDimCount);
+      p << "}";
+    }
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -279,8 +335,6 @@ static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
 //===----------------------------------------------------------------------===//
 // flow.dispatch.region
 //===----------------------------------------------------------------------===//
-
-// Verifies the workgroup count
 
 static LogicalResult
 verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
@@ -1637,6 +1691,35 @@ TensorUpdateOp::getTiedResultOperandIndex(unsigned resultIndex) {
 
 SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0}; // target
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.trace
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorTraceOp::verify() {
+  TensorTraceOp op = *this;
+  if (failed(verifyOpDynamicDims(op, op.getValues(), op.getValueDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+ValueRange TensorTraceOp::getOperandDynamicDims(unsigned idx) {
+  auto valueDims = getValueDims();
+  for (unsigned i = 0; i <= idx; ++i) {
+    auto valueType = cast<ShapedType>(getValues()[i].getType());
+    int64_t dynamicDimCount = valueType.getNumDynamicDims();
+    if (i == idx) {
+      return valueDims.take_front(dynamicDimCount);
+    }
+    valueDims = valueDims.drop_front(dynamicDimCount);
+  }
+  return ValueRange{};
+}
+
+ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
+  return ValueRange{};
 }
 
 //===----------------------------------------------------------------------===//

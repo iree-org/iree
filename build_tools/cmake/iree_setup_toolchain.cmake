@@ -189,6 +189,17 @@ macro(iree_setup_toolchain)
       message(WARNING "Thin archives requested but not supported by ar")
     endif()
   endif()
+
+  # As of XCode 15, the default linker warns on duplicate libraries.
+  if(APPLE AND NOT IREE_USE_LINKER)
+    SET(_FLAG_NO_WARN_DUP_LIB "-Wl,-no_warn_duplicate_libraries")
+    check_linker_flag(CXX "${_FLAG_NO_WARN_DUP_LIB}"
+      IREE_LINKER_HAVE_NO_WARN_DUPLICATE_LIBRARIES)
+    if (IREE_LINKER_HAVE_NO_WARN_DUPLICATE_LIBRARIES)
+      string(APPEND CMAKE_EXE_LINKER_FLAGS " ${_FLAG_NO_WARN_DUP_LIB}")
+      string(APPEND CMAKE_SHARED_LINKER_FLAGS " ${_FLAG_NO_WARN_DUP_LIB}")
+    endif()
+  endif()
 endmacro()
 
 iree_setup_toolchain()

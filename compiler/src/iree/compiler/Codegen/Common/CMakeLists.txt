@@ -116,6 +116,7 @@ iree_cc_library(
     "EncodingInfo.h"
     "ExtractAddressComputation.h"
     "Passes.h"
+    "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
   SRCS
@@ -146,6 +147,7 @@ iree_cc_library(
     "GenericVectorization.cpp"
     "HoistRedundantVectorTransfers.cpp"
     "HoistStaticallyBoundAllocations.cpp"
+    "HoistUnrolledVectorExtractInsertSlice.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
     "InstrumentMemoryAccesses.cpp"
@@ -164,6 +166,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorizePad.cpp"
@@ -185,6 +188,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
+    MLIRFuncTransforms
     MLIRGPUDialect
     MLIRIR
     MLIRLLVMCommonConversion
@@ -192,6 +196,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
+    MLIRLoopLikeInterface
     MLIRMathDialect
     MLIRMathTransforms
     MLIRMemRefDialect

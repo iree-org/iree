@@ -12,8 +12,8 @@ transform.sequence failures(propagate) {
 
   // Step 2. Tile the matmul and fuse the fill
   // ===========================================================================
-  %forall_grid, %grid_reduction =
-  transform.structured.tile_to_forall_op %broadcast tile_sizes [16] ( mapping = [#gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %grid_reduction, %forall_grid =
+  transform.structured.tile_using_forall %broadcast tile_sizes [16] ( mapping = [#gpu.block<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
   transform.structured.fuse_into_containing_op %reduce into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.structured.fuse_into_containing_op %matmul into %forall_grid : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -27,7 +27,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> !transform.any_op
+  %func_3 = transform.structured.vectorize_children_and_apply_patterns %func : (!transform.any_op) -> !transform.any_op
 
   // Step 4. Bufferize
   // ===========================================================================

@@ -13,6 +13,7 @@
 *.VC.opendb
 *.suo
 *.user
+*.code-workspace
 
 # macOS files
 .DS_Store
@@ -68,6 +69,7 @@ docs/website/site/
 
 # Temporary files
 iree/builtins/**/bin/*.ll
+artifacts/
 
 # Archive files
 *.tar
@@ -78,3 +80,6 @@ iree/builtins/**/bin/*.ll
 
 # Local cache files
 llvm-external-projects/iree-dialects/.cache
+
+# pkgci artifacts
+artifacts/

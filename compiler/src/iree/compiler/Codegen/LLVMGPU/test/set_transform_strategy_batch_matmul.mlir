@@ -22,10 +22,10 @@
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#executable_target_cuda_nvptx_fb], legacy_sync}>
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @batch_matmul_dispatch_0 {
-    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @batch_matmul_dispatch_0_generic_128x80x320x32_f32 ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device):
-        %x, %y, %z = flow.dispatch.workgroup_count_from_slice 
+        %x, %y, %z = flow.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -84,7 +84,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK: transform.sequence  failures(propagate) {
 // CHECK:   transform.iree.register_match_callbacks
 // CHECK:   %[[MATCH:.+]]:2 = transform.iree.match_callback failures(propagate) "batch_matmul"
-// CHECK:   %[[FORALL:.+]], %[[TILED:.+]] = transform.structured.tile_to_forall_op %[[MATCH]]#1
+// CHECK:   %[[TILED:.+]], %[[FORALL:.+]] = transform.structured.tile_using_forall %[[MATCH]]#1
 // DEFAULT:   num_threads [] tile_sizes [64, 64, 1](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
 // OPTIONS:   num_threads [] tile_sizes [128, 64, 32](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
 // CHECK:   apply_patterns
@@ -92,10 +92,10 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.apply_cse
 // CHECK:   %[[FUSED:.+]], %[[CONTAINING:.+]] = transform.structured.fuse_into_containing_op %[[MATCH]]#0 into %[[FORALL]]
 // CHECK:   transform.iree.populate_workgroup_count_region_using_num_threads_slice %[[FORALL]]
-// CHECK:   %[[TILED_LINALG:.+]], %[[LOOPS:.+]] = transform.structured.tile %tiled_op
+// CHECK:   %[[TILED_LINALG:.+]], %[[LOOPS:.+]] = transform.structured.tile_using_for %tiled_op
 // DEFAULT:   [0, 0, 0, 16]
 // OPTIONS:   [0, 0, 0, 8]
-// CHECK:   %[[PADDED:.+]], %{{.*}}, %{{.+}} = transform.structured.pad %tiled_linalg_op 
+// CHECK:   %[[PADDED:.+]], %{{.*}}, %{{.+}} = transform.structured.pad %tiled_linalg_op
 // CHECK:     pack_paddings = [1, 1, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3]
 // CHECK:     padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK:   %[[V3:.+]] = get_producer_of_operand %[[PADDED]][2]
@@ -104,7 +104,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 // CHECK:   %[[FILL:.+]] = transform.structured.match ops{["linalg.fill"]}
-// CHECK:   apply_patterns 
+// CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 // CHECK:   transform.structured.match ops{["tensor.parallel_insert_slice"]}
@@ -113,7 +113,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   %[[RHS:.+]] = get_producer_of_operand %[[PADDED]][1]
 // CHECK:   %[[RHS_DPS:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS]]
 
-// CHECK:   transform.structured.tile_to_forall_op %[[LHS]] 
+// CHECK:   transform.structured.tile_using_forall %[[LHS]]
 // DEFAULT:  num_threads [1, 32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // OPTIONS:  num_threads [1, 64, 2] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns
@@ -122,28 +122,28 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.structured.match ops{["scf.if"]}
 // CHECK:   transform.scf.take_assumed_branch %{{.*}} take_else_branch
 
-// CHECK:   transform.structured.tile_to_forall_op %[[RHS_DPS]]  
+// CHECK:   transform.structured.tile_using_forall %[[RHS_DPS]]
 // DEFAULT:  num_threads [8, 16, 1] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // OPTIONS:  num_threads [2, 8, 8] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK:   apply_patterns 
+// CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
-// CHECK:   transform.structured.tile_to_forall_op
+// CHECK:   transform.structured.tile_using_forall
 // DEFAULT:  num_threads [2, 64, 1] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // OPTIONS:  num_threads [1, 16, 8] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
-// CHECK:   transform.structured.tile_to_forall_op
+// CHECK:   transform.structured.tile_using_forall
 // DEFAULT:  num_threads [1, 2, 64] tile_sizes [](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
 // OPTIONS:  num_threads [1, 4, 32] tile_sizes [](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
-// CHECK:   apply_patterns 
+// CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
-// CHECK:   %forall_op_8, %tiled_op_9 = transform.structured.tile_to_forall_op %[[FILL]]
+// CHECK:   %tiled_op_8, %forall_op_9 = transform.structured.tile_using_forall %[[FILL]]
 // DEFAULT:   num_threads [1, 2, 64] tile_sizes [](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
 // OPTIONS:   num_threads [1, 4, 32] tile_sizes [](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
 // CHECK:   apply_patterns
@@ -153,15 +153,15 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
-// CHECK:   transform.structured.masked_vectorize
+// CHECK:   transform.structured.vectorize
 // DEFAULT:   vector_sizes [64, 2, 4]
 // OPTIONS:   vector_sizes [128, 1, 4]
-// CHECK:   transform.structured.masked_vectorize
+// CHECK:   transform.structured.vectorize
 // DEFAULT:   vector_sizes [32, 1, 1]
 // OPTIONS:   vector_sizes [128, 4, 4]
 // CHECK:   apply_patterns
 // CHECK:     transform.apply_patterns.vector.lower_masked_transfers
-// CHECK:   transform.structured.vectorize
+// CHECK:   transform.structured.vectorize_children_and_apply_patterns
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
@@ -172,7 +172,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.eliminate_empty_tensors
 
 // CHECK:   transform.iree.bufferize {target_gpu}
-// CHECK:   transform.iree.apply_buffer_optimizations
+// CHECK:   transform.memref.erase_dead_alloc_and_stores
 // CHECK:   transform.iree.forall_to_workgroup
 // CHECK:   transform.iree.map_nested_forall_to_gpu_threads
 // DEFAULT:  workgroup_dims = [64, 2, 1]
@@ -198,7 +198,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
-// CHECK:   transform.iree.apply_buffer_optimizations
+// CHECK:   transform.memref.erase_dead_alloc_and_stores
 // CHECK:   transform.iree.eliminate_gpu_barriers
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
@@ -211,7 +211,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // OPTIONS:   factor = 3
 // CHECK:   apply_patterns
 // CHECK:     transform.apply_patterns.vector.transfer_to_scf   max_transfer_rank = 1 full_unroll = true
-// CHECK:   apply_patterns 
+// CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 // CHECK:   transform.iree.create_async_groups

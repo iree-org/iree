@@ -45,11 +45,11 @@ void buildGlobalOptimizationPassPipeline(
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(mainPassManager)
-      .addPass(IREE::Flow::createRemoveZeroExtentTensorsPass)
-      .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
+      .addPass(createRemoveZeroExtentTensorsPass)
+      .addPass(createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
-      .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass);
-  mainPassManager.addPass(IREE::Flow::createEraseUnusedLinalgOperands());
+      .addPass(createConvert1X1FilterConv2DToMatmulPass);
+  mainPassManager.addPass(createEraseUnusedLinalgOperands());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the
@@ -62,11 +62,15 @@ void buildGlobalOptimizationPassPipeline(
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
+      // RaiseSpecialOps, by virtue of implementing various peephole
+      // optimizations, is sensitive to surrounding IR structure. Thus we run
+      // this pass both before unit dim folding + consteval, as well as after.
+      .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
       // Enable data tiling after they are in a canonical form.
       .addPredicatedPass(transformOptions.options.dataTiling,
-                         IREE::Flow::createSetEncodingPass)
+                         createSetEncodingPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
   mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
@@ -84,7 +88,8 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(IREE::Util::createIPOPass());
 
   if (transformOptions.options.constExprHoisting) {
-    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());
+    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass(
+        transformOptions.options.constExprMaxSizeIncreaseThreshold));
   }
 
   if (transformOptions.buildConstEvalPassPipeline) {

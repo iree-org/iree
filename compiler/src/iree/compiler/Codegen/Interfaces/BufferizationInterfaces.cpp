@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/Bufferization/IR/DstBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/SubsetInsertionOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
@@ -274,11 +275,7 @@ struct DispatchTensorStoreOpInterface
 static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
                                           IREE::LinalgExt::LinalgExtOp op,
                                           const BufferizationOptions &options) {
-  auto dspOp = dyn_cast<DestinationStyleOpInterface>(op.getOperation());
-  if (!dspOp) {
-    return op->emitOpError(
-        "expected op to implement the `DestinationStyleOpInterface`");
-  }
+  auto dspOp = cast<DestinationStyleOpInterface>(op.getOperation());
 
   // Take a guard before anything else.
   OpBuilder::InsertionGuard g(rewriter);
@@ -294,24 +291,25 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
     return op->emitError() << "op does not have tensor semantics";
 
   // New input operands for the cloned op.
-  SmallVector<Value> newInputBuffers;
-  newInputBuffers.reserve(op.getNumInputs());
-  for (OpOperand *opOperand : op.getInputOperands()) {
-    if (dspOp.isScalar(opOperand)) {
-      newInputBuffers.push_back(opOperand->get());
+  SmallVector<Value> newOperands, newOutputBuffers;
+  AnalysisState analysisState(options);
+  newOperands.reserve(op->getNumOperands());
+
+  for (OpOperand &opOperand : op->getOpOperands()) {
+    if (dspOp.isScalar(&opOperand)) {
+      newOperands.push_back(opOperand.get());
       continue;
     }
-    auto maybeBuffer = getBuffer(rewriter, opOperand->get(), options);
-    if (failed(maybeBuffer))
-      return failure();
-    // Input operands are never written to.
-    newInputBuffers.push_back(*maybeBuffer);
-  }
-
-  // New output operands for the cloned op.
-  AnalysisState analysisState(options);
-  SmallVector<Value> newOutputBuffers;
-  for (OpResult opResult : op->getOpResults()) {
+    if (!dspOp.isDpsInit(&opOperand)) {
+      auto maybeBuffer = getBuffer(rewriter, opOperand.get(), options);
+      if (failed(maybeBuffer))
+        return failure();
+      // Input operands are never written to.
+      newOperands.push_back(*maybeBuffer);
+      continue;
+    }
+    // New output operands for the cloned op.
+    OpResult opResult = dspOp.getTiedOpResult(&opOperand);
     AliasingOpOperandList aliasingOpOperands =
         analysisState.getAliasingOpOperands(opResult);
     assert(aliasingOpOperands.getNumAliases() == 1 && "expected 1 OpOperand");
@@ -320,16 +318,8 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
         options);
     if (failed(resultBuffer))
       return failure();
+    newOperands.push_back(*resultBuffer);
     newOutputBuffers.push_back(*resultBuffer);
-  }
-
-  // Merge input/output operands.
-  SmallVector<Value> newOperands = newInputBuffers;
-  newOperands.append(newOutputBuffers.begin(), newOutputBuffers.end());
-
-  // Append other operands besides ins and outs.
-  for (auto nonDPSOperands : op.getNonInputOrOutputOperands()) {
-    newOperands.push_back(nonDPSOperands->get());
   }
 
   // Set insertion point now that potential alloc/dealloc are introduced.
@@ -355,60 +345,14 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
 /// a new op that operates entirely on memrefs.
 template <typename OpTy>
 struct LinalgExtOpInterface
-    : public BufferizableOpInterface::ExternalModel<LinalgExtOpInterface<OpTy>,
-                                                    OpTy> {
+    : public bufferization::DstBufferizableOpInterfaceExternalModel<
+          LinalgExtOpInterface<OpTy>, OpTy> {
+
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
-    // TODO: Implement payloadUsesValueFromOperand for individual ops. There
-    // are a limited number of LinalgExt ops, so we hardcode them here. We don't
-    // expect to add more LinalgExt ops.
-    auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
-    if (linalgExtOp.isInputTensor(&opOperand))
-      return true;
+    // TODO: Revisit this for Scatter/ReverseOp. We can then get rid of
+    //       `bufferizesToMemoryRead` completely.
     return !isa<IREE::LinalgExt::ScatterOp, IREE::LinalgExt::ReverseOp>(op);
-  }
-
-  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                               const AnalysisState &state) const {
-    // Operand is written to if it has an aliasing OpResult.
-    auto bufferizableOp = cast<BufferizableOpInterface>(op);
-    return !bufferizableOp.getAliasingValues(opOperand, state)
-                .getAliases()
-                .empty();
-  }
-
-  bufferization::AliasingOpOperandList
-  getAliasingOpOperands(Operation *op, Value value,
-                        const AnalysisState &state) const {
-    auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
-
-    size_t resultNum = std::distance(op->getOpResults().begin(),
-                                     llvm::find(op->getOpResults(), value));
-    // The i-th OpResult may alias with the i-th "out" tensor.
-    return {
-        AliasingOpOperand(linalgExtOp.getOutputOperand(resultNum) /*result*/,
-                          BufferRelation::Equivalent,
-                          /*isDefinite=*/false)};
-  }
-
-  bufferization::AliasingValueList
-  getAliasingValues(Operation *op, OpOperand &opOperand,
-                    const AnalysisState &state) const {
-    auto dspOp = cast<DestinationStyleOpInterface>(op);
-
-    // The i-th "out" tensor may alias with the i-th OpResult.
-    if (dspOp.isDpsInit(&opOperand)) {
-      return {AliasingValue(dspOp.getTiedOpResult(&opOperand) /*result*/,
-                            BufferRelation::Equivalent,
-                            /*isDefinite=*/false)};
-    }
-    return {};
-  }
-
-  bufferization::BufferRelation
-  bufferRelation(Operation *op, OpResult opResult,
-                 const AnalysisState &state) const {
-    return bufferization::BufferRelation::Equivalent;
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
@@ -665,8 +609,6 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(*ctx);
     IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
-    IREE::LinalgExt::SoftmaxOp::attachInterface<
-        LinalgExtOpInterface<IREE::LinalgExt::SoftmaxOp>>(*ctx);
     IREE::LinalgExt::AttentionOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::AttentionOp>>(*ctx);
   });

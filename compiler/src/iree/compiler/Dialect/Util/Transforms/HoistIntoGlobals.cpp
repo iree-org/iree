@@ -25,6 +25,13 @@ namespace IREE {
 namespace Util {
 namespace {
 
+static llvm::cl::opt<std::string> clPrintDotGraphToFile(
+    "iree-util-hoist-into-globals-print-constexpr-dotgraph-to",
+    llvm::cl::desc(
+        "Prints a dot graph representing the const-expr analysis. The red "
+        "nodes represent roots and the green nodes represent hoisted values."),
+    llvm::cl::value_desc("filename"));
+
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
@@ -40,13 +47,30 @@ public:
     registerConstExprDependentDialects(registry);
   }
 
+  HoistIntoGlobalsPass(int64_t threshold) {
+    this->maxSizeIncreaseThreshold.setValue(threshold);
+  }
+
   void runOnOperation() override {
     SymbolTable moduleSymbols(getOperation());
     const auto &constExprs = getAnalysis<ConstExprAnalysis>();
     LLVM_DEBUG(dbgs() << constExprs);
     LLVM_DEBUG(dbgs() << "\n\n");
-    ConstExprHoistingPolicy policy(constExprs);
+    ConstExprHoistingPolicy policy(constExprs, this->maxSizeIncreaseThreshold);
     policy.initialize();
+
+    // Print analysis dot graph if requested.
+    if (!clPrintDotGraphToFile.empty()) {
+      std::error_code ec;
+      llvm::raw_fd_ostream file(clPrintDotGraphToFile, ec);
+      if (ec) {
+        getOperation().emitError()
+            << "failed to open file for printing dot graph: " << ec.message();
+        return signalPassFailure();
+      }
+      policy.printDotGraph(file);
+      file.close();
+    }
 
     // Maps original values to newly materialized values.
     HoistedValueMap hoistedMap;
@@ -232,8 +256,9 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass() {
-  return std::make_unique<HoistIntoGlobalsPass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createHoistIntoGlobalsPass(int64_t maxSizeIncreaseThreshold) {
+  return std::make_unique<HoistIntoGlobalsPass>(maxSizeIncreaseThreshold);
 }
 
 } // namespace Util
