@@ -340,7 +340,7 @@ static iree_status_t iree_hal_metal_allocator_import_host_buffer(
 #endif  // IREE_PLATFORM_MACOS
       metal_buffer, base_allocator, params->type, params->access, params->usage,
       external_buffer->size, /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
-      iree_hal_buffer_release_callback_null(), out_buffer);  // +1
+      release_callback, out_buffer);  // +1
 }
 
 static iree_status_t iree_hal_metal_allocator_import_device_buffer(
