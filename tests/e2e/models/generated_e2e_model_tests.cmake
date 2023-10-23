@@ -13,8 +13,8 @@ iree_benchmark_suite_module_test(
     "x86_64-Linux=iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
   RUNNER_ARGS
     "--function=main"
-    "--input=1x224x224x3xf32=0"
     "--device_allocator=caching"
+    "--input=1x224x224x3xf32=0"
 )
 
 iree_benchmark_suite_module_test(
@@ -25,8 +25,8 @@ iree_benchmark_suite_module_test(
     "x86_64-Linux=iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
   RUNNER_ARGS
     "--function=main"
-    "--input=1x224x224x3xui8=0"
     "--device_allocator=caching"
+    "--input=1x224x224x3xui8=0"
 )
 
 iree_benchmark_suite_module_test(
@@ -38,9 +38,9 @@ iree_benchmark_suite_module_test(
     "x86_64-Linux=iree_module_DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
   RUNNER_ARGS
     "--function=main"
-    "--input=1x257x257x3xf32=0"
     "--device_allocator=caching"
     "--expected_f32_threshold=0.001"
+    "--input=1x257x257x3xf32=0"
 )
 
 iree_benchmark_suite_module_test(
@@ -53,7 +53,7 @@ iree_benchmark_suite_module_test(
     "x86_64-Linux=iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
   RUNNER_ARGS
     "--function=main"
-    "--input=1x96x96x1xi8=0"
     "--device_allocator=caching"
+    "--input=1x96x96x1xi8=0"
 )
 

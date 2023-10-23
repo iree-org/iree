@@ -189,7 +189,10 @@ class Model(object):
     entry_function: str
     # Input types. E.g., ["100x100xf32", "200x200x5xf32"].
     input_types: List[str]
+    # URLs to download input and expected output if available.
+    input_data: Optional[str] = None
     expected_output: Optional[str] = None
+    verify_params: List[str] = dataclasses.field(default_factory=list)
 
     def __str__(self):
         return self.name
