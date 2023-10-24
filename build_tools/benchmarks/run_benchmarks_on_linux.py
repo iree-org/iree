@@ -101,7 +101,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         )
         cmds.append(tool_path)
 
-        cmds += [f"--module={iree_artifacts.MODULE_FILENAME}"]
+        module_dir_path = benchmark_case.benchmark_case_dir
+        cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
         cmds += run_config.materialize_run_flags(
             gpu_id=self.gpu_id,
             inputs_dir=inputs_dir,
@@ -152,9 +153,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         # Currently only support single output.
         cmd.append(f'--expected_output=@{expected_outputs_dir / "output_0.npy"}')
         cmd += benchmark_case.verify_params
-        execute_cmd_and_get_output(
-            cmd, verbose=self.verbose, cwd=benchmark_case.benchmark_case_dir
-        )
+        execute_cmd_and_get_output(cmd, verbose=self.verbose)
 
     def __run_benchmark(
         self,
@@ -176,7 +175,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             )
 
         benchmark_stdout, benchmark_stderr = execute_cmd_and_get_output(
-            cmd, verbose=self.verbose, cwd=benchmark_case.benchmark_case_dir
+            cmd, verbose=self.verbose
         )
         benchmark_metrics = parse_iree_benchmark_metrics(
             benchmark_stdout, benchmark_stderr
