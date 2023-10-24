@@ -2105,13 +2105,24 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
   return setRootConfigFn(op);
 }
 
+/// Update the distribution tile sizes and parallel vector tile sizes to ensure:
+/// 1. Distribution tile sizes and parallel vector tile sizes are aligned to the
+///    inner tile sizes of the pack op.
+/// 2. Parallel vector tile sizes are set with getPackVectorTileSizes to get
+///    good performance on the pack op (e.g. 16x16 tile size on AVX512 for good
+///    transpose codegen on the pack op).
+/// For example:
+/// Given the tile sizes for a Matmul RHS pack op is [1, 1, 1] and its inner
+/// tile size is 16x1. We set the parallel vector tile sizes to [1, 1, 16],
+/// which will be translated to tile sizes [1, 1, 1] on the pack op in
+/// setLoweringConfigForComputeOps due to its affine map. At the same time,
+/// its producer will have the parallel tile sizes [1, 1, 16], which is how the
+/// pack op wants to tile-and-fuse it.
 static LogicalResult
 adjustTileSizesForPackOp(func::FuncOp entryPointFn, tensor::PackOp packOp,
                          SmallVector<int64_t> &distTileSizes,
                          SmallVector<int64_t> &parallelVecTileSizes) {
-  // Align the tile sizes of the root op to the pack op's inner tile sizes, so
-  // we can derive the outer tile sizes for pack ops later in
-  // setLoweringConfigForComputeOps by dividing with inner tile sizes.
+
   ArrayRef<int64_t> innerDimsPos = packOp.getInnerDimsPos();
   ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
   // Currently we only handle pack op with static inner tile sizes.
@@ -2142,7 +2153,9 @@ adjustTileSizesForPackOp(func::FuncOp entryPointFn, tensor::PackOp packOp,
     // too large tile size on them.
     parallelVecTileSizes[pos] = std::min(parallelVecTileSizes[pos], size);
   }
-  // Ensure tile sizes are aligned to the inner tile sizes.
+  // Align the tile sizes to the pack op's inner tile sizes, so we can derive
+  // the outer tile sizes for pack ops later in setLoweringConfigForComputeOps
+  // by dividing with inner tile sizes.
   for (auto [pos, size] : llvm::zip_equal(innerDimsPos, innerTiles)) {
     if (distTileSizes[pos])
       distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
@@ -2216,10 +2229,20 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
       loweringConfig.getScalableTileFlagVals(), pipeline);
 }
 
+/// Get tile sizes for the generic op and fill into the parallel vector tile
+/// sizes if the tile size on a dimension is missing. Also get the tile sizes on
+/// the reduction dimensions. This makes sure there is a tile size set for each
+/// dimension of the generic op.
+/// For example:
+/// The root op has iterator types: parallel, reduction, reduction and the
+/// parallel tile sizes from the root op is [X, 0, 0]. The generic op's iterator
+/// types are: parallel, parallel, reduction. After the update, the parallel
+/// tile sizes become [X, Y, 0] while the Y is set by the generic op. The
+/// function also returns the reduction tile sizes for the generic op [0, 0, Z].
 static LogicalResult
 adjustTileSizesForGenericOp(func::FuncOp entryPointFn,
                             linalg::GenericOp genericOp,
-                            SmallVector<int64_t> &tileAndFuseSizes,
+                            SmallVector<int64_t> &parallelVecTileSizes,
                             SmallVector<int64_t> &reductionTileSizes) {
   auto linalgOpInfo = LinalgOpInfo(genericOp);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
@@ -2243,9 +2266,9 @@ adjustTileSizesForGenericOp(func::FuncOp entryPointFn,
   for (auto [pos, tileSize] : llvm::enumerate(vecTileSizes)) {
     // Generic op vector parallel tile size is low priority. Only use if no
     // other op has set the tile size.
-    if (tileSize == 0 || tileAndFuseSizes[pos] != 0)
+    if (tileSize == 0 || parallelVecTileSizes[pos] != 0)
       continue;
-    tileAndFuseSizes[pos] = tileSize;
+    parallelVecTileSizes[pos] = tileSize;
   }
   return success();
 }
