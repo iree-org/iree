@@ -231,7 +231,7 @@ public:
 
   // Walks all predecessor blocks of |targetBlock| and provides the operands
   // passed to them along the incoming edge. Note that |targetBlock| may be
-  // enumerated if there is recursion. Includes an offset for mapping the 
+  // enumerated if there is recursion. Includes an offset for mapping the
   // block arguments.
   TraversalResult walkIncomingBranchOperands(
       Block *targetBlock,
