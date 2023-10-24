@@ -512,6 +512,19 @@ private:
                 return WalkResult::advance();
               });
         })
+        .Case([&](mlir::scf::ForOp op) {
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getOperand(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= operandUsage.getState();
+          if (operandIdx >= op.getNumControlOperands()) {
+            int64_t blockIdx = operandIdx - op.getNumControlOperands();
+            auto &beforeUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(op.getRegionIterArg(blockIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= beforeUsage.getState();
+          }
+        })
         .Case([&](mlir::scf::WhileOp op) {
           auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op->getOperand(operandIdx)),
@@ -554,14 +567,26 @@ private:
                 Position::forValue(op->getParentOp()->getResult(operandIdx)),
                 DFX::Resolution::REQUIRED);
             getState() ^= parentUsage.getState();
-          }
-          if (auto whileOp =
-                  dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+          } else if (auto whileOp =
+                         dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
             auto value =
                 Position::forValue(whileOp.getBefore().getArgument(operandIdx));
             auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, value, DFX::Resolution::REQUIRED);
             getState() ^= valueUsage.getState();
+          } else if (auto forOp =
+                         dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
+            auto value = Position::forValue(forOp.getRegionIterArg(operandIdx));
+            auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, value, DFX::Resolution::REQUIRED);
+            getState() ^= valueUsage.getState();
+
+            auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(forOp->getResult(operandIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= parentUsage.getState();
+          } else {
+            assert(false && "Unsupported test case");
           }
         })
         .Case([&](mlir::func::ReturnOp op) {
@@ -809,6 +834,7 @@ ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
     : explorer(rootOp, TraversalAction::SHALLOW), solver(explorer, allocator) {
   explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
+  explorer.setOpAction<mlir::scf::ForOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::scf::WhileOp>(TraversalAction::RECURSE);
   explorer.setDialectAction<IREE::Stream::StreamDialect>(

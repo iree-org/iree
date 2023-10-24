@@ -494,7 +494,9 @@ TraversalResult Explorer::walkReturnOperands(Operation *parentOp,
 
 TraversalResult Explorer::walkIncomingBranchOperands(
     Block *targetBlock,
-    std::function<WalkResult(Block *sourceBlock, OperandRange operands)> fn) {
+    std::function<WalkResult(Block *sourceBlock, OperandRange operands,
+                             size_t offset)>
+        fn) {
   TraversalResult result = TraversalResult::COMPLETE;
 
   // If the block is an entry (or only) block then we need to walk up to the
@@ -505,25 +507,34 @@ TraversalResult Explorer::walkIncomingBranchOperands(
     // If the block is owned by a WhileOp we need to walk to the other region.
     if (auto whileOp = dyn_cast<scf::WhileOp>(parentOp)) {
       if (whileOp.getBeforeBody() == targetBlock) {
-        fn(parentOp->getBlock(), whileOp.getYieldOp().getOperands());
+        fn(whileOp->getBlock(), whileOp.getInits(), 0);
+        fn(whileOp.getYieldOp()->getBlock(), whileOp.getYieldOp().getOperands(),
+           0);
       }
       if (whileOp.getAfterBody() == targetBlock) {
-        fn(parentOp->getBlock(), whileOp.getConditionOp().getArgs());
+        fn(whileOp.getConditionOp()->getBlock(),
+           whileOp.getConditionOp().getArgs(), 0);
       }
+    } else if (auto forOp = dyn_cast<scf::ForOp>(parentOp)) {
+      fn(forOp->getBlock(), forOp.getInitArgs(), -1);
+      fn(&forOp.getRegion().front(),
+         forOp.getRegion().front().getTerminator()->getOperands(), -1);
     } else if (auto regionOp = dyn_cast<RegionBranchOpInterface>(parentOp)) {
       SmallVector<RegionSuccessor, 2> entrySuccessors;
       regionOp.getSuccessorRegions(RegionBranchPoint::parent(),
                                    entrySuccessors);
       for (auto &entrySuccessor : entrySuccessors) {
-        if (fn(regionOp->getBlock(), regionOp.getEntrySuccessorOperands(
-                                         entrySuccessor.getSuccessor()))
+        if (fn(regionOp->getBlock(),
+               regionOp.getEntrySuccessorOperands(
+                   entrySuccessor.getSuccessor()),
+               0)
                 .wasInterrupted()) {
           break;
         }
       }
     } else if (auto callableOp = dyn_cast<CallableOpInterface>(parentOp)) {
       result |= walkIncomingCalls(callableOp, [&](CallOpInterface callOp) {
-        return fn(callOp->getBlock(), callOp.getArgOperands());
+        return fn(callOp->getBlock(), callOp.getArgOperands(), 0);
       });
     } else {
       LLVM_DEBUG({
@@ -546,7 +557,7 @@ TraversalResult Explorer::walkIncomingBranchOperands(
       if (sourceBlock->getSuccessor(i) == targetBlock) {
         auto operandRange =
             branchOp.getSuccessorOperands(i).getForwardedOperands();
-        if (fn(sourceBlock, operandRange).wasInterrupted()) {
+        if (fn(sourceBlock, operandRange, 0).wasInterrupted()) {
           return result;
         }
       }
@@ -561,8 +572,8 @@ TraversalResult Explorer::walkIncomingBlockArgument(
     std::function<WalkResult(Block *sourceBlock, Value operand)> fn) {
   return walkIncomingBranchOperands(
       blockArg.getParentBlock(),
-      [&](Block *sourceBlock, OperandRange operands) {
-        return fn(sourceBlock, operands[blockArg.getArgNumber()]);
+      [&](Block *sourceBlock, OperandRange operands, size_t offset) {
+        return fn(sourceBlock, operands[blockArg.getArgNumber() + offset]);
       });
 }
 
@@ -632,8 +643,9 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
   auto traverseBlockArg = [&](BlockArgument arg) {
     auto *targetBlock = arg.getParentBlock();
     return walkIncomingBranchOperands(
-        targetBlock, [&](Block *sourceBlock, OperandRange operands) {
-          auto branchOperand = operands[arg.getArgNumber()];
+        targetBlock,
+        [&](Block *sourceBlock, OperandRange operands, size_t offset) {
+          auto branchOperand = operands[arg.getArgNumber() + offset];
           LLVM_DEBUG({
             llvm::dbgs() << "   + queuing ";
             sourceBlock->printAsOperand(llvm::dbgs(), asmState);

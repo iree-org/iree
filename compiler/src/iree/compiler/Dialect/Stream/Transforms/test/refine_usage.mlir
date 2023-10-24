@@ -307,3 +307,38 @@ func.func @testWhileRecurse(%arg0 : !stream.resource<*>) -> !stream.resource<ext
   // CHECK: return %[[WHILE]]#0
   return %transfer : !stream.resource<external>
 }
+
+// -----
+
+// CHECK-LABEL: @testForOp
+// CHECK-SAME: %[[ARG0:.+]]: index
+// CHECK-SAME: %[[ARG1:.+]]: !stream.resource<external>
+func.func @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: %[[C4:.+]] = arith.constant 4 : index
+// CHECK: %[[DISP0:.+]] = stream.async.dispatch @dispatch0(%arg1[%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<external>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+  %dispatch6 = stream.async.dispatch @dispatch0(%arg1[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+  // CHECK: %[[FOR:.+]] = scf.for %[[ARG2:.+]] = %[[C0]] to %[[ARG0]] step %[[C1]] iter_args(%[[ARG3:.+]] = %[[DISP0]]) -> (!stream.resource<transient>) {
+  %for = scf.for %i = %c0 to %arg0 step %c1 iter_args(%arg3 = %dispatch6) -> (!stream.resource<*>) {
+
+    // CHECK:   %[[DISP1:.+]] = stream.async.dispatch @dispatch1(%[[ARG3]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+    // CHECK:   %[[DISP2:.+]] = stream.async.dispatch @dispatch2(%[[DISP1]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+    // CHECK:   %[[DISP3:.+]] = stream.async.dispatch @dispatch3(%[[DISP2]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+    %dispatch1 = stream.async.dispatch @dispatch1(%arg3[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    %dispatch2 = stream.async.dispatch @dispatch2(%dispatch1[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    %dispatch3 = stream.async.dispatch @dispatch3(%dispatch2[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    // CHECK:   scf.yield %[[DISP3]] : !stream.resource<transient>
+    scf.yield %dispatch3 : !stream.resource<*>
+  }
+  // CHECK: %[[DISP4:.+]] = stream.async.dispatch @dispatch4(%[[FOR]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<external>{%[[C4]]}
+  %dispatch5 = stream.async.dispatch @dispatch4(%for[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+  %transfer = stream.async.transfer %dispatch5 : !stream.resource<*>{%arg0} -> !stream.resource<external>{%arg0}
+
+  // CHECK: return %[[DISP4]] : !stream.resource<external>
+  return %transfer : !stream.resource<external>
+}
