@@ -74,6 +74,43 @@ module {
 }
 
 // -----
+// CHECK-LABEL: @t005_br_table
+module @t005_br_table {
+
+module {
+  // CHECK: vm.func private @my_fn
+  // CHECK-SAME: %[[FLAG:[a-zA-Z0-9$._-]+]]
+  // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
+  // CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]
+  // CHECK-SAME: %[[ARG3:[a-zA-Z0-9$._-]+]]
+  func.func @my_fn(%flag: i32, %arg1: i32, %arg2: i32, %arg3: i32) -> i32 {
+    // CHECK: %[[INDEX:.+]] = vm.sub.i32 %[[FLAG]], %c100
+    //      CHECK: vm.br_table %[[INDEX]] {
+    // CHECK-NEXT:   default: ^bb1(%[[ARG1]] : i32),
+    // CHECK-NEXT:   0: ^bb1(%[[ARG2]] : i32),
+    // CHECK-NEXT:   1: ^bb1(%[[ARG1]] : i32),
+    // CHECK-NEXT:   2: ^bb1(%[[ARG1]] : i32),
+    // CHECK-NEXT:   3: ^bb1(%[[ARG1]] : i32),
+    // CHECK-NEXT:   4: ^bb1(%[[ARG3]] : i32),
+    // CHECK-NEXT:   5: ^bb1(%[[ARG1]] : i32),
+    // CHECK-NEXT:   6: ^bb2
+    // CHECK-NEXT: }
+    cf.switch %flag : i32, [
+      default: ^bb1(%arg1 : i32),
+      104: ^bb1(%arg3 : i32),
+      100: ^bb1(%arg2 : i32),
+      106: ^bb2
+    ]
+  ^bb1(%0 : i32):
+    return %0 : i32
+  ^bb2:
+    return %arg1 : i32
+  }
+}
+
+}
+
+// -----
 // CHECK-LABEL: @t006_assert
 module @t006_assert {
 

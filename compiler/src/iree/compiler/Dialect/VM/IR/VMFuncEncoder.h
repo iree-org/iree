@@ -61,6 +61,11 @@ public:
                                      Operation::operand_range operands,
                                      int successorIndex) = 0;
 
+  // Encodes a branch table.
+  virtual LogicalResult encodeBranchTable(SuccessorRange caseSuccessors,
+                                          OperandRangeRange caseOperands,
+                                          int baseSuccessorIndex) = 0;
+
   // Encodes an operand value (by reference).
   virtual LogicalResult encodeOperand(Value value, int ordinal) = 0;
 

@@ -135,6 +135,9 @@ static inline iree_vm_type_def_t iree_vm_map_type(
 #define VM_DecConstI8(name) \
   OP_I8(0);                 \
   ++pc;
+#define VM_DecConstI16(name) \
+  OP_I16(0);                 \
+  pc += 2;
 #define VM_DecConstI32(name) \
   OP_I32(0);                 \
   pc += 4;
