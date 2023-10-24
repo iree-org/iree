@@ -150,14 +150,16 @@ class IreeDefinitionsTest(unittest.TestCase):
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
 
-        flags = run_config.materialize_run_flags(
-            gpu_id="10", inputs_dir=pathlib.PurePath("inputs_dir")
-        )
+        inputs_dir = pathlib.PurePath("inputs_dir")
+        flags = run_config.materialize_run_flags(gpu_id="10", inputs_dir=inputs_dir)
 
         self.assertIn("--device=cuda://10", flags)
-        self.assertIn("--input=@inputs_dir/input_0.npy", flags)
-        first_input_idx = flags.index("--input=@inputs_dir/input_0.npy")
-        self.assertEqual(flags[first_input_idx + 1], "--input=@inputs_dir/input_1.npy")
+        first_input = f'--input=@{inputs_dir / "input_0.npy"}'
+        self.assertIn(first_input, flags)
+        first_input_idx = flags.index(first_input)
+        self.assertEqual(
+            flags[first_input_idx + 1], f'--input=@{inputs_dir/"input_1.npy"}'
+        )
 
 
 class ModuleGenerationConfigTest(unittest.TestCase):
