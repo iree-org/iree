@@ -63,6 +63,9 @@ IREE_API_EXPORT void iree_vm_list_deinitialize(iree_vm_list_t* list);
 //
 // |element_type| can be set to iree_vm_make_undefined_type_def to indicate that
 // the list stores variants (each element can differ in type).
+//
+// Note: list types *must* be registered, e.g. by creating a VM instance with
+// `iree_vm_instance_create()`, prior to using this API.
 IREE_API_EXPORT iree_status_t iree_vm_list_create(
     const iree_vm_type_def_t element_type, iree_host_size_t initial_capacity,
     iree_allocator_t allocator, iree_vm_list_t** out_list);
