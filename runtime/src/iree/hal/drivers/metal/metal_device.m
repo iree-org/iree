@@ -22,6 +22,55 @@
 #include "iree/hal/utils/memory_file.h"
 #include "iree/hal/utils/resource_set.h"
 
+//===------------------------------------------------------------------------------------------===//
+// iree_hal_metal_arena_block_pool_t
+//===------------------------------------------------------------------------------------------===//
+
+static inline iree_status_t iree_hal_metal_arena_block_pool_create(
+    iree_host_size_t block_size, iree_allocator_t host_allocator,
+    iree_hal_metal_arena_block_pool_t** out_pool) {
+  IREE_ASSERT_ARGUMENT(out_pool);
+  *out_pool = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_metal_arena_block_pool_t* pool = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*pool), (void**)&pool));
+  iree_atomic_ref_count_init(&pool->ref_count);  // -> 1
+  pool->host_allocator = host_allocator;
+  iree_arena_block_pool_initialize(block_size, host_allocator, &pool->block_pool);
+  *out_pool = pool;
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+static inline void iree_hal_metal_arena_block_pool_destroy(
+    iree_hal_metal_arena_block_pool_t* pool) {
+  iree_allocator_t host_allocator = pool->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_ASSERT_REF_COUNT_ZERO(&pool->ref_count);
+  iree_arena_block_pool_deinitialize(&pool->block_pool);
+  iree_allocator_free(host_allocator, pool);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_hal_metal_arena_block_pool_retain(iree_hal_metal_arena_block_pool_t* pool) {
+  iree_atomic_ref_count_inc(&pool->ref_count);
+}
+
+void iree_hal_metal_arena_block_pool_release(iree_hal_metal_arena_block_pool_t* pool) {
+  if (iree_atomic_ref_count_dec(&pool->ref_count) == 1) {
+    iree_hal_metal_arena_block_pool_destroy(pool);
+  }
+}
+
+//===------------------------------------------------------------------------------------------===//
+// iree_hal_metal_device_t
+//===------------------------------------------------------------------------------------------===//
+
 typedef struct iree_hal_metal_device_t {
   // Abstract resource used for injecting reference counting and vtable; must be at offset 0.
   iree_hal_resource_t resource;
@@ -30,7 +79,7 @@ typedef struct iree_hal_metal_device_t {
 
   // Block pool used for command buffers with a larger block size (as command buffers can
   // contain inlined data uploads).
-  iree_arena_block_pool_t block_pool;
+  iree_hal_metal_arena_block_pool_t* block_pool;
 
   // Per-queue staging buffer for parameter uploads.
   iree_hal_metal_staging_buffer_t staging_buffer;
@@ -101,7 +150,6 @@ static iree_status_t iree_hal_metal_device_create_internal(
   iree_hal_resource_initialize(&iree_hal_metal_device_vtable, &device->resource);
   iree_string_view_append_to_buffer(identifier, &device->identifier,
                                     (char*)device + iree_sizeof_struct(*device));
-  iree_arena_block_pool_initialize(params->arena_block_size, host_allocator, &device->block_pool);
   device->params = *params;
   device->host_allocator = host_allocator;
 
@@ -133,6 +181,11 @@ static iree_status_t iree_hal_metal_device_create_internal(
   if (iree_status_is_ok(status)) {
     status = iree_hal_metal_builtin_executable_create(metal_device, host_allocator,
                                                       &device->builtin_executable);
+  }
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_metal_arena_block_pool_create(params->arena_block_size, host_allocator,
+                                                    &device->block_pool);
   }
 
   if (iree_status_is_ok(status)) {
@@ -178,7 +231,7 @@ static void iree_hal_metal_device_destroy(iree_hal_device_t* base_device) {
   [device->device release];                     // -1
 
   iree_hal_metal_staging_buffer_deinitialize(&device->staging_buffer);
-  iree_arena_block_pool_deinitialize(&device->block_pool);
+  iree_hal_metal_arena_block_pool_release(device->block_pool);
 
   iree_allocator_free(host_allocator, device);
 
@@ -210,7 +263,7 @@ static void iree_hal_metal_replace_device_allocator(iree_hal_device_t* base_devi
 
 static iree_status_t iree_hal_metal_device_trim(iree_hal_device_t* base_device) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
-  iree_arena_block_pool_trim(&device->block_pool);
+  iree_arena_block_pool_trim(&device->block_pool->block_pool);
   return iree_hal_allocator_trim(device->device_allocator);
 }
 
@@ -250,7 +303,7 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
 
   return iree_hal_metal_direct_command_buffer_create(
       base_device, mode, command_categories, binding_capacity,
-      device->command_buffer_resource_reference_mode, device->queue, &device->block_pool,
+      device->command_buffer_resource_reference_mode, device->queue, device->block_pool,
       &device->staging_buffer, device->builtin_executable, device->host_allocator,
       out_command_buffer);
 }
@@ -393,7 +446,7 @@ static iree_status_t iree_hal_metal_device_queue_execute(
 
   iree_hal_resource_set_t* resource_set = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_resource_set_allocate(&device->block_pool, &resource_set));
+      z0, iree_hal_resource_set_allocate(&device->block_pool->block_pool, &resource_set));
 
   iree_status_t status =
       iree_hal_resource_set_insert(resource_set, command_buffer_count, command_buffers);
@@ -446,9 +499,13 @@ static iree_status_t iree_hal_metal_device_queue_execute(
                                            value:signal_semaphore_list.payload_values[i]];
       }
 
+      // Retain the block pool to make sure it outlive the resource set we created in the above.
+      iree_hal_metal_arena_block_pool_t* pool = device->block_pool;
+      iree_hal_metal_arena_block_pool_retain(pool);
       [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         // Now we can release all retained resources.
         iree_hal_resource_set_free(resource_set);
+        iree_hal_metal_arena_block_pool_release(pool);
       }];
       [signal_command_buffer commit];
     }

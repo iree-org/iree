@@ -170,6 +170,8 @@ typedef struct iree_hal_metal_command_buffer_t {
   // For polyfilling fill/copy/update buffers that are not directly supported by Metal APIs.
   iree_hal_metal_builtin_executable_t* builtin_executable;
 
+  // Block pool for arena and resource set allocations; need to retain to outlive allocations.
+  iree_hal_metal_arena_block_pool_t* block_pool;
   // Arena used for all allocations; references the shared device block pool.
   iree_arena_allocator_t arena;
 
@@ -335,7 +337,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories, iree_host_size_t binding_capacity,
     iree_hal_metal_command_buffer_resource_reference_mode_t resource_reference_mode,
-    id<MTLCommandQueue> queue, iree_arena_block_pool_t* block_pool,
+    id<MTLCommandQueue> queue, iree_hal_metal_arena_block_pool_t* block_pool,
     iree_hal_metal_staging_buffer_t* staging_buffer,
     iree_hal_metal_builtin_executable_t* builtin_executable, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
@@ -362,10 +364,12 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
   command_buffer->device = device;
   command_buffer->queue = [queue retain];  // +1
   command_buffer->builtin_executable = builtin_executable;
-  iree_arena_initialize(block_pool, &command_buffer->arena);
+  command_buffer->block_pool = block_pool;
+  iree_arena_initialize(&block_pool->block_pool, &command_buffer->arena);
   command_buffer->staging_buffer = staging_buffer;
   command_buffer->host_allocator = host_allocator;
-  iree_status_t status = iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+  iree_status_t status =
+      iree_hal_resource_set_allocate(&block_pool->block_pool, &command_buffer->resource_set);
   if (iree_status_is_ok(status)) {
     iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
     @autoreleasepool {  // Use @autoreleasepool to trigger the autorelease within encoder creation.
@@ -396,9 +400,12 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     // Increase command buffer refcount in the shared staging buffer. We tie this to the command
     // buffer's lifetime to avoid resource leak.
     iree_hal_metal_staging_buffer_increase_command_buffer_refcount(staging_buffer);
+    // Retain the block pool to make sure it outlive arena and resource set allocations inside this
+    // command buffer.
+    iree_hal_metal_arena_block_pool_retain(block_pool);
     // Retain the device given that we refer to builtin executables and staging buffers whose
     // lifetime is associated with the device.
-    iree_hal_resource_retain(device);
+    iree_hal_device_retain(device);
   } else {
     iree_hal_metal_command_buffer_destroy_internal(&command_buffer->base);
   }
@@ -427,6 +434,7 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
   iree_hal_metal_command_buffer_t* command_buffer =
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   iree_hal_device_t* device = command_buffer->device;
+  iree_hal_metal_arena_block_pool_t* pool = command_buffer->block_pool;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Decrease command buffer refcount in the shared staging buffer, and potentially reclaim
@@ -437,7 +445,8 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
 
   iree_hal_metal_command_buffer_destroy_internal(base_command_buffer);
 
-  iree_hal_resource_release(device);
+  iree_hal_metal_arena_block_pool_release(pool);
+  iree_hal_device_release(device);
 
   IREE_TRACE_ZONE_END(z0);
 }
