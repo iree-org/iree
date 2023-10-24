@@ -1091,7 +1091,7 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
   return std::make_pair(tileSizes, scalableTileFlags);
 }
 
-// TODO.
+/// Adjust cache-level tile sizes based on the op shape.
 static SmallVector<int64_t>
 getMatmulCacheTileSizesForShape(ArrayRef<int64_t> inputTileSizes,
                                 ArrayRef<int64_t> inputShape) {
@@ -1204,8 +1204,8 @@ setRootConfig(func::FuncOp entryPointFn,
   }
 
   // TODO: We set cache tile sizes to the distribution sizes for now (no-op) to
-  // make sure there are no performance changes for now. This will let us change
-  // the distribution sizes while still preserving the cache behavior of the
+  // make sure there are no performance changes. This will let us change the
+  // distribution sizes while still preserving the cache behavior of the
   // original sizes. When we set proper sizes, we should call again
   // `getMatmulCacheTileSizesForShape(cacheTileSizes, distTileSizes);` here as
   // the `getDefaultDistributedLevelTileSizes` above may return sizes that are
