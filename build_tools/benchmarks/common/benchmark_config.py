@@ -126,4 +126,5 @@ class BenchmarkConfig:
             keep_going=args.keep_going,
             benchmark_min_time=args.benchmark_min_time,
             continue_from_previous=args.continue_from_previous,
+            verify=args.verify,
         )
