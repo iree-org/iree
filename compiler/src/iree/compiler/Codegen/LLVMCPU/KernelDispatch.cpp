@@ -2313,13 +2313,14 @@ adjustTileSizesForGenericOp(func::FuncOp entryPointFn,
 /// elementwise op and pack ops. This method sets the vectorization tile sizes
 /// for other compute ops. E.g., [[X, 0], [Y, 0], [0, 0], [0, 16]] for the
 /// elementwise operations and [[X, 0], [Y, 0], [0, 0], [0, 1]] for the pack op.
-static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
-                                           ArrayRef<Operation *> computeOps,
-                                           Operation *rootOperation) {
+static LogicalResult
+setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
+                               ArrayRef<Operation *> computeOps,
+                               Operation *rootOperation) {
   if (isa<linalg::ConvolutionOpInterface>(rootOperation)) {
     // TODO(dcaballe): We don't know yet how to properly propagate the lowering
     // config of a convolution.
-    return;
+    return success();
   }
 
   auto ctx = entryPointFn.getContext();
@@ -2346,7 +2347,7 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
       if (iterType == utils::IteratorType::parallel)
         continue;
       if (distTileSizes[idx] || parallelVecTileSizes[idx])
-        return;
+        return success();
     }
     maxLoopNums = std::max(maxLoopNums, iterTypes.size());
   }
@@ -2369,27 +2370,28 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   bool hasSeenPackOp = false;
   for (auto op : computeOps) {
     assert(!hasSeenPackOp && "Pack op must be the last op");
+    if (hasSeenPackOp)
+      return failure();
+
     // Tile sizes have been initialized from rootOperation, so we skip it.
     if (op == rootOperation)
       continue;
 
-    TypeSwitch<Operation *>(op)
-        .Case<tensor::PackOp>([&](auto packOp) {
-          if (failed(adjustTileSizesForPackOp(
-                  entryPointFn, packOp, distTileSizes, parallelVecTileSizes))) {
-            return;
-          }
-          hasSeenPackOp = true;
-        })
-        .Case<linalg::GenericOp>([&](auto genericOp) {
-          SmallVector<int64_t> reductionTileSizes;
-          if (failed(adjustTileSizesForGenericOp(entryPointFn, genericOp,
-                                                 parallelVecTileSizes,
-                                                 reductionTileSizes))) {
-            return;
-          }
-          reductionTileSizeMap[op] = reductionTileSizes;
-        });
+    if (auto packOp = dyn_cast<tensor::PackOp>(op)) {
+      if (failed(adjustTileSizesForPackOp(entryPointFn, packOp, distTileSizes,
+                                          parallelVecTileSizes))) {
+        return failure();
+      }
+      hasSeenPackOp = true;
+    } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      SmallVector<int64_t> reductionTileSizes;
+      if (failed(adjustTileSizesForGenericOp(entryPointFn, genericOp,
+                                             parallelVecTileSizes,
+                                             reductionTileSizes))) {
+        return failure();
+      }
+      reductionTileSizeMap[op] = reductionTileSizes;
+    }
   }
 
   LLVM_DEBUG(KD_DBGS() << "Parallel vector tile sizes: " << parallelVecTileSizes
@@ -2471,6 +2473,8 @@ static void setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                                                          scalableTileFlagsList);
     setLoweringConfig(op, config);
   }
+
+  return success();
 }
 
 /// Helper method to set the dispatch to be lowered through the default
@@ -2529,8 +2533,8 @@ setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
     }
   }
 
-  // The transform dialect codegen has differnet logics and codegen flow. Ignore
-  // the tile sizes adjustment.
+  // The transform dialect codegen has differnet logics and codegen flow.
+  // Ignore the tile sizes adjustment.
   auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
   if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
     if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
@@ -2538,7 +2542,10 @@ setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
     }
 
     // Set vector level tile sizes for other operations individually.
-    setLoweringConfigForComputeOps(entryPointFn, computeOps, rootOperation);
+    if (failed(setLoweringConfigForComputeOps(entryPointFn, computeOps,
+                                              rootOperation))) {
+      return failure();
+    }
   }
 
   return success();
@@ -2578,8 +2585,8 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     }
   }
 
-  // The root configuration setting introduces `tensor.dim` operations. Resolve
-  // those away.
+  // The root configuration setting introduces `tensor.dim` operations.
+  // Resolve those away.
   RewritePatternSet patterns(moduleOp.getContext());
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   return applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
