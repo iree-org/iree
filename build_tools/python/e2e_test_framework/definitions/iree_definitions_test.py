@@ -33,7 +33,6 @@ class IreeDefinitionsTest(unittest.TestCase):
 
         flags = iree_definitions.generate_run_flags(
             imported_model=imported_model,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
             module_execution_config=execution_config,
         )
 
@@ -41,8 +40,6 @@ class IreeDefinitionsTest(unittest.TestCase):
             flags,
             [
                 "--function=main",
-                "--input=1xf32=0",
-                "--input=2x2xf32=0",
                 "--task=10",
                 "--device=local-task",
             ],
@@ -70,14 +67,11 @@ class IreeDefinitionsTest(unittest.TestCase):
 
         flags = iree_definitions.generate_run_flags(
             imported_model=imported_model,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
             module_execution_config=execution_config,
             gpu_id="3",
         )
 
-        self.assertEqual(
-            flags, ["--function=main", "--input=1xf32=0", "--device=cuda://3"]
-        )
+        self.assertEqual(flags, ["--function=main", "--device=cuda://3"])
 
     def test_generate_run_flags_without_driver(self):
         imported_model = iree_definitions.ImportedModel.from_model(
@@ -101,12 +95,66 @@ class IreeDefinitionsTest(unittest.TestCase):
 
         flags = iree_definitions.generate_run_flags(
             imported_model=imported_model,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
             module_execution_config=execution_config,
             with_driver=False,
         )
 
-        self.assertEqual(flags, ["--function=main", "--input=1xf32=0", "--task=10"])
+        self.assertEqual(flags, ["--function=main", "--task=10"])
+
+    def test_materialize_run_flags(self):
+        imported_model = iree_definitions.ImportedModel.from_model(
+            common_definitions.Model(
+                id="1234",
+                name="tflite_m",
+                tags=[],
+                source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+                source_url="https://example.com/xyz.tflite",
+                entry_function="main",
+                input_types=["1xf32", "2x2xf32"],
+            )
+        )
+        compile_target = iree_definitions.CompileTarget(
+            target_backend=iree_definitions.TargetBackend.CUDA,
+            target_architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
+            target_abi=iree_definitions.TargetABI.LINUX_GNU,
+        )
+        compile_config = iree_definitions.CompileConfig(
+            id="compile_config_a",
+            name="compile_config_a",
+            tags=["test"],
+            compile_targets=[compile_target],
+        )
+        gen_config = iree_definitions.ModuleGenerationConfig.build(
+            imported_model=imported_model, compile_config=compile_config
+        )
+        exec_config = iree_definitions.ModuleExecutionConfig.build(
+            id="123",
+            tags=["test"],
+            loader=iree_definitions.RuntimeLoader.NONE,
+            driver=iree_definitions.RuntimeDriver.CUDA,
+        )
+        device_spec = common_definitions.DeviceSpec.build(
+            id="test_dev",
+            device_name="test_model",
+            host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
+            architecture=common_definitions.DeviceArchitecture.CUDA_SM80,
+        )
+        run_config = iree_definitions.E2EModelRunConfig.build(
+            gen_config,
+            exec_config,
+            device_spec,
+            common_definitions.ZEROS_MODEL_INPUT_DATA,
+            tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+        )
+
+        flags = run_config.materialize_run_flags(
+            gpu_id="10", inputs_dir=pathlib.PurePath("inputs_dir")
+        )
+
+        self.assertIn("--device=cuda://10", flags)
+        self.assertIn("--input=@inputs_dir/input_0.npy", flags)
+        first_input_idx = flags.index("--input=@inputs_dir/input_0.npy")
+        self.assertEqual(flags[first_input_idx + 1], "--input=@inputs_dir/input_1.npy")
 
 
 class ModuleGenerationConfigTest(unittest.TestCase):
