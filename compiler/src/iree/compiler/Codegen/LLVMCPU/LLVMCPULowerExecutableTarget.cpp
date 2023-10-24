@@ -157,11 +157,6 @@ static TilingConfig getTilingConfigForPipeline(ModuleOp moduleOp) {
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  if (!variantOp){
-    getOperation()->emitError(
-      "Expected a variantOp root");
-    return signalPassFailure();
-  }
   ModuleOp moduleOp = variantOp.getInnerModule();
   if (!moduleOp) {
     getOperation()->emitError(
