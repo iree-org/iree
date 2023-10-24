@@ -716,27 +716,24 @@ setVectorSizesForDynamicShapes(linalg::LinalgOp op,
                                           reductionSizes.end());
   setAlwaysVectorizeSizes(op, parallelSizes, reductionSizes);
 
-  bool isParallelDimVectorized = false;
-  for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
-    if (origParallelSizes[i] > 1) {
-      assert(parallelSizes[i] == 1 &&
-             "This tile size should have been set to one");
-      parallelSizes[i] = origParallelSizes[i];
-      isParallelDimVectorized = true;
-      break;
+  if (llvm::all_of(parallelSizes, [](int64_t size) { return size <= 1; })) {
+    // Make sure we vectorize at least the first innermost parallel dim with a
+    // vector size greater than one.
+    for (int i = origParallelSizes.size() - 1; i >= 0; --i) {
+      if (origParallelSizes[i] > 1) {
+        parallelSizes[i] = origParallelSizes[i];
+        break;
+      }
     }
-  }
-
-  if (isParallelDimVectorized) {
-    return;
-  }
-
-  for (int i = origReductionSizes.size() - 1; i >= 0; --i) {
-    if (origReductionSizes[i] > 1) {
-      assert(reductionSizes[i] == 1 &&
-             "This tile size should have been set to one");
-      reductionSizes[i] = origReductionSizes[i];
-      break;
+  } else if (llvm::all_of(reductionSizes,
+                          [](int64_t size) { return size <= 1; })) {
+    // Make sure we vectorize at least the first innermost reduction dim with a
+    // vector size greater than one.
+    for (int i = origReductionSizes.size() - 1; i >= 0; --i) {
+      if (origReductionSizes[i] > 1) {
+        reductionSizes[i] = origReductionSizes[i];
+        break;
+      }
     }
   }
 
@@ -744,7 +741,6 @@ setVectorSizesForDynamicShapes(linalg::LinalgOp op,
                        << "\n");
   LLVM_DEBUG(KD_DBGS() << "Reduction sizes for dynamic sizes: "
                        << reductionSizes << "\n");
-
   return;
 }
 
