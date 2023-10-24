@@ -614,3 +614,34 @@ func.func @asyncLoadStore(%operand: !stream.resource<staging>, %size: index) -> 
   // CHECK: return %[[RESULT]]
   return %1 : f32
 }
+
+// -----
+
+// Tests that we recurse into scf operations.
+
+// CHECK-LABEL: @scfFor
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<staging>,
+// CHECK-SAME:  %[[SIZE:.+]]: index)
+func.func @scfFor(%operand: !stream.resource<staging>, %size: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %zero = arith.constant 0.0 : f32
+
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK: %[[C2:.+]] = arith.constant 2 : index
+  // CHECK: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK: %[[ZERO:.+]] = arith.constant 0.0
+  // CHECK: %[[FOR:.+]] = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C4]] step %[[C2]] iter_args(%[[ARG3:.+]] = %[[ZERO]])
+  %sum = scf.for %i = %c0 to %c4 step %c2 iter_args(%arg0 = %zero) -> f32 {
+  // CHECK: %[[RESULT:.+]] = stream.resource.load %[[OPERAND]][%[[ARG2]]] : !stream.resource<staging>{%[[SIZE]]} -> f32
+    %0 = stream.async.load %operand[%i] : !stream.resource<staging>{%size} -> f32
+  // CHECK: stream.resource.store %cst, %[[OPERAND]][%[[ARG2]]] : f32 -> !stream.resource<staging>{%[[SIZE]]}
+    %1 = stream.async.store %zero, %operand[%i] : f32 -> %operand as !stream.resource<staging>{%size}
+    %2 = arith.addf %0, %arg0 : f32
+    scf.yield %2 : f32
+  }
+
+  // CHECK: return %[[FOR]]
+  return %sum : f32
+}
