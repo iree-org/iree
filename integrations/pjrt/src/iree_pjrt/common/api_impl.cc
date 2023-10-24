@@ -6,7 +6,6 @@
 
 #include "iree_pjrt/common/api_impl.h"
 
-#include <iostream>
 #include <optional>
 
 #include "iree/hal/api.h"
@@ -891,14 +890,12 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
   // If we encounter the zero dim case no transfer is required:
   if (has_zero_dim) {
-    std::cerr << "Hitting zero dim case\n";
     return HostBufferToDeviceZeroDim(
         type, dims, num_dims, out_done_with_host_buffer_event, out_buffer);
   }
 
   // If we encounter the splat case we can perform a fill instead:
   if (is_splat) {
-    std::cerr << "Hitting splat case\n";
     return HostBufferToDeviceSplat(data, type, dims, num_dims,
                                    out_done_with_host_buffer_event, out_buffer);
   }
