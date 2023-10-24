@@ -156,6 +156,8 @@ static iree_vm_ref_t MakeRef(V value) {
 static iree_vm_instance_t* instance = nullptr;
 struct VMListTest : public ::testing::Test {
   static void SetUpTestSuite() {
+    // Note: VM instance creation registers list types, which is required before
+    // using the list APIs.
     IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
                                           iree_allocator_system(), &instance));
     RegisterRefTypes(instance);
