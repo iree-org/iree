@@ -302,7 +302,6 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
     for (auto &op : *block) {
       if (isa<scf::SCFDialect>(op.getDialect())) {
         for (auto &subregion : op.getRegions()) {
-          llvm::errs() << "Recursing into: " << op.getName() << "\n";
           if (failed(processRegion(loc, context, subregion, configAttr)))
             return failure();
         }
