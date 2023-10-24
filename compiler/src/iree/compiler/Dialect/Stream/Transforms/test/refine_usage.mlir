@@ -318,7 +318,6 @@ func.func @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stream.reso
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
 
-
 // CHECK: %[[C0:.+]] = arith.constant 0 : index
 // CHECK: %[[C1:.+]] = arith.constant 1 : index
 // CHECK: %[[C4:.+]] = arith.constant 4 : index
