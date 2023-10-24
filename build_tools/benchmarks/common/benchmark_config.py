@@ -56,6 +56,7 @@ class BenchmarkConfig:
       times.
     continue_from_previous: skip the benchmarks if their results are found in
       the benchmark_results_dir.
+    verify: verify the output if model's expected output is available.
     """
 
     root_benchmark_dir: pathlib.Path
@@ -73,6 +74,7 @@ class BenchmarkConfig:
     keep_going: bool = False
     benchmark_min_time: float = 0
     continue_from_previous: bool = False
+    verify: bool = False
 
     @staticmethod
     def build_from_args(args: Namespace, git_commit_hash: str):

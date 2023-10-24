@@ -54,12 +54,14 @@ def generate_rules(
         runner_args = (
             iree_definitions.generate_run_flags(
                 imported_model=imported_model,
-                input_data=test_config.input_data,
                 module_execution_config=test_config.execution_config,
                 with_driver=False,
             )
             + test_config.extra_test_flags
         )
+        runner_args += [
+            f"--input={input_type}=0" for input_type in imported_model.model.input_types
+        ]
         cmake_rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
             target_name=test_config.name,
             driver=test_config.execution_config.driver.value,

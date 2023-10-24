@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 from typing import Any, List, Optional
 import atexit
 import json
+import requests
 import shutil
 import subprocess
 import tarfile
@@ -34,6 +35,7 @@ from common.benchmark_definition import (
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_artifacts import iree_artifacts
 from e2e_model_tests import run_module_utils
+
 import common.common_arguments
 
 
@@ -50,8 +52,34 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         benchmark_results_filename: Optional[pathlib.Path],
         capture_filename: Optional[pathlib.Path],
     ) -> None:
+        case_dir = benchmark_case.benchmark_case_dir
+        inputs_dir = None
+        expected_output_dir = None
+        if benchmark_case.input_uri:
+            inputs_dir = self.__fetch_and_unpack_npy(
+                uri=benchmark_case.input_uri, dest_dir=case_dir / "inputs_npy"
+            )
+        if benchmark_case.expected_output_uri:
+            expected_output_dir = self.__fetch_and_unpack_npy(
+                uri=benchmark_case.expected_output_uri, dest_dir=case_dir / "inputs_npy"
+            )
+
         if benchmark_results_filename:
+            if self.config.normal_benchmark_tool_dir is None:
+                raise ValueError("normal_benchmark_tool_dir can't be None.")
+
+            if self.config.verify and expected_output_dir:
+                if not inputs_dir:
+                    raise ValueError(f"Input data is missing for {benchmark_case}.")
+                self.__run_verify(
+                    tool_dir=self.config.normal_benchmark_tool_dir,
+                    benchmark_case=benchmark_case,
+                    inputs_dir=inputs_dir,
+                    expected_outputs_dir=expected_output_dir,
+                )
+
             self.__run_benchmark(
+                tool_dir=self.config.normal_benchmark_tool_dir,
                 benchmark_case=benchmark_case,
                 results_filename=benchmark_results_filename,
             )
@@ -62,7 +90,10 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             )
 
     def __build_tool_cmds(
-        self, benchmark_case: BenchmarkCase, tool_path: pathlib.Path
+        self,
+        benchmark_case: BenchmarkCase,
+        tool_path: pathlib.Path,
+        inputs_dir: Optional[pathlib.Path] = None,
     ) -> List[Any]:
         run_config = benchmark_case.run_config
         cmds: List[Any] = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
@@ -70,20 +101,69 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         )
         cmds.append(tool_path)
 
-        module_dir_path = benchmark_case.benchmark_case_dir
-        cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
-        cmds += run_config.materialize_run_flags(gpu_id=self.gpu_id)
+        cmds += [f"--module={iree_artifacts.MODULE_FILENAME}"]
+        cmds += run_config.materialize_run_flags(
+            gpu_id=self.gpu_id,
+            inputs_dir=inputs_dir,
+        )
 
         return cmds
 
-    def __run_benchmark(
-        self, benchmark_case: BenchmarkCase, results_filename: pathlib.Path
-    ):
-        if self.config.normal_benchmark_tool_dir is None:
-            raise ValueError("normal_benchmark_tool_dir can't be None.")
+    def __fetch_and_unpack_npy(self, uri: str, dest_dir: pathlib.Path) -> pathlib.Path:
+        out_dir = self.__unpack_file(
+            src=self.__fetch_file(
+                uri=uri,
+                dest=dest_dir.with_suffix(".tgz"),
+            ),
+            dest=dest_dir,
+        )
+        return out_dir.absolute()
 
+    def __fetch_file(self, uri: str, dest: pathlib.Path) -> pathlib.Path:
+        """Check and fetch file if needed."""
+        if dest.exists():
+            return dest
+        req = requests.get(uri, stream=True, timeout=60)
+        with dest.open("wb") as dest_file:
+            for data in req.iter_content():
+                dest_file.write(data)
+        return dest
+
+    def __unpack_file(self, src: pathlib.Path, dest: pathlib.Path) -> pathlib.Path:
+        """Unpack tar with/without compression."""
+        if dest.exists():
+            return dest
+        with tarfile.open(src) as tar_file:
+            tar_file.extractall(dest)
+        return dest
+
+    def __run_verify(
+        self,
+        tool_dir: pathlib.Path,
+        benchmark_case: BenchmarkCase,
+        inputs_dir: pathlib.Path,
+        expected_outputs_dir: pathlib.Path,
+    ):
+        cmd = self.__build_tool_cmds(
+            benchmark_case=benchmark_case,
+            tool_path=tool_dir / "iree-run-module",
+            inputs_dir=inputs_dir,
+        )
+        # Currently only support single output.
+        cmd.append(f'--expected_output=@{expected_outputs_dir / "output_0.npy"}')
+        cmd += benchmark_case.verify_params
+        execute_cmd_and_get_output(
+            cmd, verbose=self.verbose, cwd=benchmark_case.benchmark_case_dir
+        )
+
+    def __run_benchmark(
+        self,
+        tool_dir: pathlib.Path,
+        benchmark_case: BenchmarkCase,
+        results_filename: pathlib.Path,
+    ):
         tool_name = benchmark_case.benchmark_tool_name
-        tool_path = self.config.normal_benchmark_tool_dir / tool_name
+        tool_path = tool_dir / tool_name
         cmd = self.__build_tool_cmds(benchmark_case=benchmark_case, tool_path=tool_path)
 
         if tool_name == "iree-benchmark-module":
@@ -96,7 +176,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             )
 
         benchmark_stdout, benchmark_stderr = execute_cmd_and_get_output(
-            cmd, verbose=self.verbose
+            cmd, verbose=self.verbose, cwd=benchmark_case.benchmark_case_dir
         )
         benchmark_metrics = parse_iree_benchmark_metrics(
             benchmark_stdout, benchmark_stderr
