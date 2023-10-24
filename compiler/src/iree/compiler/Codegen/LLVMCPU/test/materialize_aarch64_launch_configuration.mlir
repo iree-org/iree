@@ -116,12 +116,12 @@ hal.executable private @matmul_tensors_sve  {
   ]>
 ]>
 hal.executable private @matmul_static_tensors_sve  {
-  hal.executable.variant @llvm, target = <"llvm-cpu", "embedded-elf-arm_64", {
+  hal.executable.variant @llvm target(<"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     cpu_features = "+sve",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
-  }> {
+  }>) {
     hal.executable.export @static_tensors_non_pow_two_sizes layout(#pipeline_layout)
     builtin.module {
       func.func @static_tensors_non_pow_two_sizes() {
