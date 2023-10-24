@@ -315,7 +315,6 @@ struct ApplyScfForOp : public UsageRefinementPattern<mlir::scf::ForOp> {
           didChange |= true;
       }
     }
-
     return success(didChange);
   }
 };
