@@ -1109,7 +1109,11 @@ void SetupHalBindings(nanobind::module_ m) {
                        "signaling semaphore");
       });
 
-  py::class_<HalFence>(m, "HalFence")
+  auto hal_fence = py::class_<HalFence>(m, "HalFence");
+  VmRef::BindRefProtocol(hal_fence, iree_hal_fence_type,
+                         iree_hal_fence_retain_ref, iree_hal_fence_deref,
+                         iree_hal_fence_isa);
+  hal_fence
       .def(
           "__init__",
           [](HalFence* new_fence, iree_host_size_t capacity) {
