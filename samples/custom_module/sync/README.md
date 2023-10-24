@@ -34,7 +34,7 @@ custom calls that work asynchronously.
     ```
     (here we force runtime execution tracing for demonstration purposes)
 
-    [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
+    [See here](https://iree.dev/building-from-source/getting-started/)
     for general instructions on building using CMake.
 
 3. Run the example program to call the main function:

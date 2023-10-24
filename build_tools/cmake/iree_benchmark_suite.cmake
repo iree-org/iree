@@ -33,7 +33,7 @@ function(iree_import_tflite_model)
                       " that iree-import-tflite be available "
                       " (either on PATH or via IREE_IMPORT_TFLITE_PATH). "
                       " Install from a release with "
-                      " `python -m pip install iree-tools-tflite -f https://openxla.github.io/iree/pip-release-links.html`")
+                      " `python -m pip install iree-tools-tflite -f https://iree.dev/pip-release-links.html`")
   endif()
 
   if(NOT TARGET "${_RULE_TARGET_NAME}")
@@ -88,7 +88,7 @@ function(iree_import_tf_model)
                       " that iree-import-tf be available "
                       " (either on PATH or via IREE_IMPORT_TF_PATH). "
                       " Install from a release with "
-                      " `python -m pip install iree-tools-tf -f https://openxla.github.io/iree/pip-release-links.html`")
+                      " `python -m pip install iree-tools-tf -f https://iree.dev/pip-release-links.html`")
   endif()
 
   if(NOT TARGET "${_RULE_TARGET_NAME}")

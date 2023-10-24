@@ -1,4 +1,4 @@
---find-links https://openxla.github.io/iree/pip-release-links.html
+--find-links https://iree.dev/pip-release-links.html
 git+https://github.com/iree-org/iree-jax@26006ef5842a604e28ea71e65e9224ad20f028e9#egg=iree-jax
 jax==0.4.2
 numpy==1.24.2
