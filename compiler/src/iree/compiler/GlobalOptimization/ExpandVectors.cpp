@@ -30,10 +30,6 @@ struct ExpandVectors
     if (!linalgOp || !linalgOp.hasTensorSemantics())
       return failure();
 
-    if (op.isRowMajorMatmul() || op.isColumnMajorMatmul() ||
-        op.isRowMajorBatchMatmul()) {
-      return rewriter.notifyMatchFailure(linalgOp, "op is already a matmul");
-    }
     Value lhs = linalgOp.getDpsInputs()[0];
     Value rhs = linalgOp.getDpsInputs()[1];
 
@@ -59,7 +55,7 @@ struct ExpandVectors
     Type outEType = vectorOutTy.getElementType();
 
     SmallVector<int64_t> expandedInDims, expandedOutDims;
-    bool isBatched = false;
+    bool isBatchMatmul = false;
     SmallVector<ReassociationIndices> ri = {{0, 1}};
 
     // Expand (N * NxM = M) into (1xN * NxM = 1xM)
@@ -76,7 +72,7 @@ struct ExpandVectors
       expandedOutDims = {vectorOutTy.getDimSize(0), vectorOutTy.getDimSize(1),
                          1};
       ri = {{0}, {1, 2}};
-      isBatched = true;
+      isBatchMatmul = true;
     }
 
     auto newVectorInTy = RankedTensorType::get(expandedInDims, inEType);
@@ -96,7 +92,7 @@ struct ExpandVectors
     } else {
       rhs = expandedIn;
     }
-    if (isBatched) {
+    if (isBatchMatmul) {
       matmul = rewriter
                    .create<linalg::BatchMatmulOp>(
                        loc, newVectorOutTy, ValueRange{lhs, rhs}, expandedOut)
