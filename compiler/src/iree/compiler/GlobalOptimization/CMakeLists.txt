@@ -42,6 +42,7 @@ iree_cc_library(
     "Convert1X1FilterConv2DToMatmul.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
+    "ExpandVectors.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "Passes.cpp"
     "RemoveZeroExtentTensors.cpp"
