@@ -157,11 +157,6 @@ void populateTopkSplitReductionPattern(
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
 
-/// Tile and decompose the winograd transform ops into a sequence
-/// of linalg ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createTileAndDecomposeWinogradTransformPass();
-
 // Creates a pass to convert linalg convolution ops into a sequence of
 // linalg_ext.winograd.* ops and linalg.batch_matmul ops using the winograd
 // tranformation.
@@ -172,13 +167,16 @@ std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 std::unique_ptr<Pass> createDecomposeSoftmaxPass();
 
 // Transform dialect version of tile and decompose attention wrapper.
-SmallVector<Operation *>
-tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
-                          RewriterBase &rewriter, bool onlyTile = false);
+LogicalResult tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
+                                        SmallVector<Operation *> &ops,
+                                        RewriterBase &rewriter,
+                                        bool onlyTile = false);
 
-// Creates a pass to convert the attention op into a sequence of
-// linalg ops.
-std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
+// Creates a pass to tile and decompose certain linalg_ext ops into a sequence
+// of linalg ops.
+std::unique_ptr<Pass>
+createTileAndDecomposePass(bool onlyTile = false,
+                           std::string targetPipeline = "CPU");
 
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";

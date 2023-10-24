@@ -165,8 +165,9 @@ DiagnosedSilenceableFailure LinalgExt::TileAndDecomposeAttentionOp::applyToOne(
     transform::TransformRewriter &rewriter, LinalgExt::AttentionOp attentionOp,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  SmallVector<Operation *> ops =
-      LinalgExt::tileAndDecomposeAttention(attentionOp, rewriter);
+  SmallVector<Operation *> ops;
+  if (failed(LinalgExt::tileAndDecomposeAttention(attentionOp, ops, rewriter)))
+    return DiagnosedSilenceableFailure::definiteFailure();
   for (auto op : ops)
     results.push_back(op);
   return DiagnosedSilenceableFailure::success();

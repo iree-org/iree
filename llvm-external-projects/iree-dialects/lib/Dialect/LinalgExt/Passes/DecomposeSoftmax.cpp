@@ -128,7 +128,8 @@ LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
   for (Operation *softmaxOp : softmaxOpsToDecompose) {
     // Cast linalg::softmax to AggregatedOpInterface since this where
     // `decomposeOperation` is implemented.
-    auto decomposableSoftmaxOp = cast<linalg::AggregatedOpInterface>(softmaxOp);
+    auto decomposableSoftmaxOp =
+        cast<mlir::linalg::AggregatedOpInterface>(softmaxOp);
 
     // Decompose linalg::softmax.
     FailureOr<SmallVector<Value>> result =

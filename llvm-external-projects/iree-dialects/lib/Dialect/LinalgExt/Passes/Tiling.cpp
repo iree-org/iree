@@ -391,16 +391,6 @@ void TilingInterfaceTilingPass::runOnOperation() {
           StringAttr::get(context, "tiling_repeated_indices_scatter_input"),
           StringAttr::get(context, "tiling_repeated_indices_scatter_output")));
 
-  patterns.add<TilingInterfaceTilingPattern>(
-      context, linalg::LinalgTilingOptions().setTileSizes({1, 32}),
-      IREE::LinalgExt::LinalgTransformationFilter(
-          StringAttr::get(context, "tiling_winograd_input_nhwc")));
-
-  patterns.add<TilingInterfaceTilingPattern>(
-      context, linalg::LinalgTilingOptions().setTileSizes({10, 30, 0}),
-      IREE::LinalgExt::LinalgTransformationFilter(
-          StringAttr::get(context, "tiling_attention")));
-
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

@@ -92,7 +92,8 @@ tileAndDistributeToWorkgroup(OpPassManager &pm,
       createConvertToDestinationPassingStylePass(
           useWARForCooperativeMatrixCodegen));
   nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+      IREE::LinalgExt::createTileAndDecomposePass(/*onlyTile=*/false,
+                                                  /*pipeline=*/"GPU"));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }

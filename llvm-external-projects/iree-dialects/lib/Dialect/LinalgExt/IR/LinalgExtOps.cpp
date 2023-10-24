@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -2188,50 +2189,147 @@ WinogradInputTransformOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-FailureOr<TilingResult>
-WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
-                                                 ArrayRef<OpFoldResult> offsets,
-                                                 ArrayRef<OpFoldResult> sizes) {
+static void computeLoopParams(SmallVectorImpl<Value> &lbs,
+                              SmallVectorImpl<Value> &ubs,
+                              SmallVectorImpl<Value> &steps, Value tensor,
+                              int numImageDims, Location loc,
+                              OpBuilder &builder) {
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  SmallVector<OpFoldResult> dimValues =
+      tensor::getMixedSizes(builder, loc, tensor);
+  for (int i = numImageDims; i < dimValues.size(); i++) {
+    lbs.push_back(zero);
+    ubs.push_back(getValueOrCreateConstantIndexOp(builder, loc, dimValues[i]));
+    steps.push_back(one);
+  }
+}
+
+FailureOr<TilingResult> WinogradInputTransformOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsetsTmp,
+    ArrayRef<OpFoldResult> sizesTmp) {
 
   Location loc = getLoc();
-  auto one = builder.getIndexAttr(1);
-  auto zero = builder.getIndexAttr(0);
-  const int cDim = channelDim();
+  builder.setInsertionPoint(*this);
+  auto funcOp = builder.getInsertionPoint()->getParentOfType<func::FuncOp>();
+  assert(funcOp && "Could not find parent of type funcOp");
 
-  assert(offsets.size() == 2);
-  SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
-  SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
-  outputOffsets[2] = inputOffsets[0] = offsets[0];
-  outputOffsets[5] = inputOffsets[cDim] = offsets[1];
-
-  SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
-  SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
-
-  assert(sizes.size() == 2);
-  auto inputShape = input().getType().cast<ShapedType>().getShape();
-  auto outputShape = output().getType().cast<ShapedType>().getShape();
-  SmallVector<OpFoldResult> inputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  SmallVector<OpFoldResult> outputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
-  outputSizes[2] = inputSizes[0] = sizes[0];
-  outputSizes[5] = inputSizes[cDim] = sizes[1];
-
-  SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, input(), inputOffsets, inputSizes, inputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, output(), outputOffsets,
-                                      outputSizes, outputStrides));
-
-  SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[1].getType());
+  const int64_t inputTileSize = getInputTileSize();
+  const int64_t outputTileSize = getOutputTileSize();
+  switch (outputTileSize) {
+  case 6:
+    break;
+  default:
+    return failure();
   }
 
-  Operation *tiledOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  Value input = this->input();
+  Value output = this->output();
+  auto outputType = output.getType().cast<ShapedType>();
+  auto inputType = input.getType().cast<ShapedType>();
+  SmallVector<int64_t> inputShape(inputType.getShape());
+  const bool isNchw = this->isNchw();
+  if (isNchw) {
+    permute<Permutation::NCHW_TO_NHWC>(inputShape);
+  }
+  Type elementType = outputType.getElementType();
+  const std::array<int64_t, 2> imageDims = nhwcImageDimensions();
+  const size_t numImageDims = imageDims.size();
+  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                imageDims.end());
+  SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
 
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  builder.setInsertionPointToStart(&funcOp.getBody().front());
+
+  SmallVector<Value> lbs, ubs, steps;
+  computeLoopParams(lbs, ubs, steps, output, numImageDims, loc, builder);
+  // Construct loops
+  builder.setInsertionPoint(*this);
+  scf::LoopNest loopNest = scf::buildLoopNest(
+      builder, loc, lbs, ubs, steps, ValueRange({output}),
+      [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
+          ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
+
+  // Extract input slice
+  auto one = builder.getIndexAttr(1);
+  auto zero = builder.getIndexAttr(0);
+  auto inputTileSizeAttr = builder.getIndexAttr(inputTileSize);
+  SmallVector<OpFoldResult> strides(getInputOperandRank(), one);
+  SmallVector<OpFoldResult> sizes(getInputOperandRank(), one);
+  SmallVector<OpFoldResult> offsets(getInputOperandRank(), zero);
+  SmallVector<Value> ivs;
+  for (scf::ForOp loop : loopNest.loops) {
+    ivs.push_back(loop.getInductionVar());
+  }
+  for (int i = 0; i < inputShape.size(); i++) {
+    if (!imageDimsSet.contains(i)) {
+      offsets[i] = ivs[i];
+    } else {
+      builder.setInsertionPointToStart(loopNest.loops[i].getBody());
+      AffineExpr dim0;
+      auto it = builder.getAffineConstantExpr(inputTileSize);
+      auto ot = builder.getAffineConstantExpr(outputTileSize);
+      auto delta = builder.getAffineConstantExpr(inputShape[i]);
+      bindDims(builder.getContext(), dim0);
+      AffineMap scaleMap =
+          AffineMap::get(1, 0, {dim0 * ot}, builder.getContext());
+      offsets[i] = builder.createOrFold<affine::AffineApplyOp>(
+          loc, scaleMap, ValueRange{ivs[i]});
+      AffineMap minMap =
+          AffineMap::get(1, 0, {-dim0 + delta, it}, builder.getContext());
+      sizes[i] = builder.createOrFold<affine::AffineMinOp>(
+          loc, minMap,
+          ValueRange{
+              getValueOrCreateConstantIndexOp(builder, loc, offsets[i])});
+    }
+  }
+  builder.setInsertionPointToStart(loopNest.loops.back().getBody());
+  auto tensorType = RankedTensorType::get(
+      SmallVector<int64_t>(numImageDims, ShapedType::kDynamic), elementType);
+  if (isNchw) {
+    permute<Permutation::NHWC_TO_NCHW>(offsets);
+    permute<Permutation::NHWC_TO_NCHW>(sizes);
+  }
+  Value dynamicSlice = builder.create<tensor::ExtractSliceOp>(
+      loc, tensorType, input, offsets, sizes, strides);
+
+  // Extract output slice
+  auto stridesOutputSlice =
+      SmallVector<OpFoldResult>(getOutputOperandRank(), one);
+  auto offsetsOutputSlice = SmallVector<OpFoldResult>(numImageDims, zero);
+  offsetsOutputSlice.append(ivs.begin(), ivs.end());
+  auto sizesOutputSlice =
+      SmallVector<OpFoldResult>(getOutputOperandRank(), one);
+  sizesOutputSlice[0] = sizesOutputSlice[1] = inputTileSizeAttr;
+  tensorType = RankedTensorType::get(inputTileSquare, elementType);
+  Value iterArg = loopNest.loops.back().getRegionIterArg(0);
+  Value outputSlice = builder.create<tensor::ExtractSliceOp>(
+      loc, tensorType, iterArg, offsetsOutputSlice, sizesOutputSlice,
+      stridesOutputSlice);
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.push_back(dynamicSlice);
+  tiledOperands.push_back(outputSlice);
+  Operation *tiledOp = mlir::clone(
+      builder, getOperation(), SmallVector<Type>({tensorType}), tiledOperands);
+
+  // Insert results into output slice
+  Value updatedOutput = builder.create<tensor::InsertSliceOp>(
+      loc, tiledOp->getResult(0), iterArg, offsetsOutputSlice, sizesOutputSlice,
+      stridesOutputSlice);
+
+  // Replace returned value
+  if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
+          loopNest.loops.back().getBody()->getTerminator())) {
+    OpBuilder::InsertionGuard yieldGuard(builder);
+    builder.setInsertionPoint(yieldOp);
+    auto newYieldOp = builder.create<scf::YieldOp>(
+        loc, yieldOp->getResultTypes(), updatedOutput);
+    yieldOp->replaceAllUsesWith(newYieldOp);
+    yieldOp->erase();
+  }
+
+  return TilingResult{{tiledOp}, SmallVector<Value>({loopNest.results[0]})};
 }
 
 LogicalResult WinogradInputTransformOp::getResultTilePosition(
@@ -2250,6 +2348,94 @@ LogicalResult WinogradInputTransformOp::getResultTilePosition(
     return success();
   }
   return failure();
+}
+
+FailureOr<SmallVector<Value>>
+WinogradInputTransformOp::decomposeOperation(OpBuilder &b) {
+  OpBuilder::InsertionGuard guard(b);
+  b.setInsertionPoint(*this);
+  Location loc = getLoc();
+  auto funcOp = b.getInsertionPoint()->getParentOfType<func::FuncOp>();
+  assert(funcOp && "Could not find parent of type funcOp");
+  b.setInsertionPointToStart(&funcOp.getBody().front());
+
+  Value dynamicSlice = input();
+  Value outputSlice = output();
+  assert(getInputOperandRank() == 2 && "input operand expected to have rank-2");
+  assert(getOutputOperandRank() == 2 &&
+         "output operand expected to have rank-2");
+  auto one = b.getIndexAttr(1);
+  auto zero = b.getIndexAttr(0);
+  const int64_t inputTileSize = getInputTileSize();
+  const std::array<int64_t, 2> imageDims = nhwcImageDimensions();
+  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                imageDims.end());
+  SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
+  Type elementType = getOutputOperandType().getElementType();
+  Value zeroF32 = b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
+  Value scratch = b.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
+  const float *BT{nullptr};
+  const float *B{nullptr};
+  B = IREE::LinalgExt::Winograd::B_6x6_3x3;
+  BT = IREE::LinalgExt::Winograd::BT_6x6_3x3;
+  Value BTV = IREE::LinalgExt::createValueFrom2DConstant(BT, inputTileSize,
+                                                         inputTileSize, loc, b);
+  Value BV = IREE::LinalgExt::createValueFrom2DConstant(B, inputTileSize,
+                                                        inputTileSize, loc, b);
+
+  auto inputExtractSliceOp =
+      dynamicSlice.getDefiningOp<tensor::ExtractSliceOp>();
+  SmallVector<OpFoldResult> staticOffsets = inputExtractSliceOp.getOffsets();
+  SmallVector<OpFoldResult> staticSizes = inputExtractSliceOp.getSizes();
+  // Harcoding input rank as 4 here - since we'd be getting a tiled version with
+  // rank 2. We are always expected to either have a rank 4 version of this op,
+  // or rank 2 (tiled). And at this point in the flow, it is guaranteed to be a
+  // rank 2 version of the op as ensured by the assertion above. Copy input
+  // slice into zeroed padded scratch space
+  SmallVector<OpFoldResult> offsets(2, zero);
+  SmallVector<OpFoldResult> sizes(4, one);
+  SmallVector<OpFoldResult> strides(2, one);
+  unsigned staticSizeIndexCounter = 0;
+  for (int i = 0; i < 4; i++) {
+    if (!imageDimsSet.contains(i)) {
+      continue;
+    }
+    sizes[i] = staticSizes[staticSizeIndexCounter++];
+  }
+  SmallVector<OpFoldResult> sliceOffsets;
+  SmallVector<OpFoldResult> sliceSizes;
+  if (isNchw()) {
+    permute<Permutation::NHWC_TO_NCHW>(sizes);
+  }
+  for (const int64_t dim : imageDimensions()) {
+    sliceSizes.push_back(sizes[dim]);
+  }
+  OpBuilder::InsertionGuard afterTiledWinogradInputTransformOp(b);
+  b.setInsertionPointAfter(*this);
+  linalg::FillOp fillOp =
+      b.create<linalg::FillOp>(loc, ValueRange{zeroF32}, ValueRange{scratch});
+  Value inputSlice = b.create<tensor::InsertSliceOp>(
+      loc, dynamicSlice, fillOp.result(), offsets, sliceSizes, strides);
+
+  // Create computation
+  Value result, AMatrix, BMatrix;
+  linalg::MatmulOp matmulOp;
+  Type tensorType = outputSlice.getType();
+  for (int i = 0; i < 2; i++) {
+    fillOp = b.create<linalg::FillOp>(loc, ValueRange{zeroF32},
+                                      ValueRange{outputSlice});
+    if (i == 0) {
+      AMatrix = inputSlice;
+      BMatrix = BV;
+    } else {
+      AMatrix = BTV;
+      BMatrix = result;
+    }
+    matmulOp = b.create<linalg::MatmulOp>(
+        loc, tensorType, ValueRange{AMatrix, BMatrix}, fillOp.result());
+    result = matmulOp.getResult(0);
+  }
+  return SmallVector<Value>{result};
 }
 
 LogicalResult WinogradInputTransformOp::fold(FoldAdaptor,
@@ -2362,48 +2548,115 @@ WinogradOutputTransformOp::getLoopIteratorTypes() {
 }
 
 FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
-    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes) {
-
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsetsTmp,
+    ArrayRef<OpFoldResult> sizesTmp) {
   Location loc = getLoc();
-  auto one = builder.getIndexAttr(1);
-  auto zero = builder.getIndexAttr(0);
-  const int cDim = channelDim();
+  builder.setInsertionPoint(*this);
+  auto funcOp = builder.getInsertionPoint()->getParentOfType<func::FuncOp>();
+  assert(funcOp && "Could not find parent of type funcOp");
 
-  assert(offsets.size() == 2);
-  SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
-  SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
-  inputOffsets[2] = outputOffsets[0] = offsets[0];
-  inputOffsets[5] = outputOffsets[cDim] = offsets[1];
-
-  SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
-  SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
-
-  assert(sizes.size() == 2);
-  auto inputShape = input().getType().cast<ShapedType>().getShape();
-  auto outputShape = output().getType().cast<ShapedType>().getShape();
-  SmallVector<OpFoldResult> inputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  SmallVector<OpFoldResult> outputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
-  inputSizes[2] = outputSizes[0] = sizes[0];
-  inputSizes[5] = outputSizes[cDim] = sizes[1];
-
-  SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, input(), inputOffsets, inputSizes, inputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, output(), outputOffsets,
-                                      outputSizes, outputStrides));
-
-  SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[1].getType());
+  const int64_t inputTileSize = getInputTileSize();
+  const int64_t outputTileSize = getOutputTileSize();
+  switch (outputTileSize) {
+  case 6:
+    break;
+  default:
+    return failure();
   }
 
-  Operation *tiledOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  Value input = this->input();
+  Value output = this->output();
+  auto outputType = output.getType().cast<ShapedType>();
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+  Type elementType = outputType.getElementType();
+  const std::array<int64_t, 2> imageDims = nhwcImageDimensions();
+  const size_t numImageDims = imageDims.size();
+  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                imageDims.end());
+  SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
 
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  builder.setInsertionPointToStart(&funcOp.getBody().front());
+
+  SmallVector<Value> lbs, ubs, steps;
+  computeLoopParams(lbs, ubs, steps, input, numImageDims, loc, builder);
+  builder.setInsertionPoint(*this);
+  // Construct loops
+  scf::LoopNest loopNest = scf::buildLoopNest(
+      builder, loc, lbs, ubs, steps, ValueRange({output}),
+      [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
+          ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
+
+  // Extract input slice
+  builder.setInsertionPointToStart(loopNest.loops.back().getBody());
+  auto one = builder.getIndexAttr(1);
+  auto zero = builder.getIndexAttr(0);
+  auto inputTileSizeAttr = builder.getIndexAttr(inputTileSize);
+  auto outputTileSizeAttr = builder.getIndexAttr(outputTileSize);
+  SmallVector<OpFoldResult> strides(getInputOperandRank(), one);
+  SmallVector<OpFoldResult> sizes(getInputOperandRank(), one);
+  SmallVector<OpFoldResult> offsets(numImageDims, zero);
+  sizes[0] = sizes[1] = inputTileSizeAttr;
+  SmallVector<Value> ivs;
+  for (scf::ForOp loop : loopNest.loops) {
+    ivs.push_back(loop.getInductionVar());
+  }
+  offsets.append(ivs.begin(), ivs.end());
+  auto tensorType = RankedTensorType::get(inputTileSquare, elementType);
+  tensor::ExtractSliceOp extractSliceOp =
+      builder.create<tensor::ExtractSliceOp>(loc, tensorType, input, offsets,
+                                             sizes, strides);
+  Value inputSlice = extractSliceOp.getResult();
+
+  // Extract output slice
+  strides = SmallVector<OpFoldResult>(getOutputOperandRank(), one);
+  offsets = SmallVector<OpFoldResult>(getOutputOperandRank(), zero);
+  sizes = SmallVector<OpFoldResult>(getOutputOperandRank(), one);
+  for (int i = 0; i < outputShape.size(); i++) {
+    if (!imageDimsSet.contains(i)) {
+      offsets[i] = ivs[i];
+    } else {
+      builder.setInsertionPointToStart(loopNest.loops[i].getBody());
+      AffineExpr dim0;
+      auto ot = builder.getAffineConstantExpr(outputTileSize);
+      bindDims(builder.getContext(), dim0);
+      AffineMap scaleMap =
+          AffineMap::get(1, 0, {dim0 * ot}, builder.getContext());
+      offsets[i] = builder.createOrFold<affine::AffineApplyOp>(
+          loc, scaleMap, ValueRange{ivs[i]});
+      sizes[i] = outputTileSizeAttr;
+    }
+  }
+  builder.setInsertionPointAfter(extractSliceOp);
+  tensorType = RankedTensorType::get(
+      SmallVector<int64_t>(numImageDims, outputTileSize), elementType);
+  Value iterArg = loopNest.loops.back().getRegionIterArg(0);
+  if (isNchw()) {
+    permute<Permutation::NHWC_TO_NCHW>(offsets);
+    permute<Permutation::NHWC_TO_NCHW>(sizes);
+  }
+  Value outputSlice = builder.create<tensor::ExtractSliceOp>(
+      loc, tensorType, iterArg, offsets, sizes, strides);
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.push_back(inputSlice);
+  tiledOperands.push_back(outputSlice);
+  Operation *tiledOp = mlir::clone(
+      builder, getOperation(), SmallVector<Type>({tensorType}), tiledOperands);
+
+  // Insert results into output slice
+  Value updatedOutput = builder.create<tensor::InsertSliceOp>(
+      loc, tiledOp->getResult(0), iterArg, offsets, sizes, strides);
+
+  // Replace returned value
+  if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
+          loopNest.loops.back().getBody()->getTerminator())) {
+    auto newYieldOp = builder.create<scf::YieldOp>(
+        loc, yieldOp->getResultTypes(), updatedOutput);
+    yieldOp->replaceAllUsesWith(newYieldOp);
+    yieldOp->erase();
+  }
+
+  return TilingResult{{tiledOp}, SmallVector<Value>({loopNest.results[0]})};
 }
 
 LogicalResult WinogradOutputTransformOp::getResultTilePosition(
@@ -2423,6 +2676,62 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
     return success();
   }
   return failure();
+}
+
+FailureOr<SmallVector<Value>>
+WinogradOutputTransformOp::decomposeOperation(OpBuilder &b) {
+  OpBuilder::InsertionGuard guard(b);
+  b.setInsertionPoint(*this);
+  Location loc = getLoc();
+  auto funcOp = b.getInsertionPoint()->getParentOfType<func::FuncOp>();
+  assert(funcOp && "Could not find parent of type funcOp");
+  b.setInsertionPointToStart(&funcOp.getBody().front());
+  Value inputSlice = input();
+  Value outputSlice = output();
+  assert(getInputOperandRank() == 2 && "input operand expected to have rank-2");
+  assert(getOutputOperandRank() == 2 &&
+         "output operand expected to have rank-2");
+  ShapedType outputType = getOutputOperandType();
+  Type elementType = outputType.getElementType();
+  const float *AT{nullptr};
+  const float *A{nullptr};
+  A = IREE::LinalgExt::Winograd::A_6x6_3x3;
+  AT = IREE::LinalgExt::Winograd::AT_6x6_3x3;
+  const int64_t inputTileSize = getInputTileSize();
+  const int64_t outputTileSize = getOutputTileSize();
+  /// The two values below are the transpose(A) [ATV]
+  /// and A [AV] constant matrices that convert the output
+  /// tile from the Winograd domain to the original domain.
+  Value ATV = IREE::LinalgExt::createValueFrom2DConstant(AT, outputTileSize,
+                                                         inputTileSize, loc, b);
+  Value AV = IREE::LinalgExt::createValueFrom2DConstant(A, inputTileSize,
+                                                        outputTileSize, loc, b);
+  Value zeroF32 = b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
+  SmallVector<int64_t> scratchShape = {inputTileSize, outputTileSize};
+  Value scratch = b.create<tensor::EmptyOp>(loc, scratchShape, elementType);
+  // Create computation
+  OpBuilder::InsertionGuard afterTiledWinogradOutputTransformOp(b);
+  b.setInsertionPointAfter(*this);
+  Value result, AMatrix, BMatrix;
+  linalg::MatmulOp matmulOp;
+  linalg::FillOp fillOp;
+  Value tmp;
+  for (int i = 0; i < 2; i++) {
+    tmp = i == 0 ? scratch : outputSlice;
+    fillOp =
+        b.create<linalg::FillOp>(loc, ValueRange{zeroF32}, ValueRange{tmp});
+    if (i == 0) {
+      AMatrix = inputSlice;
+      BMatrix = AV;
+    } else {
+      AMatrix = ATV;
+      BMatrix = result;
+    }
+    matmulOp = b.create<linalg::MatmulOp>(
+        loc, tmp.getType(), ValueRange{AMatrix, BMatrix}, fillOp.result());
+    result = matmulOp.getResult(0);
+  }
+  return SmallVector<Value>{result};
 }
 
 LogicalResult WinogradOutputTransformOp::fold(FoldAdaptor,
@@ -2541,55 +2850,213 @@ SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-FailureOr<TilingResult>
-AttentionOp::getTiledImplementation(OpBuilder &builder,
-                                    ArrayRef<OpFoldResult> offsets,
-                                    ArrayRef<OpFoldResult> sizes) {
-  assert(offsets.size() == getIterationDomainRank());
-  assert(sizes.size() == getIterationDomainRank());
-
-  Location loc = getLoc();
+static std::tuple<Value, Value, Value>
+extractSlices(Value key, Value value, Value query, ArrayRef<int64_t> queryShape,
+              ArrayRef<Value> ivs, OpFoldResult sequenceTileLength,
+              OpFoldResult headDimension, Type elementType, Location loc,
+              OpBuilder &builder) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
+  SmallVector<OpFoldResult> strides(queryShape.size(), one);
+  SmallVector<OpFoldResult> sizes(queryShape.size(), one);
+  SmallVector<OpFoldResult> offsets(queryShape.size(), zero);
+  sizes[1] = sequenceTileLength;
+  sizes[2] = headDimension;
+  offsets[1] = ivs[0];
+  SmallVector<int64_t> tensorShape{queryShape[1], queryShape[2]};
+  auto tensorType = RankedTensorType::get(tensorShape, elementType);
+  Value keySlice = builder.create<tensor::ExtractSliceOp>(
+      loc, tensorType, key, offsets, sizes, strides);
+  Value valueSlice = builder.create<tensor::ExtractSliceOp>(
+      loc, tensorType, value, offsets, sizes, strides);
 
-  SmallVector<OpFoldResult> queryOutputOffsets(getQueryRank(), zero);
-  SmallVector<OpFoldResult> queryOutputStrides(getQueryRank(), one);
-  ArrayRef<int64_t> queryShape = getQueryType().getShape();
-  SmallVector<OpFoldResult> queryOutputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(queryShape));
-  for (auto info : llvm::enumerate(llvm::zip(offsets, sizes))) {
-    queryOutputOffsets[info.index()] = std::get<0>(info.value());
-    queryOutputSizes[info.index()] = std::get<1>(info.value());
+  offsets = SmallVector<OpFoldResult>(queryShape.size(), zero);
+  Value querySlice = builder.create<tensor::ExtractSliceOp>(
+      loc, tensorType, query, offsets, sizes, strides);
+  return std::make_tuple(keySlice, valueSlice, querySlice);
+}
+
+static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
+                                    Value step, Value ub, ValueRange args,
+                                    Location loc, OpBuilder &builder) {
+  SmallVector<Value> lbs{lb};
+  SmallVector<Value> steps{step};
+  SmallVector<Value> ubs{ub};
+  scf::LoopNest loopNest = scf::buildLoopNest(
+      builder, loc, lbs, ubs, steps, args,
+      [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
+          ValueRange iterArgs) -> scf::ValueVector { return iterArgs; });
+  for (scf::ForOp loop : loopNest.loops)
+    ivs.push_back(loop.getInductionVar());
+  return loopNest;
+}
+
+static Value truncateToF16(OpBuilder &builder, Location loc, Value input,
+                           Value output) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{identityMap, identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, output.getType(), ValueRange{input}, output, indexingMaps,
+      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value result = b.create<arith::TruncFOp>(loc, b.getF16Type(), args[0]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  return genericOp.getResult(0);
+}
+
+static Value extractOrInsertOutputSlice(Value src, Value dst,
+                                        ArrayRef<int64_t> queryShape,
+                                        OpFoldResult sequenceTileLength,
+                                        OpFoldResult headDimension,
+                                        Location loc, OpBuilder &builder) {
+  auto one = builder.getIndexAttr(1);
+  auto zero = builder.getIndexAttr(0);
+  SmallVector<OpFoldResult> strides(3, one);
+  SmallVector<OpFoldResult> sizes = {one, sequenceTileLength, headDimension};
+  SmallVector<OpFoldResult> offsets(3, zero);
+  Value slice;
+  if (!dst) {
+    SmallVector<int64_t> accShape{queryShape[1], queryShape[2]};
+    Type elementType = src.getType().cast<ShapedType>().getElementType();
+    auto tensorType = RankedTensorType::get(accShape, elementType);
+    slice = builder.create<tensor::ExtractSliceOp>(loc, tensorType, src,
+                                                   offsets, sizes, strides);
+  } else {
+    slice = builder.create<tensor::InsertSliceOp>(loc, src, dst, offsets, sizes,
+                                                  strides);
+  }
+  return slice;
+}
+
+static Value extractOutputSlice(Value src, ArrayRef<int64_t> queryShape,
+                                OpFoldResult sequenceTileLength,
+                                OpFoldResult headDimension, Location loc,
+                                OpBuilder &builder) {
+  return extractOrInsertOutputSlice(src, {}, queryShape, sequenceTileLength,
+                                    headDimension, loc, builder);
+}
+
+static Value insertOutputSlice(Value src, Value dst,
+                               OpFoldResult sequenceTileLength,
+                               OpFoldResult headDimension, Location loc,
+                               OpBuilder &builder) {
+  return extractOrInsertOutputSlice(src, dst, {}, sequenceTileLength,
+                                    headDimension, loc, builder);
+}
+FailureOr<TilingResult>
+AttentionOp::getTiledImplementation(OpBuilder &builder,
+                                    ArrayRef<OpFoldResult> offsetsTmp,
+                                    ArrayRef<OpFoldResult> sizesTMp) {
+  Location loc = getLoc();
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPoint(*this);
+
+  Value query = getQuery();
+  ShapedType queryType = getQueryType();
+  Type elementType = queryType.getElementType();
+  ArrayRef<int64_t> queryShape = queryType.getShape();
+  SmallVector<OpFoldResult> queryDimValues =
+      tensor::getMixedSizes(builder, loc, query);
+  OpFoldResult headDimension = queryDimValues[2];
+  OpFoldResult sequenceTileLength = queryDimValues[1];
+
+  Value key = getKey();
+  Value value = getValue();
+  SmallVector<OpFoldResult> keyDimValues =
+      tensor::getMixedSizes(builder, loc, key);
+  OpFoldResult sequenceLength = keyDimValues[1];
+
+  // Create output accumulator
+  Value output = getOutput();
+  Type f32Type = builder.getF32Type();
+  SmallVector<OpFoldResult> accShape{queryDimValues[1], queryDimValues[2]};
+  Value accumulatorF32 =
+      builder.create<tensor::EmptyOp>(loc, accShape, f32Type);
+
+  // Create accumulator, max and sum statistics
+  Value outputSlice = extractOutputSlice(output, queryShape, sequenceTileLength,
+                                         headDimension, loc, builder);
+  Value zeroF32 =
+      builder.create<arith::ConstantOp>(loc, builder.getZeroAttr(f32Type));
+  auto accumulatorFill =
+      builder.create<linalg::FillOp>(loc, ValueRange{zeroF32}, accumulatorF32);
+  accumulatorF32 = accumulatorFill.result();
+
+  SmallVector<Operation *> ops;
+  ops.push_back(accumulatorFill);
+
+  Value largeNegativeF32 = builder.create<arith::ConstantOp>(
+      loc, builder.getFloatAttr(f32Type, -1.0e+30));
+  SmallVector<OpFoldResult> dims{sequenceTileLength};
+  Value max = builder.create<tensor::EmptyOp>(loc, dims, f32Type);
+  auto maxFill =
+      builder.create<linalg::FillOp>(loc, ValueRange{largeNegativeF32}, max);
+  Value negativeMax = maxFill.result();
+  ops.push_back(maxFill);
+  Value sum = builder.create<tensor::EmptyOp>(loc, dims, f32Type);
+  auto sumFill = builder.create<linalg::FillOp>(loc, ValueRange{zeroF32}, sum);
+  Value zeroSum = sumFill.result();
+  ops.push_back(sumFill);
+
+  // Construct sequential loop
+  SmallVector<Value> ivs;
+  Value zeroValue = builder.create<arith::ConstantIndexOp>(loc, 0);
+  scf::LoopNest loopNest = createLoopNest(
+      ivs, zeroValue,
+      getValueOrCreateConstantIndexOp(builder, loc, sequenceTileLength),
+      getValueOrCreateConstantIndexOp(builder, loc, sequenceLength),
+      ValueRange({accumulatorF32, negativeMax, zeroSum}), loc, builder);
+  ops.push_back(loopNest.loops.back());
+
+  Value iterArgResult = loopNest.loops.back().getRegionIterArg(0);
+  Value iterArgMax = loopNest.loops.back().getRegionIterArg(1);
+  Value iterArgSum = loopNest.loops.back().getRegionIterArg(2);
+
+  OpBuilder::InsertionGuard guardSecondLoop(builder);
+  builder.setInsertionPointToStart(loopNest.loops.back().getBody());
+
+  // Extract slices
+  auto [keySlice, valueSlice, querySlice] =
+      extractSlices(key, value, query, queryShape, ivs, sequenceTileLength,
+                    headDimension, elementType, loc, builder);
+
+  Operation *tiledOp = builder.create<IREE::LinalgExt::AttentionOp>(
+      loc,
+      SmallVector<Type>{accumulatorF32.getType(), sum.getType(), max.getType()},
+      SmallVector<Value>{querySlice, keySlice, valueSlice},
+      SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
+
+  Value tiledResult = tiledOp->getResult(0);
+  Value newMax = tiledOp->getResult(1);
+  Value newSum = tiledOp->getResult(2);
+
+  if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
+          loopNest.loops.back().getBody()->getTerminator())) {
+    OpBuilder::InsertionGuard yieldGuard(builder);
+    builder.setInsertionPoint(yieldOp);
+    auto newYieldOp =
+        builder.create<scf::YieldOp>(loc, yieldOp->getResultTypes(),
+                                     ValueRange{tiledResult, newMax, newSum});
+    yieldOp->replaceAllUsesWith(newYieldOp);
+    yieldOp->erase();
   }
 
-  SmallVector<OpFoldResult> keyValueOffsets(getKeyRank(), zero);
-  SmallVector<OpFoldResult> keyValueStrides(getKeyRank(), one);
-  ArrayRef<int64_t> keyShape = getKeyType().getShape();
-  SmallVector<OpFoldResult> keyValueSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(keyShape));
-  keyValueSizes[0] = sizes[0];
-  keyValueOffsets[0] = offsets[0];
+  OpBuilder::InsertionGuard yieldGuard(builder);
+  builder.setInsertionPointAfter(loopNest.loops.back());
+  if (elementType.isF16()) {
+    loopNest.results[0] =
+        truncateToF16(builder, loc, loopNest.results[0], outputSlice);
+    ops.push_back(loopNest.results[0].getDefiningOp());
+  }
+  loopNest.results[0] =
+      insertOutputSlice(loopNest.results[0], output, sequenceTileLength,
+                        headDimension, loc, builder);
 
-  SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(),
-                                      queryOutputOffsets, queryOutputSizes,
-                                      queryOutputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keyValueOffsets,
-                                      keyValueSizes, keyValueStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), keyValueOffsets,
-                                      keyValueSizes, keyValueStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(),
-                                      queryOutputOffsets, queryOutputSizes,
-                                      queryOutputStrides));
-
-  SmallVector<Type> resultTypes;
-  if (hasTensorSemantics())
-    resultTypes.push_back(tiledOperands[3].getType());
-
-  Operation *tiledOp =
-      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
-
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  ops.push_back(tiledOp);
+  return TilingResult{ops, SmallVector<Value>({loopNest.results[0]})};
 }
 
 LogicalResult AttentionOp::getResultTilePosition(
@@ -2608,6 +3075,241 @@ LogicalResult AttentionOp::getResultTilePosition(
     return success();
   }
   return failure();
+}
+
+static Value computeQKTranspose(Value query, Value key, Value output,
+                                Value zero, Location loc, OpBuilder &builder,
+                                SmallVector<Value> &intermediateResults) {
+  auto fillOp = builder.create<linalg::FillOp>(loc, ValueRange{zero}, output);
+  intermediateResults.push_back(fillOp.getResult(0));
+  Value acc = fillOp.result();
+  auto matmulOp = builder.create<linalg::MatmulTransposeBOp>(
+      loc, output.getType(), ValueRange{query, key}, acc);
+  Value result = matmulOp.getResult(0);
+  intermediateResults.push_back(result);
+  return result;
+}
+
+// Computes a reduction along the rows of a 2d tensor of shape MxN
+// to produce a tensor of shape M
+template <typename T>
+static Value computeRowwiseReduction(Value a, Value output, Location loc,
+                                     OpBuilder &builder,
+                                     SmallVector<Value> &intermediateResults) {
+  SmallVector<utils::IteratorType> iteratorTypes{
+      utils::IteratorType::parallel, utils::IteratorType::reduction};
+  AffineMap id = AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  // (d0, d1) -> (d0)
+  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{id, rowMap};
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, output.getType(), a, output, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value result = b.create<T>(loc, args[0], args[1]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  Value result = genericOp.getResult(0);
+  intermediateResults.push_back(result);
+  return result;
+}
+
+static Value computePartialSoftmax(Value qkTranspose, Value currentMax,
+                                   Location loc, OpBuilder &builder,
+                                   SmallVector<Value> &intermediateResults) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  // (d0, d1) -> (d0)
+  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{rowMap, identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, qkTranspose.getType(), ValueRange{currentMax}, qkTranspose,
+      indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value diff = b.create<arith::SubFOp>(loc, args[1], args[0]);
+        Value result = b.create<math::Exp2Op>(loc, diff);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  Value result = genericOp.getResult(0);
+  intermediateResults.push_back(result);
+  return result;
+}
+
+static Value updateAndScale(Value oldMax, Value newMax, Value oldSum,
+                            Location loc, OpBuilder &builder,
+                            SmallVector<Value> &intermediateResults) {
+  SmallVector<utils::IteratorType> iteratorTypes(1,
+                                                 utils::IteratorType::parallel);
+  auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
+  SmallVector<AffineMap> indexingMaps(3, identityMap);
+  SmallVector<Type> resultTypes{oldSum.getType()};
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, resultTypes, ValueRange{oldMax, newMax}, ValueRange{oldSum},
+      indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value diff = b.create<arith::SubFOp>(loc, args[0], args[1]);
+        Value weight = b.create<math::Exp2Op>(loc, diff);
+        Value scaledOldSum = b.create<arith::MulFOp>(loc, weight, args[2]);
+        b.create<linalg::YieldOp>(loc, ValueRange{scaledOldSum});
+      });
+  Value result = genericOp.getResult(0);
+  intermediateResults.push_back(result);
+  return result;
+}
+
+static Value computeReciprocal(Value x, Location loc, OpBuilder &builder,
+                               SmallVector<Value> &intermediateResults) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(1, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(1,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, x.getType(), ValueRange{}, x, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value one = b.create<arith::ConstantOp>(
+            loc, b.getFloatAttr(args[0].getType(), 1.0));
+        Value result = b.create<arith::DivFOp>(loc, one, args[0]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  Value result = genericOp.getResult(0);
+  intermediateResults.push_back(result);
+  return result;
+}
+
+static Value scalePartialSoftmax(Value softmax, Value inverseNewSum,
+                                 Location loc, OpBuilder &builder,
+                                 SmallVector<Value> &intermediateResults) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  // (d0, d1) -> (d0)
+  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{rowMap, identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, softmax.getType(), ValueRange{inverseNewSum}, softmax, indexingMaps,
+      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value result = b.create<arith::MulFOp>(loc, args[1], args[0]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  Value result = genericOp.getResult(0);
+  intermediateResults.push_back(result);
+  return result;
+}
+
+static Value scaleAccumulator(Value accumulator, Value scaledOldSum,
+                              Value inverseNewSum, Location loc,
+                              OpBuilder &builder,
+                              SmallVector<Value> &intermediateResults) {
+  AffineMap identityMap =
+      AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  AffineExpr d0, d1;
+  bindDims(builder.getContext(), d0, d1);
+  // (d0, d1) -> (d0)
+  auto rowMap = AffineMap::get(2, 0, {d0}, builder.getContext());
+  SmallVector<AffineMap> indexingMaps{rowMap, rowMap, identityMap};
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, accumulator.getType(), ValueRange{scaledOldSum, inverseNewSum},
+      accumulator, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value ratio = b.create<arith::MulFOp>(loc, args[0], args[1]);
+        Value result = b.create<arith::MulFOp>(loc, ratio, args[2]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  Value result = genericOp.getResult(0);
+  intermediateResults.push_back(result);
+  return result;
+}
+
+static void createAttentionBody(Value keySlice, Value valueSlice,
+                                Value querySlice, Value outputSlice,
+                                Value maxSlice, Value sumSlice,
+                                OpFoldResult sequenceTileLength,
+                                OpFoldResult headDimension, Type elementType,
+                                SmallVector<Value> &intermediateResults,
+                                Location loc, OpBuilder &builder) {
+
+  Type f32Type = builder.getF32Type();
+  // Compute matmul(q, transpose(k))
+  Value zero =
+      builder.create<arith::ConstantOp>(loc, builder.getZeroAttr(f32Type));
+  SmallVector<OpFoldResult> resultShape{sequenceTileLength, sequenceTileLength};
+  Value emptySquare =
+      builder.create<tensor::EmptyOp>(loc, resultShape, f32Type);
+  Value qkTranspose =
+      computeQKTranspose(querySlice, keySlice, emptySquare, zero, loc, builder,
+                         intermediateResults);
+
+  // Compute current statistics
+  Value newMax = computeRowwiseReduction<arith::MaximumFOp>(
+      qkTranspose, maxSlice, loc, builder, intermediateResults);
+  Value partialSoftmax = computePartialSoftmax(qkTranspose, newMax, loc,
+                                               builder, intermediateResults);
+  Value scaledOldSum = updateAndScale(maxSlice, newMax, sumSlice, loc, builder,
+                                      intermediateResults);
+  Value newSum = computeRowwiseReduction<arith::AddFOp>(
+      partialSoftmax, scaledOldSum, loc, builder, intermediateResults);
+  Value inverseNewSum =
+      computeReciprocal(newSum, loc, builder, intermediateResults);
+  Value softmax = scalePartialSoftmax(partialSoftmax, inverseNewSum, loc,
+                                      builder, intermediateResults);
+  if (elementType.isF16()) {
+    Value empty =
+        builder.create<tensor::EmptyOp>(loc, resultShape, builder.getF16Type());
+    softmax = truncateToF16(builder, loc, softmax, empty);
+    intermediateResults.push_back(softmax);
+  }
+
+  // Update accumulator
+  Value scaledAcc = scaleAccumulator(outputSlice, scaledOldSum, inverseNewSum,
+                                     loc, builder, intermediateResults);
+
+  // Compute matmul(softmax, v)
+  auto matmulOp = builder.create<linalg::MatmulOp>(
+      loc, scaledAcc.getType(), ValueRange{softmax, valueSlice}, scaledAcc);
+
+  Value result = matmulOp.getResult(0);
+  intermediateResults.push_back(result);
+  intermediateResults.push_back(newMax);
+  intermediateResults.push_back(newSum);
+  return;
+}
+
+FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
+  Location loc = getLoc();
+  Value keySlice = getKey();
+  Value valueSlice = getValue();
+  Value querySlice = getQuery();
+  Value tiledResult = getOutput();
+  Value max = *getMax();
+  Value sum = *getSum();
+
+  assert(max && "expected max statistic operand to be present");
+  assert(sum && "expected sum statistic operand to be present");
+
+  OpBuilder::InsertionGuard withinScfLoop(b);
+  b.setInsertionPointAfter(*this);
+  SmallVector<OpFoldResult> queryDimValues =
+      tensor::getMixedSizes(b, loc, querySlice);
+  OpFoldResult headDimension = queryDimValues[1];
+  OpFoldResult sequenceTileLength = queryDimValues[0];
+
+  SmallVector<Value> intermediateResults;
+  Type elementType = getQueryType().getElementType();
+  createAttentionBody(keySlice, valueSlice, querySlice, tiledResult, max, sum,
+                      sequenceTileLength, headDimension, elementType,
+                      intermediateResults, loc, b);
+  return intermediateResults;
 }
 
 LogicalResult AttentionOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {

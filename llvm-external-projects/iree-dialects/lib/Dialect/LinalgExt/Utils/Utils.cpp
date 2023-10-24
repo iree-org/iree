@@ -72,7 +72,7 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 }
 
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
-                                Location loc, RewriterBase &rewriter) {
+                                Location loc, OpBuilder &rewriter) {
   ArrayRef<float> vector(val, rows * cols);
   SmallVector<int64_t> shape{rows, cols};
   return rewriter.create<arith::ConstantOp>(

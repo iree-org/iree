@@ -603,7 +603,8 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
+      IREE::LinalgExt::createTileAndDecomposePass(/*onlyTile=*/false,
+                                                  /*pipeline=*/"SPIRV"));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createFoldAffineMinInDistributedLoopsPass());
   nestedModulePM.addPass(memref::createResolveShapedTypeResultDimsPass());

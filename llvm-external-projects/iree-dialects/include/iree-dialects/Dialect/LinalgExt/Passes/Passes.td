@@ -65,18 +65,6 @@ def TopkSplitReduction:
   ];
 }
 
-def TileAndDecomposeWinogradTransform :
-    Pass<"iree-linalg-ext-tile-and-decompose-winograd", "func::FuncOp"> {
-  let summary =
-      "Tiles and decomposes winograd transform ops into linalg ops";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createTileAndDecomposeWinogradTransformPass()";
-  let options = [
-    Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
-           "Choose whether to only tile or go through till decomposition">,
-  ];
-}
-
 def ConvertConv2DToWinograd :
     Pass<"iree-linalg-ext-convert-conv2d-to-winograd", ""> {
   let summary = "Convert linalg convolution ops to winograd based implementation";
@@ -91,15 +79,19 @@ def DecomposeSoftmax :
                     "createDecomposeSoftmaxPass()";
 }
 
-def TileAndDecomposeAttention :
-    Pass<"iree-linalg-ext-tile-and-decompose-attention", "func::FuncOp"> {
+def TileAndDecompose :
+    Pass<"iree-linalg-ext-tile-and-decompose", "func::FuncOp"> {
   let summary =
-      "Tiles and decomposes attention op into a sequence of linalg ops";
+      "Tiles and decomposes a few lingalg ext ops into sequence of linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createTileAndDecomposeAttentionPass()";
+                    "createTileAndDecomposePass()";
   let options = [
     Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
            "Choose whether to only tile or go through till decomposition">,
+  Option<"targetPipeline", "pipeline", "std::string",
+          /*default=*/"\"CPU\"",
+          "Optional target pipeline based on which we initiate certain ops' tiling"
+          "and decomposing">,
   ];
 }
 

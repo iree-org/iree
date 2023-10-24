@@ -253,6 +253,7 @@ gentbl_cc_library(
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:LinalgOpsTdFiles",
         "@llvm-project//mlir:TilingInterfaceTdFiles",
         "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],

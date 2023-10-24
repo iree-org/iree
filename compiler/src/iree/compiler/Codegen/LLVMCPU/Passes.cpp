@@ -136,9 +136,8 @@ static void addTileAndDistributePasses(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConcretizePadResultShapePass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
+      IREE::LinalgExt::createTileAndDecomposePass(/*onlyTile=*/false,
+                                                  /*pipeline=*/"CPU"));
 }
 
 //===---------------------------------------------------------------------===//
