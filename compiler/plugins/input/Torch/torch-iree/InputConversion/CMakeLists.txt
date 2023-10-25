@@ -35,6 +35,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "BitCastQuantTensor.cpp"
     "ConvertTMTensorToLinalgExt.cpp"
     "SetStrictSymbolicShapes.cpp"
     "Passes.cpp"
@@ -52,5 +53,6 @@ iree_cc_library(
     torch-mlir::TorchConversionDialectIR
     torch-mlir::TorchDialectPasses
     torch-mlir-dialects::TMTensorDialectIR
+    iree::compiler::Dialect::Flow::IR
   PUBLIC
 )

@@ -46,6 +46,20 @@ func.func @tensorReshapeWithMultipleUses(%input: tensor<5x24x48xf32>)
 
 // -----
 
+// CHECK-LABEL: @tensorBitCastWithSingleUse
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
+func.func @tensorBitCastWithSingleUse(%input: tensor<5x24x48xi8>) -> tensor<30x2x192xi4> {
+  // CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<30x2x192xi4> : index
+  // CHECK: %[[BITCAST:.+]] = stream.tensor.clone %[[INPUT]] : tensor<5x24x48xi8> in !stream.resource<*>{%[[INPUT_SIZE]]} -> tensor<30x2x192xi4> in !stream.resource<*>{%[[RESULT_SIZE]]}
+  %0 = flow.tensor.bitcast %input : tensor<5x24x48xi8> -> tensor<30x2x192xi4>
+  // CHECK: %[[RESULT:.+]] = stream.tensor.clone %[[BITCAST]] : tensor<30x2x192xi4> in !stream.resource<*>{%[[RESULT_SIZE]]} -> tensor<30x2x192xi4> in !stream.resource<*>{%[[RESULT_SIZE]]}
+  %1 = flow.tensor.clone %0 : tensor<30x2x192xi4>
+  // CHECK: return %[[RESULT]], %[[RESULT_SIZE]] : !stream.resource<*>, index
+  return %1 : tensor<30x2x192xi4>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorAlloca
 //  CHECK-SAME: (%[[DIM0:.+]]: index)
 func.func @tensorAlloca(%dim0: index) -> tensor<?x0xf32> {

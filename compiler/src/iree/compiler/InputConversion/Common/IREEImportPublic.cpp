@@ -517,6 +517,7 @@ void IREEImportPublicPass::runOnOperation() {
   ONE_TO_ONE(IREE::Input::TensorCloneOp, IREE::Flow::TensorCloneOp);
   ONE_TO_ONE(IREE::Input::TensorLoadOp, IREE::Flow::TensorLoadOp);
   ONE_TO_ONE(IREE::Input::TensorReshapeOp, IREE::Flow::TensorReshapeOp);
+  ONE_TO_ONE(IREE::Input::TensorBitCastOp, IREE::Flow::TensorBitCastOp);
   ONE_TO_ONE(IREE::Input::TensorSliceOp, IREE::Flow::TensorSliceOp);
   ONE_TO_ONE(IREE::Input::TensorSplatOp, IREE::Flow::TensorSplatOp);
   ONE_TO_ONE(IREE::Input::TensorStoreOp, IREE::Flow::TensorStoreOp);

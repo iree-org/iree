@@ -84,7 +84,7 @@ struct ConvertTensorBitcastPattern
     }
     auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
         op.getLoc(), op.getOperand(), rewriter);
-    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorBitCastOp>(
         op, op.getResult().getType(), op.getOperand(), dynamicDims,
         dynamicDims);
     return success();

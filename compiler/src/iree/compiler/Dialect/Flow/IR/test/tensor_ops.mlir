@@ -32,6 +32,15 @@ func.func @tensorReshapeComplex(%arg0 : tensor<4x4xcomplex<f32>>) -> tensor<16xc
 
 // -----
 
+// CHECK-LABEL: @tensorBitCast
+func.func @tensorBitCast(%arg0 : tensor<16xi32>) -> tensor<4x8xi16> {
+  // CHECK-NEXT: %0 = flow.tensor.bitcast %arg0 : tensor<16xi32> -> tensor<4x8xi16>
+  %0 = flow.tensor.bitcast %arg0 : tensor<16xi32> -> tensor<4x8xi16>
+  return %0 : tensor<4x8xi16>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorLoad
 func.func @tensorLoad(%arg0 : tensor<4x4xf32>, %arg1 : index, %arg2 : index) -> f32 {
   // CHECK-NEXT: %0 = flow.tensor.load %arg0[%arg1, %arg2] : tensor<4x4xf32>

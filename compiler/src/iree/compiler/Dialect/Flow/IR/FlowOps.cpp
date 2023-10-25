@@ -1627,6 +1627,36 @@ SmallVector<int64_t> TensorReshapeOp::getTiedResultOperandIndices() {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.bitcast
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorBitCastOp::verify() {
+  // The element types don't need to match, we can just check the requisite
+  // number of dynamic dims.
+  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
+                                 getSourceDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 {getResultDims()}))) {
+    return failure();
+  }
+
+  return success();
+}
+
+Value TensorBitCastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+TensorBitCastOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> TensorBitCastOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.load
 //===----------------------------------------------------------------------===//
 

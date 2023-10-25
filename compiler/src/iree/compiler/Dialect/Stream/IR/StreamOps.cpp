@@ -1180,7 +1180,8 @@ bool TensorSplatOp::preferCloneToConsumers() { return true; }
 
 LogicalResult TensorCloneOp::verify() {
   TensorCloneOp op = *this;
-  // Clones can't change encodings but they can change shape information.
+  // Clones can't change encodings but they can change shape and element type
+  // information.
   auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
   auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
   if (sourceEncoding.getEncoding() != resultEncoding.getEncoding()) {
