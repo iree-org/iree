@@ -121,6 +121,7 @@ struct MaterializeUserConfigsPass
 
       if (res.wasInterrupted()) {
         moduleOp.emitOpError("error in setting user configuration");
+        return signalPassFailure();
       }
 
       /// Let user configs take priority over the global strategy flag.
@@ -137,6 +138,7 @@ struct MaterializeUserConfigsPass
             moduleOp.emitOpError(
                 "unhandled compilation of entry point functions with different "
                 "translation info");
+            return signalPassFailure();
           }
         } else {
           translationInfo = exportedTranslationInfo;
@@ -146,11 +148,13 @@ struct MaterializeUserConfigsPass
           moduleOp.emitOpError(
               "unhandled compilation of entry point functions with translation "
               "info optionality");
+          return signalPassFailure();
         }
         if (clTranslationInfo) {
           translationInfo = clTranslationInfo;
           if (failed(setTranslationInfo(funcOp, translationInfo.value()))) {
             moduleOp.emitOpError("failed to set command line translation info");
+            return signalPassFailure();
           }
         }
       }

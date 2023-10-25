@@ -88,7 +88,7 @@ LogicalResult TranslationInfoAttr::verify(
   }
   auto tdPassPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen;
-  if (codegenSpec != SymbolRefAttr() && passPipelineValue != tdPassPipeline) {
+  if (codegenSpec && passPipelineValue != tdPassPipeline) {
     return emitError()
            << "transform dialect codegen spec requires pass pipeline : "
            << stringifyEnum(tdPassPipeline);
