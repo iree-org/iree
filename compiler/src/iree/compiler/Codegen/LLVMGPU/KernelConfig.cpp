@@ -9,7 +9,6 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
@@ -1140,12 +1139,6 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
-  if (IREE::Codegen::CompilationInfoAttr compilationInfo =
-          getCompilationInfo(computeOp)) {
-    // If the op already has a lowering config coming from the IR use this and
-    // bypass the heuristic.
-    return setUserConfig(entryPointFn, computeOp, compilationInfo);
-  }
   // First try to see if there is a transform dialect configuration existing.
   if (succeeded(
           setTransformDialectConfig(entryPointFn, computeOp, targetInfo))) {
@@ -1183,6 +1176,24 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   return setRootDefaultConfig(entryPointFn, computeOp);
 }
 
+// Propogate the configuration to the other ops.
+// TODO(ravishankarm, thomasraoux): This is a very specific use (and
+// fragile). In general, this should not be needed. Things are already tiled
+// and distributed. The rest of the compilation must be structured to either
+// use `TileAndFuse` or they are independent configurations that are
+// determined based on the op.
+static void propagateLoweringConfig(Operation *rootOperation,
+                                    SmallVector<Operation *> computeOps) {
+  if (IREE::Codegen::LoweringConfigAttr config =
+          getLoweringConfig(rootOperation)) {
+    for (auto op : computeOps) {
+      if (op == rootOperation)
+        continue;
+      setLoweringConfig(op, config);
+    }
+  }
+}
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -1194,10 +1205,20 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp)
       continue;
-    if (getTranslationInfo(exportOp))
-      continue;
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+    if (getTranslationInfo(exportOp)) {
+      // Currently LLVMGPU requires propagation of user lowering configs.
+      for (auto op : computeOps) {
+        if (getLoweringConfig(op)) {
+          propagateLoweringConfig(op, computeOps);
+          break;
+        }
+      }
+      continue;
+    }
+
     Operation *rootOperation = nullptr;
+
     // Find the root operation. linalg.generic and linalg.fill are not root
     // operations if there are other compute operations present.
     for (Operation *op : llvm::reverse(computeOps)) {
@@ -1231,20 +1252,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     if (failed(setRootConfig(funcOp, rootOperation)))
       continue;
 
-    // Propogate the configuration to the other ops.
-    // TODO(ravishankarm, thomasraoux): This is a very specific use (and
-    // fragile). In general, this should not be needed. Things are already tiled
-    // and distributed. The rest of the compilation must be structured to either
-    // use `TileAndFuse` or they are independent configurations that are
-    // determined based on the op.
-    if (IREE::Codegen::LoweringConfigAttr config =
-            getLoweringConfig(rootOperation)) {
-      for (auto op : computeOps) {
-        if (op == rootOperation)
-          continue;
-        setLoweringConfig(op, config);
-      }
-    }
+    propagateLoweringConfig(rootOperation, computeOps);
   }
   return success();
 }

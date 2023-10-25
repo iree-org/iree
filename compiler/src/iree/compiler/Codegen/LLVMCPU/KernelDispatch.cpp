@@ -10,7 +10,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
-#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
@@ -2375,15 +2374,6 @@ static LogicalResult lowerUsingDefaultPipeline(func::FuncOp entryPointFn) {
 static LogicalResult
 setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
                                 ArrayRef<Operation *> computeOps) {
-  // First check if the operations have a preset pipeline. If the config is
-  // preset, do not overwrite it.
-  for (auto computeOp : computeOps) {
-    if (IREE::Codegen::CompilationInfoAttr compilationInfo =
-            getCompilationInfo(computeOp)) {
-      return setUserConfig(entryPointFn, computeOp, compilationInfo);
-    }
-  }
-
   // Make sure that lowering_config is not preset on any compute ops.
   for (auto computeOp : computeOps) {
     if (getLoweringConfig(computeOp))

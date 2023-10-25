@@ -1,5 +1,5 @@
 // RUN: iree-opt \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' \
 // RUN:   --verify-diagnostics --split-input-file %s
 
 #compilation = #iree_codegen.compilation_info<

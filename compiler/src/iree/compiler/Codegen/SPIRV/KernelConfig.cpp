@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
@@ -1660,13 +1659,6 @@ setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
 static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
                                       func::FuncOp entryPointFn,
                                       Operation *rootOp) {
-  if (IREE::Codegen::CompilationInfoAttr compilationInfo =
-          getCompilationInfo(rootOp)) {
-    // If the op already has a lowering configuration specified from the
-    // original source by the user, then use it directly.
-    return setUserConfig(entryPointFn, rootOp, compilationInfo);
-  }
-
   // First try to see if there is a matching transform dialect configuration.
   if (succeeded(setTransformDialectConfig(entryPointFn, rootOp, targetEnv))) {
     return success();
