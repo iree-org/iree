@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-global-opt-expand-vectors --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-expand-vectors --split-input-file %s | FileCheck %s
 
 func.func @vecmat_f32f32f32(%arg0 : tensor<250xf32>, %arg1 : tensor<250x100xf32>,
     %arg2 : tensor<100xf32>) -> tensor<100xf32> {

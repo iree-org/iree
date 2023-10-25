@@ -27,8 +27,9 @@ struct ExpandVectors
   LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
-    if (!linalgOp || !linalgOp.hasTensorSemantics())
+    if (!linalgOp.hasTensorSemantics()) {
       return failure();
+    }
 
     Value lhs = linalgOp.getDpsInputs()[0];
     Value rhs = linalgOp.getDpsInputs()[1];
@@ -44,8 +45,8 @@ struct ExpandVectors
     }
 
     auto vectorOut = linalgOp.getDpsInits()[0];
-    auto vectorInTy = llvm::dyn_cast<RankedTensorType>(vectorIn.getType());
-    auto vectorOutTy = llvm::dyn_cast<RankedTensorType>(vectorOut.getType());
+    auto vectorInTy = dyn_cast<RankedTensorType>(vectorIn.getType());
+    auto vectorOutTy = dyn_cast<RankedTensorType>(vectorOut.getType());
 
     if (!vectorInTy || !vectorOutTy) {
       return failure();
@@ -58,16 +59,16 @@ struct ExpandVectors
     bool isBatchMatmul = false;
     SmallVector<ReassociationIndices> ri = {{0, 1}};
 
-    // Expand (N * NxM = M) into (1xN * NxM = 1xM)
     if (op.isVecmat()) {
+      // Expand (N * NxM = M) into (1xN * NxM = 1xM)
       expandedInDims = {1, vectorInTy.getDimSize(0)};
       expandedOutDims = {1, vectorOutTy.getDimSize(0)};
-      // Expand (NxM * M = N) into (NxM * Mx1 = Mx1)
     } else if (op.isMatvec()) {
+      // Expand (NxM * M = N) into (NxM * Mx1 = Mx1)
       expandedInDims = {vectorInTy.getDimSize(0), 1};
       expandedOutDims = {vectorOutTy.getDimSize(0), 1};
-      // Expand (BxNxM * BxM = BxN) into (BxNxM * BxMx1 = BxMx1)
     } else {
+      // Expand (BxNxM * BxM = BxN) into (BxNxM * BxMx1 = BxMx1)
       expandedInDims = {vectorInTy.getDimSize(0), vectorInTy.getDimSize(1), 1};
       expandedOutDims = {vectorOutTy.getDimSize(0), vectorOutTy.getDimSize(1),
                          1};
