@@ -171,6 +171,11 @@ class Parser(argparse.ArgumentParser):
             "information",
         )
         self.add_argument(
+            "--verify",
+            action="store_true",
+            help="Verify the output when the expected output is available",
+        )
+        self.add_argument(
             "--execution_benchmark_config",
             type=_check_file_path,
             required=True,
