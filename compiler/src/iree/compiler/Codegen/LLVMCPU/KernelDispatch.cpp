@@ -865,15 +865,19 @@ static LogicalResult setMatmulNoPadRootConfig(
     bool allowIncompleteTile =
         vecPreProcStrategy == VectorPreProcStrategy::Peeling ||
         vecPreProcStrategy == VectorPreProcStrategy::Masking;
+    // The backend struggles to legalize non-power-of-two scalable vectors.
+    bool enforcePowerOfTwo = vecScalableDims[index];
 
     if (sz != 0) {
       sz = getMaxVectorTileSize(
           /*lb=*/0, /*ub=*/shape[index],
-          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile);
+          /*maxTileSize=*/sz, vectorSize, allowIncompleteTile,
+          enforcePowerOfTwo);
     }
     parallelTileSizes.push_back(sz);
-    // TODO: How to handle scalable sizes with getMaxVectorTileSize()?
-    parallelScalableFlags.push_back(vecScalableDims[index]);
+    // 1x scalable vectors e.g. vector<[1]xty> are also poorly supported, so
+    // fallback to fixed vectorization if they occur:
+    parallelScalableFlags.push_back(sz > 1 ? vecScalableDims[index] : false);
   }
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
