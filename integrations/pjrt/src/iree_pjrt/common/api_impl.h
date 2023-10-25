@@ -214,6 +214,16 @@ class DeviceInstance {
   bool is_addressable() { return true; }
   int local_hardware_id() { return -1; }
 
+  iree_status_t HostBufferToDeviceZeroDim(
+      PJRT_Buffer_Type type, const int64_t* dims, size_t num_dims,
+      EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
+  iree_status_t HostBufferToDeviceSplat(
+      const void* data, PJRT_Buffer_Type type, const int64_t* dims,
+      size_t num_dims, EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
   // Copies a host buffer to the device.
   // See PJRT_Client_BufferFromHostBuffer
   iree_status_t HostBufferToDevice(
