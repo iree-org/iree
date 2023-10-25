@@ -446,9 +446,16 @@ static iree_status_t iree_hal_metal_device_queue_execute(
                                            value:signal_semaphore_list.payload_values[i]];
       }
 
+      // We use a resource set to keep track of resources in the above. So here we need to retain
+      // the device to make sure the block pool behind outlives the resource set.
+      iree_hal_device_retain(base_device);
       [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         // Now we can release all retained resources.
         iree_hal_resource_set_free(resource_set);
+        // And then release the device handle. Note that this must happen separately--if we put the
+        // device itself in the resource set, we can destroy the block pool data structure inside
+        // the device prematurely, before the resource set free procedure done scanning it.
+        iree_hal_device_release(base_device);
       }];
       [signal_command_buffer commit];
     }
