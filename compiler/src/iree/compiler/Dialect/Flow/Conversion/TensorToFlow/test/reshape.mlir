@@ -88,4 +88,3 @@ func.func @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>)
   %1 = tensor.reshape %arg0(%0)
              : (tensor<?x4xf32>, tensor<2xindex>) -> tensor<?x1xf32>
   return %1 : tensor<?x1xf32> }
-  

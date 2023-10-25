@@ -297,7 +297,8 @@ void populateTensorToFlowConversionPatterns(MLIRContext *context,
       .insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
               ConvertTensorCastPattern, ConvertTensorExtractPattern,
               ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
-              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern, ConvertTensorDialectReshapeOpPattern,
+              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern, 
+              ConvertTensorDialectReshapeOpPattern,
               ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
               ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
