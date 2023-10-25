@@ -244,8 +244,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                                hasSMEFeature(target);
       if (!testLoweringConfiguration) {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
+        // No pipleline specified, nothing to do.
         case IREE::Codegen::DispatchLoweringPassPipeline::None:
+          return;
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
           addCPUDefaultPassPipeline(executableLoweringPipeline);
           break;
         case IREE::Codegen::DispatchLoweringPassPipeline::

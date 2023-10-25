@@ -194,6 +194,9 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
     case CodeGenPipeline::TransformDialectCodegen:
       addSPIRVTransformDialectPassPipeline(pipeline);
       break;
+    // No pipeline specified, nothing to do.
+    case CodeGenPipeline::None:
+      return;
     default:
       variantOp.emitOpError("Unsupported pipeline on GPU target.");
       return signalPassFailure();

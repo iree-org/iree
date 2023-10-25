@@ -10,7 +10,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
-#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
@@ -89,26 +88,10 @@ static llvm::cl::opt<bool>
                         llvm::cl::init(true));
 
 // Non-static options are used in other places.
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
-    "iree-codegen-llvmcpu-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
 llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
     "iree-codegen-llvmcpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag(
-    "iree-codegen-llvmcpu-transform-dialect-debug-payload-tag",
-    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
-                   "payload root operation"),
-    llvm::cl::init(""));
-
-llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag(
-    "iree-codegen-llvmcpu-transform-dialect-debug-transform-tag",
-    llvm::cl::desc(
-        "tag attribute value for the transform dialect transform op container"),
-    llvm::cl::init(""));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -2391,15 +2374,6 @@ static LogicalResult lowerUsingDefaultPipeline(func::FuncOp entryPointFn) {
 static LogicalResult
 setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
                                 ArrayRef<Operation *> computeOps) {
-  // First check if the operations have a preset pipeline. If the config is
-  // preset, do not overwrite it.
-  for (auto computeOp : computeOps) {
-    if (IREE::Codegen::CompilationInfoAttr compilationInfo =
-            getCompilationInfo(computeOp)) {
-      return setUserConfig(entryPointFn, computeOp, compilationInfo);
-    }
-  }
-
   // Make sure that lowering_config is not preset on any compute ops.
   for (auto computeOp : computeOps) {
     if (getLoweringConfig(computeOp))
@@ -2458,18 +2432,6 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       continue;
     if (getTranslationInfo(exportOp))
       continue;
-
-    // If using the transform dialect with a script file, intercept early.
-    if (!clCPUCodegenTransformDialectFileName.empty()) {
-      assert(!clCPUEnableTransformDialectJit &&
-             "Can't use both transform dialect interpreted and jitted modes");
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(),
-          IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-      if (failed(setTranslationInfo(funcOp, translationInfo)))
-        return failure();
-      continue;
-    }
 
     // For now pick the default for functions with control flow, cause
     // the currently built pipelines dont work so well with control flow.

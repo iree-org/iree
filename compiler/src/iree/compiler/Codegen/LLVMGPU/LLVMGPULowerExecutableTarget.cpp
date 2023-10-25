@@ -187,6 +187,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
       addGPUTransformDialectPasses(executableLoweringPipeline);
       break;
+    // no pipeline specified, nothing to do.
+    case IREE::Codegen::DispatchLoweringPassPipeline::None:
+      return;
     default:
       variantOp.emitOpError("Unsupported pipeline on GPU target.");
       return signalPassFailure();
