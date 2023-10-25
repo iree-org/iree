@@ -22,7 +22,11 @@ if [[ "${ARCH}" == "x86_64" ]]; then
   tar -xvf ccache.tar.xz --strip-components=1
   cp ccache /usr/bin/
 elif [[ "${ARCH}" == "aarch64" ]]; then
-  # Latest version of ccache is not released for arm64, use distro version
-  apt-get install -y ccache
+  # Latest version of ccache is not released for arm64, built it
+  git clone --depth 1 --branch "v${CCACHE_VERSION}" https://github.com/ccache/ccache.git
+  mkdir -p ccache/build && cd "$_"
+  cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release ..
+  ninja
+  cp ccache /usr/bin/
 fi
 
