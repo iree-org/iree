@@ -31,6 +31,20 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Experimental
+//===----------------------------------------------------------------------===//
+
+// NOTE: this is a placeholder for a util.tree_switch (or something) op that
+// looks like scf.index_switch but with a region per case. For now we emit a
+// sequence of arith.select ops and return the index of the first condition that
+// is true. Would be nicer with some range template magic instead of an index.
+// Returns an index of -1 if no case matches.
+Value buildIfElseTree(
+    Location loc, size_t count,
+    std::function<Value(Location, size_t, OpBuilder &)> caseBuilder,
+    OpBuilder &builder);
+
+//===----------------------------------------------------------------------===//
 // Utils
 //===----------------------------------------------------------------------===//
 

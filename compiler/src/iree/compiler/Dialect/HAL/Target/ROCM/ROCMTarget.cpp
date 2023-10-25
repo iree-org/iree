@@ -147,7 +147,7 @@ public:
 
     // Collect all the entry point names.
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
-    for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    for (auto op : variantOp.getExportOps()) {
       exportOps[op.getSymName()] = op;
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;

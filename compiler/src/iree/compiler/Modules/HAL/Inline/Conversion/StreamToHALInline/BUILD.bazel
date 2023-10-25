@@ -25,7 +25,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
-        "//compiler/src/iree/compiler/Dialect/HAL/Utils",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Modules/HAL/Inline/IR",
