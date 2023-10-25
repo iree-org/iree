@@ -184,14 +184,16 @@ struct ConvertTensorFromElementsPattern
 };
 
 /// Populates given sizes array with the dynamic dims.
-static void sizesForTensor(OpBuilder &builder, SmallVectorImpl<Value> &sizes,
-                           Location loc, ShapedType stp, Value tensor) {
+static SmallVector<Value> sizesForTensor(OpBuilder &builder, Location loc,
+                                         ShapedType stp, Value tensor) {
+  SmallVector<Value> sizes;
   for (const auto &d : enumerate(stp.getShape())) {
     if (d.value() == ShapedType::kDynamic) {
       Value dim = builder.create<tensor::DimOp>(loc, tensor, d.index());
       sizes.push_back(dim);
     }
   }
+  return sizes;
 }
 
 /// Convert tensor.reshape ops into flow.tensor.reshape ops where possible.
@@ -205,18 +207,19 @@ struct ConvertTensorDialectReshapeOpPattern
       }
       auto loc = op.getLoc();
       Value input = op.getSource();
-      ShapedType inputType = dyn_cast<ShapedType>(input.getType());
-      ShapedType shapeOperandType = dyn_cast<ShapedType>(op.getShape().getType());
-      ShapedType resultType = dyn_cast<ShapedType>(op.getResult().getType());
+      auto inputType = dyn_cast<ShapedType>(input.getType());
+      auto shapeOperandType = dyn_cast<ShapedType>(op.getShape().getType());
+      auto resultType = dyn_cast<ShapedType>(op.getResult().getType());
 
       if (!inputType || !inputType.hasRank()) {
         return rewriter.notifyMatchFailure(op, "not ranked shaped types");
       }
 
       SmallVector<Value> srcSizes;
-      sizesForTensor(rewriter, srcSizes, loc, inputType, input);
+      srcSizes = sizesForTensor(rewriter, loc, inputType, input);
 
-      //flow.reshape only takes dynamic dims for the result, source dims (ignore static dimensions)
+      // flow.reshape only takes dynamic dims for the result, source dims
+      // (ignore static dimensions)
       SmallVector<Value> destSizes;
       for (int i = 0; i < shapeOperandType.getShape()[0]; i++) {
         Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
@@ -297,7 +300,7 @@ void populateTensorToFlowConversionPatterns(MLIRContext *context,
       .insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
               ConvertTensorCastPattern, ConvertTensorExtractPattern,
               ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
-              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern, 
+              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern,
               ConvertTensorDialectReshapeOpPattern,
               ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
               ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
