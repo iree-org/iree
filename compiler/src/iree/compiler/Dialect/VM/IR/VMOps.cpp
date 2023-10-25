@@ -1265,6 +1265,87 @@ SuccessorOperands CondBranchOp::getSuccessorOperands(unsigned index) {
                             : SuccessorOperands(getFalseDestOperandsMutable());
 }
 
+static ParseResult parseBranchTableCases(
+    OpAsmParser &parser, Block *&defaultDestination,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &defaultOperands,
+    SmallVectorImpl<Type> &defaultOperandTypes,
+    SmallVectorImpl<Block *> &caseDestinations,
+    SmallVectorImpl<SmallVector<OpAsmParser::UnresolvedOperand>> &caseOperands,
+    SmallVectorImpl<SmallVector<Type>> &caseOperandTypes) {
+  if (parser.parseKeyword("default") || parser.parseColon() ||
+      parser.parseSuccessor(defaultDestination))
+    return failure();
+  if (succeeded(parser.parseOptionalLParen())) {
+    if (parser.parseOperandList(defaultOperands, OpAsmParser::Delimiter::None,
+                                /*allowResultNumber=*/false) ||
+        parser.parseColonTypeList(defaultOperandTypes) || parser.parseRParen())
+      return failure();
+  }
+  while (succeeded(parser.parseOptionalComma())) {
+    int64_t index = 0;
+    if (failed(parser.parseInteger(index)))
+      return failure();
+    if (index != caseDestinations.size())
+      return failure();
+    Block *destination;
+    SmallVector<OpAsmParser::UnresolvedOperand> operands;
+    SmallVector<Type> operandTypes;
+    if (failed(parser.parseColon()) ||
+        failed(parser.parseSuccessor(destination)))
+      return failure();
+    if (succeeded(parser.parseOptionalLParen())) {
+      if (failed(parser.parseOperandList(operands, OpAsmParser::Delimiter::None,
+                                         /*allowResultNumber=*/false)) ||
+          failed(parser.parseColonTypeList(operandTypes)) ||
+          failed(parser.parseRParen()))
+        return failure();
+    }
+    caseDestinations.push_back(destination);
+    caseOperands.emplace_back(operands);
+    caseOperandTypes.emplace_back(operandTypes);
+  }
+  return success();
+}
+
+static void printBranchTableCases(OpAsmPrinter &p, Operation *op,
+                                  Block *defaultDestination,
+                                  OperandRange defaultOperands,
+                                  TypeRange defaultOperandTypes,
+                                  SuccessorRange caseDestinations,
+                                  OperandRangeRange caseOperands,
+                                  const TypeRangeRange &caseOperandTypes) {
+  p.increaseIndent();
+  p << "  default: ";
+  p.printSuccessorAndUseList(defaultDestination, defaultOperands);
+  int index = 0;
+  for (auto [caseDestination, caseOperands, caseOperandTypes] :
+       llvm::zip_equal(caseDestinations, caseOperands, caseOperandTypes)) {
+    p << ',';
+    p.printNewline();
+    p << (index++) << ": ";
+    p.printSuccessorAndUseList(caseDestination, caseOperands);
+  }
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+SuccessorOperands BranchTableOp::getSuccessorOperands(unsigned index) {
+  assert(index < getNumSuccessors() && "invalid successor index");
+  return SuccessorOperands(index == 0 ? getDefaultOperandsMutable()
+                                      : getCaseOperandsMutable(index - 1));
+}
+
+Block *BranchTableOp::getSuccessorForOperands(ArrayRef<Attribute> operands) {
+  SuccessorRange caseDestinations = getCaseDestinations();
+  if (auto valueAttr = llvm::dyn_cast_or_null<IntegerAttr>(operands.front())) {
+    int64_t value = valueAttr.getValue().getSExtValue();
+    if (value < 0 || value >= caseDestinations.size())
+      return getDefaultDestination();
+    return caseDestinations[value];
+  }
+  return nullptr;
+}
+
 LogicalResult verifyFailOp(Operation *op, Value statusVal) {
   APInt status;
   if (matchPattern(statusVal, m_ConstantInt(&status))) {

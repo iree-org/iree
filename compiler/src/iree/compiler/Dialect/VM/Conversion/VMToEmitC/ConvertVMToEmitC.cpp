@@ -3064,6 +3064,43 @@ class CondBranchOpConversion
   }
 };
 
+// EmitC does not support cf.switch so we turn the branch table into a long
+// sequence of conditional branches.
+class BranchTableOpConversion
+    : public EmitCConversionPattern<IREE::VM::BranchTableOp> {
+  using Adaptor = IREE::VM::BranchTableOp::Adaptor;
+  using EmitCConversionPattern<IREE::VM::BranchTableOp>::EmitCConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::VM::BranchTableOp op, Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto caseDestinations = op.getCaseDestinations();
+    SmallVector<Block *> caseBlocks;
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      auto *nextBlock = rewriter.getInsertionBlock()->getNextNode();
+      for (size_t i = 0; i < caseDestinations.size(); ++i)
+        caseBlocks.push_back(rewriter.createBlock(nextBlock));
+      caseBlocks.push_back(rewriter.createBlock(nextBlock)); // default
+    }
+    rewriter.create<IREE::VM::BranchOp>(op.getLoc(), caseBlocks.front());
+    for (size_t i = 0; i < caseDestinations.size(); ++i) {
+      rewriter.setInsertionPointToStart(caseBlocks[i]);
+      Value cmp = rewriter.create<IREE::VM::CmpEQI32Op>(
+          op.getLoc(), rewriter.getI1Type(), adaptor.getIndex(),
+          rewriter.create<IREE::VM::ConstI32Op>(op.getLoc(), i));
+      auto caseOperands = adaptor.getCaseOperands();
+      rewriter.create<IREE::VM::CondBranchOp>(
+          op.getLoc(), cmp, caseDestinations[i], caseOperands[i],
+          caseBlocks[i + 1], ValueRange{});
+    }
+    rewriter.setInsertionPointToStart(caseBlocks.back());
+    rewriter.replaceOpWithNewOp<IREE::VM::BranchOp>(
+        op, op.getDefaultDestination(), adaptor.getDefaultOperands());
+    return success();
+  }
+};
+
 class ReturnOpConversion : public EmitCConversionPattern<IREE::VM::ReturnOp> {
   using Adaptor = IREE::VM::ReturnOp::Adaptor;
   using EmitCConversionPattern<IREE::VM::ReturnOp>::EmitCConversionPattern;
@@ -4306,6 +4343,7 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
     CallOpConversion<IREE::VM::CallVariadicOp>,
     CompareRefNotZeroOpConversion,
     CondBranchOpConversion,
+    BranchTableOpConversion,
     ConstOpConversion<IREE::VM::ConstF32Op>,
     ConstOpConversion<IREE::VM::ConstF64Op>,
     ConstOpConversion<IREE::VM::ConstI32Op>,

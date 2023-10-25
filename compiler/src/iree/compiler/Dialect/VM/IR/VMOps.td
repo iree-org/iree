@@ -3941,9 +3941,9 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
       build($_builder, $_state, condition, trueOperands, falseOperands, trueDest,
             falseDest);
     }]>,
-  OpBuilder<(ins "Value":$condition, "Block *":$trueDest,
-    "Block *":$falseDest, CArg<"ValueRange", "{}">:$falseOperands),
-  [{
+    OpBuilder<(ins "Value":$condition, "Block *":$trueDest,
+      "Block *":$falseDest, CArg<"ValueRange", "{}">:$falseOperands),
+    [{
       build($_builder, $_state, condition, trueDest, ValueRange(), falseDest,
             falseOperands);
     }]>
@@ -4003,6 +4003,69 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   }];
 
   let hasCanonicalizer = 1;
+}
+
+def VM_BranchTableOp : VM_PureOp<"br_table", [
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<BranchOpInterface, ["getSuccessorForOperands"]>,
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    Terminator,
+  ]> {
+  let summary = [{branch table operation}];
+  let description = [{
+    Represents a branch table instructing execution to branch to the block with
+    the specified index. If the index is out of bounds then execution will
+    branch to the default block.
+
+    ```
+    vm.br_table %index {
+      default: ^bb1(%a : i64),
+      0: ^bb2,
+      1: ^bb3(%c : i64)
+    }
+   ```
+  }];
+
+  let arguments = (ins
+    I32:$index,
+    Variadic<VM_AnyType>:$defaultOperands,
+    VariadicOfVariadic<VM_AnyType, "case_operand_segments">:$caseOperands,
+    DenseI32ArrayAttr:$case_operand_segments
+  );
+
+  let successors = (successor
+    AnySuccessor:$defaultDestination,
+    VariadicSuccessor<AnySuccessor>:$caseDestinations
+  );
+
+  let assemblyFormat = [{
+    $index ` ` `{` `\n`
+    custom<BranchTableCases>(
+        $defaultDestination, $defaultOperands, type($defaultOperands),
+        $caseDestinations, $caseOperands, type($caseOperands))
+    `}`
+    attr-dict
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_BranchTable>,
+    VM_EncOperand<"index", 0>,
+    VM_EncBranch<"defaultDestination", "getDefaultOperands", 0>,
+    VM_EncBranchTable<"getCaseDestinations", "getCaseOperands", 0>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Return the operands for the case destination block at the given index.
+    OperandRange getCaseOperands(unsigned index) {
+      return getCaseOperands()[index];
+    }
+
+    /// Return a mutable range of operands for the case destination block at the
+    /// given index.
+    MutableOperandRange getCaseOperandsMutable(unsigned index) {
+      return getCaseOperandsMutable()[index];
+    }
+  }];
 }
 
 class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :

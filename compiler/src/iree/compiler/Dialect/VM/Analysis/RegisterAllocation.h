@@ -200,6 +200,9 @@ public:
   // may have their move bit set.
   SmallVector<std::pair<Register, Register>, 8>
   remapSuccessorRegisters(Operation *op, int successorIndex);
+  SmallVector<std::pair<Register, Register>, 8>
+  remapSuccessorRegisters(Location loc, Block *targetBlock,
+                          OperandRange targetOperands);
 
 private:
   int maxI32RegisterOrdinal_ = -1;
