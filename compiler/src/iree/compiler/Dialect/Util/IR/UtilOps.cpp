@@ -60,6 +60,13 @@ Value buildIfElseTree(
 // Utils
 //===----------------------------------------------------------------------===//
 
+ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr) {
+  SetVector<Attribute> attrsSet(arrayAttr.begin(), arrayAttr.end());
+  if (attrsSet.size() == arrayAttr.size())
+    return arrayAttr;
+  return ArrayAttr::get(arrayAttr.getContext(), attrsSet.takeVector());
+}
+
 Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes) {
   assert(values[index].getType().isa<IREE::Util::SizeAwareTypeInterface>() &&
          "must be a size-aware type to get dims");

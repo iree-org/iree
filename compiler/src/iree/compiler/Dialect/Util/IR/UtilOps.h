@@ -48,6 +48,9 @@ Value buildIfElseTree(
 // Utils
 //===----------------------------------------------------------------------===//
 
+// Removes duplicate attributes in the array (if any).
+ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr);
+
 // Returns the dynamic size of the value at |index|.
 Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes);
 
