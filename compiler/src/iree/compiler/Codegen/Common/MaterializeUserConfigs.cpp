@@ -178,15 +178,14 @@ struct MaterializeUserConfigsPass
       return signalPassFailure();
     }
 
-    // TODO: At this point we could allow the user to and optionally return a
+    // TODO: At this point we could allow the user to (optionally) return a
     // translation info attribute to use, however there currently isn't a way
     // upstream to retrieve the results of the named sequence.
 
-    /// Attempt to execute the strategy. This will verify the existence of the
-    /// symbol (from the flag or otherwise) at the same time. Because the
-    /// strategy is rooted on the variant op, the strategy can change the
-    /// translation info on the variant if needed and fall back to default
-    /// IREE codegen.
+    /// Attempt to execute the strategy.  symbol (from the flag or otherwise) at
+    /// the same time. Because the strategy is rooted on the variant op, the
+    /// strategy can change the translation info on the exports if needed, else
+    /// back to default IREE codegen.
     if (failed(transform::applyTransformNamedSequence(
             variantOp, *transformLibrary, options.enableExpensiveChecks(true),
             libraryFunc->getLeafReference()))) {
@@ -196,7 +195,8 @@ struct MaterializeUserConfigsPass
     // Re-retrieve the export ops and mark all exports with unchanged
     // translation info as un-translated.
     // TODO: Currently this is the only way to "fall back" to codegen. If the
-    // user wants to do a codegen themselves they can set a `None` pipeline.
+    // user wants to do all of codegen themselves they can set a `None`
+    // pipeline.
     exportOps = getAllEntryPoints(variantOp.getInnerModule());
     for (auto &it : exportOps) {
       auto exportOp = it.second;

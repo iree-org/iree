@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRParser
     MLIRSupport
     MLIRTransformDialect
+    MLIRTransformDialectTransforms
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Utils

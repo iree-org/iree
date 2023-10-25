@@ -64,86 +64,6 @@ iree_gentbl_cc_library(
     ],
 )
 
-# TODO: If the layering causes concerns then the transform dialect interpreter
-# should be one level above everything: it is a mechanism by which
-# transformations are applied to any IR and needs to register all the dialects
-# that may be produced.
-# In particular, a single IREE-side transform interpreter is enough to perform
-# all kind of transformations and not just codegen.
-# This is an opportunity to retire the specific interpreter that is used for
-# creating dispatch regions with the transform dialect, but only once the
-# layering is correct.
-iree_compiler_cc_library(
-    name = "TransformDialectInterpreterPass",
-    srcs = [
-        "CommonDialectRegistration.cpp",
-        "MaterializeUserConfigs.cpp",
-        "TransformDialectInterpreterPass.cpp",
-    ],
-    deps = [
-        ":PassHeaders",
-        ":PassesIncGen",
-        # Dialects
-        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
-        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
-        "@llvm-project//mlir:AffineDialect",
-        "@llvm-project//mlir:AffineUtils",
-        "@llvm-project//mlir:AsyncDialect",
-        "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:ArithUtils",
-        "@llvm-project//mlir:BufferizationDialect",
-        "@llvm-project//mlir:BufferizationTransforms",
-        "@llvm-project//mlir:FuncDialect",
-        "@llvm-project//mlir:GPUDialect",
-        "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:LLVMDialect",
-        "@llvm-project//mlir:PDLDialect",
-        "@llvm-project//mlir:PDLInterpDialect",
-        "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:SCFUtils",
-        "@llvm-project//mlir:TensorDialect",
-        "@llvm-project//mlir:TransformDialect",
-        "@llvm-project//mlir:TransformDialectTransforms",
-        "@llvm-project//mlir:VectorDialect",
-        # IR
-        "@llvm-project//mlir:Analysis",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Rewrite",
-        # Interfaces
-        # Transforms (needed mostly for the BufferizableOpInterfaceImpl)
-        "@llvm-project//mlir:ArithTransforms",
-        "@llvm-project//mlir:LinalgTransforms",
-        "@llvm-project//mlir:SCFTransforms",
-        "@llvm-project//mlir:TensorTransforms",
-        "@llvm-project//mlir:VectorTransforms",
-        # Other Stuff
-        "//compiler/src/iree/compiler/Utils",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:DialectUtils",
-        # TransformStrategies
-        "//compiler/src/iree/compiler/Codegen/TransformStrategies/Common:TransformStrategies",
-        # TransformExtensions (needed for registration in the pass)
-        "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
-        "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
-        "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
-        "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
-        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
-        "@llvm-project//mlir:AffineTransformOps",
-        "@llvm-project//mlir:BufferizationTransformOps",
-        "@llvm-project//mlir:GPUTransformOps",
-        "@llvm-project//mlir:LinalgTransformOps",
-        "@llvm-project//mlir:MemRefTransformOps",
-        "@llvm-project//mlir:SCFTransformOps",
-        "@llvm-project//mlir:TensorTransformOps",
-        "@llvm-project//mlir:VectorTransformOps",
-    ],
-)
-
 iree_compiler_cc_library(
     name = "Common",
     srcs = [
@@ -271,5 +191,87 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:VectorTransforms",
         "@llvm-project//mlir:ViewLikeInterface",
+    ],
+)
+
+# TODO: If the layering causes concerns then the transform dialect interpreter
+# should be one level above everything: it is a mechanism by which
+# transformations are applied to any IR and needs to register all the dialects
+# that may be produced.
+# In particular, a single IREE-side transform interpreter is enough to perform
+# all kind of transformations and not just codegen.
+# This is an opportunity to retire the specific interpreter that is used for
+# creating dispatch regions with the transform dialect, but only once the
+# layering is correct.
+iree_compiler_cc_library(
+    name = "TransformDialectInterpreterPass",
+    srcs = [
+        "CommonDialectRegistration.cpp",
+        "MaterializeUserConfigs.cpp",
+        "TransformDialectInterpreterPass.cpp",
+    ],
+    deps = [
+        ":Common",
+        ":PassHeaders",
+        ":PassesIncGen",
+        # Dialects
+        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:AsyncDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ArithUtils",
+        "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:BufferizationTransforms",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:PDLDialect",
+        "@llvm-project//mlir:PDLInterpDialect",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFUtils",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformDialectTransforms",
+        "@llvm-project//mlir:VectorDialect",
+        # IR
+        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Rewrite",
+        # Interfaces
+        # Transforms (needed mostly for the BufferizableOpInterfaceImpl)
+        "@llvm-project//mlir:ArithTransforms",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:TensorTransforms",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorTransforms",
+        # Other Stuff
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:DialectUtils",
+        # TransformStrategies
+        "//compiler/src/iree/compiler/Codegen/TransformStrategies/Common:TransformStrategies",
+        # TransformExtensions (needed for registration in the pass)
+        "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
+        "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
+        "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
+        "@llvm-project//mlir:AffineTransformOps",
+        "@llvm-project//mlir:BufferizationTransformOps",
+        "@llvm-project//mlir:GPUTransformOps",
+        "@llvm-project//mlir:LinalgTransformOps",
+        "@llvm-project//mlir:MemRefTransformOps",
+        "@llvm-project//mlir:SCFTransformOps",
+        "@llvm-project//mlir:TensorTransformOps",
+        "@llvm-project//mlir:VectorTransformOps",
     ],
 )

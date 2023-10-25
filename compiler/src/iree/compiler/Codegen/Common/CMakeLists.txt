@@ -49,69 +49,6 @@ iree_tablegen_library(
 
 iree_cc_library(
   NAME
-    TransformDialectInterpreterPass
-  SRCS
-    "CommonDialectRegistration.cpp"
-    "MaterializeUserConfigs.cpp"
-    "TransformDialectInterpreterPass.cpp"
-  DEPS
-    ::PassHeaders
-    ::PassesIncGen
-    IREEDialectsTransforms
-    IREELinalgExtDialect
-    IREELinalgExtTransformOps
-    IREELinalgTransformDialect
-    LLVMSupport
-    MLIRAffineDialect
-    MLIRAffineTransformOps
-    MLIRAffineUtils
-    MLIRAnalysis
-    MLIRArithDialect
-    MLIRArithTransforms
-    MLIRArithUtils
-    MLIRAsyncDialect
-    MLIRBufferizationDialect
-    MLIRBufferizationTransformOps
-    MLIRBufferizationTransforms
-    MLIRFuncDialect
-    MLIRGPUDialect
-    MLIRGPUTransformOps
-    MLIRIR
-    MLIRLLVMDialect
-    MLIRLinalgDialect
-    MLIRLinalgTransformOps
-    MLIRLinalgTransforms
-    MLIRMemRefTransformOps
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
-    MLIRPass
-    MLIRRewrite
-    MLIRSCFDialect
-    MLIRSCFTransformOps
-    MLIRSCFTransforms
-    MLIRSCFUtils
-    MLIRSupport
-    MLIRTensorDialect
-    MLIRTensorTransformOps
-    MLIRTensorTransforms
-    MLIRTransformDialect
-    MLIRTransformDialectTransforms
-    MLIRVectorDialect
-    MLIRVectorTransformOps
-    MLIRVectorTransforms
-    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
-    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
-    iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
-    iree::compiler::Utils
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     Common
   HDRS
     "BufferizationAnalysis.h"
@@ -234,6 +171,71 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VMVX::IR
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
+    iree::compiler::Utils
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    TransformDialectInterpreterPass
+  SRCS
+    "CommonDialectRegistration.cpp"
+    "MaterializeUserConfigs.cpp"
+    "TransformDialectInterpreterPass.cpp"
+  DEPS
+    ::Common
+    ::PassHeaders
+    ::PassesIncGen
+    IREEDialectsTransforms
+    IREELinalgExtDialect
+    IREELinalgExtTransformOps
+    IREELinalgTransformDialect
+    LLVMSupport
+    MLIRAffineDialect
+    MLIRAffineTransformOps
+    MLIRAffineUtils
+    MLIRAnalysis
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
+    MLIRAsyncDialect
+    MLIRBufferizationDialect
+    MLIRBufferizationTransformOps
+    MLIRBufferizationTransforms
+    MLIRFuncDialect
+    MLIRGPUDialect
+    MLIRGPUTransformOps
+    MLIRIR
+    MLIRLLVMDialect
+    MLIRLinalgDialect
+    MLIRLinalgTransformOps
+    MLIRLinalgTransforms
+    MLIRMemRefTransformOps
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
+    MLIRPass
+    MLIRRewrite
+    MLIRSCFDialect
+    MLIRSCFTransformOps
+    MLIRSCFTransforms
+    MLIRSCFUtils
+    MLIRSupport
+    MLIRTensorDialect
+    MLIRTensorTransformOps
+    MLIRTensorTransforms
+    MLIRTransformDialect
+    MLIRTransformDialectTransforms
+    MLIRTransforms
+    MLIRVectorDialect
+    MLIRVectorTransformOps
+    MLIRVectorTransforms
+    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
+    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
+    iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
     iree::compiler::Utils
   PUBLIC
 )

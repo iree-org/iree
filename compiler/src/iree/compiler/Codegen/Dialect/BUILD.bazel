@@ -86,6 +86,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformDialectTransforms",
     ],
 )
 
