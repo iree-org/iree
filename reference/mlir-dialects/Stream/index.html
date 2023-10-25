@@ -4157,27 +4157,27 @@ asynchronous host call with 'coarse-fences' instead.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or index or integer or floating-point or complex-type or any type</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or index or integer or floating-point or complex-type or any type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_offsets</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_ends</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_lengths</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4192,7 +4192,7 @@ asynchronous host call with 'coarse-fences' instead.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or index or integer or floating-point or complex-type</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or index or integer or floating-point or complex-type</td>
 </tr>
 </tbody>
 </table>
@@ -4258,15 +4258,15 @@ only ready once all nested ops complete execution.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4281,7 +4281,7 @@ only ready once all nested ops complete execution.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 </tbody>
 </table>
@@ -4326,15 +4326,15 @@ execution may begin immediately.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
@@ -4353,7 +4353,7 @@ execution may begin immediately.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
@@ -4623,7 +4623,7 @@ binding may have multiple subviews at different byte offsets.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>dynamic_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4730,23 +4730,23 @@ Asynchronous calls must have no side-effects.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>index or integer or floating-point or complex-type or resource or external resource or transient resource or variable resource or constant resource or any type</td>
+<td>variadic of index or integer or floating-point or complex-type or resource or external resource or transient resource or variable resource or constant resource or any type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_offsets</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_lengths</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4761,7 +4761,7 @@ Asynchronous calls must have no side-effects.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>index or integer or floating-point or complex-type</td>
+<td>variadic of index or integer or floating-point or complex-type</td>
 </tr>
 </tbody>
 </table>
@@ -4812,19 +4812,19 @@ operations may fuse and execute more efficiently.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resources</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_offsets</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_lengths</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4991,27 +4991,27 @@ and results and is able to load/store at will.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>workload</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>uniform_operands</code></td>
-<td>index or integer or floating-point or complex-type</td>
+<td>variadic of index or integer or floating-point or complex-type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resources</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_offsets</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_lengths</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -5054,11 +5054,11 @@ execution may begin immediately.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
@@ -5531,7 +5531,7 @@ through host buffers.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -5559,11 +5559,11 @@ the SSA value is defined (or tied).</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -5610,7 +5610,7 @@ types and those that prior to lowering do not handle them.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -5674,7 +5674,7 @@ types and those that prior to lowering do not handle them.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_size</code></td>
@@ -5871,7 +5871,7 @@ upload or mapping.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -5886,7 +5886,7 @@ upload or mapping.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>constant resource or variable resource</td>
+<td>variadic of constant resource or variable resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
@@ -6075,7 +6075,7 @@ underlying allocation buffer.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>dynamic_slice_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -6094,7 +6094,7 @@ underlying allocation buffer.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>packed_offsets</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -6697,31 +6697,31 @@ and results and is able to load/store at will.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>workload</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or index or integer or floating-point or complex-type</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or index or integer or floating-point or complex-type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_offsets</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_ends</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_lengths</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -6736,7 +6736,7 @@ and results and is able to load/store at will.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource</td>
 </tr>
 </tbody>
 </table>
@@ -7205,11 +7205,11 @@ timepoint.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
@@ -7228,7 +7228,7 @@ timepoint.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or staging resource</td>
 </tr>
 </tbody>
 </table>
@@ -7329,7 +7329,7 @@ types and those that prior to lowering do not handle them.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>external_values</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -7381,7 +7381,7 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -7446,7 +7446,7 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -7487,7 +7487,7 @@ been reached.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>await_timepoints</code></td>
-<td>a timepoint indicating execution availability</td>
+<td>variadic of a timepoint indicating execution availability</td>
 </tr>
 </tbody>
 </table>
@@ -7549,7 +7549,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -7557,7 +7557,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_size</code></td>
@@ -7615,7 +7615,7 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -7670,7 +7670,7 @@ read.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_size</code></td>
@@ -7732,7 +7732,7 @@ resource with the update applied.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_size</code></td>
@@ -7740,11 +7740,11 @@ resource with the update applied.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>start_indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>lengths</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
@@ -7803,7 +7803,7 @@ resource with the update applied.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -7811,7 +7811,7 @@ resource with the update applied.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -7863,7 +7863,7 @@ assigned.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -7924,7 +7924,7 @@ copy-on-write operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_size</code></td>
@@ -7932,15 +7932,15 @@ copy-on-write operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>start_indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>lengths</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_size</code></td>
@@ -8001,7 +8001,7 @@ copy-on-write operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_size</code></td>
@@ -8061,7 +8061,7 @@ copy-on-write operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_size</code></td>
@@ -8069,7 +8069,7 @@ copy-on-write operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
@@ -8124,15 +8124,15 @@ values being traced.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resources</code></td>
-<td>staging resource</td>
+<td>variadic of staging resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -8177,7 +8177,7 @@ is the entire updated target value.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_size</code></td>
@@ -8185,7 +8185,7 @@ is the entire updated target value.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>start_indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>update</code></td>
@@ -8193,7 +8193,7 @@ is the entire updated target value.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>update_encoding_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>update_size</code></td>

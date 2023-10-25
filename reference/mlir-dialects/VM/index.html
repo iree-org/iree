@@ -7399,7 +7399,7 @@ type, with the interpretation of the type encoded on the op.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>destOperands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -10968,7 +10968,7 @@ the index is out of bounds.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>32-bit float</td>
+<td>variadic of 32-bit float</td>
 </tr>
 </tbody>
 </table>
@@ -11020,7 +11020,7 @@ the index is out of bounds.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>64-bit float</td>
+<td>variadic of 64-bit float</td>
 </tr>
 </tbody>
 </table>
@@ -11072,7 +11072,7 @@ the index is out of bounds.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>32-bit signless integer</td>
+<td>variadic of 32-bit signless integer</td>
 </tr>
 </tbody>
 </table>
@@ -11124,7 +11124,7 @@ the index is out of bounds.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>64-bit signless integer</td>
+<td>variadic of 64-bit signless integer</td>
 </tr>
 </tbody>
 </table>
@@ -11173,7 +11173,7 @@ the index is out of bounds.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>ref</td>
+<td>variadic of ref</td>
 </tr>
 </tbody>
 </table>
@@ -11551,7 +11551,7 @@ default for cases where larger or smaller alignments are needed.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>destOperands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -11594,7 +11594,7 @@ default for cases where larger or smaller alignments are needed.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -11609,7 +11609,7 @@ default for cases where larger or smaller alignments are needed.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -11639,7 +11639,7 @@ attribute.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -11654,7 +11654,7 @@ attribute.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -11855,11 +11855,11 @@ vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
 </tr>
 <tr>
 <td style="text-align: center;"><code>trueDestOperands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>falseDestOperands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -12020,7 +12020,7 @@ in a failure at runtime.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -12046,7 +12046,7 @@ target block.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>destOperands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -12091,7 +12091,7 @@ attached) execution will continue at the target block.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>destOperands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -12135,7 +12135,7 @@ attached) execution will continue at the target block.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>
@@ -12166,7 +12166,7 @@ trace verbosity setting.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
+<td>variadic of 32-bit signless integer or 64-bit signless integer or 32-bit float or 64-bit float or 32-bit signless integer or ref</td>
 </tr>
 </tbody>
 </table>

@@ -2,252 +2,252 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://iree.dev/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/building-from-source/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/building-from-source/android/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/building-from-source/getting-started/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/building-from-source/ios/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/building-from-source/riscv/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/tags/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/blog/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/blog/2021-10-15-cuda-backend/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/blog/2021-10-13-matrix-multiplication-with-mmt4d/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/blog/2021-07-19-tflite-support-via-tosa/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/developer-tips/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/deployment-configurations/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/deployment-configurations/bare-metal/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/deployment-configurations/cpu/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/deployment-configurations/gpu-cuda/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/deployment-configurations/gpu-metal/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/deployment-configurations/gpu-rocm/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/deployment-configurations/gpu-vulkan/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/ml-frameworks/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/ml-frameworks/jax/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/ml-frameworks/pytorch/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/ml-frameworks/tensorflow/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/guides/ml-frameworks/tflite/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/extensions/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/glossary/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/optimization-options/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/bindings/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/bindings/c-api/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/bindings/python/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/Check/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/Flow/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/HAL/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/HALInline/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/HALLoader/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/IREEInput/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/IREELinalgExt/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/Stream/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/Util/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/VM/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/VMVX/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/tags/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/blog/archive/2021/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/blog/category/platforms/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/blog/category/performance/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://iree.dev/community/blog/category/frontends/</loc>
-         <lastmod>2023-10-24</lastmod>
+         <lastmod>2023-10-25</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>

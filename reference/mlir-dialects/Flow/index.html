@@ -3498,7 +3498,7 @@ Interfaces: InferTypeOpInterface, TiedOpInterface</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
@@ -3558,7 +3558,7 @@ Interfaces: InferTypeOpInterface, TiedOpInterface</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
@@ -3617,7 +3617,7 @@ Interfaces: InferTypeOpInterface, TiedOpInterface</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
@@ -3678,7 +3678,7 @@ Interfaces: InferTypeOpInterface, TiedOpInterface</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
@@ -3740,7 +3740,7 @@ Interfaces: InferTypeOpInterface, TiedOpInterface</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
@@ -3813,19 +3813,19 @@ arbitrary host logic.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>workload</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>arguments</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>argument_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -3840,7 +3840,7 @@ arbitrary host logic.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -3924,11 +3924,11 @@ workgroups for the dispatch. The region is lowered directly to
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>workload</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -3943,7 +3943,7 @@ workgroups for the dispatch. The region is lowered directly to
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -3988,19 +3988,19 @@ results of regions that may overlap.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>offsets</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>strides</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4063,19 +4063,19 @@ workgroup stores into overlapping regions of the full output tensor.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>offsets</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>sizes</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>strides</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4106,7 +4106,7 @@ pass-through result of this op to allow for SSA-based shape resolution.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>dynamic_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4325,19 +4325,19 @@ result.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>workload</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>arguments</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>argument_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4352,7 +4352,7 @@ result.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -4376,7 +4376,7 @@ result.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -4420,15 +4420,15 @@ asynchronous host call with 'coarse-fences' instead.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>arguments</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>argument_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4443,7 +4443,7 @@ asynchronous host call with 'coarse-fences' instead.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -4477,10 +4477,8 @@ operation via <code>flow.call</code>. Today only external functions are allowed.
 
 <h3 id="tensor-ops">Tensor ops<a class="headerlink" href="#tensor-ops" title="Permanent link">link</a></h3>
 <h4 id="flowdispatchworkgroup_count_from_dag_root-flowdispatchworkgroupcountfromdagrootop"><code>flow.dispatch.workgroup_count_from_dag_root</code> (Flow::DispatchWorkgroupCountFromDagRootOp)<a class="headerlink" href="#flowdispatchworkgroup_count_from_dag_root-flowdispatchworkgroupcountfromdagrootop" title="Permanent link">link</a></h4>
-<p>_
-    workgroup count computed based on iteration range of the root of the DAG
-    for ops within the dispatch.
-  _</p>
+<p><em>Workgroup count computed based on iteration range of the root of the DAG
+    for ops within the dispatch.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch.workgroup_count_from_dag_root` attr-dict $operands
 </code></pre></div>
@@ -4505,7 +4503,7 @@ and distribute the root of the DAG).</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4533,9 +4531,7 @@ and distribute the root of the DAG).</p>
 </tbody>
 </table>
 <h4 id="flowdispatchworkgroup_count_from_slice-flowdispatchworkgroupcountfromsliceop"><code>flow.dispatch.workgroup_count_from_slice</code> (Flow::DispatchWorkgroupCountFromSliceOp)<a class="headerlink" href="#flowdispatchworkgroup_count_from_slice-flowdispatchworkgroupcountfromsliceop" title="Permanent link">link</a></h4>
-<p>_
-    Place holder to signify default workgroup count calculation.
-  _</p>
+<p><em>Place holder to signify default workgroup count calculation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch.workgroup_count_from_slice` attr-dict $operands
 </code></pre></div>
@@ -4566,7 +4562,7 @@ workload could be more than just values of index types.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4594,10 +4590,8 @@ workload could be more than just values of index types.</p>
 </tbody>
 </table>
 <h4 id="flowdispatchworkloadordinal-flowdispatchworkloadordinalop"><code>flow.dispatch.workload.ordinal</code> (Flow::DispatchWorkloadOrdinalOp)<a class="headerlink" href="#flowdispatchworkloadordinal-flowdispatchworkloadordinalop" title="Permanent link">link</a></h4>
-<p>_
-    Annotates the values captured as workload within the body of
-    <code>flow.dispatch.workgroups</code> op.
-  _</p>
+<p><em>Annotates the values captured as workload within the body of
+    <code>flow.dispatch.workgroups</code> op.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch.workload.ordinal` attr-dict $operand `,` $ordinal `:` type($operand)
 </code></pre></div>
@@ -4676,7 +4670,7 @@ lowering.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4720,7 +4714,7 @@ lowering.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>argument_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4794,7 +4788,7 @@ any ranges of the tensor that are later read.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4839,11 +4833,11 @@ any ranges of the tensor that are later read.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4889,11 +4883,11 @@ any ranges of the tensor that are later read.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4939,19 +4933,19 @@ any ranges of the tensor that are later read.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>start_indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>lengths</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -4995,7 +4989,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -5044,11 +5038,11 @@ any ranges of the tensor that are later read.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -5094,7 +5088,7 @@ calculations and is removed during lowering.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>dynamic_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -5142,11 +5136,11 @@ values being traced.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -5178,11 +5172,11 @@ given offset indices.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>start_indices</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>update</code></td>
@@ -5190,7 +5184,7 @@ given offset indices.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>update_dims</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>

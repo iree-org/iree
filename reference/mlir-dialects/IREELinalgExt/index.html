@@ -2831,15 +2831,15 @@ KC_to_CKkc example the tiled loops.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>inner_tiles</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>padding_value</code></td>
@@ -2858,7 +2858,7 @@ KC_to_CKkc example the tiled loops.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -2953,15 +2953,15 @@ also supports permuting the tiled loops.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>inner_tiles</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -2976,7 +2976,7 @@ also supports permuting the tiled loops.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3051,7 +3051,7 @@ MaterializeUpperBoundTileSize pass.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>index</td>
+<td>variadic of index</td>
 </tr>
 </tbody>
 </table>
@@ -3088,11 +3088,11 @@ in the current <code>max</code> and <code>sum</code> statistics while processing
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3107,7 +3107,7 @@ in the current <code>max</code> and <code>sum</code> statistics while processing
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3140,11 +3140,11 @@ context, they will be the second and third inputs.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3159,7 +3159,7 @@ context, they will be the second and third inputs.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3193,11 +3193,11 @@ tile and distribute them.
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3212,7 +3212,7 @@ tile and distribute them.
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3247,11 +3247,11 @@ tile and distribute them.
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3266,7 +3266,7 @@ tile and distribute them.
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3328,11 +3328,11 @@ batch dims to be 1D. See more information in
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>ranked tensor or memref of any type values</td>
+<td>variadic of ranked tensor or memref of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>ranked tensor or memref of any type values</td>
+<td>variadic of ranked tensor or memref of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3347,7 +3347,7 @@ batch dims to be 1D. See more information in
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3382,11 +3382,11 @@ batch dims to be 1D. See more information in
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3401,7 +3401,7 @@ batch dims to be 1D. See more information in
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3447,11 +3447,11 @@ Note: when the two values are equal, the first occurence is always selected.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3466,7 +3466,7 @@ Note: when the two values are equal, the first occurence is always selected.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3493,7 +3493,7 @@ since the op does not implement any transform interface.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -3518,7 +3518,7 @@ regions in <code>iree_linalg_ext</code> ops.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>any type</td>
+<td>variadic of any type</td>
 </tr>
 </tbody>
 </table>
@@ -3565,11 +3565,11 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3584,7 +3584,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3634,11 +3634,11 @@ only the non-padded part of the output.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>shaped of any type values</td>
+<td>variadic of shaped of any type values</td>
 </tr>
 </tbody>
 </table>
@@ -3653,7 +3653,7 @@ only the non-padded part of the output.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any type values</td>
 </tr>
 </tbody>
 </table>
