@@ -96,7 +96,8 @@ SKIP_PATH_PATTERNS = [
     ".github/ISSUE_TEMPLATE/*",
     "*.cff",
     "*.clang-format",
-    "*.git-ignore",
+    "*.gitignore",
+    "*.git-blame-ignore-revs",
     "*.md",
     "*.natvis",
     "*.pylintrc",
@@ -155,8 +156,10 @@ PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
 # intended to be merged and should exclude test/draft PRs as well as
 # PRs that include temporary patches to the submodule during review.
 # See also: https://github.com/openxla/iree/issues/12268
-LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm-project", re.IGNORECASE)
-LLVM_INTEGRATE_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump", re.IGNORECASE)
+LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm", re.IGNORECASE)
+LLVM_INTEGRATE_BRANCH_PATTERN = re.compile(
+    "bump-llvm|llvm-bump|integrate-llvm", re.IGNORECASE
+)
 LLVM_INTEGRATE_LABEL = "llvm-integrate"
 
 
