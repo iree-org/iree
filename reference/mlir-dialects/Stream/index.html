@@ -6662,7 +6662,7 @@ in-place.</p>
 <p><em>Dispatches a parallelized grid of work</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.async.dispatch` (`on` `(` $affinity^ `)`)?
-              $entry_point
+              custom&lt;DispatchEntryPoints&gt;($entry_points)
               (`[` $workload^ `]`)? ``
               custom&lt;DispatchOperands&gt;($resource_operands,
               $resource_operand_offsets,
@@ -6681,7 +6681,7 @@ and results and is able to load/store at will.</p>
 <h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>entry_point</code></td><td>::mlir::SymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>entry_points</code></td><td>::mlir::ArrayAttr</td><td>symbol ref array attribute</td></tr>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
 </table>

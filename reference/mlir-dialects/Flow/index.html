@@ -3779,7 +3779,7 @@ Interfaces: InferTypeOpInterface, TiedOpInterface</p>
 <h4 id="flowdispatch-flowdispatchop"><code>flow.dispatch</code> (Flow::DispatchOp)<a class="headerlink" href="#flowdispatch-flowdispatchop" title="Permanent link">link</a></h4>
 <p><em>A dispatch of workgroups across a grid</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch` $entry_point
+<div class="highlight"><pre><span></span><code>operation ::= `flow.dispatch` custom&lt;DispatchEntryPoints&gt;($entry_points)
               (`[` $workload^ `]`)? ``
               `(` $arguments `)` attr-dict `:`
               custom&lt;ShapedFunctionType&gt;(ref($arguments),
@@ -3798,7 +3798,7 @@ arbitrary host logic.</p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>entry_point</code></td><td>::mlir::SymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>entry_points</code></td><td>::mlir::ArrayAttr</td><td>symbol ref array attribute</td></tr>
 <tr><td><code>tied_operands</code></td><td>::mlir::ArrayAttr</td><td>64-bit integer array attribute</td></tr>
 </table>
 
