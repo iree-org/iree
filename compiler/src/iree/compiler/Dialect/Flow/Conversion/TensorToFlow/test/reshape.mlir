@@ -79,7 +79,7 @@ func.func @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>)
   return %0 : tensor<1x?xf32> }
 
   // -----
-  func.func @fom_elements_test_reshape(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: index) -> tensor<?x1xf32> {
+  func.func @from_elements_test_reshape(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: index) -> tensor<?x1xf32> {
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[D1:.*]] = tensor.dim %arg0, %[[C0:.*]] : tensor<?x4xf32>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<?x4xf32>{%[[D1]]} -> tensor<?x1xf32>{%arg1}
