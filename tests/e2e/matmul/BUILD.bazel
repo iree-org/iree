@@ -44,10 +44,10 @@ py_binary(
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
+    target_cpu_features_variants = ["default"] +
+                                   # Widening matmuls fail to lower for SVE.
+                                   (["arm_64:sve:+sve"] if lhs_rhs_type == acc_type else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
-    target_cpu_features_variants = ["default"]
-        # Widening matmuls fail to lower for SVE.
-        + (["arm_64:sve:+sve"] if lhs_rhs_type == acc_type else [])
 ) for (lhs_rhs_type, acc_type) in [
     ("i8", "i32"),
     ("f32", "f32"),
