@@ -190,9 +190,15 @@ struct MaterializeUserConfigsPass
     /// the same time. Because the strategy is rooted on the variant op, the
     /// strategy can change the translation info on the exports if needed, else
     /// back to default IREE codegen.
+    StringRef entryPoint = libraryFunc->getLeafReference();
+    Operation *transformRoot = transform::detail::findTransformEntryPoint(
+        variantOp, *transformLibrary, entryPoint);
+    if (!transformRoot) {
+      return;
+    }
     if (failed(transform::applyTransformNamedSequence(
-            variantOp, *transformLibrary, options.enableExpensiveChecks(true),
-            libraryFunc->getLeafReference()))) {
+            variantOp, transformRoot, *transformLibrary,
+            options.enableExpensiveChecks(true)))) {
       return signalPassFailure();
     }
 
