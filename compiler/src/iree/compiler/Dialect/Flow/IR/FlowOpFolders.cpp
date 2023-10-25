@@ -703,6 +703,34 @@ void DispatchTensorStoreOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DeduplicateDispatchEntryRefs final
+    : public OpRewritePattern<DispatchOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    auto originalAttr = dispatchOp.getEntryPointsAttr();
+    auto newAttr = deduplicateArrayElements(originalAttr);
+    if (newAttr == originalAttr)
+      return failure();
+    rewriter.updateRootInPlace(
+        dispatchOp, [&]() { dispatchOp.setEntryPointsAttr(newAttr); });
+    return success();
+  }
+};
+
+} // namespace
+
+void DispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                             MLIRContext *context) {
+  results.insert<DeduplicateDispatchEntryRefs>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // Tensor ops
 //===----------------------------------------------------------------------===//
 

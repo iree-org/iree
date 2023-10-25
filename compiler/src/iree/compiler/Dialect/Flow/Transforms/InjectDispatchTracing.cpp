@@ -37,12 +37,7 @@ public:
   void runOnOperation() override {
     auto funcOp = getOperation();
     for (auto dispatchOp : funcOp.getFunctionBody().getOps<DispatchOp>()) {
-      std::string entryPointName =
-          dispatchOp.getEntryPoint().getRootReference().getValue().str();
-      for (FlatSymbolRefAttr nestedRef :
-           dispatchOp.getEntryPoint().getNestedReferences()) {
-        entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
-      }
+      std::string entryPointName = dispatchOp.getEntryPointName();
 
       // Input tensors:
       OpBuilder builder(dispatchOp);

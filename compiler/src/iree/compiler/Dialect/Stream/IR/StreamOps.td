@@ -2057,7 +2057,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
   let arguments = (ins
     Variadic<Index>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_PrimitiveType,
@@ -2076,7 +2076,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     custom<DispatchOperands>($resource_operands,
                              $resource_operand_offsets,
@@ -2089,6 +2089,13 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   }];
 
   let extraClassDeclaration = [{
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }

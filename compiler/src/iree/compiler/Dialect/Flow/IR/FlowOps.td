@@ -766,7 +766,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 
   let arguments = (ins
     Variadic<FLOW_Dim>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<AnyType>:$arguments,
     FLOW_ShapeDynamicDims:$argument_dims,
     FLOW_ShapeDynamicDims:$result_dims,
@@ -777,7 +777,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   );
 
   let assemblyFormat = [{
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     `(` $arguments `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($arguments),
@@ -827,8 +827,18 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   ];
 
   let extraClassDeclaration = [{
-    StringAttr executable();
     FunctionType getEntryPointType();
+
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
+    // Returns a human-friendly string name for what is being dispatched.
+    // May not be unique or a valid reference to an executable.
+    std::string getEntryPointName();
 
     // StreamableOpInterface:
     bool isTransfer() { return false; }
@@ -841,6 +851,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     }
   }];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 }
 

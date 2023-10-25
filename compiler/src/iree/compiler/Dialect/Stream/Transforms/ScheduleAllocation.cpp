@@ -765,10 +765,9 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   }
 
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.getWorkload(),
-      builder.getArrayAttr({asyncOp.getEntryPoint()}), newOperands,
-      newResources, newResourceSizes, newResourceOffsets, newResourceLengths,
-      builder.getArrayAttr(newResourceAccesses));
+      asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPointsAttr(),
+      newOperands, newResources, newResourceSizes, newResourceOffsets,
+      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
   newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();

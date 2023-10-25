@@ -202,9 +202,20 @@ void replaceEntryPointUses(
     const DenseMap<Attribute, SymbolRefAttr> &replacements) {
   for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
     funcLikeOp->walk([&](DispatchOp dispatchOp) {
-      auto it = replacements.find(dispatchOp.getEntryPoint());
-      if (it != replacements.end()) {
-        dispatchOp.setEntryPointAttr(llvm::cast<SymbolRefAttr>(it->second));
+      bool didChange = false;
+      SmallVector<Attribute> newAttrs;
+      for (auto oldAttr : dispatchOp.getEntryPoints()) {
+        auto it = replacements.find(oldAttr);
+        if (it != replacements.end()) {
+          didChange = true;
+          newAttrs.push_back(it->second);
+        } else {
+          newAttrs.push_back(oldAttr);
+        }
+      }
+      if (didChange) {
+        dispatchOp.setEntryPointsAttr(
+            ArrayAttr::get(moduleOp.getContext(), newAttrs));
       }
     });
   }

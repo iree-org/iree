@@ -1888,10 +1888,30 @@ void AsyncStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.dispatch
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+struct DeduplicateAsyncDispatchEntryRefs final
+    : public OpRewritePattern<AsyncDispatchOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    auto originalAttr = dispatchOp.getEntryPointsAttr();
+    auto newAttr = deduplicateArrayElements(originalAttr);
+    if (newAttr == originalAttr)
+      return failure();
+    rewriter.updateRootInPlace(
+        dispatchOp, [&]() { dispatchOp.setEntryPointsAttr(newAttr); });
+    return success();
+  }
+};
+
+} // namespace
+
 void AsyncDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
-  // TODO(benvanik): nothing? maybe tied type/lifetime updates?
+  // TODO(benvanik):maybe tied type/lifetime updates?
   results.insert<ElideUnusedOp<AsyncDispatchOp>>(context);
+  results.insert<DeduplicateAsyncDispatchEntryRefs>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2316,8 +2336,28 @@ void CmdCollectiveOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.cmd.dispatch
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+struct DeduplicateCmdDispatchEntryRefs final
+    : public OpRewritePattern<CmdDispatchOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(CmdDispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    auto originalAttr = dispatchOp.getEntryPointsAttr();
+    auto newAttr = deduplicateArrayElements(originalAttr);
+    if (newAttr == originalAttr)
+      return failure();
+    rewriter.updateRootInPlace(
+        dispatchOp, [&]() { dispatchOp.setEntryPointsAttr(newAttr); });
+    return success();
+  }
+};
+
+} // namespace
+
 void CmdDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
+  results.insert<DeduplicateCmdDispatchEntryRefs>(context);
   results.insert<FoldSubviewsIntoDispatchOp<CmdDispatchOp>>(context);
 }
 
