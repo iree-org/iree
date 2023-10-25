@@ -2364,6 +2364,21 @@ setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   // dispatch have identity mapping between their parallel dimensions. So we
   // don't need to handle the permutation on dimensions between ops except for
   // the pack op.
+  //
+  // For example:
+  // Given there are 3 generic ops in the dispatch:
+  // %rootOp = linalg.generic {iterator_types = ["reduction", "parallel"]} ...
+  // %2 = linalg.generic {iterator_types = ["parallel", "parallel"]}
+  // %3 = tensor.pack %2
+  // Assume the distribution and parallel vector tile sizes from %rootOp is:
+  // [[X1, 0], [X2, 0]]
+  // Then the generic op %2 set the missing parallel vector tile sizes on its
+  // parallel dims:
+  // [[X1, 0], [X2, Y2]]
+  // Then the pack op %3 updates the distribution and parallel vector tile sizes
+  // based on its requirement:
+  // [[X1', Z1], [X2', Y2']]
+  // which is the final parallel tile sizes for all ops.
   llvm::SmallDenseMap<Operation *, SmallVector<int64_t>> reductionTileSizeMap;
   distTileSizes.resize(maxLoopNums);
   parallelVecTileSizes.resize(maxLoopNums);
