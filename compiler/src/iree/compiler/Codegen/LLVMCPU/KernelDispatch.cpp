@@ -892,7 +892,9 @@ static LogicalResult setMatmulNoPadRootConfig(
           enforcePowerOfTwo);
     }
     parallelTileSizes.push_back(sz);
-    parallelScalableFlags.push_back(vecScalableDims[index]);
+    // 1x scalable vectors e.g. vector<[1]xty> are also poorly supported, so
+    // fallback to fixed vectorization if they occur:
+    parallelScalableFlags.push_back(sz > 1 ? vecScalableDims[index] : false);
   }
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
