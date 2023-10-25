@@ -849,4 +849,44 @@ iree_generated_trace_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_small_arm_sve
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu-features=+sve"
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sve:+sve"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_large_arm_sve
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu-features=+sve"
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sve:+sve"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
