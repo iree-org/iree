@@ -61,7 +61,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             )
         if benchmark_case.expected_output_uri:
             expected_output_dir = self.__fetch_and_unpack_npy(
-                uri=benchmark_case.expected_output_uri, dest_dir=case_dir / "inputs_npy"
+                uri=benchmark_case.expected_output_uri,
+                dest_dir=case_dir / "expected_outputs_npy",
             )
 
         if benchmark_results_filename:
