@@ -205,9 +205,9 @@ struct ConvertTensorDialectReshapeOpPattern
       }
       auto loc = op.getLoc();
       Value input = op.getSource();
-      ShapedType inputType = llvm::dyn_cast<ShapedType>(input.getType());
-      ShapedType shapeOperandType = llvm::dyn_cast<ShapedType>(op.getShape().getType());
-      ShapedType resultType = llvm::dyn_cast<ShapedType>(op.getResult().getType());
+      ShapedType inputType = dyn_cast<ShapedType>(input.getType());
+      ShapedType shapeOperandType = dyn_cast<ShapedType>(op.getShape().getType());
+      ShapedType resultType = dyn_cast<ShapedType>(op.getResult().getType());
 
       if (!inputType || !inputType.hasRank()) {
         return rewriter.notifyMatchFailure(op, "not ranked shaped types");
