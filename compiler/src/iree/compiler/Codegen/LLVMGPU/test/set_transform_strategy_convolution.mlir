@@ -34,7 +34,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK: transform.structured.convert_conv2d_to_img2col
 // CHECK: get_producer_of_operand %{{.*}}[0]
 // CHECK: transform.apply_patterns.iree.bubble_collapse
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [] tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.structured.fuse_into_containing_op
 // CHECK: transform.iree.populate_workgroup_count_region_using_num_threads_slice %{{.*}}
 // CHECK: transform.structured.match ops{["linalg.fill"]}
@@ -49,10 +49,10 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK: %[[LHS:.+]] = get_producer_of_operand %{{.*}}[0]
 // CHECK: %[[RHS:.+]] = get_producer_of_operand %{{.*}}[1]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[LHS]]
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK: transform.structured.tile_using_forall %[[RHS]]   num_threads [1, 4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [32, 4](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %[[RHS]]   num_threads [1, 4, 32](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [1, 2, 2](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [1, 2, 2](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.apply_patterns.iree.fold_reshape_into_tensor_hal_interface
 // CHECK: transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
 // CHECK: transform.apply_patterns.vector.cast_away_vector_leading_one_dim
@@ -101,17 +101,17 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK-LABEL: func @nhwc_convolution
 
 // CHECK: transform.sequence  failures(propagate) {
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [] tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [0, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: %[[RES:.+]] = get_producer_of_operand %{{.*}}[2]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RES]]
 // CHECK: %[[LHS:.+]] = get_producer_of_operand %{{.*}}[0]
 // CHECK: %[[RHS:.+]] = get_producer_of_operand %{{.*}}[1]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RHS]]
-// CHECK: transform.structured.tile_using_forall %[[LHS]]   num_threads [1, 32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [1, 2, 2] tile_sizes [](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_using_forall %[[LHS]]   num_threads [1, 32, 4](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 32](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [1, 2, 2](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [1, 2, 2](mapping = [#gpu.warp<z>, #gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.iree.map_nested_forall_to_gpu_threads %{{.*}} workgroup_dims = [64, 2, 1]
 
 

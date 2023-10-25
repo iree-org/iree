@@ -75,8 +75,7 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
     assert(value && "expected a serializable rodata value");
     SmallVector<char> byteBuffer;
     if (failed(value.serializeToVector(rodataOp.getLoc(),
-                                       llvm::support::endianness::little,
-                                       byteBuffer))) {
+                                       llvm::endianness::little, byteBuffer))) {
       return rodataOp.emitError() << "error during serialization";
     }
 

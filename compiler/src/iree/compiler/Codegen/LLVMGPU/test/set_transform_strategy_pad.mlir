@@ -47,7 +47,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //       CHECK:   transform.sequence  failures(propagate) {
 //       CHECK:   transform.iree.register_match_callbacks
 //       CHECK:   {{.*}} = transform.iree.match_callback failures(propagate) "pad"({{.*}}) : (!transform.any_op) -> !transform.any_op
-//       CHECK:   transform.structured.tile_using_forall {{.*}}   num_threads [] tile_sizes [64, 64](mapping = [#gpu.block<y>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+//       CHECK:   transform.structured.tile_using_forall {{.*}}   tile_sizes [64, 64](mapping = [#gpu.block<y>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 //       CHECK:   apply_patterns to %{{.*}} {
 //       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK    }
@@ -56,7 +56,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //       CHECK:   {{.*}} = transform.structured.match ops{["scf.if"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.scf.take_assumed_branch {{.*}} take_else_branch : (!transform.any_op) -> ()
 //       CHECK:   transform.iree.populate_workgroup_count_region_using_num_threads_slice {{.*}} : (!transform.any_op) -> ()
-//       CHECK:   {{.*}} = transform.structured.tile_using_forall {{.*}}   num_threads [16, 16] tile_sizes [](mapping = [#gpu.thread<y>, #gpu.thread<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+//       CHECK:   {{.*}} = transform.structured.tile_using_forall {{.*}}   num_threads [16, 16](mapping = [#gpu.thread<y>, #gpu.thread<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 //       CHECK:   apply_patterns to %{{.*}} {
 //       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK    }
@@ -96,8 +96,8 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //       CHECK:   transform.iree.apply_cse
 
 // WITH_OPTIONS-LABEL: func @pad
-//       WITH_OPTIONS:   transform.structured.tile_using_forall {{.*}}   num_threads [] tile_sizes [32, 16](mapping = [#gpu.block<y>, #gpu.block<x>])
-//       WITH_OPTIONS:   {{.*}} = transform.structured.tile_using_forall {{.*}}   num_threads [4, 8] tile_sizes [](mapping = [#gpu.thread<y>, #gpu.thread<x>])
+//       WITH_OPTIONS:   transform.structured.tile_using_forall {{.*}}   tile_sizes [32, 16](mapping = [#gpu.block<y>, #gpu.block<x>])
+//       WITH_OPTIONS:   {{.*}} = transform.structured.tile_using_forall {{.*}}   num_threads [4, 8](mapping = [#gpu.thread<y>, #gpu.thread<x>])
 //       WITH_OPTIONS:   transform.structured.vectorize {{.*}} vector_sizes [2, 4] : !transform.any_op
 //       WITH_OPTIONS:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [8, 4, 1]
 
