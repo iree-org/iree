@@ -978,16 +978,56 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#quickstart_1" class="md-nav__link">
-     Quickstart
+  <a href="#simple-api" class="md-nav__link">
+     Simple API
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Simple API">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#samples_1" class="md-nav__link">
      Samples
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-api" class="md-nav__link">
+     Advanced API
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exporting-functions" class="md-nav__link">
+     Exporting functions
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#global-variables" class="md-nav__link">
+     Global variables
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#samples_2" class="md-nav__link">
+     Samples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -2426,16 +2466,56 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#quickstart_1" class="md-nav__link">
-     Quickstart
+  <a href="#simple-api" class="md-nav__link">
+     Simple API
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Simple API">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#samples_1" class="md-nav__link">
      Samples
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-api" class="md-nav__link">
+     Advanced API
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exporting-functions" class="md-nav__link">
+     Exporting functions
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#global-variables" class="md-nav__link">
+     Global variables
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#samples_2" class="md-nav__link">
+     Samples
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -2580,7 +2660,7 @@ PyTorch models/functions using IREE, all within an interactive Python session.</
     output([Optimized module])
     input --&gt; compile --&gt; output
   end</code></pre>
-<p>For deployment outside of Python, see the ahead-of-time section below.</p>
+<p>For deployment outside of Python, see the ahead-of-time sections below.</p>
 <h3 id="quickstart"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.752 8.752 0 0 1-2.564 6.186l-.458.459c-.314.314-.641.616-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.749.749 0 0 1-1.11-.418l-.954-3.102a1.214 1.214 0 0 1-.145-.125L3.754 9.816a1.218 1.218 0 0 1-.124-.145L.528 8.717a.749.749 0 0 1-.418-1.11l1.71-2.774A1.748 1.748 0 0 1 3.31 4h3.204c.288-.338.59-.665.904-.979l.459-.458A8.749 8.749 0 0 1 14.064 0ZM8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.249 7.249 0 0 0-5.125 2.123ZM3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.234.234 0 0 1-.201-.064.234.234 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12Zm6.94-3.935c-.088.06-.177.118-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766c.058-.09.117-.178.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg></span> Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">link</a></h3>
 <p>Turbine integrates into PyTorch as a
 <a href="https://pytorch.org/docs/2.0/dynamo/custom-backends.html">custom backend</a> for
@@ -2616,14 +2696,18 @@ computation graph and feeds that graph through to the selected backend compiler.
 <table>
 <thead>
 <tr>
-<th>Colab notebooks</th>
+<th>Code samples</th>
 <th></th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Eager execution / JIT compilation</td>
+<td>JIT compilation notebook</td>
 <td><a href="https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_jit.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+</tr>
+<tr>
+<td>Simple MLP eager</td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/eager_mlp/mlp_eager_simple.py"><code>examples/eager_mlp/mlp_eager_simple.py</code></a></td>
 </tr>
 </tbody>
 </table>
@@ -2632,9 +2716,7 @@ computation graph and feeds that graph through to the selected backend compiler.
 Python and then export deployment-ready artifacts that can be used in IREE's
 <a href="../../deployment-configurations/">deployment configurations</a> via the
 <a href="../../../reference/bindings/">API bindings</a>.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 8H2.5a1 1 0 0 0-1 1v5.25a.75.75 0 0 1-1.5 0V9a2.5 2.5 0 0 1 2.5-2.5H4V5.133a1.75 1.75 0 0 1 1.533-1.737l2.831-.353.76-.913c.332-.4.825-.63 1.344-.63h.782c.966 0 1.75.784 1.75 1.75V4h2.25a.75.75 0 0 1 0 1.5H13v4h2.25a.75.75 0 0 1 0 1.5H13v.75a1.75 1.75 0 0 1-1.75 1.75h-.782c-.519 0-1.012-.23-1.344-.63l-.761-.912-2.83-.354A1.75 1.75 0 0 1 4 9.867Zm6.276-4.91-.95 1.14a.753.753 0 0 1-.483.265l-3.124.39a.25.25 0 0 0-.219.248v4.734c0 .126.094.233.219.249l3.124.39a.752.752 0 0 1 .483.264l.95 1.14a.25.25 0 0 0 .192.09h.782a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-.782a.25.25 0 0 0-.192.09Z"/></svg></span> Simple API</label><label for="__tabbed_1_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.433 2.304A4.492 4.492 0 0 0 3.5 6c0 1.598.832 3.002 2.09 3.802.518.328.929.923.902 1.64v.008l-.164 3.337a.75.75 0 1 1-1.498-.073l.163-3.33c.002-.085-.05-.216-.207-.316A5.996 5.996 0 0 1 2 6a5.993 5.993 0 0 1 2.567-4.92 1.482 1.482 0 0 1 1.673-.04c.462.296.76.827.76 1.423v2.82c0 .082.041.16.11.206l.75.51a.25.25 0 0 0 .28 0l.75-.51A.249.249 0 0 0 9 5.282V2.463c0-.596.298-1.127.76-1.423a1.482 1.482 0 0 1 1.673.04A5.993 5.993 0 0 1 14 6a5.996 5.996 0 0 1-2.786 5.068c-.157.1-.209.23-.207.315l.163 3.33a.752.752 0 0 1-1.094.714.75.75 0 0 1-.404-.64l-.164-3.345c-.027-.717.384-1.312.902-1.64A4.495 4.495 0 0 0 12.5 6a4.492 4.492 0 0 0-1.933-3.696c-.024.017-.067.067-.067.16v2.818a1.75 1.75 0 0 1-.767 1.448l-.75.51a1.75 1.75 0 0 1-1.966 0l-.75-.51A1.75 1.75 0 0 1 5.5 5.282V2.463c0-.092-.043-.142-.067-.159Z"/></svg></span> Advanced API</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
+<h3 id="simple-api"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 8H2.5a1 1 0 0 0-1 1v5.25a.75.75 0 0 1-1.5 0V9a2.5 2.5 0 0 1 2.5-2.5H4V5.133a1.75 1.75 0 0 1 1.533-1.737l2.831-.353.76-.913c.332-.4.825-.63 1.344-.63h.782c.966 0 1.75.784 1.75 1.75V4h2.25a.75.75 0 0 1 0 1.5H13v4h2.25a.75.75 0 0 1 0 1.5H13v.75a1.75 1.75 0 0 1-1.75 1.75h-.782c-.519 0-1.012-.23-1.344-.63l-.761-.912-2.83-.354A1.75 1.75 0 0 1 4 9.867Zm6.276-4.91-.95 1.14a.753.753 0 0 1-.483.265l-3.124.39a.25.25 0 0 0-.219.248v4.734c0 .126.094.233.219.249l3.124.39a.752.752 0 0 1 .483.264l.95 1.14a.25.25 0 0 0 .192.09h.782a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-.782a.25.25 0 0 0-.192.09Z"/></svg></span> Simple API<a class="headerlink" href="#simple-api" title="Permanent link">link</a></h3>
 <p>For simple models, a one-shot export API is available.</p>
 <pre class="mermaid"><code>graph LR
   accTitle: PyTorch simple AOT workflow overview
@@ -2647,28 +2729,14 @@ Python and then export deployment-ready artifacts that can be used in IREE's
   subgraph Python
     input([nn.Module])
     export(["ExportOutput (MLIR)"])
+    input -- "aot.export()" --&gt; export
   end
 
   subgraph Native
     binary(["binary (.vmfb)"])
   end
 
-  input -- "aot.export()" --&gt; export
   export -. "compile()" .-&gt; binary</code></pre>
-</div>
-<div class="tabbed-block">
-<p>For more complex models, an underlying advanced API is available that gives
-access to more features.</p>
-<div class="admonition note">
-<p class="admonition-title">Documentation coming soon!</p>
-</div>
-</div>
-</div>
-</div>
-<h3 id="quickstart_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.752 8.752 0 0 1-2.564 6.186l-.458.459c-.314.314-.641.616-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.749.749 0 0 1-1.11-.418l-.954-3.102a1.214 1.214 0 0 1-.145-.125L3.754 9.816a1.218 1.218 0 0 1-.124-.145L.528 8.717a.749.749 0 0 1-.418-1.11l1.71-2.774A1.748 1.748 0 0 1 3.31 4h3.204c.288-.338.59-.665.904-.979l.459-.458A8.749 8.749 0 0 1 14.064 0ZM8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.249 7.249 0 0 0-5.125 2.123ZM3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.234.234 0 0 1-.201-.064.234.234 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12Zm6.94-3.935c-.088.06-.177.118-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766c.058-.09.117-.178.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg></span> Quickstart<a class="headerlink" href="#quickstart_1" title="Permanent link">link</a></h3>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 8H2.5a1 1 0 0 0-1 1v5.25a.75.75 0 0 1-1.5 0V9a2.5 2.5 0 0 1 2.5-2.5H4V5.133a1.75 1.75 0 0 1 1.533-1.737l2.831-.353.76-.913c.332-.4.825-.63 1.344-.63h.782c.966 0 1.75.784 1.75 1.75V4h2.25a.75.75 0 0 1 0 1.5H13v4h2.25a.75.75 0 0 1 0 1.5H13v.75a1.75 1.75 0 0 1-1.75 1.75h-.782c-.519 0-1.012-.23-1.344-.63l-.761-.912-2.83-.354A1.75 1.75 0 0 1 4 9.867Zm6.276-4.91-.95 1.14a.753.753 0 0 1-.483.265l-3.124.39a.25.25 0 0 0-.219.248v4.734c0 .126.094.233.219.249l3.124.39a.752.752 0 0 1 .483.264l.95 1.14a.25.25 0 0 0 .192.09h.782a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-.782a.25.25 0 0 0-.192.09Z"/></svg></span> Simple API</label><label for="__tabbed_2_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.433 2.304A4.492 4.492 0 0 0 3.5 6c0 1.598.832 3.002 2.09 3.802.518.328.929.923.902 1.64v.008l-.164 3.337a.75.75 0 1 1-1.498-.073l.163-3.33c.002-.085-.05-.216-.207-.316A5.996 5.996 0 0 1 2 6a5.993 5.993 0 0 1 2.567-4.92 1.482 1.482 0 0 1 1.673-.04c.462.296.76.827.76 1.423v2.82c0 .082.041.16.11.206l.75.51a.25.25 0 0 0 .28 0l.75-.51A.249.249 0 0 0 9 5.282V2.463c0-.596.298-1.127.76-1.423a1.482 1.482 0 0 1 1.673.04A5.993 5.993 0 0 1 14 6a5.996 5.996 0 0 1-2.786 5.068c-.157.1-.209.23-.207.315l.163 3.33a.752.752 0 0 1-1.094.714.75.75 0 0 1-.404-.64l-.164-3.345c-.027-.717.384-1.312.902-1.64A4.495 4.495 0 0 0 12.5 6a4.492 4.492 0 0 0-1.933-3.696c-.024.017-.067.067-.067.16v2.818a1.75 1.75 0 0 1-.767 1.448l-.75.51a1.75 1.75 0 0 1-1.966 0l-.75-.51A1.75 1.75 0 0 1 5.5 5.282V2.463c0-.092-.043-.142-.067-.159Z"/></svg></span> Advanced API</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">iree.runtime</span> <span class="k">as</span> <span class="nn">ireert</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">shark_turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
@@ -2703,26 +2771,207 @@ access to more features.</p>
 <span class="n">result</span> <span class="o">=</span> <span class="n">vm_module</span><span class="o">.</span><span class="n">main</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">to_host</span><span class="p">())</span>
 </code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="admonition note">
-<p class="admonition-title">Documentation coming soon!</p>
-</div>
-</div>
-</div>
-</div>
-<h3 id="samples_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples_1" title="Permanent link">link</a></h3>
+<h4 id="samples_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples_1" title="Permanent link">link</a></h4>
 <table>
 <thead>
 <tr>
-<th>Colab notebooks</th>
+<th>Code samples</th>
 <th></th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Simple AOT export</td>
+<td>Simple AOT export notebook</td>
 <td><a href="https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_aot_simple.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+</tr>
+<tr>
+<td>Simple MLP export</td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_simple.py"><code>examples/aot_mlp/mlp_export_simple.py</code></a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="advanced-api"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.433 2.304A4.492 4.492 0 0 0 3.5 6c0 1.598.832 3.002 2.09 3.802.518.328.929.923.902 1.64v.008l-.164 3.337a.75.75 0 1 1-1.498-.073l.163-3.33c.002-.085-.05-.216-.207-.316A5.996 5.996 0 0 1 2 6a5.993 5.993 0 0 1 2.567-4.92 1.482 1.482 0 0 1 1.673-.04c.462.296.76.827.76 1.423v2.82c0 .082.041.16.11.206l.75.51a.25.25 0 0 0 .28 0l.75-.51A.249.249 0 0 0 9 5.282V2.463c0-.596.298-1.127.76-1.423a1.482 1.482 0 0 1 1.673.04A5.993 5.993 0 0 1 14 6a5.996 5.996 0 0 1-2.786 5.068c-.157.1-.209.23-.207.315l.163 3.33a.752.752 0 0 1-1.094.714.75.75 0 0 1-.404-.64l-.164-3.345c-.027-.717.384-1.312.902-1.64A4.495 4.495 0 0 0 12.5 6a4.492 4.492 0 0 0-1.933-3.696c-.024.017-.067.067-.067.16v2.818a1.75 1.75 0 0 1-.767 1.448l-.75.51a1.75 1.75 0 0 1-1.966 0l-.75-.51A1.75 1.75 0 0 1 5.5 5.282V2.463c0-.092-.043-.142-.067-.159Z"/></svg></span> Advanced API<a class="headerlink" href="#advanced-api" title="Permanent link">link</a></h3>
+<p>For more complex models, an underlying advanced API is available that gives
+access to more features.</p>
+<pre class="mermaid"><code>graph LR
+  accTitle: PyTorch advanced AOT workflow overview
+  accDescr {
+    Programs are represented using the aot.CompiledModule class.
+    CompiledModules can extend nn.Module objects, export globals, and set
+    shapes and dtypes for each function.
+    Modules are exported using the "aot" API.
+    Exported outputs are then compiled to .vmfb files with executable binaries.
+  }
+
+  subgraph Python
+    compiledmodule("aot.CompiledModule\n\n- extend nn.Module\n- export globals\n- set shapes/dtypes")
+    export(["ExportOutput (MLIR)"])
+    compiledmodule -- "aot.export()" --&gt; export
+  end
+
+  subgraph Native
+    binary(["binary (.vmfb)"])
+  end
+
+  export -. "compile()" .-&gt; binary</code></pre>
+<p>Advanced export workflows can use the
+<a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/python/shark_turbine/aot/compiled_module.py"><code>aot.CompiledModule</code></a>
+class to define and constrain the structure of a program prior to compiling it.</p>
+<!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
+                      https://github.com/nod-ai/SHARK-Turbine/issues/106
+-->
+
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">shark_turbine.aot</span> <span class="k">as</span> <span class="nn">aot</span>
+
+<span class="c1"># A minimal program, with no functions or variables.</span>
+<span class="k">class</span> <span class="nc">BasicModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
+  <span class="o">...</span>
+
+<span class="c1"># Create an instance of the program and convert it to MLIR.</span>
+<span class="kn">from</span> <span class="nn">iree.compiler.ir</span> <span class="kn">import</span> <span class="n">Context</span>
+<span class="n">instance</span> <span class="o">=</span> <span class="n">BasicModule</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="n">Context</span><span class="p">())</span>
+<span class="n">module_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="o">.</span><span class="n">get_mlir_module</span><span class="p">(</span><span class="n">instance</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">module_str</span><span class="p">)</span>
+<span class="c1"># module @basic {</span>
+<span class="c1"># }</span>
+</code></pre></div>
+<h4 id="exporting-functions"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15.6 5.29c-1.1-.1-2.07.71-2.17 1.82L13.18 10H16v2h-3l-.44 5.07a3.986 3.986 0 0 1-4.33 3.63 4.007 4.007 0 0 1-3.06-1.87l1.5-1.5c.24.74.9 1.31 1.73 1.38 1.1.1 2.07-.71 2.17-1.82L11 12H8v-2h3.17l.27-3.07c.19-2.2 2.13-3.83 4.33-3.63 1.31.11 2.41.84 3.06 1.87l-1.5 1.5c-.24-.74-.9-1.31-1.73-1.38Z"/></svg></span> Exporting functions<a class="headerlink" href="#exporting-functions" title="Permanent link">link</a></h4>
+<p><em>Exported functions</em> are the API entry points into a compiled program.</p>
+<p>Simple feed-forward neural networks used for inference may have a single
+exported function (typically called "forward"), while more complex programs can
+have multiple computation functions, initialization functions, "backward"
+methods for training, state management functions, debugging functions, etc.</p>
+<ul>
+<li>
+<p>Each instance method on a <code>aot.CompiledModule</code>-derived class is exported.
+  These instance methods can include calls to other <code>aot</code> components, such as
+  <code>aot.jittable</code> compute functions:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">GetOnesModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
+  <span class="nd">@aot</span><span class="o">.</span><span class="n">jittable</span>
+  <span class="k">def</span> <span class="nf">compute_ones</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">get_ones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_ones</span><span class="p">()</span>
+</code></pre></div>
+</li>
+<li>
+<p>Instance methods can use <code>aot.AbstractTensor</code> to specify data types:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">IntSumModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
+  <span class="nd">@aot</span><span class="o">.</span><span class="n">jittable</span>
+  <span class="k">def</span> <span class="nf">compute_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+
+  <span class="k">def</span> <span class="nf">sum_int32</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+<span class="hll">    <span class="n">a</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+</span><span class="hll">    <span class="n">b</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>
+</span>  <span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+</code></pre></div>
+</li>
+<li>
+<p>Shapes can be made dynamic using <code>aot.AbstractTensor</code> and <code>aot.jittable</code>
+  constraints:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">DynamicSumModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
+  <span class="nd">@aot</span><span class="o">.</span><span class="n">jittable</span>
+  <span class="k">def</span> <span class="nf">compute_sum</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+
+  <span class="k">def</span> <span class="nf">sum_dynamic</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+<span class="hll">    <span class="n">a</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
+</span><span class="hll">    <span class="n">b</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
+</span>  <span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_sum</span><span class="p">(</span>
+        <span class="n">a</span><span class="p">,</span>
+        <span class="n">b</span><span class="p">,</span>
+<span class="hll">        <span class="n">constraints</span><span class="o">=</span><span class="p">[</span>
+</span><span class="hll">            <span class="n">a</span><span class="o">.</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">dynamic_dim</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+</span><span class="hll">        <span class="p">],</span>
+</span>    <span class="p">)</span>
+</code></pre></div>
+</li>
+</ul>
+<h4 id="global-variables"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.41 3c1.39 2.71 1.94 5.84 1.59 9-.2 3.16-1.3 6.29-3.17 9l-1.53-1c1.61-2.43 2.55-5.2 2.7-8 .34-2.8-.11-5.57-1.3-8l1.71-1M5.17 3 6.7 4C5.09 6.43 4.15 9.2 4 12c-.34 2.8.12 5.57 1.3 8l-1.69 1c-1.4-2.71-1.96-5.83-1.61-9 .2-3.16 1.3-6.29 3.17-9m6.91 7.68 2.32-3.23h2.53l-3.78 5 2.2 4.92h-2.26L11.71 14l-2.43 3.33H6.76l3.9-5.12-2.13-4.76h2.27l1.28 3.23Z"/></svg></span> Global variables<a class="headerlink" href="#global-variables" title="Permanent link">link</a></h4>
+<p><em>Global variables</em> are used to represent persistent state within a program
+instance.</p>
+<p>For example, they can be used to represent the weights and biases in a neural
+network, and exporting these as mutable variables can allow for setting
+their values independently at runtime.</p>
+<ul>
+<li>
+<p>Individual globals can be exported using <code>aot.export_global()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">state_example</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+<span class="n">update_example</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">SampleModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
+  <span class="n">value</span> <span class="o">=</span> <span class="n">aot</span><span class="o">.</span><span class="n">export_global</span><span class="p">(</span><span class="n">state_example</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">get_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span>
+
+  <span class="k">def</span> <span class="nf">update_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">abstractify</span><span class="p">(</span><span class="n">update_example</span><span class="p">)):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">new_value</span>
+</code></pre></div>
+</li>
+<li>
+<p>All named parameters on a <code>nn.Module</code> can be exported using
+  <code>export_parameters()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span> <span class="nc">SimpleParams</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+  <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">classifier</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">20</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">classifier</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="n">m</span> <span class="o">=</span> <span class="n">SimpleParams</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">SimpleParamsModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
+<span class="hll">  <span class="n">params</span> <span class="o">=</span> <span class="n">aot</span><span class="o">.</span><span class="n">export_parameters</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+</span>  <span class="n">compute</span> <span class="o">=</span> <span class="n">aot</span><span class="o">.</span><span class="n">jittable</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">forward</span><span class="p">)</span>
+
+  <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">AbstractTensor</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">20</span><span class="p">)):</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="hll">  <span class="c1"># torch.nn.Linear has &#39;weight&#39; and &#39;bias&#39; variables:</span>
+</span><span class="hll">  <span class="c1">#   https://pytorch.org/docs/stable/generated/torch.nn.Linear.html</span>
+</span><span class="hll">  <span class="c1"># Add getters for both exported parameters.</span>
+</span><span class="hll">
+</span><span class="hll">  <span class="k">def</span> <span class="nf">get_weight</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span class="hll">    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;classifier.weight&quot;</span><span class="p">]</span>
+</span><span class="hll">
+</span><span class="hll">  <span class="k">def</span> <span class="nf">get_bias</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span class="hll">    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;classifier.bias&quot;</span><span class="p">]</span>
+</span></code></pre></div>
+</li>
+</ul>
+<h4 id="samples_2"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples_2" title="Permanent link">link</a></h4>
+<table>
+<thead>
+<tr>
+<th>Code samples</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PyTorch dynamic shapes notebook</td>
+<td><a href="https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+</tr>
+<tr>
+<td>Unit tests</td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/tree/main/tests/aot"><code>tests/aot/</code></a></td>
+</tr>
+<tr>
+<td>Dynamic MLP export</td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_dynamic.py"><code>examples/aot_mlp/mlp_export_dynamic.py</code></a></td>
+</tr>
+<tr>
+<td>llama2 inference example</td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/llama2_inference/stateless_llama.py"><code>examples/llama2_inference/stateless_llama.py</code></a></td>
 </tr>
 </tbody>
 </table>
@@ -2733,7 +2982,7 @@ access to more features.</p>
 <table>
 <thead>
 <tr>
-<th>Colab notebooks</th>
+<th>Code samples</th>
 <th></th>
 </tr>
 </thead>
