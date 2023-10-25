@@ -916,10 +916,9 @@ struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
     auto sourceType = llvm::cast<ShapedType>(source.getType());
     auto resultType = llvm::cast<ShapedType>(reshapeOp.getResult().getType());
 
-    // If the bitwidths don't match, this is a bitcast, else we can use
+    // If the element types don't match, this is a bitcast, else we can use
     // reshape.
-    if (IREE::Util::getTypeBitWidth(sourceType.getElementType()) !=
-        IREE::Util::getTypeBitWidth(resultType.getElementType())) {
+    if (sourceType.getElementType() != resultType.getElementType()) {
       rewriter.replaceOpWithNewOp<TensorBitCastOp>(
           reshapeOp, reshapeOp.getResult().getType(), source, sourceDims,
           reshapeOp.getResultDims());

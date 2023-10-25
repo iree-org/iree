@@ -75,10 +75,10 @@ func.func @reshapeNoOpStatic(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 // -----
 
-// CHECK-LABEL: @reshapeElementTypeDifferent
-func.func @reshapeElementTypeDifferent(%arg0: tensor<f32>) -> tensor<i32> {
-  // CHECK-NEXT: flow.tensor.reshape %arg0
-  %0 = flow.tensor.reshape %arg0 : tensor<f32> -> tensor<i32>
+// CHECK-LABEL: @bitcastSameBitWidth
+func.func @bitcastSameBitWidth(%arg0: tensor<f32>) -> tensor<i32> {
+  // CHECK-NEXT: flow.tensor.bitcast %arg0
+  %0 = flow.tensor.bitcast %arg0 : tensor<f32> -> tensor<i32>
   return %0 : tensor<i32>
 }
 
@@ -137,9 +137,9 @@ func.func @flattenReshapeChain(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: inde
 // CHECK-SAME: %[[ARG:.+]]: tensor<4x?xi16>,
 // CHECK-SAME: %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[DIM2:.+]]: index
 func.func @flattenReshapeBitcastChain(%arg0: tensor<4x?xi16>, %dim0: index, %dim1: index, %dim2: index) -> tensor<4x?xbf16> {
-  // CHECK-NEXT: %[[RET:.+]] = flow.tensor.reshape %[[ARG]] : tensor<4x?xi16>{%[[DIM0]]} -> tensor<4x?xbf16>{%[[DIM2]]}
-  %0 = flow.tensor.reshape %arg0 : tensor<4x?xi16>{%dim0} -> tensor<4x?xf16>{%dim1}
-  %1 = flow.tensor.reshape %0 : tensor<4x?xf16>{%dim1} -> tensor<4x?xbf16>{%dim2}
+  // CHECK-NEXT: %[[RET:.+]] = flow.tensor.bitcast %[[ARG]] : tensor<4x?xi16>{%[[DIM0]]} -> tensor<4x?xbf16>{%[[DIM2]]}
+  %0 = flow.tensor.bitcast %arg0 : tensor<4x?xi16>{%dim0} -> tensor<4x?xf16>{%dim1}
+  %1 = flow.tensor.bitcast %0 : tensor<4x?xf16>{%dim1} -> tensor<4x?xbf16>{%dim2}
   // CHECK-NEXT: return %[[RET]]
   return %1 : tensor<4x?xbf16>
 }
@@ -165,8 +165,8 @@ func.func @flattenBitCastChain(%arg0: tensor<?x4xi16>, %dim0: index, %dim1: inde
 func.func @flattenBitCastReshapeBitCast(%arg0: tensor<?x16xi16>, %dim0: index, %dim1: index, %dim2: index, %dim3: index) -> tensor<?x4x4xi16> {
   // CHECK-NEXT: %[[RET:.+]] = flow.tensor.reshape %[[ARG]] : tensor<?x16xi16>{%[[DIM0]]} -> tensor<?x4x4xi16>{%[[DIM3]]}
   %0 = flow.tensor.bitcast %arg0 : tensor<?x16xi16>{%dim0} -> tensor<?x8xi32>{%dim1}
-  %1 = flow.tensor.reshape %0 : tensor<?x8xi32>{%dim1} -> tensor<?x4x2xf32>{%dim2}
-  %2 = flow.tensor.bitcast %1 : tensor<?x4x2xf32>{%dim2} -> tensor<?x4x4xi16>{%dim3}
+  %1 = flow.tensor.reshape %0 : tensor<?x8xi32>{%dim1} -> tensor<?x4x2xi32>{%dim2}
+  %2 = flow.tensor.bitcast %1 : tensor<?x4x2xi32>{%dim2} -> tensor<?x4x4xi16>{%dim3}
   // CHECK-NEXT: return %[[RET]]
   return %2 : tensor<?x4x4xi16>
 }
