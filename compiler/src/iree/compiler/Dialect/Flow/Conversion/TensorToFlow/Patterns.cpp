@@ -183,9 +183,10 @@ struct ConvertTensorFromElementsPattern
   }
 };
 
-/// Populates given sizes array with the dynamic dims.
-static SmallVector<Value> sizesForTensor(OpBuilder &builder, Location loc,
-                                         ShapedType stp, Value tensor) {
+/// Returns a sizes array with the dynamic dims.
+static SmallVector<Value> getDynamicTensorSizes(OpBuilder &builder,
+                                                Location loc, ShapedType stp,
+                                                Value tensor) {
   SmallVector<Value> sizes;
   for (const auto &d : enumerate(stp.getShape())) {
     if (d.value() == ShapedType::kDynamic) {
@@ -216,7 +217,7 @@ struct ConvertTensorDialectReshapeOpPattern
       }
 
       SmallVector<Value> srcSizes;
-      srcSizes = sizesForTensor(rewriter, loc, inputType, input);
+      srcSizes = getDynamicTensorSizes(rewriter, loc, inputType, input);
 
       // flow.reshape only takes dynamic dims for the result, source dims
       // (ignore static dimensions)
