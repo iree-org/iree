@@ -419,8 +419,11 @@ struct TransposeReshapeGenericDotGeneral final
     auto rhsNewType = cast<RankedTensorType>(rhs.getType());
 
     // batching、lhs parallel、rhs parallel this order is a conversion
-    SmallVector<int64_t> newShape = {lhsNewType.getShape()[0],
-                                     lhsNewType.getShape()[1]};
+    SmallVector<int64_t, 3> newShape = {lhsNewType.getShape()[0]};
+
+    if (lhsNewType.getRank() > 2)
+      newShape.push_back(lhsNewType.getDimSize(1));
+
     if (rhsNewType.getRank() > 2)
       newShape.push_back(rhsNewType.getDimSize(2));
 
