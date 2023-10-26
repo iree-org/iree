@@ -46,10 +46,10 @@ func.func @duplicate_dispatches(%cmd1 : !hal.command_buffer, %cmd2 : !hal.comman
 
 util.global @_executable : !hal.executable
 
-// CHECK-LABEL: @duplicate_dispatches
+// CHECK-LABEL: @nested_dispatch
 //  CHECK-SAME: (%[[CMD1:.+]]: !hal.command_buffer,
 //  CHECK-SAME:  %[[IDX:.+]]: index)
-func.func @duplicate_dispatches(%cmd1 : !hal.command_buffer, %idx : index) {
+func.func @nested_dispatch(%cmd1 : !hal.command_buffer, %idx : index) {
   // CHECK: %[[EXE:.+]] = util.global.load @_executable
   %exe = util.global.load @_executable : !hal.executable
 
