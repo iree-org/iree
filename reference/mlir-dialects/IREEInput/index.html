@@ -2025,6 +2025,13 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_inputtensorbitcast-inputtensorbitcastop" class="md-nav__link">
+    iree_input.tensor.bitcast (Input::TensorBitCastOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_inputtensorclone-inputtensorcloneop" class="md-nav__link">
     iree_input.tensor.clone (Input::TensorCloneOp)
   </a>
@@ -3108,6 +3115,13 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#iree_inputtensorbitcast-inputtensorbitcastop" class="md-nav__link">
+    iree_input.tensor.bitcast (Input::TensorBitCastOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_inputtensorclone-inputtensorcloneop" class="md-nav__link">
     iree_input.tensor.clone (Input::TensorCloneOp)
   </a>
@@ -3460,6 +3474,7 @@ LLVM/MLIR's API surface is itself unstable.</p>
 </ul>
 </li>
 <li><a href="#tensor-ops">Tensor ops</a><ul>
+<li><a href="#iree_inputtensorbitcast-inputtensorbitcastop">iree_input.tensor.bitcast (Input::TensorBitCastOp)</a></li>
 <li><a href="#iree_inputtensorclone-inputtensorcloneop">iree_input.tensor.clone (Input::TensorCloneOp)</a></li>
 <li><a href="#iree_inputtensorload-inputtensorloadop">iree_input.tensor.load (Input::TensorLoadOp)</a></li>
 <li><a href="#iree_inputtensorreshape-inputtensorreshapeop">iree_input.tensor.reshape (Input::TensorReshapeOp)</a></li>
@@ -4348,6 +4363,56 @@ with the default list value of the element type.</p>
 </tbody>
 </table>
 <h3 id="tensor-ops">Tensor ops<a class="headerlink" href="#tensor-ops" title="Permanent link">link</a></h3>
+<h4 id="iree_inputtensorbitcast-inputtensorbitcastop"><code>iree_input.tensor.bitcast</code> (Input::TensorBitCastOp)<a class="headerlink" href="#iree_inputtensorbitcast-inputtensorbitcastop" title="Permanent link">link</a></h4>
+<p><em>Bitcasts a tensor</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_input.tensor.bitcast` $source `:`
+              type($source) (`{` $source_dims^ `}`)? `-&gt;`
+              type($result) (`{` $result_dims^ `}`)?
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Bitcasts a tensor to a new shape without modifying the contents.</p>
+<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_dims</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_dims</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h4 id="iree_inputtensorclone-inputtensorcloneop"><code>iree_input.tensor.clone</code> (Input::TensorCloneOp)<a class="headerlink" href="#iree_inputtensorclone-inputtensorcloneop" title="Permanent link">link</a></h4>
 <p><em>Performs a full tensor clone operation</em></p>
 <p>Syntax:</p>
@@ -4358,7 +4423,7 @@ with the default list value of the element type.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
+<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4377,7 +4442,7 @@ with the default list value of the element type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
+<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4403,7 +4468,7 @@ with the default list value of the element type.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
+<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4426,7 +4491,7 @@ with the default list value of the element type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
+<h5 id="results_17">Results:<a class="headerlink" href="#results_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4453,7 +4518,7 @@ with the default list value of the element type.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
+<h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4476,7 +4541,7 @@ with the default list value of the element type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_17">Results:<a class="headerlink" href="#results_17" title="Permanent link">link</a></h5>
+<h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4503,7 +4568,7 @@ with the default list value of the element type.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
+<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4534,7 +4599,7 @@ with the default list value of the element type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
+<h5 id="results_19">Results:<a class="headerlink" href="#results_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4559,7 +4624,7 @@ with the default list value of the element type.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
+<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4578,7 +4643,7 @@ with the default list value of the element type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_19">Results:<a class="headerlink" href="#results_19" title="Permanent link">link</a></h5>
+<h5 id="results_20">Results:<a class="headerlink" href="#results_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4604,7 +4669,7 @@ with the default list value of the element type.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
+<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4631,7 +4696,7 @@ with the default list value of the element type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_20">Results:<a class="headerlink" href="#results_20" title="Permanent link">link</a></h5>
+<h5 id="results_21">Results:<a class="headerlink" href="#results_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4663,7 +4728,7 @@ values being traced.</p>
 <tr><td><code>key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
+<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4695,7 +4760,7 @@ given offset indices.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
+<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4726,7 +4791,7 @@ given offset indices.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_21">Results:<a class="headerlink" href="#results_21" title="Permanent link">link</a></h5>
+<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4751,7 +4816,7 @@ given offset indices.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultType</p>
 <p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
+<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4770,7 +4835,7 @@ given offset indices.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
+<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4794,7 +4859,7 @@ given offset indices.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
+<h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4831,7 +4896,7 @@ restricted to 3 (XYZ).</p>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
-<h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
+<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4868,7 +4933,7 @@ restricted to 3 (XYZ).</p>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
-<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
+<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4910,7 +4975,7 @@ restricted to 3 (XYZ).</p>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
-<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
+<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>

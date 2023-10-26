@@ -1811,6 +1811,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#flowtensorbitcast-flowtensorbitcastop" class="md-nav__link">
+    flow.tensor.bitcast (Flow::TensorBitCastOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#flowtensorclone-flowtensorcloneop" class="md-nav__link">
     flow.tensor.clone (Flow::TensorCloneOp)
   </a>
@@ -2997,6 +3004,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#flowtensorbitcast-flowtensorbitcastop" class="md-nav__link">
+    flow.tensor.bitcast (Flow::TensorBitCastOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#flowtensorclone-flowtensorcloneop" class="md-nav__link">
     flow.tensor.clone (Flow::TensorCloneOp)
   </a>
@@ -3265,6 +3279,7 @@ workload size, shapes of inputs and outputs, etc.</p>
 <li><a href="#flowdispatchworkgroup_count_from_slice-flowdispatchworkgroupcountfromsliceop">flow.dispatch.workgroup_count_from_slice (Flow::DispatchWorkgroupCountFromSliceOp)</a></li>
 <li><a href="#flowdispatchworkloadordinal-flowdispatchworkloadordinalop">flow.dispatch.workload.ordinal (Flow::DispatchWorkloadOrdinalOp)</a></li>
 <li><a href="#flowtensoralloca-flowtensorallocaop">flow.tensor.alloca (Flow::TensorAllocaOp)</a></li>
+<li><a href="#flowtensorbitcast-flowtensorbitcastop">flow.tensor.bitcast (Flow::TensorBitCastOp)</a></li>
 <li><a href="#flowtensorclone-flowtensorcloneop">flow.tensor.clone (Flow::TensorCloneOp)</a></li>
 <li><a href="#flowtensorconstant-flowtensorconstantop">flow.tensor.constant (Flow::TensorConstantOp)</a></li>
 <li><a href="#flowtensorempty-flowtensoremptyop">flow.tensor.empty (Flow::TensorEmptyOp)</a></li>
@@ -4689,6 +4704,56 @@ lowering.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="flowtensorbitcast-flowtensorbitcastop"><code>flow.tensor.bitcast</code> (Flow::TensorBitCastOp)<a class="headerlink" href="#flowtensorbitcast-flowtensorbitcastop" title="Permanent link">link</a></h4>
+<p><em>Bitcasts a tensor</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.bitcast` $source `:`
+              type($source) (`{` $source_dims^ `}`)? `-&gt;`
+              type($result) (`{` $result_dims^ `}`)?
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Bitcasts a tensor to a new type without modifying the contents.</p>
+<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
+<p>Interfaces: ConditionallySpeculatable, FLOW_StreamableOp, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_dims</code></td>
+<td>variadic of index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>result_dims</code></td>
+<td>variadic of index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>ranked tensor of any type values</td>
+</tr>
+</tbody>
+</table>
 <h4 id="flowtensorclone-flowtensorcloneop"><code>flow.tensor.clone</code> (Flow::TensorCloneOp)<a class="headerlink" href="#flowtensorclone-flowtensorcloneop" title="Permanent link">link</a></h4>
 <p><em>Performs a full tensor clone operation</em></p>
 <p>Syntax:</p>
@@ -4699,7 +4764,7 @@ lowering.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, FLOW_StreamableOp, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
+<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4718,7 +4783,7 @@ lowering.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
+<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4751,7 +4816,7 @@ information should be hidden from the compiler and resolved at runtime.</p>
 <tr><td><code>value</code></td><td>::mlir::ElementsAttr</td><td>constant vector/tensor attribute</td></tr>
 </table>
 
-<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
+<h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4777,7 +4842,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, FLOW_StreamableOp, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
+<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4792,7 +4857,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
+<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4818,7 +4883,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
+<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4841,7 +4906,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
+<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4868,7 +4933,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, FLOW_StreamableOp, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
+<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4891,7 +4956,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
+<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4918,7 +4983,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, FLOW_StreamableOp, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
+<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4949,7 +5014,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
+<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4974,7 +5039,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, FLOW_StreamableOp, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
+<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4993,7 +5058,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
+<h5 id="results_29">Results:<a class="headerlink" href="#results_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5019,7 +5084,7 @@ any ranges of the tensor that are later read.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
+<h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5046,7 +5111,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_29">Results:<a class="headerlink" href="#results_29" title="Permanent link">link</a></h5>
+<h5 id="results_30">Results:<a class="headerlink" href="#results_30" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5073,7 +5138,7 @@ calculations and is removed during lowering.</p>
 <p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), ReifyRankedShapedTypeOpInterface, Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
+<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5092,7 +5157,7 @@ calculations and is removed during lowering.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_30">Results:<a class="headerlink" href="#results_30" title="Permanent link">link</a></h5>
+<h5 id="results_31">Results:<a class="headerlink" href="#results_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5125,7 +5190,7 @@ values being traced.</p>
 <tr><td><code>key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
+<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5157,7 +5222,7 @@ given offset indices.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
 <p>Interfaces: ConditionallySpeculatable, FLOW_StreamableOp, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
-<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
+<h5 id="operands_30">Operands:<a class="headerlink" href="#operands_30" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5188,7 +5253,7 @@ given offset indices.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_31">Results:<a class="headerlink" href="#results_31" title="Permanent link">link</a></h5>
+<h5 id="results_32">Results:<a class="headerlink" href="#results_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
