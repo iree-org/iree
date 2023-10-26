@@ -155,11 +155,6 @@ createCollapseDimensionsPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCloneProducersIntoDispatchRegionsPass();
 
-// A pass to fuse dequantization and matmul linalg.generic ops
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFuseDequantizationMatmulPass(
-    bool enableQuantizedMatmulReassociation = false);
-
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
 //===----------------------------------------------------------------------===//

@@ -20,7 +20,7 @@ namespace GlobalOptimization {
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
 static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
-    "iree-flow-enable-quantized-matmul-reassociation",
+    "iree-global-opt-enable-quantized-matmul-reassociation",
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
@@ -74,7 +74,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPass([&]() {
-        return IREE::Flow::createFuseDequantizationMatmulPass(
+        return createFuseDequantizationMatmulPass(
             clEnableQuantizedMatmulReassociation);
       })
       .addPass(mlir::createCanonicalizerPass)

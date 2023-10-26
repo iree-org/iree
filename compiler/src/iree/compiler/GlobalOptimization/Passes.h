@@ -58,6 +58,11 @@ createEraseUnusedLinalgOperands();
 // forms.
 std::unique_ptr<Pass> createExpandVectorsPass();
 
+// A pass to fuse dequantization and matmul linalg.generic ops
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFuseDequantizationMatmulPass(
+    bool enableQuantizedMatmulReassociation = false);
+
 // Materializes logical encodings to physical encodings if there is a single
 // device target.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>

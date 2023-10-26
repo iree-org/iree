@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-flow-fuse-dequantization-matmul{enable-quantized-matmul-reassociation=true},canonicalize))" %s | FileCheck %s --check-prefix=REASSOCIATE-CHECK
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-flow-fuse-dequantization-matmul,canonicalize))" %s | FileCheck %s --check-prefix=FUSE-CHECK
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-global-opt-fuse-dequantization-matmul{enable-quantized-matmul-reassociation=true},canonicalize))" %s | FileCheck %s --check-prefix=REASSOCIATE-CHECK
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-global-opt-fuse-dequantization-matmul,canonicalize))" %s | FileCheck %s --check-prefix=FUSE-CHECK
 
 module {
   func.func @grouped_quantized_matmul_reassociate(%arg0: tensor<11008x32x128xi4>, %arg1: tensor<32x128xf32>, %arg2: tensor<11008x32xf32>, %arg3: tensor<11008x32xf32>) -> tensor<11008xf32> {

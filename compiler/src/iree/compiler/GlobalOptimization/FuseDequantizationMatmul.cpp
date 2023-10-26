@@ -4,11 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/GlobalOptimization/PassDetail.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -17,12 +19,11 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-fuse-dequantization-matmul"
+#define DEBUG_TYPE "iree-global-opt-fuse-dequantization-matmul"
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace GlobalOptimization {
 
 namespace {
 
@@ -37,23 +38,25 @@ static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
                                           Operation *dequant, Operation *matmul,
                                           std::optional<Operation *> fill) {
 
-  DispatchRegionOp regionOp = matmul->getParentOfType<DispatchRegionOp>();
+  auto regionOp = matmul->getParentOfType<IREE::Flow::DispatchRegionOp>();
   if (!regionOp) {
-    FailureOr<DispatchRegionOp> maybeRegionOp =
-        wrapOpInDispatchRegion(rewriter, matmul);
+    FailureOr<IREE::Flow::DispatchRegionOp> maybeRegionOp =
+        IREE::Flow::wrapOpInDispatchRegion(rewriter, matmul);
     if (failed(maybeRegionOp))
       return failure();
     regionOp = maybeRegionOp.value();
   }
 
-  FailureOr<DispatchRegionOp> maybeFusedRegionOp =
-      clonePrecedingOpIntoDispatchRegion(rewriter, dequant, regionOp);
+  FailureOr<IREE::Flow::DispatchRegionOp> maybeFusedRegionOp =
+      IREE::Flow::clonePrecedingOpIntoDispatchRegion(rewriter, dequant,
+                                                     regionOp);
   if (failed(maybeFusedRegionOp))
     return failure();
 
   if (fill && *fill) {
-    FailureOr<DispatchRegionOp> maybeFusedFillRegionOp =
-        clonePrecedingOpIntoDispatchRegion(rewriter, fill.value(), regionOp);
+    FailureOr<IREE::Flow::DispatchRegionOp> maybeFusedFillRegionOp =
+        IREE::Flow::clonePrecedingOpIntoDispatchRegion(rewriter, fill.value(),
+                                                       regionOp);
     if (failed(maybeFusedFillRegionOp))
       return failure();
   }
@@ -61,19 +64,20 @@ static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
   return success();
 }
 
-static FailureOr<DispatchRegionOp>
+static FailureOr<IREE::Flow::DispatchRegionOp>
 wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
                                    SmallVector<Operation *> ops) {
-  FailureOr<DispatchRegionOp> maybeRegionOp =
-      wrapOpInDispatchRegion(rewriter, ops.back());
+  FailureOr<IREE::Flow::DispatchRegionOp> maybeRegionOp =
+      IREE::Flow::wrapOpInDispatchRegion(rewriter, ops.back());
   if (failed(maybeRegionOp)) {
     return failure();
   }
-  DispatchRegionOp regionOp = maybeRegionOp.value();
+  IREE::Flow::DispatchRegionOp regionOp = maybeRegionOp.value();
 
   SmallVector<Operation *> precedingOps(ops.begin(), ops.end() - 1);
-  FailureOr<DispatchRegionOp> maybeFusedRegionOp =
-      movePrecedingOpsIntoDispatchRegion(rewriter, precedingOps, regionOp);
+  FailureOr<IREE::Flow::DispatchRegionOp> maybeFusedRegionOp =
+      IREE::Flow::movePrecedingOpsIntoDispatchRegion(rewriter, precedingOps,
+                                                     regionOp);
   if (failed(maybeFusedRegionOp)) {
     return failure();
   }
@@ -578,7 +582,7 @@ static LogicalResult reassociateAndFuseDequantMatmul(RewriterBase &rewriter,
   // Fuse dequantization + matmul ops into a single dispatch region
   SmallVector<Operation *> dequantMatmulOps(
       {integerMatmulOp, dequantizedMatmulOp});
-  FailureOr<DispatchRegionOp> maybeDequantMatmulDispatch =
+  FailureOr<IREE::Flow::DispatchRegionOp> maybeDequantMatmulDispatch =
       wrapConsecutiveOpsInDispatchRegion(rewriter, dequantMatmulOps);
   if (failed(maybeDequantMatmulDispatch)) {
     return failure();
@@ -594,12 +598,15 @@ static LogicalResult reassociateAndFuseDequantMatmul(RewriterBase &rewriter,
 static LogicalResult isGroupedContractionOp(linalg::GenericOp genericOp) {
   unsigned numLoops = genericOp.getNumLoops();
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(genericOp.getOperation());
-  if (numLoops == 0)
+  if (numLoops == 0) {
     return failure();
-  if (!linalg::isaContractionOpInterface(linalgOp))
+  }
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
     return failure();
-  if (genericOp.getNumReductionLoops() != 2)
+  }
+  if (genericOp.getNumReductionLoops() != 2) {
     return failure();
+  }
   return success();
 }
 
@@ -617,18 +624,21 @@ static LogicalResult isGroupedContractionOp(linalg::GenericOp genericOp) {
 static LogicalResult isGroupedDequantizationOp(linalg::GenericOp genericOp) {
   // Check for 1 result, and 2 (input, scales) or 3 (input, scales, zero points)
   // inputs
-  if (genericOp.getNumDpsInits() != 1)
+  if (genericOp.getNumDpsInits() != 1) {
     return failure();
-  if (genericOp.getNumDpsInputs() != 2 && genericOp.getNumDpsInputs() != 3)
+  }
+  if (genericOp.getNumDpsInputs() != 2 && genericOp.getNumDpsInputs() != 3) {
     return failure();
-
+  }
   // Check that the rank is at least 3 and all loops are parallel
   unsigned numLoops = genericOp.getNumLoops();
   unsigned numParallelLoops = genericOp.getNumParallelLoops();
-  if (numLoops < 3)
+  if (numLoops < 3) {
     return failure();
-  if (numLoops != numParallelLoops)
+  }
+  if (numLoops != numParallelLoops) {
     return failure();
+  }
 
   // Work back from linalg.yield and check body of genericOp.
   // The genericOp should yield the result of an arith.mulf,
@@ -641,40 +651,48 @@ static LogicalResult isGroupedDequantizationOp(linalg::GenericOp genericOp) {
   {
     producerOutput = yieldOp->getOperand(0);
     producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
+    if (!producer || producer->getNumOperands() == 0) {
       return failure();
-    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
+    }
+    if (!matchPattern(producer, m_Op<arith::MulFOp>())) {
       return failure();
+    }
   }
 
   // Producer of arith.mulf op is arith.subf
   {
     producerOutput = producer->getOperand(0);
     producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
+    if (!producer || producer->getNumOperands() == 0) {
       return failure();
-    if (!matchPattern(producer, m_Op<arith::SubFOp>()))
+    }
+    if (!matchPattern(producer, m_Op<arith::SubFOp>())) {
       return failure();
+    }
   }
 
   // Producer of arith.subf op is arith.uitofp
   {
     producerOutput = producer->getOperand(0);
     producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
+    if (!producer || producer->getNumOperands() == 0) {
       return failure();
-    if (!matchPattern(producer, m_Op<arith::UIToFPOp>()))
+    }
+    if (!matchPattern(producer, m_Op<arith::UIToFPOp>())) {
       return failure();
+    }
   }
 
   // Producer of arith.uitofp op is arith.extui
   {
     producerOutput = producer->getOperand(0);
     producer = producerOutput.getDefiningOp();
-    if (!producer)
+    if (!producer) {
       return failure();
-    if (!matchPattern(producer, m_Op<arith::ExtUIOp>()))
+    }
+    if (!matchPattern(producer, m_Op<arith::ExtUIOp>())) {
       return failure();
+    }
   }
 
   // Ensure that the dequantization increases the
@@ -682,17 +700,20 @@ static LogicalResult isGroupedDequantizationOp(linalg::GenericOp genericOp) {
   auto elementTypeOut =
       llvm::cast<ShapedType>(genericOp.getOutputs()[0].getType())
           .getElementType();
-  if (!elementTypeOut.isIntOrFloat())
+  if (!elementTypeOut.isIntOrFloat()) {
     return failure();
+  }
   unsigned bitWidthOut = elementTypeOut.getIntOrFloatBitWidth();
   auto elementTypeIn =
       llvm::cast<ShapedType>(genericOp.getInputs()[0].getType())
           .getElementType();
-  if (!elementTypeIn.isIntOrFloat())
+  if (!elementTypeIn.isIntOrFloat()) {
     return failure();
+  }
   unsigned bitWidthIn = elementTypeIn.getIntOrFloatBitWidth();
-  if (bitWidthIn >= bitWidthOut)
+  if (bitWidthIn >= bitWidthOut) {
     return failure();
+  }
 
   return success();
 }
@@ -711,12 +732,13 @@ public:
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
     // Fail if matmul is already in a dispatch
-    if (!isNonNullAndOutsideDispatch(genericOp)) {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
       return failure();
     }
     // Match first generic op as matmul
-    if (failed(isGroupedContractionOp(genericOp)))
+    if (failed(isGroupedContractionOp(genericOp))) {
       return failure();
+    }
 
     Value genericOpResult = genericOp->getResult(0);
     Operation *matmulOp = genericOpResult.getDefiningOp();
@@ -753,8 +775,8 @@ struct FuseDequantizationMatmulPass
     : public FuseDequantizationMatmulBase<FuseDequantizationMatmulPass> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, Flow::FlowDialect, math::MathDialect>();
+    registry.insert<linalg::LinalgDialect, IREE::Flow::FlowDialect,
+                    math::MathDialect>();
   }
   FuseDequantizationMatmulPass(bool enableQuantizedMatmulReassociation) {
     this->enableQuantizedMatmulReassociation =
@@ -777,8 +799,9 @@ void FuseDequantizationMatmulPass::runOnOperation() {
     SmallVector<std::pair<linalg::GenericOp, linalg::GenericOp>> candidates;
     for (auto genericOp :
          funcOp.getFunctionBody().getOps<linalg::GenericOp>()) {
-      if (failed(isGroupedContractionOp(genericOp)))
+      if (failed(isGroupedContractionOp(genericOp))) {
         continue;
+      }
 
       OpOperand *lhs = genericOp.getDpsInputOperand(0);
       OpOperand *rhs = genericOp.getDpsInputOperand(1);
@@ -832,7 +855,6 @@ createFuseDequantizationMatmulPass(bool enableQuantizedMatmulReassociation) {
       enableQuantizedMatmulReassociation);
 }
 
-} // namespace Flow
-} // namespace IREE
+} // namespace GlobalOptimization
 } // namespace iree_compiler
 } // namespace mlir
