@@ -529,6 +529,8 @@ struct ConvertStableHloToIreeInputDialects final
           ml_program::GlobalLoadConstOp::getOperationName(),
           ml_program::GlobalStoreOp::getOperationName(),
           tensor::FromElementsOp::getOperationName(),
+          tensor::CollapseShapeOp::getOperationName(),
+          tensor::ExpandShapeOp::getOperationName(),
           arith::IndexCastUIOp::getOperationName()}) {
       patterns.add<GenericTypeConvert>(opName, *typeConverter, context);
     }
