@@ -128,6 +128,9 @@ iree_status_t MapElementTypeToMlirType(iree_hal_element_type_t element_type,
     case IREE_HAL_ELEMENT_TYPE_UINT_64:
       *ty = "ui64";
       return iree_ok_status();
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      *ty = "f16";
+      return iree_ok_status();
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       *ty = "f32";
       return iree_ok_status();
