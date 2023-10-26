@@ -418,19 +418,14 @@ struct TransposeReshapeGenericDotGeneral final
     auto lhsNewType = cast<RankedTensorType>(lhs.getType());
     auto rhsNewType = cast<RankedTensorType>(rhs.getType());
 
-    // if lhs's shape or rhs's shape has collapsed, we need reshape the result
-    bool needReshapeResult = lhsNewType.getRank() < lhsShapeType.getRank() ||
-                             rhsNewType.getRank() < rhsShapeType.getRank();
     // batching、lhs parallel、rhs parallel this order is a conversion
     SmallVector<int64_t> newShape = {lhsNewType.getShape()[0],
                                      lhsNewType.getShape()[1]};
     if (rhsNewType.getRank() > 2)
       newShape.push_back(rhsNewType.getDimSize(2));
 
-    TensorType newResultType =
-        needReshapeResult
-            ? RankedTensorType::get(newShape, resultType.getElementType())
-            : op.getType();
+    TensorType newResultType = RankedTensorType::get(
+      newShape, resultType.getElementType());
 
     auto newOp = rewriter.create<mlir::stablehlo::DotGeneralOp>(
         op.getLoc(), newResultType, lhs, rhs, dimensionNumbers,
@@ -446,10 +441,11 @@ struct TransposeReshapeGenericDotGeneral final
     }
 
     Value result = newOp.getResult();
-    if (needReshapeResult) {
-      result = rewriter.create<mlir::stablehlo::ReshapeOp>(op.getLoc(),
-                                                           resultType, result);
+    if (op.getType() != newResultType) {
+      result = rewriter.create<mlir::stablehlo::ReshapeOp>(
+          op.getLoc(), op.getType(), newOp.getResult());
     }
+
     rewriter.replaceOp(op, result);
     return success();
   }

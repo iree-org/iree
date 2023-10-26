@@ -372,6 +372,20 @@ func.func @dynamic_dot_general(%arg1: tensor<?x1024x16x64xf32>, %arg2: tensor<?x
 
 // -----
 
+// CHECK-LABEL: @unary_out_channel_dot
+func.func public @unary_out_channel_dot(%arg0: tensor<1x3x4xui16>, %arg1: tensor<1x4x3xui16>) -> tensor<1xui16> {
+
+  // CHECK: %[[TRANS:.+]] = stablehlo.transpose %arg0, dims = [0, 2, 1]
+  // CHECK: %[[LHS:.+]] = stablehlo.reshape %[[TRANS]]
+  // CHECK: %[[RHS:.+]] = stablehlo.reshape %arg1 : (tensor<1x4x3xui16>) -> tensor<1x12x1xui16>
+  // CHECK: %[[DOT:.+]] = stablehlo.dot_general %[[LHS]], %[[RHS]], batching_dims = [0] x [0], contracting_dims = [2] x [1], precision = [HIGH, HIGH]
+  // CHECK: %[[OUT:.+]] = stablehlo.reshape %[[DOT]] : (tensor<1x1x1xui16>) -> tensor<1xui16>
+  %0 = stablehlo.dot_general %arg0, %arg1, batching_dims = [0] x [0], contracting_dims = [2, 1] x [1, 2], precision = [HIGH, HIGH] : (tensor<1x3x4xui16>, tensor<1x4x3xui16>) -> tensor<1xui16>
+  return %0 : tensor<1xui16>
+}
+
+// -----
+
 func.func @custom_call_topk_tuple(%arg0: tensor<4x8000xbf16>) -> (tensor<4x40xbf16>, tensor<4x40xi32>) {
   %0 = stablehlo.custom_call @TopK(%arg0) {called_computations = [@comparison], xla_shape = "(bf16[4,40]{1,0}, s32[4,40]{1,0})"} : (tensor<4x8000xbf16>) -> tuple<tensor<4x40xbf16>, tensor<4x40xi32>>
   %1 = stablehlo.get_tuple_element %0[0] : (tuple<tensor<4x40xbf16>, tensor<4x40xi32>>) -> tensor<4x40xbf16>
