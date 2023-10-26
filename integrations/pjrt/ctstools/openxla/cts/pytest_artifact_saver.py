@@ -53,7 +53,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item, call) -> None:
+def pytest_runtest_makereport(item, call):
     outcome = yield
     test_dir = item.stash[TEST_DIR_KEY]
     if test_dir is None:
