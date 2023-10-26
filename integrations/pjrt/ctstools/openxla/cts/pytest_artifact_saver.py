@@ -11,7 +11,7 @@ import shutil
 
 ARTIFACT_DIR_KEY = pytest.StashKey[Path]()
 TEST_DIR_KEY = pytest.StashKey[Path]()
-MAX_PATHLENGTH = os.pathconf('/', 'PC_NAME_MAX')
+MAX_PATHLENGTH = os.pathconf("/", "PC_NAME_MAX")
 
 
 def pytest_addoption(parser, pluginmanager) -> None:
