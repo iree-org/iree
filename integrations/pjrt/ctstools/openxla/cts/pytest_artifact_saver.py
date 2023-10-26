@@ -36,7 +36,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     )
 
     test_dir = artifact_dir / sanitized_name
-    if (len(sanitized_name) > MAX_PATHLENGTH):
+    if len(sanitized_name) > MAX_PATHLENGTH:
         test_dir = artifact_dir / str(hash(sanitized_name))
     else:
         test_dir = artifact_dir / sanitized_name
