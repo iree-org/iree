@@ -186,12 +186,20 @@ EOF
   rm -rf /home/*/snap
   rm -rf /root/snap
 
-  local gcloud_checksum="e0382917353272655959bb650643c5df72c85de326a720b97e562bb6ea4478b1"
-
-  nice_curl \
-    https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-414.0.0-linux-x86_64.tar.gz \
-    --output gcloud.tar.gz
-  echo "${gcloud_checksum} *gcloud.tar.gz" | sha256sum --check --strict
+  GCLOUD_CLI_VERSION="414.0.0"
+  if [[ "${RUNNER_TYPE^^}" != ARM64 ]]; then
+    local gcloud_checksum="e0382917353272655959bb650643c5df72c85de326a720b97e562bb6ea4478b1"
+    nice_curl \
+      https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_CLI_VERSION}-linux-x86_64.tar.gz \
+      --output gcloud.tar.gz
+    echo "${gcloud_checksum} *gcloud.tar.gz" | sha256sum --check --strict
+  else
+    local gcloud_checksum="6f9186bc2b90b9140b3fbc8db121da71638b4a5c91c05c4f77e188bde20f692c"
+    nice_curl \
+      https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_CLI_VERSION}-linux-arm.tar.gz \
+      --output gcloud.tar.gz
+    echo "${gcloud_checksum} *gcloud.tar.gz" | sha256sum --check --strict
+  fi
   tar -xf gcloud.tar.gz
   rm gcloud.tar.gz
   google-cloud-sdk/install.sh --quiet
