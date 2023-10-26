@@ -976,13 +976,15 @@ iree_status_t DeviceInstance::TransposeBroadcastDeviceBuffer(
    return %%1 : %3$s
   })";
   char transpose_program[512];
-  size_t program_len = std::snprintf(transpose_program, 1024, program_literal, input_ty.c_str(),
-    transpose_ty.c_str(), output_ty.c_str(), perms_str.c_str(), broadcast_str.c_str());
+  size_t program_len =
+      std::snprintf(transpose_program, 1024, program_literal, input_ty.c_str(),
+                    transpose_ty.c_str(), output_ty.c_str(), perms_str.c_str(),
+                    broadcast_str.c_str());
   if (program_len > sizeof(transpose_program)) {
     auto ret = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "program size exceeded limit"); 
+                                "program size exceeded limit");
   }
-  
+
   // Create an on stack program:
   PJRT_Program program;
   program.code = transpose_program;
