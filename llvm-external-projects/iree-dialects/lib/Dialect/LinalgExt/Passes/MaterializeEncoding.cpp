@@ -50,7 +50,7 @@ static RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
                                originalType.getElementType(), encoding);
 }
 
-static RankedTensorType getOriginalTypeWithoutEncoding(RankedTensorType type) {
+static RankedTensorType getTypeWithDroppingEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 
@@ -63,7 +63,7 @@ getMaterializedType(RankedTensorType tensorType,
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
       materializeEncodingFn(tensorType);
   if (failed(materializeEncodingInfo)) {
-    return getOriginalTypeWithoutEncoding(tensorType);
+    return getTypeWithDroppingEncoding(tensorType);
   }
   return tensor::PackOp::inferPackedType(
              getOriginalTypeWithEncoding(tensorType),
@@ -273,7 +273,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
                     convertedOutputOperands.end());
     result = mlir::clone(
         rewriter, matmulOp,
-        {getOriginalTypeWithoutEncoding(
+        {getTypeWithDroppingEncoding(
             convertedOutputOperands[0].getType().cast<RankedTensorType>())},
         operands);
   } else {
@@ -327,7 +327,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
                     convertedOutputOperands.end());
     result = mlir::clone(
         rewriter, batchMatmulOp,
-        {getOriginalTypeWithoutEncoding(
+        {getTypeWithDroppingEncoding(
             convertedOutputOperands[0].getType().cast<RankedTensorType>())},
         operands);
   } else {
