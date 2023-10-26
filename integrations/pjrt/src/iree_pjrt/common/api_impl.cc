@@ -8,6 +8,7 @@
 
 #include <optional>
 #include <sstream>
+#include <utility>
 
 #include "iree/hal/api.h"
 #include "iree_pjrt/common/iree_helpers.h"
@@ -969,29 +970,29 @@ iree_status_t DeviceInstance::TransposeBroadcastDeviceBuffer(
   auto perms_str = arrayBuilder(perms, num_dims);
   auto broadcast_str = broadcastBuilder(num_dims);
 
-  std::stringstream program_builder;
-  program_builder << "func.func @main(\%arg0 : " << input_ty << ") -> ("
-                  << output_ty << ") {\n";
-  program_builder << "  %0 = \"stablehlo.transpose\"(\%arg0) " << perms_str
-                  << " : (" << input_ty << ") -> " << transpose_ty << "\n";
-  program_builder << "  %1 = \"stablehlo.broadcast_in_dim\"(%0) "
-                  << broadcast_str << " : (" << transpose_ty << ") -> "
-                  << output_ty << "\n";
-  program_builder << "  return %1 : " << output_ty << "\n";
-  program_builder << "}\n";
-
-  std::string transpose_program = program_builder.str();
-
+  const char* program_literal = R"(func.func @main(%%arg0 : %1$s) -> (%3$s) {
+   %%0 = "stablehlo.transpose"(%%arg0) %4$s : (%1$s) -> %2$s
+   %%1 = "stablehlo.broadcast_in_dim"(%%0) %5$s : (%2$s) -> %3$s
+   return %%1 : %3$s
+  })";
+  char transpose_program[512];
+  size_t program_len = std::snprintf(transpose_program, 1024, program_literal, input_ty.c_str(),
+    transpose_ty.c_str(), output_ty.c_str(), perms_str.c_str(), broadcast_str.c_str());
+  if (program_len > sizeof(transpose_program)) {
+    auto ret = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "program size exceeded limit"); 
+  }
+  
   // Create an on stack program:
   PJRT_Program program;
-  program.code = transpose_program.data();
-  program.code_size = transpose_program.size();
+  program.code = transpose_program;
+  program.code_size = program_len;
   program.format = kMlirFormat.data();
   program.format_size = kMlirFormat.size();
 
   // Compile program and check for errors:
   LoadedExecutableInstance* executable;
-  auto* error = this->client().Compile(&program, /**options,*/ &executable);
+  auto* error = this->client().Compile(&program, &executable);
   if (error) {
     auto errinst = ErrorInstance::FromError(error);
     auto ret = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -1019,8 +1020,10 @@ iree_status_t DeviceInstance::TransposeBroadcastDeviceBuffer(
   execute_args.output_lists = &output_list;
   execute_args.num_devices = 1;
   execute_args.num_args = 1;
-  execute_args.execute_device = nullptr;
   execute_args.device_complete_events = &event;
+
+  // We do no support specifying the device yet.
+  execute_args.execute_device = nullptr;
 
   auto err = executable->BatchExecute(&execute_args);
   delete executable;
