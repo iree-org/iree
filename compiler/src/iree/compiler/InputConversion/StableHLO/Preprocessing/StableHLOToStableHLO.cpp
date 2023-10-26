@@ -427,8 +427,8 @@ struct TransposeReshapeGenericDotGeneral final
     if (rhsNewType.getRank() > 2)
       newShape.push_back(rhsNewType.getDimSize(2));
 
-    TensorType newResultType = RankedTensorType::get(
-      newShape, resultType.getElementType());
+    TensorType newResultType =
+        RankedTensorType::get(newShape, resultType.getElementType());
 
     auto newOp = rewriter.create<mlir::stablehlo::DotGeneralOp>(
         op.getLoc(), newResultType, lhs, rhs, dimensionNumbers,

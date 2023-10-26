@@ -165,19 +165,17 @@ struct GeneralDotRemoveBatch final
     auto dimNumbers = op.getDotDimensionNumbers();
     if (dimNumbers.getLhsBatchingDimensions().size() != 1 ||
         dimNumbers.getLhsBatchingDimensions().size() != 1) {
-        return rewriter.notifyMatchFailure(op, "non-unary batch dimension");
+      return rewriter.notifyMatchFailure(op, "non-unary batch dimension");
     }
 
-    if (dimNumbers.getLhsBatchingDimensions().front() != 0 ||    
-        dimNumbers.getRhsBatchingDimensions().front() != 0)  {
-        return rewriter.notifyMatchFailure(op, "not first dim on lhs/rhs");
+    if (dimNumbers.getLhsBatchingDimensions().front() != 0 ||
+        dimNumbers.getRhsBatchingDimensions().front() != 0) {
+      return rewriter.notifyMatchFailure(op, "not first dim on lhs/rhs");
     }
 
-    if (lhsTy.getDimSize(0) != 1 ||
-        rhsTy.getDimSize(0) != 1) {
-        return rewriter.notifyMatchFailure(op, "not unary batch size");
+    if (lhsTy.getDimSize(0) != 1 || rhsTy.getDimSize(0) != 1) {
+      return rewriter.notifyMatchFailure(op, "not unary batch size");
     }
-
 
     // We no longer include the batch dimension of 1.
     llvm::SmallVector<int64_t> newLhsContractingDims;
@@ -189,10 +187,10 @@ struct GeneralDotRemoveBatch final
       newRhsContractingDims.push_back(dim - 1);
 
     auto lhs = rewriter.create<mlir::stablehlo::ReshapeOp>(
-      op.getLoc(), lhsTy.clone(lhsTy.getShape().drop_front()), op.getLhs());
+        op.getLoc(), lhsTy.clone(lhsTy.getShape().drop_front()), op.getLhs());
 
     auto rhs = rewriter.create<mlir::stablehlo::ReshapeOp>(
-      op.getLoc(), rhsTy.clone(rhsTy.getShape().drop_front()), op.getRhs());
+        op.getLoc(), rhsTy.clone(rhsTy.getShape().drop_front()), op.getRhs());
 
     auto newDimNumbers = mlir::stablehlo::DotDimensionNumbersAttr::get(
         rewriter.getContext(),
@@ -204,10 +202,10 @@ struct GeneralDotRemoveBatch final
         newRhsContractingDims);
 
     auto dot = rewriter.create<mlir::stablehlo::DotGeneralOp>(
-      op.getLoc(), ty.clone(ty.getShape().drop_front()), lhs, rhs, newDimNumbers,
-        op.getPrecisionConfigAttr());
-    rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(
-      op, ty, dot.getResult());
+        op.getLoc(), ty.clone(ty.getShape().drop_front()), lhs, rhs,
+        newDimNumbers, op.getPrecisionConfigAttr());
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, ty,
+                                                            dot.getResult());
     return success();
   }
 };
@@ -438,7 +436,9 @@ struct DotGeneralToDot final : impl::DotGeneralToDotBase<DotGeneralToDot> {
 void populatePreprocessingDotGeneralToDotPatterns(mlir::MLIRContext *context,
                                                   RewritePatternSet *patterns,
                                                   PatternBenefit benefit) {
-  patterns->add<GeneralDotConvert, GeneralDotRemoveBatch, DotVectorOptimization>(context, benefit);
+  patterns
+      ->add<GeneralDotConvert, GeneralDotRemoveBatch, DotVectorOptimization>(
+          context, benefit);
 }
 
 } // namespace mlir::iree_compiler::stablehlo
