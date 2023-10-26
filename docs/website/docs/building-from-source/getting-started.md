@@ -15,7 +15,7 @@ recommend the [Ninja](https://ninja-build.org/) CMake generator and the
     configurations (including the Makefile generator and gcc) are "best effort".
     Patches to improve support are always welcome.
 
-=== "Linux"
+=== ":fontawesome-brands-linux: Linux"
 
     1. Install a compiler/linker (typically "clang" and "lld" package)
 
@@ -30,7 +30,7 @@ recommend the [Ninja](https://ninja-build.org/) CMake generator and the
     sudo apt install cmake ninja-build clang lld
     ```
 
-=== "macOS"
+=== ":fontawesome-brands-apple: macOS"
 
     1. Install [CMake](https://cmake.org/download/)
 
@@ -42,7 +42,7 @@ recommend the [Ninja](https://ninja-build.org/) CMake generator and the
     brew install cmake ninja
     ```
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     1. Install MSVC from Visual Studio or "Tools for Visual Studio" on the
        [official downloads page](https://visualstudio.microsoft.com/downloads/)
@@ -96,7 +96,7 @@ settings can improve compile and link times substantially.
 
 <!-- TODO(#5804): add notes about CMake presets?  -->
 
-=== "Linux"
+=== ":fontawesome-brands-linux: Linux"
 
     ``` shell
     # Recommended development options using clang and lld:
@@ -110,7 +110,7 @@ settings can improve compile and link times substantially.
         -DIREE_ENABLE_LLD=ON
     ```
 
-=== "macOS"
+=== ":fontawesome-brands-apple: macOS"
 
     ``` shell
     # Recommended development options using clang and lld:
@@ -127,7 +127,7 @@ settings can improve compile and link times substantially.
     `CMAKE_AR` variable is defined and points to the path of either the GNU
     binutils or LLVM `ar` program, overriding the default Apple `ar`.
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     ``` shell
     # Recommended development options:
@@ -267,7 +267,7 @@ You will need a recent Python installation >=3.9 (we aim to support
 ???+ Tip "Tip - Managing Python versions"
     Make sure your 'python' is what you expect:
 
-    === "Linux"
+    === ":fontawesome-brands-linux: Linux"
 
         Note that on multi-python systems, this may have a version suffix, and on
         many Linuxes where python2 and python3 can co-exist, you may also want to
@@ -278,7 +278,7 @@ You will need a recent Python installation >=3.9 (we aim to support
         python --version
         ```
 
-    === "macOS"
+    === ":fontawesome-brands-apple: macOS"
 
         Note that on multi-python systems, this may have a version suffix, and on
         macOS where python2 and python3 can co-exist, you may also want to use `python3`.
@@ -288,7 +288,7 @@ You will need a recent Python installation >=3.9 (we aim to support
         python --version
         ```
 
-    === "Windows"
+    === ":fontawesome-brands-windows: Windows"
         The
         [Python launcher for Windows](https://docs.python.org/3/using/windows.html#python-launcher-for-windows) (`py`) can help manage versions.
 
@@ -304,21 +304,21 @@ You will need a recent Python installation >=3.9 (we aim to support
     ([about](https://docs.python.org/3/library/venv.html),
     [tutorial](https://docs.python.org/3/tutorial/venv.html)):
 
-    === "Linux"
+    === ":fontawesome-brands-linux: Linux"
 
         ``` shell
         python -m venv .venv
         source .venv/bin/activate
         ```
 
-    === "macOS"
+    === ":fontawesome-brands-apple: macOS"
 
         ``` shell
         python -m venv .venv
         source .venv/bin/activate
         ```
 
-    === "Windows"
+    === ":fontawesome-brands-windows: Windows"
 
         ``` powershell
         python -m venv .venv
@@ -356,7 +356,7 @@ cmake --build ../iree-build/
 
 Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
 
-=== "Linux"
+=== ":fontawesome-brands-linux: Linux"
 
     ``` shell
     source ../iree-build/.env && export PYTHONPATH
@@ -364,7 +364,7 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     python -c "import iree.runtime"
     ```
 
-=== "macOS"
+=== ":fontawesome-brands-apple: macOS"
 
     ``` shell
     source ../iree-build/.env && export PYTHONPATH
@@ -372,7 +372,7 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     python -c "import iree.runtime"
     ```
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     ``` powershell
     ../iree-build/.env.bat
