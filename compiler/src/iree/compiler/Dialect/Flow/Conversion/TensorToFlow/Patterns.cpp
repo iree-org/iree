@@ -204,37 +204,37 @@ struct ConvertTensorDialectReshapeOpPattern
   using OpRewritePattern<tensor::ReshapeOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ReshapeOp op,
                                 PatternRewriter &rewriter) const override {
-      if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
-        return failure();
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    auto loc = op.getLoc();
+    Value input = op.getSource();
+    auto inputType = dyn_cast<RankedTensorType>(input.getType());
+    auto shapeOperandType = dyn_cast<ShapedType>(op.getShape().getType());
+    auto resultType = dyn_cast<ShapedType>(op.getResult().getType());
+
+    if (!inputType) {
+      return rewriter.notifyMatchFailure(op, "not ranked shaped types");
+    }
+
+    SmallVector<Value> srcSizes;
+    srcSizes = getDynamicTensorSizes(rewriter, loc, inputType, input);
+
+    // flow.reshape only takes dynamic dims for the result, source dims
+    // (ignore static dimensions)
+    SmallVector<Value> destSizes;
+    for (int i = 0; i < shapeOperandType.getShape()[0]; i++) {
+      Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value element = rewriter.create<tensor::ExtractOp>(loc, op.getShape(),
+                                                         ValueRange({idx}));
+      if (ShapedType::isDynamic(resultType.getShape()[i])) {
+        destSizes.push_back(element);
       }
-      auto loc = op.getLoc();
-      Value input = op.getSource();
-      auto inputType = dyn_cast<RankedTensorType>(input.getType());
-      auto shapeOperandType = dyn_cast<ShapedType>(op.getShape().getType());
-      auto resultType = dyn_cast<ShapedType>(op.getResult().getType());
+    }
 
-      if (!inputType) {
-        return rewriter.notifyMatchFailure(op, "not ranked shaped types");
-      }
-
-      SmallVector<Value> srcSizes;
-      srcSizes = getDynamicTensorSizes(rewriter, loc, inputType, input);
-
-      // flow.reshape only takes dynamic dims for the result, source dims
-      // (ignore static dimensions)
-      SmallVector<Value> destSizes;
-      for (int i = 0; i < shapeOperandType.getShape()[0]; i++) {
-        Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
-        Value element = rewriter.create<tensor::ExtractOp>(
-          loc, op.getShape(), ValueRange({idx}));
-        if (ShapedType::isDynamic(resultType.getShape()[i])) {
-          destSizes.push_back(element);
-        }
-      }
-
-      rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         op, resultType, input, srcSizes, destSizes);
-      return success();
+    return success();
   }
 };
 
