@@ -111,8 +111,45 @@ module {
 }
 
 // -----
-// CHECK-LABEL: @t006_assert
-module @t006_assert {
+// CHECK-LABEL: @t006_br_table
+module @t006_br_table_idx {
+
+module {
+  // CHECK: vm.func private @my_fn
+  // CHECK-SAME: %[[FLAG:[a-zA-Z0-9$._-]+]]
+  func.func @my_fn(%flag: i32) -> i32 {
+    // CHECK-DAG: %[[C1:.+]] = vm.const.i64 1
+    // CHECK-DAG: %[[C2:.+]] = vm.const.i64 2
+    // CHECK-DAG: %[[C2_I32:.+]] = vm.const.i32 2
+    // CHECK: %[[INDEX:.+]] = vm.sub.i32 %[[FLAG]], %[[C2_I32]]
+    //      CHECK: vm.br_table %[[INDEX]] {
+    // CHECK-NEXT:   default: ^bb1(%[[C2]] : i64),
+    // CHECK-NEXT:   0: ^bb1(%[[C1]] : i64),
+    // CHECK-NEXT:   1: ^bb1(%[[C2]] : i64),
+    // CHECK-NEXT:   2: ^bb1(%[[C2]] : i64),
+    // CHECK-NEXT:   3: ^bb1(%[[C2]] : i64),
+    // CHECK-NEXT:   4: ^bb2
+    // CHECK-NEXT: }
+    %c1 = arith.constant 1 : index
+    %c2 = arith.constant 2 : index
+    cf.switch %flag : i32, [
+      default: ^bb1(%c2 : index),
+      2: ^bb1(%c1 : index),
+      6: ^bb2
+    ]
+  ^bb1(%0 : index):
+    %cast = arith.index_cast %0 : index to i32
+    return %cast : i32
+  ^bb2:
+    return %flag : i32
+  }
+}
+
+}
+
+// -----
+// CHECK-LABEL: @t007_assert
+module @t007_assert {
 
 module {
   // CHECK: vm.func private @my_fn
