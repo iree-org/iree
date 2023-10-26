@@ -1462,7 +1462,16 @@ EventInstance::~EventInstance() {
 void EventInstance::BindApi(PJRT_Api* api) {
   api->PJRT_Event_Destroy = +[](PJRT_Event_Destroy_Args* args) -> PJRT_Error* {
     IREE_TRACE_SCOPE_NAMED("PJRT_Event_Destroy");
-    delete EventInstance::Unwrap(args->event);
+    auto instance = EventInstance::Unwrap(args->event);
+    auto delete_event = [](PJRT_Error* error, void* user_data) {
+      EventInstance* event = static_cast<EventInstance*>(user_data);
+      delete event;
+      if (error) {
+        delete ErrorInstance::FromError(error);
+      }
+    };
+
+    instance->OnReady(delete_event, args->event);
     return nullptr;
   };
   api->PJRT_Event_IsReady = +[](PJRT_Event_IsReady_Args* args) -> PJRT_Error* {
