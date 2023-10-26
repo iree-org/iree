@@ -699,7 +699,7 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
     <nav class="md-nav" aria-label="Prerequisites">
@@ -746,7 +746,7 @@
       
         <li class="md-nav__item">
   <a href="#configure-and-build" class="md-nav__link">
-    Configure and build
+     Configure and build
   </a>
   
     <nav class="md-nav" aria-label="Configure and build">
@@ -786,7 +786,7 @@
       
         <li class="md-nav__item">
   <a href="#running-iree-bytecode-modules-on-the-risc-v-system" class="md-nav__link">
-    Running IREE bytecode modules on the RISC-V system
+     Running IREE bytecode modules on the RISC-V system
   </a>
   
 </li>
@@ -2383,7 +2383,7 @@
       
         <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
-    Prerequisites
+     Prerequisites
   </a>
   
     <nav class="md-nav" aria-label="Prerequisites">
@@ -2430,7 +2430,7 @@
       
         <li class="md-nav__item">
   <a href="#configure-and-build" class="md-nav__link">
-    Configure and build
+     Configure and build
   </a>
   
     <nav class="md-nav" aria-label="Configure and build">
@@ -2470,7 +2470,7 @@
       
         <li class="md-nav__item">
   <a href="#running-iree-bytecode-modules-on-the-risc-v-system" class="md-nav__link">
-    Running IREE bytecode modules on the RISC-V system
+     Running IREE bytecode modules on the RISC-V system
   </a>
   
 </li>
@@ -2523,7 +2523,7 @@ and operating system):</p>
 <li>IREE's <em>runtime</em> is built on the host for the target. The runtime is then
   pushed to the target to run natively.</li>
 </ul>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
+<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <h3 id="host-environment-setup">Host environment setup<a class="headerlink" href="#host-environment-setup" title="Permanent link">link</a></h3>
 <p>You should already be able to build IREE from source on your host platform.
 Please make sure you have followed the <a href="../getting-started/">getting started</a>
@@ -2558,7 +2558,7 @@ It requires glibc &gt;= 2.28 for your host machine.</p>
 <h4 id="support-vector-extension">Support vector extension<a class="headerlink" href="#support-vector-extension" title="Permanent link">link</a></h4>
 <p>For RISC-V vector extensions support, see
 <a href="#optional-configuration">additional instructions</a></p>
-<h2 id="configure-and-build">Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">link</a></h2>
+<h2 id="configure-and-build"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75Zm-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5H6.5Zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5h6ZM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8Zm-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0v-2Zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75Z"/></svg></span> Configure and build<a class="headerlink" href="#configure-and-build" title="Permanent link">link</a></h2>
 <h3 id="host-configuration">Host configuration<a class="headerlink" href="#host-configuration" title="Permanent link">link</a></h3>
 <p>Build and install on your host machine:</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build/<span class="w"> </span><span class="se">\</span>
@@ -2585,7 +2585,7 @@ as a reference of how to set up the cmake configuration.</p>
 <span class="w">  </span>.
 cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build-riscv/
 </code></pre></div>
-<h2 id="running-iree-bytecode-modules-on-the-risc-v-system">Running IREE bytecode modules on the RISC-V system<a class="headerlink" href="#running-iree-bytecode-modules-on-the-risc-v-system" title="Permanent link">link</a></h2>
+<h2 id="running-iree-bytecode-modules-on-the-risc-v-system"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Running IREE bytecode modules on the RISC-V system<a class="headerlink" href="#running-iree-bytecode-modules-on-the-risc-v-system" title="Permanent link">link</a></h2>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The following instructions are meant for the RISC-V 64-bit Linux
