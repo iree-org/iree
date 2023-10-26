@@ -185,12 +185,13 @@ struct ConvertTensorFromElementsPattern
 
 /// Returns a sizes array with the dynamic dims.
 static SmallVector<Value> getDynamicTensorSizes(OpBuilder &builder,
-                                                Location loc, ShapedType stp,
+                                                Location loc,
+                                                RankedTensorType type,
                                                 Value tensor) {
   SmallVector<Value> sizes;
-  for (const auto &d : enumerate(stp.getShape())) {
-    if (d.value() == ShapedType::kDynamic) {
-      Value dim = builder.create<tensor::DimOp>(loc, tensor, d.index());
+  for (const auto [idx, size] : enumerate(type.getShape())) {
+    if (type.isDynamicDim(idx)) {
+      Value dim = builder.create<tensor::DimOp>(loc, tensor, idx);
       sizes.push_back(dim);
     }
   }
@@ -208,11 +209,11 @@ struct ConvertTensorDialectReshapeOpPattern
       }
       auto loc = op.getLoc();
       Value input = op.getSource();
-      auto inputType = dyn_cast<ShapedType>(input.getType());
+      auto inputType = dyn_cast<RankedTensorType>(input.getType());
       auto shapeOperandType = dyn_cast<ShapedType>(op.getShape().getType());
       auto resultType = dyn_cast<ShapedType>(op.getResult().getType());
 
-      if (!inputType || !inputType.hasRank()) {
+      if (!inputType) {
         return rewriter.notifyMatchFailure(op, "not ranked shaped types");
       }
 
