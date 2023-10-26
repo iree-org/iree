@@ -8,7 +8,9 @@
 #define IREE_COMPILER_DIALECT_HAL_TARGET_VULKANSPIRV_VULKANSPIRVTARGET_H_
 
 #include <functional>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace mlir {
 namespace iree_compiler {
@@ -17,10 +19,13 @@ namespace HAL {
 
 // Options controlling the SPIR-V translation.
 struct VulkanSPIRVTargetOptions {
-  // Vulkan target environment as #vk.target_env attribute assembly.
-  std::string targetEnv;
-  // Vulkan target triple.
-  std::string targetTriple;
+  // Vulkan target environments as #vk.target_env attribute assembly.
+  std::vector<std::string> targetEnvs;
+  // Vulkan target triples.
+  std::vector<std::string> targetTriples;
+  // Optional list to indicate how to prioritize the target environments and
+  // triples.
+  std::optional<std::vector<bool>> isEnvPriorityOrder = std::nullopt;
   // Whether to use indirect bindings for all generated dispatches.
   bool indirectBindings = false;
 };
