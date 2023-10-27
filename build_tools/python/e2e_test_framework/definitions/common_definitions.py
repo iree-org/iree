@@ -109,13 +109,6 @@ class ModelSourceType(Enum):
     EXPORTED_TFLITE = "exported_tflite"
 
 
-class InputDataFormat(Enum):
-    """Model input data format."""
-
-    ZEROS = "zeros"
-    NUMPY_NPY = "numpy_npy"
-
-
 @serialization.serializable(type_key="device_specs")
 @dataclass(frozen=True)
 class DeviceSpec(object):
@@ -201,27 +194,16 @@ class ModelInputData(object):
 
     id: str
     # Associated model.
-    model_id: str
-    # Friendly name.
     name: str
-    # Tags that describe the data characteristics.
-    tags: List[str]
-    data_format: InputDataFormat
-    source_url: str
 
     def __str__(self):
         return self.name
 
 
-# All-zeros dummy input data. Runners will generate the zeros input with proper
-# shapes.
-ZEROS_MODEL_INPUT_DATA = ModelInputData(
+# Get input from model input_data_url if available; otherwise use all zeros.
+DEFAULT_INPUT_DATA = ModelInputData(
     id=unique_ids.MODEL_INPUT_DATA_ZEROS,
-    model_id="",
-    name="zeros",
-    tags=[],
-    data_format=InputDataFormat.ZEROS,
-    source_url="",
+    name="default",
 )
 
 
