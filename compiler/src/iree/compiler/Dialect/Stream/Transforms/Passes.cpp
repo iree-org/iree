@@ -146,10 +146,6 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
 
-  // Cleanup patterns currently fail on SCF operations.
-  passManager.addNestedPass<func::FuncOp>(
-      IREE::Flow::createTopLevelSCFToCFGPass());
-
   addCleanupPatterns(passManager);
 
   // Verify all stream.async.* op access ranges that we can by taking advantage
@@ -205,9 +201,6 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
       // This expands packed constants into explicit forms with partitioned
       // storage buffers and upload logic.
       .addPass(IREE::Stream::createPackConstantsPass)
-
-      // Pack fused allocations based on lifetime.
-      .addPass(IREE::Stream::createPackAllocationsPass)
 
       // Layout packed slices to emit the arithmetic required for all resource
       // offsets. This enables us to propagate the subviews across the program

@@ -62,7 +62,7 @@ functions in the compiled programs.
    `counter_vmvx.vmfb` files it generates
 
 2. Build the `iree_samples_variables_and_state` CMake target (see
-    [here](https://openxla.github.io/iree/building-from-source/getting-started/)
+    [here](https://iree.dev/building-from-source/getting-started/)
     for general instructions on building using CMake)
 
     ```
@@ -87,7 +87,7 @@ compile the imported MLIR file using IREE's tools on your own machine.
 
 For example, to use IREE's `cpu` target, which is optimized for CPU execution
 using LLVM, refer to the
-[documentation](https://openxla.github.io/iree/guides/deployment-configurations/cpu/)
+[documentation](https://iree.dev/guides/deployment-configurations/cpu/)
 and compile the imported `counter.mlir` file using `iree-compile`:
 
 ```

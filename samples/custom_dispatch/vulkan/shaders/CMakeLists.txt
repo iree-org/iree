@@ -13,7 +13,7 @@ endif()
 # custom shaders in .spv format and not supporting infrastructure for compiling
 # shaders from various textual input languages (HLSL/etc). Users are expected to
 # bring their own infrastructure if they want to bring their own source code.
-find_program(GLSLC glslc)
+find_program(GLSLC glslc HINTS "D:\\Tools\\VulkanSDK\\1.3.261.1\\Bin\\glslc.exe")
 if(NOT GLSLC)
   message(STATUS "IREE custom_dispatch/vulkan/shaders ignored -- glslc not found")
   return()
@@ -49,6 +49,7 @@ iree_lit_test_suite(
     example
   SRCS
     "example.mlir"
+    "example_inline.mlir"
   DATA
     ${_SPV_TARGET}
   TOOLS

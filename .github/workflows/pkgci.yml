@@ -35,7 +35,12 @@ jobs:
     uses: ./.github/workflows/pkgci_regression_test_cpu.yml
     needs: [build_packages]
 
-  regression_test_amdgpu:
-    name: Regression Test AMDGPU
-    uses: ./.github/workflows/pkgci_regression_test_amdgpu.yml
+  regression_test_amdgpu_vulkan:
+    name: Regression Test AMDGPU-Vulkan
+    uses: ./.github/workflows/pkgci_regression_test_amdgpu_vulkan.yml
+    needs: [build_packages]
+
+  regression_test_amdgpu_rocm:
+    name: Regression Test AMDGPU-ROCm
+    uses: ./.github/workflows/pkgci_regression_test_amdgpu_rocm.yml
     needs: [build_packages]

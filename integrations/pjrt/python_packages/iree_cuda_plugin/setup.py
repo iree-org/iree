@@ -32,9 +32,7 @@ class CMakeBuildPy(iree_pjrt_setup.BaseCMakeBuildPy):
         print("*****************************", file=sys.stderr)
         self.build_configuration(
             os.path.join(THIS_DIR, "build", "cmake"),
-            extra_cmake_args=(
-                "-DIREE_HAL_DRIVER_CUDA=ON",
-            ),
+            extra_cmake_args=("-DIREE_HAL_DRIVER_CUDA=ON",),
         )
         print("Target populated.", file=sys.stderr)
 
@@ -56,10 +54,10 @@ setup(
     author="The IREE Team",
     author_email="iree-discuss@googlegroups.com",
     license="Apache-2.0",
-    description="IREE PJRT Plugin for CPUs (generic)",
+    description="IREE PJRT Plugin for CUDA (generic)",
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/openxla/openxla-pjrt-plugin",
+    url="https://github.com/openxla/iree",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: Apache Software License",

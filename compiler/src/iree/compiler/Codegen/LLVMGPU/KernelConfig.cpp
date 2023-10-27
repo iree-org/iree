@@ -9,7 +9,6 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
@@ -33,28 +32,11 @@ static constexpr StringLiteral kCudaTarget = "cuda";
 static constexpr StringLiteral kRocmTarget = "rocm";
 namespace mlir {
 namespace iree_compiler {
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
-    "iree-codegen-llvmgpu-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(true));
-
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag(
-    "iree-codegen-llvmgpu-transform-dialect-debug-payload-tag",
-    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
-                   "payload root operation"),
-    llvm::cl::init(""));
-
-llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag(
-    "iree-codegen-llvmgpu-transform-dialect-debug-transform-tag",
-    llvm::cl::desc(
-        "tag attribute value for the transform dialect transform op container"),
-    llvm::cl::init(""));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -345,7 +327,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
             std::move(workgroupTileSizes)); // Workgroup level.
         return setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes, pipeline, workgroupSize,
-            /*subgroupSize=*/std::nullopt, softwarePipelineDepth);
+            /*subgroupSize=*/std::nullopt, softwarePipelineDepth,
+            /*softwarePipelineStoreStage=*/1);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
@@ -717,29 +700,17 @@ static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   return std::nullopt;
 }
 
-/// Set configuration for reduction transform dialect based strategy.
+/// Set configuration for transform dialect based strategies.
 static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
                                                Operation *op,
                                                const TargetInfo &targetInfo) {
-  if (!clGPUCodegenTransformDialectFileName.empty() &&
-      clGPUEnableTransformDialectJit) {
-    return entryPoint.emitError()
-           << "option clash in transform dialect lowering config: the filename "
-              "cannot be provided when the jit option is set";
-  }
-
-  if (!clGPUEnableTransformDialectJit &&
-      clGPUCodegenTransformDialectFileName.empty()) {
+  if (!clGPUEnableTransformDialectJit) {
     return failure();
   }
 
-  // Transform script file provided, use it.
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPoint.getContext(),
       IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-  if (!clGPUCodegenTransformDialectFileName.empty()) {
-    return setTranslationInfo(entryPoint, translationInfo);
-  }
 
   // TODO: unify the target informations into one structure.
   iree_compiler::gpu::GPUModel gpuModel;
@@ -785,31 +756,24 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   if (!isa<linalg::GenericOp>(op))
     return failure();
-  // TODO: Enable dynamic shape.
-  auto walkResult = entryPoint.walk([](linalg::LinalgOp op) {
-    using utils::IteratorType;
-    SmallVector<IteratorType, 4> kinds = op.getIteratorTypesArray();
-    SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-    for (auto [kind, bound] : llvm::zip_equal(kinds, bounds)) {
-      if (kind == IteratorType::reduction && ShapedType::isDynamic(bound))
-        return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  if (walkResult.wasInterrupted()) {
-    return failure();
-  }
+
+  SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+
   if (reductionDims.empty())
     return failure();
 
-  // Make sure reduction dimensions are the innermost ones.
-  int64_t numParallelDims = op.getNumParallelLoops();
-  if (llvm::any_of(reductionDims, [&](int64_t reductionDim) {
-        return reductionDim < numParallelDims;
-      })) {
-    return failure();
+  // Make sure reduction dimensions are static and innermost ones.
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim]))
+      return failure();
+    if (dim < numParallelDims)
+      return failure();
   }
 
   if (op.getRegionOutputArgs().size() != 1)
@@ -817,7 +781,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
 
   // Only support projected permutation, this could be extended to projected
   // permutated with broadcast.
-
   if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
         return !op.getMatchingIndexingMap(input).isProjectedPermutation();
       }))
@@ -840,11 +803,10 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if (!foundSingleReductionOutput)
     return failure();
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-  int64_t dimSize = 1;
+  int64_t reductionSize = 1;
   for (int64_t dim : reductionDims)
-    dimSize *= bounds[dim];
-  if (dimSize % cudaWarpSize != 0)
+    reductionSize *= bounds[dim];
+  if (reductionSize % cudaWarpSize != 0)
     return failure();
 
   const Type elementType =
@@ -859,17 +821,58 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
 
   const unsigned largestLoadSizeInBits = 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
-  while ((dimSize / vectorSize) % cudaWarpSize != 0)
+  while ((reductionSize / vectorSize) % cudaWarpSize != 0)
     vectorSize /= 2;
 
-  // TODO: Add reduction tiling to handle larger reductions.
+  // Deduce the workgroup size we should use for reduction. Currently a
+  // workgroup processes all elements in reduction dimensions. Need to make sure
+  // the workgroup size we use can divide the total reduction size, and it's
+  // also within hardware limitations.
   const int64_t maxWorkgroupSize = 1024;
-  int64_t groupSize = dimSize / vectorSize;
+  int64_t groupSize = reductionSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
   }
+
+  // Then we need to strike a balance--
+  // 1) parallel dimensions are distributed to workgroups. If there are many
+  //    workgroups dispatched, we'd want to have each GPU core hosting multiple
+  //    of them for occupancy.
+  // 2) we want each thread to read quite a few 128-bit vectors for better
+  //    memory cache behavior.
+  // Both means we cannot use a too large workgroup size.
+
+  std::optional<int64_t> parallelSize = 1;
+  for (int64_t dim : parallelDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      parallelSize = std::nullopt;
+      break;
+    }
+    *parallelSize *= bounds[dim];
+  }
+  // Total parallel size that can fill the GPU with enough workgorups.
+  // TODO: query from the target device; roughly 2x hardware compute unit.
+  int parallelThreshold = 256;
+  // How many 128-bit vectors each thread should at least read.
+  const int targetVectorCount = 8;
+  while (parallelSize && *parallelSize > parallelThreshold &&
+         (groupSize / 2) % cudaWarpSize == 0 &&
+         reductionSize / (groupSize * vectorSize) < targetVectorCount) {
+    // Use less subgroups per workgroup..
+    groupSize /= 2;
+    // in order to host more workgroups per hardware compute unit.
+    *parallelSize /= 2;
+  }
+
+  // Current warp reduction pattern is a two step butterfly warp reduce.
+  // First, do warp reductions along multiple subgroups.
+  // Second, reduce results from multiple subgroups using single warp reduce.
+  // The final warp reduce requires subgroup count <= subgroup size to work.
+  if ((groupSize / cudaWarpSize) > cudaWarpSize)
+    return failure();
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
@@ -1136,12 +1139,6 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
-  if (IREE::Codegen::CompilationInfoAttr compilationInfo =
-          getCompilationInfo(computeOp)) {
-    // If the op already has a lowering config coming from the IR use this and
-    // bypass the heuristic.
-    return setUserConfig(entryPointFn, computeOp, compilationInfo);
-  }
   // First try to see if there is a transform dialect configuration existing.
   if (succeeded(
           setTransformDialectConfig(entryPointFn, computeOp, targetInfo))) {
@@ -1163,17 +1160,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     }
   }
 
-  // If using the transform dialect, call the proper pipeline.
-  assert((clGPUCodegenTransformDialectFileName.empty() ||
-          !clGPUEnableTransformDialectJit) &&
-         "Can't use both transform dialect interpreted and jitted modes");
-  if (clGPUCodegenTransformDialectFileName.size() > 0) {
-    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        entryPointFn.getContext(),
-        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen);
-    return setTranslationInfo(entryPointFn, translationInfo);
-  }
-
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
   }
@@ -1190,6 +1176,24 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   return setRootDefaultConfig(entryPointFn, computeOp);
 }
 
+// Propogate the configuration to the other ops.
+// TODO(ravishankarm, thomasraoux): This is a very specific use (and
+// fragile). In general, this should not be needed. Things are already tiled
+// and distributed. The rest of the compilation must be structured to either
+// use `TileAndFuse` or they are independent configurations that are
+// determined based on the op.
+static void propagateLoweringConfig(Operation *rootOperation,
+                                    SmallVector<Operation *> computeOps) {
+  if (IREE::Codegen::LoweringConfigAttr config =
+          getLoweringConfig(rootOperation)) {
+    for (auto op : computeOps) {
+      if (op == rootOperation)
+        continue;
+      setLoweringConfig(op, config);
+    }
+  }
+}
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -1201,10 +1205,20 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp)
       continue;
-    if (getTranslationInfo(exportOp))
-      continue;
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+    if (getTranslationInfo(exportOp)) {
+      // Currently LLVMGPU requires propagation of user lowering configs.
+      for (auto op : computeOps) {
+        if (getLoweringConfig(op)) {
+          propagateLoweringConfig(op, computeOps);
+          break;
+        }
+      }
+      continue;
+    }
+
     Operation *rootOperation = nullptr;
+
     // Find the root operation. linalg.generic and linalg.fill are not root
     // operations if there are other compute operations present.
     for (Operation *op : llvm::reverse(computeOps)) {
@@ -1238,20 +1252,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     if (failed(setRootConfig(funcOp, rootOperation)))
       continue;
 
-    // Propogate the configuration to the other ops.
-    // TODO(ravishankarm, thomasraoux): This is a very specific use (and
-    // fragile). In general, this should not be needed. Things are already tiled
-    // and distributed. The rest of the compilation must be structured to either
-    // use `TileAndFuse` or they are independent configurations that are
-    // determined based on the op.
-    if (IREE::Codegen::LoweringConfigAttr config =
-            getLoweringConfig(rootOperation)) {
-      for (auto op : computeOps) {
-        if (op == rootOperation)
-          continue;
-        setLoweringConfig(op, config);
-      }
-    }
+    propagateLoweringConfig(rootOperation, computeOps);
   }
   return success();
 }

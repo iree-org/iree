@@ -9,11 +9,11 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -22,6 +22,14 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::cl::opt<bool> clExternalResourcesMappable(
+    "iree-stream-external-resources-mappable",
+    llvm::cl::desc("Allocates external resources as host-visible and mappable. "
+                   "This can degrade performance and introduce allocation "
+                   "overhead and staging buffers for readback on the host "
+                   "should be managed by the calling application instead."),
+    llvm::cl::init(false));
 
 namespace {
 
@@ -263,17 +271,21 @@ deriveAllowedResourceBufferBits(Location loc,
   default:
     break;
   case IREE::Stream::Lifetime::External:
-    // #yolo; these come from/go to outside the program.
-    // Today we assume they are device-local|host-visible just for
-    // practical purposes but that does not have to be true. We really
-    // want this to be something we analyze and handle on the edges
-    // (transferring devices/etc if needed).
-    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                  IREE::HAL::MemoryTypeBitfield::HostVisible;
-    // NOTE: we may not map it but users may after they get them back.
-    // Another reason we should annotate this - having a buffer be
-    // mappable is potentially expensive (may get a 2nd copy in memory!).
-    bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
+    if (clExternalResourcesMappable) {
+      // #yolo; these come from/go to outside the program.
+      // Today we assume they are device-local|host-visible just for
+      // practical purposes but that does not have to be true. We really
+      // want this to be something we analyze and handle on the edges
+      // (transferring devices/etc if needed).
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
+                    IREE::HAL::MemoryTypeBitfield::HostVisible;
+      // NOTE: we may not map it but users may after they get them back.
+      // Another reason we should annotate this - having a buffer be
+      // mappable is potentially expensive (may get a 2nd copy in memory!).
+      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
+    } else {
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+    }
     break;
   }
   return success();
@@ -332,26 +344,19 @@ struct ResourceAllocOpPattern
         lookupAllocatorAndQueueAffinityFor(allocOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
-    SmallVector<Value> results;
-    for (auto [resourceResult, storageSize] :
-         llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
-      auto resourceType =
-          llvm::cast<IREE::Stream::ResourceType>(resourceResult.getType());
+    auto resourceType =
+        cast<IREE::Stream::ResourceType>(allocOp.getResult().getType());
 
-      auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-      auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-      if (failed(deriveAllowedResourceBufferBits(allocOp.getLoc(), resourceType,
-                                                 memoryTypes, bufferUsage))) {
-        return failure();
-      }
-
-      auto allocateOp = rewriter.create<IREE::HAL::AllocatorAllocateOp>(
-          allocOp.getLoc(), bufferType, allocator, queueAffinity, memoryTypes,
-          bufferUsage, storageSize);
-      results.push_back(allocateOp.getResult());
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+    if (failed(deriveAllowedResourceBufferBits(allocOp.getLoc(), resourceType,
+                                               memoryTypes, bufferUsage))) {
+      return failure();
     }
 
-    rewriter.replaceOp(allocOp, results);
+    rewriter.replaceOpWithNewOp<IREE::HAL::AllocatorAllocateOp>(
+        allocOp, bufferType, allocator, queueAffinity, memoryTypes, bufferUsage,
+        adaptor.getStorageSize());
     return success();
   }
 };
@@ -367,16 +372,14 @@ struct ResourceAllocaOpPattern
         lookupDeviceAndQueueAffinityFor(allocaOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
-    // Transient allocations are device-local. Copies are required to get their
-    // contents back on the host/another device.
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-
-    // TODO(benvanik): refine usage.
-    // We know by construction that transient buffers are not host visible and
-    // as such can only be used for device commands. We should be able to more
-    // closely limit to just dispatch or transfer though.
-    auto bufferUsage = IREE::HAL::BufferUsageBitfield::Transfer |
-                       IREE::HAL::BufferUsageBitfield::DispatchStorage;
+    auto resourceType =
+        cast<IREE::Stream::ResourceType>(allocaOp.getResult().getType());
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
+    auto bufferUsage = IREE::HAL::BufferUsageBitfield::None;
+    if (failed(deriveAllowedResourceBufferBits(loc, resourceType, memoryTypes,
+                                               bufferUsage))) {
+      return failure();
+    }
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -767,8 +770,22 @@ struct TensorTraceOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Value> bufferViews;
+    auto resourceEncodingDims = adaptor.getResourceEncodingDims();
+    for (auto [resource, resourceSize, resourceEncoding] : llvm::zip_equal(
+             adaptor.getResources(), adaptor.getResourceSizes(),
+             adaptor.getResourceEncodings().getAsRange<TypeAttr>())) {
+      int64_t dynamicDimCount =
+          cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims();
+      bufferViews.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
+          traceOp.getLoc(), rewriter.getType<IREE::HAL::BufferViewType>(),
+          resource, resourceEncoding,
+          resourceEncodingDims.take_front(dynamicDimCount), resourceSize,
+          /*affinity=*/IREE::Stream::AffinityAttr{}));
+      resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
+    }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewTraceOp>(
-        traceOp, traceOp.getKeyAttr(), adaptor.getOperands());
+        traceOp, traceOp.getKeyAttr(), bufferViews);
     return success();
   }
 };
@@ -902,16 +919,6 @@ struct CmdCollectiveOpPattern
   }
 };
 
-// Returns a hal.device.switch match expression that selects the given export.
-static Attribute
-getExportConditionAttr(IREE::HAL::ExecutableExportOp exportOp) {
-  // TODO(benvanik): customizable selection logic. Today this just checks
-  // whether the variant target is supported but we can also allow
-  // specialization of entry points based on dispatch site parameters.
-  auto variantOp = exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  return variantOp.getTarget().getMatchExpression();
-}
-
 struct CmdDispatchOpPattern
     : public StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -924,42 +931,65 @@ struct CmdDispatchOpPattern
     // Get the device handle we're executing against in this execution region.
     // Note that this is a dynamic value: we have to treat the device as unknown
     // here.
-    auto device = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
+    auto deviceValue = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
         loc, rewriter.getType<IREE::HAL::DeviceType>(), commandBuffer);
 
-    // Ask each target backend to record their dispatch logic.
-    IREE::HAL::DeviceSwitchRewriter switchRewriter(loc,
-                                                   /*resultTypes=*/TypeRange{},
-                                                   device, rewriter);
+    // Prepare for variant switch table by gathering the conditions selecting
+    // each variant.
+    SmallVector<int64_t> caseIndices;
+    SmallVector<std::pair<SymbolRefAttr, IREE::HAL::ExecutableExportOp>>
+        caseExportOps;
     dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
       // NOTE: slow lookup!
       auto exportOp =
           SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
               dispatchOp, entryPointAttr);
       assert(exportOp && "dispatch target export not found");
+      caseIndices.push_back(caseIndices.size());
+      caseExportOps.push_back(std::make_pair(entryPointAttr, exportOp));
+    });
 
-      // Setup the case condition for the entry point.
-      auto *caseRegion =
-          switchRewriter.addConditionRegion(getExportConditionAttr(exportOp));
-      auto &entryBlock = caseRegion->front();
-      auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
+    // Select the variant index.
+    Value selectedIndex = buildIfElseTree(
+        loc, caseExportOps.size(),
+        [&](Location loc, size_t i, OpBuilder &builder) {
+          auto exportOp = caseExportOps[i].second;
+          auto variantOp =
+              exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+          return variantOp.buildCondition(deviceValue, rewriter);
+        },
+        rewriter);
+
+    // Allow each variant to define how it is dispatched.
+    auto switchOp = rewriter.replaceOpWithNewOp<scf::IndexSwitchOp>(
+        dispatchOp, TypeRange{}, selectedIndex, caseIndices,
+        caseIndices.size());
+    for (size_t i = 0; i < caseExportOps.size(); ++i) {
+      auto entryPointAttr = caseExportOps[i].first;
+      auto exportOp = caseExportOps[i].second;
+      auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
+      auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
 
       // Record push constants and buffer bindings.
-      recordParameters(loc, device, commandBuffer, dispatchOp, adaptor,
+      recordParameters(loc, deviceValue, commandBuffer, dispatchOp, adaptor,
                        exportOp.getLayout(), caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
       auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
-          loc, device, adaptor.getWorkload(), caseBuilder);
+          loc, deviceValue, adaptor.getWorkload(), caseBuilder);
       caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
           loc, commandBuffer, entryPointAttr, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);
 
-      caseBuilder.create<IREE::HAL::ReturnOp>(loc);
-    });
-    switchRewriter.build();
+      caseBuilder.create<scf::YieldOp>(loc);
+    }
 
-    rewriter.eraseOp(dispatchOp);
+    // Fallback for no available variant. Today we just no-op as executable
+    // loading should have already failed.
+    auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
+    auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
+    defaultBuilder.create<scf::YieldOp>(loc);
+
     return success();
   }
 

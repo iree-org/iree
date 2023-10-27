@@ -10,8 +10,8 @@
   ]>
 ]>
 hal.executable private @buffer_types {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>, #spirv.resource_limits<>>}> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>, #spirv.resource_limits<>>}>) {
     hal.executable.export @buffer_types layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
@@ -47,8 +47,8 @@ hal.executable private @buffer_types {
 // -----
 
 hal.executable private @emulate_1d_vector {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<>>}> {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<>>}>) {
     hal.executable.export public @emulate_1d_vector ordinal(0)
       layout(#hal.pipeline.layout<push_constants = 0,
                                   sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
@@ -108,8 +108,8 @@ hal.executable private @emulate_1d_vector {
   ]>
 ]>
 hal.executable private @no_emulation {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, Int64], []>, #spirv.resource_limits<>>}> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, Int64], []>, #spirv.resource_limits<>>}>) {
     hal.executable.export @no_emulation layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -24,6 +25,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+
 namespace {
 
 /// Starting from `op` walk all operands backwards to find all
@@ -85,19 +87,20 @@ struct LLVMCPUTileAndFusePass : LLVMCPUTileAndFuseBase<LLVMCPUTileAndFusePass> {
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, affine::AffineDialect,
-                    linalg::LinalgDialect, scf::SCFDialect>();
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override;
 };
 
 LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
+                               DominanceInfo &dominanceInfo,
                                scf::SCFTilingOptions options) {
   llvm::SmallDenseSet<Operation *> origTiledAndFusedOps;
   collectTiledAndFusedOps(rootOp, origTiledAndFusedOps);
   auto isIgnoredUser = [&](Operation *user, scf::ForOp outerMostTiledLoop) {
-    return origTiledAndFusedOps.count(user) || isa<tensor::DimOp>(user) ||
-           outerMostTiledLoop->isAncestor(user);
+    return origTiledAndFusedOps.count(user) || isa<tensor::DimOp>(user);
   };
 
   // The rest of this method is similar to
@@ -184,7 +187,9 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
     // to be yielded from within the tiled loop.
     OpResult untiledProducer = fusedProducer->origProducer;
     if (llvm::any_of(untiledProducer.getUsers(), [&](Operation *user) {
-          return !isIgnoredUser(user, forLoops.front());
+          return !isIgnoredUser(user, forLoops.front()) &&
+                 !forLoops.front()->isAncestor(user);
+          ;
         })) {
       yieldReplacementForFusedProducer(rewriter, candidateSliceOp,
                                        fusedProducer.value(), forLoops);
@@ -202,7 +207,8 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   for (auto [index, origVal] : llvm::enumerate(yieldedValuesToOrigValues)) {
     Value replacement = outermostLoop.getResult(index);
     rewriter.replaceUsesWithIf(origVal, replacement, [&](OpOperand &use) {
-      return !isIgnoredUser(use.getOwner(), outermostLoop);
+      return !isIgnoredUser(use.getOwner(), outermostLoop) &&
+             dominanceInfo.properlyDominates(outermostLoop, use.getOwner());
     });
   }
 
@@ -232,8 +238,10 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
   // If `consumerOp` has its own lowering config, we prefer using it. Otherwise,
   // fallback to find a lowering_config from other operations.
   SmallVector<int64_t> tileSizes;
+  SmallVector<bool> tileScalableFlags;
   if (auto loweringConfig = getLoweringConfig(consumerOp)) {
     tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+    tileScalableFlags = loweringConfig.getScalableTileFlagVals(tilingLevel);
   } else {
     FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
         getLoweringConfig(getComputeOps(funcOp));
@@ -243,24 +251,22 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
       return;
     }
     tileSizes = maybeLoweringConfig.value().getTileSizeVals(tilingLevel);
+    tileScalableFlags =
+        maybeLoweringConfig.value().getScalableTileFlagVals(tilingLevel);
   }
-
-  IRRewriter rewriter(context);
-  int numLoops = consumerOp.getLoopIteratorTypes().size();
-  if (numLoops > tileSizes.size()) {
-    tileSizes.append(numLoops - tileSizes.size(), 0);
-  }
-  tileSizes.resize(numLoops);
 
   if (llvm::all_of(tileSizes, [&](int64_t size) { return size == 0; })) {
     LLVM_DEBUG(llvm::dbgs() << "----- skip, all zeros -----\n");
     return;
   }
 
-  SmallVector<OpFoldResult> tileSizesOfr =
-      getAsIndexOpFoldResult(rewriter.getContext(), tileSizes);
-  auto options = scf::SCFTilingOptions().setTileSizes(tileSizesOfr);
-  if (failed(applyTileAndFuse(rewriter, consumerOp, options))) {
+  scf::SCFTilingOptions options{};
+  setSCFTileSizes(options, consumerOp, std::move(tileSizes),
+                  std::move(tileScalableFlags));
+
+  IRRewriter rewriter(context);
+  DominanceInfo dominanceInfo(funcOp);
+  if (failed(applyTileAndFuse(rewriter, consumerOp, dominanceInfo, options))) {
     LLVM_DEBUG(llvm::dbgs() << "----- tile and fuse failed -----\n");
     return signalPassFailure();
   }

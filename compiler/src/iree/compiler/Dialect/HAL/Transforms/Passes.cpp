@@ -318,10 +318,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Device management and specialization
   //----------------------------------------------------------------------------
 
-  // Inline hal.device.switch ops and memoize their queries such that we can
-  // better CSE/fold dispatch logic.
-  FunctionLikeNest(passManager).addPass(createInlineDeviceSwitchesPass);
-
   // Memoize device queries such that we don't need to repeatedly ask the same
   // information at runtime.
   passManager.addPass(createMemoizeDeviceQueriesPass());

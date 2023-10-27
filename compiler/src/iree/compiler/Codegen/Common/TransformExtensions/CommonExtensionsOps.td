@@ -16,43 +16,6 @@ include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
-def ApplyBufferOptimizationsOp :
-  Op<Transform_Dialect, "iree.apply_buffer_optimizations",
-    [TransformEachOpTrait,
-     TransformOpInterface,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    This applies memory optimization on memref. In particular it does store to
-    load forwarding, dead store elimination and dead alloc elimination.
-
-    #### Return modes
-
-    This operation applies a set of memory optimization on the whole region of
-    the operand.
-
-    The transformation does not consume the target handle.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs);
-
-  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def ApplyBubbleCollapsePatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.bubble_collapse",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,

@@ -17,7 +17,7 @@ and operating system):
 * IREE's _runtime_ is built on the host for the target. The runtime is then
   pushed to the target to run natively.
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
 ### Host environment setup
 
@@ -51,12 +51,17 @@ from the IREE root directory:
 ./build_tools/riscv/riscv_bootstrap.sh
 ```
 
+!!! note
+    The prebuilt toolchain is built with AlmaLinux release 8.8
+    [docker](https://quay.io/pypa/manylinux_2_28_x86_64)
+    It requires glibc >= 2.28 for your host machine.
+
 #### Support vector extension
 
 For RISC-V vector extensions support, see
 [additional instructions](#optional-configuration)
 
-## Configure and build
+## :octicons-sliders-16: Configure and build
 
 ### Host configuration
 
@@ -93,7 +98,7 @@ cmake -GNinja -B ../iree-build-riscv/ \
 cmake --build ../iree-build-riscv/
 ```
 
-## Running IREE bytecode modules on the RISC-V system
+## :octicons-code-16: Running IREE bytecode modules on the RISC-V system
 
 !!! note
     The following instructions are meant for the RISC-V 64-bit Linux

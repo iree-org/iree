@@ -196,7 +196,13 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
       continue;
     }
     TilingConfig tilingConfig(maybeLoweringConfig.value());
-    auto reductionSizes = tilingConfig.getVectorReductionSizes();
+    auto [reductionSizes, scalableDims] =
+        tilingConfig.getVectorReductionSizes();
+    if (scalableDims.back()) {
+      LLVM_DEBUG(llvm::dbgs() << "scalable reduction dimensions not yet "
+                                 "supported, skip SplitReduction");
+      continue;
+    }
     if (reductionSizes.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "the list of reduction tiling sizes is empty, "
                                  "skip SplitReduction");

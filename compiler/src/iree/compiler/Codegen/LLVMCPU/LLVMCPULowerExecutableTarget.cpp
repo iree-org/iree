@@ -156,7 +156,7 @@ static TilingConfig getTilingConfigForPipeline(ModuleOp moduleOp) {
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
-  if (!variantOp || !moduleOp) {
+  if (!moduleOp) {
     getOperation()->emitError(
         "Expected a variantOp root with an inner ModuleOp");
     return signalPassFailure();
@@ -244,8 +244,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                                hasSMEFeature(target);
       if (!testLoweringConfiguration) {
         switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
+        // No pipleline specified, nothing to do.
         case IREE::Codegen::DispatchLoweringPassPipeline::None:
+          return;
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
           addCPUDefaultPassPipeline(executableLoweringPipeline);
           break;
         case IREE::Codegen::DispatchLoweringPassPipeline::

@@ -26,5 +26,5 @@ RUN python3 -m pip install --ignore-installed \
     numpy \
     matplotlib \
     bottleneck \
-    tensorflow==2.12.0 \
-    tensorflow_hub==0.13.0
+    tensorflow==2.14.0 \
+    tensorflow_hub==0.15.0

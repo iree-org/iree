@@ -516,6 +516,11 @@ iree_status_t iree_vm_bytecode_function_verify(
   uint8_t name = OP_I8(0);                 \
   (void)(name);                            \
   ++pc;
+#define VM_VerifyConstI16(name)            \
+  IREE_VM_VERIFY_PC_RANGE(pc + 2, max_pc); \
+  uint32_t name = OP_I16(0);               \
+  (void)(name);                            \
+  pc += 2;
 #define VM_VerifyConstI32(name)            \
   IREE_VM_VERIFY_PC_RANGE(pc + 4, max_pc); \
   uint32_t name = OP_I32(0);               \
@@ -1545,6 +1550,18 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       VM_VerifyBranchOperands(true_operands);
       VM_VerifyBranchTarget(false_dest_pc);
       VM_VerifyBranchOperands(false_operands);
+      verify_state->in_block = 0;  // terminator
+    });
+
+    VERIFY_OP(CORE, BranchTable, {
+      VM_VerifyOperandRegI32(index);
+      VM_VerifyBranchTarget(default_dest_pc);
+      VM_VerifyBranchOperands(default_operands);
+      VM_VerifyConstI16(table_size);
+      for (uint16_t i = 0; i < table_size; ++i) {
+        VM_VerifyBranchTarget(case_dest_pc);
+        VM_VerifyBranchOperands(case_operands);
+      }
       verify_state->in_block = 0;  // terminator
     });
 

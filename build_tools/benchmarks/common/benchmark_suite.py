@@ -9,10 +9,10 @@ See docs/developers/developing_iree/benchmark_suites.md for how to build the
 benchmark suite.
 """
 
-import collections
 import pathlib
 import re
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
@@ -36,6 +36,8 @@ class BenchmarkCase:
     benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
     benchmark_case_dir: the path to benchmark case directory.
     run_config: the run config from e2e test framework.
+    input_uri: URI to find the input npy.
+    expected_output_uri: URI to find the expected output npy.
     """
 
     model_name: str
@@ -46,6 +48,9 @@ class BenchmarkCase:
     benchmark_tool_name: str
     benchmark_case_dir: pathlib.Path
     run_config: iree_definitions.E2EModelRunConfig
+    input_uri: Optional[str] = None
+    expected_output_uri: Optional[str] = None
+    verify_params: List[str] = dataclasses.field(default_factory=list)
 
 
 # A map from execution config to driver info. This is temporary during migration

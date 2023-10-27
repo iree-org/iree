@@ -47,7 +47,7 @@ class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
   string opcodeEnumTag = enumTag;
 }
 
-// Next available opcode: 0x83
+// Next available opcode: 0x84
 
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
@@ -184,6 +184,7 @@ def VM_OPC_CmpNZRef              : VM_OPC<0x55, "CmpNZRef">;
 def VM_OPC_Block                 : VM_OPC<0x79, "Block">;
 def VM_OPC_Branch                : VM_OPC<0x56, "Branch">;
 def VM_OPC_CondBranch            : VM_OPC<0x57, "CondBranch">;
+def VM_OPC_BranchTable           : VM_OPC<0x83, "BranchTable">;
 def VM_OPC_Call                  : VM_OPC<0x58, "Call">;
 def VM_OPC_CallVariadic          : VM_OPC<0x59, "CallVariadic">;
 def VM_OPC_Return                : VM_OPC<0x5A, "Return">;
@@ -347,6 +348,7 @@ def VM_CoreOpcodeAttr :
 
     VM_OPC_Branch,
     VM_OPC_CondBranch,
+    VM_OPC_BranchTable,
     VM_OPC_Call,
     VM_OPC_CallVariadic,
     VM_OPC_Return,

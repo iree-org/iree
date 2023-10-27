@@ -90,6 +90,15 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
         // TODO(#14566): continue if sparse emplacement on multiple results.
         break;
       }
+      if (!IREE::Util::isValueUsableForOp(updateOp.getTargetSize(), dispatchOp))
+        break;
+      if (!IREE::Util::isValueUsableForOp(updateOp.getTargetOffset(),
+                                          dispatchOp))
+        break;
+      if (!IREE::Util::isValueUsableForOp(updateOp.getTargetEnd(), dispatchOp))
+        break;
+      if (!IREE::Util::isValueUsableForOp(updateOp.getUpdateSize(), dispatchOp))
+        break;
       if (!IREE::Util::tryMoveProducerBefore(updateOp.getTarget(),
                                              dispatchOp)) {
         // Failed to move while keeping valid SSA dominance.

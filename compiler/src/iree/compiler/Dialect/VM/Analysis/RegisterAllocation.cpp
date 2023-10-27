@@ -520,15 +520,21 @@ struct FeedbackArcSet {
 
 SmallVector<std::pair<Register, Register>, 8>
 RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
+  auto *targetBlock = op->getSuccessor(successorIndex);
+  auto targetOperands = cast<BranchOpInterface>(op)
+                            .getSuccessorOperands(successorIndex)
+                            .getForwardedOperands();
+  return remapSuccessorRegisters(op->getLoc(), targetBlock, targetOperands);
+}
+
+SmallVector<std::pair<Register, Register>, 8>
+RegisterAllocation::remapSuccessorRegisters(Location loc, Block *targetBlock,
+                                            OperandRange targetOperands) {
   // Compute the initial directed graph of register movements.
   // This may contain cycles ([reg 0->1], [reg 1->0], ...) that would not be
   // possible to evaluate as a direct remapping.
   SmallVector<std::pair<Register, Register>, 8> srcDstRegs;
-  auto *targetBlock = op->getSuccessor(successorIndex);
-  auto operands = cast<BranchOpInterface>(op)
-                      .getSuccessorOperands(successorIndex)
-                      .getForwardedOperands();
-  for (auto it : llvm::enumerate(operands)) {
+  for (auto it : llvm::enumerate(targetOperands)) {
     auto srcReg = mapToRegister(it.value());
     BlockArgument targetArg = targetBlock->getArgument(it.index());
     auto dstReg = mapToRegister(targetArg);
@@ -580,7 +586,7 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
     assert(getMaxI32RegisterOrdinal() <= Register::kInt32RegisterCount &&
            "spilling i32 regs");
     if (getMaxI32RegisterOrdinal() > Register::kInt32RegisterCount) {
-      op->emitOpError() << "spilling entire i32 register address space";
+      mlir::emitError(loc) << "spilling entire i32 register address space";
     }
   }
   if (localScratchRefRegCount > 0) {
@@ -589,7 +595,7 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
     assert(getMaxRefRegisterOrdinal() <= Register::kRefRegisterCount &&
            "spilling ref regs");
     if (getMaxRefRegisterOrdinal() > Register::kRefRegisterCount) {
-      op->emitOpError() << "spilling entire ref register address space";
+      mlir::emitError(loc) << "spilling entire ref register address space";
     }
   }
 

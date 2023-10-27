@@ -57,5 +57,5 @@ transform.sequence failures(propagate) {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_cse %func_8 : !transform.any_op
-    transform.iree.apply_buffer_optimizations %func_8 : (!transform.any_op) -> ()
+    transform.memref.erase_dead_alloc_and_stores %func_8 : (!transform.any_op) -> ()
 }

@@ -57,6 +57,18 @@ Args:
   signal_semaphores: Semaphores/Fence to signal.
 )";
 
+static const char kHalDeviceQueueCopy[] =
+    R"(Copy data from a source buffer to destination buffer.
+
+Args:
+  source_buffer: `HalBuffer` that holds src data.
+  target_buffer: `HalBuffer` that will receive data.
+  wait_semaphores: `List[Tuple[HalSemaphore, int]]` of semaphore values or
+    a HalFence. The allocation will be made once these semaphores are
+    satisfied.
+  signal_semaphores: Semaphores/Fence to signal.
+)";
+
 static const char kHalFenceWait[] =
     R"(Waits until the fence is signalled or errored.
 
@@ -524,6 +536,69 @@ void HalDevice::QueueExecute(py::handle command_buffers,
       "executing command buffers");
 }
 
+void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
+                          py::handle wait_semaphores,
+                          py::handle signal_semaphores) {
+  iree_hal_semaphore_list_t wait_list;
+  iree_hal_semaphore_list_t signal_list;
+
+  // Wait list.
+  if (py::isinstance<HalFence>(wait_semaphores)) {
+    wait_list = iree_hal_fence_semaphore_list(
+        py::cast<HalFence*>(wait_semaphores)->raw_ptr());
+  } else {
+    size_t wait_count = py::len(wait_semaphores);
+    wait_list = {
+        wait_count,
+        /*semaphores=*/
+        static_cast<iree_hal_semaphore_t**>(
+            alloca(sizeof(iree_hal_semaphore_t*) * wait_count)),
+        /*payload_values=*/
+        static_cast<uint64_t*>(alloca(sizeof(uint64_t) * wait_count)),
+    };
+    for (size_t i = 0; i < wait_count; ++i) {
+      py::tuple pair = wait_semaphores[i];
+      wait_list.semaphores[i] = py::cast<HalSemaphore*>(pair[0])->raw_ptr();
+      wait_list.payload_values[i] = py::cast<uint64_t>(pair[1]);
+    }
+  }
+
+  // Signal list.
+  if (py::isinstance<HalFence>(signal_semaphores)) {
+    signal_list = iree_hal_fence_semaphore_list(
+        py::cast<HalFence*>(signal_semaphores)->raw_ptr());
+  } else {
+    size_t signal_count = py::len(signal_semaphores);
+    signal_list = {
+        signal_count,
+        /*semaphores=*/
+        static_cast<iree_hal_semaphore_t**>(
+            alloca(sizeof(iree_hal_semaphore_t*) * signal_count)),
+        /*payload_values=*/
+        static_cast<uint64_t*>(alloca(sizeof(uint64_t) * signal_count)),
+    };
+    for (size_t i = 0; i < signal_count; ++i) {
+      py::tuple pair = signal_semaphores[i];
+      signal_list.semaphores[i] = py::cast<HalSemaphore*>(pair[0])->raw_ptr();
+      signal_list.payload_values[i] = py::cast<uint64_t>(pair[1]);
+    }
+  }
+
+  // TODO: Accept params for src_offset and target_offset.
+  iree_device_size_t source_length =
+      iree_hal_buffer_byte_length(source_buffer.raw_ptr());
+  if (source_length != iree_hal_buffer_byte_length(target_buffer.raw_ptr())) {
+    throw std::invalid_argument(
+        "Source and target buffer length must match and it does not. Please "
+        "check allocations");
+  }
+  CheckApiStatus(iree_hal_device_queue_copy(
+                     raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,
+                     signal_list, source_buffer.raw_ptr(), 0,
+                     target_buffer.raw_ptr(), 0, source_length),
+                 "Copying buffer on queue");
+}
+
 //------------------------------------------------------------------------------
 // HalDriver
 //------------------------------------------------------------------------------
@@ -861,6 +936,9 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("queue_execute", &HalDevice::QueueExecute,
            py::arg("command_buffers"), py::arg("wait_semaphores"),
            py::arg("signal_semaphores"), kHalDeviceQueueExecute)
+      .def("queue_copy", &HalDevice::QueueCopy, py::arg("source_buffer"),
+           py::arg("target_buffer"), py::arg("wait_semaphores"),
+           py::arg("signal_semaphores"), kHalDeviceQueueCopy)
       .def("__repr__", [](HalDevice& self) {
         auto id_sv = iree_hal_device_id(self.raw_ptr());
         return std::string(id_sv.data, id_sv.size);
@@ -963,6 +1041,9 @@ void SetupHalBindings(nanobind::module_ m) {
   py::class_<HalBuffer>(m, "HalBuffer")
       .def("fill_zero", &HalBuffer::FillZero, py::arg("byte_offset"),
            py::arg("byte_length"))
+      .def("byte_length", &HalBuffer::byte_length)
+      .def("memory_type", &HalBuffer::memory_type)
+      .def("allowed_usage", &HalBuffer::allowed_usage)
       .def("create_view", &HalBuffer::CreateView, py::arg("shape"),
            py::arg("element_size"), py::keep_alive<0, 1>())
       .def("map", HalMappedMemory::CreateFromBuffer, py::keep_alive<0, 1>())
@@ -994,6 +1075,8 @@ void SetupHalBindings(nanobind::module_ m) {
       py::arg("buffer"), py::arg("shape"), py::arg("element_type"));
   hal_buffer_view
       .def("map", HalMappedMemory::CreateFromBufferView, py::keep_alive<0, 1>())
+      .def("get_buffer", HalBuffer::CreateFromBufferView,
+           py::keep_alive<0, 1>())
       .def_prop_ro("shape",
                    [](HalBufferView& self) {
                      iree_host_size_t rank =
@@ -1026,7 +1109,11 @@ void SetupHalBindings(nanobind::module_ m) {
                        "signaling semaphore");
       });
 
-  py::class_<HalFence>(m, "HalFence")
+  auto hal_fence = py::class_<HalFence>(m, "HalFence");
+  VmRef::BindRefProtocol(hal_fence, iree_hal_fence_type,
+                         iree_hal_fence_retain_ref, iree_hal_fence_deref,
+                         iree_hal_fence_isa);
+  hal_fence
       .def(
           "__init__",
           [](HalFence* new_fence, iree_host_size_t capacity) {

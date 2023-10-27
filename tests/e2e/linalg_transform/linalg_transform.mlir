@@ -2,7 +2,7 @@
 /// Specify the dispatch region formation with the transform dialect.
 // R-UN:   --iree-flow-dispatch-use-transform-dialect=%p/transform_dialect_dispatch_spec.mlir \
 /// Specify the codegen strategy with the transform dialect.
-// R-UN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/transform_dialect_codegen_spec.mlir \
+// R-UN:   --iree-codegen-use-transform-dialect-strategy=%p/transform_dialect_codegen_spec.mlir \
 // R-UN: %s | FileCheck %s
 
 

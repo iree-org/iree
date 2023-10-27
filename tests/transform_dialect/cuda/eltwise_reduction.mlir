@@ -43,8 +43,8 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-flow-transformation-pipeline \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))'
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/%S_codegen_spec.mlir | \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target)))'
+// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/%S_codegen_spec.mlir | \
 // RUN: FileCheck %s
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda | \

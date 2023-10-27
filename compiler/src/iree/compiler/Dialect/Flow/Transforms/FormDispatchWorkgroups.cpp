@@ -318,6 +318,8 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
         convertToFlowPatterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(
         convertToFlowPatterns, context);
+    IREE::Flow::TensorBitCastOp::getCanonicalizationPatterns(
+        convertToFlowPatterns, context);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(convertToFlowPatterns)))) {
       funcOp->emitOpError("failed conversion to flow.tensor ops");

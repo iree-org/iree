@@ -11,7 +11,7 @@ from benchmark_suites.iree import benchmark_presets, module_execution_configs, u
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
-from e2e_test_framework.models import tflite_models
+from e2e_test_framework.models import tflite_models, tf_models
 
 
 class Android_ARMv8_A_Benchmarks(object):
@@ -19,11 +19,9 @@ class Android_ARMv8_A_Benchmarks(object):
 
     NONQUANT_MODELS = [
         tflite_models.DEEPLABV3_FP32,
-        tflite_models.MOBILESSD_FP32,
-        tflite_models.POSENET_FP32,
         tflite_models.MOBILEBERT_FP32,
-        tflite_models.MOBILENET_V2,
-        tflite_models.MOBILENET_V3SMALL,
+        tf_models.GPT2_117M_1x4_FP32_TF,
+        tf_models.GPT2_117M_1x1_FP32_TF,
     ]
     QUANT_MODELS = [tflite_models.MOBILEBERT_INT8]
 
@@ -92,10 +90,6 @@ class Android_ARMv8_A_Benchmarks(object):
             for model in self.QUANT_MODELS
         ]
 
-        all_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-            architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-            host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-        )
         big_cores_devices = (
             device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
                 architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
@@ -107,13 +101,7 @@ class Android_ARMv8_A_Benchmarks(object):
             module_generation_configs=default_gen_confings,
             module_execution_configs=local_sync_execution_configs
             + local_task_execution_configs,
-            device_specs=all_devices,
-            presets=[benchmark_presets.ANDROID_CPU],
-        )
-        run_configs += utils.generate_e2e_model_run_configs(
-            module_generation_configs=experimental_gen_confings,
-            module_execution_configs=local_sync_execution_configs,
-            device_specs=all_devices,
+            device_specs=big_cores_devices,
             presets=[benchmark_presets.ANDROID_CPU],
         )
         run_configs += utils.generate_e2e_model_run_configs(

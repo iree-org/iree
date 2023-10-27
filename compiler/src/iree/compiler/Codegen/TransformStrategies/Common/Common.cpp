@@ -27,7 +27,6 @@ using namespace mlir;
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 // TODO: significantly better namespacing.
-using iree_compiler::IREE::transform_dialect::ApplyBufferOptimizationsOp;
 using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
@@ -36,6 +35,7 @@ using iree_compiler::IREE::transform_dialect::
 using transform::FuseIntoContainingOp;
 using transform::HoistRedundantTensorSubsetsOp;
 using transform::MatchOp;
+using transform::MemRefEraseDeadAllocAndStoresOp;
 using transform::MergeHandlesOp;
 using transform::PrintOp;
 using transform::SequenceOp;
@@ -503,6 +503,6 @@ Value mlir::iree_compiler::buildMemoryOptimizations(ImplicitLocOpBuilder &b,
           b.create<transform::ApplyCastAwayVectorLeadingOneDimPatternsOp>(loc);
         });
   }
-  b.create<ApplyBufferOptimizationsOp>(funcH);
+  b.create<MemRefEraseDeadAllocAndStoresOp>(funcH);
   return funcH;
 }

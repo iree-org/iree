@@ -12,7 +12,7 @@
 #map3 = affine_map<(d0)[s0] -> (s0, -d0 + 96)>
 #map4 = affine_map<(d0)[s0] -> (s0, -d0 + 128)>
 hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
-  hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
+  hal.executable.variant public @embedded_elf_arm_64 target(#executable_target_embedded_elf_arm_64_) {
     hal.executable.export public @mmt4d_384x384x512_4x1x4_dispatch_0 layout(#pipeline_layout)
     builtin.module  {
       func.func @mmt4d_384x384x512_4x1x4_dispatch_0() {
@@ -54,7 +54,7 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
   ]>
 ]>
 hal.executable private @batch_mmt4d {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @batch_mmt4d ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @batch_mmt4d() {

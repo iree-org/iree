@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[128, 256], [16, 16]]>,
@@ -12,13 +12,13 @@
   ]>
 ]>
 hal.executable public @user_config {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
           max_compute_shared_memory_size = 16384,
           max_compute_workgroup_invocations = 128,
           max_compute_workgroup_size = [128, 128, 64],
           subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @matmul_128x1024x256 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_128x1024x256() {

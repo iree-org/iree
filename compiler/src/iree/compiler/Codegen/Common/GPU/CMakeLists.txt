@@ -56,7 +56,6 @@ iree_cc_library(
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
     "GPUTileReduction.cpp"
-    "GPUVectorization.cpp"
     "Passes.cpp"
     "VectorReductionToGPU.cpp"
     "WorkGroupSwizzle.cpp"

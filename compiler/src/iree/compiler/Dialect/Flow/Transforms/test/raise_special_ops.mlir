@@ -3,7 +3,7 @@
 // CHECK-LABEL: @softmax
 //  CHECK-SAME: %[[ARG:.+]]: tensor<?x?x?xf32>
 //       CHECK:   %[[E:.+]] = tensor.empty(%{{.*}}, %{{.*}}, %{{.*}}) : tensor<?x?x?xf32>
-//       CHECK:   %[[S:.+]] = iree_linalg_ext.softmax dimension(2) ins(%[[ARG]] : tensor<?x?x?xf32>) outs(%[[E]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+//       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<?x?x?xf32>) outs(%[[E]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
 //       CHECK:   return %[[S]] : tensor<?x?x?xf32>
 
 func.func @softmax(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
@@ -56,7 +56,7 @@ func.func @softmax(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
 // CHECK-LABEL: @softmax_no_rcp
 //  CHECK-SAME: %[[ARG:.+]]: tensor<10x4096x4096xf16>
 //       CHECK:   %[[E:.+]] = tensor.empty() : tensor<10x4096x4096xf16>
-//       CHECK:   %[[S:.+]] = iree_linalg_ext.softmax dimension(2) ins(%[[ARG]] : tensor<10x4096x4096xf16>) outs(%[[E]] : tensor<10x4096x4096xf16>) -> tensor<10x4096x4096xf16>
+//       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<10x4096x4096xf16>) outs(%[[E]] : tensor<10x4096x4096xf16>) -> tensor<10x4096x4096xf16>
 //       CHECK:   return %[[S]] : tensor<10x4096x4096xf16>
 func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x4096xf16>) {
   %cst_158 = arith.constant -6.550400e+04 : f16
@@ -113,7 +113,7 @@ func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x40
 // CHECK-LABEL: @softmax_broadcast
 //  CHECK-SAME: %[[ARG:.+]]: tensor<12x128x128xf32>
 //       CHECK:   %[[E:.+]] = tensor.empty() : tensor<12x128x128xf32>
-//       CHECK:   %[[S:.+]] = iree_linalg_ext.softmax dimension(2) ins(%[[ARG]] : tensor<12x128x128xf32>) outs(%[[E]] : tensor<12x128x128xf32>) -> tensor<12x128x128xf32>
+//       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<12x128x128xf32>) outs(%[[E]] : tensor<12x128x128xf32>) -> tensor<12x128x128xf32>
 //       CHECK:   return %[[S]] : tensor<12x128x128xf32>
 func.func @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x128x128xf32>) {
   %cst_16 = arith.constant 0xFF800000 : f32
@@ -311,3 +311,71 @@ func.func @test_non_slice(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) 
   } -> tensor<64x64xf32>
   return %0 : tensor<64x64xf32>
 }
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @test_slice_negate_cat_peephole(%arg0: tensor<1x32x1x128xf16>) -> tensor<1x32x1x128xf16> {
+  %1 = tensor.empty() : tensor<1x32x1x128xf16>
+  %2 = tensor.empty() : tensor<32x64xf16>
+  %extracted_slice = tensor.extract_slice %arg0[0, 0, 0, 0] [1, 32, 1, 64] [1, 1, 1, 1] : tensor<1x32x1x128xf16> to tensor<32x64xf16>
+  %extracted_slice_0 = tensor.extract_slice %arg0[0, 0, 0, 64] [1, 32, 1, 64] [1, 1, 1, 1] : tensor<1x32x1x128xf16> to tensor<32x64xf16>
+  %3 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%extracted_slice_0 : tensor<32x64xf16>) outs(%2 : tensor<32x64xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %5 = arith.negf %in : f16
+    linalg.yield %5 : f16
+  } -> tensor<32x64xf16>
+  %inserted_slice = tensor.insert_slice %3 into %1[0, 0, 0, 0] [1, 32, 1, 64] [1, 1, 1, 1] : tensor<32x64xf16> into tensor<1x32x1x128xf16>
+  %inserted_slice_1 = tensor.insert_slice %extracted_slice into %inserted_slice[0, 0, 0, 64] [1, 32, 1, 64] [1, 1, 1, 1] : tensor<32x64xf16> into tensor<1x32x1x128xf16>
+  return %inserted_slice_1 : tensor<1x32x1x128xf16>
+}
+
+// CHECK-LABEL: func.func @test_slice_negate_cat_peephole
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<1x32x1x128xf16>
+//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[EXPIN:.+]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2], [3, 4]] : tensor<1x32x1x128xf16> into tensor<1x32x1x2x64xf16>
+//       CHECK:   %[[NREV:.+]] = linalg.generic
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+
+//       CHECK:      %[[I0:.+]] = linalg.index 0 : index
+//       CHECK:      %[[I1:.+]] = linalg.index 1 : index
+//       CHECK:      %[[I2:.+]] = linalg.index 2 : index
+//       CHECK:      %[[I3:.+]] = linalg.index 3 : index
+//       CHECK:      %[[I4:.+]] = linalg.index 4 : index
+//       CHECK:      %[[R3:.+]] = arith.subi %[[C1]], %[[I3]] : index
+//       CHECK:      %[[EXTR:.+]] = tensor.extract %expanded[%[[I0]], %[[I1]], %[[I2]], %[[R3]], %[[I4]]] : tensor<1x32x1x2x64xf16>
+//       CHECK:      %[[NEGF:.+]] = arith.negf %[[EXTR]] : f16
+//       CHECK:      %[[CMP:.+]] = arith.cmpi eq, %[[R3]], %[[C1]] : index
+//       CHECK:      %[[SEL:.+]] = arith.select %[[CMP]], %[[NEGF]], %[[EXTR]] : f16
+//       CHECK:      linalg.yield %[[SEL]] : f16
+
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[NREV]] {{\[\[}}0], [1], [2], [3, 4]] : tensor<1x32x1x2x64xf16> into tensor<1x32x1x128xf16>
+//       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+func.func @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<1x32x?x128xf16>) -> tensor<1x32x?x128xf16> {
+  %c2 = arith.constant 2 : index
+  %d2 = tensor.dim %arg0, %c2 : tensor<1x32x?x128xf16>
+  %1 = tensor.empty(%d2) : tensor<1x32x?x128xf16>
+  %2 = tensor.empty(%d2) : tensor<32x?x64xf16>
+  %extracted_slice = tensor.extract_slice %arg0[0, 0, 0, 0] [1, 32, %d2, 64] [1, 1, 1, 1] : tensor<1x32x?x128xf16> to tensor<32x?x64xf16>
+  %extracted_slice_0 = tensor.extract_slice %arg0[0, 0, 0, 64] [1, 32, %d2, 64] [1, 1, 1, 1] : tensor<1x32x?x128xf16> to tensor<32x?x64xf16>
+  %3 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%extracted_slice_0 : tensor<32x?x64xf16>) outs(%2 : tensor<32x?x64xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %5 = arith.negf %in : f16
+    linalg.yield %5 : f16
+  } -> tensor<32x?x64xf16>
+  %inserted_slice = tensor.insert_slice %3 into %1[0, 0, 0, 0] [1, 32, %d2, 64] [1, 1, 1, 1] : tensor<32x?x64xf16> into tensor<1x32x?x128xf16>
+  %inserted_slice_1 = tensor.insert_slice %extracted_slice into %inserted_slice[0, 0, 0, 64] [1, 32, %d2, 64] [1, 1, 1, 1] : tensor<32x?x64xf16> into tensor<1x32x?x128xf16>
+  return %inserted_slice_1 : tensor<1x32x?x128xf16>
+}
+
+/// Verify that the pattern kicks in for a simple dynamic example.
+// CHECK-LABEL: func.func @test_slice_negate_cat_peephole_dynamic
+//       CHECK:    tensor.expand_shape
+//       CHECK:    linalg.generic
+//       CHECK:      tensor.extract
+//       CHECK:    %[[COL:.+]] = tensor.collapse_shape
+//       CHECK:    return %[[COL]]

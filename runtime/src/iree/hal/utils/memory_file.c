@@ -30,17 +30,19 @@ typedef struct iree_hal_memory_file_storage_t {
   iree_atomic_ref_count_t ref_count;
   // Used to allocate this structure.
   iree_allocator_t host_allocator;
+  // Base file handle, retained.
+  iree_io_file_handle_t* handle;
   // Host memory contents, unowned.
   iree_byte_span_t contents;
-  // Called on destruction to allow for creators to manage lifetime.
-  iree_hal_file_release_callback_t release_callback;
 } iree_hal_memory_file_storage_t;
 
 static iree_status_t iree_hal_memory_file_storage_create(
-    iree_byte_span_t contents,
-    iree_hal_file_release_callback_t release_callback,
+    iree_io_file_handle_t* handle, iree_byte_span_t contents,
     iree_allocator_t host_allocator,
     iree_hal_memory_file_storage_t** out_storage) {
+  IREE_ASSERT_ARGUMENT(handle);
+  IREE_ASSERT_ARGUMENT(out_storage);
+  *out_storage = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_memory_file_storage_t* storage = NULL;
@@ -49,8 +51,9 @@ static iree_status_t iree_hal_memory_file_storage_create(
                                 (void**)&storage));
   iree_atomic_ref_count_init(&storage->ref_count);
   storage->host_allocator = host_allocator;
+  storage->handle = handle;
+  iree_io_file_handle_retain(storage->handle);
   storage->contents = contents;
-  storage->release_callback = release_callback;
 
   *out_storage = storage;
   IREE_TRACE_ZONE_END(z0);
@@ -63,9 +66,7 @@ static void iree_hal_memory_file_storage_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_allocator_t host_allocator = storage->host_allocator;
 
-  if (storage->release_callback.fn) {
-    storage->release_callback.fn(storage->release_callback.user_data);
-  }
+  iree_io_file_handle_release(storage->handle);
 
   iree_allocator_free(host_allocator, storage);
 
@@ -118,14 +119,22 @@ static void iree_hal_memory_file_try_import_buffer(
 
 IREE_API_EXPORT iree_status_t iree_hal_memory_file_wrap(
     iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_access_t access,
-    iree_byte_span_t contents,
-    iree_hal_file_release_callback_t release_callback,
-    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
-    iree_hal_file_t** out_file) {
+    iree_io_file_handle_t* handle, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_file_t** out_file) {
   IREE_ASSERT_ARGUMENT(out_file);
   *out_file = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)contents.data_length);
+
+  // For now we only support host allocations but could open other types that
+  // may be backed by memory if desired.
+  if (iree_io_file_handle_type(handle) !=
+      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "support for wrapping non-host-allocation file "
+                            "handles with memory files is not yet implemented");
+  }
+  iree_byte_span_t contents = iree_io_file_handle_value(handle).host_allocation;
 
   // Note that iree_device_size_t (for device offsets/sizes) may be smaller than
   // iree_host_size_t (for host offsets/sizes) - if so we need to ensure the
@@ -148,7 +157,7 @@ IREE_API_EXPORT iree_status_t iree_hal_memory_file_wrap(
   // Create the underlying storage container that we use to manage the storage
   // lifetime independently from the file lifetime.
   iree_status_t status = iree_hal_memory_file_storage_create(
-      contents, release_callback, host_allocator, &file->storage);
+      handle, contents, host_allocator, &file->storage);
 
 #if !IREE_HAL_MEMORY_FILE_CAN_IMPORT
   // Importing disabled; useful for testing the slow path.

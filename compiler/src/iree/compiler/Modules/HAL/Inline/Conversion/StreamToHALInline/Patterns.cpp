@@ -70,16 +70,11 @@ struct ResourceAllocOpPattern
     Value minAlignment =
         rewriter.create<arith::ConstantIndexOp>(allocOp.getLoc(), 64);
 
-    SmallVector<Value> results;
-    for (auto [resourceResult, storageSize] :
-         llvm::zip_equal(allocOp.getResults(), allocOp.getStorageSizes())) {
-      auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
-          allocOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
-          storageSize);
-      results.push_back(allocateOp.getResult());
-    }
+    auto allocateOp = rewriter.create<IREE::HAL::Inline::BufferAllocateOp>(
+        allocOp.getLoc(), deviceBufferType, hostBufferType, minAlignment,
+        adaptor.getStorageSize());
+    rewriter.replaceOp(allocOp, allocateOp.getResult());
 
-    rewriter.replaceOp(allocOp, results);
     return success();
   }
 };
@@ -379,8 +374,29 @@ struct TensorTraceOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::TensorTraceOp traceOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
+    auto bufferViewType = rewriter.getType<IREE::HAL::BufferViewType>();
+    auto zero = rewriter.create<arith::ConstantIndexOp>(traceOp.getLoc(), 0);
+    auto resourceEncodingDims = adaptor.getResourceEncodingDims();
+    SmallVector<Value> bufferViews;
+    for (auto [resource, resourceSize, resourceEncoding] : llvm::zip_equal(
+             adaptor.getResources(), adaptor.getResourceSizes(),
+             adaptor.getResourceEncodings().getAsRange<TypeAttr>())) {
+      Value resourceBuffer = rewriter.create<IREE::HAL::Inline::BufferWrapOp>(
+          traceOp.getLoc(), bufferType, resource,
+          /*offset=*/
+          zero,
+          /*length=*/resourceSize);
+      int64_t dynamicDimCount =
+          cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims();
+      bufferViews.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
+          traceOp.getLoc(), bufferViewType, resourceBuffer, resourceEncoding,
+          resourceEncodingDims.take_front(dynamicDimCount), resourceSize,
+          /*affinity=*/IREE::Stream::AffinityAttr{}));
+      resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
+    }
     rewriter.replaceOpWithNewOp<IREE::HAL::Inline::BufferViewTraceOp>(
-        traceOp, traceOp.getKeyAttr(), adaptor.getOperands());
+        traceOp, traceOp.getKeyAttr(), bufferViews);
     return success();
   }
 };

@@ -8,7 +8,7 @@
   ]>
 ]>
 hal.executable private @matmul_static  {
-  hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb">) {
     hal.executable.export public @matmul_static layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_static() {
@@ -48,7 +48,7 @@ hal.executable private @matmul_static  {
   ]>
 ]>
 hal.executable @copy_op_dynamic {
-  hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb">) {
     hal.executable.export @copy_op_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_op_dynamic() {
@@ -89,7 +89,7 @@ hal.executable @copy_op_dynamic {
   ]>
 ]>
 hal.executable private @static_1d_fft_stage2  {
-  hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb">) {
     hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
@@ -130,7 +130,7 @@ hal.executable private @static_1d_fft_stage2  {
   ]>
 ]>
 hal.executable @fusion_quant_matmul_generic {
-  hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb">) {
     hal.executable.export @fusion_quant_matmul_generic layout(#pipeline_layout)
     builtin.module {
       func.func @fusion_quant_matmul_generic() {
@@ -194,7 +194,7 @@ hal.executable @fusion_quant_matmul_generic {
   ]>
 ]>
 hal.executable private @unpack_outer_dynamic  {
-  hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb">) {
   hal.executable.export public @unpack_outer_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @unpack_outer_dynamic() {

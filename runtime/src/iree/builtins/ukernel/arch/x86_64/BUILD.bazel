@@ -108,12 +108,27 @@ iree_bitcode_library(
     internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
 )
 
+UKERNEL_X86_64_AVX512_BF16_COPTS = UKERNEL_X86_64_AVX512_BASE_COPTS + [
+    "-mavx512bf16",
+]
+
+iree_bitcode_library(
+    name = "ukernel_bitcode_x86_64_avx512_bf16",
+    srcs = [
+        "mmt4d_x86_64_avx512_bf16.c",
+    ],
+    arch = "x86_64",
+    copts = UKERNEL_X86_64_AVX512_BF16_COPTS,
+    internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
+)
+
 iree_link_bitcode(
     name = "ukernel_bitcode_x86_64",
     bitcode_files = [
         "ukernel_bitcode_x86_64_avx2_fma.bc",
         "ukernel_bitcode_x86_64_avx512_base.bc",
         "ukernel_bitcode_x86_64_avx512_vnni.bc",
+        "ukernel_bitcode_x86_64_avx512_bf16.bc",
     ],
 )
 

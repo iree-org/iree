@@ -108,10 +108,8 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
   # These tests are failing on Windows.
   excluded_tests+=(
     # TODO(#11077): INVALID_ARGUMENT: argument/result signature mismatch
-    "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_ukernel_vmvx_local-task"
-    "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_ukernel_vmvx_local-task"
-    "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_small_vmvx_ukernel_vmvx_local-task"
-    "iree/tests/e2e/matmul/e2e_matmul_mmt4d_f32_small_vmvx_ukernel_vmvx_local-task"
+    "iree/tests/e2e/matmul/e2e_matmul_dt_uk_i8_small_vmvx_local-task"
+    "iree/tests/e2e/matmul/e2e_matmul_dt_uk_f32_small_vmvx_local-task"
     # TODO: Regressed when `pack` ukernel gained a uint64_t parameter in #13264.
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_pack.mlir"
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_pack_dynamic_inner_tiles.mlir"
@@ -122,10 +120,6 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
   )
 elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(
-    #TODO(#12496): Remove after fixing the test on macOS
-    "iree/compiler/bindings/c/loader_test"
-    #TODO(#12496): Remove after fixing the test on macOS
-    "iree/compiler/bindings/python/test/transforms/ireec/compile_sample_module"
     #TODO(#13501): Fix failing sample on macOS
     "iree/samples/custom_module/async/test/example.mlir.test"
   )

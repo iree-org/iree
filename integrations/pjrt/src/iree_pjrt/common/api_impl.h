@@ -214,6 +214,16 @@ class DeviceInstance {
   bool is_addressable() { return true; }
   int local_hardware_id() { return -1; }
 
+  iree_status_t HostBufferToDeviceZeroDim(
+      PJRT_Buffer_Type type, const int64_t* dims, size_t num_dims,
+      EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
+  iree_status_t HostBufferToDeviceSplat(
+      const void* data, PJRT_Buffer_Type type, const int64_t* dims,
+      size_t num_dims, EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
   // Copies a host buffer to the device.
   // See PJRT_Client_BufferFromHostBuffer
   iree_status_t HostBufferToDevice(
@@ -402,7 +412,7 @@ class LoadedExecutableInstance {
 // created against an API.
 //===----------------------------------------------------------------------===//
 
-struct ClientInstance {
+class ClientInstance {
  public:
   ClientInstance(std::unique_ptr<Platform> platform);
   virtual ~ClientInstance();
@@ -461,6 +471,7 @@ struct ClientInstance {
 
  protected:
   iree_allocator_t host_allocator_;
+  iree_hal_driver_registry_t* driver_registry_ = nullptr;
   std::string cached_platform_name_;
   std::string cached_platform_version_;
 

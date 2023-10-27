@@ -13,6 +13,9 @@
 namespace mlir {
 namespace iree_compiler {
 
+using SizesAndScalableFlags =
+    std::pair<SmallVector<int64_t>, SmallVector<bool>>;
+
 /// Provides unified API to get access to all the tile size needed during the
 /// CPU lowering process, while abstracting the representation and verification
 /// details of such information in the IR.
@@ -35,12 +38,20 @@ public:
 
   /// Returns the number of dimensions of the configuration. All the tiling
   /// levels must have the same number of dimensions.
-  unsigned getNumDimensions() { return getDistributionTileSizes().size(); }
+  unsigned getNumDimensions() {
+    return getNumTilingLevels() > 0
+               ? loweringConfig.getTilingLevels()[0].getSizes().size()
+               : 0;
+  }
 
   /// Returns the number of parallel dimensions to tile at vector level.
   unsigned getNumVectorParallelTiles() {
-    return llvm::count_if(getVectorCommonParallelSizes(),
-                          [](int64_t tileSize) { return tileSize != 0; });
+    unsigned parallelLevel = getVectorCommonParallelLevel();
+    if (parallelLevel <= getNumTilingLevels())
+      return 0;
+    return llvm::count_if(
+        loweringConfig.getTilingLevels()[parallelLevel].getSizes(),
+        [](int64_t tileSize) { return tileSize != 0; });
   }
 
   /// Returns the tiling level for cache parallel dimensions.
@@ -76,28 +87,28 @@ public:
 
   /// Returns the distribution tile sizes of the configuration.
   SmallVector<int64_t> getDistributionTileSizes() {
-    return loweringConfig.getTileSizeVals(getActualLevel(DistributionTiles));
+    return getTileSizesForLevel(getActualLevel(DistributionTiles));
   }
 
   SmallVector<int64_t> getCacheReductionSizes() {
-    return loweringConfig.getTileSizeVals(getCacheReductionLevel());
+    return getTileSizesForLevel(getCacheReductionLevel());
   }
 
-  SmallVector<int64_t> getVectorCommonParallelSizes() {
-    return loweringConfig.getTileSizeVals(getVectorCommonParallelLevel());
+  SizesAndScalableFlags getVectorCommonParallelSizes() {
+    return getVectorSizesForLevel(getVectorCommonParallelLevel());
   }
 
-  SmallVector<int64_t> getVectorReductionSizes() {
-    return loweringConfig.getTileSizeVals(getVectorReductionLevel());
+  SizesAndScalableFlags getVectorReductionSizes() {
+    return getVectorSizesForLevel(getVectorReductionLevel());
   }
 
-  SmallVector<int64_t> getVectorInnerParallelSizes() {
-    return loweringConfig.getTileSizeVals(getVectorInnerParallelLevel());
+  SizesAndScalableFlags getVectorInnerParallelSizes() {
+    return getVectorSizesForLevel(getVectorInnerParallelLevel());
   }
 
   /// Returns the tile sizes of all the vector dimensions, including parallel
   /// and reduction dimensions.
-  SmallVector<int64_t> getVectorTileSizes();
+  SizesAndScalableFlags getVectorTileSizes();
 
   /// Returns a list with the tiling levels that can be fused for this
   /// configuration.
@@ -112,6 +123,15 @@ public:
   }
 
 private:
+  SizesAndScalableFlags getVectorSizesForLevel(unsigned level) {
+    return std::make_pair(loweringConfig.getTileSizeVals(level),
+                          loweringConfig.getScalableTileFlagVals(level));
+  }
+
+  SmallVector<int64_t> getTileSizesForLevel(unsigned level) {
+    return loweringConfig.getTileSizeVals(level);
+  }
+
   /// Internal representation for all the supported tiling levels. All or just
   /// a subset of them may be available in a valid configuration.
   enum TilingLevel : unsigned {

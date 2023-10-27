@@ -7,8 +7,8 @@
   ]>
 ]>
 hal.executable private @vulkan_client_api {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>, #spirv.resource_limits<>>}> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>, #spirv.resource_limits<>>}>) {
     hal.executable.export @vulkan_client_api layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
@@ -54,8 +54,8 @@ hal.executable private @vulkan_client_api {
   ]>
 ]>
 hal.executable private @opencl_client_api {
-  hal.executable.variant @opencl, target = <"opencl-spirv", "opencl-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Kernel], []>, #spirv.resource_limits<>>}> {
+  hal.executable.variant @opencl target(<"opencl-spirv", "opencl-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Kernel], []>, #spirv.resource_limits<>>}>) {
     hal.executable.export @opencl_client_api layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }

@@ -1,4 +1,4 @@
-// RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-outline-dispatch-regions %s | FileCheck %s
+// RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-outline-dispatch-regions --mlir-print-local-scope %s | FileCheck %s
 
 //      CHECK: flow.executable private @staticShapeDispatch_dispatch_0
 // CHECK-NEXT:   flow.executable.export public @staticShapeDispatch_dispatch_0
@@ -179,172 +179,55 @@ func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
 
 // -----
 
-// Dispatches containing some ops get a heuristics-driven summary in their name.
+//      CHECK: flow.executable private @dispatchExtern_dispatch_0
+// CHECK-NEXT:   flow.executable.export public @main
+// CHECK-SAME:     workgroups(%arg0: !hal.device, %arg1: index, %arg2: index) -> (index, index, index) {
+// CHECK-NEXT:       %ok, %value = hal.device.query<%arg0 : !hal.device> key("some" :: "value") : i1, i32
+// CHECK-NEXT:       %0 = arith.index_cast %value : i32 to index
+// CHECK-NEXT:       hal.return %arg1, %arg2, %0 : index, index, index
+// CHECK-NEXT:     } attributes {
+// CHECK-SAME:       hal.interface.layout = #hal.pipeline.layout<push_constants = 1, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
+// CHECK-SAME:     }
 
-//      CHECK: flow.executable private @main_dispatch_0 {
-// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_4x8
-//      CHECK: func.func @main_dispatch_0_fill_4x8_f32(
-func.func @main() -> tensor<4x8xf32> {
+// Demonstrates the full functionality of an extern dispatch op.
+// Note that some fields are optional.
+
+// CHECK-LABEL: func.func @dispatchExtern
+func.func @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %arg2: i32) -> tensor<8xi32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
-  %0 = flow.dispatch.workgroups[%x, %y]() : () -> (tensor<4x8xf32>) = (
-    %ret: !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
-  ) {
-    %cst = arith.constant 100.0 : f32
-    %init = tensor.empty() : tensor<4x8xf32>
-    %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
-    flow.dispatch.tensor.store %fill, %ret, offsets = [0, 0], sizes = [4, 8], strides = [1, 1] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
-    flow.return
-  }
-  return %0 : tensor<4x8xf32>
-}
-
-// -----
-
-// A cost model picks the "most expensive" op to include in the summary.
-
-//      CHECK: flow.executable private @main_dispatch_0 {
-// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_40
-//      CHECK: func.func @main_dispatch_0_fill_40_f32(
-func.func @main() -> tensor<10xf32> {
-  %x = arith.constant 100 : index
-  %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<10xf32>) = (
-    %ret: !flow.dispatch.tensor<writeonly:tensor<10xf32>>
-  ) {
-    %cst = arith.constant 100.0 : f32
-    %init_small = tensor.empty() : tensor<10xf32>
-    %fill_small = linalg.fill ins(%cst : f32) outs(%init_small : tensor<10xf32>) -> tensor<10xf32>
-    // Note the ordering here - test that we don't just pick the first or the
-    // last op. If an op in the middle has a higher cost then it should be used.
-    %init_large = tensor.empty() : tensor<40xf32>
-    %fill_large = linalg.fill ins(%cst : f32) outs(%init_large : tensor<40xf32>) -> tensor<40xf32>
-    %init_medium = tensor.empty() : tensor<20xf32>
-    %fill_medium = linalg.fill ins(%cst : f32) outs(%init_medium : tensor<20xf32>) -> tensor<20xf32>
-    flow.dispatch.tensor.store %fill_small, %ret, offsets = [0], sizes = [10], strides = [1] : tensor<10xf32> -> !flow.dispatch.tensor<writeonly:tensor<10xf32>>
-    flow.return
-  }
-  return %0 : tensor<10xf32>
-}
-
-// -----
-
-// Dynamic dimensions are considered the most expensive.
-
-//      CHECK: flow.executable private @main_dispatch_0 {
-// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_DxDxD
-//      CHECK: func.func @main_dispatch_0_fill_DxDxD_f32(
-func.func @main(%arg0 : index) -> tensor<10xf32> {
-  %x = arith.constant 100 : index
-  %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<10xf32>) = (
-    %arg0: index,
-    %ret: !flow.dispatch.tensor<writeonly:tensor<10xf32>>
-  ) {
-    %cst = arith.constant 100.0 : f32
-    %init_small = tensor.empty() : tensor<10xf32>
-    %fill_small = linalg.fill ins(%cst : f32) outs(%init_small : tensor<10xf32>) -> tensor<10xf32>
-    %init_dynamic = tensor.empty(%arg0, %arg0, %arg0) : tensor<?x?x?xf32>
-    %fill_dynamic = linalg.fill ins(%cst : f32) outs(%init_dynamic : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-    flow.dispatch.tensor.store %fill_small, %ret, offsets = [0], sizes = [10], strides = [1] : tensor<10xf32> -> !flow.dispatch.tensor<writeonly:tensor<10xf32>>
-    flow.return
-  }
-  return %0 : tensor<10xf32>
-}
-
-// -----
-
-// Dispatch key op with multiple datatypes should be reflected in summary.
-
-//      CHECK: flow.executable private @main_dispatch_0 {
-// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_generic_4x8_i32xf32
-//      CHECK: func.func @main_dispatch_0_generic_4x8_i32xf32(
-func.func @main() -> tensor<4x8xf32> {
-  %x = arith.constant 100 : index
-  %y = arith.constant 50 : index
-  %0 = flow.dispatch.workgroups[%x, %y]() : () -> (tensor<4x8xf32>) = (
-    %ret: !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
-  ) {
-    %a = tensor.empty() : tensor<4x8xi32>
-    %b = tensor.empty() : tensor<4x8xf32>
-    %ans = linalg.generic {
-        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-        iterator_types = ["parallel", "parallel"]}
-        ins(%a : tensor<4x8xi32>) outs(%b : tensor<4x8xf32>) {
-      ^bb0(%b0 : i32, %b1 : f32):
-        %1 = arith.index_cast %b0 : i32 to index
-        %2 = tensor.extract %b[%1, %1] : tensor<4x8xf32>
-        linalg.yield %2 : f32
-      } -> tensor<4x8xf32>
-    flow.dispatch.tensor.store %ans, %ret, offsets = [0, 0], sizes = [4, 8], strides = [1, 1] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
-    flow.return
-  }
-  return %0 : tensor<4x8xf32>
-}
-
-// -----
-
-// Dispatches set_encoding and unset_encoding ops get a heuristics-driven
-// summary in their name.
-
-// CHECK: flow.executable private @main_dispatch_0
-// CHECK:   func.func @main_dispatch_0_map_DxD
-// CHECK: flow.executable private @main_dispatch_1
-// CHECK:   func.func @main_dispatch_1_unset_encoding_MATMUL_F32F32F32_LHS_DxD
-func.func @main(%arg0: tensor<?x?xf32>, %arg1: index, %arg2: index, %arg3: tensor<?x?xf32>, %arg4: index, %arg5: index) -> (tensor<?x?xf32>, index, index) {
-  %0 = flow.tensor.tie_shape %arg0 : tensor<?x?xf32>{%arg1, %arg2}
-  %1 = flow.tensor.tie_shape %arg3 : tensor<?x?xf32>{%arg4, %arg5}
-  %2 = flow.dispatch.workgroups[%arg1, %arg2, %arg4, %arg5](%0, %1, %arg1, %arg2, %arg4, %arg5) : (tensor<?x?xf32>{%arg1, %arg2}, tensor<?x?xf32>{%arg4, %arg5}, index, index, index, index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>{%arg4, %arg5} =
-      (%arg6: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg7: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg8: index, %arg9: index, %arg10: index, %arg11: index, %arg12: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>) {
-    %arg8_0 = flow.dispatch.workload.ordinal %arg8, 0 : index
-    %arg9_0 = flow.dispatch.workload.ordinal %arg9, 1 : index
-    %arg10_0 = flow.dispatch.workload.ordinal %arg10, 2 : index
-    %arg11_0 = flow.dispatch.workload.ordinal %arg11, 3 : index
-    %4 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg8_0, %arg9_0}
-    %5 = flow.dispatch.tie_shape %arg7 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg10_0, %arg11_0}
-    %6 = flow.dispatch.tie_shape %arg12 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>{%arg10_0, %arg11_0}
-    %7 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%arg8_0, %arg9_0], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg8_0, %arg9_0} -> tensor<?x?xf32>
-    %8 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%arg10_0, %arg11_0], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg10_0, %arg11_0} -> tensor<?x?xf32>
-    %mapped = linalg.map { math.absf } ins(%7 : tensor<?x?xf32>) outs(%8 : tensor<?x?xf32>)
-    %9 = iree_linalg_ext.set_encoding %mapped : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-    flow.dispatch.tensor.store %9, %6, offsets = [0, 0], sizes = [%arg10_0, %arg11_0], strides = [1, 1] : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>{%arg10, %arg11}
-    flow.return
-  } count(%arg6: index, %arg7: index, %arg8: index, %arg9: index) -> (index, index, index) {
-    %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg6, %arg7, %arg8, %arg9
-    flow.return %x, %y, %z : index, index, index
-  }
-  %3 = flow.dispatch.workgroups[%arg4, %arg5](%2, %arg4, %arg5) : (tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>{%arg4, %arg5}, index, index) -> tensor<?x?xf32>{%arg4, %arg5} =
-      (%arg6: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>, %arg7: index, %arg8: index, %arg9: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
-    %4 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>{%arg7, %arg8}
-    %5 = flow.dispatch.tie_shape %arg9 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg7, %arg8}
-    %6 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%arg7, %arg8], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>{%arg7, %arg8} -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-    %7 = iree_linalg_ext.unset_encoding %6 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<?x?xf32>
-    flow.dispatch.tensor.store %7, %5, offsets = [0, 0], sizes = [%arg7, %arg8], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg7, %arg8}
-    flow.return
-  } count(%arg6: index, %arg7: index) -> (index, index, index) {
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg6, %arg7
-    flow.return %x, %y, %z : index, index, index
-  }
-  return %3, %arg1, %arg2 : tensor<?x?xf32>, index, index
-}
-
-// -----
-
-// iree_linalg_ext ops get a heuristics-driven summary in their name.
-
-//      CHECK: flow.executable private @main_dispatch_0 {
-// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_softmax_7xf32
-//      CHECK: func.func @main_dispatch_0_softmax_7xf32(
-func.func @main(%arg0: tensor<7xf32>) -> tensor<7xf32> {
-  %c7 = arith.constant 7 : index
-  %0 = flow.dispatch.workgroups[%c7](%arg0) : (tensor<7xf32>) -> tensor<7xf32> =
-      (%arg1: !flow.dispatch.tensor<readonly:tensor<7xf32>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<7xf32>>) {
-    %1 = flow.dispatch.tensor.load %arg1, offsets = [0], sizes = [7], strides = [1] : !flow.dispatch.tensor<readonly:tensor<7xf32>> -> tensor<7xf32>
-    %2 = tensor.empty() : tensor<7xf32>
-    %3 = iree_linalg_ext.softmax dimension(0) ins(%1 : tensor<7xf32>) outs(%2 : tensor<7xf32>) -> tensor<7xf32>
-    flow.dispatch.tensor.store %3, %arg2, offsets = [0], sizes = [7], strides = [1] : tensor<7xf32> -> !flow.dispatch.tensor<writeonly:tensor<7xf32>>
-    flow.return
-  } count(%arg1: index) -> (index, index, index) {
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
-    flow.return %x, %y, %z : index, index, index
-  }
-  return %0 : tensor<7xf32>
+  // Dispatch workgroups to the externally defined function "main" in the
+  // referenced object files.
+  // CHECK: %[[RESULT:.+]] = flow.dispatch @dispatchExtern_dispatch_0::@main[%c100, %c50](%arg0, %arg1, %arg2) {
+  // CHECK-SAME: hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>]
+  // CHECK-SAME: } : (tensor<4xi32>, tensor<8xi32>, i32) -> %arg1
+  %result = hal.dispatch.extern "main"[%x, %y](%arg0, %arg1, %arg2) : (tensor<4xi32>, tensor<8xi32>, i32) -> %arg1
+    // Translates the workload (%x and %y captured above) into an XYZ workgroup
+    // count, optionally using device information.
+    count(%device: !hal.device, %x_capture: index, %y_capture: index) -> (index, index, index) {
+      // Shows how device queries can be used when computing the workgroup count.
+      // The device is the one used at runtime.
+      %ok, %z_i32 = hal.device.query<%device : !hal.device> key("some" :: "value") : i1, i32
+      %z = arith.index_cast %z_i32 : i32 to index
+      hal.return %x_capture, %y_capture, %z : index, index, index
+    }
+    // Must match the external definition.
+    layout(#hal.pipeline.layout<push_constants = 1, sets = [
+      <0, bindings = [
+          <0, storage_buffer, ReadOnly>,
+          <1, storage_buffer>
+      ]>
+    ]>)
+    // Optional, automatically inferred if omitted.
+    bindings([
+      #hal.interface.binding<0, 0>,
+      #hal.interface.binding<0, 1>
+    ])
+    // Can have object references for multiple targets or configurations.
+    objects(#hal.executable.objects<{
+      #hal.executable.target<"llvm-cpu", "a"> = [#hal.executable.object<{path = "a.o"}>],
+      #hal.executable.target<"llvm-cpu", "b"> = [#hal.executable.object<{path = "b.o"}>]
+    }>)
+  // CHECK: return %[[RESULT]]
+  return %result : tensor<8xi32>
 }

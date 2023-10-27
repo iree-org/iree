@@ -22,6 +22,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Function to register all dependent dialects for Transform Dialect based
+/// passes.
+void registerTransformDialectTranslationDependentDialects(
+    DialectRegistry &registry);
+
 /// Passes that are done on all backends before target-specific code-generation
 /// kicks in.
 void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager);
@@ -163,6 +168,9 @@ createHoistRedundantVectorTransfersPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createHoistUnrolledVectorExtractInsertSlicePass();
+
 /// Pass to perform linalg on tensor bufferization. The function passed into
 /// the pass through the `allocationFn` argument is invoked whenever a new
 /// buffer is to be created. The callback will be passed the Values for the
@@ -188,6 +196,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass();
 
 /// Creates a pass to convert memref.copy to linalg op.
 std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
+
+/// Extracts lowering configs and translation info from user configs.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createMaterializeUserConfigsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>>

@@ -13,7 +13,7 @@
   ]>
 ]>
 hal.executable public @matmul_256x1024x128_div_add {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -34,7 +34,7 @@ hal.executable public @matmul_256x1024x128_div_add {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x128_div_add layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_256x1024x128_div_add() {
@@ -99,7 +99,7 @@ hal.executable public @matmul_256x1024x128_div_add {
   ]>
 ]>
 hal.executable public @batch_matmul_16x128x256x512_div {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -120,7 +120,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_16x128x256x512_div layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_16x128x256x512_div() {
@@ -173,7 +173,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
   ]>
 ]>
 hal.executable @generic_batch_matmul_32x8x512x64 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -194,7 +194,7 @@ hal.executable @generic_batch_matmul_32x8x512x64 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-     >}> {
+     >}>) {
     hal.executable.export @generic_batch_matmul_32x8x512x64 layout(#pipeline_layout)
     builtin.module {
       func.func @generic_batch_matmul_32x8x512x64() {
@@ -249,7 +249,7 @@ hal.executable @generic_batch_matmul_32x8x512x64 {
   ]>
 ]>
 hal.executable public @batch_matmul_16x1024x1024x80 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -270,7 +270,7 @@ hal.executable public @batch_matmul_16x1024x1024x80 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_16x1024x1024x80 layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_16x1024x1024x80() {
@@ -313,7 +313,7 @@ hal.executable public @batch_matmul_16x1024x1024x80 {
   ]>
 ]>
 hal.executable public @matmul_256x1024x8 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -334,7 +334,7 @@ hal.executable public @matmul_256x1024x8 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x8 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_256x1024x8() {

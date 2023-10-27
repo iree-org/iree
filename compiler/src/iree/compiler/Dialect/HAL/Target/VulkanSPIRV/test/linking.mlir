@@ -21,7 +21,7 @@
 ]>
 
 hal.executable private @call_dispatch_0  {
-  hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export @call_dispatch_0 ordinal(0) layout(#pipeline_layout_0) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -39,7 +39,7 @@ hal.executable private @call_dispatch_0  {
   }
 }
 hal.executable private @call_dispatch_1  {
-  hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export @call_dispatch_1 ordinal(0) layout(#pipeline_layout_1) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -57,7 +57,7 @@ hal.executable private @call_dispatch_1  {
   }
 }
 hal.executable private @call_dispatch_2  {
-  hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export @call_dispatch_2 ordinal(0) layout(#pipeline_layout_0) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -75,7 +75,7 @@ hal.executable private @call_dispatch_2  {
   }
 }
 hal.executable private @call_dispatch_3  {
-  hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export @call_dispatch_3 ordinal(0) layout(#pipeline_layout_1) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -93,7 +93,7 @@ hal.executable private @call_dispatch_3  {
   }
 }
 hal.executable private @call_dispatch_4  {
-  hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export @call_dispatch_4 ordinal(0) layout(#pipeline_layout_1) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -114,7 +114,7 @@ hal.executable private @call_dispatch_4  {
 // Two groups should be created, according to their interfaces.
 
 //      CHECK: hal.executable private @linking_linked_vulkan_0 {
-// CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+// CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_1 ordinal(0) layout(#pipeline_layout_0)
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_3 ordinal(1) layout(#pipeline_layout_0)
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_4 ordinal(2) layout(#pipeline_layout_0)
@@ -141,7 +141,7 @@ hal.executable private @call_dispatch_4  {
 // CHECK-NEXT: }
 
 //      CHECK: hal.executable private @linking_linked_vulkan {
-// CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+// CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_0 ordinal(0) layout(#pipeline_layout_1)
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_2 ordinal(1) layout(#pipeline_layout_1)
 // CHECK-NEXT:     module  {

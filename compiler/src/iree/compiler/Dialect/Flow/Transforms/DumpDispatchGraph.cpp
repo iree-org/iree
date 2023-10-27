@@ -377,7 +377,7 @@ private:
   void printDispatchBody(raw_ostream &os, DispatchOp &dispatchOp) {
     // Find the entry point function from the dispatch entry point symbol
     // attribute.
-    auto entryPoint = dispatchOp.getEntryPoint();
+    auto entryPoint = *dispatchOp.getEntryPointRefs().begin();
     auto executableOp = cast<ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
         dispatchOp, entryPoint.getRootReference()));
     if (!executableOp)
@@ -385,6 +385,8 @@ private:
 
     auto calleeNameAttr = entryPoint.getLeafReference();
     auto innerModule = executableOp.getInnerModule();
+    if (!innerModule)
+      return;
     auto funcOps = innerModule.getOps<func::FuncOp>();
     auto funcIt = llvm::find_if(funcOps, [&](func::FuncOp op) {
       return op.getNameAttr() == calleeNameAttr;
@@ -450,7 +452,7 @@ private:
           // Print entry function name, if there is only one entry function,
           // then the name space and the entry function names are the same,
           // and we can just print the function name to save space.
-          auto entryPoint = dispatch.getEntryPoint();
+          auto entryPoint = *dispatch.getEntryPointRefs().begin();
           auto rootName = entryPoint.getRootReference();
           auto leafName = entryPoint.getLeafReference();
           if (rootName == leafName) {

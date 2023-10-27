@@ -93,6 +93,10 @@ def TileAndDecomposeAttention :
       "Tiles and decomposes attention op into a sequence of linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
                     "createTileAndDecomposeAttentionPass()";
+  let options = [
+    Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
+           "Choose whether to only tile or go through till decomposition">,
+  ];
 }
 
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

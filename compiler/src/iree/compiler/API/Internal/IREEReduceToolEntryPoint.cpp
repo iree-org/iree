@@ -12,6 +12,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
@@ -24,6 +25,10 @@ using namespace mlir;
 using namespace llvm;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::Reducer;
+
+#if defined(_MSC_VER)
+#define fileno _fileno
+#endif // _MSC_VER
 
 // Parse and verify the input MLIR file. Returns null on error.
 static OwningOpRef<Operation *> loadModule(MLIRContext &context,
@@ -47,18 +52,27 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
 
   llvm::cl::OptionCategory ireeReduceCategory("iree-reduce options");
 
-  static llvm::cl::opt<std::string> testScript(cl::Positional, cl::Required,
-                                               cl::desc("<test script>"),
-                                               cl::cat(ireeReduceCategory));
+  llvm::cl::opt<std::string> testScript(cl::Positional, cl::Required,
+                                        cl::desc("<test script>"),
+                                        cl::cat(ireeReduceCategory));
 
-  static cl::opt<std::string> inputFilename(
-      cl::Positional, cl::desc("<input file>"), cl::init("-"),
-      llvm::cl::cat(ireeReduceCategory));
+  cl::opt<std::string> inputFilename(cl::Positional, cl::desc("<input file>"),
+                                     cl::init("-"),
+                                     llvm::cl::cat(ireeReduceCategory));
 
-  static cl::opt<std::string> outputFilename(
+  cl::opt<std::string> outputFilename(
       "o", cl::desc("Output filename for the reduced test case."),
       cl::value_desc("filename"), cl::init("-"),
       llvm::cl::cat(ireeReduceCategory));
+
+  cl::opt<bool> useBytecodeForTesting(
+      "use-bytecode",
+      cl::desc("Use bytecode as input to the interesting script."),
+      cl::init(false), llvm::cl::cat(ireeReduceCategory));
+
+  cl::opt<bool> outputAsBytecode(
+      "output-bytecode", cl::desc("Output the final output as bytecode."),
+      cl::init(false), llvm::cl::cat(ireeReduceCategory));
 
   llvm::cl::HideUnrelatedOptions(ireeReduceCategory);
 
@@ -84,12 +98,22 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
     return failure();
   }
 
-  Operation *newModule =
-      ireeRunReducingStrategies(std::move(module), testScript);
+  ReducerConfig config(testScript, useBytecodeForTesting);
+  Operation *newModule = ireeRunReducingStrategies(std::move(module), config);
   module = OwningOpRef<Operation *>(newModule);
 
-  // Print module to output file.
-  module->print(output->os());
+  if (outputAsBytecode) {
+    // Write bytecode to output file.
+    BytecodeWriterConfig config;
+    LogicalResult result =
+        writeBytecodeToFile(module.get(), output->os(), config);
+    if (failed(result)) {
+      llvm::report_fatal_error("Failed to write bytecode to output file");
+    }
+  } else {
+    // Write MLIR to file.
+    module->print(output->os());
+  }
 
   // Keep the output file if the invocation of MlirOptMain was successful.
   output->keep();

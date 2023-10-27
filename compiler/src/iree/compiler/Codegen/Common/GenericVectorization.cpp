@@ -128,21 +128,27 @@ inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
 
 // Return the vector sizes from the local lowering config or try to infer them
 // from the tensor shapes and tiled loops in the IR.
-static FailureOr<SmallVector<int64_t>>
+static FailureOr<SizesAndScalableFlags>
 getVectorSizes(linalg::LinalgOp linalgOp) {
   // Get vector sizes from the lowering config, if available in the op itself.
   IREE::Codegen::LoweringConfigAttr loweringConfig =
       getLoweringConfig(linalgOp);
   if (loweringConfig) {
     TilingConfig tilingConfig(loweringConfig);
-    SmallVector<int64_t> vectorSizes = tilingConfig.getVectorTileSizes();
+    auto [vectorSizes, scalableFlags] = tilingConfig.getVectorTileSizes();
     // Replace zeros in canonical vector shape to turn it into a valid shape.
     std::replace(vectorSizes.begin(), vectorSizes.end(), 0, 1);
-    return vectorSizes;
+    return std::make_pair(vectorSizes, scalableFlags);
   }
 
   // Try to infer the vector sizes from the IR.
-  return inferVectorSizesFromIR(linalgOp);
+  auto vectorSizes = inferVectorSizesFromIR(linalgOp);
+  if (succeeded(vectorSizes)) {
+    // This can't identify scalable flags, so pad them with `false`.
+    return std::make_pair(*vectorSizes,
+                          SmallVector<bool>(vectorSizes->size(), false));
+  }
+  return failure();
 }
 
 static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
@@ -193,14 +199,16 @@ void GenericVectorizationPass::runOnOperation() {
   });
   for (auto op : candidates) {
     SmallVector<int64_t> vectorSizes;
+    SmallVector<bool> scalableVecDims;
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
       if (enableVectorMasking) {
-        auto maybeVectorSizes = getVectorSizes(linalgOp);
-        if (succeeded(maybeVectorSizes)) {
-          vectorSizes.append(maybeVectorSizes->begin(),
-                             maybeVectorSizes->end());
+        auto vectorSizesAndScalableDims = getVectorSizes(linalgOp);
+        if (succeeded(vectorSizesAndScalableDims)) {
+          auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
+          vectorSizes.append(sizes.begin(), sizes.end());
+          scalableVecDims.append(scalableDims.begin(), scalableDims.end());
         }
         if (std::accumulate(vectorSizes.begin(), vectorSizes.end(), 1,
                             std::multiplies<int64_t>()) >= maxVectorSize)
@@ -217,8 +225,8 @@ void GenericVectorizationPass::runOnOperation() {
         continue;
       vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
     }
-
-    SmallVector<bool> scalableVecDims(vectorSizes.size(), false);
+    // Pad scalable dims with `false` to match the vector sizes.
+    scalableVecDims.resize(vectorSizes.size());
     (void)linalg::vectorize(rewriter, op, vectorSizes, scalableVecDims,
                             vectorizeGatherAccesses);
   };

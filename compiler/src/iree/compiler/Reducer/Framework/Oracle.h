@@ -15,12 +15,14 @@ namespace mlir::iree_compiler::Reducer {
 
 class Oracle {
 public:
-  Oracle(StringRef testScript) : testScript(testScript) {}
+  Oracle(StringRef testScript, bool useBytecode)
+      : testScript(testScript), useBytecode(useBytecode) {}
 
   bool isInteresting(WorkItem &workItem);
 
 private:
   StringRef testScript;
+  bool useBytecode;
 };
 
 } // namespace mlir::iree_compiler::Reducer

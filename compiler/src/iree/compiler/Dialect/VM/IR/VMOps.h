@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_VM_IR_VMOPS_H_
 
 #include <cstdint>
+#include <numeric>
 
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"

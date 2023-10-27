@@ -33,6 +33,7 @@ void mlir::iree_compiler::Reducer::reduceOptimizationBarriersDelta(
 
   // Replace all dispatch ops with the chosen operand.
   for (auto optBarrier : optBarriers) {
+    optBarrier.replaceAllUsesWith(optBarrier.getOperands());
     optBarrier.erase();
   }
 

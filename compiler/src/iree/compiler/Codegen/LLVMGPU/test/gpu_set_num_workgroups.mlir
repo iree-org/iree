@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-jit=false %s | FileCheck %s
 // Transform dialect attributes are tested separately.
 
@@ -10,7 +10,7 @@
   ]>
 ]>
 hal.executable @add_dispatch_0 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout)
   builtin.module {
     func.func @add_dispatch_0() {
@@ -52,7 +52,7 @@ hal.executable @add_dispatch_0 {
   ]>
 ]>
 hal.executable private @dot_dispatch_1  {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @dot_dispatch_1 layout(#pipeline_layout)
     builtin.module {
       func.func @dot_dispatch_1() {
@@ -92,7 +92,7 @@ hal.executable private @dot_dispatch_1  {
   ]>
 ]>
 hal.executable private @unaligned_k  {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @unaligned_k layout(#pipeline_layout)
     builtin.module {
       func.func @unaligned_k() {
@@ -132,7 +132,7 @@ hal.executable private @unaligned_k  {
   ]>
 ]>
 hal.executable @reduction_dispatch {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @predict_dispatch_153 layout(#pipeline_layout)
     builtin.module {
       func.func @predict_dispatch_153() {
@@ -174,7 +174,7 @@ hal.executable @reduction_dispatch {
   ]>
 ]>
 hal.executable private @reduction_aligned2 {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @reduction_aligned2 ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @reduction_aligned2() {
@@ -219,7 +219,7 @@ hal.executable private @reduction_aligned2 {
   ]>
 ]>
 hal.executable @copy_as_generic {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @copy_as_generic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_as_generic() {
@@ -255,7 +255,7 @@ hal.executable @copy_as_generic {
   ]>
 ]>
 hal.executable private @static_1d_fft_stage2 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
@@ -292,7 +292,7 @@ hal.executable private @static_1d_fft_stage2 {
   ]>
 ]>
 hal.executable private @static_3d_fft_stage3 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @static_3d_fft_stage3 layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
@@ -337,7 +337,7 @@ hal.executable private @static_3d_fft_stage3 {
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @_lowering_config_test_dispatch_1 layout(#pipeline_layout)
   builtin.module {
     func.func @_lowering_config_test_dispatch_1() {
@@ -384,7 +384,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
   ]>
 ]>
 hal.executable private @sort_op {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @sort_op layout(#pipeline_layout)
     builtin.module {
       func.func @sort_op() {
@@ -429,7 +429,7 @@ hal.executable private @sort_op {
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
   hal.executable.export public @matmul_config_sm35 layout(#pipeline_layout)
   builtin.module {
     func.func @matmul_config_sm35() {
@@ -469,7 +469,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @matmul_config_sm80 layout(#pipeline_layout)
   builtin.module {
     func.func @matmul_config_sm80() {
@@ -509,7 +509,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}>) {
   hal.executable.export public @matmul_config_sm86 layout(#pipeline_layout)
   builtin.module {
     func.func @matmul_config_sm86() {
@@ -549,7 +549,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @contract_reduction {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}>) {
   hal.executable.export public @contract_reduction layout(#pipeline_layout)
   builtin.module {
     func.func @contract_reduction() {
@@ -598,7 +598,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @dynamic_pack_2x2 {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}>) {
   hal.executable.export public @dynamic_pack_2x2 layout(#pipeline_layout)
   builtin.module {
     func.func @dynamic_pack_2x2() {
@@ -641,7 +641,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @large_matmul_f16 layout(#pipeline_layout)
   builtin.module {
     func.func @large_matmul_f16() {
@@ -688,7 +688,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @large_matmul_f32 layout(#pipeline_layout)
   builtin.module {
     func.func @large_matmul_f32() {
@@ -735,7 +735,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @inner_unit_dim {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @inner_unit_dim layout(#pipeline_layout)
   builtin.module {
     func.func @inner_unit_dim() {
@@ -784,7 +784,7 @@ hal.executable @inner_unit_dim {
   ]>
 ]>
 hal.executable @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 layout(#pipeline_layout)
   builtin.module {
     func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32() {
@@ -836,7 +836,7 @@ hal.executable @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 {
 
 
 hal.executable public @_main_dispatch_15 {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @_main_dispatch_15_generic_512x4x42x42x64_f32 ordinal(0) layout(#hal.pipeline.layout<push_constants = 3, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -899,7 +899,7 @@ hal.executable public @_main_dispatch_15 {
 ]>
 
 hal.executable public @i4_dequant_matvec {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @i4_dequant_matvec ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -966,7 +966,7 @@ hal.executable public @i4_dequant_matvec {
         } -> tensor<4096x11008xf32>
         %41 = linalg.generic {
             indexing_maps = [
-                affine_map<(d0, d1, d2) -> (d0, d2)>, 
+                affine_map<(d0, d1, d2) -> (d0, d2)>,
                 affine_map<(d0, d1, d2) -> (d1, d2)>,
                 affine_map<(d0, d1, d2) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel", "reduction"]}

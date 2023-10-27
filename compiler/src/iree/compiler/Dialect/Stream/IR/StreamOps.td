@@ -42,7 +42,7 @@ def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
   AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
 ]> {
-  let summary = [{allocates a persistent value with undefined contents}];
+  let summary = [{allocates a persistent resource}];
   let description = [{
     Allocates a persistent value (one that is long-lived and possibly external
     to the program) with undefined contents. Consumers of the allocated
@@ -58,31 +58,39 @@ def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
     separate allocations may be fused into one or more slab allocations in order
     to reduce overheads. How many allocations can be fused is based on the size
     of the individual resources and the target constraints (how large any single
-    buffer may be, etc). At the stream dialect level treat a multi-result alloc
-    as a way to indicate similar lifetimes.
+    buffer may be, etc).
   }];
 
   let arguments = (ins
-    Variadic<Stream_Size>:$storage_sizes,
+    Stream_Size:$storage_size,
     UnitAttr:$uninitialized,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
-    Variadic<Stream_AnyResource>:$results
+    Stream_AnyResource:$result
   );
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
     (`uninitialized` $uninitialized^)?
-    attr-dict `:` custom<SizeAwareTypeList>(type($results), $storage_sizes)
+    attr-dict `:`
+    type($result) `{` $storage_size `}`
   }];
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getStorageSizes()[idx]; }
-  }];
+    Value getResultSize(unsigned idx) { return getStorageSize(); }
 
-  let hasVerifier = 1;
+    // Creates a single shared allocation for multiple suballocations.
+    // Suballocations are defined by entries in the struct-of-arrays-style
+    // `{locs, storageSizes}` set. Currently all result types must match.
+    // Returns the allocation and subviews into all suballocated resources.
+    static std::pair<IREE::Stream::ResourceAllocOp, SmallVector<Value>>
+    createSuballocations(
+        Type resourceType,
+        ArrayRef<Location> locs, ValueRange storageSizes,
+        bool uninitialized, AffinityAttr affinityAttr, OpBuilder &builder);
+  }];
 
   let hasCanonicalizer = 1;
 }
@@ -113,10 +121,7 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
-    AnyTypeOf<[
-      Stream_StagingResource,
-      Stream_TransientResource,
-    ]>:$result,
+    Stream_AnyResource:$result,
     Stream_Timepoint:$result_timepoint
   );
 
@@ -136,6 +141,16 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
     SmallVector<Value> getAwaitTimepoints() {
       if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
     }
+
+    // Creates a single shared allocation for multiple suballocations.
+    // Suballocations are defined by entries in the struct-of-arrays-style
+    // `{locs, storageSizes}` set. Currently all result types must match.
+    // Returns the allocation and subviews into all suballocated resources.
+    static std::pair<IREE::Stream::ResourceAllocaOp, SmallVector<Value>>
+    createSuballocations(
+        Type timepointType, Type resourceType,
+        ArrayRef<Location> locs, ValueRange storageSizes,
+        Value awaitTimepoint, AffinityAttr affinityAttr, OpBuilder &builder);
   }];
 
   let hasCanonicalizer = 1;
@@ -161,10 +176,7 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
   }];
 
   let arguments = (ins
-    AnyTypeOf<[
-      Stream_StagingResource,
-      Stream_TransientResource,
-    ]>:$operand,
+    Stream_AnyResource:$operand,
     Stream_Size:$operand_size,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
@@ -776,7 +788,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
-    Stream_ExternalResource:$result
+    AnyTypeOf<[Stream_AnyStreamResource, Stream_StagingResource]>:$result
   );
 
   let assemblyFormat = [{
@@ -822,7 +834,7 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
   }];
 
   let arguments = (ins
-    Stream_ExternalResource:$source,
+    AnyTypeOf<[Stream_AnyStreamResource, Stream_StagingResource]>:$source,
     TypeAttr:$source_encoding,
     Stream_ShapeDynamicDims:$source_encoding_dims,
     Stream_Size:$source_size,
@@ -1371,22 +1383,40 @@ def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_TensorTraceOp : Stream_Op<"tensor.trace", []> {
-  let summary = [{trace value(s) operation}];
+def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_ShapeAwareOp>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{traces one or more tensor values at runtime}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given
-    tensors and titles them with the given key. The key is informational only
-    and useful for titling/marking specific sets of tensors for easier
-    searching.
+    tensors. The key is arbitrary and can be used for identifying the set of
+    values being traced.
   }];
 
   let arguments = (ins
     StrAttr:$key,
-    Variadic<AnyTensor>:$operands
+    Variadic<Stream_StagingResource>:$resources,
+    Variadic<Stream_Size>:$resource_sizes,
+    TypeArrayAttr:$resource_encodings,
+    Stream_ShapeDynamicDims:$resource_encoding_dims
   );
 
-  // TODO(benvanik): stream.tensor.trace assembly format (custom).
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = [{
+    $key `=` `[`
+    custom<EncodedResourceOperands>(
+        $resources, type($resources), $resource_sizes,
+        $resource_encodings, $resource_encoding_dims)
+    `]` attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getResourceSizes()[idx]; }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let hasVerifier = 1;
 }
 
 } // OpGroupTensorOps
@@ -2027,7 +2057,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
   let arguments = (ins
     Variadic<Index>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_PrimitiveType,
@@ -2046,7 +2076,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     custom<DispatchOperands>($resource_operands,
                              $resource_operand_offsets,
@@ -2059,6 +2089,13 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   }];
 
   let extraClassDeclaration = [{
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
@@ -3591,7 +3628,7 @@ def Stream_ExecutableOp : Stream_Op<"executable", [
     SymbolNameAttr:$sym_name
   );
 
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
@@ -3608,7 +3645,9 @@ def Stream_ExecutableOp : Stream_Op<"executable", [
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
     ::mlir::ModuleOp getInnerModule() {
-      return *getBlock().getOps<::mlir::ModuleOp>().begin();
+      auto it = getBlock().getOps<::mlir::ModuleOp>();
+      if (it.empty()) return {};
+      return *it.begin();
     }
   }];
 

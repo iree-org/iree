@@ -24,6 +24,7 @@ the process of being compiled.
 """
 
 from .ctypes_dl import (
+    _initializeGlobalCL,
     Session,
     Invocation,
     Source,
