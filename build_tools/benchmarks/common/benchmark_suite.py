@@ -215,6 +215,9 @@ class BenchmarkSuite(object):
                 driver_info=driver_info,
                 benchmark_tool_name=run_config.tool.value,
                 benchmark_case_dir=module_dir_path,
+                input_uri=model.input_data_url,
+                expected_output_uri=model.expected_output_url,
+                verify_params=model.verify_params,
                 run_config=run_config,
             )
             benchmark_cases.append(benchmark_case)

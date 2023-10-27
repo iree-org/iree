@@ -8,7 +8,7 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from e2e_test_framework import serialization, unique_ids
 
@@ -182,6 +182,15 @@ class Model(object):
     entry_function: str
     # Input types. E.g., ["100x100xf32", "200x200x5xf32"].
     input_types: List[str]
+    # Url to fetch input data tgz. The archive should contain
+    # "input_{0,1,...}.npy" for each input.
+    input_data_url: Optional[str] = None
+    # Url to fetch expected output tgz. The archive should contain
+    # "ouptut_0.npy".
+    expected_output_url: Optional[str] = None
+    # Parameters for iree-run-module to control the tolerance.
+    # For example: --expected_f32_threshold=0.0001
+    verify_params: List[str] = dataclasses.field(default_factory=list)
 
     def __str__(self):
         return self.name
