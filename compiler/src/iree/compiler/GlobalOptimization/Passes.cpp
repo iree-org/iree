@@ -67,7 +67,6 @@ void buildGlobalOptimizationPassPipeline(
       // this pass both before unit dim folding + consteval, as well as after.
       .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
-      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
       // Expand all vectors in vecmat/matvec ops into matrices for tiling.
       .addPredicatedPass(transformOptions.options.dataTiling,
                          createExpandVectorsPass)

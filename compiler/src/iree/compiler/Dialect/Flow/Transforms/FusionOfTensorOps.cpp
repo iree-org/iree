@@ -42,6 +42,14 @@ static llvm::cl::opt<int64_t> clLinalgMaxConstantFoldElements(
     llvm::cl::desc("Maximum number of elements to try to constant fold."),
     llvm::cl::init(0));
 
+/// Returns true if the operation is a matmul or matmul-like op.
+static bool isMatmulLikeOp(const Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp)
+    return false;
+  return linalg::isaContractionOpInterface(linalgOp);
+}
+
 /// Check if any of the use dominates all other uses of the operation.
 static std::optional<OpOperand *> getFusableUse(Operation *op,
                                                 DominanceInfo &dominanceInfo) {
@@ -362,6 +370,13 @@ struct FusionOfTensorOpsPass
               return false;
             }
 
+            // Do not fuse producer op if src is from a global.
+            for (auto srcOperand : producer->getOperands()) {
+              auto producerSrcOp = srcOperand.getDefiningOp();
+              if (producerSrcOp && isa<Util::GlobalLoadOp>(producerSrcOp))
+                return false;
+            }
+
             // Do not fuse producer generic op if it has more than one user.
             if (auto producerGenericOp =
                     dyn_cast<linalg::GenericOp>(producer)) {
@@ -427,6 +442,11 @@ struct FusionOfTensorOpsPass
             Operation *producer = fusedOperand->get().getDefiningOp();
             Operation *consumer = fusedOperand->getOwner();
             if (!isNonNullAndOutsideDispatch({producer, consumer})) {
+              return false;
+            }
+
+            // Do not fuse if consumer is a contraction/mm like op.
+            if (isMatmulLikeOp(consumer)) {
               return false;
             }
 
