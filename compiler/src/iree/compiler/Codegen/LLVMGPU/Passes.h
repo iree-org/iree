@@ -57,12 +57,12 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 void addGPUDefaultPassPipeline(OpPassManager &pm);
 
 /// Populates passes needed to preprocess and select the strategy for lowering.
-void buildLLVMGPUTransformSelectionPassPipeline(OpPassManager &pm);
+void buildLLVMGPUCodegenStrategyRefinementPassPipeline(OpPassManager &pm);
 
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via
 /// the structured ops path. The pass manager `pm` in here should operate on
 /// the module within the IREE::HAL::ExecutableOp.
-void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM);
+void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM);
 
 /// Performs the final conversion to NNVM+LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
