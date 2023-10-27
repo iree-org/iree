@@ -139,6 +139,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
             source_url="",
             entry_function="predict",
             input_types=["1xf32"],
+            input_url="https://abc/inputs_npy.tgz",
+            expected_output_url="https://abc/outputs_npy.tgz",
         )
         exec_config_a = iree_definitions.ModuleExecutionConfig.build(
             id="exec_a",
@@ -247,6 +249,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
                     driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                     benchmark_tool_name="iree-benchmark-module",
                     benchmark_case_dir=run_config_c_case_dir,
+                    input_uri=model_tf.input_url,
+                    expected_output_uri=model_tf.expected_output_url,
                     run_config=run_config_c,
                 )
             ],

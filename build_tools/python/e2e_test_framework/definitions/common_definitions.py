@@ -182,10 +182,10 @@ class Model(object):
     entry_function: str
     # Input types. E.g., ["100x100xf32", "200x200x5xf32"].
     input_types: List[str]
-    # Url to fetch input data tgz. The archive should contain
+    # URL to fetch input data tgz. The archive should contain
     # "input_{0,1,...}.npy" for each input.
-    input_data_url: Optional[str] = None
-    # Url to fetch expected output tgz. The archive should contain
+    input_url: Optional[str] = None
+    # URL to fetch expected output tgz. The archive should contain
     # "ouptut_0.npy".
     expected_output_url: Optional[str] = None
     # Parameters for iree-run-module to control the tolerance.
@@ -209,7 +209,7 @@ class ModelInputData(object):
         return self.name
 
 
-# Get input from model input_data_url if available; otherwise use all zeros.
+# Get input from model input_url if available; otherwise use all zeros.
 DEFAULT_INPUT_DATA = ModelInputData(
     id=unique_ids.MODEL_INPUT_DATA_ZEROS,
     name="default",
