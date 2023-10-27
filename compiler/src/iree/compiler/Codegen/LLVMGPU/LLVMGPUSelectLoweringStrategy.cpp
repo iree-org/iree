@@ -36,6 +36,8 @@ class LLVMGPUSelectLoweringStrategyPass
           LLVMGPUSelectLoweringStrategyPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
+    // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
+    // unnecessary dialect registrations.
     // clang-format off
     registry
         .insert<IREE::Codegen::IREECodegenDialect,

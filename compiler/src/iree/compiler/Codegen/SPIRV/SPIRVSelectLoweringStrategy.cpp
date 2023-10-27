@@ -45,6 +45,8 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
+    // unnecessary dialect registrations.
     registry
         .insert<IREE::Codegen::IREECodegenDialect, affine::AffineDialect,
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
