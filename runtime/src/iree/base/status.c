@@ -628,8 +628,8 @@ static bool iree_symbol_resolver_format_frame(iree_symbol_resolver_t* resolver,
   if (resolver->SymGetLineFromAddr64(process, (DWORD64)address, &displacement32,
                                      &line)) {
     *buffer_length = iree_string_buffer_append_format(
-        buffer_capacity, buffer, *buffer_length, " (%s:%u)", line.FileName,
-        line.LineNumber);
+        buffer_capacity, buffer, *buffer_length, " (%s:%" PRIu32 ")",
+        line.FileName, (uint32_t)line.LineNumber);
   }
   iree_symbol_resolver_unlock(resolver);
 
