@@ -79,7 +79,7 @@ jobs:
         run: |
           set -eou pipefail
           if [[ "${MACHINE_TYPE}" == "arm64" ]]; then
-            BASE_DOCKER_IMAGE="gcr.io/iree-oss/base-arm64@sha256:31cdb58f556e415c3c65afae31ae9c54e43c1eb3dcd845f3d107abd9b368ff3d"
+            BASE_DOCKER_IMAGE="gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353"
           else
             BASE_DOCKER_IMAGE="gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33"
           fi
