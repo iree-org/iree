@@ -408,7 +408,13 @@ static bool collapseDimensions(IRRewriter &rewriter,
   if (!genericOp.has_value())
     return false;
 
-  // Step 2. Check whether it is possible to collapse
+  // Step 2. Don't collapse dims if there is a clonable dequantization like
+  // producer. Collapsing in this case will prevent fusion later.
+  if (llvm::any_of(getCloneableOps(regionOp),
+                   [&](Operation *op) { return isDequantizationLikeOp(op); }))
+    return false;
+
+  // Step 3. Check whether it is possible to collapse
   if (!isEligibleForCollapse(genericOp.value()))
     return false;
   SmallVector<ReassociationIndices> collapseIndices;
@@ -416,7 +422,7 @@ static bool collapseDimensions(IRRewriter &rewriter,
   if (collapseIndices.empty())
     return false;
 
-  // Step 3. Collapse dimensions
+  // Step 4. Collapse dimensions
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(genericOp.value());
 

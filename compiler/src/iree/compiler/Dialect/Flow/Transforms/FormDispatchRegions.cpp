@@ -757,10 +757,12 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
         continue;
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
-      // to convert them to splats.
+      // to convert them to splats. Also avoid moving dequantization-like ops
+      // into their own dispatch since it is better to clone these ops and avoid
+      // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::LinalgExt::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op)) {
+          isa<linalg::FillOp>(op) || isDequantizationLikeOp(&op)) {
         continue;
       }
 
