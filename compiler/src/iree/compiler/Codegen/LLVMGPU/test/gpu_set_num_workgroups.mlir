@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-select-lowering-strategy)))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-jit=false %s | FileCheck %s
 // Transform dialect attributes are tested separately.
 

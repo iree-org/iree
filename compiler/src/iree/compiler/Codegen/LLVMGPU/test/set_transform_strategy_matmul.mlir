@@ -1,8 +1,8 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN: -td-matmul-strategy-blk-sizes=256,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=8 \
 // RUN: -td-matmul-strategy-num-threads=32,4,1 \
@@ -13,7 +13,7 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=16,16,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
@@ -25,7 +25,7 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_2 %s
 
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=128,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
@@ -36,7 +36,7 @@
 // RUN: -td-matmul-strategy-pipeline-depth=3 \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_3 %s
 
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul \
 // RUN: | FileCheck --check-prefix=SMALL %s
 
 hal.executable @matmul_1 {

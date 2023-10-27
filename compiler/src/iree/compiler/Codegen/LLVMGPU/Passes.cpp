@@ -593,8 +593,13 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
-void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
+void buildLLVMGPUTransformSelectionPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
+  pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
+}
+
+void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
+  buildLLVMGPUTransformSelectionPassPipeline(pm);
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//
