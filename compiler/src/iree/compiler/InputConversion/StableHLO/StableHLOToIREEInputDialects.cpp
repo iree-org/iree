@@ -383,10 +383,15 @@ struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
   }
 };
 
+template <typename T>
 struct GenericTypeConvert final : ConversionPattern {
   GenericTypeConvert(StringRef rootName, TypeConverter &converter,
                      MLIRContext *context, PatternBenefit benefit = 0)
       : ConversionPattern(converter, rootName, benefit, context) {}
+
+  GenericTypeConvert(TypeConverter &converter, MLIRContext *context,
+                     PatternBenefit benefit = 0)
+      : ConversionPattern(converter, T::getOperationName(), benefit, context) {}
 
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
@@ -518,22 +523,19 @@ struct ConvertStableHloToIreeInputDialects final
     patterns.add<BuiltinFuncOpPattern>(*typeConverter, context);
     patterns.add<GlobalOpPattern, TensorEmptyPattern>(*typeConverter, context);
 
-    for (StringRef opName :
-         {func::ReturnOp::getOperationName(), func::CallOp::getOperationName(),
-          cf::CondBranchOp::getOperationName(),
-          cf::BranchOp::getOperationName(), scf::ForOp::getOperationName(),
-          scf::IfOp::getOperationName(), scf::YieldOp::getOperationName(),
-          scf::ConditionOp::getOperationName(),
-          scf::WhileOp::getOperationName(),
-          ml_program::GlobalLoadOp::getOperationName(),
-          ml_program::GlobalLoadConstOp::getOperationName(),
-          ml_program::GlobalStoreOp::getOperationName(),
-          tensor::FromElementsOp::getOperationName(),
-          tensor::CollapseShapeOp::getOperationName(),
-          tensor::ExpandShapeOp::getOperationName(),
-          arith::IndexCastUIOp::getOperationName()}) {
-      patterns.add<GenericTypeConvert>(opName, *typeConverter, context);
-    }
+    patterns.add<
+        GenericTypeConvert<func::ReturnOp>, GenericTypeConvert<func::ReturnOp>,
+        GenericTypeConvert<func::CallOp>, GenericTypeConvert<cf::CondBranchOp>,
+        GenericTypeConvert<cf::BranchOp>, GenericTypeConvert<scf::ForOp>,
+        GenericTypeConvert<scf::IfOp>, GenericTypeConvert<scf::YieldOp>,
+        GenericTypeConvert<scf::ConditionOp>, GenericTypeConvert<scf::WhileOp>,
+        GenericTypeConvert<ml_program::GlobalLoadOp>,
+        GenericTypeConvert<ml_program::GlobalLoadConstOp>,
+        GenericTypeConvert<ml_program::GlobalStoreOp>,
+        GenericTypeConvert<tensor::FromElementsOp>,
+        GenericTypeConvert<tensor::CollapseShapeOp>,
+        GenericTypeConvert<tensor::ExpandShapeOp>,
+        GenericTypeConvert<arith::IndexCastUIOp>>(*typeConverter, context);
 
     ConversionTarget target(*context);
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
