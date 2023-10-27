@@ -37,7 +37,7 @@ compiler target backend, and the `local-sync` runtime HAL driver (see
 for general instructions on building using CMake):
 
   ```shell
-  cmake -B ../iree-build/ \
+  cmake -B ../iree-build/ -G Ninja \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo .
     -DIREE_BUILD_SAMPLES=ON \
     -DIREE_TARGET_BACKEND_DEFAULTS=OFF \
