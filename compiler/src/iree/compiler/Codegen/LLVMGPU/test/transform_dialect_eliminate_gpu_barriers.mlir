@@ -18,11 +18,13 @@ func.func @read_read_write(%arg0: memref<?xf32>, %arg1: index) attributes {__par
   return
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -44,11 +46,13 @@ attributes {__parallel_region_boundary_for_test} {
   return %2 : f32
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -66,11 +70,13 @@ func.func @write_in_a_loop(%arg0: memref<?xf32>, %arg1: f32) attributes {__paral
   return
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -95,12 +101,13 @@ func.func @read_read_write_loop(%arg0: memref<?xf32>, %arg1: f32) attributes {__
   return
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
-
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -128,11 +135,13 @@ func.func @read_read_write_loop_trailing_sync(%arg0: memref<?xf32>, %arg1: f32) 
   return
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -151,11 +160,13 @@ attributes {__parallel_region_boundary_for_test} {
   return %0, %1 : memref<42xf32>, memref<10xf32>
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -173,11 +184,13 @@ attributes {__parallel_region_boundary_for_test} {
   return %0 : memref<42xf32>
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -193,11 +206,13 @@ attributes {__parallel_region_boundary_for_test} {
   return %0 : f32
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -237,8 +252,10 @@ attributes {__parallel_region_boundary_for_test} {
   return %0, %1, %2, %3, %4 : f32, f32, f32, f32, f32
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
-  transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.iree.eliminate_gpu_barriers %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  } // @__transform_main
+} // module

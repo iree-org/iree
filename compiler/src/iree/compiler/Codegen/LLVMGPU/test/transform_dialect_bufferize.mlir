@@ -28,10 +28,13 @@ hal.executable private @pad_matmul_static_dispatch_0  {
     }
   }
 
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
-    transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
-    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op: (!transform.any_op) -> !transform.any_op
-    %func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-  }
+  builtin.module attributes { transform.with_named_sequence } {
+    transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.consumed}) {
+      transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
+      %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op: (!transform.any_op) -> !transform.any_op
+      %func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+      transform.yield
+    } // @__transform_main
+  } // module
+
 }

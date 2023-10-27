@@ -9,13 +9,6 @@
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: FileCheck %s
 
-// Check that compilation runs all the way to the end.
-// TODO: this currently fails with:
-//   'memref.alloca' op all stack allocations need to be hoisted to the entry block of the function
-//
-// R-UN: iree-opt %s --iree-transform-dialect-interpreter --transform-dialect-drop-schedule | \
-// R-UN: iree-compile --iree-hal-target-backends=llvm-cpu
-
 !a_tensor_t = tensor<1234x567xf32>
 !b_tensor_t = tensor<567x890xf32>
 !c_tensor_t = tensor<1234x890xf32>
@@ -57,14 +50,15 @@ func.func @matmul(%arg0: !a_tensor_t, %arg2: !c_tensor_t) -> !c_tensor_t {
 
 // CHECK-LABEL: func.func @matmul_dispatch_4
 //       CHECK:   tensor.unpack
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %matmul = transform.structured.match interface{LinalgOp} in %module_op
+      : (!transform.any_op) -> (!transform.any_op)
 
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %matmul = transform.structured.match interface{LinalgOp} in %module_op
-    : (!transform.any_op) -> (!transform.any_op)
-
-  transform.structured.pack_greedily %matmul
-      matmul_packed_sizes = [8, 16, 32] 
-      matmul_inner_dims_order = [0, 1, 2]
-    : (!transform.any_op) -> !transform.op<"linalg.generic">
-}
+    transform.structured.pack_greedily %matmul
+        matmul_packed_sizes = [8, 16, 32]
+        matmul_inner_dims_order = [0, 1, 2]
+      : (!transform.any_op) -> !transform.op<"linalg.generic">
+    transform.yield 
+  }
+} // module

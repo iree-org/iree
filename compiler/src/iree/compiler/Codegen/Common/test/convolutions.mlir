@@ -1,4 +1,8 @@
-// RUN: iree-opt %s --iree-transform-dialect-interpreter='transform-file-name=%p/convolution_match_spec.mlir' --split-input-file --verify-diagnostics
+// RUN: iree-opt %s \
+// RUN: --iree-codegen-transform-dialect-library=%p/convolution_match_spec.mlir \
+// RUN: --iree-transform-dialect-interpreter \
+// RUN: --split-input-file --verify-diagnostics
+
 
 !input_tensor_t = tensor<2x16x130x130xf32>
 !weight_tensor_t = tensor<32x16x3x3xf32>

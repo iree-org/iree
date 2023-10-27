@@ -67,7 +67,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // CHECK-LABEL: func @matmul_1
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 // CHECK: transform.iree.match_callback failures(propagate) "matmul"
 // CHECK: transform.structured.tile_using_forall %{{.*}} tile_sizes [128, 128](mapping = [#gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.structured.fuse_into_containing_op
@@ -127,7 +127,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // WITH_OPTIONS-LABEL: func @matmul_1
 
-// WITH_OPTIONS: transform.sequence  failures(propagate) {
+// WITH_OPTIONS: transform.named_sequence
 // WITH_OPTIONS: transform.iree.match_callback failures(propagate) "matmul"
 // Tile sizes are set by td-matmul-strategy-blk-size-XX.
 // WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}} tile_sizes [256, 64](mapping = [#gpu.block<y>, #gpu.block<x>])
@@ -233,7 +233,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // CHECK-LABEL: func @matmul_2
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 // CHECK: transform.iree.match_callback failures(propagate) "matmul"
 // CHECK: transform.structured.tile_using_forall %{{.*}} tile_sizes [128, 128](mapping = [#gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.iree.populate_workgroup_count_region_using_num_threads_slice
@@ -287,7 +287,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // CHECK-LABEL: func @matmul_3
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 
 // WITH_OPTIONS_2-LABEL: func @matmul_3
 
@@ -335,10 +335,10 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
 // CHECK:      transform.iree.apply_cse
-// CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
+// CHECK:      %[[RES_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
-// CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
-// CHECK:      %[[RHS_PAD:.+]] = get_producer_of_operand %{{.*}}[1]
+// CHECK:      %[[LHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[0]
+// CHECK:      %[[RHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[1]
 // CHECK:      %[[TILED_LHS:.+]], %{{.*}} = transform.structured.tile_using_forall %[[LHS_PAD]]   num_threads [32, 4](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:      transform.structured.match ops{["scf.if"]}
 // CHECK:      transform.scf.take_assumed_branch %{{.*}} take_else_branch
@@ -409,10 +409,10 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
 // CHECK:      transform.iree.apply_cse
-// CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
+// CHECK:      %[[RES_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
-// CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
-// CHECK:      %[[RHS_PAD:.+]] = get_producer_of_operand %{{.*}}[1]
+// CHECK:      %[[LHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[0]
+// CHECK:      %[[RHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[1]
 // CHECK:      %[[LHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[LHS_PAD]]
 // CHECK:      %[[RHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS_PAD]]
 // CHECK:      transform.structured.tile_using_forall %[[LHS_COPY]]   num_threads [32, 4](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
@@ -427,7 +427,8 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // Verify we don't go down the path without the flag.
 // WITH_OPTIONS-LABEL: func @aligned_matmul
 
-// WITH_OPTIONS-NOT: transform.sequence  failures(propagate) {
+// WITH_OPTIONS-NOT: transform.sequence
+// WITH_OPTIONS-NOT: transform.named_sequence
 
 // WITH_OPTIONS_2-LABEL: func @aligned_matmul
 
@@ -472,7 +473,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // WITH_OPTIONS_3-LABEL: func @matmul_5_small
 
 // SMALL-LABEL: func @matmul_5_small
-// SMALL: transform.sequence
+// SMALL: transform.named_sequence
 // SMALL-NOT: mma
 // SMALL-NOT: wmma
 
@@ -507,6 +508,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
 // CHECK-LABEL: func @f16_matmul
 // CHECK-NOT: transform.sequence
+// CHECK-NOT: transform.named_sequence
 
 // WITH_OPTIONS_2-LABEL: func @f16_matmul
 
@@ -542,18 +544,22 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 }
 
 // SMALL-LABEL: func @int8_matmul
-// SMALL: transform.sequence
+// SMALL: transform.named_sequence
 // SMALL-NOT: mma
 // SMALL-NOT: wmma
 
 // CHECK-LABEL: func @int8_matmul
 // CHECK-NOT: transform.sequence
+// CHECK-NOT: transform.named_sequence
 
 // WITH_OPTIONS-LABEL: func @int8_matmul
 // WITH_OPTIONS-NOT: transform.sequence
+// WITH_OPTIONS-NOT: transform.named_sequence
 
 // WITH_OPTIONS_2-LABEL: func @int8_matmul
 // WITH_OPTIONS_2-NOT: transform.sequence
+// WITH_OPTIONS_2-NOT: transform.named_sequence
 
 // WITH_OPTIONS_3-LABEL: func @int8_matmul
 // WITH_OPTIONS_3-NOT: transform.sequence
+// WITH_OPTIONS_3-NOT: transform.named_sequence

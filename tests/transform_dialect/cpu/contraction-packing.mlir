@@ -136,16 +136,19 @@ func.func @matmul_nnt(%arg0: !a_tensor_t, %arg2: !ct_tensor_t) -> !ct_tensor_t {
   return %0 : !ct_tensor_t
 }
 
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %matmul = transform.structured.match interface{LinalgOp} in %module_op
-    : (!transform.any_op) -> (!transform.any_op)
-  
-  // Generalized packing rewrite extracts a gemm from any linalg op that contains 
-  // one. This acts as a powerful normalization step: after this point, we have a
-  // gemm (i.e. 3-D contraction with (m,n,k)=(8,16,32) ) on the 3 most minor
-  // dimensions.
-  transform.structured.pack_greedily %matmul
-      matmul_packed_sizes = [8, 16, 32] matmul_inner_dims_order = [0, 1, 2]
-    : (!transform.any_op) -> !transform.op<"linalg.generic">
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %matmul = transform.structured.match interface{LinalgOp} in %module_op
+      : (!transform.any_op) -> (!transform.any_op)
+    
+    // Generalized packing rewrite extracts a gemm from any linalg op that contains 
+    // one. This acts as a powerful normalization step: after this point, we have a
+    // gemm (i.e. 3-D contraction with (m,n,k)=(8,16,32) ) on the 3 most minor
+    // dimensions.
+    transform.structured.pack_greedily %matmul
+        matmul_packed_sizes = [8, 16, 32] matmul_inner_dims_order = [0, 1, 2]
+      : (!transform.any_op) -> !transform.op<"linalg.generic">
+    transform.yield 
+  }
+} // module
+

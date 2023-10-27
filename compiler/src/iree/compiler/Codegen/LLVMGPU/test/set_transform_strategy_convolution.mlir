@@ -29,10 +29,10 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // CHECK-LABEL: func @nchw_convolution
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 // CHECK: transform.iree.match_callback failures(propagate) "convolution"
 // CHECK: transform.structured.convert_conv2d_to_img2col
-// CHECK: get_producer_of_operand %{{.*}}[0]
+// CHECK: transform.get_producer_of_operand %{{.*}}[0]
 // CHECK: transform.apply_patterns.iree.bubble_collapse
 // CHECK: transform.structured.tile_using_forall %{{.*}}   tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.structured.fuse_into_containing_op
@@ -44,10 +44,10 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK: transform.structured.fuse_into_containing_op
 // CHECK: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [1, 0, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: transform.structured.match ops{["linalg.fill"]}
-// CHECK: %[[RES:.+]] = get_producer_of_operand %{{.*}}[2]
+// CHECK: %[[RES:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RES]]
-// CHECK: %[[LHS:.+]] = get_producer_of_operand %{{.*}}[0]
-// CHECK: %[[RHS:.+]] = get_producer_of_operand %{{.*}}[1]
+// CHECK: %[[LHS:.+]] = transform.get_producer_of_operand %{{.*}}[0]
+// CHECK: %[[RHS:.+]] = transform.get_producer_of_operand %{{.*}}[1]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[LHS]]
 // CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [32, 4](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK: transform.structured.tile_using_forall %[[RHS]]   num_threads [1, 4, 32](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
@@ -100,13 +100,13 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // CHECK-LABEL: func @nhwc_convolution
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 // CHECK: transform.structured.tile_using_forall %{{.*}}   tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [0, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
-// CHECK: %[[RES:.+]] = get_producer_of_operand %{{.*}}[2]
+// CHECK: %[[RES:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RES]]
-// CHECK: %[[LHS:.+]] = get_producer_of_operand %{{.*}}[0]
-// CHECK: %[[RHS:.+]] = get_producer_of_operand %{{.*}}[1]
+// CHECK: %[[LHS:.+]] = transform.get_producer_of_operand %{{.*}}[0]
+// CHECK: %[[RHS:.+]] = transform.get_producer_of_operand %{{.*}}[1]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RHS]]
 // CHECK: transform.structured.tile_using_forall %[[LHS]]   num_threads [1, 32, 4](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 32](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
@@ -148,4 +148,4 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK-LABEL: func @unaligned_convolution
 
 // Currently padding on the img2col op is not supported so bail out for unaligned.
-// CHECK-NOT: transform.sequence
+// CHECK-NOT: transform.named_sequence

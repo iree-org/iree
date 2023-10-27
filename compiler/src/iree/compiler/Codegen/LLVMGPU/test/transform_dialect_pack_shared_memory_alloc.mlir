@@ -25,9 +25,11 @@ func.func @shared_memory_disjoint() {
   return
 }
 
-transform.sequence failures(propagate) {
-^bb1(%arg1: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%arg1: !transform.any_op {transform.readonly}) {
   %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
   transform.iree.pack_shared_memory_alloc %0 : (!transform.any_op) -> ()
   transform.iree.apply_cse %0 : !transform.any_op
-}
+    transform.yield
+  } // @__transform_main
+} // module
