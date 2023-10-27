@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
+
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -80,14 +82,34 @@ struct CanonicalizeForOpInductionVarShape final
     return Value();
   }
 
-  void transferBody(Block *source, Block *dest, ArrayRef<Value> results,
-                    PatternRewriter &rewriter) const {
+  SmallVector<Value> transferBody(Block *source, Block *dest,
+                                  ArrayRef<Value> results,
+                                  PatternRewriter &rewriter) const {
+    // Collect the old block arguments before merging.
+    SmallVector<int64_t> maybeBlockArgNum;
+    for (auto res : results) {
+      if (auto blockArg = dyn_cast<BlockArgument>(res)) {
+        maybeBlockArgNum.push_back(blockArg.getArgNumber());
+      } else {
+        maybeBlockArgNum.push_back(-1);
+      }
+    }
     // Move all operations to the destination block.
     rewriter.mergeBlocks(source, dest, dest->getArguments());
     // Replace the yield op by one that returns only the used values.
     auto yieldOp = cast<scf::YieldOp>(dest->getTerminator());
+    // Create a new result set with the updated block arguments.
+    SmallVector<Value> newResults;
+    for (auto [index, argNum] : llvm::enumerate(maybeBlockArgNum)) {
+      if (argNum >= 0) {
+        newResults.push_back(dest->getArgument(argNum));
+      } else {
+        newResults.push_back(results[index]);
+      }
+    }
     rewriter.updateRootInPlace(
-        yieldOp, [&]() { yieldOp.getOperation()->setOperands(results); });
+        yieldOp, [&]() { yieldOp.getOperation()->setOperands(newResults); });
+    return newResults;
   }
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
@@ -106,6 +128,10 @@ struct CanonicalizeForOpInductionVarShape final
         continue;
       }
       Operation *returnValDef = returnValues[index].getDefiningOp();
+      // Currently we don't track usage through block arguments.
+      if (!returnValDef) {
+        continue;
+      }
       Value newReturn = FoldCarryDep(forOp, op, returnValDef);
       if (!newReturn)
         continue;
@@ -122,14 +148,15 @@ struct CanonicalizeForOpInductionVarShape final
     auto newLoop = rewriter.create<scf::ForOp>(
         forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
         forOp.getStep(), initArgs);
-    transferBody(forOp.getBody(), newLoop.getBody(), returnValues, rewriter);
+    SmallVector<Value> newReturnVals = transferBody(
+        forOp.getBody(), newLoop.getBody(), returnValues, rewriter);
 
     // Replace the operation by the new one.
     SmallVector<Value, 8> repResults(newLoop.getResults().begin(),
                                      newLoop.getResults().end());
     for (auto [index, iter] : llvm::enumerate(iteratorFolded)) {
       IRMapping mapping;
-      mapping.map(returnValues[iter], newLoop.getResult(iter));
+      mapping.map(newReturnVals[iter], newLoop.getResult(iter));
       repResults[index] =
           rewriter.clone(*resultOps[index], mapping)->getResult(0);
       Operation *oldOp =
@@ -143,35 +170,58 @@ struct CanonicalizeForOpInductionVarShape final
   }
 };
 
-/// An ad-hoc pattern to convert scf.for loop-carried values from
-/// `vector<8xf16>` to `vector<4xf32>` by inserting `vector.bitcast` around
-/// scf.for boundaries.
+/// An ad-hoc pattern to convert scf.for loop-carried values of < 128 total
+/// bits, but more than 4 elements. For example, insert `vector.bitcasts` to
+/// cast `vector<8xf16>` to `vector<4xf32>`. To handle `vector<2x4xf16>` and
+/// `vector<1x8xf16>`, shape casts are inserted to before the bitcast to align
+/// the ranks
 ///
 /// Those loop-carried values will be lowered into SPIR-V local variables. This
-/// pattern allows packing f16 values into f32 variables tightly so that we can
-/// generate shader conformant SPIR-V.
+/// pattern allows packing i4/i8/f16 values into i32 variables tightly so that
+/// we can generate shader conformant SPIR-V.
 struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
   using OpRewritePattern<scf::ForOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
-    VectorType v8f16Type = VectorType::get({8}, rewriter.getF16Type());
-    VectorType v4f32Type = VectorType::get({4}, rewriter.getF32Type());
-
     SmallVector<unsigned, 8> ivIndices;
+    SmallVector<VectorType, 8> ivTypes;
+    SmallVector<VectorType, 8> castTypes;
+    SmallVector<VectorType, 8> targetTypes;
     for (auto [index, iterArg] : llvm::enumerate(forOp.getRegionIterArgs())) {
-      if (iterArg.getType() == v8f16Type)
+      VectorType iterType = dyn_cast<VectorType>(iterArg.getType());
+      if (!iterType || iterType.getRank() == 0) {
+        continue;
+      }
+      auto shape = iterType.getShape();
+      auto numElements = std::accumulate(shape.begin(), shape.end(), 1,
+                                         std::multiplies<int64_t>());
+      int64_t bitWidth = iterType.getElementType().getIntOrFloatBitWidth();
+      int64_t totalBits = numElements * bitWidth;
+      if (numElements > 4 && totalBits <= 128 &&
+          llvm::isPowerOf2_64(totalBits)) {
         ivIndices.push_back(index);
+        ivTypes.push_back(iterType);
+        castTypes.push_back(
+            VectorType::get({numElements}, iterType.getElementType()));
+        targetTypes.push_back(
+            VectorType::get({totalBits / 32 + (totalBits % 32 != 0)},
+                            rewriter.getIntegerType(std::min(
+                                static_cast<int64_t>(32), totalBits))));
+      }
     }
     if (ivIndices.empty())
       return failure();
 
-    // Bit cast all init values from v8f16 to v4f32.
+    // Bit cast all init values to the smaller vector (fewer elements).
     auto ivInitValues = llvm::to_vector<8>(forOp.getInitArgs());
-    for (unsigned index : ivIndices) {
+    for (auto [index, castType, targetType] :
+         llvm::zip_equal(ivIndices, castTypes, targetTypes)) {
       Value oldValue = ivInitValues[index];
+      Value shapeCast = rewriter.create<vector::ShapeCastOp>(
+          oldValue.getLoc(), castType, oldValue);
       ivInitValues[index] = rewriter.create<vector::BitCastOp>(
-          oldValue.getLoc(), v4f32Type, oldValue);
+          oldValue.getLoc(), targetType, shapeCast);
     }
 
     // Create a new loop with the casted init values. This also creates
@@ -187,15 +237,18 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
 
     // Bit cast induction variables back to the original type to fix uses.
     rewriter.setInsertionPointToStart(newLoop.getBody());
-    for (unsigned index : ivIndices) {
+    for (auto [index, castType, origType] :
+         llvm::zip_equal(ivIndices, castTypes, ivTypes)) {
       Value newIv = newLoop.getRegionIterArgs()[index];
       auto bitcastOp =
-          rewriter.create<vector::BitCastOp>(newIv.getLoc(), v8f16Type, newIv);
+          rewriter.create<vector::BitCastOp>(newIv.getLoc(), castType, newIv);
+      auto shapeCastOp = rewriter.create<vector::ShapeCastOp>(
+          newIv.getLoc(), origType, bitcastOp);
       // Replace all uses of the new induction variable with a bitcast. We need
       // to exclude the bitcast op itself given it also uses the induction
       // variable.
-      SmallPtrSet<Operation *, 1> exceptions{bitcastOp};
-      newIv.replaceAllUsesExcept(bitcastOp, exceptions);
+      SmallPtrSet<Operation *, 2> exceptions{bitcastOp};
+      newIv.replaceAllUsesExcept(shapeCastOp, exceptions);
     }
 
     auto yieldOp = cast<scf::YieldOp>(newLoop.getBody()->getTerminator());
@@ -203,10 +256,13 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
 
     // Bit cast return values to the new type to fix yield.
     rewriter.setInsertionPoint(yieldOp);
-    for (unsigned index : ivIndices) {
+    for (auto [index, castType, targetType] :
+         llvm::zip_equal(ivIndices, castTypes, targetTypes)) {
       Value oldRet = ivRetValues[index];
+      Value shapeCast = rewriter.create<vector::ShapeCastOp>(oldRet.getLoc(),
+                                                             castType, oldRet);
       ivRetValues[index] = rewriter.create<vector::BitCastOp>(
-          oldRet.getLoc(), v4f32Type, oldRet);
+          oldRet.getLoc(), targetType, shapeCast);
     }
     yieldOp->setOperands(ivRetValues);
 
@@ -216,10 +272,13 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
 
     // Bit cast return values to the old type to fix for op uses.
     rewriter.setInsertionPointAfter(newLoop);
-    for (unsigned index : ivIndices) {
+    for (auto [index, castType, origType] :
+         llvm::zip_equal(ivIndices, castTypes, ivTypes)) {
       Value oldRet = forRetValues[index];
-      forRetValues[index] = rewriter.create<vector::BitCastOp>(
-          oldRet.getLoc(), v8f16Type, oldRet);
+      Value bitCast =
+          rewriter.create<vector::BitCastOp>(oldRet.getLoc(), castType, oldRet);
+      forRetValues[index] = rewriter.create<vector::ShapeCastOp>(
+          oldRet.getLoc(), origType, bitCast);
     }
 
     rewriter.replaceOp(forOp, forRetValues);
@@ -235,10 +294,17 @@ struct ForOpCanonicalizationPass
 
   void runOnOperation() override {
     func::FuncOp fn = getOperation();
-    RewritePatternSet patterns(&getContext());
-    patterns.insert<CanonicalizeForOpInductionVarShape,
-                    PackForOpInductionVarVector>(fn.getContext());
-    if (failed(applyPatternsAndFoldGreedily(fn, std::move(patterns)))) {
+    // These patterns collide so we apply them one after another. The
+    // canonicalization pattern will be blocked by the packing pattern
+    // so we apply that first.
+    RewritePatternSet canonPatterns(&getContext());
+    canonPatterns.insert<CanonicalizeForOpInductionVarShape>(fn.getContext());
+    if (failed(applyPatternsAndFoldGreedily(fn, std::move(canonPatterns)))) {
+      return signalPassFailure();
+    }
+    RewritePatternSet packPatterns(&getContext());
+    packPatterns.insert<PackForOpInductionVarVector>(fn.getContext());
+    if (failed(applyPatternsAndFoldGreedily(fn, std::move(packPatterns)))) {
       return signalPassFailure();
     }
   }
