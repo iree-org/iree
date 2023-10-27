@@ -183,6 +183,61 @@ struct ConvertTensorFromElementsPattern
   }
 };
 
+/// Returns a sizes array with the dynamic dims.
+static SmallVector<Value> getDynamicTensorSizes(OpBuilder &builder,
+                                                Location loc,
+                                                RankedTensorType type,
+                                                Value tensor) {
+  SmallVector<Value> sizes;
+  for (const auto [idx, size] : enumerate(type.getShape())) {
+    if (type.isDynamicDim(idx)) {
+      Value dim = builder.create<tensor::DimOp>(loc, tensor, idx);
+      sizes.push_back(dim);
+    }
+  }
+  return sizes;
+}
+
+/// Convert tensor.reshape ops into flow.tensor.reshape ops where possible.
+struct ConvertTensorDialectReshapeOpPattern
+    : public OpRewritePattern<tensor::ReshapeOp> {
+  using OpRewritePattern<tensor::ReshapeOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::ReshapeOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    auto loc = op.getLoc();
+    Value input = op.getSource();
+    auto inputType = dyn_cast<RankedTensorType>(input.getType());
+    auto shapeOperandType = dyn_cast<ShapedType>(op.getShape().getType());
+    auto resultType = dyn_cast<ShapedType>(op.getResult().getType());
+
+    if (!inputType) {
+      return rewriter.notifyMatchFailure(op, "not ranked shaped types");
+    }
+
+    SmallVector<Value> srcSizes;
+    srcSizes = getDynamicTensorSizes(rewriter, loc, inputType, input);
+
+    // flow.reshape only takes dynamic dims for the result, source dims
+    // (ignore static dimensions)
+    SmallVector<Value> destSizes;
+    for (int i = 0; i < shapeOperandType.getShape()[0]; i++) {
+      Value idx = rewriter.create<arith::ConstantIndexOp>(loc, i);
+      Value element = rewriter.create<tensor::ExtractOp>(loc, op.getShape(),
+                                                         ValueRange({idx}));
+      if (ShapedType::isDynamic(resultType.getShape()[i])) {
+        destSizes.push_back(element);
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, resultType, input, srcSizes, destSizes);
+    return success();
+  }
+};
+
 /// Converts linalg.tensor_reshape operations into flow.tensor.reshape
 /// operations.
 template <typename TensorReshapeOp>
@@ -248,6 +303,7 @@ void populateTensorToFlowConversionPatterns(MLIRContext *context,
               ConvertTensorCastPattern, ConvertTensorExtractPattern,
               ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
               ConvertTensorInsertPattern, ConvertTensorFromElementsPattern,
+              ConvertTensorDialectReshapeOpPattern,
               ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
               ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
