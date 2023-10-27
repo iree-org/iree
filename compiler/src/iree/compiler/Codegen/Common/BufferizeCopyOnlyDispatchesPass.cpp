@@ -89,6 +89,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
 
   // Apply the bufferization passes.
   OpPassManager bufferizationPipeline(module.getOperationName());
+  OpPassManager &nestedFuncPM = bufferizationPipeline.nest<func::FuncOp>();
   // The copy-only dispatch shouldnt need an allocation. Error out on
   // allocation.
   bufferization::BufferizationOptions::AllocationFn allocationFn =
@@ -104,8 +105,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     return success();
   };
 
-  addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(nestedFuncPM, allocationFn, memcpyFn);
   if (failed(runPipeline(bufferizationPipeline, module))) {
     return signalPassFailure();
   }

@@ -167,7 +167,7 @@ def ReplaceSlowMinMaxOps
 }
 
 def EliminateEmptyTensors :
-    Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
+    Pass<"iree-eliminate-empty-tensors", "func::FuncOp"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
   let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
 }
@@ -296,7 +296,7 @@ def HoistStaticallyBoundAllocations :
 }
 
 def IREEComprehensiveBufferize :
-    Pass<"iree-codegen-iree-comprehensive-bufferize", "ModuleOp"> {
+    Pass<"iree-codegen-iree-comprehensive-bufferize", "func::FuncOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
   let constructor = "mlir::iree_compiler::createIREEComprehensiveBufferizePass()";
   let options = [

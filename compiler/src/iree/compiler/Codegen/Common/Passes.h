@@ -101,7 +101,7 @@ createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 
 /// A pass to eliminate tensor.empty ops that could turn into allocations
 /// during bufferization.
-std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createEliminateEmptyTensorsPass();
 
 /// A pass to emulate memref load operations that use narrow integer types
 /// with equivalent operations on supported wide integer types.
@@ -179,7 +179,8 @@ createHoistUnrolledVectorExtractInsertSlicePass();
 /// is specified, the default allocator generates an `std.alloc` instruction
 /// with the allocated MemRefType having no stride map (i.e. default row-major
 /// striding) and default memory space.
-std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
+std::unique_ptr<OperationPass<func::FuncOp>>
+createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);

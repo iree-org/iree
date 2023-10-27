@@ -102,7 +102,8 @@ static void addBufferizePasses(OpPassManager &passManager,
                                BufferizationOptions::AllocationFn fn) {
   BufferizationOptions::AllocationFn allocationFn = fn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
+  auto &nestedFuncPM = passManager.nest<func::FuncOp>();
+  addIREEComprehensiveBufferizePasses(nestedFuncPM, allocationFn, memcpyFn);
 }
 
 //===----------------------------------------------------------------------===//

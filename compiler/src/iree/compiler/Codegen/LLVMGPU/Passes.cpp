@@ -75,7 +75,8 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
+  auto &nestedFuncPM = passManager.nest<func::FuncOp>();
+  addIREEComprehensiveBufferizePasses(nestedFuncPM, allocationFn, memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 }

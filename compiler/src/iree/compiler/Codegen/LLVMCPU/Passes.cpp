@@ -119,7 +119,8 @@ static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = cpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
+  OpPassManager &nestedFuncPM = passManager.nest<func::FuncOp>();
+  addIREEComprehensiveBufferizePasses(nestedFuncPM, allocationFn, memcpyFn);
 }
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
