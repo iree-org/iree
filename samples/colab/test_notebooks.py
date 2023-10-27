@@ -20,6 +20,7 @@ NOTEBOOKS_TO_SKIP = [
     # samples.Dockerfile does not currently include.
     "tflite_text_classification.ipynb",
     # PyTorch notebooks using SHARK-Turbine require Python 3.10+ in Docker.
+    "pytorch_aot_advanced.ipynb",
     "pytorch_aot_simple.ipynb",
     "pytorch_jit.ipynb",
 ]
