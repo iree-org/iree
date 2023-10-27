@@ -76,7 +76,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
         loc, IntegerType::get(builder.getContext(), 64),
         builder.getI64IntegerAttr(offset));
     Value shiftedPtr = builder.create<LLVM::GEPOp>(
-        loc, globalPtr.getType(), globalOp.getGlobalType(), globalPtr,
+        loc, globalPtr.getType(), global.getGlobalType(), globalPtr,
         ValueRange({zero, offsetValue}));
     addressOfOp.replaceAllUsesWith(shiftedPtr);
     addressOfOp.erase();
