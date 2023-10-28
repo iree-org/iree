@@ -15,6 +15,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -82,16 +83,20 @@ struct CanonicalizeForOpInductionVarShape final
     return Value();
   }
 
+  // Transfer the body of `source` into `dest` and update the terminator of
+  // `dest` to use the specified results. The result list also replaces
+  // any block arguments from `source` with the corresponding block argument
+  // in `dest` and returns the updated result list.
   SmallVector<Value> transferBody(Block *source, Block *dest,
                                   ArrayRef<Value> results,
                                   PatternRewriter &rewriter) const {
     // Collect the old block arguments before merging.
-    SmallVector<int64_t> maybeBlockArgNum;
+    SmallVector<std::optional<int64_t>> maybeBlockArgNum;
     for (auto res : results) {
       if (auto blockArg = dyn_cast<BlockArgument>(res)) {
         maybeBlockArgNum.push_back(blockArg.getArgNumber());
       } else {
-        maybeBlockArgNum.push_back(-1);
+        maybeBlockArgNum.push_back(std::nullopt);
       }
     }
     // Move all operations to the destination block.
@@ -101,8 +106,8 @@ struct CanonicalizeForOpInductionVarShape final
     // Create a new result set with the updated block arguments.
     SmallVector<Value> newResults;
     for (auto [index, argNum] : llvm::enumerate(maybeBlockArgNum)) {
-      if (argNum >= 0) {
-        newResults.push_back(dest->getArgument(argNum));
+      if (argNum) {
+        newResults.push_back(dest->getArgument(*argNum));
       } else {
         newResults.push_back(results[index]);
       }
@@ -171,7 +176,7 @@ struct CanonicalizeForOpInductionVarShape final
 };
 
 /// An ad-hoc pattern to convert scf.for loop-carried values of < 128 total
-/// bits, but more than 4 elements. For example, insert `vector.bitcasts` to
+/// bits, but more than 4 elements. For example, insert `vector.bitcast` ops to
 /// cast `vector<8xf16>` to `vector<4xf32>`. To handle `vector<2x4xf16>` and
 /// `vector<1x8xf16>`, shape casts are inserted to before the bitcast to align
 /// the ranks
@@ -193,21 +198,21 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
       if (!iterType || iterType.getRank() == 0) {
         continue;
       }
-      auto shape = iterType.getShape();
-      auto numElements = std::accumulate(shape.begin(), shape.end(), 1,
-                                         std::multiplies<int64_t>());
+      int64_t numElements = ShapedType::getNumElements(iterType.getShape());
       int64_t bitWidth = iterType.getElementType().getIntOrFloatBitWidth();
       int64_t totalBits = numElements * bitWidth;
       if (numElements > 4 && totalBits <= 128 &&
           llvm::isPowerOf2_64(totalBits)) {
         ivIndices.push_back(index);
         ivTypes.push_back(iterType);
-        castTypes.push_back(
-            VectorType::get({numElements}, iterType.getElementType()));
-        targetTypes.push_back(
-            VectorType::get({totalBits / 32 + (totalBits % 32 != 0)},
-                            rewriter.getIntegerType(std::min(
-                                static_cast<int64_t>(32), totalBits))));
+        auto shapeCastType =
+            VectorType::get({numElements}, iterType.getElementType());
+        castTypes.push_back(shapeCastType);
+        auto targetType =
+            VectorType::get({mlir::ceilDiv(totalBits, 32)},
+                            rewriter.getIntegerType(
+                                std::min(static_cast<int64_t>(32), totalBits)));
+        targetTypes.push_back(targetType);
       }
     }
     if (ivIndices.empty())
