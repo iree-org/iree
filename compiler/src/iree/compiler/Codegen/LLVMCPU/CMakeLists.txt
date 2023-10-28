@@ -61,6 +61,7 @@ iree_cc_library(
     "LLVMCPULowerToUKernels.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUPeel.cpp"
+    "LLVMCPUSelectLoweringStrategy.cpp"
     "LLVMCPUSplitReduction.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTensorPad.cpp"

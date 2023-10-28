@@ -1,8 +1,8 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=1 --iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy |\
 // RUN:   FileCheck %s --check-prefixes=CHECK,DEFAULT
 
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=1 --iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy \
 // RUN: -td-matmul-strategy-blk-sizes=128,64,32,2 \
 // RUN: -td-matmul-strategy-reduc-size=8 \

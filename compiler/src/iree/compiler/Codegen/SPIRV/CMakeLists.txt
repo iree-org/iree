@@ -65,6 +65,7 @@ iree_cc_library(
     "SPIRVInitialVectorLowering.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVMapMemRefStorageClass.cpp"
+    "SPIRVSelectLoweringStrategy.cpp"
     "SPIRVTile.cpp"
     "SPIRVTileAndDistribute.cpp"
     "SPIRVTileAndPromote.cpp"

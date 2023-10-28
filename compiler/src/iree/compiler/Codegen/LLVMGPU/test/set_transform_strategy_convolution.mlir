@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-implicit-gemm-strategy | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" --iree-codegen-llvmgpu-enable-transform-dialect-implicit-gemm-strategy | FileCheck %s
 
 hal.executable @nchw_convolution {
 hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {

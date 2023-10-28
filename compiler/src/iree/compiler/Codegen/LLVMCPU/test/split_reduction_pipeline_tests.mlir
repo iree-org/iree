@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' --iree-llvmcpu-reassociate-fp-reductions=false --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' --iree-llvmcpu-reassociate-fp-reductions=true --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' --iree-llvmcpu-reassociate-fp-reductions=false --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' --iree-llvmcpu-reassociate-fp-reductions=true --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>

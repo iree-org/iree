@@ -654,11 +654,16 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
+void buildSPIRVCodegenStrategyInitializationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVGeneralizeNamedOpsPass());
+  pm.addPass(createSPIRVSelectLoweringStrategyPass());
+}
+
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
+  buildSPIRVCodegenStrategyInitializationPassPipeline(pm);
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
