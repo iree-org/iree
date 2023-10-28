@@ -64,15 +64,6 @@ def SPIRVGeneralizeNamedOps :
   let constructor = "mlir::iree_compiler::createSPIRVGeneralizeNamedOpsPass()";
 }
 
-def SPIRVSelectLoweringStrategy :
-    Pass<"iree-spirv-select-lowering-strategy-pass",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Select the IREE::HAL::DispatchLoweringPassPipeline for lowering"
-                "to SPIR-V";
-  let constructor =
-      "mlir::iree_compiler::createSPIRVSelectLoweringStrategyPass()";
-}
-
 def SPIRVLowerExecutableTarget :
     Pass<"iree-spirv-lower-executable-target-pass",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
@@ -86,6 +77,15 @@ def SPIRVMapMemRefStorageClass :
     Pass<"iree-spirv-map-memref-storage-class", "func::FuncOp"> {
   let summary = "Map MemRef memory spaces to SPIR-V storage classes";
   let constructor = "mlir::iree_compiler::createSPIRVMapMemRefStorageClassPass()";
+}
+
+def SPIRVSelectLoweringStrategy :
+    Pass<"iree-spirv-select-lowering-strategy-pass",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Select the IREE::HAL::DispatchLoweringPassPipeline for lowering"
+                "to SPIR-V";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVSelectLoweringStrategyPass()";
 }
 
 def SPIRVTile : Pass<"iree-spirv-tile", "func::FuncOp"> {

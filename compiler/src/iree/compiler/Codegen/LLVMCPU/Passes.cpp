@@ -751,7 +751,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<LLVM::LLVMFuncOp>(createAddFastMathFlagsPass());
 }
 
-void buildLLVMCPUCodegenStrategyRefinementPassPipeline(
+void buildLLVMCPUCodegenStrategyInitializationPassPipeline(
     OpPassManager &passManager) {
   {
     addCommonTargetExecutablePreprocessingPasses(passManager);
@@ -773,7 +773,7 @@ void buildLLVMCPUCodegenStrategyRefinementPassPipeline(
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
-  buildLLVMCPUCodegenStrategyRefinementPassPipeline(passManager);
+  buildLLVMCPUCodegenStrategyInitializationPassPipeline(passManager);
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);

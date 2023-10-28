@@ -52,7 +52,7 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm);
 
 /// Populates passes needed to preprocess the input variant before lowering
 /// and select lowering strategies.
-void buildSPIRVCodegenStrategyRefinementPassPipeline(OpPassManager &pm);
+void buildSPIRVCodegenStrategyInitializationPassPipeline(OpPassManager &pm);
 
 /// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via
 /// the structured ops path. The pass manager `pm` here operate on the module

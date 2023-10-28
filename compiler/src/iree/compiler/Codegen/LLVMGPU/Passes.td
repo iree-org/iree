@@ -47,15 +47,6 @@ def LLVMGPUCastAddressSpaceFunction :
   let constructor = "mlir::iree_compiler::createLLVMGPUCastAddressSpaceFunction()";
 }
 
-// TODO: Bring the argument in line with the names used elsewhere.
-def LLVMGPUSelectLoweringStrategy :
-    Pass<"iree-llvmgpu-select-lowering-strategy", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
-  let constructor = "mlir::iree_compiler::createLLVMGPUSelectLoweringStrategyPass()";
-}
-
-
-// TODO: Bring the argument in line with the names used elsewhere.
 def LLVMGPULowerExecutableTarget :
     Pass<"iree-llvmgpu-lower-executable-target", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
@@ -66,6 +57,12 @@ def LLVMGPUPackSharedMemoryAlloc :
     Pass<"iree-llvmgpu-pack-shared-memory-alloc", "func::FuncOp"> {
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
   let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
+}
+
+def LLVMGPUSelectLoweringStrategy :
+    Pass<"iree-llvmgpu-select-lowering-strategy", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
+  let constructor = "mlir::iree_compiler::createLLVMGPUSelectLoweringStrategyPass()";
 }
 
 def LLVMGPUTensorCoreVectorization :

@@ -64,16 +64,6 @@ def LLVMCPULinkExecutables :
   let constructor = "mlir::iree_compiler::createLLVMCPULinkExecutablesPass()";
 }
 
-def LLVMCPUSelectLoweringStrategy :
-    Pass<"iree-llvmcpu-select-lowering-strategy",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary =
-      "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
-  let constructor =
-      "mlir::iree_compiler::createLLVMCPUSelectLoweringStrategyPass()";
-}
-
-
 def LLVMCPULowerExecutableTarget :
     Pass<"iree-llvmcpu-lower-executable-target",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
@@ -108,6 +98,15 @@ def LLVMCPUPeel :
   let summary = "Pass to perform peeling on non-distributed loops.";
   let constructor =
       "mlir::iree_compiler::createLLVMCPUPeelPass()";
+}
+
+def LLVMCPUSelectLoweringStrategy :
+    Pass<"iree-llvmcpu-select-lowering-strategy",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUSelectLoweringStrategyPass()";
 }
 
 def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp"> {
