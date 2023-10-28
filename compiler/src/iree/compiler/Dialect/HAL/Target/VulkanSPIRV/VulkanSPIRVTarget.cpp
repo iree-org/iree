@@ -64,12 +64,12 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(false));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.targetEnvs = std::vector<std::string>(
+  targetOptions.targetEnvs = SmallVector<std::string>(
       clVulkanTargetEnvs.begin(), clVulkanTargetEnvs.end());
-  targetOptions.targetTriples = std::vector<std::string>(
+  targetOptions.targetTriples = SmallVector<std::string>(
       clVulkanTargetTriples.begin(), clVulkanTargetTriples.end());
 
-  std::vector<bool> isEnv;
+  SmallVector<bool> isEnv;
   int tripleCount = clVulkanTargetTriples.getNumOccurrences();
   int envCount = clVulkanTargetEnvs.getNumOccurrences();
   int tripleIdx = 0;
@@ -337,16 +337,12 @@ private:
     // Determine the priority for the target environments. If not specified,
     // prioritize target triples over target environments as they are more
     // likely to over-specify requirements.
-    std::vector<bool> isEnvList;
+    SmallVector<bool> isEnvList;
     if (options_.isEnvPriorityOrder) {
       isEnvList = *options_.isEnvPriorityOrder;
     } else {
-      for (int i = 0, e = options_.targetEnvs.size(); i < e; ++i) {
-        isEnvList.push_back(true);
-      }
-      for (int i = 0, e = options_.targetTriples.size(); i < e; ++i) {
-        isEnvList.push_back(false);
-      }
+      isEnvList.append(options_.targetEnvs.size(), true);
+      isEnvList.append(options_.targetTriples.size(), false);
     }
 
     assert((isEnvList.size() ==
