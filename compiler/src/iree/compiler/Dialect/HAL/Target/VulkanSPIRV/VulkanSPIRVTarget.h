@@ -20,13 +20,9 @@ namespace HAL {
 
 // Options controlling the SPIR-V translation.
 struct VulkanSPIRVTargetOptions {
-  // Vulkan target environments as #vk.target_env attribute assembly.
-  llvm::SmallVector<std::string> targetEnvs;
-  // Vulkan target triples.
-  llvm::SmallVector<std::string> targetTriples;
-  // Optional list to indicate how to prioritize the target environments and
-  // triples.
-  std::optional<llvm::SmallVector<bool>> isEnvPriorityOrder = std::nullopt;
+  // Vulkan target environments, either as #vk.target_env attribute assembly
+  // or as a Vulkan target triple.
+  llvm::SmallVector<std::string> targetTriplesAndEnvs;
   // Whether to use indirect bindings for all generated dispatches.
   bool indirectBindings = false;
 };

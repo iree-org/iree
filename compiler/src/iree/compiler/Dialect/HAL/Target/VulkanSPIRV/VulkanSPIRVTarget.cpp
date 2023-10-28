@@ -64,39 +64,32 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(false));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.targetEnvs = SmallVector<std::string>(
-      clVulkanTargetEnvs.begin(), clVulkanTargetEnvs.end());
-  targetOptions.targetTriples = SmallVector<std::string>(
-      clVulkanTargetTriples.begin(), clVulkanTargetTriples.end());
 
-  SmallVector<bool> isEnv;
   int tripleCount = clVulkanTargetTriples.getNumOccurrences();
   int envCount = clVulkanTargetEnvs.getNumOccurrences();
   int tripleIdx = 0;
   int envIdx = 0;
+
+  // Use the relative positions in the argument list to get the flat list of
+  // target environments.
+  SmallVector<std::string> vulkanTargetTriplesAndEnvs;
   for (int i = 0, e = tripleCount + envCount; i < e; ++i) {
     if (tripleIdx >= tripleCount) {
-      isEnv.push_back(true);
-      envIdx++;
+      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetEnvs[envIdx++]);
       continue;
     }
     if (envIdx >= envCount) {
-      isEnv.push_back(false);
-      tripleIdx++;
+      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetTriples[tripleIdx++]);
       continue;
     }
-
-    // Use the relative positions in the argument list to infer priority.
     if (clVulkanTargetTriples.getPosition(tripleIdx) >
         clVulkanTargetEnvs.getPosition(envIdx)) {
-      isEnv.push_back(true);
-      envIdx++;
+      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetEnvs[envIdx++]);
     } else {
-      isEnv.push_back(false);
-      tripleIdx++;
+      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetTriples[tripleIdx++]);
     }
   }
-  targetOptions.isEnvPriorityOrder = isEnv;
+  targetOptions.targetTriplesAndEnvs = vulkanTargetTriplesAndEnvs;
 
   targetOptions.indirectBindings = clVulkanIndirectBindings;
 
@@ -105,27 +98,23 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
 
 // Returns the Vulkan target environment for conversion.
 static spirv::TargetEnvAttr
-getSPIRVTargetEnv(const std::string &vulkanTargetEnv, MLIRContext *context) {
-  if (!vulkanTargetEnv.empty()) {
-    if (auto attr = parseAttribute(vulkanTargetEnv, context)) {
-      if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
-        return convertTargetEnv(vkTargetEnv);
+getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
+                  MLIRContext *context) {
+  if (!vulkanTargetTripleOrEnv.empty()) {
+    if (vulkanTargetTripleOrEnv[0] == '#') {
+      if (auto attr = parseAttribute(vulkanTargetTripleOrEnv, context)) {
+        if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
+          return convertTargetEnv(vkTargetEnv);
+        }
       }
+      emitError(Builder(context).getUnknownLoc())
+          << "cannot parse vulkan target environment as #vk.target_env "
+             "attribute: '"
+          << vulkanTargetTripleOrEnv << "'";
+    } else {
+      return convertTargetEnv(
+          Vulkan::getTargetEnvForTriple(context, vulkanTargetTripleOrEnv));
     }
-    emitError(Builder(context).getUnknownLoc())
-        << "cannot parse vulkan target environment as #vk.target_env "
-           "attribute: '"
-        << vulkanTargetEnv << "'";
-  }
-  return {};
-}
-
-static spirv::TargetEnvAttr
-getSPIRVTargetEnvFromTriple(const std::string &vulkanTargetTriple,
-                            MLIRContext *context) {
-  if (!vulkanTargetTriple.empty()) {
-    return convertTargetEnv(
-        Vulkan::getTargetEnvForTriple(context, vulkanTargetTriple));
   }
   return {};
 }
@@ -334,42 +323,16 @@ private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
 
-    // Determine the priority for the target environments. If not specified,
-    // prioritize target triples over target environments as they are more
-    // likely to over-specify requirements.
-    SmallVector<bool> isEnvList;
-    if (options_.isEnvPriorityOrder) {
-      isEnvList = *options_.isEnvPriorityOrder;
-    } else {
-      isEnvList.append(options_.targetEnvs.size(), true);
-      isEnvList.append(options_.targetTriples.size(), false);
-    }
-
-    assert((isEnvList.size() ==
-            options_.targetEnvs.size() + options_.targetTriples.size()) &&
-           "Mismatch size of priority vector and env + triple count.");
-
-    int tripleIdx = 0;
-    int envIdx = 0;
-    for (bool isEnv : isEnvList) {
-      if (isEnv) {
-        targetAttrs.push_back(getExecutableTarget(
-            context, getSPIRVTargetEnv(options_.targetEnvs[envIdx++], context),
-            options_.indirectBindings));
-      } else {
-        targetAttrs.push_back(getExecutableTarget(
-            context,
-            getSPIRVTargetEnvFromTriple(options_.targetTriples[tripleIdx++],
-                                        context),
-            options_.indirectBindings));
-      }
+    for (std::string targetTripleOrEnv : options_.targetTriplesAndEnvs) {
+      targetAttrs.push_back(getExecutableTarget(
+          context, getSPIRVTargetEnv(targetTripleOrEnv, context),
+          options_.indirectBindings));
     }
 
     // If no environment specified, populate with a minimal target.
     if (targetAttrs.empty()) {
       targetAttrs.push_back(getExecutableTarget(
-          context,
-          getSPIRVTargetEnvFromTriple("unknown-unknown-unknown", context),
+          context, getSPIRVTargetEnv("unknown-unknown-unknown", context),
           options_.indirectBindings));
     }
     return ArrayAttr::get(context, targetAttrs);
