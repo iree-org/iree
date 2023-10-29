@@ -8,7 +8,6 @@
 #define IREE_COMPILER_DIALECT_HAL_TARGET_VULKANSPIRV_VULKANSPIRVTARGET_H_
 
 #include <functional>
-#include <optional>
 #include <string>
 
 #include "llvm/ADT/SmallVector.h"
