@@ -70,8 +70,8 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   int tripleIdx = 0;
   int envIdx = 0;
 
-  // Use the relative positions in the argument list to get the flat list of
-  // target environments.
+  // Get a flat list of target triples and environments following the original
+  // order specified via the command line.
   SmallVector<std::string> vulkanTargetTriplesAndEnvs;
   for (int i = 0, e = tripleCount + envCount; i < e; ++i) {
     if (tripleIdx >= tripleCount) {
@@ -101,20 +101,20 @@ static spirv::TargetEnvAttr
 getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
                   MLIRContext *context) {
   if (!vulkanTargetTripleOrEnv.empty()) {
-    if (vulkanTargetTripleOrEnv[0] == '#') {
-      if (auto attr = parseAttribute(vulkanTargetTripleOrEnv, context)) {
-        if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
-          return convertTargetEnv(vkTargetEnv);
-        }
-      }
-      emitError(Builder(context).getUnknownLoc())
-          << "cannot parse vulkan target environment as #vk.target_env "
-             "attribute: '"
-          << vulkanTargetTripleOrEnv << "'";
-    } else {
+    if (vulkanTargetTripleOrEnv[0] != '#') {
       return convertTargetEnv(
           Vulkan::getTargetEnvForTriple(context, vulkanTargetTripleOrEnv));
     }
+
+    if (auto attr = parseAttribute(vulkanTargetTripleOrEnv, context)) {
+      if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
+        return convertTargetEnv(vkTargetEnv);
+      }
+    }
+    emitError(Builder(context).getUnknownLoc())
+        << "cannot parse vulkan target environment as #vk.target_env "
+           "attribute: '"
+        << vulkanTargetTripleOrEnv << "'";
   }
   return {};
 }
