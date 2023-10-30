@@ -461,14 +461,17 @@ enum {
   IREE_UK_TYPE_OPAQUE_16 = IREE_UK_TYPE_CATEGORY_OPAQUE | 4,
   IREE_UK_TYPE_OPAQUE_32 = IREE_UK_TYPE_CATEGORY_OPAQUE | 5,
   IREE_UK_TYPE_OPAQUE_64 = IREE_UK_TYPE_CATEGORY_OPAQUE | 6,
+  IREE_UK_TYPE_INT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 2,
   IREE_UK_TYPE_INT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 3,
   IREE_UK_TYPE_INT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 4,
   IREE_UK_TYPE_INT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 5,
   IREE_UK_TYPE_INT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 6,
+  IREE_UK_TYPE_SINT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 2,
   IREE_UK_TYPE_SINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 3,
   IREE_UK_TYPE_SINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 4,
   IREE_UK_TYPE_SINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 5,
   IREE_UK_TYPE_SINT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 6,
+  IREE_UK_TYPE_UINT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 2,
   IREE_UK_TYPE_UINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 3,
   IREE_UK_TYPE_UINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 4,
   IREE_UK_TYPE_UINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 5,
@@ -531,7 +534,9 @@ static inline iree_uk_uint8_t iree_uk_integer_type_as_unsigned(
 // The current implementation might return a negative value, but don't rely on
 // that.
 static inline int iree_uk_type_size_log2(iree_uk_type_t t) {
-  return iree_uk_type_bit_count_log2(t) - 3;
+  int bit_count_log2 = iree_uk_type_bit_count_log2(t);
+  IREE_UK_ASSERT(bit_count_log2 >= 3);
+  return bit_count_log2 - 3;
 }
 
 static inline int iree_uk_type_bit_count(iree_uk_type_t t) {
@@ -543,6 +548,21 @@ static inline int iree_uk_type_bit_count(iree_uk_type_t t) {
 // compiler to assume this can't happen.
 static inline int iree_uk_type_size(iree_uk_type_t t) {
   return 1 << iree_uk_type_size_log2(t);
+}
+
+// Helper to correctly convert a bit-size to a byte-size, rounding up if the
+// bit-size is not a multiple of 8.
+static inline iree_uk_index_t iree_uk_bits_to_bytes_rounding_up(
+    iree_uk_index_t bits) {
+  return (bits + 7) / 8;
+}
+
+// Helper to correctly convert a bit-size to a byte-size, asserting that the
+// bit-size is a multiple of 8.
+static inline iree_uk_index_t iree_uk_bits_to_bytes_exact(
+    iree_uk_index_t bits) {
+  IREE_UK_ASSERT(!(bits % 8));
+  return bits / 8;
 }
 
 //===----------------------------------------------------------------------===//

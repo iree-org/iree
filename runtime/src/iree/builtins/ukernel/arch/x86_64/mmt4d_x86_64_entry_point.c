@@ -292,6 +292,10 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
       return iree_uk_mmt4d_select_tile_func_x86_64_bf16bf16bf16(params);
     case iree_uk_mmt4d_type_s8s8s32:
       return iree_uk_mmt4d_select_tile_func_x86_64_i8i8i32(params);
+    case iree_uk_mmt4d_type_s16s16s32:
+      return 0;
+    case iree_uk_mmt4d_type_s16u4s32:
+      return 0;
     default:
       IREE_UK_ASSUME_UNREACHABLE;
       return 0;
