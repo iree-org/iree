@@ -44,14 +44,14 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     yielded with a `return` terminator and returned from this op.
 
     `dispatch.region` ops are lowered to `dispatch.workgroups` ops. Workgroups
-    isolated from above. `dispatch.region` ops are a more lightweight
+    are isolated from above. `dispatch.region` ops are a more lightweight
     abstraction for implementing fusion heuristics, i.e., the process of
     deciding which ops should form a dispatch region.
 
-    This op also has a second region: `workload_count`. The arguments to the
+    This op also has a second region: `workgroup_count`. The arguments to the
     region represent the workload for the dispatch, and returns the number of
     workgroups for the dispatch. The region is lowered directly to
-    `workload_count` region of `dispatch.workgroups`.
+    `workgroup_count` region of `dispatch.workgroups`.
   }];
 
   let arguments = (ins FLOW_ShapeDynamicDims:$result_dims,
@@ -131,8 +131,8 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     block argument of type `!flow.dispatch.tensor`. Furthermore, each argument
     has a corresponding `arguments` operand.
 
-    There are no `arguments` operands for results, but a result can be tied an
-    argument by writing the argument operand's SSA value instead of its type:
+    There are no `arguments` operands for results, but a result can be tied to 
+    an argument by writing the argument operand's SSA value instead of its type:
     E.g., in the above example, `-> %0` would tie the first argument to the
     result. In that case, there would be no separate block argument for the
     result.
@@ -1576,6 +1576,9 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
+
+
+
 
 def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", [
   AttrSizedOperandSegments,
