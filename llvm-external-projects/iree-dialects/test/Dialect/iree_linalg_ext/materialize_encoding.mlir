@@ -338,3 +338,30 @@ func.func @pack_batch_matmul_fill_dynamic(%arg0 : tensor<?x?x?xf32>, %arg1 : ten
 // CHECK-SAME:       outs(%[[FILL]] :
 //      CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[BATCH_MMT4D]]
 //      CHECK:   return %[[UNPACK]]
+
+// -----
+
+func.func @matmul_i32i32.i32(%arg0: tensor<2x4xi32>, %arg1: tensor<4x2xi32>) -> tensor<2x2xi32> {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c0_i32 = arith.constant 0 : i32
+  %padded = tensor.pad %arg0 low[0, 0] high[%c0, %c0] {
+  ^bb0(%arg2: index, %arg3: index):
+    tensor.yield %c0_i32 : i32
+  } : tensor<2x4xi32> to tensor<?x?xi32>
+  %0 = iree_linalg_ext.set_encoding %padded : tensor<?x?xi32> -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i32, i32, i32], original_type = tensor<2x4xi32>>>
+  %padded_0 = tensor.pad %arg1 low[0, 0] high[%c0, %c0] {
+  ^bb0(%arg2: index, %arg3: index):
+    tensor.yield %c0_i32 : i32
+  } : tensor<4x2xi32> to tensor<?x?xi32>
+  %1 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xi32> -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i32, i32, i32], original_type = tensor<4x2xi32>>>
+  %2 = tensor.empty(%c2, %c2) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i32, i32, i32], original_type = tensor<2x2xi32>>>
+  %3 = linalg.fill ins(%c0_i32 : i32) outs(%2 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i32, i32, i32], original_type = tensor<2x2xi32>>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i32, i32, i32], original_type = tensor<2x2xi32>>>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i32, i32, i32], original_type = tensor<2x4xi32>>>, tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i32, i32, i32], original_type = tensor<4x2xi32>>>) outs(%3 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i32, i32, i32], original_type = tensor<2x2xi32>>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i32, i32, i32], original_type = tensor<2x2xi32>>>
+  %5 = iree_linalg_ext.unset_encoding %4 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i32, i32, i32], original_type = tensor<2x2xi32>>> -> tensor<?x?xi32>
+  %extracted_slice = tensor.extract_slice %5[0, 0] [2, 2] [1, 1] : tensor<?x?xi32> to tensor<2x2xi32>
+  return %extracted_slice : tensor<2x2xi32>
+}
+// CHECK: func.func @matmul_i32i32.i32
+// CHECK:   linalg.fill
+// CHECK:   linalg.matmul
