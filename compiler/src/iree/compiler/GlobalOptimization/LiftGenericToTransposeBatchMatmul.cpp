@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -38,6 +39,41 @@ mlir::raw_ostream &operator<<(mlir::raw_ostream &s,
   return s;
 }
 
+bool isCastOfBlockArgument(Operation *op) {
+  return isa<CastOpInterface>(op) && op->getNumOperands() == 1 &&
+         isa<BlockArgument>(op->getOperand(0));
+}
+
+bool isCastOrInputBlockArgument(Value input, int64_t numInputs) {
+  if (!input.isa<BlockArgument>()) {
+    Operation *castOp0 = input.getDefiningOp();
+    if (!castOp0 || !isCastOfBlockArgument(castOp0)) {
+      return false;
+    }
+    return castOp0->getOperand(0).cast<BlockArgument>().getArgNumber() !=
+           numInputs;
+  } else {
+    return input.cast<BlockArgument>().getArgNumber() != numInputs;
+  }
+}
+
+// Returns true if the linalg::GenericOp has a body like a matmul. This
+// does not check the indexing maps
+//
+// This function looks for a body like:
+// ```mlir
+// ^bb0(%in: !lhs, %in_0: !rhs, %out: !out):
+//   %3 = arith.extui %in : !lhs to !out
+//   %4 = arith.extsi %in_0 : !rhs to !out
+//   %5 = arith.muli %3, %4 : !out
+//   %6 = arith.addi %5, %out : !out
+//   linalg.yield %6 : !out
+// ```
+// Ensuring the following conditions:
+//    1) linalg.yield result comes from an arith.add op, accumulating on %out
+//    2) The other arith.add operand comes from arith.mul
+//    3) Both arith.mul operands are either block input arguments, or produced
+//       by a `CastOpInterface` of a block input argument
 static bool hasMatmulBody(linalg::GenericOp genericOp) {
   int numInputs = genericOp.getNumDpsInputs();
   if (numInputs != 2) {
@@ -55,12 +91,11 @@ static bool hasMatmulBody(linalg::GenericOp genericOp) {
 
   // Check that yielded value is an arith.add op, and is accumulating
   Operation *addOp = yieldedValue.getDefiningOp();
-  if (!addOp || addOp->getNumOperands() != 2) {
-    LLVM_DEBUG(llvm::dbgs() << "no arith.add body op, wrong numOperands\n");
+  if (!addOp) {
+    LLVM_DEBUG(llvm::dbgs() << "linalg.yield operand has no defining op\n");
     return false;
   }
-  if (!matchPattern(addOp, m_Op<arith::AddFOp>()) &&
-      !matchPattern(addOp, m_Op<arith::AddIOp>())) {
+  if (!isa<arith::AddFOp>(*addOp) && !isa<arith::AddIOp>(*addOp)) {
     LLVM_DEBUG(llvm::dbgs() << "no arith.add body op\n");
     return false;
   }
@@ -76,73 +111,26 @@ static bool hasMatmulBody(linalg::GenericOp genericOp) {
   }
 
   // Check that the producer of the add is an arith.mul op
-  Operation *mulOp;
-  if (add0.isa<BlockArgument>()) {
-    mulOp = add1.getDefiningOp();
-  } else {
-    mulOp = add0.getDefiningOp();
-  }
-  if (!mulOp || mulOp->getNumOperands() != 2) {
-    LLVM_DEBUG(llvm::dbgs() << "no arith.mul body op, wrong numOperands\n");
+  Operation *mulOp =
+      add0.isa<BlockArgument>() ? add1.getDefiningOp() : add0.getDefiningOp();
+  if (!mulOp) {
+    LLVM_DEBUG(llvm::dbgs() << "arith.add operand has no defining op\n");
     return false;
   }
-  if (!matchPattern(mulOp, m_Op<arith::MulFOp>()) &&
-      !matchPattern(mulOp, m_Op<arith::MulIOp>())) {
+  if (!isa<arith::MulFOp>(*mulOp) && !isa<arith::MulIOp>(*mulOp)) {
     LLVM_DEBUG(llvm::dbgs() << "no arith.mul body op\n");
     return false;
   }
-  Value mul0 = mulOp->getOperand(0);
-  Value mul1 = mulOp->getOperand(1);
-  if (mul0.isa<BlockArgument>() && mul1.isa<BlockArgument>()) {
-    return true;
-  }
 
   // Check that non block args come from arith.ext ops
-  if (!mul0.isa<BlockArgument>()) {
-    Operation *extOp0 = mul0.getDefiningOp();
-    if (!extOp0 || extOp0->getNumOperands() != 1) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "no arith.ext body op on in0, wrong numOperands\n");
-      return false;
-    }
-    if (!matchPattern(extOp0, m_Op<arith::ExtUIOp>()) &&
-        !matchPattern(extOp0, m_Op<arith::ExtSIOp>()) &&
-        !matchPattern(extOp0, m_Op<arith::ExtFOp>())) {
-      LLVM_DEBUG(llvm::dbgs() << "no arith.ext body op on in0\n");
-      return false;
-    }
-    Value ext0 = extOp0->getOperand(0);
-    if (!ext0 || !ext0.isa<BlockArgument>()) {
-      return false;
-    }
-  }
-  if (!mul1.isa<BlockArgument>()) {
-    Operation *extOp1 = mul1.getDefiningOp();
-    if (!extOp1 || extOp1->getNumOperands() != 1) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "no arith.ext body op on in1, wrong numOperands\n");
-      return false;
-    }
-    if (!matchPattern(extOp1, m_Op<arith::ExtUIOp>()) &&
-        !matchPattern(extOp1, m_Op<arith::ExtSIOp>()) &&
-        !matchPattern(extOp1, m_Op<arith::ExtFOp>())) {
-      LLVM_DEBUG(llvm::dbgs() << "no arith.ext body op on in1\n");
-      return false;
-    }
-    Value ext1 = extOp1->getOperand(0);
-    if (!ext1 || !ext1.isa<BlockArgument>()) {
-      return false;
-    }
+  if (!isCastOrInputBlockArgument(mulOp->getOperand(0), numInputs) ||
+      !isCastOrInputBlockArgument(mulOp->getOperand(1), numInputs)) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "arith.mul operands are not CastOpInterface or BlockArgument\n");
+    return false;
   }
   return true;
-}
-
-static SmallVector<int64_t> getInverseTransposePerm(SmallVector<int64_t> perm) {
-  SmallVector<int64_t> inversePerm(perm);
-  for (auto permIdx : llvm::enumerate(perm)) {
-    inversePerm[permIdx.value()] = permIdx.index();
-  }
-  return inversePerm;
 }
 
 static Value transposeTensor(Location loc, PatternRewriter &rewriter,
@@ -154,43 +142,36 @@ static Value transposeTensor(Location loc, PatternRewriter &rewriter,
                    [](auto idx) { return idx.index() == idx.value(); })) {
     return input;
   }
-  auto inputType = llvm::cast<RankedTensorType>(input.getType());
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  SmallVector<int64_t> newInputShape(inputShape);
-  for (auto permIdx : llvm::enumerate(perm)) {
-    newInputShape[permIdx.index()] = inputShape[permIdx.value()];
-  }
-  Value init = rewriter.create<tensor::EmptyOp>(loc, newInputShape,
+  auto inputType = cast<RankedTensorType>(input.getType());
+  SmallVector<OpFoldResult> inputMixedSizes =
+      tensor::getMixedSizes(rewriter, loc, input);
+  SmallVector<OpFoldResult> newInputMixedSizes =
+      applyPermutation(inputMixedSizes, perm);
+  Value init = rewriter.create<tensor::EmptyOp>(loc, newInputMixedSizes,
                                                 inputType.getElementType());
   return rewriter.create<linalg::TransposeOp>(loc, input, init, perm)
       .getResults()[0];
 }
 
-static FailureOr<Value> extendTensor(Location loc, PatternRewriter &rewriter,
-                                     linalg::GenericOp genericOp,
-                                     int64_t inputIdx, Value input) {
+static FailureOr<Value> castTensor(Location loc, PatternRewriter &rewriter,
+                                   linalg::GenericOp genericOp,
+                                   int64_t inputIdx, Value input) {
   Value output = genericOp.getResults()[0];
-  auto inputType = llvm::cast<RankedTensorType>(input.getType());
-  auto outputType = llvm::cast<RankedTensorType>(output.getType());
+  auto inputType = cast<RankedTensorType>(input.getType());
+  auto outputType = cast<RankedTensorType>(output.getType());
   if (inputType.getElementType() == outputType.getElementType()) {
     return input;
   }
-  auto extendedType =
+  auto castedType =
       RankedTensorType::get(inputType.getShape(), outputType.getElementType());
-  for (auto bodyOp : genericOp.getBody()->getOps<arith::ExtUIOp>()) {
-    Value extInput = bodyOp.getIn();
-    if (extInput.isa<BlockArgument>() &&
-        extInput.cast<BlockArgument>().getArgNumber() == inputIdx) {
-      return rewriter.create<arith::ExtUIOp>(loc, extendedType, input)
-          .getResult();
-    }
-  }
-  for (auto bodyOp : genericOp.getBody()->getOps<arith::ExtSIOp>()) {
-    Value extInput = bodyOp.getIn();
-    if (extInput.isa<BlockArgument>() &&
-        extInput.cast<BlockArgument>().getArgNumber() == inputIdx) {
-      return rewriter.create<arith::ExtSIOp>(loc, extendedType, input)
-          .getResult();
+  for (auto bodyOp : genericOp.getBody()->getOps<CastOpInterface>()) {
+    Value castInput = bodyOp->getOperand(0);
+    if (castInput.isa<BlockArgument>() &&
+        castInput.cast<BlockArgument>().getArgNumber() == inputIdx) {
+      return rewriter
+          .create(bodyOp->getLoc(), bodyOp->getName().getIdentifier(), input,
+                  castedType, bodyOp->getAttrs())
+          ->getResult(0);
     }
   }
   return failure();
@@ -201,10 +182,10 @@ static LogicalResult
 liftGenericOp(PatternRewriter &rewriter, linalg::GenericOp genericOp,
               SmallVector<int64_t> lhsPerm, SmallVector<int64_t> rhsPerm,
               SmallVector<int64_t> outPerm) {
-  assert((std::is_same<OpTy, linalg::BatchVecmatOp>::value ||
-          std::is_same<OpTy, linalg::BatchMatvecOp>::value ||
-          std::is_same<OpTy, linalg::BatchMatmulOp>::value) &&
-         "expected only BatchVecmatOp, BatchMatvecOp, or BatchMatmulOp");
+  static_assert((std::is_same<OpTy, linalg::BatchVecmatOp>::value ||
+                 std::is_same<OpTy, linalg::BatchMatvecOp>::value ||
+                 std::is_same<OpTy, linalg::BatchMatmulOp>::value) &&
+                "expected only BatchVecmatOp, BatchMatvecOp, or BatchMatmulOp");
   LLVM_DEBUG(llvm::dbgs() << "lhsPerm: " << lhsPerm << "\n");
   LLVM_DEBUG(llvm::dbgs() << "rhsPerm: " << rhsPerm << "\n");
   LLVM_DEBUG(llvm::dbgs() << "outPerm: " << outPerm << "\n");
@@ -214,27 +195,23 @@ liftGenericOp(PatternRewriter &rewriter, linalg::GenericOp genericOp,
   Value transposedRhs =
       transposeTensor(loc, rewriter, genericOp.getInputs()[1], rhsPerm);
   FailureOr<Value> extendedLhs =
-      extendTensor(loc, rewriter, genericOp, 0, transposedLhs);
+      castTensor(loc, rewriter, genericOp, 0, transposedLhs);
   FailureOr<Value> extendedRhs =
-      extendTensor(loc, rewriter, genericOp, 1, transposedRhs);
+      castTensor(loc, rewriter, genericOp, 1, transposedRhs);
   if (failed(extendedLhs) || failed(extendedRhs)) {
     return failure();
   }
+  Value genericInit = genericOp.getDpsInitOperand(0)->get();
+  SmallVector<OpFoldResult> genericMixedSizes =
+      tensor::getMixedSizes(rewriter, loc, genericInit);
+  SmallVector<OpFoldResult> batchMixedSizes =
+      applyPermutation(genericMixedSizes, invertPermutationVector(outPerm));
   Value out = genericOp.getResults()[0];
-  auto outType = llvm::cast<RankedTensorType>(out.getType());
-  ArrayRef<int64_t> outputShape = outType.getShape();
-  SmallVector<int64_t> batchInitShape(outputShape);
-  for (auto idx : llvm::enumerate(getInverseTransposePerm(outPerm))) {
-    batchInitShape[idx.index()] = outputShape[idx.value()];
-  }
-  Value batchEmpty = rewriter.create<tensor::EmptyOp>(loc, batchInitShape,
+  auto outType = cast<RankedTensorType>(out.getType());
+  Value batchEmpty = rewriter.create<tensor::EmptyOp>(loc, batchMixedSizes,
                                                       outType.getElementType());
-  Value zero =
-      outType.getElementType().isa<IntegerType>()
-          ? rewriter.create<arith::ConstantOp>(
-                loc, rewriter.getIntegerAttr(outType.getElementType(), 0))
-          : rewriter.create<arith::ConstantOp>(
-                loc, rewriter.getFloatAttr(outType.getElementType(), 0.0));
+  Value zero = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(outType.getElementType()));
   Value batchInit =
       rewriter.create<linalg::FillOp>(loc, zero, batchEmpty).getResult(0);
   OpTy batchOp = rewriter.create<OpTy>(
@@ -261,27 +238,23 @@ raiseToBatchVecmat(PatternRewriter &rewriter, linalg::GenericOp genericOp,
   assert(vecMap.getNumResults() == 2 && matMap.getNumResults() == 3 &&
          outMap.getNumResults() == 2 && "wrong numResults for indexing maps");
 
+  auto getResultIndex = [&](AffineMap map, int64_t dimIndex) {
+    return *(map.getResultPosition(rewriter.getAffineDimExpr(dimIndex)));
+  };
   // Permutation from GenericOp lhs shape to BatchVecmatOp lhs shape
-  SmallVector<int64_t> vecPerm{
-      *(vecMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(vecMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.k[0])))};
+  SmallVector<int64_t> vecPerm;
+  vecPerm.push_back(getResultIndex(vecMap, contractionDims.batch[0]));
+  vecPerm.push_back(getResultIndex(vecMap, contractionDims.k[0]));
   // Permutation from GenericOp rhs shape to BatchVecmatOp rhs shape
-  SmallVector<int64_t> matPerm{
-      *(matMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(matMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.k[0]))),
-      *(matMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.n[0])))};
+  SmallVector<int64_t> matPerm;
+  matPerm.push_back(getResultIndex(matMap, contractionDims.batch[0]));
+  matPerm.push_back(getResultIndex(matMap, contractionDims.k[0]));
+  matPerm.push_back(getResultIndex(matMap, contractionDims.n[0]));
   // Permutation from BatchVecmatOp result shape to GenericOp result shape
-  SmallVector<int64_t> outPerm{
-      *(outMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(outMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.n[0])))};
-  outPerm = getInverseTransposePerm(outPerm);
+  SmallVector<int64_t> outPerm;
+  outPerm.push_back(getResultIndex(outMap, contractionDims.batch[0]));
+  outPerm.push_back(getResultIndex(outMap, contractionDims.n[0]));
+  outPerm = invertPermutationVector(outPerm);
   return liftGenericOp<linalg::BatchVecmatOp>(rewriter, genericOp, vecPerm,
                                               matPerm, outPerm);
 }
@@ -301,27 +274,23 @@ raiseToBatchMatvec(PatternRewriter &rewriter, linalg::GenericOp genericOp,
   assert(vecMap.getNumResults() == 2 && matMap.getNumResults() == 3 &&
          outMap.getNumResults() == 2 && "wrong numResults for indexing maps");
 
-  // Permutation from GenericOp lhs shape to BatchVecmatOp lhs shape
-  SmallVector<int64_t> matPerm{
-      *(matMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(matMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.m[0]))),
-      *(matMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.k[0])))};
-  // Permutation from GenericOp rhs shape to BatchVecmatOp rhs shape
-  SmallVector<int64_t> vecPerm{
-      *(vecMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(vecMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.k[0])))};
-  // Permutation from BatchVecmatOp result shape to GenericOp result shape
-  SmallVector<int64_t> outPerm{
-      *(outMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(outMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.m[0])))};
-  outPerm = getInverseTransposePerm(outPerm);
+  auto getResultIndex = [&](AffineMap map, int64_t dimIndex) {
+    return *(map.getResultPosition(rewriter.getAffineDimExpr(dimIndex)));
+  };
+  // Permutation from GenericOp lhs shape to BatchMatvecOp lhs shape
+  SmallVector<int64_t> matPerm;
+  matPerm.push_back(getResultIndex(matMap, contractionDims.batch[0]));
+  matPerm.push_back(getResultIndex(matMap, contractionDims.m[0]));
+  matPerm.push_back(getResultIndex(matMap, contractionDims.k[0]));
+  // Permutation from GenericOp rhs shape to BatchMatvecOp rhs shape
+  SmallVector<int64_t> vecPerm;
+  vecPerm.push_back(getResultIndex(vecMap, contractionDims.batch[0]));
+  vecPerm.push_back(getResultIndex(vecMap, contractionDims.k[0]));
+  // Permutation from BatchMatvecOp result shape to GenericOp result shape
+  SmallVector<int64_t> outPerm;
+  outPerm.push_back(getResultIndex(outMap, contractionDims.batch[0]));
+  outPerm.push_back(getResultIndex(outMap, contractionDims.m[0]));
+  outPerm = invertPermutationVector(outPerm);
   return liftGenericOp<linalg::BatchMatvecOp>(rewriter, genericOp, matPerm,
                                               vecPerm, outPerm);
 }
@@ -341,31 +310,25 @@ raiseToBatchMatmul(PatternRewriter &rewriter, linalg::GenericOp genericOp,
   assert(lhsMap.getNumResults() == 3 && rhsMap.getNumResults() == 3 &&
          outMap.getNumResults() == 3 && "wrong numResults for indexing maps");
 
-  // Permutation from GenericOp lhs shape to BatchVecmatOp lhs shape
-  SmallVector<int64_t> lhsPerm{
-      *(lhsMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(lhsMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.m[0]))),
-      *(lhsMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.k[0])))};
-  // Permutation from GenericOp rhs shape to BatchVecmatOp rhs shape
-  SmallVector<int64_t> rhsPerm{
-      *(rhsMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(rhsMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.k[0]))),
-      *(rhsMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.n[0])))};
-  // Permutation from BatchVecmatOp result shape to GenericOp result shape
-  SmallVector<int64_t> outPerm{
-      *(outMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
-      *(outMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.m[0]))),
-      *(outMap.getResultPosition(
-          rewriter.getAffineDimExpr(contractionDims.n[0])))};
-  outPerm = getInverseTransposePerm(outPerm);
+  auto getResultIndex = [&](AffineMap map, int64_t dimIndex) {
+    return *(map.getResultPosition(rewriter.getAffineDimExpr(dimIndex)));
+  };
+  // Permutation from GenericOp lhs shape to BatchMatmulOp lhs shape
+  SmallVector<int64_t> lhsPerm;
+  lhsPerm.push_back(getResultIndex(lhsMap, contractionDims.batch[0]));
+  lhsPerm.push_back(getResultIndex(lhsMap, contractionDims.m[0]));
+  lhsPerm.push_back(getResultIndex(lhsMap, contractionDims.k[0]));
+  // Permutation from GenericOp rhs shape to BatchMatmulOp rhs shape
+  SmallVector<int64_t> rhsPerm;
+  rhsPerm.push_back(getResultIndex(rhsMap, contractionDims.batch[0]));
+  rhsPerm.push_back(getResultIndex(rhsMap, contractionDims.k[0]));
+  rhsPerm.push_back(getResultIndex(rhsMap, contractionDims.n[0]));
+  // Permutation from BatchMatmulOp result shape to GenericOp result shape
+  SmallVector<int64_t> outPerm;
+  outPerm.push_back(getResultIndex(outMap, contractionDims.batch[0]));
+  outPerm.push_back(getResultIndex(outMap, contractionDims.m[0]));
+  outPerm.push_back(getResultIndex(outMap, contractionDims.n[0]));
+  outPerm = invertPermutationVector(outPerm);
   return liftGenericOp<linalg::BatchMatmulOp>(rewriter, genericOp, lhsPerm,
                                               rhsPerm, outPerm);
 }
@@ -394,13 +357,13 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "k: " << contractionDims->k << "\n");
 
     auto lhsType =
-        llvm::dyn_cast<RankedTensorType>(genericOp.getInputs()[0].getType());
+        dyn_cast<RankedTensorType>(genericOp.getOperands()[0].getType());
     auto rhsType =
-        llvm::dyn_cast<RankedTensorType>(genericOp.getInputs()[1].getType());
+        dyn_cast<RankedTensorType>(genericOp.getOperands()[1].getType());
     auto outType =
-        llvm::dyn_cast<RankedTensorType>(genericOp.getResults()[0].getType());
+        dyn_cast<RankedTensorType>(genericOp.getResults()[0].getType());
     if (!lhsType || !rhsType || !outType) {
-      LLVM_DEBUG(llvm::dbgs() << "Inputs do not have RankedTensorType\n\n");
+      LLVM_DEBUG(llvm::dbgs() << "Operands do not have RankedTensorType\n\n");
       return failure();
     }
 
