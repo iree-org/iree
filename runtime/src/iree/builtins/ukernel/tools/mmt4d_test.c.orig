@@ -91,7 +91,7 @@ static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
   *out_ptr = acc;
 }
 
-static void iree_mmt4d_reference_innerloop_i8i8i32(
+static void iree_mmt4d_reference_innerloop_s8s8s32(
     int32_t* out_ptr, const int8_t* lhs_ptr, const int8_t* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
   int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
@@ -159,8 +159,8 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
                   (uint16_t*)out_ptr, (const uint16_t*)lhs_ptr,
                   (const uint16_t*)rhs_ptr, params);
               break;
-            case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
-              iree_mmt4d_reference_innerloop_i8i8i32(
+            case IREE_UK_FLAG_MMT4D_TYPE_S8S8S32:
+              iree_mmt4d_reference_innerloop_s8s8s32(
                   (int32_t*)out_ptr, (const int8_t*)lhs_ptr,
                   (const int8_t*)rhs_ptr, params);
               break;
@@ -320,7 +320,7 @@ int main(int argc, char** argv) {
   // to test weird M0, N0, K0 to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 3, 5, 7, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 9, 6, 3, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 9, 6, 3, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 4, 6, 5, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 3, 5, 8, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 11, 4, 1, "");
@@ -332,9 +332,9 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4, "dotprod");
-  iree_uk_test_mmt4d_default_and_intrinsics(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8,
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4, "dotprod");
+  iree_uk_test_mmt4d_default_and_intrinsics(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8,
                                             8, 8, "i8mm");
 #elif defined(IREE_ARCH_X86_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 4, 1, "");  // SSE
@@ -347,10 +347,10 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 16, 16, 1,
                      "avx512_base");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 4, 2, "");  // SSE2
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 2, "avx2_fma");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_base");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_vnni");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 4, 2, "");  // SSE2
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 2, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_vnni");
 #endif  // defined(IREE_ARCH_ARM_64)
 
   return iree_uk_test_exit_status();

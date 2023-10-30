@@ -12,8 +12,8 @@
 typedef enum iree_uk_mmt4d_type_t {
   iree_uk_mmt4d_type_f32f32f32 =
       IREE_UK_TIE_3_TYPES_LITERAL(FLOAT_32, FLOAT_32, FLOAT_32),
-  iree_uk_mmt4d_type_i8i8i32 =
-      IREE_UK_TIE_3_TYPES_LITERAL(INT_8, INT_8, INT_32),
+  iree_uk_mmt4d_type_s8s8s32 =
+      IREE_UK_TIE_3_TYPES_LITERAL(SINT_8, SINT_8, SINT_32),
   iree_uk_mmt4d_type_f16f16f32 =
       IREE_UK_TIE_3_TYPES_LITERAL(FLOAT_16, FLOAT_16, FLOAT_32),
   iree_uk_mmt4d_type_f16f16f16 =
@@ -28,8 +28,8 @@ static inline iree_uk_mmt4d_type_t iree_uk_mmt4d_type(iree_uk_uint32_t flags) {
   switch (flags & IREE_UK_FLAG_MMT4D_TYPE_MASK) {
     case IREE_UK_FLAG_MMT4D_TYPE_F32F32F32:
       return iree_uk_mmt4d_type_f32f32f32;
-    case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
-      return iree_uk_mmt4d_type_i8i8i32;
+    case IREE_UK_FLAG_MMT4D_TYPE_S8S8S32:
+      return iree_uk_mmt4d_type_s8s8s32;
     case IREE_UK_FLAG_MMT4D_TYPE_F16F16F32:
       return iree_uk_mmt4d_type_f16f16f32;
     case IREE_UK_FLAG_MMT4D_TYPE_F16F16F16:

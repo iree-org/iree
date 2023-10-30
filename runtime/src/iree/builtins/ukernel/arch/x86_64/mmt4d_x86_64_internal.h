@@ -9,10 +9,10 @@
 
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_i8i8i32_1x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_i8i8i32_2x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_i8i8i32_4x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_i8i8i32_8x8x2_x86_64_avx2_fma)
+IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s8s8s32_1x8x2_x86_64_avx2_fma)
+IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s8s8s32_2x8x2_x86_64_avx2_fma)
+IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s8s8s32_4x8x2_x86_64_avx2_fma)
+IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s8s8s32_8x8x2_x86_64_avx2_fma)
 IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f32f32f32_1x8x1_x86_64_avx2_fma)
 IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f32f32f32_2x8x1_x86_64_avx2_fma)
 IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f32f32f32_4x8x1_x86_64_avx2_fma)
@@ -66,24 +66,24 @@ IREE_UK_MMT4D_TILE_FUNC_DECL(
 IREE_UK_MMT4D_TILE_FUNC_DECL(
     iree_uk_mmt4d_tile_f16f16f16_16x16x1_x86_64_avx512_base)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_1x16x2_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_base)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_2x16x2_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_base)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_4x16x2_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_base)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_8x16x2_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_base)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_base)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_1x16x2_x86_64_avx512_vnni)
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_vnni)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_2x16x2_x86_64_avx512_vnni)
+    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_vnni)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_4x16x2_x86_64_avx512_vnni)
+    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_vnni)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_8x16x2_x86_64_avx512_vnni)
+    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_vnni)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni)
+    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_vnni)
 
 #endif  // foIREE_BUILTINS_UKERNEL_ARCH_X86_64_MMT4D_X86_64_INTERNAL_H_

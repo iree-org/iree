@@ -134,11 +134,11 @@ int main(int argc, char** argv) {
                                    "fp16");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4,
                                    "bf16");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1,
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1,
                                    "");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4,
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4,
                                    "dotprod");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 8,
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8,
                                    "i8mm");
 #elif defined(IREE_ARCH_X86_64)
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
@@ -155,18 +155,18 @@ int main(int argc, char** argv) {
                                    "avx512_base");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 16, 16,
                                    2, "avx512_bf16");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 2,
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 2,
                                    "avx2_fma");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2,
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2,
                                    "avx512_base");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2,
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2,
                                    "avx512_vnni");
 #else   // defined(IREE_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
                                    "");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1,
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1,
                                    "");
 #endif  // defined(IREE_ARCH_ARM_64)
 
