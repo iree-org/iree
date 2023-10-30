@@ -50,7 +50,7 @@ are implemented using this mechanism.
 3. Build the `iree_samples_custom_module_run` CMake target :
 
     ```
-    cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
+    cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
         -DCMAKE_C_FLAGS=-DIREE_VM_EXECUTION_TRACING_FORCE_ENABLE=1
     cmake --build ../iree-build/ --target iree_samples_custom_module_basic_run
     ```

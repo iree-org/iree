@@ -593,8 +593,13 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
-void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
+void buildLLVMGPUCodegenStrategyInitializationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
+  pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
+}
+
+void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM) {
+  buildLLVMGPUCodegenStrategyInitializationPassPipeline(pm);
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//
@@ -630,14 +635,14 @@ void registerCodegenLLVMGPUPasses() {
       "iree-codegen-linalg-to-nvvm-pipeline",
       "Runs the progressive lowering pipeline from Linalg to NVVM",
       [](OpPassManager &passManager) {
-        buildLLVMGPUTransformPassPipeline(passManager, false);
+        buildLLVMGPUCodegenPassPipeline(passManager, false);
       });
 
   static PassPipelineRegistration<> LinalgROCDLPipeline(
       "iree-codegen-linalg-to-rocdl-pipeline",
       "Runs the progressive lowering pipeline from Linalg to ROCDL",
       [](OpPassManager &passManager) {
-        buildLLVMGPUTransformPassPipeline(passManager, true);
+        buildLLVMGPUCodegenPassPipeline(passManager, true);
       });
 }
 

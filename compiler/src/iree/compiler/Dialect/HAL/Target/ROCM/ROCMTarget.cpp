@@ -112,7 +112,7 @@ public:
     if (variantOp.isExternal())
       return;
 
-    buildLLVMGPUTransformPassPipeline(passManager, true);
+    buildLLVMGPUCodegenPassPipeline(passManager, true);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,

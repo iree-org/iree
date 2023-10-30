@@ -46,17 +46,17 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
   //     "IREE Vulkan/SPIR-V backend options");
 
-  static llvm::cl::opt<std::string> clVulkanTargetTriple(
+  static llvm::cl::list<std::string> clVulkanTargetTriples{
       "iree-vulkan-target-triple",
       llvm::cl::desc(
           "Vulkan target triple controlling the SPIR-V environment."),
-      llvm::cl::init("unknown-unknown-unknown"));
+  };
 
-  static llvm::cl::opt<std::string> clVulkanTargetEnv(
+  static llvm::cl::list<std::string> clVulkanTargetEnvs{
       "iree-vulkan-target-env",
       llvm::cl::desc(
           "Vulkan target environment as #vk.target_env attribute assembly."),
-      llvm::cl::init(""));
+  };
 
   static llvm::cl::opt<bool> clVulkanIndirectBindings(
       "iree-vulkan-experimental-indirect-bindings",
@@ -64,8 +64,33 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(false));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.targetEnv = clVulkanTargetEnv;
-  targetOptions.targetTriple = clVulkanTargetTriple;
+
+  int tripleCount = clVulkanTargetTriples.getNumOccurrences();
+  int envCount = clVulkanTargetEnvs.getNumOccurrences();
+  int tripleIdx = 0;
+  int envIdx = 0;
+
+  // Get a flat list of target triples and environments following the original
+  // order specified via the command line.
+  SmallVector<std::string> vulkanTargetTriplesAndEnvs;
+  for (int i = 0, e = tripleCount + envCount; i < e; ++i) {
+    if (tripleIdx >= tripleCount) {
+      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetEnvs[envIdx++]);
+      continue;
+    }
+    if (envIdx >= envCount) {
+      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetTriples[tripleIdx++]);
+      continue;
+    }
+    if (clVulkanTargetTriples.getPosition(tripleIdx) >
+        clVulkanTargetEnvs.getPosition(envIdx)) {
+      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetEnvs[envIdx++]);
+    } else {
+      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetTriples[tripleIdx++]);
+    }
+  }
+  targetOptions.targetTriplesAndEnvs = vulkanTargetTriplesAndEnvs;
+
   targetOptions.indirectBindings = clVulkanIndirectBindings;
 
   return targetOptions;
@@ -73,10 +98,15 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
 
 // Returns the Vulkan target environment for conversion.
 static spirv::TargetEnvAttr
-getSPIRVTargetEnv(const std::string &vulkanTargetEnv,
-                  const std::string &vulkanTargetTriple, MLIRContext *context) {
-  if (!vulkanTargetEnv.empty()) {
-    if (auto attr = parseAttribute(vulkanTargetEnv, context)) {
+getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
+                  MLIRContext *context) {
+  if (!vulkanTargetTripleOrEnv.empty()) {
+    if (vulkanTargetTripleOrEnv[0] != '#') {
+      return convertTargetEnv(
+          Vulkan::getTargetEnvForTriple(context, vulkanTargetTripleOrEnv));
+    }
+
+    if (auto attr = parseAttribute(vulkanTargetTripleOrEnv, context)) {
       if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
         return convertTargetEnv(vkTargetEnv);
       }
@@ -84,12 +114,8 @@ getSPIRVTargetEnv(const std::string &vulkanTargetEnv,
     emitError(Builder(context).getUnknownLoc())
         << "cannot parse vulkan target environment as #vk.target_env "
            "attribute: '"
-        << vulkanTargetEnv << "'";
-  } else if (!vulkanTargetTriple.empty()) {
-    return convertTargetEnv(
-        Vulkan::getTargetEnvForTriple(context, vulkanTargetTriple));
+        << vulkanTargetTripleOrEnv << "'";
   }
-
   return {};
 }
 
@@ -296,12 +322,19 @@ public:
 private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    targetAttrs.push_back(getExecutableTarget(
-        context,
-        getSPIRVTargetEnv(options_.targetEnv, options_.targetTriple, context),
-        options_.indirectBindings));
+
+    for (std::string targetTripleOrEnv : options_.targetTriplesAndEnvs) {
+      targetAttrs.push_back(getExecutableTarget(
+          context, getSPIRVTargetEnv(targetTripleOrEnv, context),
+          options_.indirectBindings));
+    }
+
+    // If no environment specified, populate with a minimal target.
+    if (targetAttrs.empty()) {
+      targetAttrs.push_back(getExecutableTarget(
+          context, getSPIRVTargetEnv("unknown-unknown-unknown", context),
+          options_.indirectBindings));
+    }
     return ArrayAttr::get(context, targetAttrs);
   }
 

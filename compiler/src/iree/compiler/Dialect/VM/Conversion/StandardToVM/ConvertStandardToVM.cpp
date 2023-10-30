@@ -1137,6 +1137,7 @@ class SwitchOpConversion : public OpConversionPattern<cf::SwitchOp> {
     }
 
     // Emit each dense case, filling interior holes as needed.
+    SmallVector<ValueRange> adaptedCaseOperands = adaptor.getCaseOperands();
     SmallVector<Block *> caseDestinations;
     SmallVector<ValueRange> caseOperands;
     int64_t lastValue = 0;
@@ -1148,7 +1149,7 @@ class SwitchOpConversion : public OpConversionPattern<cf::SwitchOp> {
         ++lastValue;
       }
       caseDestinations.push_back(srcOp.getCaseDestinations()[i]);
-      caseOperands.push_back(srcOp.getCaseOperands(i));
+      caseOperands.push_back(adaptedCaseOperands[i]);
       lastValue = value;
     }
 

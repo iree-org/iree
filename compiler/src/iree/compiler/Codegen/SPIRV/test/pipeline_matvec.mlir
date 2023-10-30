@@ -83,7 +83,7 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 // Load the quantized weight and get 8xi4 out of it.
 //         CHECK:   spirv.Load "StorageBuffer" %{{.+}} : vector<4xi32>
 //         CHECK:   spirv.VectorShuffle [0 : i32, 1 : i32] %{{.*}} : vector<4xi32>, %{{.*}} : vector<4xi32> -> vector<2xi32>
-//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, %75 : vector<2xi32> -> vector<4xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, {{.*}} : vector<2xi32> -> vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI320]] : vector<4xi32>
 //         CHECK:   spirv.ShiftRightLogical %{{.*}}, %[[CSTVEC4XI321]] : vector<4xi32>, vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI32]] : vector<4xi32>
@@ -94,16 +94,16 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 // CHECK-COUNT-2:   spirv.FSub %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-4:   spirv.FMul %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:   spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:   spirv.Bitcast %{{.+}} : vector<4xf16> to vector<2xf32>
-// CHECK-COUNT-2:   spirv.VectorShuffle {{.+}} : vector<2xf32> -> vector<4xf32>
+// CHECK-COUNT-2:   spirv.Bitcast %{{.+}} : vector<4xf16> to vector<2xi32>
+// CHECK-COUNT-2:   spirv.VectorShuffle {{.+}} : vector<2xi32> -> vector<4xi32>
 
 //         CHECK:   spirv.mlir.merge
 
-//         CHECK: %[[LD:.+]] = spirv.Load "Function" %4 : vector<4xf32>
+//         CHECK: %[[LD:.+]] = spirv.Load "Function" {{.*}} : vector<4xi32>
 //         CHECK: %[[VS0:.+]] = spirv.VectorShuffle [0 : i32, 1 : i32] %[[LD]]
-//         CHECK: spirv.Bitcast %[[VS0]] : vector<2xf32> to vector<4xf16>
+//         CHECK: spirv.Bitcast %[[VS0]] : vector<2xi32> to vector<4xf16>
 //         CHECK: %[[VS1:.+]] = spirv.VectorShuffle [2 : i32, 3 : i32] %[[LD]]
-//         CHECK: spirv.Bitcast %[[VS1]] : vector<2xf32> to vector<4xf16>
+//         CHECK: spirv.Bitcast %[[VS1]] : vector<2xi32> to vector<4xf16>
 
 // CHECK-COUNT-5: spirv.GroupNonUniformShuffleXor <Subgroup>
 

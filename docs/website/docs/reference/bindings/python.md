@@ -36,21 +36,21 @@ To use IREE's Python bindings, you will first need to install
     ([about](https://docs.python.org/3/library/venv.html),
     [tutorial](https://docs.python.org/3/tutorial/venv.html)):
 
-    === "Linux"
+    === ":fontawesome-brands-linux: Linux"
 
         ``` shell
         python -m venv .venv
         source .venv/bin/activate
         ```
 
-    === "macOS"
+    === ":fontawesome-brands-apple: macOS"
 
         ``` shell
         python -m venv .venv
         source .venv/bin/activate
         ```
 
-    === "Windows"
+    === ":fontawesome-brands-windows: Windows"
 
         ``` powershell
         python -m venv .venv

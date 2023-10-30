@@ -93,7 +93,7 @@ them.
     for general instructions on building using CMake)
 
     ```
-    cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo .
+    cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo .
     cmake --build ../iree-build/ --target iree-compile
     ```
 

@@ -25,6 +25,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "multiple_target_env_conversion.mlir",
             "target_env_conversion.mlir",
         ],
         include = ["*.mlir"],

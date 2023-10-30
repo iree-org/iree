@@ -29,6 +29,31 @@ iree_generated_trace_runner_test(
     "--iree-opt-data-tiling=false"
   LABELS
 
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_nondt_i8_i32_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--acc_type=i32"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+  LABELS
+
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
 )
 
 iree_generated_trace_runner_test(
@@ -50,6 +75,33 @@ iree_generated_trace_runner_test(
     "--iree-opt-data-tiling=false"
   LABELS
 
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "arm_64:sve:+sve"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_nondt_f32_f32_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+  LABELS
+
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "arm_64:sve:+sve"
 )
 
 iree_generated_trace_runner_test(
@@ -72,6 +124,34 @@ iree_generated_trace_runner_test(
   LABELS
     "noriscv"
     "nowasm"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "arm_64:sve:+sve"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_nondt_f16_f16_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f16"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+  LABELS
+    "noriscv"
+    "nowasm"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "arm_64:sve:+sve"
 )
 
 iree_generated_trace_runner_test(
@@ -94,6 +174,32 @@ iree_generated_trace_runner_test(
   LABELS
     "noriscv"
     "nowasm"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_nondt_f16_f32_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+  LABELS
+    "noriscv"
+    "nowasm"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
 )
 
 iree_generated_trace_runner_test(

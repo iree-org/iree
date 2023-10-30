@@ -8,7 +8,7 @@
 #include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_internal.h"
 
 static inline void
-iree_uk_mmt4d_tile_i8i8i32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
+iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
@@ -129,9 +129,9 @@ iree_uk_mmt4d_tile_i8i8i32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
 }
 
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
-    iree_uk_mmt4d_tile_i8i8i32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_i8i8i32_1x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_i8i8i32_2x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_i8i8i32_4x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_i8i8i32_8x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_i8i8i32_16x16x2_x86_64_avx512_vnni)
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_vnni)

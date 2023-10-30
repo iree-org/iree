@@ -1109,6 +1109,7 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
 
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   FLOW_StreamableOp,
+  AllElementTypesMatch<["source", "result"]>,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
       "getTiedResult",
@@ -1120,6 +1121,62 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   let summary = [{reshapes a tensor}];
   let description = [{
     Reshapes a tensor to a new shape without modifying the contents.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$source,
+    FLOW_ShapeDynamicDims:$source_dims,
+    FLOW_ShapeDynamicDims:$result_dims
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$result_type, "Value":$source, "ValueRange":$target_dims),
+    [{
+      build($_builder, $_state,
+          result_type,
+          source,
+          IREE::Util::buildDynamicDimsForValue($_state.location, source, $_builder),
+          target_dims);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def FLOW_TensorBitCastOp : FLOW_PureOp<"tensor.bitcast", [
+  FLOW_StreamableOp,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{bitcasts a tensor}];
+  let description = [{
+    Bitcasts a tensor to a new type without modifying the contents.
   }];
 
   let arguments = (ins

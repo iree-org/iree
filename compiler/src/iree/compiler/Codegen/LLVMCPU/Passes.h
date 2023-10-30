@@ -31,6 +31,12 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUEmitVectorizationRemarksPass();
 
+/// Pass to select a lowering strategy for a hal.executable.variant operation.
+/// The variant is annotated with the selected strategies, which are
+/// subsequently ingested by LLVMCPULowerExecutableTargetPass.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createLLVMCPUSelectLoweringStrategyPass();
+
 /// Pass to lower the module an hal.executable.variant operation to external
 /// dialect. Currently this pass lowers to LLVM dialect, but could be
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
@@ -182,6 +188,10 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.
 //----------------------------------------------------------------------------//
+
+/// Populates passes needed for preprocessing before codegen lowerings, as well
+/// as high level lowering strategy selection.
+void buildLLVMCPUCodegenRoutingPassPipeline(OpPassManager &passManager);
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the

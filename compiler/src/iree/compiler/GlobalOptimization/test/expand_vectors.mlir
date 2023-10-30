@@ -93,3 +93,35 @@ func.func @batch_matvec_f16f16f16_dynamic(%arg0 : tensor<?x?x?xf16>, %arg1 : ten
 //  CHECK-DAG:  %[[MATMUL:.+]] = linalg.batch_matmul ins(%[[ARG0]], %[[EXPANDED_IN]] : tensor<?x?x?xf16>, tensor<?x?x1xf16>) outs(%[[EXPANDED_OUT]] : tensor<?x?x1xf16>)
 //  CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MATMUL]] {{\[}}[0], [1, 2]] : tensor<?x?x1xf16> into tensor<?x?xf16>
 //      CHECK:  return %[[COLLAPSED]]
+
+// -----
+
+func.func @batch_vecmat_f32f32f32(%arg0 : tensor<3x250xf32>, %arg1 : tensor<3x250x100xf32>,
+    %arg2 : tensor<3x100xf32>) -> tensor<3x100xf32> {
+  %0 = linalg.batch_vecmat ins(%arg0, %arg1 : tensor<3x250xf32>, tensor<3x250x100xf32>)
+      outs(%arg2 : tensor<3x100xf32>) -> tensor<3x100xf32>
+  return %0 : tensor<3x100xf32>
+}
+//      CHECK:  func @batch_vecmat_f32f32f32(
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<3x250xf32>, %[[ARG1:.+]]: tensor<3x250x100xf32>, %[[ARG2:.+]]: tensor<3x100xf32>
+//  CHECK-DAG:  %[[EXPANDED_IN:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2]] : tensor<3x250xf32> into tensor<3x1x250xf32>
+//  CHECK-DAG:  %[[EXPANDED_OUT:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2]] : tensor<3x100xf32> into tensor<3x1x100xf32>
+//  CHECK-DAG:  %[[MATMUL:.+]] = linalg.batch_matmul ins(%[[EXPANDED_IN]], %[[ARG1]] : tensor<3x1x250xf32>, tensor<3x250x100xf32>) outs(%[[EXPANDED_OUT]] : tensor<3x1x100xf32>)
+//  CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MATMUL]] {{\[}}[0, 1], [2]] : tensor<3x1x100xf32> into tensor<3x100xf32>
+//      CHECK:  return %[[COLLAPSED]]
+
+// -----
+
+func.func @batch_vecmat_f16f32f32_dynamic(%arg0 : tensor<3x?xf16>, %arg1 : tensor<3x?x?xf32>,
+    %arg2 : tensor<3x?xf32>) -> tensor<3x?xf32> {
+  %0 = linalg.batch_vecmat ins(%arg0, %arg1 : tensor<3x?xf16>, tensor<3x?x?xf32>)
+      outs(%arg2 : tensor<3x?xf32>) -> tensor<3x?xf32>
+  return %0 : tensor<3x?xf32>
+}
+//      CHECK:  func @batch_vecmat_f16f32f32_dynamic(
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<3x?xf16>, %[[ARG1:.+]]: tensor<3x?x?xf32>, %[[ARG2:.+]]: tensor<3x?xf32>
+//  CHECK-DAG:  %[[EXPANDED_IN:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2]] : tensor<3x?xf16> into tensor<3x1x?xf16>
+//  CHECK-DAG:  %[[EXPANDED_OUT:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2]] : tensor<3x?xf32> into tensor<3x1x?xf32>
+//  CHECK-DAG:  %[[MATMUL:.+]] = linalg.batch_matmul ins(%[[EXPANDED_IN]], %[[ARG1]] : tensor<3x1x?xf16>, tensor<3x?x?xf32>) outs(%[[EXPANDED_OUT]] : tensor<3x1x?xf32>)
+//  CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MATMUL]] {{\[}}[0, 1], [2]] : tensor<3x1x?xf32> into tensor<3x?xf32>
+//      CHECK:  return %[[COLLAPSED]]

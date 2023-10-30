@@ -40,6 +40,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
+  passManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

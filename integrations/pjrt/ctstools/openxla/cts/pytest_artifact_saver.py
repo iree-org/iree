@@ -11,6 +11,7 @@ import shutil
 
 ARTIFACT_DIR_KEY = pytest.StashKey[Path]()
 TEST_DIR_KEY = pytest.StashKey[Path]()
+MAX_PATHLENGTH = os.pathconf("/", "PC_NAME_MAX")
 
 
 def pytest_addoption(parser, pluginmanager) -> None:
@@ -33,17 +34,26 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     sanitized_name = (
         item.nodeid.replace(".py::", "::").replace("/", "_").replace("::", "__")
     )
+
     test_dir = artifact_dir / sanitized_name
+    if len(sanitized_name) > MAX_PATHLENGTH:
+        test_dir = artifact_dir / str(hash(sanitized_name))
+    else:
+        test_dir = artifact_dir / sanitized_name
+
     shutil.rmtree(test_dir, ignore_errors=True)
     test_dir.mkdir(parents=True, exist_ok=True)
     item.stash[TEST_DIR_KEY] = test_dir
     os.putenv("IREE_PJRT_SAVE_ARTIFACTS", str(test_dir))
+    with open(test_dir / "NAME", "wt") as f:
+        f.write(sanitized_name)
+
     with open(test_dir / "CRASH_MARKER", "wt") as f:
         f.write("If this file exists, the test crashed or was killed")
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item, call) -> None:
+def pytest_runtest_makereport(item, call):
     outcome = yield
     test_dir = item.stash[TEST_DIR_KEY]
     if test_dir is None:

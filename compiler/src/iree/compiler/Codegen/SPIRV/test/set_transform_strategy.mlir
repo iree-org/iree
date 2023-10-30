@@ -1,5 +1,5 @@
 // RUN: iree-opt %s --split-input-file \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration})))"\
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))"\
 // RUN:   --iree-spirv-enable-transform-dialect-jit=true | FileCheck %s
 
 hal.executable @matmul {

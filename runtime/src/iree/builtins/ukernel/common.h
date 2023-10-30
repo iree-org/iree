@@ -433,7 +433,7 @@ typedef iree_uk_uint8_t iree_uk_type_t;
 // Signless integers. Use in microkernels that perform same-bit-width integer
 // arithmetic that is insensitive to signedness. For example, same-bit-width
 // element-wise integer add and mul ops.
-#define IREE_UK_TYPE_CATEGORY_INTEGER 0x20u
+#define IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS 0x20u
 // Signed integers. Use in microkernels that are specifically performing signed
 // integer arithmetic. For example, any mixed-bit-width op that involves a
 // sign-extension (as in arith.extsi).
@@ -461,10 +461,10 @@ enum {
   IREE_UK_TYPE_OPAQUE_16 = IREE_UK_TYPE_CATEGORY_OPAQUE | 4,
   IREE_UK_TYPE_OPAQUE_32 = IREE_UK_TYPE_CATEGORY_OPAQUE | 5,
   IREE_UK_TYPE_OPAQUE_64 = IREE_UK_TYPE_CATEGORY_OPAQUE | 6,
-  IREE_UK_TYPE_INT_8 = IREE_UK_TYPE_CATEGORY_INTEGER | 3,
-  IREE_UK_TYPE_INT_16 = IREE_UK_TYPE_CATEGORY_INTEGER | 4,
-  IREE_UK_TYPE_INT_32 = IREE_UK_TYPE_CATEGORY_INTEGER | 5,
-  IREE_UK_TYPE_INT_64 = IREE_UK_TYPE_CATEGORY_INTEGER | 6,
+  IREE_UK_TYPE_INT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 3,
+  IREE_UK_TYPE_INT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 4,
+  IREE_UK_TYPE_INT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 5,
+  IREE_UK_TYPE_INT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 6,
   IREE_UK_TYPE_SINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 3,
   IREE_UK_TYPE_SINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 4,
   IREE_UK_TYPE_SINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 5,
@@ -488,6 +488,43 @@ static inline iree_uk_uint8_t iree_uk_type_category(iree_uk_type_t t) {
 
 static inline int iree_uk_type_bit_count_log2(iree_uk_type_t t) {
   return t & IREE_UK_TYPE_BIT_COUNT_LOG2_MASK;
+}
+
+// Mutate type category while keeping the same bit-width
+static inline iree_uk_uint8_t iree_uk_type_mutate_category(
+    iree_uk_type_t t, iree_uk_uint8_t new_category) {
+  return new_category | iree_uk_type_bit_count_log2(t);
+}
+
+// Integer type helpers
+static inline iree_uk_uint8_t iree_uk_type_is_integer(iree_uk_type_t t) {
+  switch (iree_uk_type_category(t)) {
+    case IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS:
+    case IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED:
+    case IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED:
+      return true;
+    default:
+      return false;
+  }
+}
+
+static inline iree_uk_uint8_t iree_uk_integer_type_as_signless(
+    iree_uk_type_t t) {
+  IREE_UK_ASSERT(iree_uk_type_is_integer(t));
+  return iree_uk_type_mutate_category(t,
+                                      IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS);
+}
+
+static inline iree_uk_uint8_t iree_uk_integer_type_as_signed(iree_uk_type_t t) {
+  IREE_UK_ASSERT(iree_uk_type_is_integer(t));
+  return iree_uk_type_mutate_category(t, IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED);
+}
+
+static inline iree_uk_uint8_t iree_uk_integer_type_as_unsigned(
+    iree_uk_type_t t) {
+  IREE_UK_ASSERT(iree_uk_type_is_integer(t));
+  return iree_uk_type_mutate_category(t,
+                                      IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED);
 }
 
 // Behavior is undefined if the bit-count is not a multiple of 8!

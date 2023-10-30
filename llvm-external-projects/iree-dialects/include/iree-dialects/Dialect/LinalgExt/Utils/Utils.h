@@ -57,7 +57,7 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 /// Converts a 2D float array to a constant value. The 2D array is stored as
 /// a 1D row-major array in `val` and has shape `rows` x `cols`.
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
-                                Location loc, PatternRewriter &rewriter);
+                                Location loc, RewriterBase &rewriter);
 
 // Converts OpFoldResults to int64_t shape entries, unconditionally mapping all
 // Value's to kDynamic, even if they are arith.constant values.

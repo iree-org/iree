@@ -26,8 +26,8 @@ if [[ "${OSTYPE}" == "linux-gnu" ]]; then
   RISCV_CLANG_TOOLCHAIN_FILE_NAME="toolchain_iree_manylinux_2_28_20231012.tar.gz"
   RISCV_CLANG_TOOLCHAIN_FILE_SHA="3af56a58551ed5ae7441214822461a5368fee9403d7c883762fa902489bfbff0"
 
-  QEMU_FILE_NAME="qemu-riscv.tar.gz"
-  QEMU_FILE_SHA="6e0bca77408e606add8577d6f1b6709f6ef3165b0e241ed2ba191183dfc931ec"
+  QEMU_FILE_NAME="qemu-riscv_8.1.2_manylinux_2.28_20231026.tar.gz"
+  QEMU_FILE_SHA="dd77b39820d45b80bafab9155581578b4c625cb92fd6db9e9adbb9798fde3597"
 
   TOOLCHAIN_PATH_PREFIX=${PREBUILT_DIR}/toolchain/clang/linux/RISCV
   QEMU_PATH_PREFIX=${PREBUILT_DIR}/qemu/linux/RISCV

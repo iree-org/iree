@@ -71,6 +71,10 @@ def TileAndDecomposeWinogradTransform :
       "Tiles and decomposes winograd transform ops into linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
                     "createTileAndDecomposeWinogradTransformPass()";
+  let options = [
+    Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
+           "Choose whether to only tile or go through till decomposition">,
+  ];
 }
 
 def ConvertConv2DToWinograd :
