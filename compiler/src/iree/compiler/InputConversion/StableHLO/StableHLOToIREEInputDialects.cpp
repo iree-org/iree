@@ -524,14 +524,15 @@ struct ConvertStableHloToIreeInputDialects final
     patterns.add<GlobalOpPattern, TensorEmptyPattern>(*typeConverter, context);
 
     patterns.add<
+        GenericTypeConvert<cf::CondBranchOp>, GenericTypeConvert<cf::BranchOp>,
         GenericTypeConvert<func::ReturnOp>, GenericTypeConvert<func::ReturnOp>,
-        GenericTypeConvert<func::CallOp>, GenericTypeConvert<cf::CondBranchOp>,
-        GenericTypeConvert<cf::BranchOp>, GenericTypeConvert<scf::ForOp>,
-        GenericTypeConvert<scf::IfOp>, GenericTypeConvert<scf::YieldOp>,
-        GenericTypeConvert<scf::ConditionOp>, GenericTypeConvert<scf::WhileOp>,
+        GenericTypeConvert<func::CallOp>,
         GenericTypeConvert<ml_program::GlobalLoadOp>,
         GenericTypeConvert<ml_program::GlobalLoadConstOp>,
         GenericTypeConvert<ml_program::GlobalStoreOp>,
+        GenericTypeConvert<scf::ForOp>, GenericTypeConvert<scf::IfOp>,
+        GenericTypeConvert<scf::YieldOp>, GenericTypeConvert<scf::ConditionOp>,
+        GenericTypeConvert<scf::WhileOp>,
         GenericTypeConvert<tensor::FromElementsOp>,
         GenericTypeConvert<tensor::CollapseShapeOp>,
         GenericTypeConvert<tensor::ExpandShapeOp>,
