@@ -224,6 +224,14 @@ class DeviceInstance {
       size_t num_dims, EventInstance** out_done_with_host_buffer_event,
       BufferInstance** out_buffer);
 
+  iree_status_t TransposeBroadcastDeviceBuffer(
+      BufferInstance* buffer, iree_hal_element_type_t type,
+      const iree_hal_dim_t* input_dims, const iree_hal_dim_t* output_dims,
+      const int64_t* perms, size_t num_dims,
+      PJRT_HostBufferSemantics host_buffer_semantics,
+      EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
   // Copies a host buffer to the device.
   // See PJRT_Client_BufferFromHostBuffer
   iree_status_t HostBufferToDevice(
