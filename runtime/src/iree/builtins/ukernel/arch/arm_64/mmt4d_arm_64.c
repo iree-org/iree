@@ -200,7 +200,7 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
     iree_uk_mmt4d_tile_f16f16f16_4x8x1_arm_64,
     iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64)
 
-static inline void iree_uk_mmt4d_tile_i8i8i32_1x8x1_to_8x8x1_arm_64(
+static inline void iree_uk_mmt4d_tile_s8s8s32_1x8x1_to_8x8x1_arm_64(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
@@ -262,8 +262,8 @@ static inline void iree_uk_mmt4d_tile_i8i8i32_1x8x1_to_8x8x1_arm_64(
 }
 
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
-    iree_uk_mmt4d_tile_i8i8i32_1x8x1_to_8x8x1_arm_64,
-    iree_uk_mmt4d_tile_i8i8i32_1x8x1_arm_64,
-    iree_uk_mmt4d_tile_i8i8i32_2x8x1_arm_64,
-    iree_uk_mmt4d_tile_i8i8i32_4x8x1_arm_64,
-    iree_uk_mmt4d_tile_i8i8i32_8x8x1_arm_64)
+    iree_uk_mmt4d_tile_s8s8s32_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_s8s8s32_1x8x1_arm_64,
+    iree_uk_mmt4d_tile_s8s8s32_2x8x1_arm_64,
+    iree_uk_mmt4d_tile_s8s8s32_4x8x1_arm_64,
+    iree_uk_mmt4d_tile_s8s8s32_8x8x1_arm_64)
