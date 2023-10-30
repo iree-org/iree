@@ -289,15 +289,85 @@ raiseToBatchVecmat(PatternRewriter &rewriter, linalg::GenericOp genericOp,
 static LogicalResult
 raiseToBatchMatvec(PatternRewriter &rewriter, linalg::GenericOp genericOp,
                    linalg::ContractionDimensions contractionDims) {
-  LLVM_DEBUG(llvm::dbgs() << "Not implemented\n\n");
-  return failure();
+  assert(contractionDims.batch.size() == 1 && contractionDims.m.size() == 1 &&
+         contractionDims.n.size() == 0 && contractionDims.k.size() == 1 &&
+         "expected batch matvec contraction dims");
+  AffineMap matMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0));
+  AffineMap vecMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(1));
+  AffineMap outMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
+  assert(vecMap.getNumResults() == 2 && matMap.getNumResults() == 3 &&
+         outMap.getNumResults() == 2 && "wrong numResults for indexing maps");
+
+  // Permutation from GenericOp lhs shape to BatchVecmatOp lhs shape
+  SmallVector<int64_t> matPerm{
+      *(matMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
+      *(matMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.m[0]))),
+      *(matMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.k[0])))};
+  // Permutation from GenericOp rhs shape to BatchVecmatOp rhs shape
+  SmallVector<int64_t> vecPerm{
+      *(vecMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
+      *(vecMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.k[0])))};
+  // Permutation from BatchVecmatOp result shape to GenericOp result shape
+  SmallVector<int64_t> outPerm{
+      *(outMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
+      *(outMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.m[0])))};
+  outPerm = getInverseTransposePerm(outPerm);
+  return liftGenericOp<linalg::BatchMatvecOp>(rewriter, genericOp, matPerm,
+                                              vecPerm, outPerm);
 }
 
 static LogicalResult
 raiseToBatchMatmul(PatternRewriter &rewriter, linalg::GenericOp genericOp,
                    linalg::ContractionDimensions contractionDims) {
-  LLVM_DEBUG(llvm::dbgs() << "Not implemented\n\n");
-  return failure();
+  assert(contractionDims.batch.size() == 1 && contractionDims.m.size() == 1 &&
+         contractionDims.n.size() == 1 && contractionDims.k.size() == 1 &&
+         "expected batch matmul contraction dims");
+  AffineMap lhsMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0));
+  AffineMap rhsMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(1));
+  AffineMap outMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
+  assert(lhsMap.getNumResults() == 3 && rhsMap.getNumResults() == 3 &&
+         outMap.getNumResults() == 3 && "wrong numResults for indexing maps");
+
+  // Permutation from GenericOp lhs shape to BatchVecmatOp lhs shape
+  SmallVector<int64_t> lhsPerm{
+      *(lhsMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
+      *(lhsMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.m[0]))),
+      *(lhsMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.k[0])))};
+  // Permutation from GenericOp rhs shape to BatchVecmatOp rhs shape
+  SmallVector<int64_t> rhsPerm{
+      *(rhsMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
+      *(rhsMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.k[0]))),
+      *(rhsMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.n[0])))};
+  // Permutation from BatchVecmatOp result shape to GenericOp result shape
+  SmallVector<int64_t> outPerm{
+      *(outMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.batch[0]))),
+      *(outMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.m[0]))),
+      *(outMap.getResultPosition(
+          rewriter.getAffineDimExpr(contractionDims.n[0])))};
+  outPerm = getInverseTransposePerm(outPerm);
+  return liftGenericOp<linalg::BatchMatmulOp>(rewriter, genericOp, lhsPerm,
+                                              rhsPerm, outPerm);
 }
 
 // Converts linalg.conv_2d_input_nhwc_filter_nhwc op to linalg.matmul
