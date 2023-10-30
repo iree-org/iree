@@ -269,7 +269,7 @@ def GenericVectorization :
       "generated from tiling so it affects later steps like bufferization and vector hoisting.">,
     Option<"generateContract", "generate-contract", "bool",/*default=*/"true",
       "Enable conversion for reduction ops to contraction ops.">,
-    Option<"foldCastIntoContract", "fold-cast-into-ctract", "bool",/*default=*/"false",
+    Option<"foldCastIntoContract", "fold-cast-into-contract", "bool",/*default=*/"false",
       "Enable folding casting ops into vector.contract.">,
     Option<"maxVectorSize", "max-vector-size", "int64_t",
             /*default=*/"2147483647",
