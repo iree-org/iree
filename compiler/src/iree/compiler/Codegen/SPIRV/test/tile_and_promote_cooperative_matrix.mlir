@@ -19,7 +19,7 @@
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 32], [16, 16, 16], [0, 0, 32]]>
 
 hal.executable @matmul_f16_32x32x32 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -40,7 +40,7 @@ hal.executable @matmul_f16_32x32x32 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_f16_32x32x32 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>,
       workgroup_size = [64 : index, 2 : index, 1 : index]
@@ -124,7 +124,7 @@ hal.executable @matmul_f16_32x32x32 {
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -145,7 +145,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @generic_batch_matmul_f16_32x128x512x64 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>,
       workgroup_size = [64 : index, 2 : index, 1 : index]
@@ -274,7 +274,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -295,7 +295,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @generic_batch_matmul_f16_32x128x512x64 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>,
       workgroup_size = [64 : index, 2 : index, 1 : index]
@@ -393,7 +393,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 ]>
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
 hal.executable @generic_batch_matmul_f16_32x128x512x64 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -414,7 +414,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @generic_batch_matmul_f16_32x128x512x64 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>,
       workgroup_size = [64 : index, 2 : index, 1 : index]
@@ -511,7 +511,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 128], [1, 32, 64], [0, 0, 0, 32], [1, 16, 16, 16]]>
 
 hal.executable @batch_matmul_f16_1x64x128x512 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -526,7 +526,7 @@ hal.executable @batch_matmul_f16_1x64x128x512 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_f16_1x64x128x512 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>,
       workgroup_size = [128 : index, 2 : index, 1 : index]
@@ -619,7 +619,7 @@ hal.executable @batch_matmul_f16_1x64x128x512 {
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 
 hal.executable @matmul_f16_f512x4096x64 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -634,7 +634,7 @@ hal.executable @matmul_f16_f512x4096x64 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_f16_f512x4096x64 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>,
       workgroup_size = [128 : index, 2 : index, 1 : index]
@@ -736,7 +736,7 @@ hal.executable @matmul_f16_f512x4096x64 {
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 
 hal.executable @matmul_f16_f512x4096x64 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -751,7 +751,7 @@ hal.executable @matmul_f16_f512x4096x64 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_f16_f512x4096x64 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>,
       workgroup_size = [128 : index, 2 : index, 1 : index]
@@ -853,7 +853,7 @@ hal.executable @matmul_f16_f512x4096x64 {
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 128], [32, 64], [0, 0, 32], [16, 16, 16]]>
 
 hal.executable @matmul_f16_128x262144x2304 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
@@ -868,7 +868,7 @@ hal.executable @matmul_f16_128x262144x2304 {
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_f16_128x262144x2304 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>,
       workgroup_size = [128 : index, 2 : index, 1 : index]

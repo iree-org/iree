@@ -12,11 +12,13 @@ namespace mlir {
 namespace iree_compiler {
 
 void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager) {
-  passManager.addNestedPass<func::FuncOp>(createTypePropagationPass());
-  passManager.addPass(createBubbleUpOrdinalOpsPass());
-  passManager.addPass(createBufferizeCopyOnlyDispatchesPass());
-  passManager.addNestedPass<func::FuncOp>(
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(createTypePropagationPass());
+  nestedModulePM.addPass(createBubbleUpOrdinalOpsPass());
+  nestedModulePM.addPass(createBufferizeCopyOnlyDispatchesPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createDecomposeSoftmaxPass());
+  passManager.addPass(createMaterializeUserConfigsPass());
 }
 
 //===---------------------------------------------------------------------===//

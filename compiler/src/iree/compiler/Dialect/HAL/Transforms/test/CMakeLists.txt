@@ -21,7 +21,6 @@ iree_lit_test_suite(
     "dump_executable_sources.mlir"
     "elide_redundant_commands.mlir"
     "fixup_legacy_sync.mlir"
-    "inline_device_switches.mlir"
     "materialize_dispatch_instrumentation.mlir"
     "materialize_interfaces.mlir"
     "materialize_resource_caches.mlir"

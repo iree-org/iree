@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -11,13 +11,13 @@
 ]>
 
 hal.executable @i4_dequant_matvec_f32 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant_matvec_f32 layout(#pipeline_layout)
     builtin.module {
       func.func @i4_dequant_matvec_f32() {
@@ -77,13 +77,13 @@ hal.executable @i4_dequant_matvec_f32 {
 ]>
 
 hal.executable @i4_dequant_matvec_f32 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant_matvec_f32 layout(#pipeline_layout)
     builtin.module {
       func.func @i4_dequant_matvec_f32() {
@@ -158,13 +158,13 @@ hal.executable @i4_dequant_matvec_f32 {
 ]>
 
 hal.executable @i4_dequant_matvec_f32 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant_matvec_f32 layout(#pipeline_layout)
     builtin.module {
       func.func @i4_dequant_matvec_f32() {
@@ -227,7 +227,7 @@ hal.executable @i4_dequant_matvec_f32 {
         } -> tensor<4096x86x128xf32>
         %41 = linalg.generic {
             indexing_maps = [
-                affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, 
+                affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
                 affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
                 affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
@@ -265,7 +265,7 @@ hal.executable @i4_dequant_matvec_f32 {
   ]>
 ]>
 hal.executable @i4_dequant_matvec_f16 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<
         #spirv.vce<v1.4, [Shader, Float16, StorageBuffer16BitAccess, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_16bit_storage]>,
         Unknown:IntegratedGPU,
@@ -274,7 +274,7 @@ hal.executable @i4_dequant_matvec_f16 {
           max_compute_workgroup_invocations = 1024,
           max_compute_workgroup_size = [1024, 1024, 64],
           subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant_matvec_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -352,13 +352,13 @@ hal.executable @i4_dequant_matvec_f16 {
 ]>
 
 hal.executable @i4_dequant_matvec {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant_matvec layout(#pipeline_layout)
     builtin.module {
       func.func @i4_dequant_matvec() {
@@ -421,7 +421,7 @@ hal.executable @i4_dequant_matvec {
         } -> tensor<4096x86x128xf32>
         %41 = linalg.generic {
             indexing_maps = [
-                affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>, 
+                affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
                 affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
                 affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
@@ -460,13 +460,13 @@ hal.executable @i4_dequant_matvec {
 ]>
 
 hal.executable @i4_dequant_matvec {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant_matvec layout(#pipeline_layout)
     builtin.module {
       func.func @i4_dequant_matvec() {

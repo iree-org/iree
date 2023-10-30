@@ -11,7 +11,7 @@
   ]>
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
-  hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
@@ -55,7 +55,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @dot_dispatch_0 {
-  hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

@@ -580,17 +580,12 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   }
 }
 
-extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag;
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag;
 
 void addGPUTransformDialectPasses(OpPassManager &passManager) {
-  // Give control to the transform dialect.
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clGPUCodegenTransformDialectFileName,
-          clGPUCodegenTransformDialectDebugPayloadTag,
-          clGPUCodegenTransformDialectDebugTransformTag));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -599,8 +594,13 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
-void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
-  addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
+void buildLLVMGPUCodegenStrategyInitializationPassPipeline(OpPassManager &pm) {
+  addCommonTargetExecutablePreprocessingPasses(pm);
+  pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
+}
+
+void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM) {
+  buildLLVMGPUCodegenStrategyInitializationPassPipeline(pm);
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//
@@ -636,14 +636,14 @@ void registerCodegenLLVMGPUPasses() {
       "iree-codegen-linalg-to-nvvm-pipeline",
       "Runs the progressive lowering pipeline from Linalg to NVVM",
       [](OpPassManager &passManager) {
-        buildLLVMGPUTransformPassPipeline(passManager, false);
+        buildLLVMGPUCodegenPassPipeline(passManager, false);
       });
 
   static PassPipelineRegistration<> LinalgROCDLPipeline(
       "iree-codegen-linalg-to-rocdl-pipeline",
       "Runs the progressive lowering pipeline from Linalg to ROCDL",
       [](OpPassManager &passManager) {
-        buildLLVMGPUTransformPassPipeline(passManager, true);
+        buildLLVMGPUCodegenPassPipeline(passManager, true);
       });
 }
 

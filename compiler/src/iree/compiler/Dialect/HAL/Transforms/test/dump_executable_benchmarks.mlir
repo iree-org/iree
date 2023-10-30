@@ -3,9 +3,9 @@
 // Tests dumping executable benchmarks to stdout - it's more common to use files
 // but this is much easier to test with lit.
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
+#executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 #device_target_cpu = #hal.device.target<"llvm-cpu", {
-  executable_targets = [#executable_target_embedded_elf_x86_64_]
+  executable_targets = [#executable_target_embedded_elf_x86_64]
 }>
 #pipeline_layout_0 = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -26,7 +26,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // Executable should be dumped:
   // CHECK: hal.executable private @ex0
   hal.executable private @ex0 {
-    hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
       hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout_0) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault>
       } {

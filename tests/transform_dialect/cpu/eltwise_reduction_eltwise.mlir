@@ -49,7 +49,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-flow-transformation-pipeline \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmcpu-enable-transform-dialect-jit | \
 // RUN: FileCheck %s
 

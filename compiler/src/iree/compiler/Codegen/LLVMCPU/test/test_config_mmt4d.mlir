@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy)))' %s | FileCheck %s
 
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -12,7 +12,7 @@
 #map3 = affine_map<(d0)[s0] -> (s0, -d0 + 96)>
 #map4 = affine_map<(d0)[s0] -> (s0, -d0 + 128)>
 hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
-  hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
+  hal.executable.variant public @embedded_elf_arm_64 target(#executable_target_embedded_elf_arm_64_) {
     hal.executable.export public @mmt4d_384x384x512_4x1x4_dispatch_0 layout(#pipeline_layout)
     builtin.module  {
       func.func @mmt4d_384x384x512_4x1x4_dispatch_0() {
@@ -54,7 +54,7 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
   ]>
 ]>
 hal.executable private @batch_mmt4d {
-  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
     hal.executable.export public @batch_mmt4d ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @batch_mmt4d() {

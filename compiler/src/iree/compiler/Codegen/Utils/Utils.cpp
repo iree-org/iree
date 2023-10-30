@@ -39,7 +39,7 @@ FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   if (!variantOp)
     return failure();
 
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+  for (auto op : variantOp.getExportOps()) {
     if (op.getSymName() == funcOp.getName()) {
       return op;
     }
@@ -66,7 +66,7 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp>
 getAllEntryPoints(ModuleOp module) {
   auto variantOp = module->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+  for (auto op : variantOp.getExportOps()) {
     exportOps[op.getSymName()] = op;
   }
   return exportOps;

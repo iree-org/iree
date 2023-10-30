@@ -1,6 +1,6 @@
 // Replacement executable for substitute_executables.mlir.
 hal.executable private @executable0 {
-  hal.executable.variant public @variant, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @variant target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @dispatch0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %c123 = arith.constant 123 : index

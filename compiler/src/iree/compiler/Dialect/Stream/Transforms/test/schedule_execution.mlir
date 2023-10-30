@@ -333,3 +333,26 @@ func.func @inplaceCall(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -
   // CHECK: stream.timepoint.await
   return %0, %arg1 : !stream.resource<*>, index
 }
+
+// -----
+
+// Tests that we can recurse into an SCF region:
+
+stream.async.func private @inplaceExtern(%arg0: !stream.resource<*>, %arg1: index) -> %arg0
+
+// CHECK-LABEL: @scfRecurse
+func.func @scfRecurse(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> (!stream.resource<*>, index) {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+
+  // CHECK: scf.for
+  %sum = scf.for %i = %c0 to %c4 step %c2 iter_args(%arg3 = %arg0) -> !stream.resource<*> {
+    // CHECK: stream.async.execute
+    // CHECK-NEXT: stream.async.call
+    %0 = stream.async.call @inplaceExtern(%arg3[%c0 to %arg1 for %arg1], %arg2) : (!stream.resource<*>{%arg1}, index) -> %arg3{%arg1}
+    // CHECK: stream.timepoint.await
+    scf.yield %0 : !stream.resource<*>
+  }
+  return %sum, %arg1 : !stream.resource<*>, index
+}

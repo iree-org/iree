@@ -360,10 +360,17 @@ public:
     // new symbol name.
     for (auto funcLikeOp : getOperation().getOps<FunctionOpInterface>()) {
       funcLikeOp->walk([&](IREE::Flow::DispatchOp dispatchOp) {
-        auto it = entryPointRefReplacements.find(dispatchOp.getEntryPoint());
-        if (it != entryPointRefReplacements.end()) {
-          dispatchOp.setEntryPointAttr(llvm::cast<SymbolRefAttr>(it->second));
+        SmallVector<Attribute> replacementRefs;
+        for (auto originalRef : dispatchOp.getEntryPointRefs()) {
+          auto it = entryPointRefReplacements.find(originalRef);
+          if (it != entryPointRefReplacements.end()) {
+            replacementRefs.push_back(it->second);
+          } else {
+            replacementRefs.push_back(originalRef);
+          }
         }
+        dispatchOp.setEntryPointsAttr(
+            ArrayAttr::get(dispatchOp.getContext(), replacementRefs));
       });
     }
   }

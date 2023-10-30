@@ -15,6 +15,7 @@
 #define IREE_UK_BUILD_X86_64_AVX2_FMA
 #define IREE_UK_BUILD_X86_64_AVX512_BASE
 #define IREE_UK_BUILD_X86_64_AVX512_VNNI
+#define IREE_UK_BUILD_X86_64_AVX512_BF16
 #else  // IREE_DEVICE_STANDALONE
 // Compiling with the system toolchain. Include the configured header.
 #include "iree/builtins/ukernel/arch/x86_64/config_x86_64.h"

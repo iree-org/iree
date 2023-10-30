@@ -727,6 +727,15 @@ SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
   return dynamicDims;
 }
 
+SmallVector<Value> buildDynamicDimsForValues(Location loc, ValueRange values,
+                                             OpBuilder &builder) {
+  SmallVector<Value> dynamicDims;
+  for (auto value : values) {
+    dynamicDims.append(buildDynamicDimsForValue(loc, value, builder));
+  }
+  return dynamicDims;
+}
+
 static SmallVector<Value> buildShape(Location loc, ShapedType type,
                                      ValueRange dynamicDims,
                                      OpBuilder &builder) {

@@ -192,6 +192,20 @@ static LogicalResult verifyEscapingResources(Region &region,
   return success();
 }
 
+static void eraseStreamRegionResults(Region &region,
+                                     ArrayRef<unsigned> excludedResultIndices) {
+  for (auto &block : region.getBlocks()) {
+    auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
+    if (!yieldOp)
+      continue;
+    llvm::SmallVector<Value> newOperands;
+    for (auto i : llvm::reverse(excludedResultIndices)) {
+      yieldOp.getResourceOperandsMutable().erase(i);
+      yieldOp.getResourceOperandSizesMutable().erase(i);
+    }
+  }
+}
+
 // Computes the value access bits starting from |rootValue|.
 // Traverses the IR graph along tied ops but does not handle branches.
 static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
@@ -260,18 +274,120 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
   return access;
 }
 
-static void eraseStreamRegionResults(Region &region,
-                                     ArrayRef<unsigned> excludedResultIndices) {
-  for (auto &block : region.getBlocks()) {
-    auto yieldOp = dyn_cast<IREE::Stream::YieldOp>(block.getTerminator());
-    if (!yieldOp)
-      continue;
-    llvm::SmallVector<Value> newOperands;
-    for (auto i : llvm::reverse(excludedResultIndices)) {
-      yieldOp.getResourceOperandsMutable().erase(i);
-      yieldOp.getResourceOperandSizesMutable().erase(i);
-    }
+//===----------------------------------------------------------------------===//
+// custom<DispatchEntryPoints>($entry_points)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseDispatchEntryPoints(OpAsmParser &parser,
+                                            ArrayAttr &entryPointAttrsArray) {
+  SmallVector<Attribute> entryPointAttrs;
+  if (succeeded(parser.parseOptionalLBrace())) {
+    do {
+      SymbolRefAttr entryPointAttr;
+      if (failed(parser.parseAttribute(entryPointAttr)))
+        return failure();
+      entryPointAttrs.push_back(entryPointAttr);
+    } while (succeeded(parser.parseOptionalComma()));
+    if (failed(parser.parseRBrace()))
+      return failure();
+  } else {
+    SymbolRefAttr entryPointAttr;
+    if (failed(parser.parseAttribute(entryPointAttr)))
+      return failure();
+    entryPointAttrs.push_back(entryPointAttr);
   }
+  entryPointAttrsArray = parser.getBuilder().getArrayAttr(entryPointAttrs);
+  return success();
+}
+
+static void printDispatchEntryPoints(OpAsmPrinter &p, Operation *op,
+                                     ArrayAttr entryPointAttrs) {
+  if (entryPointAttrs.size() == 1) {
+    p.printAttribute(entryPointAttrs.getValue().front());
+  } else {
+    p << '{';
+    llvm::interleaveComma(entryPointAttrs, p.getStream(),
+                          [&](Attribute attr) { p.printAttribute(attr); });
+    p << '}';
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// custom<EncodedResourceOperands>(
+//     $resources, type($resources), $resource_sizes,
+//     $resource_encodings, $resource_encoding_dims)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseEncodedResourceOperands(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resources,
+    SmallVectorImpl<Type> &resourceTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceSizes,
+    ArrayAttr &resourceEncodings,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceEncodingDims) {
+  SmallVector<Attribute> resourceEncodingAttrs;
+  do {
+    resources.emplace_back();
+    TypeAttr resourceEncoding;
+    if (failed(parser.parseOperand(resources.back())) ||
+        failed(parser.parseColon()) ||
+        failed(parser.parseAttribute(resourceEncoding)))
+      return failure();
+    resourceEncodingAttrs.push_back(resourceEncoding);
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(resourceEncoding.getValue()).getNumDynamicDims()) {
+      if (failed(parser.parseOperandList(resourceEncodingDims, dynamicDimCount,
+                                         AsmParser::Delimiter::Braces)))
+        return failure();
+    }
+    resourceTypes.emplace_back();
+    resourceSizes.emplace_back();
+    if (failed(parser.parseKeyword("in")) ||
+        failed(parseSizeAwareType(parser, resourceTypes.back(),
+                                  resourceSizes.back())))
+      return failure();
+  } while (succeeded(parser.parseOptionalComma()));
+  resourceEncodings = parser.getBuilder().getArrayAttr(resourceEncodingAttrs);
+  return success();
+}
+
+static void printEncodedResourceOperands(OpAsmPrinter &p, Operation *op,
+                                         ValueRange resources,
+                                         TypeRange resourceTypes,
+                                         ValueRange resourceSizes,
+                                         ArrayAttr resourceEncodings,
+                                         ValueRange resourceEncodingDims) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(resources, resourceTypes, resourceSizes,
+                      resourceEncodings.getAsValueRange<TypeAttr>()),
+      [&](auto it) {
+        auto [resource, resourceType, resourceSize, resourceEncoding] = it;
+        p << resource;
+        p << " : ";
+        p << resourceEncoding;
+        if (int64_t dynamicDimCount =
+                cast<ShapedType>(resourceEncoding).getNumDynamicDims()) {
+          p << "{";
+          llvm::interleaveComma(
+              resourceEncodingDims.take_front(dynamicDimCount), p);
+          resourceEncodingDims =
+              resourceEncodingDims.drop_front(dynamicDimCount);
+          p << "}";
+        }
+        p << " in ";
+        p << resourceType;
+        p << "{";
+        p << resourceSize;
+        p << "}";
+      },
+      [&]() {
+        p << ",";
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1064,7 +1180,8 @@ bool TensorSplatOp::preferCloneToConsumers() { return true; }
 
 LogicalResult TensorCloneOp::verify() {
   TensorCloneOp op = *this;
-  // Clones can't change encodings but they can change shape information.
+  // Clones can't change encodings but they can change shape and element type
+  // information.
   auto sourceEncoding = llvm::cast<RankedTensorType>(op.getSourceEncoding());
   auto resultEncoding = llvm::cast<RankedTensorType>(op.getResultEncoding());
   if (sourceEncoding.getEncoding() != resultEncoding.getEncoding()) {
@@ -1209,6 +1326,54 @@ TensorStoreOp::getTiedResultOperandIndex(unsigned resultIndex) {
 
 SmallVector<int64_t> TensorStoreOp::getTiedResultOperandIndices() {
   return {0}; // target
+}
+
+//===----------------------------------------------------------------------===//
+// stream.tensor.trace
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorTraceOp::verify() {
+  TensorTraceOp op = *this;
+  if (op.getResources().size() != op.getResourceEncodings().size() ||
+      op.getResources().size() != op.getResourceSizes().size()) {
+    return op.emitOpError(
+        "each resource needs a matching resource encoding and size "
+        "(array length mismatch)");
+  }
+  auto resourceEncodingDims = op.getResourceEncodingDims();
+  for (auto [resource, resourceSize, resourceEncoding] :
+       llvm::zip_equal(op.getResources(), op.getResourceSizes(),
+                       op.getResourceEncodings().getAsValueRange<TypeAttr>())) {
+    int64_t dynamicDimCount =
+        cast<ShapedType>(resourceEncoding).getNumDynamicDims();
+    if (failed(verifyOpDynamicDims(
+            op, resourceEncoding,
+            resourceEncodingDims.take_front(dynamicDimCount))) ||
+        failed(verifyOpValueSizes(op, resource, resourceSize))) {
+      return failure();
+    }
+    resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
+  }
+  return success();
+}
+
+ValueRange TensorTraceOp::getOperandDynamicDims(unsigned idx) {
+  auto resourceEncodings = getResourceEncodings().getValue();
+  auto resourceEncodingDims = getResourceEncodingDims();
+  for (unsigned i = 0; i <= idx; ++i) {
+    auto resourceEncoding = resourceEncodings[i].cast<TypeAttr>().getValue();
+    int64_t dynamicDimCount =
+        cast<ShapedType>(resourceEncoding).getNumDynamicDims();
+    if (i == idx) {
+      return resourceEncodingDims.take_front(dynamicDimCount);
+    }
+    resourceEncodingDims = resourceEncodingDims.drop_front(dynamicDimCount);
+  }
+  return ValueRange{};
+}
+
+ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
+  return ValueRange{};
 }
 
 //===----------------------------------------------------------------------===//
@@ -1664,26 +1829,32 @@ LogicalResult AsyncDispatchOp::verify() {
 LogicalResult
 AsyncDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
-  auto exportOp =
-      symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
-          op, getEntryPoint());
-  if (!exportOp) {
-    // TODO(benvanik): there are a lot of tests that are assuming this is not
-    // verified. We'll need to go add dummy executables for all of them. Today
-    // we just bail on the verifier if the symbol isn't found.
-    //
-    // Should be:
-    //   return op->emitOpError() << "undefined entry point: " << entry_point();
-    return success();
+  auto entryPointRefs = getEntryPointRefs();
+  if (entryPointRefs.empty()) {
+    return emitOpError() << "at least one entry point must be defined";
   }
+  for (auto entryPointAttr : entryPointRefs) {
+    auto exportOp =
+        symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
+            op, entryPointAttr);
+    if (!exportOp) {
+      // TODO(benvanik): there are a lot of tests that are assuming this is not
+      // verified. We'll need to go add dummy executables for all of them. Today
+      // we just bail on the verifier if the symbol isn't found.
+      //
+      // Should be:
+      //   return op->emitOpError() << "undefined entry point: " <<
+      //   entry_point();
+      return success();
+    }
 
-  // Verify that the workload parameters captured match the target export.
-  if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
-    return failure();
+    // Verify that the workload parameters captured match the target export.
+    if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
+      return failure();
+    }
+
+    // TODO(benvanik): verify that the target function has matching operands.
   }
-
-  // TODO(benvanik): verify that the target function has matching operands.
-
   return success();
 }
 
@@ -2361,40 +2532,6 @@ CmdDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // TODO(benvanik): verify that the target function has matching operands.
   }
   return success();
-}
-
-static ParseResult parseDispatchEntryPoints(OpAsmParser &parser,
-                                            ArrayAttr &entryPointAttrsArray) {
-  SmallVector<Attribute> entryPointAttrs;
-  if (succeeded(parser.parseOptionalLBrace())) {
-    do {
-      SymbolRefAttr entryPointAttr;
-      if (failed(parser.parseAttribute(entryPointAttr)))
-        return failure();
-      entryPointAttrs.push_back(entryPointAttr);
-    } while (succeeded(parser.parseOptionalComma()));
-    if (failed(parser.parseRBrace()))
-      return failure();
-  } else {
-    SymbolRefAttr entryPointAttr;
-    if (failed(parser.parseAttribute(entryPointAttr)))
-      return failure();
-    entryPointAttrs.push_back(entryPointAttr);
-  }
-  entryPointAttrsArray = parser.getBuilder().getArrayAttr(entryPointAttrs);
-  return success();
-}
-
-static void printDispatchEntryPoints(OpAsmPrinter &p, Operation *op,
-                                     ArrayAttr entryPointAttrs) {
-  if (entryPointAttrs.size() == 1) {
-    p.printAttribute(entryPointAttrs.getValue().front());
-  } else {
-    p << '{';
-    llvm::interleaveComma(entryPointAttrs, p.getStream(),
-                          [&](Attribute attr) { p.printAttribute(attr); });
-    p << '}';
-  }
 }
 
 static ParseResult parseDispatchResources(

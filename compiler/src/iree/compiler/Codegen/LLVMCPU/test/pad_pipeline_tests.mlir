@@ -1,10 +1,10 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))" --split-input-file %s | FileCheck %s
 
 hal.executable private @pad_only {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>) {
     hal.executable.export public @pad_only_dispatch ordinal(0)
         layout(#hal.pipeline.layout<push_constants = 0,
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
@@ -60,10 +60,10 @@ hal.executable private @pad_only {
 // -----
 
 hal.executable private @pad_with_producer {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>) {
     hal.executable.export public @pad_with_producer_dispatch ordinal(0)
         layout(#hal.pipeline.layout<push_constants = 0,
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
@@ -158,10 +158,10 @@ hal.executable private @pad_with_producer {
 // -----
 
 hal.executable private @pad_consumer_fusion {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>) {
     hal.executable.export public @pad_consumer_fusion_dispatch ordinal(0)
         layout(#hal.pipeline.layout<push_constants = 0,
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {

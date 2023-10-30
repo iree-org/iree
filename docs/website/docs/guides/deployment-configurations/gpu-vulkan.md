@@ -40,7 +40,7 @@ verified by the following steps:
     Android mandates Vulkan 1.1 support since Android 10. You just need to
     make sure the device's Android version is 10 or higher.
 
-=== "Linux"
+=== ":fontawesome-brands-linux: Linux"
 
     Run the following command in a shell:
 
@@ -56,7 +56,7 @@ verified by the following steps:
     If the listed version is lower than Vulkan 1.2, you will need to update the
     driver for your GPU.
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     Run the following command in a shell:
 
@@ -99,7 +99,7 @@ The core `iree-compiler` package includes the SPIR-V compiler:
 
     ``` shell
     python -m pip install \
-      --find-links https://openxla.github.io/iree/pip-release-links.html \
+      --find-links https://iree.dev/pip-release-links.html \
       --upgrade iree-compiler
     ```
 

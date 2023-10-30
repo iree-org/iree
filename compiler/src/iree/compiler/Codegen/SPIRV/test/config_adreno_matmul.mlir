@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))' %s | FileCheck %s
 
 // Large matmul that can match the best tiling scheme.
 
@@ -10,13 +10,13 @@
   ]>
 ]>
 hal.executable @matmul_1024x2048x512 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @matmul_1024x2048x512 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_1024x2048x512() {
@@ -64,13 +64,13 @@ hal.executable @matmul_1024x2048x512 {
   ]>
 ]>
 hal.executable @matmul_3136x24x96 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @matmul_3136x24x96 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_3136x24x96() {
@@ -118,13 +118,13 @@ hal.executable @matmul_3136x24x96 {
   ]>
 ]>
 hal.executable @matmul_196x64x192 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @matmul_196x64x192 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_196x64x192() {
@@ -172,13 +172,13 @@ hal.executable @matmul_196x64x192 {
   ]>
 ]>
 hal.executable @matmul_12544x96x16 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @matmul_12544x96x16 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_12544x96x16() {
@@ -218,13 +218,13 @@ hal.executable @matmul_12544x96x16 {
   ]>
 ]>
 hal.executable @matmul_49x160x576 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @matmul_49x160x576 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_49x160x576() {
@@ -270,13 +270,13 @@ hal.executable @matmul_49x160x576 {
   ]>
 ]>
 hal.executable @batch_matmul_4x384x384 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @batch_matmul_4x384x384 layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_4x384x384() {
@@ -324,13 +324,13 @@ hal.executable @batch_matmul_4x384x384 {
   ]>
 ]>
 hal.executable @batch_matmul_4x8x8 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @batch_matmul_4x8x8 layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_4x8x8() {

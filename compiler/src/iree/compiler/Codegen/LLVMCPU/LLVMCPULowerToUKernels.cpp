@@ -120,7 +120,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   uint32_t flags = 0;
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_I8I8I32;
+    flags = IREE_UK_FLAG_MMT4D_TYPE_S8S8S32;
   } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
              outElemType.isF32()) {
     flags = IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;

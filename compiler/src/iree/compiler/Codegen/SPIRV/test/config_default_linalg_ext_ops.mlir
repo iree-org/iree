@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -6,13 +6,13 @@
   ]>
 ]>
 hal.executable private @static_1d_sort {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
-    }> {
+    }>) {
     hal.executable.export @static_1d_sort layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_sort() {
@@ -51,13 +51,13 @@ hal.executable private @static_1d_sort {
   ]>
 ]>
 hal.executable private @static_3d_sort {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
-    }> {
+    }>) {
     hal.executable.export @static_3d_sort layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_sort() {
@@ -100,13 +100,13 @@ hal.executable private @static_3d_sort {
   ]>
 ]>
 hal.executable private @static_1d_fft_stage2 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirvfb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirvfb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
-    }> {
+    }>) {
     hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
@@ -145,13 +145,13 @@ hal.executable private @static_1d_fft_stage2 {
   ]>
 ]>
 hal.executable private @static_3d_fft_stage3 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirvfb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirvfb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
-    }> {
+    }>) {
     hal.executable.export @static_3d_fft_stage3 layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {

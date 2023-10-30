@@ -628,8 +628,8 @@ static bool iree_symbol_resolver_format_frame(iree_symbol_resolver_t* resolver,
   if (resolver->SymGetLineFromAddr64(process, (DWORD64)address, &displacement32,
                                      &line)) {
     *buffer_length = iree_string_buffer_append_format(
-        buffer_capacity, buffer, *buffer_length, " (%s:%u)", line.FileName,
-        line.LineNumber);
+        buffer_capacity, buffer, *buffer_length, " (%s:%" PRIu32 ")",
+        line.FileName, (uint32_t)line.LineNumber);
   }
   iree_symbol_resolver_unlock(resolver);
 
@@ -810,7 +810,7 @@ iree_status_allocate(iree_status_code_t code, const char* file, uint32_t line,
 #endif  // has any IREE_STATUS_FEATURES
 }
 
-static IREE_MUST_USE_RESULT iree_status_t iree_status_allocate_vf_impl(
+IREE_MUST_USE_RESULT static iree_status_t iree_status_allocate_vf_impl(
     iree_status_code_t code, const char* file, uint32_t line, int skip_frames,
     const char* format, va_list varargs_0, va_list varargs_1) {
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) == 0

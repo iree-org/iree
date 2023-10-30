@@ -349,6 +349,9 @@ static void iree_trace_replay_write_element(
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
       break;
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      *(uint16_t*)dst = iree_math_f32_to_bf16((float)value);
+      break;
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_32, float)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_64, double)
     // clang-format on
@@ -402,6 +405,7 @@ static void iree_trace_replay_get_min_max_for_element_type(
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
       *min = -4;
       *max = +4;
       break;

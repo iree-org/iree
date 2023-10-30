@@ -506,6 +506,32 @@ def IREEInput_TensorReshapeOp : IREEInput_PureOp<"tensor.reshape", [
   }];
 }
 
+def IREEInput_TensorBitCastOp : IREEInput_PureOp<"tensor.bitcast", [
+    AllElementTypesMatch<["source", "result"]>,
+    AttrSizedOperandSegments,
+  ]> {
+  let summary = [{bitcasts a tensor}];
+  let description = [{
+    Bitcasts a tensor to a new shape without modifying the contents.
+  }];
+
+  let arguments = (ins
+    IREEInput_Tensor:$source,
+    IREEInput_ShapeDynamicDims:$source_dims,
+    IREEInput_ShapeDynamicDims:$result_dims
+  );
+  let results = (outs
+    IREEInput_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+}
+
 def IREEInput_TensorLoadOp : IREEInput_PureOp<"tensor.load", [
     TypesMatchWith<"value type matches element type of target operand",
                    "source", "result",
@@ -681,21 +707,31 @@ def IREEInput_TensorUpdateOp : IREEInput_PureOp<"tensor.update", [
   ];
 }
 
-def IREEInput_TensorTraceOp : IREEInput_Op<"tensor.trace", []> {
-  let summary = [{trace value(s) operation}];
+def IREEInput_TensorTraceOp : IREEInput_Op<"tensor.trace", [
+  AttrSizedOperandSegments,
+]> {
+  let summary = [{traces one or more tensor values at runtime}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given
-    tensors and titles them with the given key. The key is informational only
-    and useful for titling/marking specific sets of tensors for easier
-    searching.
+    tensors. The key is arbitrary and can be used for identifying the set of
+    values being traced.
   }];
 
   let arguments = (ins
     StrAttr:$key,
-    Variadic<IREEInput_Tensor>:$operands
+    Variadic<IREEInput_Tensor>:$values,
+    IREEInput_ShapeDynamicDims:$value_dims
   );
 
-  let assemblyFormat = "$key attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = [{
+    $key `=` `[`
+    custom<ShapedOperandList>($values, type($values), $value_dims)
+    `]` attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins "StringRef":$key, "ValueRange":$values)>,
+  ];
 }
 
 } // OpGroupTensorOps

@@ -2,18 +2,21 @@
 
 This sample shows how to
 
-1. Create a TensorFlow program that includes dynamic shapes in program inputs
-   and outputs
+1. Create a program that includes dynamic shapes in program inputs and outputs
 2. Import that program into IREE's compiler
 3. Compile that program to an IREE VM bytecode module
 4. Load the compiled program using IREE's high level runtime C API
 5. Call exported functions on the loaded program
 
 Steps 1-2 are performed in Python via the
-[`dynamic_shapes.ipynb`](./dynamic_shapes.ipynb)
-[Colab](https://research.google.com/colaboratory/) notebook:
+[`pytorch_dynamic_shapes.ipynb`](./pytorch_dynamic_shapes.ipynb) or
+[`tensorflow_dynamic_shapes.ipynb`](./tensorflow_dynamic_shapes.ipynb)
+[Colab](https://colab.google/) notebooks:
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/dynamic_shapes.ipynb)
+| Framework | Notebook |
+| --------- | -------- |
+PyTorch | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
+TensorFlow | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/tensorflow_dynamic_shapes.ipynb)
 
 Step 3 should be performed on your development host machine
 
@@ -23,33 +26,51 @@ The program used to demonstrate includes functions with varying uses of
 dynamic shapes:
 
 ```python
-class DynamicShapesModule(tf.Module):
+import torch
+import shark_turbine.aot as aot
+
+class DynamicShapesModule(aot.CompiledModule, export_name="module"):
   # reduce_sum_1d (dynamic input size, static output size)
+  #   tensor<?xi32> -> tensor<i32>
   #   e.g. [1, 2, 3] -> 6
-  @tf.function(input_signature=[tf.TensorSpec([None], tf.int32)])
-  def reduce_sum_1d(self, values):
-    return tf.math.reduce_sum(values)
+  def reduce_sum_1d(self, values=aot.AbstractTensor(None, dtype=torch.int32)):
+    return self.compute_reduce_sum_1d(values)
+
+  @aot.jittable
+  def compute_reduce_sum_1d(values):
+    return torch.sum(values, dtype=torch.int32)
 
   # reduce_sum_2d (partially dynamic input size, static output size)
+  #   tensor<?x3xi32> -> tensor<3xi32>
   #   e.g. [[1, 2, 3], [10, 20, 30]] -> [11, 22, 33]
-  @tf.function(input_signature=[tf.TensorSpec([None, 3], tf.int32)])
-  def reduce_sum_2d(self, values):
-    return tf.math.reduce_sum(values, 0)
+  def reduce_sum_2d(self, values=aot.AbstractTensor(None, 3, dtype=torch.int32)):
+    return self.compute_reduce_sum_2d(values)
+
+  @aot.jittable
+  def compute_reduce_sum_2d(values):
+    return torch.sum(values, 0, dtype=torch.int32)
 
   # add_one (dynamic input size, dynamic output size)
+  #   tensor<?xi32>) -> tensor<?xi32>
   #   e.g. [1, 2, 3] -> [2, 3, 4]
-  @tf.function(input_signature=[tf.TensorSpec([None], tf.int32)])
-  def add_one(self, values):
-    return tf.math.add(values, tf.constant(1, dtype=tf.int32))
+  def add_one(self, values=aot.AbstractTensor(None, dtype=torch.int32)):
+    return self.compute_add_one(values)
+
+  @aot.jittable
+  def compute_add_one(values):
+    return values + 1
 ```
 
 ## Background
 
 Tensors are multi-dimensional arrays with a uniform type (e.g. int32, float32)
 and a shape. Shapes consist of a rank and a list of dimensions and may be
-static (i.e. fully known and fixed) or varying degrees of dynamic. See
-TensorFlow's [Introduction to Tensors](https://www.tensorflow.org/guide/tensor)
-for more information on how tensors are used in TensorFlow programs.
+static (i.e. fully known and fixed) or varying degrees of dynamic. For more
+information, see these references:
+* PyTorch:
+[Compiler dynamic shapes](https://pytorch.org/docs/stable/torch.compiler_dynamic_shapes.html),
+[`torch.Tensor`](https://pytorch.org/docs/stable/tensors.html)
+* TensorFlow: [Introduction to Tensors](https://www.tensorflow.org/guide/tensor)
 
 Dynamic shapes are useful for passing variable sized batches as input,
 receiving variable length sentences of text as output, etc.
@@ -64,26 +85,25 @@ them.
 
 ## Instructions
 
-1. Run the Colab notebook and download the `dynamic_shapes.mlir` file it
+1. Run either Colab notebook and download the `dynamic_shapes.mlir` file it
     generates
 
 2. Build the `iree-compile` tool (see
-    [here](https://openxla.github.io/iree/building-from-source/getting-started/)
+    [here](https://iree.dev/building-from-source/getting-started/)
     for general instructions on building using CMake)
 
     ```
-    cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo .
+    cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo .
     cmake --build ../iree-build/ --target iree-compile
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The
-    [CPU configuration](https://openxla.github.io/iree/guides/deployment-configurations/cpu/)
+    [CPU configuration](https://iree.dev/guides/deployment-configurations/cpu/)
     has the best support for dynamic shapes:
 
     ```
     ../iree-build/tools/iree-compile \
         --iree-hal-target-backends=llvm-cpu \
-        --iree-input-type=stablehlo \
         dynamic_shapes.mlir -o dynamic_shapes_cpu.vmfb
     ```
 

@@ -17,7 +17,7 @@ Starting in a python venv, you can find the IREE commit from both the shell:
 
 ```shell
 "$(find . -name 'iree-compile' -executable)" --version
-IREE (https://openxla.github.io/iree):
+IREE (https://iree.dev):
   IREE compiler version 20231016.553 @ f1cb2692a086738d7f16274b9b3af6d2c15ef133
   LLVM version 18.0.0git
   Optimized build
@@ -28,7 +28,7 @@ and the Python API:
 ```shell
 python -c "import iree.compiler.version as v; print(v.REVISIONS['IREE'])"
 f1cb2692a086738d7f16274b9b3af6d2c15ef133
-``` 
+```
 
 ## Manylinux releases
 
@@ -54,7 +54,6 @@ ones:
 ```shell
 export PATH=/opt/python/cp39-cp39/bin:$PATH
 ```
-
 
 Build core installation:
 

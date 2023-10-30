@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "conv1x1_to_matmul.mlir"
     "detach_elementwise_from_named_ops.mlir"
+    "expand_vectors.mlir"
     "materialize_homogeneous_encodings.mlir"
     "remove_zero_extent_tensors.mlir"
     "set_encoding.mlir"

@@ -347,9 +347,30 @@ class E2EModelRunConfig(object):
     def __str__(self):
         return self.name
 
-    def materialize_run_flags(self, gpu_id: str = "0"):
-        """Materialize flags with dependent values."""
-        return utils.substitute_flag_vars(flags=self.run_flags, GPU_ID=gpu_id)
+    def materialize_run_flags(
+        self, gpu_id: str = "0", inputs_dir: Optional[pathlib.PurePath] = None
+    ) -> List[str]:
+        """Materialize flags with dependent values.
+
+        Args:
+            gpu_id: gpu id to use.
+            inputs_dir: directory contains input_{0,1,...}.npy for each input.
+
+        Returns:
+            List of flags
+        """
+        flags = utils.substitute_flag_vars(flags=self.run_flags, GPU_ID=gpu_id)
+
+        model = self.module_generation_config.imported_model.model
+        if inputs_dir:
+            input_npys = [
+                inputs_dir / f"input_{idx}.npy" for idx in range(len(model.input_types))
+            ]
+            flags += [f"--input=@{npy}" for npy in input_npys]
+        else:
+            flags += [f"--input={input_type}=0" for input_type in model.input_types]
+
+        return flags
 
     @classmethod
     def build(
@@ -374,7 +395,6 @@ class E2EModelRunConfig(object):
         name = f"{module_generation_config} {module_execution_config} with {input_data} @ {target_device_spec}"
         run_flags = generate_run_flags(
             imported_model=module_generation_config.imported_model,
-            input_data=input_data,
             module_execution_config=module_execution_config,
             gpu_id=r"${GPU_ID}",
         )
@@ -394,7 +414,6 @@ class E2EModelRunConfig(object):
 
 def generate_run_flags(
     imported_model: ImportedModel,
-    input_data: common_definitions.ModelInputData,
     module_execution_config: ModuleExecutionConfig,
     gpu_id: str = "0",
     with_driver: bool = True,
@@ -413,9 +432,6 @@ def generate_run_flags(
 
     model = imported_model.model
     run_flags = [f"--function={model.entry_function}"]
-    if input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
-        raise ValueError("Currently only support all-zeros data.")
-    run_flags += [f"--input={input_type}=0" for input_type in model.input_types]
 
     exec_config = module_execution_config
     run_flags += exec_config.extra_flags.copy()

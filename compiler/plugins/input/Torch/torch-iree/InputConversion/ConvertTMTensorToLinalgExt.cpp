@@ -152,10 +152,10 @@ struct AttentionOpConversion
         collapsedResult);
 
     if (sizes.size() > 3)
-      rewriter.replaceOp(op, expandBatches(rewriter, loc, batchSizes,
-                                           attention.getResult()[0]));
+      rewriter.replaceOp(
+          op, expandBatches(rewriter, loc, batchSizes, attention.getResult(0)));
     else
-      rewriter.replaceOp(op, attention.getResult()[0]);
+      rewriter.replaceOp(op, attention.getResult(0));
     return success();
   }
 };

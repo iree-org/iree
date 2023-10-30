@@ -79,6 +79,15 @@ def SPIRVMapMemRefStorageClass :
   let constructor = "mlir::iree_compiler::createSPIRVMapMemRefStorageClassPass()";
 }
 
+def SPIRVSelectLoweringStrategy :
+    Pass<"iree-spirv-select-lowering-strategy-pass",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Select the IREE::HAL::DispatchLoweringPassPipeline for lowering"
+                "to SPIR-V";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVSelectLoweringStrategyPass()";
+}
+
 def SPIRVTile : Pass<"iree-spirv-tile", "func::FuncOp"> {
   let summary = "Tile Linalg ops with tensor semantics to invocations";
   let constructor = "mlir::iree_compiler::createSPIRVTilePass()";

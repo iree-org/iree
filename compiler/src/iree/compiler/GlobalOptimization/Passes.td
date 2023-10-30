@@ -27,6 +27,11 @@ def EraseUnusedLinalgOperands :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createEraseUnusedLinalgOperands()";
 }
 
+def ExpandVectors : Pass<"iree-global-opt-expand-vectors", ""> {
+  let summary = "Expand vector in vector/matrix operations";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandVectorsPass()";
+}
+
 def MaterializeHomogeneousEncodings :
   Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
   let summary = "Materializes logical encodings to physical encodings if there is a single device target.";

@@ -17,7 +17,7 @@ and operating system):
 * IREE's _runtime_ is built on the host for the target. The runtime is then
   pushed to the target to run natively.
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
 ### Host environment setup
 
@@ -34,7 +34,7 @@ See instructions in the following links
 
 * [Clang getting started](https://clang.llvm.org/get_started.html)
 * [RISC-V GNU toolchain](https://github.com/riscv/riscv-gnu-toolchain)
-* [QEMU](https://github.com/qemu/qemu)
+* [QEMU](https://gitlab.com/qemu-project/qemu)
 * [RISC-V Linux QEMU](https://risc-v-getting-started-guide.readthedocs.io/en/latest/linux-qemu.html)
 
 !!! note
@@ -61,7 +61,7 @@ from the IREE root directory:
 For RISC-V vector extensions support, see
 [additional instructions](#optional-configuration)
 
-## Configure and build
+## :octicons-sliders-16: Configure and build
 
 ### Host configuration
 
@@ -98,7 +98,7 @@ cmake -GNinja -B ../iree-build-riscv/ \
 cmake --build ../iree-build-riscv/
 ```
 
-## Running IREE bytecode modules on the RISC-V system
+## :octicons-code-16: Running IREE bytecode modules on the RISC-V system
 
 !!! note
     The following instructions are meant for the RISC-V 64-bit Linux
@@ -151,7 +151,7 @@ ${QEMU_BIN} \
       (master branch). Switch the "riscv-binutils" submodule to
       `git://sourceware.org/git/binutils-gdb.git` (master branch) manually.
 * RISC-V QEMU is built from
-[https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
+<https://gitlab.com/qemu-project/qemu/tree/v8.1.2>.
 
 The SIMD code can be generated following the
 [IREE CPU flow](../guides/deployment-configurations/cpu.md)
@@ -172,7 +172,7 @@ Then run on the RISC-V QEMU:
 
 ```shell hl_lines="2 5"
 ${QEMU_BIN} \
-  -cpu rv64,x-v=true,x-k=true,vlen=512,elen=64,vext_spec=v1.0 \
+  -cpu rv64,Zve64d=true,vlen=512,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --device=local-task \

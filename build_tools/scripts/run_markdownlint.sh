@@ -15,13 +15,21 @@ declare -a included_files_patterns=(
   # All .md files (disabled while we decide how rigorously to apply lint checks)
   # "./**/*.md"
 
-  # Just .md files for the user-facing website.
+  # .md files for the website.
   "./docs/website/**/*.md"
+
+  # Some developer documentation .md files that we may move to the website.
+  "./docs/developers/debugging/*.md"
+  "./docs/developers/developing_iree/*.md"
+  "./docs/developers/get_started/*.md"
 )
 
 declare -a excluded_files_patterns=(
   "**/third_party/**"
   "**/node_modules/**"
+
+  # Exclude generated files.
+  "./docs/website/docs/reference/mlir-dialects/!(index).md"
 )
 
 # ${excluded_files_patterns} is expanded into

@@ -263,13 +263,9 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   spirvPM.addPass(spirv::createSPIRVUpdateVCEPass());
 }
 
-extern llvm::cl::opt<std::string> clSPIRVTransformDialectFileName;
-
 void addSPIRVTransformDialectPasses(OpPassManager &passManager) {
-  // Give control to the transform dialect.
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clSPIRVTransformDialectFileName));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -658,11 +654,16 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
-  addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
+void buildSPIRVCodegenStrategyInitializationPassPipeline(OpPassManager &pm) {
+  addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVGeneralizeNamedOpsPass());
+  pm.addPass(createSPIRVSelectLoweringStrategyPass());
+}
+
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
+  buildSPIRVCodegenStrategyInitializationPassPipeline(pm);
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());

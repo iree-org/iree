@@ -279,6 +279,56 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @my_module_br_table_empty
+vm.module @my_module {
+  vm.func @br_table_empty(%arg0: i32, %arg1: i32) -> i32 {
+    //  CHECK-NOT: vm.br_table
+    //      CHECK:  cf.br ^bb1
+    // CHECK-NEXT: ^bb1:
+    // CHECK-NEXT:  cf.br ^bb2(%arg4 : i32)
+    // CHECK-NEXT: ^bb2(%0: i32):
+    //      CHECK:  return
+    vm.br_table %arg0 {
+      default: ^bb1(%arg1 : i32)
+    }
+  ^bb1(%0 : i32):
+    // CHECK: return
+    // CHECK-NOT: vm.return
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @my_module_br_table
+vm.module @my_module {
+  vm.func @br_table(%arg0: i32, %arg1: i32, %arg2: i32) -> i32 {
+    //  CHECK-NOT: vm.br_table
+    //      CHECK:  cf.br ^bb1
+    // CHECK-NEXT: ^bb1:
+    //      CHECK:  emitc.call "vm_cmp_eq_i32"
+    //      CHECK:  emitc.call "vm_cmp_nz_i32"
+    //      CHECK:  cf.cond_br %{{.+}}, ^bb5(%arg4 : i32), ^bb2
+    //      CHECK: ^bb2:
+    //      CHECK:  emitc.call "vm_cmp_eq_i32"
+    //      CHECK:  emitc.call "vm_cmp_nz_i32"
+    //      CHECK:  cf.cond_br %{{.+}}, ^bb5(%arg5 : i32), ^bb3
+    //      CHECK: ^bb3:
+    //      CHECK:  cf.br ^bb4(%arg3 : i32)
+    vm.br_table %arg0 {
+      default: ^bb1(%arg0 : i32),
+      0: ^bb2(%arg1 : i32),
+      1: ^bb2(%arg2 : i32)
+    }
+  ^bb1(%0 : i32):
+    vm.return %0 : i32
+  ^bb2(%1 : i32):
+    vm.return %1 : i32
+  }
+}
+
+// -----
+
 vm.module @my_module {
   // CHECK-LABEL: @my_module_fail
   vm.func @fail(%arg0 : i32) {

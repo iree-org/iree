@@ -19,6 +19,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/trace_replay.h"
+#include "iree/tooling/vm_util.h"
 #include "iree/tooling/yaml_util.h"
 #include "iree/vm/api.h"
 
@@ -58,6 +59,8 @@ typedef enum iree_e2e_test_value_type_e {
   IREE_E2E_TEST_VALUE_TYPE_F32 = 6,
   // double.
   IREE_E2E_TEST_VALUE_TYPE_F64 = 7,
+  // bfloat16
+  IREE_E2E_TEST_VALUE_TYPE_BF16 = 8,
 } iree_e2e_test_value_type_t;
 
 // Maximum size, in bytes, of any value type we can represent.
@@ -73,6 +76,7 @@ typedef struct iree_e2e_test_value_t {
     int64_t i64;
     float f32;
     uint16_t f16_u16;
+    uint16_t bf16_u16;
     double f64;
     uint8_t value_storage[IREE_E2E_TEST_VALUE_STORAGE_SIZE];  // max size of all
                                                               // value types
@@ -136,6 +140,14 @@ static inline iree_e2e_test_value_t iree_e2e_test_value_make_f16(
   return result;
 }
 
+static inline iree_e2e_test_value_t iree_e2e_test_value_make_bf16(
+    uint16_t value) {
+  iree_e2e_test_value_t result;
+  result.type = IREE_E2E_TEST_VALUE_TYPE_BF16;
+  result.bf16_u16 = value;
+  return result;
+}
+
 static inline iree_e2e_test_value_t iree_e2e_test_value_make_f32(float value) {
   iree_e2e_test_value_t result;
   result.type = IREE_E2E_TEST_VALUE_TYPE_F32;
@@ -152,6 +164,12 @@ static inline float iree_e2e_test_value_get_f32(iree_e2e_test_value_t* value) {
 static inline uint16_t iree_e2e_test_value_get_f16(
     iree_e2e_test_value_t* value) {
   return value->f16_u16;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline uint16_t iree_e2e_test_value_get_bf16(
+    iree_e2e_test_value_t* value) {
+  return value->bf16_u16;
 }
 
 static inline iree_e2e_test_value_t iree_e2e_test_value_make_f64(double value) {
@@ -200,10 +218,8 @@ static iree_status_t map_host_local_row_major_data(
     iree_hal_buffer_view_t* buffer_view,
     enum iree_hal_memory_access_bits_t access,
     iree_hal_buffer_mapping_t* mapping) {
-  // Really validate host-local, not just host-visible: callers may rely on
-  // host-coherency.
   IREE_RETURN_IF_ERROR(
-      validate_memory_type(buffer_view, IREE_HAL_MEMORY_TYPE_HOST_LOCAL));
+      validate_memory_type(buffer_view, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
   if (iree_hal_buffer_view_encoding_type(buffer_view) !=
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -344,10 +360,13 @@ static void write_int_element(iree_hal_element_type_t element_type, int value,
   switch (element_type) {
     WRITE_INT_ELEMENT_CASE(INT_8, int8_t)
     WRITE_INT_ELEMENT_CASE(INT_32, int32_t)
+    WRITE_INT_ELEMENT_CASE(FLOAT_32, float)
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
       break;
-      WRITE_INT_ELEMENT_CASE(FLOAT_32, float)
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      *(uint16_t*)dst = iree_math_f32_to_bf16((float)value);
+      break;
     default:
       IREE_ASSERT(false, "unhandled element type");
       break;
@@ -383,6 +402,9 @@ static void write_int_to_matrix_element(int32_t value, iree_hal_dim_t m_size,
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
     ((uint16_t*)data)[index] = iree_math_f32_to_f16((float)value);
     return;
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {
+    ((uint16_t*)data)[index] = iree_math_f32_to_bf16((float)value);
+    return;
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     ((float*)data)[index] = value;
     return;
@@ -406,6 +428,8 @@ static iree_e2e_test_value_t read_matrix_element(
     return iree_e2e_test_value_make_i32(((int32_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
     return iree_e2e_test_value_make_f16(((uint16_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {
+    return iree_e2e_test_value_make_bf16(((uint16_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     return iree_e2e_test_value_make_f32(((float*)data)[index]);
   }
@@ -484,9 +508,9 @@ static iree_status_t get_matmul_sizes(
   static void reference_matmul_##LHSTYPE##_##RHSTYPE##_##RESTYPE##_##ACCTYPE(  \
       iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,     \
       iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,      \
-      iree_hal_element_type_t acc_type, LHSTYPE* lhs_data, RHSTYPE* rhs_data,  \
-      ACCTYPE* acc_data, RESTYPE* result_data, iree_hal_dim_t m,               \
-      iree_hal_dim_t n) {                                                      \
+      iree_hal_element_type_t acc_type, const LHSTYPE* lhs_data,               \
+      const RHSTYPE* rhs_data, const ACCTYPE* acc_data, RESTYPE* result_data,  \
+      iree_hal_dim_t m, iree_hal_dim_t n) {                                    \
     ACCTYPE acc = acc_data ? acc_data[n + m * n_size] : 0;                     \
     for (iree_hal_dim_t k = 0; k < k_size; ++k) {                              \
       LHSTYPE lhs_value = lhs_data[k + m * k_size];                            \
@@ -506,15 +530,15 @@ IREE_TRACE_REPLAY_REFERENCE_MATMUL(float, float, float, float)
 // [i32 <= i8 * i8 + i32]
 IREE_TRACE_REPLAY_REFERENCE_MATMUL(int8_t, int8_t, int32_t, int32_t)
 
-// Reference mamtul for the half_t input, half_t accumlation, and half_t result.
+// Reference mamtul for the f16 input, f16 accumlation, and f16 result.
 // [f16 <= f16 * f16 + f16]
 static void reference_matmul_f16_f16_f16_f16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, uint16_t* lhs_data, uint16_t* rhs_data,
-    uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
-    iree_hal_dim_t n) {
-  float acc = acc_data ? iree_math_f16_to_f32(acc_data[n + m * n_size]) : 0;
+    iree_hal_element_type_t acc_type, const uint16_t* lhs_data,
+    const uint16_t* rhs_data, const uint16_t* acc_data, uint16_t* result_data,
+    iree_hal_dim_t m, iree_hal_dim_t n) {
+  float acc = acc_data ? iree_math_f16_to_f32(acc_data[n + m * n_size]) : 0.f;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
     acc = iree_math_round_to_nearest_f16(
         iree_math_round_to_nearest_f16(
@@ -523,6 +547,57 @@ static void reference_matmul_f16_f16_f16_f16(
         acc);
   }
   result_data[n + m * n_size] = iree_math_f32_to_f16(acc);
+}
+
+// Reference mamtul for the f16 input, f32 accumlation, and f32 result.
+// [f32 <= f16 * f16 + f32]
+static void reference_matmul_f16_f16_f32_f32(
+    iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
+    iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
+    iree_hal_element_type_t acc_type, const uint16_t* lhs_data,
+    const uint16_t* rhs_data, const float* acc_data, float* result_data,
+    iree_hal_dim_t m, iree_hal_dim_t n) {
+  float acc = acc_data ? acc_data[n + m * n_size] : 0.f;
+  for (iree_hal_dim_t k = 0; k < k_size; ++k) {
+    acc += iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
+           iree_math_f16_to_f32(rhs_data[n + k * n_size]);
+  }
+  result_data[n + m * n_size] = acc;
+}
+
+// Reference mamtul for the bf16 input, bf16 accumlation, and bf16 result.
+// [bf16 <= bf16 * bf16 + bf16]
+static void reference_matmul_bf16_bf16_bf16_bf16(
+    iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
+    iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
+    iree_hal_element_type_t acc_type, const uint16_t* lhs_data,
+    const uint16_t* rhs_data, const uint16_t* acc_data, uint16_t* result_data,
+    iree_hal_dim_t m, iree_hal_dim_t n) {
+  float acc = acc_data ? iree_math_bf16_to_f32(acc_data[n + m * n_size]) : 0.f;
+  for (iree_hal_dim_t k = 0; k < k_size; ++k) {
+    acc = iree_math_round_to_nearest_bf16(
+        iree_math_round_to_nearest_bf16(
+            (iree_math_bf16_to_f32(lhs_data[k + m * k_size]) *
+             iree_math_bf16_to_f32(rhs_data[n + k * n_size]))) +
+        acc);
+  }
+  result_data[n + m * n_size] = iree_math_f32_to_bf16(acc);
+}
+
+// Reference mamtul for the bf16 input, f32 accumlation, and f32 result.
+// [f32 <= bf16 * bf16 + f32]
+static void reference_matmul_bf16_bf16_f32_f32(
+    iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
+    iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
+    iree_hal_element_type_t acc_type, const uint16_t* lhs_data,
+    const uint16_t* rhs_data, const float* acc_data, float* result_data,
+    iree_hal_dim_t m, iree_hal_dim_t n) {
+  float acc = acc_data ? acc_data[n + m * n_size] : 0.f;
+  for (iree_hal_dim_t k = 0; k < k_size; ++k) {
+    acc += iree_math_bf16_to_f32(lhs_data[k + m * k_size]) *
+           iree_math_bf16_to_f32(rhs_data[n + k * n_size]);
+  }
+  result_data[n + m * n_size] = acc;
 }
 
 // Helper for reference_matmul.
@@ -536,21 +611,44 @@ static void reference_matmul_element(
       rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     reference_matmul_float_float_float_float(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, (float*)lhs_data,
-        (float*)rhs_data, (float*)acc_data, (float*)result_data, m, n);
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        (const float*)lhs_data, (const float*)rhs_data, (const float*)acc_data,
+        (float*)result_data, m, n);
   } else if (iree_hal_element_type_is_integer(lhs_type, 8) &&
              iree_hal_element_type_is_integer(rhs_type, 8) &&
              iree_hal_element_type_is_integer(acc_type, 32)) {
     reference_matmul_int8_t_int8_t_int32_t_int32_t(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, (int8_t*)lhs_data,
-        (int8_t*)rhs_data, (int32_t*)acc_data, (int32_t*)result_data, m, n);
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        (const int8_t*)lhs_data, (const int8_t*)rhs_data,
+        (const int32_t*)acc_data, (int32_t*)result_data, m, n);
   } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
-    reference_matmul_f16_f16_f16_f16(m_size, k_size, n_size, lhs_type, rhs_type,
-                                     acc_type, (uint16_t*)lhs_data,
-                                     (uint16_t*)rhs_data, (uint16_t*)acc_data,
-                                     (uint16_t*)result_data, m, n);
+    reference_matmul_f16_f16_f16_f16(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
+        (const uint16_t*)acc_data, (uint16_t*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_f16_f16_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16 &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {
+    reference_matmul_bf16_bf16_bf16_bf16(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
+        (const uint16_t*)acc_data, (uint16_t*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16 &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_bf16_bf16_f32_f32(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
+        (const float*)acc_data, (float*)result_data, m, n);
   } else {
     iree_status_abort(
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -648,6 +746,10 @@ static int snprintf_value(char* buf, size_t bufsize,
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.5g" : "%.4g",
                       iree_math_f16_to_f32(value.f16_u16));
+    case IREE_E2E_TEST_VALUE_TYPE_BF16:
+      return snprintf(buf, bufsize,
+                      precision == PRECISION_HIGH ? "%.5g" : "%.4g",
+                      iree_math_bf16_to_f32(value.bf16_u16));
     case IREE_E2E_TEST_VALUE_TYPE_F32:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.8g" : "%.4g", value.f32);
@@ -682,6 +784,15 @@ static bool matmul_result_elements_agree(iree_e2e_test_value_t expected,
       if (FLAG_require_exact_results) return false;
       return fabsf(iree_math_f16_to_f32(actual.f16_u16) -
                    iree_math_f16_to_f32(expected.f16_u16)) <
+             FLAG_acceptable_fp_delta;
+    case IREE_E2E_TEST_VALUE_TYPE_BF16:
+      if (actual.bf16_u16 == expected.bf16_u16) return true;
+      fprintf(stderr, "actual (%x) %g ; expected (%x) %g\n", actual.bf16_u16,
+              iree_math_bf16_to_f32(actual.bf16_u16), expected.bf16_u16,
+              iree_math_bf16_to_f32(expected.bf16_u16));
+      if (FLAG_require_exact_results) return false;
+      return fabsf(iree_math_bf16_to_f32(actual.bf16_u16) -
+                   iree_math_bf16_to_f32(expected.bf16_u16)) <
              FLAG_acceptable_fp_delta;
     case IREE_E2E_TEST_VALUE_TYPE_F32:
       if (actual.f32 == expected.f32) return true;
@@ -844,12 +955,7 @@ static iree_status_t check_matmul_failure(
   // We have a lot more freedom to pick k_start, k_end, since these parameters
   // only affect which regions of the input lhs and rhs matrices are printed.
   // If we were only testing random lhs and rhs, we would just pick
-  // k_start = 0 and any reasonable k_end value. Since we are often using
-  // identity matrices for lhs and rhs, and we expect the majority of
-  // test failures to occur with such identity matrices, we try to pick
-  // k_start and k_end so that nontrivial regions of identity matrices will be
-  // printed. That means that we try to have [k_start, k_end) intervals
-  // overlap [m_start, m_end) and [n_start, n_end).
+  // k_start = 0 and any reasonable k_end value.
   int k_start = iree_max(0, iree_min(m_start, n_start));
   int k_end = iree_min(k_size, iree_max(m_end, n_end));
   // [k_start, k_end) could be arbitrarily long at this point. Constrain it a
@@ -979,29 +1085,6 @@ static iree_status_t check_matmul_results(
  *
  *****************************************************************************/
 
-static iree_status_t make_identity_matrix_callback(
-    iree_hal_buffer_mapping_t* mapping, void* user_data) {
-  iree_hal_buffer_view_t* src = (iree_hal_buffer_view_t*)user_data;
-  iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(src);
-  iree_host_size_t elem_byte_count =
-      iree_hal_element_dense_byte_count(elem_type);
-  iree_hal_dim_t dims[2] = {0};
-  IREE_RETURN_IF_ERROR(get_matrix_shape(src, dims));
-  int rows = dims[0];
-  int cols = dims[1];
-  // Write 1 to matrix elements on the main diagonal.
-  int diagonal_size = iree_min(rows, cols);
-  memset(mapping->contents.data, 0, mapping->contents.data_length);
-  intptr_t diagonal_elem_addr = (intptr_t)mapping->contents.data;
-  for (int i = 0; i < diagonal_size; ++i) {
-    write_int_element(elem_type, 1, (void*)diagonal_elem_addr);
-    // Due to the row-major storage, the diagonal entries are every
-    // (cols + 1)-th buffer elements.
-    diagonal_elem_addr += elem_byte_count * (cols + 1);
-  }
-  return iree_ok_status();
-}
-
 // Deep-copies device-local list of buffer_views |src| into |dst|.
 static iree_status_t copy_device_buffer_views_to_device(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
@@ -1055,39 +1138,43 @@ static iree_status_t do_matmul_and_check_results(
       replay->device, device_allocator, device_inputs, &host_inputs));
 
   // Invoke the function to produce the actual result.
-  iree_vm_list_t* device_outputs = NULL;
+  iree_vm_list_t* outputs = NULL;
   IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                     /*initial_capacity=*/8,
-                                    replay->host_allocator, &device_outputs));
+                                    replay->host_allocator, &outputs));
   IREE_CHECK_OK(iree_vm_invoke(
       replay->context, function, IREE_VM_INVOCATION_FLAG_NONE,
-      /*policy=*/NULL, device_inputs, device_outputs, replay->host_allocator));
+      /*policy=*/NULL, device_inputs, outputs, replay->host_allocator));
   iree_vm_list_release(device_inputs);
 
-  // Get the device_actual_result from the device_outputs.
-  iree_hal_buffer_view_t* device_actual_result;
-  IREE_CHECK_OK(
-      get_item_as_buffer_view(device_outputs, 0, &device_actual_result));
+  // Transfer device buffers to host buffers.
+  iree_hal_buffer_params_t host_params = {
+      .usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+      .access = IREE_HAL_MEMORY_ACCESS_ALL,
+      .type =
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
+      .min_alignment = 0,
+  };
+  IREE_CHECK_OK(iree_tooling_transfer_variant_list(
+      replay->device, outputs, device_allocator, host_params,
+      /*wait_fence=*/NULL, /*signal_fence=*/NULL));
 
-  // Copy the results to a host local buffer to be able to map it.
-  iree_hal_buffer_view_t* host_actual_result = NULL;
-  IREE_CHECK_OK(copy_device_buffer_view_to_host(
-      replay->device, device_allocator, device_actual_result,
-      &host_actual_result));
+  // Get the actual result computed by the program.
+  iree_hal_buffer_view_t* actual_result;
+  IREE_CHECK_OK(get_item_as_buffer_view(outputs, 0, &actual_result));
 
-  // Allocate host_expected_result with same shape as host_actual_result.
+  // Allocate host_expected_result with same shape as actual_result.
   iree_hal_buffer_view_t* host_expected_result = NULL;
-  IREE_CHECK_OK(allocate_host_buffer_view_like(replay->device, device_allocator,
-                                               host_actual_result,
-                                               &host_expected_result));
+  IREE_CHECK_OK(allocate_host_buffer_view_like(
+      replay->device, device_allocator, actual_result, &host_expected_result));
 
-  // Check that host_actual_result and host_expected_result agree.
-  iree_status_t status = check_matmul_results(
-      file, host_inputs, host_actual_result, host_expected_result);
+  // Check that actual_result and host_expected_result agree.
+  iree_status_t status = check_matmul_results(file, host_inputs, actual_result,
+                                              host_expected_result);
 
-  iree_vm_list_release(device_outputs);  // releases device_actual_result
+  iree_vm_list_release(outputs);  // releases actual_result
   iree_vm_list_release(host_inputs);
-  iree_hal_buffer_view_release(host_actual_result);
   iree_hal_buffer_view_release(host_expected_result);
   return status;
 }

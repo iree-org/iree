@@ -126,3 +126,22 @@ func.func @scfWhileExpansion(%arg0 : i32, %arg1 : tensor<1xf32>) {
   }
   return
 }
+
+// -----
+
+// CHECK-LABEL: @scfWhileExpansion
+// CHECK-SAME: %[[ARG0:.+]]: index,
+// CHECK-SAME: %[[ARG1:.+]]: !stream.resource<*>,
+// CHECK-SAME: %[[ARG2:.+]]: index
+func.func @scfWhileExpansion(%arg0 : index, %arg1 : tensor<1xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK: %[[C1:.+]] = arith.constant 1 : index
+  // CHECK: [[FOR:.+]]:2 = scf.for %[[ARG3:.+]] = %[[C0]] to %[[ARG0]] step %c1 iter_args(%[[ARG4:.+]] = %[[ARG1]], %[[ARG5:.+]] = %[[ARG2]]) -> (!stream.resource<*>, index)
+  scf.for %i = %c0 to %arg0 step %c1 iter_args(%arg2 = %arg1) -> (tensor<1xf32>) {
+    scf.yield %arg2 : tensor<1xf32>
+  }
+  return
+}

@@ -134,3 +134,31 @@ func.func @side_effects() {
 }
 
 func.func private @other_fn()
+
+// -----
+
+util.global private mutable @varA = dense<1> : tensor<2xi32>
+util.global private mutable @varB = dense<2> : tensor<2xi32>
+
+// CHECK-LABEL: @ordering
+func.func @ordering() {
+  %cst_top = arith.constant 1 : index
+  %varA_0 = util.global.load @varA {id = 0} : tensor<2xi32>
+  util.global.store %varA_0, @varA {id = 0} : tensor<2xi32>
+  %varB_0 = util.global.load @varB {id = 1} : tensor<2xi32>
+  util.global.store %varB_0, @varB {id = 1} : tensor<2xi32>
+  %cst_bottom = arith.constant 2 : index
+
+  // Loads should be moved up (in any order).
+  // CHECK-DAG: %[[T0:.+]] = util.global.load @varA {id = 0
+  // CHECK-DAG: %[[T1:.+]] = util.global.load @varB {id = 1
+  // CHECK-NEXT: arith.constant
+
+  // CHECK-NOT: NOT
+
+  // Stores should be moved down (in any order).
+  // CHECK-NEXT: arith.constant
+  // CHECK-DAG: util.global.store %[[T0]], @varA {id = 0
+  // CHECK-DAG: util.global.store %[[T1]], @varB {id = 1
+  return
+}

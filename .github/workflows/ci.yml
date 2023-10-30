@@ -922,19 +922,19 @@ jobs:
           - platform: linux
             arch: riscv_64
             abi: lp64d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: riscv_32
             abi: ilp32d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: generic
             arch: riscv_32
             abi: ilp32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./tests/riscv32/smoke.sh"
           - platform: emscripten
@@ -1023,11 +1023,11 @@ jobs:
         target:
           - platform: linux
             arch: riscv_64
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: riscv_32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: x86_64
@@ -1058,12 +1058,6 @@ jobs:
         run: |
           mkdir -p ${E2E_TEST_ARTIFACTS_DIR}
           gcloud storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" "${E2E_TEST_ARTIFACTS_DIR}"
-      - name: "Download benchmark expected output"
-        env:
-          EXPECTED_OUTPUT_GSC_ARTIFACT: gs://iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy
-          EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy
-        run: |
-          gcloud storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${E2E_TEST_ARTIFACTS_DIR}/${EXPECTED_OUTPUT_FILE}"
       - name: "Build iree-run-module and test benchmark suite modules"
         run: |
           ./build_tools/github_actions/docker_run.sh \

@@ -84,7 +84,7 @@ jobs:
             experimental: true
 
     env:
-      MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:e83893d35be4ce3558c989e9d5ccc4ff88d058bc3e74a83181059cc76e2cf1f8
+      MANYLINUX_X86_64_IMAGE: ghcr.io/nod-ai/manylinux_x86_64:main
 
     steps:
       - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0

@@ -31,18 +31,18 @@ for compiler passes and pipelines in other `.../test/*.mlir` files.
 ### Running a Test
 
 For the test
-https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir
+<https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir>
 
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir.test
+ctest -R iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir.test
 ```
 
 With Bazel, run this from the repo root:
 
 ```shell
-$ bazel test //compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM/test:arithmetic_ops.mlir.test
+bazel test //compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM/test:arithmetic_ops.mlir.test
 ```
 
 ### Writing a Test
@@ -106,13 +106,13 @@ For the test
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R iree/base/bitfield_test
+ctest -R iree/base/bitfield_test
 ```
 
 With Bazel, run this from the repo root:
 
 ```shell
-$ bazel test //runtime/src/iree/base:arena_test
+bazel test //runtime/src/iree/base:arena_test
 ```
 
 ### Setting test environments
@@ -121,7 +121,7 @@ Parallel testing for `ctest` can be enabled via the `CTEST_PARALLEL_LEVEL`
 environment variable. For example:
 
 ```shell
-$ export CTEST_PARALLEL_LEVEL=$(nproc)
+export CTEST_PARALLEL_LEVEL=$(nproc)
 ```
 
 To use the Vulkan backend as test driver, you may need to select between a
@@ -220,13 +220,20 @@ need to build the special `iree-test-deps` target to generate test files prior
 to running CTest (from the build directory):
 
 ```shell
-$ cmake --build . --target iree-test-deps
+cmake --build . --target iree-test-deps
 ```
+
+To run e2e model tests in
+[generated_e2e_model_tests.cmake](/tests/e2e/models/generated_e2e_model_tests.cmake),
+because of their dependencies, `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON` needs to be
+set when configuring CMake. Also see
+[IREE Benchmark Suite Prerequisites](/docs/developers/developing_iree/benchmark_suites.md#prerequisites)
+for required packages.
 
 ### Running a Test
 
 For the test
-https://github.com/openxla/iree/tree/main/tests/e2e/xla_ops/floor.mlir
+<https://github.com/openxla/iree/tree/main/tests/e2e/xla_ops/floor.mlir>
 compiled for the VMVX target backend and running on the VMVX driver (here they
 match exactly, but in principle there's a many-to-many mapping from backends to
 drivers).
@@ -234,13 +241,13 @@ drivers).
 With CMake, run this from the build directory:
 
 ```shell
-$ ctest -R tests/e2e/xla_ops/check_vmvx_local-task_floor.mlir
+ctest -R tests/e2e/xla_ops/check_vmvx_local-task_floor.mlir
 ```
 
 With Bazel, run this from the repo root:
 
 ```shell
-$ bazel test tests/e2e/xla_ops:check_vmvx_local-task_floor.mlir
+bazel test tests/e2e/xla_ops:check_vmvx_local-task_floor.mlir
 ```
 
 ### Setting test environments

@@ -54,6 +54,10 @@ std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createEraseUnusedLinalgOperands();
 
+// Expands vectors in vector/matrix operations into linalg.batch_matmul/matmul
+// forms.
+std::unique_ptr<Pass> createExpandVectorsPass();
+
 // Materializes logical encodings to physical encodings if there is a single
 // device target.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>

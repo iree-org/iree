@@ -7,8 +7,15 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_IREECODEGEN_DIALECT_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_IREECODEGEN_DIALECT_H_
 
+#include <mutex>
+
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringMap.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/TypeID.h"
 
 // clang-format off: must be included after all LLVM/MLIR eaders
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h.inc" // IWYU pragma: keep

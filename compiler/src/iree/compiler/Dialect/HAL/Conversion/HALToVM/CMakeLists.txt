@@ -34,7 +34,6 @@ iree_cc_library(
     MLIRPass
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion

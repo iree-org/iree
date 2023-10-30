@@ -114,10 +114,16 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
   //      broadcast this ends up redundantly computing operations without more
   //      parallelism.
   if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
-    return linalgConsumerOp.getNumParallelLoops() ==
-               linalgConsumerOp.getNumLoops() ||
-           linalgConsumerOp.getMatchingIndexingMap(fusedOperand)
-               .isPermutation();
+    if (linalgConsumerOp.getNumParallelLoops() ==
+        linalgConsumerOp.getNumLoops()) {
+      return true;
+    }
+    if (linalgConsumerOp.getNumReductionLoops() != 1 ||
+        !linalgConsumerOp.getMatchingIndexingMap(fusedOperand)
+             .isPermutation()) {
+      return false;
+    }
+    return true;
   }
 
   // All other cases dont fuse.

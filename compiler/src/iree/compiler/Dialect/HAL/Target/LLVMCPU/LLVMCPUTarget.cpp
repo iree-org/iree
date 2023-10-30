@@ -406,8 +406,10 @@ public:
     if (!target.linkStatic) {
       // Grab a linker tool based on the options (and target environment).
       // This uses the defaultOptions_ in order to get paths and such, which
-      // are environmental.
-      linkerTool = LinkerTool::getForTarget(targetTriple, defaultOptions_);
+      // are environmental, but replace the target with the actual one.
+      LLVMTargetOptions options = defaultOptions_;
+      options.target = target;
+      linkerTool = LinkerTool::getForTarget(targetTriple, options);
       if (!linkerTool) {
         return mlir::emitError(variantOp.getLoc())
                << "failed to find a target linker for the given target triple '"

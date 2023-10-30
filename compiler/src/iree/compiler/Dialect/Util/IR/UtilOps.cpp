@@ -26,8 +26,46 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Experimental
+//===----------------------------------------------------------------------===//
+
+// For now we emit all cases and then select the first found (by selecting
+// in reverse). So if selecting between case0, case1, and case2 we'd end up with
+//   %case0 = ...
+//   %case1 = ...
+//   %case2 = ...
+//   %0 = arith.select %case2, %c2, %c-1
+//   %1 = arith.select %case1, %c1, %0
+//   %2 = arith.select %case0, %c0, %1
+//   // %2 is now -1 if nothing matched or the index of the match
+Value buildIfElseTree(
+    Location loc, size_t count,
+    std::function<Value(Location, size_t, OpBuilder &)> caseBuilder,
+    OpBuilder &builder) {
+  SmallVector<Value> caseValues;
+  caseValues.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    caseValues.push_back(caseBuilder(loc, i, builder));
+  }
+  Value result = builder.create<arith::ConstantIndexOp>(loc, -1);
+  for (int i = count - 1; i >= 0; --i) {
+    result = builder.create<arith::SelectOp>(
+        loc, caseValues[i], builder.create<arith::ConstantIndexOp>(loc, i),
+        result);
+  }
+  return result;
+}
+
+//===----------------------------------------------------------------------===//
 // Utils
 //===----------------------------------------------------------------------===//
+
+ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr) {
+  SetVector<Attribute> attrsSet(arrayAttr.begin(), arrayAttr.end());
+  if (attrsSet.size() == arrayAttr.size())
+    return arrayAttr;
+  return ArrayAttr::get(arrayAttr.getContext(), attrsSet.takeVector());
+}
 
 Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes) {
   assert(values[index].getType().isa<IREE::Util::SizeAwareTypeInterface>() &&

@@ -10,6 +10,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
 #define GET_ATTRDEF_CLASSES
@@ -59,11 +60,12 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
+    SymbolRefAttr codegenSpec) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
   return get(context, pipelineAttr, softwarePipelineDepth,
-             softwarePipelineStoreStage);
+             softwarePipelineStoreStage, codegenSpec);
 }
 
 DispatchLoweringPassPipeline
@@ -74,7 +76,8 @@ TranslationInfoAttr::getDispatchLoweringPassPipeline() {
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
+    SymbolRefAttr codegenSpec) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
@@ -82,6 +85,13 @@ LogicalResult TranslationInfoAttr::verify(
   if (passPipelineValue > IREE::Codegen::DispatchLoweringPassPipeline::None) {
     return emitError() << "invalid pass pipeline value : "
                        << stringifyEnum(passPipeline.getValue());
+  }
+  auto tdPassPipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen;
+  if (codegenSpec && passPipelineValue != tdPassPipeline) {
+    return emitError()
+           << "transform dialect codegen spec requires pass pipeline : "
+           << stringifyEnum(tdPassPipeline);
   }
   return success();
 }
@@ -291,7 +301,8 @@ LogicalResult CompilationInfoAttr::verify(
   if (failed(TranslationInfoAttr::verify(
           emitError, translationInfo.getPassPipeline(),
           translationInfo.getSoftwarePipelineDepth(),
-          translationInfo.getSoftwarePipelineStoreStage()))) {
+          translationInfo.getSoftwarePipelineStoreStage(),
+          translationInfo.getCodegenSpec()))) {
     return failure();
   }
   return success();

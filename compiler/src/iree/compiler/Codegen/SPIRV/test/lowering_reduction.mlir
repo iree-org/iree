@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-spirv-lower-executable-target-pass)))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-spirv-select-lowering-strategy-pass, iree-spirv-lower-executable-target-pass)))' \
 // RUN:   %s | FileCheck %s
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
@@ -10,7 +10,7 @@
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable @warp_reduction_dispatch {
-  hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export public @warp_reduction_dispatch ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -106,7 +106,7 @@ hal.executable @warp_reduction_dispatch {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable @warp_reduction_dispatch {
-  hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export public @warp_reduction_dispatch ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -201,7 +201,7 @@ hal.executable @warp_reduction_dispatch {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable @softmax {
-hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
   hal.executable.export public @softmax ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2

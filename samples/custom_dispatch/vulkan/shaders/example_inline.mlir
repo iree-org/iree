@@ -53,6 +53,16 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
 
     // Dispatch a basic `ret = lhs * rhs` shader.
     %0 = hal.dispatch.extern "main"[%dim](%dim_i32, %arg0, %arg1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> tensor<?xf32>{%dim}
+      count(%device: !hal.device, %workload: index) -> (index, index, index) {
+        // This host function is used to compute the XYZ workgroup count
+        // dispatched at runtime. It can query the %device for capabilities
+        // and limits (shared memory size, etc). The other arguments are the
+        // values passed in the dispatch operation (usually things like root
+        // output op tensor dimensions and other abstract values).
+        %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
+        %c1 = arith.constant 1 : index
+        hal.return %x, %c1, %c1 : index, index, index
+      }
       // The layout defines the required bindings and push constants and can be
       // thought of as the function signature.
       layout(#hal.pipeline.layout<push_constants = 1, sets = [
@@ -94,16 +104,6 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
           }>
         ]
       }>)
-      count(%device: !hal.device, %workload: index) -> (index, index, index) {
-        // This host function is used to compute the XYZ workgroup count
-        // dispatched at runtime. It can query the %device for capabilities
-        // and limits (shared memory size, etc). The other arguments are the
-        // values passed in the dispatch operation (usually things like root
-        // output op tensor dimensions and other abstract values).
-        %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
-        %c1 = arith.constant 1 : index
-        hal.return %x, %c1, %c1 : index, index, index
-      }
 
     // Code gen some other ops - these will interleave with the hand-authored
     // ones but naturally won't be able to fuse with them.

@@ -191,6 +191,51 @@ static bool doesSliceSpanWholeTarget(
 }
 
 //===----------------------------------------------------------------------===//
+// custom<ShapedOperandList>($values, type($values), $value_dims)
+//===----------------------------------------------------------------------===//
+// %value : type{%dynamic_dims}, ...
+
+static ParseResult parseShapedOperandList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+    SmallVectorImpl<Type> &valueTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &valueDims) {
+  do {
+    values.emplace_back();
+    valueTypes.emplace_back();
+    if (failed(parser.parseOperand(values.back())) ||
+        failed(parser.parseColon()) ||
+        failed(parser.parseType(valueTypes.back())))
+      return failure();
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(valueTypes.back()).getNumDynamicDims()) {
+      if (failed(parser.parseOperandList(valueDims, dynamicDimCount,
+                                         AsmParser::Delimiter::Braces)))
+        return failure();
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printShapedOperandList(OpAsmPrinter &p, Operation *op,
+                                   ValueRange values, TypeRange valueTypes,
+                                   ValueRange valueDims) {
+  llvm::interleaveComma(llvm::zip_equal(values, valueTypes), p, [&](auto it) {
+    auto [value, valueType] = it;
+    p << value;
+    p << " : ";
+    p << valueType;
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(valueType).getNumDynamicDims()) {
+      p << "{";
+      llvm::interleaveComma(valueDims.take_front(dynamicDimCount), p);
+      valueDims = valueDims.drop_front(dynamicDimCount);
+      p << "}";
+    }
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
 
@@ -285,6 +330,44 @@ static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
     return;
   p << " count";
   printWorkgroupCountRegionWithoutKeyword(p, op, body);
+}
+
+//===----------------------------------------------------------------------===//
+// custom<DispatchEntryPoints>($entry_points)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseDispatchEntryPoints(OpAsmParser &parser,
+                                            ArrayAttr &entryPointAttrsArray) {
+  SmallVector<Attribute> entryPointAttrs;
+  if (succeeded(parser.parseOptionalLBrace())) {
+    do {
+      SymbolRefAttr entryPointAttr;
+      if (failed(parser.parseAttribute(entryPointAttr)))
+        return failure();
+      entryPointAttrs.push_back(entryPointAttr);
+    } while (succeeded(parser.parseOptionalComma()));
+    if (failed(parser.parseRBrace()))
+      return failure();
+  } else {
+    SymbolRefAttr entryPointAttr;
+    if (failed(parser.parseAttribute(entryPointAttr)))
+      return failure();
+    entryPointAttrs.push_back(entryPointAttr);
+  }
+  entryPointAttrsArray = parser.getBuilder().getArrayAttr(entryPointAttrs);
+  return success();
+}
+
+static void printDispatchEntryPoints(OpAsmPrinter &p, Operation *op,
+                                     ArrayAttr entryPointAttrs) {
+  if (entryPointAttrs.size() == 1) {
+    p.printAttribute(entryPointAttrs.getValue().front());
+  } else {
+    p << '{';
+    llvm::interleaveComma(entryPointAttrs, p.getStream(),
+                          [&](Attribute attr) { p.printAttribute(attr); });
+    p << '}';
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1284,7 +1367,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
                        ValueRange operands, ValueRange operandDims,
                        ArrayAttr tiedOperands,
                        ArrayRef<NamedAttribute> attributes) {
-  state.addAttribute("entry_point", entryPoint);
+  state.addAttribute("entry_points", builder.getArrayAttr(entryPoint));
   state.addOperands(workload);
   state.addTypes(resultTypes);
   state.addOperands(operands);
@@ -1304,13 +1387,23 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
                      }));
 }
 
-StringAttr DispatchOp::executable() {
-  return getEntryPoint().getRootReference();
-}
-
 FunctionType DispatchOp::getEntryPointType() {
   SmallVector<Type, 8> argTypes(operand_type_range{getArguments()});
   return FunctionType::get(getContext(), argTypes, getResultTypes());
+}
+
+std::string DispatchOp::getEntryPointName() {
+  // Pick the first entry point we have. The common case is we only have one
+  // but frontends may provide multiple variants - they're all likely the
+  // same name but with slight differences and enough for a user to know what's
+  // happening.
+  auto anyEntryPoint = *getEntryPointRefs().begin();
+  std::string entryPointName =
+      anyEntryPoint.getRootReference().getValue().str();
+  for (FlatSymbolRefAttr nestedRef : anyEntryPoint.getNestedReferences()) {
+    entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
+  }
+  return entryPointName;
 }
 
 std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
@@ -1319,36 +1412,47 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 
 LogicalResult DispatchOp::verify() {
   Operation *op = getOperation();
+
+  if (getEntryPoints().empty()) {
+    return op->emitOpError("at least one entry point reference is required");
+  }
+
   if (failed(verifyOpDynamicDims(op, getArguments(), getArgumentDims())) ||
       failed(verifyOpDynamicDims(op, getResults(), getResultDims()))) {
     return failure();
   }
+
   return success();
 }
 
 LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
-  auto exportOp =
-      symbolTable.lookupNearestSymbolFrom<IREE::Flow::ExecutableExportOp>(
-          op, getEntryPoint());
-  if (!exportOp) {
-    // TODO(benvanik): there are a lot of tests that are assuming this is not
-    // verified. We'll need to go add dummy executables for all of them. Today
-    // we just bail on the verifier if the symbol isn't found.
-    //
-    // Should be:
-    //   return op->emitOpError() << "undefined entry point: " <<
-    //   getEntryPoint();
-    return success();
+  auto entryPointRefs = getEntryPointRefs();
+  if (entryPointRefs.empty()) {
+    return emitOpError() << "at least one entry point must be defined";
   }
+  for (auto entryPointAttr : entryPointRefs) {
+    auto exportOp =
+        symbolTable.lookupNearestSymbolFrom<IREE::Flow::ExecutableExportOp>(
+            op, entryPointAttr);
+    if (!exportOp) {
+      // TODO(benvanik): there are a lot of tests that are assuming this is not
+      // verified. We'll need to go add dummy executables for all of them. Today
+      // we just bail on the verifier if the symbol isn't found.
+      //
+      // Should be:
+      //   return op->emitOpError() << "undefined entry point: " <<
+      //   getEntryPoint();
+      return success();
+    }
 
-  // Verify that the workload parameters captured match the target export.
-  if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
-    return failure();
+    // Verify that the workload parameters captured match the target export.
+    if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
+      return failure();
+    }
+
+    // TODO(benvanik): verify that the target function has matching operands.
   }
-
-  // TODO(benvanik): verify that the target function has matching operands.
-
   return success();
 }
 
@@ -1523,6 +1627,36 @@ SmallVector<int64_t> TensorReshapeOp::getTiedResultOperandIndices() {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.bitcast
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorBitCastOp::verify() {
+  // The element types don't need to match, we can just check the requisite
+  // number of dynamic dims.
+  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
+                                 getSourceDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 {getResultDims()}))) {
+    return failure();
+  }
+
+  return success();
+}
+
+Value TensorBitCastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+TensorBitCastOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> TensorBitCastOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.load
 //===----------------------------------------------------------------------===//
 
@@ -1646,6 +1780,35 @@ TensorUpdateOp::getTiedResultOperandIndex(unsigned resultIndex) {
 
 SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0}; // target
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.trace
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorTraceOp::verify() {
+  TensorTraceOp op = *this;
+  if (failed(verifyOpDynamicDims(op, op.getValues(), op.getValueDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+ValueRange TensorTraceOp::getOperandDynamicDims(unsigned idx) {
+  auto valueDims = getValueDims();
+  for (unsigned i = 0; i <= idx; ++i) {
+    auto valueType = cast<ShapedType>(getValues()[i].getType());
+    int64_t dynamicDimCount = valueType.getNumDynamicDims();
+    if (i == idx) {
+      return valueDims.take_front(dynamicDimCount);
+    }
+    valueDims = valueDims.drop_front(dynamicDimCount);
+  }
+  return ValueRange{};
+}
+
+ValueRange TensorTraceOp::getResultDynamicDims(unsigned idx) {
+  return ValueRange{};
 }
 
 //===----------------------------------------------------------------------===//

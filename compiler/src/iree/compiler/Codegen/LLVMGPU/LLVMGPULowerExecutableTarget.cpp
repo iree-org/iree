@@ -42,8 +42,7 @@ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
-        .insert<IREE::Codegen::IREECodegenDialect,
-                IREE::HAL::HALDialect,
+        .insert<IREE::HAL::HALDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 linalg::LinalgDialect,
                 gpu::GPUDialect,
@@ -62,52 +61,8 @@ public:
       const LLVMGPULowerExecutableTargetPass &pass){};
 
   void runOnOperation() override;
-
-private:
-  Option<bool> testLoweringConfiguration{
-      *this, "test-lowering-configuration",
-      llvm::cl::desc(
-          "Flag used for lit-testing the default configuration set for root "
-          "ops in hal.executable.variants. Defaults to false and is set to "
-          "true "
-          "for lit tests. Not for general usage"),
-      llvm::cl::init(false)};
 };
 } // namespace
-
-/// Verify that valid configuration is set for all ops within the compiled
-/// module.
-template <typename F>
-static LogicalResult
-verifyLoweringConfiguration(ModuleOp module,
-                            IREE::Codegen::TranslationInfoAttr translationInfo,
-                            ArrayRef<int64_t> workgroupSize, F verificationFn) {
-  auto walkResult = module.walk([&](Operation *op) -> WalkResult {
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
-    if (!loweringConfig)
-      return WalkResult::advance();
-    return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
-  });
-  return failure(walkResult.wasInterrupted());
-}
-
-static LogicalResult
-verifyEntryPoint(ModuleOp moduleOp,
-                 IREE::Codegen::TranslationInfoAttr translationInfo,
-                 IREE::HAL::ExecutableExportOp exportOp) {
-  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
-      exportOp.getWorkgroupSize();
-
-  if (workgroupSizeAttr.has_value()) {
-    std::array<int64_t, 3> workgroupSizes;
-    for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-      workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
-    }
-    return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                       workgroupSizes, verifyGPUMatmulPipeline);
-  }
-  return success();
-}
 
 void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
@@ -115,15 +70,10 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   OpPassManager executableLoweringPipeline(
       IREE::HAL::ExecutableVariantOp::getOperationName());
 
-  if (failed(initGPULaunchConfig(moduleOp))) {
-    return signalPassFailure();
-  }
-
   // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same pipeline.
-  // TODO(ravishankarm): This is strange that this is not enforced
-  // structurally, but something to address later on. For now this restriction
-  // is fine.
+  // them need to have the same pipeline. This should have been verified during
+  // strategy selection, but we still need to retrieve the translation info
+  // here.
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
@@ -140,16 +90,10 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       } else {
         translationInfo = currTranslationInfo;
       }
-
-      // Verify the properties of each entry point based on the target
-      // pipeline.
-      if (failed(verifyEntryPoint(moduleOp, currTranslationInfo, exportOp))) {
-        return signalPassFailure();
-      }
     }
   }
 
-  if (!testLoweringConfiguration && translationInfo.has_value()) {
+  if (translationInfo.has_value()) {
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
     case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
       addGPUDefaultPassPipeline(executableLoweringPipeline);
@@ -187,6 +131,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
       addGPUTransformDialectPasses(executableLoweringPipeline);
       break;
+    // no pipeline specified, nothing to do.
+    case IREE::Codegen::DispatchLoweringPassPipeline::None:
+      return;
     default:
       variantOp.emitOpError("Unsupported pipeline on GPU target.");
       return signalPassFailure();

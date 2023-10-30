@@ -765,10 +765,9 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   }
 
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.getWorkload(),
-      builder.getArrayAttr({asyncOp.getEntryPoint()}), newOperands,
-      newResources, newResourceSizes, newResourceOffsets, newResourceLengths,
-      builder.getArrayAttr(newResourceAccesses));
+      asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPointsAttr(),
+      newOperands, newResources, newResourceSizes, newResourceOffsets,
+      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
   newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();
@@ -1822,9 +1821,12 @@ public:
           callableOp.getCallableRegion()->empty()) {
         continue;
       }
-      for (auto &op : llvm::make_early_inc_range(
-               callableOp.getCallableRegion()->getOps())) {
-        if (failed(TypeSwitch<Operation *, LogicalResult>(&op)
+
+      llvm::SmallVector<Operation *> operations;
+      callableOp.walk([&](Operation *op) { operations.push_back(op); });
+
+      for (auto op : operations) {
+        if (failed(TypeSwitch<Operation *, LogicalResult>(op)
                        .Case([&](IREE::Stream::AsyncExecuteOp op) {
                          return allocateExecutionRegion(op);
                        })

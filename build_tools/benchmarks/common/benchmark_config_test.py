@@ -53,6 +53,7 @@ class BenchmarkConfigTest(unittest.TestCase):
                 f"--e2e_test_artifacts_dir={self.e2e_test_artifacts_dir}",
                 f"--execution_benchmark_config={self.execution_config}",
                 "--target_device=test",
+                "--verify",
             ]
         )
 
@@ -79,6 +80,7 @@ class BenchmarkConfigTest(unittest.TestCase):
             keep_going=True,
             benchmark_min_time=10,
             use_compatible_filter=True,
+            verify=True,
         )
         self.assertEqual(config, expected_config)
 

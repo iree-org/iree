@@ -148,8 +148,7 @@ public:
     // For each executable entry point op, rename the entry point symbol using
     // that convention and keep track of the mapping between entry point
     // ordinals to which shader module they reference.
-    auto exportOps =
-        llvm::to_vector(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
+    auto exportOps = llvm::to_vector(variantOp.getExportOps());
     llvm::SmallVector<uint32_t> entryPointOrdinals(exportOps.size());
     SymbolTableCollection symbolTable;
     SymbolUserMap symbolUsers(symbolTable, variantOp);
