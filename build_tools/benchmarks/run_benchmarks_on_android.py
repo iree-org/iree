@@ -37,16 +37,18 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import atexit
 import json
+import requests
 import shutil
+import socket
 import subprocess
 import tarfile
+import time
 from typing import Any, Optional, Sequence, Tuple
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (
-    DriverInfo,
     execute_cmd,
     execute_cmd_and_get_stdout,
     execute_cmd_and_get_output,
@@ -68,6 +70,9 @@ from e2e_test_framework.device_specs import device_parameters
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
+ANDROID_STREAM_RETRIES_LIMIT = 3
+ANDROID_STREAM_PORT = 8085
+ANDROID_TRACY_PORT = 8086
 
 NORMAL_TOOL_REL_DIR = pathlib.PurePosixPath("normal-tools")
 TRACED_TOOL_REL_DIR = pathlib.PurePosixPath("traced-tools")
@@ -181,6 +186,61 @@ def adb_start_cmd(
     if verbose:
         print(f"cmd: {cmd}")
     return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+
+
+def adb_fetch_to_tmp_dir(
+    url: str,
+    relative_path: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    verbose: bool = False,
+):
+    """Fetch file from the URL and stream to the device. This method avoids the
+    temporary file on the host, which reduces the overhead when the file is
+    large.
+
+    Args:
+      url: URL to fetch the file.
+      relative_dir: the path to push to; relative to ANDROID_TMPDIR.
+    """
+
+    android_path = ANDROID_TMPDIR / relative_path
+    # Start a one-time netcat server to receive and save the file.
+    netcat_server = adb_start_cmd(
+        [
+            "netcat",
+            "-s",
+            "127.0.0.1",
+            "-p",
+            str(ANDROID_STREAM_PORT),
+            "-l",
+            ">",
+            android_path.as_posix(),
+        ]
+    )
+
+    retry_times = ANDROID_STREAM_RETRIES_LIMIT
+    while not netcat_server.poll():
+        req = requests.get(url, stream=True, timeout=60)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(("127.0.0.1", ANDROID_STREAM_PORT))
+        if verbose:
+            print(f"Streaming file {url} to {android_path}.")
+        try:
+            for data in req.iter_content(chunk_size=4 * 1024 * 1024):
+                sock.sendall(data)
+        except OSError as e:
+            if retry_times == 0:
+                raise RuntimeError("Failed to stream file.") from e
+            retry_times -= 1
+            # Netcat server might not be ready. Wait before retry.
+            time.sleep(1.0)
+            continue
+        finally:
+            sock.close()
+        break
+
+    retcode = netcat_server.wait()
+    if retcode != 0:
+        raise ValueError(f"Netcat server ended with error {retcode}.")
 
 
 def get_vmfb_full_path_for_benchmark_case(
