@@ -22,6 +22,9 @@ namespace iree::pjrt {
 
 const std::string_view kMlirFormat = "mlir";
 
+// We hardcode the maximum number of dimensions to avoid mallocs.
+constexpr int64_t kMaxDims = 9;
+
 // Some general conversion functions for managing around some API layering
 // that is in flight. It is expected that most of this goes away over time.
 namespace PJRTApiConverter {
@@ -783,7 +786,7 @@ iree_status_t DeviceInstance::HostBufferToDeviceSplat(
       iree_hal_element_dense_byte_count(element_type);
 
   // Handle strided layouts and shape.
-  std::array<iree_hal_dim_t, 9> shape;
+  std::array<iree_hal_dim_t, kMaxDims> shape;
   if (num_dims > shape.size()) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "only supports up to %d dims but got %d",
@@ -870,7 +873,7 @@ iree_status_t DeviceInstance::HostBufferToDeviceZeroDim(
   IREE_RETURN_IF_ERROR(
       PJRTApiConverter::MapBufferTypeToElementType(type, &element_type));
 
-  std::array<iree_hal_dim_t, 9> shape;
+  std::array<iree_hal_dim_t, kMaxDims> shape;
   if (num_dims > shape.size()) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "only supports up to %d dims but got %d",
@@ -925,12 +928,12 @@ iree_status_t DeviceInstance::TransposeBroadcastDeviceBuffer(
     PJRT_HostBufferSemantics host_buffer_semantics,
     EventInstance** out_done_with_host_buffer_event,
     BufferInstance** out_buffer) {
-  if (num_dims > 9) {
+  if (num_dims > kMaxDims) {
     auto ret = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "number of dimensions exceeded 9");
+                                "number of dimensions exceeded max supported");
   }
 
-  std::array<iree_hal_dim_t, 9> transpose_dims;
+  std::array<iree_hal_dim_t, kMaxDims> transpose_dims;
   for (int i = 0; i < num_dims; ++i) {
     transpose_dims[i] = input_dims[perms[i]];
   }
@@ -979,10 +982,10 @@ iree_status_t DeviceInstance::TransposeBroadcastDeviceBuffer(
    return %%1 : %3$s
   })";
   char transpose_program[512];
-  size_t program_len =
-      std::snprintf(transpose_program, 1024, program_literal, input_ty.c_str(),
-                    transpose_ty.c_str(), output_ty.c_str(), perms_str.c_str(),
-                    broadcast_str.c_str());
+  size_t program_len = std::snprintf(
+      transpose_program, sizeof(transpose_program), program_literal,
+      input_ty.c_str(), transpose_ty.c_str(), output_ty.c_str(),
+      perms_str.c_str(), broadcast_str.c_str());
   if (program_len > sizeof(transpose_program)) {
     auto ret = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "program size exceeded limit");
@@ -1093,9 +1096,9 @@ iree_status_t DeviceInstance::HostBufferToDevice(
 
   // Handle strided layouts and shape:
   std::vector<int64_t> perms(num_dims);
-  std::array<iree_hal_dim_t, 9> input_shape;
-  std::array<iree_hal_dim_t, 9> transpose_shape;
-  std::array<iree_hal_dim_t, 9> output_shape;
+  std::array<iree_hal_dim_t, kMaxDims> input_shape;
+  std::array<iree_hal_dim_t, kMaxDims> transpose_shape;
+  std::array<iree_hal_dim_t, kMaxDims> output_shape;
   if (num_dims > input_shape.size()) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "only supports up to %d dims but got %d",
