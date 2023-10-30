@@ -141,7 +141,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             module_generation_config=gen_config,
             module_execution_config=exec_config_a,
             target_device_spec=device_spec,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         exec_config_b = iree_definitions.ModuleExecutionConfig.build(
@@ -154,7 +154,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             module_generation_config=gen_config,
             module_execution_config=exec_config_b,
             target_device_spec=device_spec,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         self.case1 = BenchmarkCase(
@@ -201,7 +201,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             module_generation_config=gen_config_rv64,
             module_execution_config=exec_config_b,
             target_device_spec=device_spec_rv64,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         self.incompatible_case = BenchmarkCase(

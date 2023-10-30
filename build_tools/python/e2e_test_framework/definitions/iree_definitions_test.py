@@ -143,10 +143,7 @@ class IreeDefinitionsTest(unittest.TestCase):
             gen_config,
             exec_config,
             device_spec,
-            # TODO(#15282): ZEROS_MODEL_INPUT_DATA should be renamed to
-            # DEFAULT_INPUT_DATA, which means to use input npys if available;
-            # otherwise use all zeros data.
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
 

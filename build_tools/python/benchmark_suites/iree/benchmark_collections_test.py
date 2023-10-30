@@ -143,7 +143,7 @@ class BenchmarkCollectionsTest(unittest.TestCase):
             ),
             module_execution_config=EXEC_CONFIG,
             target_device_spec=DEVICE_SPEC,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             run_flags=[],
         )
@@ -158,7 +158,7 @@ class BenchmarkCollectionsTest(unittest.TestCase):
             ),
             module_execution_config=EXEC_CONFIG,
             target_device_spec=DEVICE_SPEC,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             run_flags=[],
         )
@@ -177,7 +177,7 @@ class BenchmarkCollectionsTest(unittest.TestCase):
             ),
             module_execution_config=EXEC_CONFIG,
             target_device_spec=DEVICE_SPEC,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             run_flags=[],
         )
@@ -192,7 +192,7 @@ class BenchmarkCollectionsTest(unittest.TestCase):
             ),
             module_execution_config=EXEC_CONFIG,
             target_device_spec=DEVICE_SPEC,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             run_flags=[],
         )
@@ -214,7 +214,7 @@ class BenchmarkCollectionsTest(unittest.TestCase):
             ),
             module_execution_config=EXEC_CONFIG,
             target_device_spec=DEVICE_SPEC,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             run_flags=[],
         )
@@ -229,7 +229,7 @@ class BenchmarkCollectionsTest(unittest.TestCase):
             ),
             module_execution_config=EXEC_CONFIG,
             target_device_spec=DEVICE_SPEC,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             run_flags=[],
         )
@@ -251,7 +251,7 @@ class BenchmarkCollectionsTest(unittest.TestCase):
             ),
             module_execution_config=EXEC_CONFIG,
             target_device_spec=DEVICE_SPEC,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             run_flags=[],
         )
