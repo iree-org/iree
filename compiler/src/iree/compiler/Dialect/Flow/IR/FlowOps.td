@@ -131,7 +131,7 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     block argument of type `!flow.dispatch.tensor`. Furthermore, each argument
     has a corresponding `arguments` operand.
 
-    There are no `arguments` operands for results, but a result can be tied to 
+    There are no `arguments` operands for results, but a result can be tied to
     an argument by writing the argument operand's SSA value instead of its type:
     E.g., in the above example, `-> %0` would tie the first argument to the
     result. In that case, there would be no separate block argument for the
@@ -1576,9 +1576,6 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
-
-
-
 
 def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", [
   AttrSizedOperandSegments,
