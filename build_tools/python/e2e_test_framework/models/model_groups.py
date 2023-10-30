@@ -79,6 +79,9 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
     ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[8]
+    ),
 ]
 
 # A subset of `x86_64_MODELS_AND_THREADS`.
@@ -131,6 +134,9 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[8]
     ),
 ]
 
