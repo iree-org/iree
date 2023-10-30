@@ -2535,7 +2535,7 @@ emulator.</p>
 <ul>
 <li><a href="https://clang.llvm.org/get_started.html">Clang getting started</a></li>
 <li><a href="https://github.com/riscv/riscv-gnu-toolchain">RISC-V GNU toolchain</a></li>
-<li><a href="https://github.com/qemu/qemu">QEMU</a></li>
+<li><a href="https://gitlab.com/qemu-project/qemu">QEMU</a></li>
 <li><a href="https://risc-v-getting-started-guide.readthedocs.io/en/latest/linux-qemu.html">RISC-V Linux QEMU</a></li>
 </ul>
 <div class="admonition note">
@@ -2630,7 +2630,7 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
 </ul>
 </li>
 <li>RISC-V QEMU is built from
-<a href="https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh">https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh</a>.</li>
+<a href="https://gitlab.com/qemu-project/qemu/tree/v8.1.2">https://gitlab.com/qemu-project/qemu/tree/v8.1.2</a>.</li>
 </ul>
 <p>The SIMD code can be generated following the
 <a href="../../guides/deployment-configurations/cpu/">IREE CPU flow</a>
@@ -2646,7 +2646,7 @@ with the additional command-line flags</p>
 </span></code></pre></div>
 <p>Then run on the RISC-V QEMU:</p>
 <div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>-cpu<span class="w"> </span>rv64,x-v<span class="o">=</span>true,x-k<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">512</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>-cpu<span class="w"> </span>rv64,Zve64d<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">512</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>-L<span class="w"> </span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>../iree-build-riscv/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
