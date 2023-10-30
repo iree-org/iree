@@ -175,6 +175,7 @@ public:
     this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
     this->enableCleanup.setValue(options.enableCleanup);
     this->generateContract.setValue(options.generateContract);
+    this->foldCastIntoContract.setValue(options.foldCastIntoContract);
     this->maxVectorSize.setValue(options.maxVectorSize);
   }
 
@@ -253,6 +254,8 @@ void GenericVectorizationPass::runOnOperation() {
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
     vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
+  }
+  if (foldCastIntoContract) {
     vector::populateFoldArithExtensionPatterns(vectorizationPatterns);
   }
   if (enableVectorMasking) {

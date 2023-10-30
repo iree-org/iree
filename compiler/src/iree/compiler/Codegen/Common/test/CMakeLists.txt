@@ -38,6 +38,7 @@ iree_lit_test_suite(
     "fold_affine_min_of_block_id.mlir"
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
+    "generic_vectorization.mlir"
     "hoist_statically_bound_allocations.mlir"
     "hoist_unrolled_vector_extract_insert_slice.mlir"
     "iree_comprehensive_bufferize.mlir"

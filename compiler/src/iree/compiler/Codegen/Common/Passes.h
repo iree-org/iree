@@ -154,6 +154,9 @@ struct GenericVectorizationPassOptions {
   bool enableCleanup = true;
   // Enable conversion for reduction ops to contraction ops.
   bool generateContract = true;
+  // Enable folding casting ops into contraction ops. Note that the resulting
+  // mixed-type contraction ops are only handled by certain backends.
+  bool foldCastIntoContract = false;
   // Max vector size allowed to avoid creating large vectors.
   int64_t maxVectorSize = std::numeric_limits<int64_t>::max();
 };
