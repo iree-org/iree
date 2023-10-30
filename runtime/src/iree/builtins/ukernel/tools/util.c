@@ -6,7 +6,6 @@
 
 #include "iree/builtins/ukernel/tools/util.h"
 
-#include <iree/builtins/ukernel/common.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
