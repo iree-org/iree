@@ -50,7 +50,7 @@ static RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
                                originalType.getElementType(), encoding);
 }
 
-static RankedTensorType getTypeWithDroppingEncoding(RankedTensorType type) {
+static RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 
@@ -63,7 +63,7 @@ getMaterializedType(RankedTensorType tensorType,
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
       materializeEncodingFn(tensorType);
   if (failed(materializeEncodingInfo)) {
-    return getTypeWithDroppingEncoding(tensorType);
+    return dropEncoding(tensorType);
   }
   return tensor::PackOp::inferPackedType(
              getOriginalTypeWithEncoding(tensorType),
@@ -73,15 +73,30 @@ getMaterializedType(RankedTensorType tensorType,
       .cast<RankedTensorType>();
 }
 
+static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
+                                         ValueRange convertedInputOperands,
+                                         ValueRange convertedOutputOperands) {
+  SmallVector<Value> operands;
+  operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
+  operands.append(convertedOutputOperands.begin(),
+                  convertedOutputOperands.end());
+  return mlir::clone(
+      builder, op,
+      {dropEncoding(
+          convertedOutputOperands[0].getType().cast<RankedTensorType>())},
+      operands);
+}
+
 //===---------------------------------------------------------------------===//
 // Methods to convert the encoding to parameters of the Pack operation
 //===---------------------------------------------------------------------===//
 
 /// Given the `encoding` return the `MaterializeEncodingInfo` to use for
-/// materializing the pack op.
-// TODO(ravishankarm): This is currently hard-coded here for convenience. When
-// used in IREE, this will be computed based on the architecture information in
-// `hal.executable.variant`.
+/// materializing the pack op. This is mainly for testing. The configurations
+/// are arbitrary values.
+// TODO(hanchung): Move the implementation to Codegen/Common. This is currently
+// hard-coded here for testing convenience. When used in IREE, this will be
+// computed based on the architecture information in `hal.executable.variant`.
 // A real implementation would return tile sizes that depend on at least the
 // `tensorType`'s element type (e.g. different tile sizes for i8 vs f32, because
 // the SIMD instructions may have different shapes).
@@ -96,6 +111,7 @@ chooseEncodingInfo(RankedTensorType tensorType) {
 
   auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
+  // Below is for testing purpose. It only materialize for f32 cases.
   switch (user) {
   case EncodingUser::MATMUL:
   case EncodingUser::BATCH_MATMUL:
@@ -266,16 +282,8 @@ static FailureOr<Operation *> lowerOpWithEncoding(
           matmulOp.getResultTypes()[0].cast<RankedTensorType>()));
   Operation *result;
   if (failed(materializeEncodingInfo)) {
-    SmallVector<Value> operands;
-    operands.append(convertedInputOperands.begin(),
-                    convertedInputOperands.end());
-    operands.append(convertedOutputOperands.begin(),
-                    convertedOutputOperands.end());
-    result = mlir::clone(
-        rewriter, matmulOp,
-        {getTypeWithDroppingEncoding(
-            convertedOutputOperands[0].getType().cast<RankedTensorType>())},
-        operands);
+    result = dropEncodingAndCloneOp(rewriter, matmulOp, convertedInputOperands,
+                                    convertedOutputOperands);
   } else {
     result = rewriter.create<linalg::Mmt4DOp>(
         matmulOp.getLoc(), convertedOutputOperands[0].getType(),
@@ -320,16 +328,9 @@ static FailureOr<Operation *> lowerOpWithEncoding(
           batchMatmulOp.getResultTypes()[0].cast<RankedTensorType>()));
   Operation *result;
   if (failed(materializeEncodingInfo)) {
-    SmallVector<Value> operands;
-    operands.append(convertedInputOperands.begin(),
-                    convertedInputOperands.end());
-    operands.append(convertedOutputOperands.begin(),
-                    convertedOutputOperands.end());
-    result = mlir::clone(
-        rewriter, batchMatmulOp,
-        {getTypeWithDroppingEncoding(
-            convertedOutputOperands[0].getType().cast<RankedTensorType>())},
-        operands);
+    result =
+        dropEncodingAndCloneOp(rewriter, batchMatmulOp, convertedInputOperands,
+                               convertedOutputOperands);
   } else {
     result = rewriter.create<linalg::BatchMmt4DOp>(
         batchMatmulOp.getLoc(), convertedOutputOperands[0].getType(),
