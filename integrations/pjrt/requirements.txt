@@ -1,0 +1,4 @@
+-f https://iree.dev/pip-release-links.html
+-f https://storage.googleapis.com/jax-releases/jaxlib_nightly_releases.html
+iree-compiler==20230922.653
+jaxlib==0.4.17.dev20230922

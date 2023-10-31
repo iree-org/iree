@@ -511,7 +511,7 @@ func.func @reduce_window_max_4x6xf32() {
   %3 = tensor.empty() : tensor<2x2x3xf32>
   %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d2, d0 * 2 + d3, d1 * 3 + d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%2, %3 : tensor<2x4x6xf32>, tensor<2x2x3xf32>) outs(%cst : tensor<2x2xf32>) {
   ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
-    %5 = arith.maxf %arg0, %arg2 : f32
+    %5 = arith.maximumf %arg0, %arg2 : f32
     linalg.yield %5 : f32
   } -> tensor<2x2xf32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [2, 2], strides = [1, 1] : tensor<2x2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x2xf32>>
@@ -751,7 +751,7 @@ func.func @non_perfect_tiling_unpack() {
   %c512 = arith.constant 512 : index
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
-  %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_linalg_ext.encoding<user = MATMUL_I8I8I32, role = RESULT>> -> index, index
+  %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32]>> -> index, index
   %1 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#0]
   %2 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#1]
   %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c512) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1}

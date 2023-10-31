@@ -39,18 +39,16 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
   )
 endif()
 
-# TODO(#14776): enable Vulkan when it passes on the bots - currently fails with
-# an unexpected out-of-memory.
-# if(IREE_TARGET_BACKEND_VULKAN_SPIRV AND IREE_HAL_DRIVER_VULKAN)
-#   iree_py_test(
-#     NAME
-#       mnist_train_test_vulkan
-#     SRCS
-#       "mnist_train_test.py"
-#     ARGS
-#       "--target_backend=vulkan-spirv"
-#       "--driver=vulkan"
-#     LABELS
-#       "driver=vulkan"
-#   )
-# endif()
+if(IREE_TARGET_BACKEND_VULKAN_SPIRV AND IREE_HAL_DRIVER_VULKAN)
+  iree_py_test(
+    NAME
+      mnist_train_test_vulkan
+    SRCS
+      "mnist_train_test.py"
+    ARGS
+      "--target_backend=vulkan-spirv"
+      "--driver=vulkan"
+    LABELS
+      "driver=vulkan"
+  )
+endif()

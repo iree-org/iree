@@ -123,7 +123,7 @@ static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
   *out_ptr = acc;
 }
 
-static void iree_mmt4d_reference_innerloop_i8i8i32(
+static void iree_mmt4d_reference_innerloop_s8s8s32(
     int32_t* out_ptr, const int8_t* lhs_ptr, const int8_t* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
   int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
@@ -191,8 +191,8 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
                   (uint16_t*)out_ptr, (const uint16_t*)lhs_ptr,
                   (const uint16_t*)rhs_ptr, params);
               break;
-            case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
-              iree_mmt4d_reference_innerloop_i8i8i32(
+            case IREE_UK_FLAG_MMT4D_TYPE_S8S8S32:
+              iree_mmt4d_reference_innerloop_s8s8s32(
                   (int32_t*)out_ptr, (const int8_t*)lhs_ptr,
                   (const int8_t*)rhs_ptr, params);
               break;
@@ -336,8 +336,11 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
 }
 
 static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
-                                    int K0, const char* cpu_features,
-                                    const char* code_path_suffix) {
+                                    int K0, const char* cpu_features) {
+  const char* code_path_suffix = "";
+  if (flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) {
+    code_path_suffix = " skipround";
+  }
   char types_str[32];
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(flags);
   iree_uk_type_triple_str(types_str, sizeof types_str, mmt4d_type);
@@ -352,24 +355,19 @@ static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
 
 static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
                                const char* cpu_features) {
-  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
-}
-
-static void iree_uk_test_mmt4d_default_and_intrinsics(
-    iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
-  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
-#if defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
-  iree_uk_test_mmt4d_impl(flags | IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS, M0, N0,
-                          K0, cpu_features, " intrinsics");
-#endif  // defined(IREE_UK_HAVE_BOTH_INLINE_ASM_AND_INTRINSICS)
+  // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
+  // narrow variants for handling these cases.
+  for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
+    iree_uk_test_mmt4d_impl(flags, narrowM0, N0, K0, cpu_features);
+  }
+  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features);
 }
 
 static void iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
     iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
-  iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
-  iree_uk_test_mmt4d_impl(
-      flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS, M0, N0, K0,
-      cpu_features, " skipround");
+  iree_uk_test_mmt4d(flags, M0, N0, K0, cpu_features);
+  iree_uk_test_mmt4d(flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS, M0,
+                     N0, K0, cpu_features);
 }
 
 int main(int argc, char** argv) {
@@ -377,15 +375,13 @@ int main(int argc, char** argv) {
   // to test weird M0, N0, K0 to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 3, 5, 7, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 9, 6, 3, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 9, 6, 3, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 4, 6, 5, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 3, 5, 8, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 11, 4, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 2, 9, 3, "");
 
 #if defined(IREE_ARCH_ARM_64)
-  // On arm64, some code paths have inline asm and intrinsics variants. For them
-  // we use iree_uk_test_mmt4d_default_and_intrinsics to test both.
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
@@ -394,10 +390,9 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
       IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "fp16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4, "bf16");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4, "dotprod");
-  iree_uk_test_mmt4d_default_and_intrinsics(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8,
-                                            8, 8, "i8mm");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4, "dotprod");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8, "i8mm");
 #elif defined(IREE_ARCH_X86_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 4, 1, "");  // SSE
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
@@ -410,10 +405,12 @@ int main(int argc, char** argv) {
       IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
       IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 16, 16, 1, "avx512_base");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 4, 2, "");  // SSE2
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 2, "avx2_fma");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_base");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_vnni");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 16, 16, 2,
+                     "avx512_bf16");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 4, 2, "");  // SSE2
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 2, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_vnni");
 #endif  // defined(IREE_ARCH_ARM_64)
 
   return iree_uk_test_exit_status();

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -100,6 +101,13 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
     return {};
   }
 
+  // Target-dependent ops are not const-expr.
+  // TODO(#14887): Use trait/interface instead.
+  if (isa<IREE::LinalgExt::UpperBoundTileSizeOp,
+          IREE::LinalgExt::SetEncodingOp>(op)) {
+    return {};
+  }
+
   // By default, ops without results are not const-expr.
   if (op->getNumResults() == 0) {
     return {};
@@ -184,7 +192,8 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
 
   // Never hoist empty. These are sometimes used for pure shape metadata
   // and must not be separated from their consumers.
-  if (isa<tensor::EmptyOp>(op)) {
+  if (isa<tensor::EmptyOp, tensor::ExpandShapeOp, tensor::CollapseShapeOp>(
+          op)) {
     return false;
   }
 

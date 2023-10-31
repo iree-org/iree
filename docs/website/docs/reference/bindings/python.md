@@ -24,11 +24,6 @@ components:
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
 
-!!! Caution "Caution - Operating system support"
-    Packages are currently only available on Linux and macOS. They are not
-    available on Windows yet (see
-    [this issue](https://github.com/openxla/iree/issues/13484)).
-
 ## :octicons-download-16: Prerequisites
 
 To use IREE's Python bindings, you will first need to install
@@ -41,21 +36,21 @@ To use IREE's Python bindings, you will first need to install
     ([about](https://docs.python.org/3/library/venv.html),
     [tutorial](https://docs.python.org/3/tutorial/venv.html)):
 
-    === "Linux"
+    === ":fontawesome-brands-linux: Linux"
 
         ``` shell
         python -m venv .venv
         source .venv/bin/activate
         ```
 
-    === "macOS"
+    === ":fontawesome-brands-apple: macOS"
 
         ``` shell
         python -m venv .venv
         source .venv/bin/activate
         ```
 
-    === "Windows"
+    === ":fontawesome-brands-windows: Windows"
 
         ``` powershell
         python -m venv .venv
@@ -86,7 +81,7 @@ To use IREE's Python bindings, you will first need to install
 
     ``` shell
     python -m pip install \
-      --find-links https://openxla.github.io/iree/pip-release-links.html \
+      --find-links https://iree.dev/pip-release-links.html \
       --upgrade \
       iree-compiler \
       iree-runtime
@@ -136,6 +131,7 @@ compiled_flatbuffer = ireec.tools.compile_str(
 
 ```python
 from iree import runtime as ireert
+import numpy as np
 
 # Register the module with a runtime context.
 # Use the "local-task" CPU driver, which can load the vmvx executable:

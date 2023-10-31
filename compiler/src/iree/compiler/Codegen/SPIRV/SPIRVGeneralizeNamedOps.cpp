@@ -30,9 +30,11 @@ struct SPIRVGeneralizeNamedOpsPass
 
 void SPIRVGeneralizeNamedOpsPass::runOnOperation() {
   auto funcOp = getOperation();
-  SmallVector<linalg::MatmulTransposeBOp> namedOpCandidates;
-  funcOp.walk([&](linalg::MatmulTransposeBOp linalgOp) {
-    namedOpCandidates.push_back(linalgOp);
+  SmallVector<linalg::LinalgOp> namedOpCandidates;
+  funcOp.walk([&](linalg::LinalgOp linalgOp) {
+    if (isa<linalg::BatchMatmulTransposeBOp, linalg::MatmulTransposeBOp,
+            linalg::VecmatOp, linalg::MatvecOp>(linalgOp))
+      namedOpCandidates.push_back(linalgOp);
   });
 
   IRRewriter rewriter(&getContext());

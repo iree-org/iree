@@ -27,4 +27,10 @@ def VerifyCompilerTOSAInputLegality :
   let constructor = "mlir::iree_compiler::createVerifyCompilerTOSAInputLegality()";
 }
 
+def Converti48Toi64 :
+    Pass<"iree-convert-i48-to-i64", "mlir::func::FuncOp"> {
+  let summary = "Converts all i48s to i64s";
+  let constructor = "mlir::iree_compiler::createConverti48Toi64()";
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_TOSA_PASSES

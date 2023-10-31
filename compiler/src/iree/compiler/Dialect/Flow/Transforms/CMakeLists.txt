@@ -29,20 +29,18 @@ iree_cc_library(
     "Passes.h.inc"
     "RegionOpUtils.h"
   SRCS
+    "AnnotateDispatches.cpp"
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
     "CleanupTensorShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
     "CollapseReductionDims.cpp"
-    "Convert1X1FilterConv2DToMatmul.cpp"
     "ConvertRegionToWorkgroups.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
-    "DetachElementwiseFromNamedOps.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
-    "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FoldUnitExtentDims.cpp"
@@ -64,8 +62,6 @@ iree_cc_library(
     "Passes.cpp"
     "RaiseSpecialOps.cpp"
     "RegionOpUtils.cpp"
-    "RemoveZeroExtentTensors.cpp"
-    "SetEncoding.cpp"
     "SplitReduction.cpp"
     "StripSignedness.cpp"
     "TensorPadToTensorInsertSlice.cpp"
@@ -82,12 +78,14 @@ iree_cc_library(
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms

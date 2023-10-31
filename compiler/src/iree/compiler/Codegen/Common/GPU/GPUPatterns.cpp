@@ -200,6 +200,22 @@ static LogicalResult contractOpFilter(Operation *op) {
       linalgOp.getNumParallelLoops() <= 3);
 }
 
+// A `dealloc` is converted into a call to `free` on the underlying data buffer.
+// The memref descriptor being an SSA value, there is no need to clean it up
+// in any way.
+struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::DeallocOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!hasSharedMemoryAddressSpace(
+            llvm::cast<MemRefType>(op.getMemref().getType())))
+      return failure();
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateVectorTransferToGPUMMAPreparationPatterns(
@@ -230,6 +246,10 @@ void populateContractPromotionPatterns(RewritePatternSet &patterns,
           StringAttr::get(context, getWorkgroupMemoryMarker()))
           .setMatchByDefault()
           .addFilter(contractOpFilter));
+}
+
+void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns) {
+  patterns.add<DropSharedMemoryDeallocOp>(patterns.getContext());
 }
 
 } // namespace iree_compiler

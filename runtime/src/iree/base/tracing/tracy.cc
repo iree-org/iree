@@ -30,6 +30,24 @@ void IREEDbgHelpUnlock(void) { ReleaseMutex(iree_dbghelp_mutex); }
 
 #if IREE_TRACING_FEATURES != 0
 
+void iree_tracing_tracy_initialize() {
+  // No-op.
+}
+
+void iree_tracing_tracy_deinitialize() {
+#if defined(IREE_PLATFORM_APPLE)
+  // Synchronously shut down the profiler service.
+  // This is required on some platforms to support TRACY_NO_EXIT=1 such as
+  // MacOS and iOS. It should be harmless on other platforms as it returns
+  // quickly if TRACY_NO_EXIT=1 is not set.
+  // See: https://github.com/wolfpld/tracy/issues/8
+  tracy::GetProfiler().RequestShutdown();
+  while (!tracy::GetProfiler().HasShutdownFinished()) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+#endif  // IREE_PLATFORM_*
+}
+
 iree_zone_id_t iree_tracing_zone_begin_impl(
     const iree_tracing_location_t* src_loc, const char* name,
     size_t name_length) {

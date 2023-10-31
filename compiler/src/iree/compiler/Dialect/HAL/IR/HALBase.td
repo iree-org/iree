@@ -177,11 +177,11 @@ def HAL_DescriptorFlagsAttr :
 }
 
 def HAL_DescriptorSetLayoutFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
-def HAL_DescriptorSetLayoutFlags_Reserved : I32BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_DescriptorSetLayoutFlags_Indirect : I32BitEnumAttrCase<"Indirect", 0x0001>;
 def HAL_DescriptorSetLayoutFlagsAttr :
     I32BitEnumAttr<"DescriptorSetLayoutFlags", "valid DescriptorSetLayout flags", [
       HAL_DescriptorSetLayoutFlags_None,
-      HAL_DescriptorSetLayoutFlags_Reserved,  // to make tblgen happy
+      HAL_DescriptorSetLayoutFlags_Indirect,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
@@ -614,12 +614,14 @@ def HAL_DescriptorSetLayoutAttr :
   }];
   let parameters = (ins
     AttrParameter<"int64_t", "">:$ordinal,
-    ArrayRefParameter<"DescriptorSetBindingAttr", "">:$bindings
+    ArrayRefParameter<"DescriptorSetBindingAttr", "">:$bindings,
+    OptionalParameter<"std::optional<DescriptorSetLayoutFlags>">:$flags
   );
   let assemblyFormat = [{
     `<`
     $ordinal `,`
     `bindings` `=` `[` $bindings `]`
+    (`,` `flags` `=` $flags^)?
     `>`
   }];
 }
@@ -666,6 +668,10 @@ def HAL_InterfaceBindingAttr :
     `<` $set `,` $binding `>`
   }];
 }
+
+def HAL_InterfaceBindingArrayAttr :
+    TypedArrayAttrBase<HAL_InterfaceBindingAttr,
+                       "HAL binding array attribute">;
 
 //===----------------------------------------------------------------------===//
 // Device and executable target specification
@@ -714,7 +720,7 @@ def HAL_DeviceTargetAttr :
     bool hasConfigurationAttr(StringRef name);
 
     // Returns zero or more executable targets that this device supports.
-    SmallVector<ExecutableTargetAttr, 4> getExecutableTargets();
+    SmallVector<IREE::HAL::ExecutableTargetAttr, 4> getExecutableTargets();
 
     // Returns a list of target devices that may be active for the given
     // operation. This will recursively walk parent operations until one with
@@ -752,7 +758,7 @@ def HAL_DeviceTargetAttr :
 
     // Returns a list of all target executable configurations that may be
     // required for the given operation.
-    static SmallVector<ExecutableTargetAttr, 4>
+    static SmallVector<IREE::HAL::ExecutableTargetAttr, 4>
     lookupExecutableTargets(Operation *op);
   }];
   let hasCustomAssemblyFormat = 1;
@@ -807,6 +813,10 @@ def HAL_ExecutableTargetAttr :
     // device that can load an executable of this target.
     Attribute getMatchExpression();
 
+    // Returns true if there's an attribute with the given name in the
+    // configuration dictionary.
+    bool hasConfigurationAttr(StringRef name);
+
     // Returns true if this attribute is a generic version of |specificAttr|.
     // A more generic version will match with many specific versions.
     bool isGenericOf(IREE::HAL::ExecutableTargetAttr specificAttr);
@@ -815,7 +825,7 @@ def HAL_ExecutableTargetAttr :
     // This will recursively walk parent operations until one with the
     // `hal.executable.target` attribute is found or a `hal.executable.variant`
     // specifies a value. Returns nullptr if no target specification can be found.
-    static ExecutableTargetAttr lookup(Operation *op);
+    static IREE::HAL::ExecutableTargetAttr lookup(Operation *op);
   }];
 
   let hasCustomAssemblyFormat = 1;

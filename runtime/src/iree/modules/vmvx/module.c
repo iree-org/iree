@@ -542,7 +542,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d, mmt4d, v) {
       in_elem_size = 4;
       out_elem_size = 4;
       break;
-    case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
+    case IREE_UK_FLAG_MMT4D_TYPE_S8S8S32:
       in_elem_size = 1;
       out_elem_size = 4;
       break;

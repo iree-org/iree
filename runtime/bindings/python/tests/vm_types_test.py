@@ -96,6 +96,12 @@ class VmTypesTest(unittest.TestCase):
         lst.push_ref(buffer_view)
         self.assertEqual(str(lst), "<VmVariantList(1): [HalBufferView(:0x20000011)]>")
 
+    def test_variant_list_fence_to_str(self):
+        lst = rt.VmVariantList(1)
+        fence = rt.HalFence(2)
+        lst.push_ref(fence)
+        self.assertEqual(str(lst), "<VmVariantList(1): [fence(0)]>")
+
     def test_variant_list_list(self):
         lst1 = rt.VmVariantList(5)
         lst2 = rt.VmVariantList(5)

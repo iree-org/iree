@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -38,7 +39,7 @@ FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   if (!variantOp)
     return failure();
 
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+  for (auto op : variantOp.getExportOps()) {
     if (op.getSymName() == funcOp.getName()) {
       return op;
     }
@@ -65,7 +66,7 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp>
 getAllEntryPoints(ModuleOp module) {
   auto variantOp = module->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+  for (auto op : variantOp.getExportOps()) {
     exportOps[op.getSymName()] = op;
   }
   return exportOps;
@@ -934,36 +935,23 @@ SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp) {
   return result;
 }
 
-// Return true if all the uses of op are either Store/transfer_write.
-// There can be SubviewOp users as long as all its users are also
-// StoreOp/transfer_write. If return true it also fills out the uses, if it
-// returns false uses is unchanged.
-static bool allUsesAreStores(Operation *op, std::vector<Operation *> &uses) {
-  std::vector<Operation *> opUses;
-  for (OpOperand &use : op->getUses()) {
-    Operation *useOp = use.getOwner();
-    if (isa<memref::DeallocOp, vector::TransferWriteOp, memref::StoreOp>(
-            useOp) ||
-        (isa<memref::SubViewOp>(useOp) && allUsesAreStores(useOp, opUses))) {
-      opUses.push_back(useOp);
-      continue;
-    }
-    return false;
-  }
-  uses.insert(uses.end(), opUses.begin(), opUses.end());
-  return true;
-}
+bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
+  assert(rootOp.getNumDpsInputs() == 2 && "rootOp expected to have two inputs");
 
-void eraseDeadAllocAndStores(Operation *parentOp) {
-  std::vector<Operation *> opToErase;
-  parentOp->walk([&](memref::AllocOp op) {
-    if (allUsesAreStores(op, opToErase)) {
-      opToErase.push_back(op.getOperation());
-    }
-  });
-  for (Operation *op : opToErase) {
-    op->erase();
+  BackwardSliceOptions options;
+  options.inclusive = true;
+
+  // Get the backward slice of each input operand and take the union.
+  SetVector<Operation *> backwardSlice;
+  for (OpOperand *operand : rootOp.getDpsInputOperands()) {
+    SetVector<Operation *> tmpBackwardSlice;
+    getBackwardSlice(operand->get(), &tmpBackwardSlice, options);
+    backwardSlice.set_union(tmpBackwardSlice);
   }
+
+  return llvm::any_of(backwardSlice, [](Operation *op) {
+    return llvm::isa<linalg::LinalgOp>(op);
+  });
 }
 
 } // namespace iree_compiler

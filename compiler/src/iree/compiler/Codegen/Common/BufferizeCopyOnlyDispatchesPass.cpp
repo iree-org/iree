@@ -58,14 +58,17 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     /// Check if the dispatch has all sources for `flow.dispatch.tensor.store`
     /// operations coming from `flow.dispatch.tensor.load` operations. If so,
     /// this dispatch is just a copy dispatch.
+    bool hasFlowDispatchStore = false;
     auto walkResult = funcOp.walk(
         [&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
+          hasFlowDispatchStore = true;
           return success(isReadOnly(storeOp.getValue()));
         });
     if (walkResult.wasInterrupted())
       continue;
-    // The function is just a copy.
-    copyOnlyFunctions.push_back(funcOp);
+    // The function is just a copy and is not yet bufferized.
+    if (hasFlowDispatchStore)
+      copyOnlyFunctions.push_back(funcOp);
   }
 
   // There are no copy-only functions. So nothing to do.
@@ -94,11 +97,6 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     return emitError(
         loc, "unexpected allocation while bufferizing copy only dispatches");
   };
-  bufferization::BufferizationOptions::DeallocationFn deallocationFn =
-      [](OpBuilder &, Location loc, Value) -> LogicalResult {
-    return emitError(
-        loc, "unexpected deallocation while bufferizing copy only dispatches");
-  };
   bufferization::BufferizationOptions::MemCpyFn memcpyFn =
       [](OpBuilder &builder, Location loc, Value from,
          Value to) -> LogicalResult {
@@ -107,7 +105,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   };
 
   addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
-                                      deallocationFn, memcpyFn);
+                                      memcpyFn);
   if (failed(runPipeline(bufferizationPipeline, module))) {
     return signalPassFailure();
   }

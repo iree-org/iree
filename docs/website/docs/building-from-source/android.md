@@ -18,7 +18,7 @@ system architecture):
   either pushed to the target to run natively or is bundled into an Android
   [APK](https://en.wikipedia.org/wiki/Android_application_package)
 
-## Prerequisites
+## :octicons-download-16: Prerequisites
 
 ### Host environment setup
 
@@ -43,7 +43,7 @@ ADB (the Android Debug Bridge) is also needed to communicate with Android
 devices from the command line. Install it following the
 [official user guide](https://developer.android.com/studio/command-line/adb).
 
-## Configure and build
+## :octicons-sliders-16: Configure and build
 
 ### Host configuration
 
@@ -61,7 +61,7 @@ cmake --build ../iree-build/ --target install
 
 Build the runtime using the Android NDK toolchain:
 
-=== "Linux"
+=== ":fontawesome-brands-linux: Linux"
 
     ``` shell
     cmake -GNinja -B ../iree-build-android/ \
@@ -74,7 +74,7 @@ Build the runtime using the Android NDK toolchain:
     cmake --build ../iree-build-android/
     ```
 
-=== "macOS"
+=== ":fontawesome-brands-apple: macOS"
 
     ``` shell
     cmake -GNinja -B ../iree-build-android/ \
@@ -87,7 +87,7 @@ Build the runtime using the Android NDK toolchain:
     cmake --build ../iree-build-android/
     ```
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     ``` shell
     cmake -GNinja -B ../iree-build-android/ \
@@ -110,22 +110,29 @@ Build the runtime using the Android NDK toolchain:
     The specific `ANDROID_ABI` and `ANDROID_PLATFORM` used should match your
     target device.
 
-## Running Android tests
+## :octicons-code-16: Running Android tests
 
 Make sure you
 [enable developer options and USB debugging](https://developer.android.com/studio/debug/dev-options#enable)
 on your Android device and can see your it when you run `adb devices`, then run
-all built tests through
-[CTest](https://gitlab.kitware.com/cmake/community/-/wikis/doc/ctest/Testing-With-CTest):
+all tests through
+[ctest](https://cmake.org/cmake/help/latest/manual/ctest.1.html):
 
 ``` shell
+# Build test dependencies
+cmake --build ../iree-build-android/ --target iree-test-deps
+
+# Ensure that your Android device is visible
+adb devices
+
+# Run tests
 ctest --test-dir ../iree-build-android/ --output-on-failure
 ```
 
 This will automatically upload build artifacts to the connected Android device,
 run the tests, then report the status back to your host machine.
 
-## Running tools directly
+## :octicons-code-16: Running tools directly
 
 Invoke the host compiler tools to produce a bytecode module FlatBuffer:
 

@@ -2,7 +2,7 @@
 
 hal.executable private @pad_matmul_static_dispatch_0  {
   builtin.module {
-    func.func @pad_matmul_static_dispatch_0(%arg0: tensor<250x500xf32>, %arg1: tensor<500x1020xf32>) -> tensor<250x1020xf32> {
+    func.func @pad_matmul_static_dispatch_0() {
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<250x500xf32>>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<500x1020xf32>>
@@ -14,19 +14,17 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       %cst = arith.constant 0.000000e+00 : f32
       %5 = linalg.fill ins(%cst : f32) outs(%50 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
-      //      CHECK: memref.alloc() {alignment = 64 : i64} : memref<250x1020xf32, #gpu.address_space<workgroup>>
-      // CHECK-NEXT: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>)
+      // CHECK: linalg.fill ins(%{{.*}} : f32) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
+      // CHECK: memref.alloc() {alignment = 64 : i64} : memref<250x500xf32, #gpu.address_space<workgroup>>
       // CHECK: gpu.barrier
       // CHECK: linalg.generic
       // CHECK: gpu.barrier
-      // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32, #gpu.address_space<workgroup>>, memref<500x1020xf32, #hal.descriptor_type<storage_buffer>>) outs(%{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>)
-      // CHECK-NEXT: bufferization.to_tensor %{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>
-      // CHECK-NEXT: memref.dealloc %{{.*}} : memref<250x1020xf32, #gpu.address_space<workgroup>>
+      // CHECK-NEXT: linalg.matmul{{.*}}ins(%{{.*}} : memref<250x500xf32, #gpu.address_space<workgroup>>, memref<500x1020xf32, #hal.descriptor_type<storage_buffer>>) outs(%{{.*}} : memref<250x1020xf32, #hal.descriptor_type<storage_buffer>>)
       %p = bufferization.alloc_tensor() copy(%3) : tensor<250x500xf32>
       %6 = linalg.matmul ins(%p, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
-      // Returning a tensor force the allocation that we want to test here: and alloca with memory space "3" for GPU shared memory.
-      return %6: tensor<250x1020xf32>
+      flow.dispatch.tensor.store %6, %2, offsets=[0, 0], sizes=[250, 1020], strides=[1, 1] : tensor<250x1020xf32> -> !flow.dispatch.tensor<readwrite:tensor<250x1020xf32>>
+      return 
     }
   }
 

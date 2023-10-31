@@ -386,6 +386,49 @@ partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
       // Always inherit hazards whether merging or not.
       opInfo.hazards |= userInfo.hazards;
     }
+
+    // Additional exhaustive testing for users of tied operands.
+    // For each resource operand of this op we scan back through previously
+    // created waves to see if there are any partitioned ops that have a hazard.
+    for (auto operand : op.getOperands()) {
+      if (!operand.getType().isa<IREE::Stream::ResourceType>())
+        continue;
+      for (auto user : operand.getUsers()) {
+        if (user == &op || user->getBlock() != block ||
+            user->isBeforeInBlock(&op))
+          continue;
+        auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user);
+        if (!tiedOp || !tiedOp.hasAnyTiedUses(operand))
+          continue;
+        auto userInfoIt = opInfos.find(user);
+        if (userInfoIt == opInfos.end())
+          continue;
+        auto &userInfo = userInfoIt->second;
+        LLVM_DEBUG({
+          llvm::dbgs() << "Testing tied user:\n";
+          user->print(llvm::dbgs(), *asmState);
+          llvm::dbgs() << "\n";
+          for (auto membershipOrdinal : userInfo.membership.set_bits()) {
+            llvm::dbgs() << "  member of wave " << membershipOrdinal << "\n";
+          }
+          int lastHazardOrdinal = userInfo.hazards.find_last();
+          if (lastHazardOrdinal != -1) {
+            llvm::dbgs() << "  hazard w/ waves 0-" << lastHazardOrdinal << "\n";
+          }
+        });
+        bool hazardPresent = hazardAnalysis.hasHazard(streamableOp, user);
+        if (hazardPresent) {
+          // Hazard with existing op usage - prevent concurrent scheduling.
+          opInfo.hazards |= userInfo.membership;
+        } else {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "  $ hazard analysis says ok to schedule with tied\n");
+        }
+        // Always inherit hazards whether merging or not.
+        opInfo.hazards |= userInfo.hazards;
+      }
+    }
+
     llvm::BitVector candidates(builders.size(), /*t=*/true);
     candidates ^= opInfo.hazards;
 

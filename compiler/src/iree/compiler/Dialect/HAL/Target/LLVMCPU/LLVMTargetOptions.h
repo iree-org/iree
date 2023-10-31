@@ -71,7 +71,7 @@ struct LLVMTarget {
   // Optimization level to be used by the LLVM optimizer (middle-end).
   llvm::OptimizationLevel optimizerOptLevel;
   // Optimization level to be used by the LLVM code generator (back-end).
-  llvm::CodeGenOpt::Level codeGenOptLevel;
+  llvm::CodeGenOptLevel codeGenOptLevel;
   llvm::TargetOptions llvmTargetOptions;
 
   // Include debug information in output files (PDB, DWARF, etc).

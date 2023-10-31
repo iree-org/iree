@@ -4,7 +4,7 @@
 
 // CHECK-LABEL: @multiple_constant_blocks
 hal.executable @multiple_constant_blocks {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // CHECK: hal.executable.constant.block() -> (i32, i32, i32) as ("foo", "bar", "baz")
     hal.executable.constant.block() -> (i32, i32) as ("foo", "bar") {
       // CHECK-DAG: %[[FOO:.+]] = arith.constant 0
@@ -32,7 +32,7 @@ hal.executable @multiple_constant_blocks {
 
 // CHECK-LABEL: @complex_constant_blocks
 hal.executable @complex_constant_blocks {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // CHECK: hal.executable.constant.block(%[[DEVICE:.+]]: !hal.device) -> (i32, i32, i32) as ("foo", "bar", "baz")
     hal.executable.constant.block(%device: !hal.device) -> (i32, i32) as ("foo", "bar") {
       // CHECK-DAG: %[[DUMMY:.+]] = arith.constant 0
@@ -75,7 +75,7 @@ hal.executable @complex_constant_blocks {
 
 // CHECK-LABEL: @unused_device_arg
 hal.executable @unused_device_arg {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // CHECK: hal.executable.constant.block() -> i32 as "foo"
     hal.executable.constant.block(%device: !hal.device) -> i32 as "foo" {
       %c0 = arith.constant 0 : i32
@@ -91,7 +91,7 @@ hal.executable @unused_device_arg {
 
 // CHECK-LABEL: @duplicate_keys
 hal.executable @duplicate_keys {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // CHECK: hal.executable.constant.block() -> (i32, i32) as ("foo", "bar")
     hal.executable.constant.block() -> (i32, i32, i32) as ("foo", "bar", "foo") {
       // CHECK-DAG: %[[FOO:.+]] = arith.constant 1000
@@ -114,7 +114,7 @@ hal.executable @duplicate_keys {
 
 // CHECK-LABEL: @multiple_blocks_duplicate_keys
 hal.executable @multiple_blocks_duplicate_keys {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // CHECK:  hal.executable.constant.block() -> (i32, i32) as ("foo", "bar")
     hal.executable.constant.block() -> (i32, i32) as ("foo", "bar") {
       // CHECK-DAG: %[[FOO:.+]] = arith.constant 0

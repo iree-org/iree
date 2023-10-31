@@ -54,6 +54,16 @@ iree_status_t iree_tooling_append_async_fence_inputs(
     iree_hal_device_t* device, iree_hal_fence_t* wait_fence,
     iree_hal_fence_t** out_signal_fence);
 
+// Transfers all buffers in |list| to ones using |target_params|.
+// If no |wait_fence| is provided then the transfer will begin immediately.
+// If no |signal_fence| is provided then the call will block until the transfer
+// completes.
+iree_status_t iree_tooling_transfer_variant_list(
+    iree_hal_device_t* device, iree_vm_list_t* list,
+    iree_hal_allocator_t* target_allocator,
+    iree_hal_buffer_params_t target_params, iree_hal_fence_t* wait_fence,
+    iree_hal_fence_t* signal_fence);
+
 // Appends a variant list of VM scalars and buffers to |builder|.
 // |list_name| will be printed alongside each element ordinal.
 //

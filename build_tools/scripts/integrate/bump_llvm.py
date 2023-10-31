@@ -75,7 +75,7 @@ def main(args):
     # and you will find out.
     iree_utils.git_submodule_set_origin(
         "third_party/llvm-project",
-        url="https://github.com/iree-org/iree-llvm-fork.git",
+        url="https://github.com/shark-infra/llvm-project.git",
         branch="--default",
     )
 

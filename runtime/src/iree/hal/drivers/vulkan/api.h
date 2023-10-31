@@ -207,24 +207,12 @@ enum iree_hal_vulkan_device_flag_bits_t {
   // IREE execution to run asynchronously with the graphics workloads.
   // See: https://gpuopen.com/learn/concurrent-execution-asynchronous-queues/
   IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE = 1u << 0,
-
-  // Whether to use the VMA allocator instead of native Vulkan API memory
-  // allocations.
-  // NOTE: this is temporary and VMA is slated for removal in the future.
-  IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR = 1u << 1,
 };
 typedef uint32_t iree_hal_vulkan_device_flags_t;
 
 typedef struct iree_hal_vulkan_device_options_t {
   // Flags controlling device behavior.
   iree_hal_vulkan_device_flags_t flags;
-
-  // Sets the VMA preferredLargeHeapBlockSize field to control the preferred
-  // size of a large heap block allocation. This effectively specifies the
-  // minimum amount of memory required and will always allocate at least this
-  // much.
-  // NOTE: this is temporary and VMA is slated for removal in the future.
-  iree_device_size_t large_heap_block_size;
 } iree_hal_vulkan_device_options_t;
 
 IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
@@ -324,8 +312,6 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create_using_instance(
 // iree_hal_vulkan_*_buffer_t
 //===----------------------------------------------------------------------===//
 
-// EXPERIMENTAL: until VMA is removed this is doing a shady reinterpret cast.
-//
 // TODO(benvanik): make this safer (dyn_cast-like, lookup allocated buffer).
 // Returns the backing device memory and logical buffer handle of a HAL buffer
 // managed by the Vulkan HAL. Invalid to call on any buffer but a base allocated

@@ -1,4 +1,4 @@
-"""Module init for the python bindings."""
+"""IREE runtime Python bindings."""
 
 # Copyright 2019 The IREE Authors
 #

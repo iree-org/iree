@@ -329,18 +329,16 @@ static iree_status_t iree_hal_task_device_create_executable_cache(
 
 static iree_status_t iree_hal_task_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_memory_access_t access,
-    iree_hal_external_file_t* IREE_RESTRICT external_file,
-    iree_hal_file_release_callback_t release_callback,
-    iree_hal_file_t** out_file) {
-  if (external_file->type != IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION) {
+    iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
+    iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
+  if (iree_io_file_handle_type(handle) !=
+      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
         "implementation does not support the external file type");
   }
   return iree_hal_memory_file_wrap(
-      queue_affinity, access, external_file->handle.host_allocation,
-      release_callback, iree_hal_device_allocator(base_device),
+      queue_affinity, access, handle, iree_hal_device_allocator(base_device),
       iree_hal_device_host_allocator(base_device), out_file);
 }
 
@@ -484,7 +482,7 @@ static iree_status_t iree_hal_task_device_wait_semaphores(
 }
 
 static iree_status_t iree_hal_task_device_profiling_begin(
-    iree_hal_device_t* device,
+    iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
   // Unimplemented (and that's ok).
   // We could hook in to vendor APIs (Intel/ARM/etc) or generic perf infra:
@@ -497,8 +495,14 @@ static iree_status_t iree_hal_task_device_profiling_begin(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_task_device_profiling_flush(
+    iree_hal_device_t* base_device) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_task_device_profiling_end(
-    iree_hal_device_t* device) {
+    iree_hal_device_t* base_device) {
   // Unimplemented (and that's ok).
   return iree_ok_status();
 }
@@ -532,5 +536,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .queue_flush = iree_hal_task_device_queue_flush,
     .wait_semaphores = iree_hal_task_device_wait_semaphores,
     .profiling_begin = iree_hal_task_device_profiling_begin,
+    .profiling_flush = iree_hal_task_device_profiling_flush,
     .profiling_end = iree_hal_task_device_profiling_end,
 };

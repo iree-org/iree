@@ -64,12 +64,24 @@ def import_saved_model(
     *, output_path, saved_model_dir, exported_names, import_type, tags
 ):
     # From here there be dragons.
-    from tensorflow.mlir.experimental import (
-        convert_saved_model,
-        convert_saved_model_v1,
-        run_pass_pipeline,
-        write_bytecode,
-    )
+    try:
+        # Available from TF 2.14.
+        from tensorflow.mlir.experimental import (
+            convert_saved_model,
+            convert_saved_model_v1,
+            run_pass_pipeline,
+            write_bytecode,
+        )
+    except ImportError as e:
+        # Try the old names for the same API instead, e.g. with TF 2.12.
+        # Yes, this is brittle. Yes, we may need to completely change this
+        # if/when these APIs change again. Such is working with TensorFlow.
+        from tensorflow.python import pywrap_mlir
+
+        convert_saved_model = pywrap_mlir.experimental_convert_saved_model_to_mlir
+        convert_saved_model_v1 = pywrap_mlir.experimental_convert_saved_model_v1_to_mlir
+        run_pass_pipeline = pywrap_mlir.experimental_run_pass_pipeline
+        write_bytecode = pywrap_mlir.experimental_write_bytecode
 
     if import_type == "savedmodel_v2":
         result = convert_saved_model(

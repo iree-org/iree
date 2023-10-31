@@ -31,7 +31,6 @@
 #include "iree/hal/drivers/vulkan/tracing.h"
 #include "iree/hal/drivers/vulkan/util/arena.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
-#include "iree/hal/drivers/vulkan/vma_allocator.h"
 #include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
@@ -241,6 +240,25 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   // since Vulkan v1.3.
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
           VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME);
+
+  // VK_KHR_8bit_storage:
+  // This extension allows use of 8-bit types in uniform and storage buffers,
+  // and push constant blocks. It's promoted to core since Vulkan 1.2.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+
+  // VK_KHR_shader_float16_int8:
+  // This extension allows use of 16-bit floating-point types and 8-bit integer
+  // types in shaders for arithmetic operations. It's promoted to core since
+  // Vulkan 1.2.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+
+  // VK_KHR_cooperative_matrix:
+  // This extension exposes SIMD matrix-matrix multiply accumulate operations.
+  // It's available in Vulkan 1.3.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
+          VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
 
   //===--------------------------------------------------------------------===//
   // Optional debugging features
@@ -537,7 +555,6 @@ IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->flags = 0;
-  out_options->large_heap_block_size = 64 * 1024 * 1024;
 }
 
 // Creates a transient command pool for the given queue family.
@@ -734,17 +751,9 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
 
   // Create the device memory allocator that will service all buffer
   // allocation requests.
-  iree_status_t status = iree_ok_status();
-  if (iree_all_bits_set(options->flags,
-                        IREE_HAL_VULKAN_DEVICE_FLAG_VMA_ALLOCATOR)) {
-    status = iree_hal_vulkan_vma_allocator_create(
-        options, instance, physical_device, logical_device,
-        &device->device_allocator);
-  } else {
-    status = iree_hal_vulkan_native_allocator_create(
-        options, instance, physical_device, logical_device,
-        &device->device_allocator);
-  }
+  iree_status_t status = iree_hal_vulkan_native_allocator_create(
+      options, instance, physical_device, logical_device,
+      &device->device_allocator);
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -919,13 +928,54 @@ iree_status_t iree_hal_vulkan_device_create(
   VkPhysicalDeviceFeatures2 available_features2;
   memset(&available_features2, 0, sizeof(available_features2));
   available_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+  // + Buffer device address features.
   VkPhysicalDeviceBufferDeviceAddressFeatures
       available_buffer_device_address_features;
   memset(&available_buffer_device_address_features, 0,
          sizeof(available_buffer_device_address_features));
   available_buffer_device_address_features.sType =
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+  available_buffer_device_address_features.pNext = available_features2.pNext;
   available_features2.pNext = &available_buffer_device_address_features;
+
+  // + Shader 16 bit storage features.
+  VkPhysicalDevice16BitStorageFeatures available_16bit_storage_features;
+  memset(&available_16bit_storage_features, 0,
+         sizeof(available_16bit_storage_features));
+  available_16bit_storage_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
+  available_16bit_storage_features.pNext = available_features2.pNext;
+  available_features2.pNext = &available_16bit_storage_features;
+
+  // + Shader 8 bit storage features.
+  VkPhysicalDevice8BitStorageFeatures available_8bit_storage_features;
+  memset(&available_8bit_storage_features, 0,
+         sizeof(available_8bit_storage_features));
+  available_8bit_storage_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES;
+  available_8bit_storage_features.pNext = available_features2.pNext;
+  available_features2.pNext = &available_8bit_storage_features;
+
+  // + Shader float16 and int8 features.
+  VkPhysicalDeviceShaderFloat16Int8Features
+      available_shader_float16_int8_features;
+  memset(&available_shader_float16_int8_features, 0,
+         sizeof(available_shader_float16_int8_features));
+  available_shader_float16_int8_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
+  available_shader_float16_int8_features.pNext = available_features2.pNext;
+  available_features2.pNext = &available_shader_float16_int8_features;
+
+  // + Cooperative matrix features.
+  VkPhysicalDeviceCooperativeMatrixFeaturesKHR available_coop_matrix_features;
+  memset(&available_coop_matrix_features, 0,
+         sizeof(available_coop_matrix_features));
+  available_coop_matrix_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR;
+  available_coop_matrix_features.pNext = available_features2.pNext;
+  available_features2.pNext = &available_coop_matrix_features;
+
   instance_syms->vkGetPhysicalDeviceFeatures2(physical_device,
                                               &available_features2);
   const VkPhysicalDeviceFeatures* available_features =
@@ -949,6 +999,9 @@ iree_status_t iree_hal_vulkan_device_create(
   device_create_info.pNext = &enabled_features2;
   if (available_features->shaderInt64) {
     enabled_features2.features.shaderInt64 = VK_TRUE;
+  }
+  if (available_features->shaderInt16) {
+    enabled_features2.features.shaderInt16 = VK_TRUE;
   }
 
   iree_hal_vulkan_features_t enabled_features = 0;
@@ -998,7 +1051,7 @@ iree_status_t iree_hal_vulkan_device_create(
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
     buffer_device_address_features.pNext = enabled_features2.pNext;
     enabled_features2.pNext = &buffer_device_address_features;
-    buffer_device_address_features.bufferDeviceAddress = true;
+    buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
     enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES;
   }
 
@@ -1028,6 +1081,24 @@ iree_status_t iree_hal_vulkan_device_create(
     subgroup_control_features.pNext = enabled_features2.pNext;
     enabled_features2.pNext = &subgroup_control_features;
     subgroup_control_features.subgroupSizeControl = VK_TRUE;
+  }
+
+  // Enable all available 16- or 8-bit integer/floating-point features.
+  available_16bit_storage_features.pNext = enabled_features2.pNext;
+  enabled_features2.pNext = &available_16bit_storage_features;
+  if (enabled_device_extensions.shader_8bit_storage) {
+    available_8bit_storage_features.pNext = enabled_features2.pNext;
+    enabled_features2.pNext = &available_8bit_storage_features;
+  }
+  if (enabled_device_extensions.shader_float16_int8) {
+    available_shader_float16_int8_features.pNext = enabled_features2.pNext;
+    enabled_features2.pNext = &available_shader_float16_int8_features;
+  }
+
+  // Enable all available coop matrix features.
+  if (enabled_device_extensions.cooperative_matrix) {
+    available_coop_matrix_features.pNext = enabled_features2.pNext;
+    enabled_features2.pNext = &available_coop_matrix_features;
   }
 
   auto logical_device = new VkDeviceHandle(
@@ -1293,18 +1364,16 @@ static iree_status_t iree_hal_vulkan_device_create_executable_cache(
 
 static iree_status_t iree_hal_vulkan_device_import_file(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_memory_access_t access,
-    iree_hal_external_file_t* IREE_RESTRICT external_file,
-    iree_hal_file_release_callback_t release_callback,
-    iree_hal_file_t** out_file) {
-  if (external_file->type != IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION) {
+    iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
+    iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
+  if (iree_io_file_handle_type(handle) !=
+      IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
         "implementation does not support the external file type");
   }
   return iree_hal_memory_file_wrap(
-      queue_affinity, access, external_file->handle.host_allocation,
-      release_callback, iree_hal_device_allocator(base_device),
+      queue_affinity, access, handle, iree_hal_device_allocator(base_device),
       iree_hal_device_host_allocator(base_device), out_file);
 }
 
@@ -1489,6 +1558,28 @@ static iree_status_t iree_hal_vulkan_device_profiling_begin(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_device_profiling_flush(
+    iree_hal_device_t* base_device) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  (void)device;
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+  if (iree_all_bits_set(device->logical_device->enabled_features(),
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING)) {
+    for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
+      iree_hal_vulkan_tracing_context_t* tracing_context =
+          device->queues[i]->tracing_context();
+      if (tracing_context) {
+        iree_hal_vulkan_tracing_context_collect(tracing_context,
+                                                VK_NULL_HANDLE);
+      }
+    }
+  }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_device_profiling_end(
     iree_hal_device_t* base_device) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
@@ -1545,6 +1636,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.queue_flush=*/iree_hal_vulkan_device_queue_flush,
     /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
     /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
+    /*.profiling_flush=*/iree_hal_vulkan_device_profiling_flush,
     /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,
 };
 }  // namespace

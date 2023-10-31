@@ -6,7 +6,7 @@
 
 # Run commands below on the workstation that the phone is attached to.
 # Prerequisites:
-#   Manual installations of the Android NDK and ADB are needed. See https://openxla.github.io/iree/building-from-source/android/#install-android-ndk-and-adb for instructions.
+#   Manual installations of the Android NDK and ADB are needed. See https://iree.dev/building-from-source/android/#install-android-ndk-and-adb for instructions.
 #   Manual installations of the Termux App and python are needed on the Android device. See README.md for instructions.
 
 #!/bin/bash
@@ -121,7 +121,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
     --iree-llvmcpu-target-triple=aarch64-none-linux-android29 \
-    --iree-flow-enable-data-tiling \
+    --iree-opt-data-tiling \
     --iree-llvmcpu-target-cpu-features=+dotprod \
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops" \
     "--iree-llvmcpu-enable-pad-consumer-fusion" \
@@ -136,7 +136,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-input-type=tosa \
     --iree-hal-target-backends=llvm-cpu \
     --iree-llvmcpu-target-triple=aarch64-none-linux-android29 \
-    --iree-flow-enable-data-tiling \
+    --iree-opt-data-tiling \
     --iree-llvmcpu-target-cpu-features=+dotprod \
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops" \
     "--iree-llvmcpu-enable-pad-consumer-fusion" \
@@ -176,7 +176,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
       --iree-vulkan-target-triple=valhall-unknown-android31 \
-      --iree-flow-demote-f32-to-f16 \
+      --iree-opt-demote-f32-to-f16 \
       --iree-llvmcpu-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \

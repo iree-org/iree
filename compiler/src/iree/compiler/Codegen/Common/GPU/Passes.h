@@ -107,11 +107,6 @@ createGPUTensorTile(bool distributeToWarp = false);
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 
-/// Convert Linalg ops to Vector.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createGPUVectorizationPass(bool generateContract = true,
-                           int64_t maxVectorSize = 4096);
-
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the
 // current function containing those vector ops as the argument.

@@ -23,7 +23,8 @@ std::unique_ptr<OperationPass<void>>
 createFixedPointIteratorPass(OpPassManager pipeline);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createHoistIntoGlobalsPass(int64_t maxSizeIncreaseThreshold = 2147483647);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass();

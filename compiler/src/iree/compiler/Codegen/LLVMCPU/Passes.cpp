@@ -8,10 +8,8 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
-#include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
@@ -44,6 +42,12 @@ static llvm::cl::opt<bool> clCheckLinalgVectorization(
     "iree-llvmcpu-check-linalg-vectorization",
     llvm::cl::desc(
         "Runs the pass to check if all the Linalg ops are vectorized"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clUseFastMinMaxOps(
+    "iree-llvmcpu-use-fast-min-max-ops",
+    llvm::cl::desc(
+        "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
     llvm::cl::init(false));
 
 // TODO(#10820): Delete the flag. This should be a nop pass to default pipeline
@@ -82,14 +86,6 @@ static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
                    "instrumentation is enabled."),
     llvm::cl::init(false)};
 
-// MLIR file containing a top-level module that specifies the transformations to
-// apply to form dispatch regions.
-// Defined externally in KernelDispatch.cpp to control the codegen pass
-// pipeline.
-extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName;
-extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugPayloadTag;
-extern llvm::cl::opt<std::string> clCPUCodegenTransformDialectDebugTransformTag;
-
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
@@ -114,11 +110,6 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
-static LogicalResult cpuDeallocationFn(OpBuilder &builder, Location loc,
-                                       Value allocation) {
-  return success();
-}
-
 static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   createLinalgCopyOp(builder, loc, from, to);
@@ -127,10 +118,8 @@ static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
 
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = cpuAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn = cpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
 }
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
@@ -206,7 +195,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       }
     }
 
-    SmallVector<int64_t> secondLevelTileSizes =
+    SmallVector<int64_t> secondLevelTileSizes;
+    std::tie(secondLevelTileSizes, std::ignore) =
         tilingConfig.getVectorCommonParallelSizes();
     for (auto [index, tileSize] : llvm::enumerate(secondLevelTileSizes)) {
       if (tileSize != 0 && !pLoopsSet.contains(index)) {
@@ -217,7 +207,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       }
     }
 
-    SmallVector<int64_t> thirdLevelTileSizes =
+    SmallVector<int64_t> thirdLevelTileSizes;
+    std::tie(thirdLevelTileSizes, std::ignore) =
         tilingConfig.getVectorReductionSizes();
     for (auto [index, tileSize] : llvm::enumerate(thirdLevelTileSizes)) {
       if (tileSize != 0 && pLoopsSet.contains(index)) {
@@ -230,17 +221,14 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   }
 
   // Verify interchange
-  if (!tilingConfig.getTileInterchange().empty()) {
-    for (auto level : llvm::seq<unsigned>(
-             0,
-             static_cast<unsigned>(tilingConfig.getTileInterchange().size()))) {
-      auto tileSizes = tilingConfig.getTileSizes()[level];
-      auto interchange = tilingConfig.getTileInterchangeSizes(level);
-      if (!isValidInterchange(interchange, tileSizes.size())) {
-        return op->emitOpError("expected [0, ")
-               << tileSizes.size()
-               << ") to be set exactly once in interchange #" << level;
-      }
+  auto tileSizesForLevel = tilingConfig.getTileSizes();
+  for (int level = 0; level < tilingConfig.getNumTilingLevels(); level++) {
+    auto interchange = tilingConfig.getTileInterchangeSizes(level);
+    auto &tileSizes = tileSizesForLevel[level];
+    if (!isValidInterchange(interchange, tileSizes.size())) {
+      return op->emitOpError("expected [0, ")
+             << tileSizes.size() << ") to be set exactly once in interchange #"
+             << level;
     }
   }
 
@@ -607,6 +595,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
   if (enableMicrokernels) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createDecomposeBatchMmt4DOpsPass());
     nestedModulePM.addPass(
         createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   } else {
@@ -672,10 +662,7 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
 void addTransformDialectPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clCPUCodegenTransformDialectFileName,
-          clCPUCodegenTransformDialectDebugPayloadTag,
-          clCPUCodegenTransformDialectDebugTransformTag));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
   //      schedule once applied.
@@ -686,8 +673,7 @@ void addTransformDialectPasses(OpPassManager &passManager) {
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // TODO: Remove the following pass and plumb support for #hal.descriptor_type
   // memory space through the stack.
-  passManager.addNestedPass<func::FuncOp>(
-      createEraseHALDescriptorTypeFromMemRefPass());
+  passManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
 
   // Lower `ukernel.*` ops to function calls
   passManager.addPass(createLowerUKernelOpsToCallsPass());
@@ -720,6 +706,11 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   passManager.addNestedPass<func::FuncOp>(
       createHoistStaticallyBoundAllocationsPass());
+
+  // Use `arith.minf/maxf` instead of `arith.minimumf/maximumf`.
+  if (clUseFastMinMaxOps) {
+    passManager.addNestedPass<func::FuncOp>(createReplaceSlowMinMaxOpsPass());
+  }
 
   // Resolve get_buffer_descriptor ops. All structural buffer manipulations
   // must conclude before this point.
@@ -760,10 +751,11 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<LLVM::LLVMFuncOp>(createAddFastMathFlagsPass());
 }
 
-void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
+void buildLLVMCPUCodegenStrategyInitializationPassPipeline(
+    OpPassManager &passManager) {
   {
+    addCommonTargetExecutablePreprocessingPasses(passManager);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
-    addCommonTargetExecutablePreprocessingPasses(modulePassManager);
     modulePassManager.addNestedPass<func::FuncOp>(
         createRematerializeParallelOpsPass());
     // TODO(#13888): This(createExpandF16OpToF32Pass()) pass is being added way
@@ -774,10 +766,14 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
         createCPUMaterializeEncodingPass());
     // TODO: Remove the following pass the plumb support for
     // #hal.descriptor_type memory space through the stack.
-    modulePassManager.addNestedPass<func::FuncOp>(
-        createEraseHALDescriptorTypeFromMemRefPass());
+    modulePassManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
   }
 
+  passManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
+}
+
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
+  buildLLVMCPUCodegenStrategyInitializationPassPipeline(passManager);
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);

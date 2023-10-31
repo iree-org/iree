@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-select-lowering-strategy)))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-jit=false %s | FileCheck %s
 // Transform dialect attributes are tested separately.
 
@@ -10,7 +10,7 @@
   ]>
 ]>
 hal.executable @add_dispatch_0 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout)
   builtin.module {
     func.func @add_dispatch_0() {
@@ -52,7 +52,7 @@ hal.executable @add_dispatch_0 {
   ]>
 ]>
 hal.executable private @dot_dispatch_1  {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @dot_dispatch_1 layout(#pipeline_layout)
     builtin.module {
       func.func @dot_dispatch_1() {
@@ -92,7 +92,7 @@ hal.executable private @dot_dispatch_1  {
   ]>
 ]>
 hal.executable private @unaligned_k  {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @unaligned_k layout(#pipeline_layout)
     builtin.module {
       func.func @unaligned_k() {
@@ -132,7 +132,7 @@ hal.executable private @unaligned_k  {
   ]>
 ]>
 hal.executable @reduction_dispatch {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @predict_dispatch_153 layout(#pipeline_layout)
     builtin.module {
       func.func @predict_dispatch_153() {
@@ -174,7 +174,7 @@ hal.executable @reduction_dispatch {
   ]>
 ]>
 hal.executable private @reduction_aligned2 {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @reduction_aligned2 ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @reduction_aligned2() {
@@ -219,7 +219,7 @@ hal.executable private @reduction_aligned2 {
   ]>
 ]>
 hal.executable @copy_as_generic {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @copy_as_generic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_as_generic() {
@@ -255,7 +255,7 @@ hal.executable @copy_as_generic {
   ]>
 ]>
 hal.executable private @static_1d_fft_stage2 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
@@ -292,7 +292,7 @@ hal.executable private @static_1d_fft_stage2 {
   ]>
 ]>
 hal.executable private @static_3d_fft_stage3 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @static_3d_fft_stage3 layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
@@ -337,7 +337,7 @@ hal.executable private @static_3d_fft_stage3 {
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @_lowering_config_test_dispatch_1 layout(#pipeline_layout)
   builtin.module {
     func.func @_lowering_config_test_dispatch_1() {
@@ -384,7 +384,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
   ]>
 ]>
 hal.executable private @sort_op {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @sort_op layout(#pipeline_layout)
     builtin.module {
       func.func @sort_op() {
@@ -429,7 +429,7 @@ hal.executable private @sort_op {
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
   hal.executable.export public @matmul_config_sm35 layout(#pipeline_layout)
   builtin.module {
     func.func @matmul_config_sm35() {
@@ -469,7 +469,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @matmul_config_sm80 layout(#pipeline_layout)
   builtin.module {
     func.func @matmul_config_sm80() {
@@ -509,7 +509,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}>) {
   hal.executable.export public @matmul_config_sm86 layout(#pipeline_layout)
   builtin.module {
     func.func @matmul_config_sm86() {
@@ -549,7 +549,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @contract_reduction {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}>) {
   hal.executable.export public @contract_reduction layout(#pipeline_layout)
   builtin.module {
     func.func @contract_reduction() {
@@ -572,7 +572,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
         ins(%4, %6 : tensor<3x64x4xf32>, tensor<f32>) outs(%5 : tensor<3x64xf32>)  {
       ^bb0(%in: f32, %in_0: f32, %out: f32):
         %8 = arith.subf %in, %in_0 : f32
-        %9 = arith.maxf %8, %cst : f32
+        %9 = arith.maximumf %8, %cst : f32
         %10 = arith.mulf %9, %9 : f32
         %11 = arith.addf %out, %10 : f32
         linalg.yield %11 : f32
@@ -598,7 +598,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @dynamic_pack_2x2 {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_86"}>) {
   hal.executable.export public @dynamic_pack_2x2 layout(#pipeline_layout)
   builtin.module {
     func.func @dynamic_pack_2x2() {
@@ -641,7 +641,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @large_matmul_f16 layout(#pipeline_layout)
   builtin.module {
     func.func @large_matmul_f16() {
@@ -688,7 +688,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @large_matmul_f32 layout(#pipeline_layout)
   builtin.module {
     func.func @large_matmul_f32() {
@@ -735,7 +735,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
   ]>
 ]>
 hal.executable @inner_unit_dim {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @inner_unit_dim layout(#pipeline_layout)
   builtin.module {
     func.func @inner_unit_dim() {
@@ -784,7 +784,7 @@ hal.executable @inner_unit_dim {
   ]>
 ]>
 hal.executable @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 layout(#pipeline_layout)
   builtin.module {
     func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32() {
@@ -814,7 +814,7 @@ hal.executable @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 {
         %13 = arith.mulf %12, %in_8 : f32
         %14 = arith.divf %13, %10 : f32
         %15 = arith.addf %14, %in_10 : f32
-        %16 = arith.maxf %15, %cst_0 : f32
+        %16 = arith.maximumf %15, %cst_0 : f32
         linalg.yield %16 : f32
         } -> tensor<256x112x112x64xf32>
         flow.dispatch.tensor.store %8, %2, offsets = [0, 0, 0, 0], sizes = [256, 112, 112, 64], strides = [1, 1, 1, 1] : tensor<256x112x112x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<256x112x112x64xf32>>
@@ -836,7 +836,7 @@ hal.executable @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32 {
 
 
 hal.executable public @_main_dispatch_15 {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @_main_dispatch_15_generic_512x4x42x42x64_f32 ordinal(0) layout(#hal.pipeline.layout<push_constants = 3, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -885,3 +885,109 @@ hal.executable public @_main_dispatch_15 {
 //  CHECK-SAME:      lowering_config = #[[CONFIG]]
 //       CHECK:  linalg.generic
 //  CHECK-SAME:      lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer, ReadOnly>,
+    #hal.descriptor_set.binding<1, storage_buffer, ReadOnly>,
+    #hal.descriptor_set.binding<2, storage_buffer, ReadOnly>,
+    #hal.descriptor_set.binding<3, storage_buffer, ReadOnly>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
+
+hal.executable public @i4_dequant_matvec {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
+    hal.executable.export public @i4_dequant_matvec ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @i4_dequant_matvec() {
+        %c32_i64 = arith.constant 32 : i64
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = hal.interface.constant.load[3] : i32
+        %4 = hal.interface.constant.load[4] : i32
+        %5 = hal.interface.constant.load[5] : i32
+        %6 = hal.interface.constant.load[6] : i32
+        %7 = hal.interface.constant.load[7] : i32
+        %8 = hal.interface.constant.load[8] : i32
+        %9 = arith.index_castui %0 : i32 to index
+        %10 = arith.index_castui %1 : i32 to index
+        %11 = arith.index_castui %2 : i32 to index
+        %12 = arith.extui %3 : i32 to i64
+        %13 = arith.extui %4 : i32 to i64
+        %14 = arith.shli %13, %c32_i64 : i64
+        %15 = arith.ori %12, %14 : i64
+        %16 = arith.index_castui %15 : i64 to index
+        %17 = arith.extui %5 : i32 to i64
+        %18 = arith.extui %6 : i32 to i64
+        %19 = arith.shli %18, %c32_i64 : i64
+        %20 = arith.ori %17, %19 : i64
+        %21 = arith.index_castui %20 : i64 to index
+        %22 = arith.extui %7 : i32 to i64
+        %23 = arith.extui %8 : i32 to i64
+        %24 = arith.shli %23, %c32_i64 : i64
+        %25 = arith.ori %22, %24 : i64
+        %26 = arith.index_castui %25 : i64 to index
+        %27 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%9) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x11008xi4>>
+        %28 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%10) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf32>>
+        %29 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%11) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf32>>
+        %30 = flow.dispatch.workload.ordinal %26, 0 : index
+        %31 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%16) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x11008xf32>>{%30}
+        %32 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%21) : !flow.dispatch.tensor<writeonly:tensor<?x4096xf32>>{%30}
+        %33 = flow.dispatch.tensor.load %27, offsets = [0, 0], sizes = [4096, 11008], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x11008xi4>> -> tensor<4096x11008xi4>
+        %34 = flow.dispatch.tensor.load %28, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf32>> -> tensor<4096xf32>
+        %35 = flow.dispatch.tensor.load %29, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf32>> -> tensor<4096xf32>
+        %36 = flow.dispatch.tensor.load %31, offsets = [0, 0], sizes = [%30, 11008], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x11008xf32>>{%30} -> tensor<?x11008xf32>
+        %37 = tensor.empty(%30) : tensor<?x4096xf32>
+        %38 = tensor.empty() : tensor<4096x11008xf32>
+        %39 = linalg.fill ins(%cst : f32) outs(%37 : tensor<?x4096xf32>) -> tensor<?x4096xf32>
+        %40 = linalg.generic {
+            indexing_maps = [
+                affine_map<(d0, d1) -> (d0, d1)>,
+                affine_map<(d0, d1) -> (d0)>,
+                affine_map<(d0, d1) -> (d0)>,
+                affine_map<(d0, d1) -> (d0, d1)>],
+            iterator_types = ["parallel", "parallel"]}
+        ins(%33, %34, %35 : tensor<4096x11008xi4>, tensor<4096xf32>, tensor<4096xf32>) outs(%38 : tensor<4096x11008xf32>) {
+        ^bb0(%in: i4, %in_0: f32, %in_1: f32, %out: f32):
+          %42 = arith.extui %in : i4 to i32
+          %43 = arith.uitofp %42 : i32 to f32
+          %44 = arith.subf %43, %in_1 : f32
+          %45 = arith.mulf %44, %in_0 : f32
+          linalg.yield %45 : f32
+        } -> tensor<4096x11008xf32>
+        %41 = linalg.generic {
+            indexing_maps = [
+                affine_map<(d0, d1, d2) -> (d0, d2)>,
+                affine_map<(d0, d1, d2) -> (d1, d2)>,
+                affine_map<(d0, d1, d2) -> (d0, d1)>],
+            iterator_types = ["parallel", "parallel", "reduction"]}
+        ins(%36, %40 : tensor<?x11008xf32>, tensor<4096x11008xf32>) outs(%39 : tensor<?x4096xf32>) {
+        ^bb0(%in: f32, %in_0: f32, %out: f32):
+          %42 = arith.mulf %in, %in_0 : f32
+          %43 = arith.addf %42, %out : f32
+          linalg.yield %43 : f32
+        } -> tensor<?x4096xf32>
+        flow.dispatch.tensor.store %41, %32, offsets = [0, 0], sizes = [%30, 4096], strides = [1, 1] : tensor<?x4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x4096xf32>>{%30}
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 256]{{\]}}>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
+// CHECK-LABEL: hal.executable.export public @i4_dequant_matvec
+//  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
+//  CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
+//       CHECK: func.func @i4_dequant_matvec()
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     lowering_config = #[[$CONFIG]]

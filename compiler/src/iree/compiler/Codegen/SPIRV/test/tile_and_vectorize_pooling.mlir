@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile,canonicalize,cse,iree-spirv-vectorize,canonicalize,cse)))))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile,canonicalize,cse,iree-codegen-generic-vectorization,iree-spirv-initial-vector-lowering,iree-codegen-hoist-redundant-vector-transfers,iree-spirv-final-vector-lowering,canonicalize,cse)))))' \
 // RUN:   %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 2, 2, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]]>
@@ -12,7 +12,7 @@
 ]>
 
 hal.executable private @pooling_nhwc_sum_f32 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @pooling_nhwc_sum_f32 layout(#pipeline_layout) attributes {
       workgroup_size = [2: index, 2: index, 2: index],
       translation_info = #translation

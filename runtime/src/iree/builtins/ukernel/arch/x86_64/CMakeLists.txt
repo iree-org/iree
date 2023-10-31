@@ -82,12 +82,33 @@ iree_bitcode_library(
     "-mavx512vnni"
 )
 
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_x86_64_avx512_bf16
+  ARCH
+    x86_64
+  SRCS
+    "mmt4d_x86_64_avx512_bf16.c"
+  COPTS
+    "-mavx"
+    "-mavx2"
+    "-mfma"
+    "-mf16c"
+    "-mavx512f"
+    "-mavx512vl"
+    "-mavx512cd"
+    "-mavx512bw"
+    "-mavx512dq"
+    "-mavx512bf16"
+)
+
 iree_link_bitcode(
   NAME
     ukernel_bitcode_x86_64
   SRCS
     "ukernel_bitcode_x86_64_avx2_fma.bc"
     "ukernel_bitcode_x86_64_avx512_base.bc"
+    "ukernel_bitcode_x86_64_avx512_bf16.bc"
     "ukernel_bitcode_x86_64_avx512_vnni.bc"
 
 )
@@ -143,8 +164,8 @@ iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX512_BASE
     "/arch:AVX512"
 )
 
-# Target CPUs supporting the AVX-512 VNNI feature. That includes Intel Sunny
-# Cove (2019) and newer, and AMD Zen4 (2022).
+# Target CPUs supporting AVX-512-VNNI. That includes Intel Cascade
+# Lake (2019) and newer, and AMD Zen4 (2022).
 iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX512_VNNI_RELATIVE
   CLANG_OR_GCC
     "-mavx512vnni"
@@ -155,9 +176,31 @@ set(IREE_UK_COPTS_X86_64_AVX512_VNNI
   "${IREE_UK_COPTS_X86_64_AVX512_VNNI_RELATIVE}"
 )
 
+# Target CPUs supporting AVX-512-BF16 feature. That includes Intel Cooper
+# Lake (2020) and newer, and AMD Zen4 (2022).
+iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX512_BF16_RELATIVE
+  CLANG_OR_GCC
+    "-mavx512bf16"
+  MSVC
+)
+set(IREE_UK_COPTS_X86_64_AVX512_BF16
+  "${IREE_UK_COPTS_X86_64_AVX512_BASE}"
+  "${IREE_UK_COPTS_X86_64_AVX512_BF16_RELATIVE}"
+)
+
+if ((CMAKE_C_COMPILER_ID STREQUAL GNU) AND
+    (CMAKE_C_COMPILER_VERSION VERSION_LESS 12))
+# Old GCC versions have incompatible x86 intrinsics. Supporting them
+# is not considered worth it. By not defining these tokens, we leave these
+# code paths out. At least GCC 9 is known to be problematic, while GCC 12 is
+# known working, so the current test is based on that.
+else()
 check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX2_FMA}" IREE_UK_BUILD_X86_64_AVX2_FMA)
 check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BASE}" IREE_UK_BUILD_X86_64_AVX512_BASE)
 check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_VNNI}" IREE_UK_BUILD_X86_64_AVX512_VNNI)
+check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BF16}" IREE_UK_BUILD_X86_64_AVX512_BF16)
+endif()
+
 configure_file("config_x86_64.h.in" "config_x86_64.h")
 
 iree_cc_library(
@@ -217,6 +260,20 @@ iree_cc_library(
 )
 list(APPEND IREE_UK_X86_64_DEPS "::x86_64_avx512_vnni")
 endif()  # IREE_UK_BUILD_X86_64_AVX512_VNNI
+
+if(IREE_UK_BUILD_X86_64_AVX512_BF16)
+iree_cc_library(
+  NAME
+    x86_64_avx512_bf16
+  SRCS
+    "mmt4d_x86_64_avx512_bf16.c"
+  COPTS
+    "${IREE_UK_COPTS_X86_64_AVX512_BF16}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_X86_64_DEPS "::x86_64_avx512_bf16")
+endif()  # IREE_UK_BUILD_X86_64_AVX512_BF16
 
 iree_cc_library(
   NAME

@@ -18,12 +18,12 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/Dominance.h"
-#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/CastInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
 
 namespace mlir {
@@ -723,6 +723,15 @@ SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
     if (valueType.isDynamicDim(i)) {
       dynamicDims.push_back(builder.createOrFold<tensor::DimOp>(loc, value, i));
     }
+  }
+  return dynamicDims;
+}
+
+SmallVector<Value> buildDynamicDimsForValues(Location loc, ValueRange values,
+                                             OpBuilder &builder) {
+  SmallVector<Value> dynamicDims;
+  for (auto value : values) {
+    dynamicDims.append(buildDynamicDimsForValue(loc, value, builder));
   }
   return dynamicDims;
 }

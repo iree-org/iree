@@ -1,14 +1,16 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-linalg-ext-decompose-softmax)), iree-spirv-select-lowering-strategy-pass, iree-spirv-lower-executable-target-pass)))' \
+// RUN:   %s | FileCheck %s
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
     [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, Unknown:Unknown,
-    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32, cooperative_matrix_properties_nv = []>>}>
+    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32, cooperative_matrix_properties_khr = []>>}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable @warp_reduction_dispatch {
-  hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export public @warp_reduction_dispatch ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -104,7 +106,7 @@ hal.executable @warp_reduction_dispatch {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable @warp_reduction_dispatch {
-  hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+  hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
     hal.executable.export public @warp_reduction_dispatch ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -199,7 +201,7 @@ hal.executable @warp_reduction_dispatch {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 
 hal.executable @softmax {
-hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
+hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
   hal.executable.export public @softmax ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -215,7 +217,7 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
       %3 = tensor.empty() : tensor<12x128x40960xf32>
-      %4 = iree_linalg_ext.softmax dimension(2) ins(%2 : tensor<12x128x40960xf32>) outs(%3 : tensor<12x128x40960xf32>) -> tensor<12x128x40960xf32>
+      %4 = linalg.softmax dimension(2) ins(%2 : tensor<12x128x40960xf32>) outs(%3 : tensor<12x128x40960xf32>) -> tensor<12x128x40960xf32>
       flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
       return
     }
@@ -226,19 +228,19 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
 //   CHECK-LABEL:  func.func @softmax
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32{{.+}}>, vector<4xf32>
-//         CHECK:      arith.maxf {{.*}} : vector<4xf32>
+//         CHECK:      arith.maximumf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
-//         CHECK:    vector.reduction <maxf>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    vector.reduction <maximumf>, %{{.*}} : vector<4xf32> into f32
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    arith.remui
 //         CHECK:    scf.if
 //         CHECK:      memref.store {{.*}} : memref<32xf32, #gpu.address_space<workgroup>>
@@ -247,16 +249,16 @@ hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulk
 //         CHECK:    arith.minui
 //         CHECK:    memref.load
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
 //         CHECK:    gpu.shuffle  xor
-//         CHECK:    arith.maxf
-//         CHECK:    arith.maxf
+//         CHECK:    arith.maximumf
+//         CHECK:    arith.maximumf
 //         CHECK:    vector.splat %{{.*}} : vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read

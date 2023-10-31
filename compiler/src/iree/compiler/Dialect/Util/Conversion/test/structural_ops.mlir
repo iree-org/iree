@@ -65,6 +65,25 @@ func.func @condBrOp(%cond: i1, %arg0: memref<?xi8>, %arg1: memref<?xi8>) -> memr
 
 // -----
 
+// CHECK-LABEL: @switchOp
+// CHECK-SAME: (%[[FLAG:.+]]: i32, %[[ARG0:.+]]: !util.buffer, %[[ARG1:.+]]: !util.buffer) -> !util.buffer
+func.func @switchOp(%flag: i32, %arg0: memref<?xi8>, %arg1: memref<?xi8>) -> memref<?xi8> {
+  // CHECK: cf.switch %[[FLAG]] : i32, [
+  // CHECK:   default: ^bb1(%[[ARG0]] : !util.buffer),
+  // CHECK:   0: ^bb1(%[[ARG1]] : !util.buffer)
+  // CHECK: ]
+  cf.switch %flag : i32, [
+    default: ^bb1(%arg0 : memref<?xi8>),
+    0: ^bb1(%arg1 : memref<?xi8>)
+  ]
+// CHECK: ^bb1(%[[BB1_ARG0:.+]]: !util.buffer):
+^bb1(%bb1_arg0 : memref<?xi8>):
+  // CHECK: return %[[BB1_ARG0]] : !util.buffer
+  return %bb1_arg0 : memref<?xi8>
+}
+
+// -----
+
 // CHECK-LABEL: @selectOp
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG0:.+]]: !util.buffer, %[[ARG1:.+]]: !util.buffer) -> !util.buffer
 func.func @selectOp(%cond: i1, %arg0: memref<?xi8>, %arg1: memref<?xi8>) -> memref<?xi8> {

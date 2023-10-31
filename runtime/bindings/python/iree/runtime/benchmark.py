@@ -57,26 +57,25 @@ class BenchmarkTimeoutError(Exception):
 
 
 def benchmark_exe():
-    return os.path.join(os.path.dirname(__file__), "iree-benchmark-module")
+    return os.path.join(
+        os.path.dirname(__file__), "..", "_runtime_libs", "iree-benchmark-module"
+    )
 
 
-def benchmark_module(module, entry_functiong=None, inputs=[], timeout=None, **kwargs):
+def benchmark_module(module, entry_function=None, inputs=[], timeout=None, **kwargs):
     funcs = [a for a in module.function_names if a != "__init"]
-    if entry_functiong is None:
+    if entry_function is None:
         if len(funcs) > 1:
             raise ValueError(f"No function specified with multiple options {funcs}")
-        entry_functiong = funcs[0]
-
-    # Throw an error
-    if entry_functiong not in funcs:
+        entry_function = funcs[0]
+    if entry_function not in funcs:
         raise ValueError(
-            f"Attempted to benchmark unknown function {entry_functiong} of options {funcs}"
+            f"Attempted to benchmark unknown function {entry_function} of options {funcs}"
         )
 
     flatbuffer = module.stashed_flatbuffer_blob
-    function = module.lookup_function(entry_functiong)
     args = [iree.runtime.benchmark_exe()]
-    args.append(f"--function={funcs[0]}")
+    args.append(f"--function={entry_function}")
 
     for k in kwargs:
         v = kwargs[k]

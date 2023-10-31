@@ -9,7 +9,7 @@
 #   * Vulkan (using SwiftShader)
 #   * Python (including `venv` and common pip packages needed for Colab)
 
-FROM gcr.io/iree-oss/swiftshader@sha256:beeb2c9853bb41375f5c9ccfb19b1ed35655c4354cc71fbcf124fe9103a7f543
+FROM gcr.io/iree-oss/swiftshader@sha256:035ac89d3c357787052a836f4cbd227035260c05c95fa9a53d809600c454e819
 
 # Install additional packages often used in notebooks.
 # Installing these at the system level helps with caching, since venvs can
@@ -26,5 +26,5 @@ RUN python3 -m pip install --ignore-installed \
     numpy \
     matplotlib \
     bottleneck \
-    tensorflow==2.12.0 \
-    tensorflow_hub==0.13.0
+    tensorflow==2.14.0 \
+    tensorflow_hub==0.15.0

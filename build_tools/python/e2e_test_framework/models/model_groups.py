@@ -20,57 +20,50 @@ from e2e_test_framework.models import (
 # Note `0` represents sync execution.
 X86_64_BENCHMARK_CONFIG = [
     # Tiny models.
-    # TODO(#14775): Re-enable the benchmarks.
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILENET_V3SMALL, threads=[0, 1]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILENET_V3SMALL, threads=[0, 1]
+    ),
     # Small models.
-    # TODO(#14775): Re-enable the benchmarks.
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.DEEPLABV3_FP32, threads=[1, 8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.EFFICIENTNET_INT8, threads=[1, 8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILENET_V1, threads=[1, 8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILENET_V2, threads=[1, 8]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.DEEPLABV3_FP32, threads=[1, 8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.EFFICIENTNET_INT8, threads=[1, 8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILENET_V1, threads=[1, 8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILENET_V2, threads=[1, 8]
+    ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V2_INT8, threads=[1, 8]
     ),
-    # TODO(#14775): Re-enable the benchmarks.
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILESSD_FP32, threads=[1, 8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.POSENET_FP32, threads=[1, 8]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILESSD_FP32, threads=[1, 8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.POSENET_FP32, threads=[1, 8]
+    ),
     # Medium models.
     # TODO: Add 13 threads once we move to new hardware.
-    # TODO(#14775): Re-enable the benchmarks.
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILEBERT_FP16, threads=[1, 8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILEBERT_FP32, threads=[1, 8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILEBERT_INT8, threads=[1, 8]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILEBERT_FP16, threads=[1, 8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILEBERT_FP32, threads=[1, 8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILEBERT_INT8, threads=[1, 8]
+    ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.EFFICIENTNET_V2_S_FP32, threads=[1, 8]
     ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, threads=[1, 8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.EFFICIENTNET_V2_S_FP32_TORCH, threads=[1, 8]
     ),
     # Large models.
     # TODO: These models should be running at 8, 13, 28 threads but we use 8 for now until new hardware becomes available.
@@ -81,64 +74,63 @@ X86_64_BENCHMARK_CONFIG = [
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[8]
     ),
     common_definitions.CpuBenchmarkConfig(
-        model=torch_models.EFFICIENTNET_B7_FP32_TORCH, threads=[8]
+        model=tf_models.GPT2_117M_1x4_FP32_TF, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
     ),
 ]
 
 # A subset of `x86_64_MODELS_AND_THREADS`.
 X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     # Tiny models.
-    # TODO(#14775): Re-enable the benchmarks.
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.PERSON_DETECT_INT8, threads=[1]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILENET_V3SMALL, threads=[1]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.PERSON_DETECT_INT8, threads=[1]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILENET_V3SMALL, threads=[1]
+    ),
     # Small models.
-    # TODO(#14775): Re-enable the benchmarks.
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.DEEPLABV3_FP32, threads=[8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.EFFICIENTNET_INT8, threads=[8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILENET_V2, threads=[8]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.DEEPLABV3_FP32, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.EFFICIENTNET_INT8, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILENET_V2, threads=[8]
+    ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V2_INT8, threads=[8]
     ),
-    # TODO(#14775): Re-enable the benchmarks.
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILESSD_FP32, threads=[8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.POSENET_FP32, threads=[8]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILESSD_FP32, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.POSENET_FP32, threads=[8]
+    ),
     # Medium models.
-    # TODO(#14775): Re-enable the benchmarks.
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILEBERT_FP32, threads=[8]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    # model=tflite_models.MOBILEBERT_INT8, threads=[8]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILEBERT_FP32, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tflite_models.MOBILEBERT_INT8, threads=[8]
+    ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.EFFICIENTNET_V2_S_FP32, threads=[8]
     ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, threads=[8]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.EFFICIENTNET_V2_S_FP32_TORCH, threads=[8]
-    ),
     # Large models.
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[8]
     ),
     common_definitions.CpuBenchmarkConfig(
-        model=torch_models.EFFICIENTNET_B7_FP32_TORCH, threads=[8]
+        model=tf_models.GPT2_117M_1x4_FP32_TF, threads=[8]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
     ),
 ]
 
@@ -195,31 +187,7 @@ MICRO_MATMUL_SPLITK = [
 BERT_LARGE_TORCH_BATCHES = [
     model
     for batch_size, model in torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES.items()
-    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
-    if batch_size < 64
 ]
-
-BERT_LARGE_FP16_TORCH_BATCHES = [
-    model
-    for batch_size, model in torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES.items()
-    # Batchsize 1 is included separately in CUDA_MODELS
-    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
-    if batch_size != 1 and batch_size < 64
-]
-
-RESNET50_TORCH_BATCHES = [
-    model
-    for batch_size, model in torch_models.RESNET50_3X224X224_FP32_TORCH_BATCHES.items()
-    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
-    if batch_size < 2048
-]
-
-RESNET50_FP16_TORCH_BATCHES = list(
-    model
-    for batch_size, model in torch_models.RESNET50_3X224X224_FP16_TORCH_BATCHES.items()
-    # Higher batch sizes disabled due to OOM https://github.com/openxla/iree/issues/14668.
-    if batch_size < 2048
-)
 
 # Batched Tensorflow models.
 BERT_LARGE_TF_BATCHES = [
@@ -272,27 +240,13 @@ CUDA_MODELS = [
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
     tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512,
     tf_models.BERT_LARGE_TF_FP32_SEQLEN384,
-    torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
-    torch_models.MODEL_UNET_2D_FP32_TORCH,
-    torch_models.EFFICIENTNET_B7_FP32_TORCH,
-    torch_models.BERT_LARGE_384_FP16_TORCH_BATCHES[1],
-    torch_models.EFFICIENTNET_V2_S_FP16_TORCH,
+    # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+    # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
+    # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]
 
-CUDA_MODELS_LONG = (
-    RESNET50_TF_BATCHES
-    + BERT_LARGE_TF_BATCHES
-    + T5_LARGE_TF_BATCHES
-    + BERT_LARGE_TORCH_BATCHES
-    + RESNET50_TORCH_BATCHES
-    + RESNET50_FP16_TORCH_BATCHES
-    + BERT_LARGE_FP16_TORCH_BATCHES
-    + BERT_LARGE_JAX_BATCHES
-    + RESNET50_JAX_BATCHES
-    + T5_LARGE_JAX_BATCHES
-)
-
 VULKAN_MODELS = [
-    torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
-    torch_models.MODEL_UNET_2D_FP32_TORCH,
+    # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+    # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
+    # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]

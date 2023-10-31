@@ -961,7 +961,7 @@ static void replaceForOpWithNewSignature(RewriterBase &rewriter,
   // We will be using dummy values instead of the old operands
   // only for those operands that are being distributed
   SmallVector<Value> newOperands;
-  auto operands = llvm::to_vector(loop.getIterOperands());
+  auto operands = llvm::to_vector(loop.getInitArgs());
   for (auto operand : operands) {
     if (!layoutMap.count(operand)) {
       newOperands.push_back(operand);
@@ -978,9 +978,8 @@ static void replaceForOpWithNewSignature(RewriterBase &rewriter,
       newOperands);
   newLoop.getBody()->erase();
 
-  newLoop.getLoopBody().getBlocks().splice(
-      newLoop.getLoopBody().getBlocks().begin(),
-      loop.getLoopBody().getBlocks());
+  newLoop.getRegion().getBlocks().splice(
+      newLoop.getRegion().getBlocks().begin(), loop.getRegion().getBlocks());
   for (Value operand : newIterOperands)
     newLoop.getBody()->addArgument(operand.getType(), operand.getLoc());
 
@@ -1018,7 +1017,7 @@ static void distributeFor(scf::ForOp forOp, DenseMap<Value, Layout> &layoutMap,
   rewriter.setInsertionPoint(forOp);
 
   SmallVector<Value> newOperands;
-  for (const auto &operand : llvm::enumerate(forOp.getIterOperands())) {
+  for (const auto &operand : llvm::enumerate(forOp.getInitArgs())) {
     if (!simdToSimtMap.count(operand.value())) {
       continue;
     }
@@ -1044,7 +1043,7 @@ static void distributeYield(scf::YieldOp yieldOp,
       continue;
     // Replace the yield of old value with the for op argument to make it easier
     // to remove the dead code.
-    yieldOperands[operand.index()] = loop.getIterOperands()[operand.index()];
+    yieldOperands[operand.index()] = loop.getInitArgs()[operand.index()];
     yieldOperands.push_back(simdToSimtMap.at(operand.value()));
   }
   rewriter.create<scf::YieldOp>(yieldOp.getLoc(), yieldOperands);

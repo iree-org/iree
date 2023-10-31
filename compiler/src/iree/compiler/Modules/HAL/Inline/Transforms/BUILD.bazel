@@ -22,6 +22,7 @@ iree_compiler_cc_library(
     hdrs = ["Passes.h"],
     deps = [
         ":PassHeaders",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/StandardToHAL",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/UtilToHAL",
         "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",

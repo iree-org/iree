@@ -11,12 +11,12 @@
 #config = #iree_codegen.lowering_config<tile_sizes = [[128, 128], [16, 4], [0, 0, 32]]>
 
 hal.executable @matmul_f32_256x1024x128 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
       max_compute_shared_memory_size = 49152,
       max_compute_workgroup_invocations = 1024,
       max_compute_workgroup_size = [65535, 65535, 65535],
-      subgroup_size = 32>>}> {
+      subgroup_size = 32>>}>) {
     hal.executable.export public @matmul_f32_256x1024x128 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>,
       workgroup_size = [32 : index, 8 : index, 1 : index]
@@ -141,12 +141,12 @@ hal.executable @matmul_f32_256x1024x128 {
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 256], [1, 8, 8], [0, 0, 0, 16]]>
 
 hal.executable @batch_matmul_16x1024x1024x80 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16], []>, AMD:DiscreteGPU, #spirv.resource_limits<
       max_compute_shared_memory_size = 65536,
       max_compute_workgroup_invocations = 1024,
       max_compute_workgroup_size = [1024, 1024, 1024],
-      subgroup_size = 64>>}> {
+      subgroup_size = 64>>}>) {
     hal.executable.export public @batch_matmul_16x1024x1024x80 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>,
       workgroup_size = [32 : index, 8 : index, 1 : index]
@@ -224,12 +224,12 @@ hal.executable @batch_matmul_16x1024x1024x80 {
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 512, 8], [1, 8, 4], [0, 0, 0, 16]]>
 
 hal.executable @batch_matmul_f32_16x4096x40x4096 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader], []>, AMD:DiscreteGPU, #spirv.resource_limits<
       max_compute_shared_memory_size = 65536,
       max_compute_workgroup_invocations = 1024,
       max_compute_workgroup_size = [1024, 1024, 1024],
-      subgroup_size = 64>>}> {
+      subgroup_size = 64>>}>) {
     hal.executable.export public @batch_matmul_f32_16x4096x40x4096 ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>,
       workgroup_size = [2 : index, 64 : index, 1 : index]

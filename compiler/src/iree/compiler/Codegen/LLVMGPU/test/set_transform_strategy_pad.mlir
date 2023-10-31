@@ -1,12 +1,12 @@
 // RUN: iree-opt %s --split-input-file \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
 // RUN: | FileCheck %s
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
 // RUN: iree-opt %s --split-input-file \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
 // RUN:   --td-pad-strategy-blk-sizes=16,32,1 \
 // RUN:   --td-pad-strategy-num-threads=8,4,1 \
@@ -15,7 +15,7 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
 hal.executable @pad {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @pad ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -47,7 +47,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       CHECK:   transform.sequence  failures(propagate) {
 //       CHECK:   transform.iree.register_match_callbacks
 //       CHECK:   {{.*}} = transform.iree.match_callback failures(propagate) "pad"({{.*}}) : (!transform.any_op) -> !transform.any_op
-//       CHECK:   transform.structured.tile_to_forall_op {{.*}}   num_threads [] tile_sizes [64, 64](mapping = [#gpu.block<y>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+//       CHECK:   transform.structured.tile_using_forall {{.*}}   tile_sizes [64, 64](mapping = [#gpu.block<y>, #gpu.block<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 //       CHECK:   apply_patterns to %{{.*}} {
 //       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK    }
@@ -56,7 +56,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       CHECK:   {{.*}} = transform.structured.match ops{["scf.if"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.scf.take_assumed_branch {{.*}} take_else_branch : (!transform.any_op) -> ()
 //       CHECK:   transform.iree.populate_workgroup_count_region_using_num_threads_slice {{.*}} : (!transform.any_op) -> ()
-//       CHECK:   {{.*}} = transform.structured.tile_to_forall_op {{.*}}   num_threads [16, 16] tile_sizes [](mapping = [#gpu.thread<y>, #gpu.thread<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+//       CHECK:   {{.*}} = transform.structured.tile_using_forall {{.*}}   num_threads [16, 16](mapping = [#gpu.thread<y>, #gpu.thread<x>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 //       CHECK:   apply_patterns to %{{.*}} {
 //       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK    }
@@ -64,7 +64,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       CHECK:   transform.iree.apply_cse
 //       CHECK:   {{.*}} = transform.structured.match ops{["scf.if"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.scf.take_assumed_branch {{.*}} take_else_branch : (!transform.any_op) -> ()
-//       CHECK:   transform.structured.masked_vectorize {{.*}} vector_sizes [4, 4] : !transform.any_op
+//       CHECK:   transform.structured.vectorize {{.*}} vector_sizes [4, 4] : !transform.any_op
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:     transform.apply_patterns.vector.lower_masked_transfers
 //       CHECK:   apply_patterns to %{{.*}} {
@@ -72,7 +72,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //   CHECK-DAG:     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
 //   CHECK-DAG:     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
 //       CHECK:   } : !transform.any_op
-//       CHECK:   {{.*}} = transform.structured.vectorize {{.*}} : (!transform.any_op) -> !transform.any_op
+//       CHECK:   {{.*}} = transform.structured.vectorize_children_and_apply_patterns {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   apply_patterns to %{{.*}} {
 //       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK    }
@@ -81,7 +81,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       CHECK:   transform.iree.eliminate_empty_tensors {{.*}} : (!transform.any_op) -> ()
 //       CHECK:   {{.*}} = transform.iree.bufferize {target_gpu} {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
-//       CHECK:   transform.iree.apply_buffer_optimizations {{.*}} : (!transform.any_op) -> ()
+//       CHECK:   transform.memref.erase_dead_alloc_and_stores {{.*}} : (!transform.any_op) -> ()
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.iree.forall_to_workgroup {{.*}} : (!transform.any_op) -> ()
 //       CHECK:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [16, 16, 1] subgroup_size = 32 : (!transform.any_op) -> ()
@@ -96,15 +96,15 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //       CHECK:   transform.iree.apply_cse
 
 // WITH_OPTIONS-LABEL: func @pad
-//       WITH_OPTIONS:   transform.structured.tile_to_forall_op {{.*}}   num_threads [] tile_sizes [32, 16](mapping = [#gpu.block<y>, #gpu.block<x>])
-//       WITH_OPTIONS:   {{.*}} = transform.structured.tile_to_forall_op {{.*}}   num_threads [4, 8] tile_sizes [](mapping = [#gpu.thread<y>, #gpu.thread<x>])
-//       WITH_OPTIONS:   transform.structured.masked_vectorize {{.*}} vector_sizes [2, 4] : !transform.any_op
+//       WITH_OPTIONS:   transform.structured.tile_using_forall {{.*}}   tile_sizes [32, 16](mapping = [#gpu.block<y>, #gpu.block<x>])
+//       WITH_OPTIONS:   {{.*}} = transform.structured.tile_using_forall {{.*}}   num_threads [4, 8](mapping = [#gpu.thread<y>, #gpu.thread<x>])
+//       WITH_OPTIONS:   transform.structured.vectorize {{.*}} vector_sizes [2, 4] : !transform.any_op
 //       WITH_OPTIONS:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [8, 4, 1]
 
 // -----
 
 hal.executable @pad_low {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @pad_low ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -140,7 +140,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 // -----
 
 hal.executable @pad_local {
-hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @pad_local ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

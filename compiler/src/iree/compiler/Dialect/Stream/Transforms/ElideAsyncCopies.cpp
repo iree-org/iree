@@ -261,10 +261,11 @@ private:
       // Branch argument.
       traversalResult |= solver.getExplorer().walkIncomingBranchOperands(
           arg.getParentBlock(),
-          [&](Block *sourceBlock, OperandRange operands) -> WalkResult {
+          [&](Block *sourceBlock, OperandRange operands,
+              size_t offset) -> WalkResult {
             unsigned baseIdx = operands.getBeginOperandIndex();
             auto &sourceOperand = sourceBlock->getTerminator()->getOpOperand(
-                baseIdx + arg.getArgNumber());
+                baseIdx + arg.getArgNumber() + offset);
             updateFromPredecessorUse(sourceOperand, solver);
             return WalkResult::advance();
           });

@@ -24,7 +24,10 @@ namespace {
 struct LLVMGPUVectorLoweringPass
     : public LLVMGPUVectorLoweringBase<LLVMGPUVectorLoweringPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<affine::AffineDialect>();
+    registry.insert<memref::MemRefDialect>();
     registry.insert<vector::VectorDialect>();
+    registry.insert<scf::SCFDialect>();
   }
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
@@ -33,6 +36,10 @@ struct LLVMGPUVectorLoweringPass
       // Lower high level vector operations like contract or multidim reduce ops
       // to lower level vector ops.
       RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      vector::populateVectorTransferPermutationMapLoweringPatterns(
+          contractLoweringPatterns);
+      vector::TransposeOp::getCanonicalizationPatterns(contractLoweringPatterns,
+                                                       funcOp.getContext());
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
           contractLoweringPatterns,

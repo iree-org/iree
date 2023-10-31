@@ -8,5 +8,4 @@ third_party/spirv_cross
 third_party/spirv_headers
 third_party/tracy
 third_party/vulkan_headers
-third_party/vulkan_memory_allocator
 third_party/webgpu-headers

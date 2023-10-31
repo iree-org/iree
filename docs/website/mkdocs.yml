@@ -1,5 +1,5 @@
 site_name: IREE
-site_url: https://openxla.github.io/iree/
+site_url: https://iree.dev/
 repo_url: https://github.com/openxla/iree
 repo_name: openxla/iree
 
@@ -52,7 +52,7 @@ extra:
   community_homepage: https://github.com/openxla/community
   community_site_name: OpenXLA
 
-  homepage: https://openxla.github.io/iree/
+  homepage: https://iree.dev/
 
   # TODO(scotttodd): join mkdocs-material insiders and remove notice?
   #   (we *can* remove the notice without joining)
@@ -70,7 +70,7 @@ extra:
       name: IREE Discuss Google Group
 
   status:
-    new: Recently added
+    new: Recently updated
 
 extra_css:
   - assets/stylesheets/extra.css
@@ -133,7 +133,9 @@ nav:
           - CPU: "guides/deployment-configurations/cpu.md"
           - CPU - Bare-Metal: "guides/deployment-configurations/bare-metal.md"
           - GPU - Vulkan: "guides/deployment-configurations/gpu-vulkan.md"
-          - GPU - CUDA/ROCm: "guides/deployment-configurations/gpu-cuda-rocm.md"
+          - GPU - CUDA: "guides/deployment-configurations/gpu-cuda.md"
+          - GPU - ROCm: "guides/deployment-configurations/gpu-rocm.md"
+          - GPU - Metal: "guides/deployment-configurations/gpu-metal.md"
       - "Other topics":
           - Developer tips and tricks: "guides/developer-tips.md"
   - "Reference":
@@ -167,16 +169,21 @@ nav:
       - "community/index.md"
       - "Blog":
           - "community/blog/index.md"
-          - CUDA backend: "community/blog/2021-10-15-cuda-backend.md"
-          - Work in progress on Matrix Multiplication on CPU: "community/blog/2021-10-13-mmt4d.md"
-          - TFLite Support via TOSA: "community/blog/2021-07-19-tflite-tosa.md"
-
+      - "community/tags.md"
 plugins:
+  # https://squidfunk.github.io/mkdocs-material/setup/setting-up-a-blog/
+  - blog:
+      blog_dir: "community/blog"
+      blog_toc: true
+      post_url_date_format: yyyy-MM-dd
+      post_url_format: "{date}-{slug}"
+
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-site-search/
   - search
 
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-tags/
-  - tags
+  - tags:
+      tags_file: community/tags.md
 
   # https://github.com/mkdocs/mkdocs-redirects
   - redirects:
@@ -195,7 +202,9 @@ plugins:
         "deployment-configurations/cpu.md": "guides/deployment-configurations/cpu.md"
         "deployment-configurations/bare-metal.md": "guides/deployment-configurations/bare-metal.md"
         "deployment-configurations/gpu-vulkan.md": "guides/deployment-configurations/gpu-vulkan.md"
-        "deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda-rocm.md"
+        "deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda.md"
+        # The CUDA/ROCm page split into two pages
+        "guides/deployment-configurations/gpu-cuda-rocm.md": "guides/deployment-configurations/gpu-cuda.md"
 
         # "bindings/" moved under "reference/"
         "bindings/index.md": "reference/bindings/index.md"
@@ -204,6 +213,9 @@ plugins:
 
         # "blog/" moved under "community/"
         "blog/index.md": "community/blog/index.md"
-        "blog/2021-07-19-tflite-tosa.md": "community/blog/2021-07-19-tflite-tosa.md"
-        "blog/2021-10-13-mmt4d.md": "community/blog/2021-10-13-mmt4d.md"
-        "blog/2021-10-15-cuda-backend.md": "community/blog/2021-10-15-cuda-backend.md"
+        "blog/2021-07-19-tflite-tosa.md": "community/blog/posts/tflite-tosa.md"
+        "blog/2021-10-13-mmt4d.md": "community/blog/posts/mmt4d.md"
+        "blog/2021-10-15-cuda-backend.md": "community/blog/posts/cuda-backend.md"
+        # Some blog post names/paths changed when setting up the blog plugin
+        "community/blog/2021-07-19-tflite-tosa.md": "community/blog/posts/tflite-tosa.md"
+        "community/blog/2021-10-13-mmt4d.md": "community/blog/posts/mmt4d.md"

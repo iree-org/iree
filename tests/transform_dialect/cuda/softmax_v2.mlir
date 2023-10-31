@@ -4,9 +4,9 @@
 // RUN:     --iree-flow-fuse-multi-use \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_v2_codegen_spec.mlir | \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/softmax_v2_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
@@ -15,7 +15,7 @@
 /// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-flow-fuse-multi-use \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_v2_codegen_spec.mlir | \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/softmax_v2_codegen_spec.mlir | \
 // RUN: iree-run-module --module=- --function=softmax --device=cuda | \
 // RUN: FileCheck %s
 
@@ -49,7 +49,7 @@ func.func @softmax() -> !out_tensor_t {
      ins(%input : !in_tensor_t)
     outs(%input_max_filled : !tmp_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32):
-        %max = arith.maxf %arg0, %arg1 : f32
+        %max = arith.maximumf %arg0, %arg1 : f32
         linalg.yield %max : f32
       } -> !tmp_tensor_t
 

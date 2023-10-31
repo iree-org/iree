@@ -7,6 +7,8 @@
 #include "iree/compiler/Modules/Check/Conversion/ConversionPatterns.h"
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Modules/Check/IR/CheckOps.h"
 #include "mlir/Pass/Pass.h"
@@ -60,17 +62,90 @@ void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
       context, importSymbols, typeConverter, "check.expect_almost_eq");
 }
 
+// Attempts to rewrite an op that may use tensor values into an op using HAL
+// buffers.
+static LogicalResult applyDefaultCheckBufferRewrite(
+    Operation *srcOp, ValueRange operands, StringRef dstOpName,
+    TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
+  OperationState state{srcOp->getLoc(), dstOpName};
+  state.addAttributes(srcOp->getAttrs());
+
+  // Add device argument.
+  Value device = rewriter.create<IREE::HAL::ExSharedDeviceOp>(srcOp->getLoc());
+  state.addOperands({device});
+
+  for (auto [srcOperand, dstOperand] :
+       llvm::zip_equal(srcOp->getOperands(), operands)) {
+    // Check that any type that should have been mapped to buffer view was.
+    // This is just to catch conflicts in type conversions that may sneak in
+    // during development.
+    assert(
+        (!HALTypeConverter::shouldConvertToBufferView(srcOperand.getType()) ||
+         dstOperand.getType().isa<IREE::HAL::BufferViewType>()) &&
+        "expect that tensors have been mapped to buffer views");
+    state.addOperands({dstOperand});
+  }
+  for (auto resultType : srcOp->getResultTypes()) {
+    if (HALTypeConverter::shouldConvertToBufferView(resultType)) {
+      state.addTypes(IREE::HAL::BufferViewType::get(rewriter.getContext()));
+    } else {
+      // Normal pass-through result.
+      if (failed(typeConverter.convertType(resultType, state.types))) {
+        return failure();
+      }
+    }
+  }
+
+  auto *dstOp = rewriter.create(state);
+  rewriter.replaceOp(srcOp, dstOp->getResults());
+  return success();
+}
+
+// HAL tensor-to-buffer conversion utility.
+// This can be used by dialects to model custom op conversion from a dialect
+// that uses the MLIR tensor type to the IREE HAL buffer type. At this point
+// during conversion the source values will be TensorType and the target values
+// will be IREE::HAL::BufferTypes. Any static information available about the
+// tensor (such as static dimensions, element type, layout, etc) are extracted
+// here and lowered as expanded values.
+//
+// The ABI is currently very basic and will change with the introduction of more
+// dynamic shape logic.
+//
+// Source:
+//   my.tensor_op(%arg0 : tensor<2x4xf32>)
+// Target:
+//   %arg0_view = hal.buffer_view.create %arg0, ...
+//   my.buffer_op(%arg0_view : !hal.buffer_view)
+template <typename SRC, typename DST>
+class HALCheckOpConversion : public OpConversionPattern<SRC> {
+public:
+  HALCheckOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern<SRC>(context), typeConverter(typeConverter) {}
+
+  LogicalResult
+  matchAndRewrite(SRC srcOp, typename SRC::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    return applyDefaultCheckBufferRewrite(srcOp, adaptor.getOperands(),
+                                          DST::getOperationName(),
+                                          typeConverter, rewriter);
+  }
+
+protected:
+  TypeConverter &typeConverter;
+};
+
 void populateCheckToHALPatterns(MLIRContext *context,
                                 RewritePatternSet &patterns,
                                 TypeConverter &typeConverter) {
   // The same op handles both tensors and buffer views.
-  patterns
-      .insert<HALOpConversion<IREE::Check::ExpectAllTrueOp,
-                              IREE::Check::ExpectAllTrueOp>,
-              HALOpConversion<IREE::Check::ExpectEqOp, IREE::Check::ExpectEqOp>,
-              HALOpConversion<IREE::Check::ExpectAlmostEqOp,
-                              IREE::Check::ExpectAlmostEqOp>>(context,
-                                                              typeConverter);
+  patterns.insert<
+      HALCheckOpConversion<IREE::Check::ExpectAllTrueOp,
+                           IREE::Check::ExpectAllTrueOp>,
+      HALCheckOpConversion<IREE::Check::ExpectEqOp, IREE::Check::ExpectEqOp>,
+      HALCheckOpConversion<IREE::Check::ExpectAlmostEqOp,
+                           IREE::Check::ExpectAlmostEqOp>>(context,
+                                                           typeConverter);
 }
 
 } // namespace Check

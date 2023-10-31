@@ -8,7 +8,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -46,7 +45,6 @@ namespace IREE = mlir::iree_compiler::IREE;
 namespace mlir {
 namespace test_ext {
 /// Test passes, do not deserve an include.
-void registerTestLinalgTransformWrapScope();
 void registerTestListenerPasses();
 } // namespace test_ext
 } // namespace mlir
@@ -61,7 +59,6 @@ int main(int argc, char **argv) {
       // Local dialects
       mlir::iree_compiler::IREE::Input::IREEInputDialect,
       mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
-      mlir::linalg::transform::LinalgTransformDialect,
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithDialect,
@@ -86,10 +83,8 @@ int main(int argc, char **argv) {
   // Local dialect passes.
   mlir::iree_compiler::IREE::LinalgExt::registerPasses();
   mlir::linalg::transform::registerTransformDialectInterpreterPass();
-  mlir::linalg::transform::registerLinalgTransformExpertExpansionPass();
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
-  mlir::test_ext::registerTestLinalgTransformWrapScope();
   mlir::test_ext::registerTestListenerPasses();
 
   // External models.

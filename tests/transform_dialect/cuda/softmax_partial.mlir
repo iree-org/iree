@@ -4,8 +4,8 @@
 // RUN:     --iree-flow-transformation-pipeline  \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_partial_codegen_spec.mlir \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target)))' \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/softmax_partial_codegen_spec.mlir \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
@@ -14,7 +14,7 @@
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_partial_codegen_spec.mlir | \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/softmax_partial_codegen_spec.mlir | \
 // RUN: iree-run-module --module=- --function=softmax_partial --device=cuda | \
 // RUN: FileCheck %s
 
@@ -42,7 +42,7 @@ func.func @softmax_partial() -> !out_tensor_t {
                        iterator_types = ["parallel", "parallel", "reduction"]}
   ins(%0 : !out_tensor_t) outs(%2 : !tmp_tensor_t) {
   ^bb0(%arg0: f32, %arg1: f32):
-    %8 = arith.maxf %arg0, %arg1 : f32
+    %8 = arith.maximumf %arg0, %arg1 : f32
     linalg.yield %8 : f32
   } -> !tmp_tensor_t
 

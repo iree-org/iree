@@ -33,7 +33,7 @@ typedef struct iree_hal_cuda2_native_executable_t {
   iree_host_size_t entry_point_count;
   // The list of entry point data pointers, pointing to trailing inline
   // allocation after the end of this struct.
-  iree_hal_cuda2_kernel_params_t entry_points[];
+  iree_hal_cuda2_kernel_info_t entry_points[];
 } iree_hal_cuda2_native_executable_t;
 // + Additional inline allocation for holding entry point information.
 
@@ -225,20 +225,20 @@ iree_status_t iree_hal_cuda2_native_executable_create(
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.
-      iree_hal_cuda2_kernel_params_t* params = &executable->entry_points[i];
-      params->layout = executable_params->pipeline_layouts[i];
-      iree_hal_pipeline_layout_retain(params->layout);
-      params->function = function;
-      params->block_size[0] = block_sizes_vec[i].x;
-      params->block_size[1] = block_sizes_vec[i].y;
-      params->block_size[2] = block_sizes_vec[i].z;
-      params->shared_memory_size = shared_memory_sizes[i];
+      iree_hal_cuda2_kernel_info_t* info = &executable->entry_points[i];
+      info->layout = executable_params->pipeline_layouts[i];
+      iree_hal_pipeline_layout_retain(info->layout);
+      info->function = function;
+      info->block_size[0] = block_sizes_vec[i].x;
+      info->block_size[1] = block_sizes_vec[i].y;
+      info->block_size[2] = block_sizes_vec[i].z;
+      info->shared_memory_size = shared_memory_sizes[i];
 
       // Stash the entry point name in the string table for use when tracing.
       IREE_TRACE({
         iree_host_size_t entry_name_length = flatbuffers_string_len(entry_name);
         memcpy(string_table_buffer, entry_name, entry_name_length);
-        params->function_name =
+        info->function_name =
             iree_make_string_view(string_table_buffer, entry_name_length);
         string_table_buffer += entry_name_length;
       });
@@ -253,9 +253,9 @@ iree_status_t iree_hal_cuda2_native_executable_create(
           flatbuffers_string_t filename =
               iree_hal_cuda_FileLineLocDef_filename_get(source_loc);
           uint32_t line = iree_hal_cuda_FileLineLocDef_line_get(source_loc);
-          params->source_filename =
+          info->source_filename =
               iree_make_string_view(filename, flatbuffers_string_len(filename));
-          params->source_line = line;
+          info->source_line = line;
         }
       });
     }
@@ -290,9 +290,9 @@ static void iree_hal_cuda2_native_executable_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_status_t iree_hal_cuda2_native_executable_entry_point_kernel_params(
+iree_status_t iree_hal_cuda2_native_executable_entry_point_kernel_info(
     iree_hal_executable_t* base_executable, int32_t entry_point,
-    iree_hal_cuda2_kernel_params_t* out_params) {
+    iree_hal_cuda2_kernel_info_t* out_info) {
   iree_hal_cuda2_native_executable_t* executable =
       iree_hal_cuda2_native_executable_cast(base_executable);
   if (entry_point >= executable->entry_point_count) {
@@ -301,8 +301,7 @@ iree_status_t iree_hal_cuda2_native_executable_entry_point_kernel_params(
                             "only contains %" PRIhsz " entry points",
                             entry_point, executable->entry_point_count);
   }
-  memcpy(out_params, &executable->entry_points[entry_point],
-         sizeof(*out_params));
+  memcpy(out_info, &executable->entry_points[entry_point], sizeof(*out_info));
   return iree_ok_status();
 }
 

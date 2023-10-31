@@ -8,7 +8,7 @@
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASS_DETAIL_H_
 
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/FunctionInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

@@ -12,7 +12,7 @@ include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
-include "mlir/IR/FunctionInterfaces.td"
+include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -287,6 +287,151 @@ def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
   ];
 
   let hasCanonicalizer = 1;
+}
+
+def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
+  IsolatedFromAbove,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedOperandsIndexAndLength",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{a dispatch of workgroups across a 3-dimensional grid}];
+  let description = [{
+    Dispatches some number of workgroups across a 3-dimensional grid using a
+    function defined externally in one or more referenced objects. Objects are
+    declared per executable target and selected automatically during linking
+    based on where the dispatch is used. Semantically this is equivalent to
+    a `flow.dispatch.workgroups` but with the workgroup region invisible to the
+    compiler. See `hal.executable` for more information about object linkage.
+
+    Note that since this happens at tensor level the dispatch operation has
+    value semantics: some tensors (and optionally other primitive types) are
+    consumed and one or more new result tensors are produced. Inside each
+    workgroup, however, the input and output tensors are available for arbitrary
+    loads and stores. In many cases each workgroup will load some particular
+    tile(s) from the input tensors and store some particular tile(s) to the
+    output tensors unique to that workgroup. Though it's possible for multiple
+    workgroups to load the same regions of the input tensors behavior is
+    undefined if multiple workgroups store to the same regions of the output
+    tensors. Codegen guarantees this behavior but when sourcing externally
+    authored dispatch functions it's critical that this behavior is observed.
+
+    Though the representation is similar to the GPU-style grid dispatch model
+    here we still have not yet allocated buffers, determined the target device
+    for execution, or even completed fully resolving shapes/types/etc. Because
+    of this it's important that the workgroup body use the platform-dependent
+    primitives for accessing workgroup ID, size, and count intrinsics instead
+    of hardcoding them to a particular set of values. Assume that any workgroup
+    dispatch may end up being specialized for several different target devices
+    and even several different variants for a particular target device
+    (differing workgroup sizes, etc). To aid deduplication code producing these
+    external dispatches should try not to specialize early for particular shapes
+    and instead emit the most generic code possible as having 500 slightly
+    different `hal.dispatch.extern` ops pointing at the same object file is
+    likely to require 500 copies of the object instead of 500 calls to the same
+    object.
+
+    Because at this point in the layering devices have not yet been selected the
+    workgroup count cannot be fully evaluated. Instead workload parameters are
+    captured that are then passed to a function that when later evaluated
+    computes the actual workgroup count based on target information. The
+    workload is not limited to the 3D XYZ grid dispatch of the workgroup count
+    and can contain any number of parameters used to compute it. If workgroup
+    size or distribution varies based on the target device a `!hal.device`
+    argument can be used by the workgroup count calculation region to factor in
+    device parameters. See `hal.device.query` for more information on how to
+    query information.
+
+    ```mlir
+    %r = hal.dispatch.extern "some_function"[%c5, %c5](%0, %1)
+        : (tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32>
+      ...
+    ```
+
+    The number of results of the operation is equal to the number of results
+    in the type signature (`(tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32>`).
+    Each tensor argument and result in the type signature has a corresponding
+    pipeline layout slot and must be declared. If multiple arguments or results
+    share the same layout slot they can be aliased using the `bindings`
+    attribute and otherwise each is assumed unique.
+
+    There are no `arguments` operands for results, but a result can be tied an
+    argument by writing the argument operand's SSA value instead of its type:
+    E.g., in the above example, `-> %0` would tie the first argument to the
+    result. In that case, there would be no separate block argument for the
+    result.
+  }];
+
+  let arguments = (ins
+    StrAttr:$export,
+    Variadic<Index>:$workload,
+    Variadic<AnyType>:$arguments,
+    HAL_ShapeDynamicDims:$argument_dims,
+    HAL_ShapeDynamicDims:$result_dims,
+    HAL_PipelineLayoutAttr:$layout,
+    HAL_ExecutableObjectsAttr:$objects,
+    OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
+    OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
+    OptionalAttr<IndexAttr>:$workgroup_local_memory,
+    OptionalAttr<HAL_InterfaceBindingArrayAttr>:$bindings,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let regions = (region
+    AnyRegion:$workgroup_count
+  );
+
+  let assemblyFormat = [{
+    $export
+    (`[` $workload^ `]`)? ``
+    `(` $arguments `)` `:`
+    custom<ShapedFunctionType>(ref($arguments),
+                               type($arguments), $argument_dims,
+                               type($results), $result_dims,
+                               $tied_operands)
+    `count` `` custom<WorkgroupCountRegion>($workgroup_count)
+    `layout` `(` $layout `)`
+    (`bindings` `(` $bindings^ `)`)?
+    `objects` `(` $objects `)`
+    attr-dict-with-keyword
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$workload,
+      "TypeRange":$resultTypes, "ValueRange":$resultDims,
+      "ValueRange":$arguments, "ValueRange":$argumentDims,
+      "ArrayRef<int64_t>":$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+  ];
+
+  let extraClassDeclaration = [{
+    FunctionType getDispatchType() {
+      return FunctionType::get(
+          getContext(), llvm::map_to_vector(getArguments(), [](Value value) {
+            return value.getType();
+          }),
+          getResultTypes());
+    }
+
+    /// Returns the index of the args() operand in the Operation operands list.
+    unsigned mapArgOperandToOpOperand(unsigned i) { return i + getWorkload().size(); };
+
+    ValueRange getOperandDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx - getWorkload().size(), getArguments(), getArgumentDims());
+    }
+    ValueRange getResultDynamicDims(unsigned idx) {
+      return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+    }
+  }];
+
+  let hasVerifier = 1;
 }
 
 } // OpGroupPseudoOps
@@ -735,6 +880,7 @@ def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
   );
 
   let assemblyFormat = [{
+    $key `=`
     $operands `:` type($operands)
     attr-dict-with-keyword
   }];
@@ -1388,88 +1534,8 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   ];
 }
 
-def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [
-    NoRegionArguments,
-    RecursiveMemoryEffects,
-  ]> {
-  let summary = [{runtime device switch pseudo op}];
-  let description = [{
-    Switches between multiple regions based on the runtime device type.
-    The provided regions are matched against the runtime backend of the given
-    device and executed only when the device matches the conditions.
-
-    Conditions can match on wildcards and be folded to enable conditions that
-    have similar bodies to be folded. The patterns themselves are only matched
-    once at startup and then the results are cached; the runtime overhead is
-    equivalent to a normal switch statement. In cases where the compiler can
-    statically identify the device type entire cases can be folded away.
-
-    Supported conditions:
-    * `#hal.match...`: execute the region if the expression matches.
-
-    Supported match expressions:
-    * `#hal.match.always`: always matches; useful for defaults.
-    * `#hal.match.any<[...]>`: matches if any of the nested expressions match.
-    * `#hal.match.all<[...]>`: matches only if all of the nested expressions
-      match.
-    * `#hal.device.match.id<"pattern*-?-*">`: matches against the device
-      identifier. The pattern is evaluated with standard file path wildcards
-      (`*` for zero or more characters and `?` for one character).
-
-    If more than one condition is satisfied the first listed will be chosen.
-    More specific conditions should be earlier in the set. If no condition is
-    matched but there are return values the switch will abort at runtime. It's
-    strongly recommend that all switches that return values end with a trailing
-    `#hal.match.always` condition to handle the fallthrough case.
-
-    Upon creation each condition region will have an empty entry block with the
-    specified operands available as arguments. Each region must be setup to
-    return the same types.
-
-    ```mlir
-    %c0 = arith.constant 0 : i32
-    %c1 = arith.constant 1 : i32
-    %c2 = arith.constant 2 : i32
-    %device = ... : !hal.device
-    %0 = hal.device.switch<%device : !hal.device> -> i32
-      #hal.device.match.id<"vulkan-v1.?-*"> {
-        hal.return %c1 : i32
-      },
-      #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
-        hal.return %c2 : i32
-      },
-      #hal.match.always {
-        hal.return %c0 : i32
-      }
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    ArrayAttr:$conditions
-  );
-  let results = (outs
-    Variadic<AnyType>:$results
-  );
-
-  let regions = (region VariadicRegion<AnyRegion>:$condition_regions);
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins
-      "TypeRange":$resultTypes,
-      "Value":$device,
-      "ArrayRef<Attribute>":$conditions,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
-    )>,
-  ];
-
-
-  let hasVerifier = 1;
-}
-
 def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
-  let summary = [{return from a hal.device.switch region}];
+  let summary = [{return from a hal.* region}];
   let description = [{
     Returns the given values from the region and back to the host code.
   }];
@@ -1809,29 +1875,46 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
     OptionalAttr<HAL_ExecutableObjectsAttr>:$objects
   );
 
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region
+    SizedRegion<1>:$body
+  );
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
     ``
-    regions
+    $body
   }];
 
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
+
+    IREE::HAL::ExecutableConditionOp getConditionOp() {
+      auto conditionOps = getBody().getOps<IREE::HAL::ExecutableConditionOp>();
+      return !conditionOps.empty() ? *conditionOps.begin() : IREE::HAL::ExecutableConditionOp{};
+    }
+    iterator_range<Region::op_iterator<IREE::HAL::ExecutableConstantBlockOp>>
+    getConstantBlockOps() {
+      return getBody().getOps<IREE::HAL::ExecutableConstantBlockOp>();
+    }
+    iterator_range<Region::op_iterator<IREE::HAL::ExecutableExportOp>>
+    getExportOps() {
+      return getBody().getOps<IREE::HAL::ExecutableExportOp>();
+    }
 
     bool isExternal() {
       return getBlock().getOps<::mlir::ModuleOp>().empty();
     }
 
     ::mlir::ModuleOp getInnerModule() {
-      auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
-      assert(!moduleOps.empty() && "source ops need inner modules");
-      return *moduleOps.begin();
+      auto it = getBlock().getOps<::mlir::ModuleOp>();
+      if (it.empty()) return {};
+      return *it.begin();
     }
   }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
@@ -1902,11 +1985,10 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     An entry point exported by the executable with statically-available
     information describing the IO interface it uses and other dispatch metadata.
 
-    The `calculate_workgroup_count` region represents the computation that
+    The `workgroup_count` region represents the computation that
     returns the number of workgroups to use in the 3D grid dispatch.
     The arguments to the region represents the workload as captured by each
-    dispatch.
-    It returns the number of workgroups along x, y, and z.
+    dispatch. It returns the number of workgroups along x, y, and z.
   }];
 
   let arguments = (ins
@@ -1969,6 +2051,12 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   let description = [{
     The target IR for the executable. This can be preserved for debugging but
     is usually removed during transformation.
+
+    Variants are selected based on their target and an optional condition
+    op that returns true if the variant is valid for use on the provided
+    runtime `!hal.device`. If no variants within an executable are valid then
+    loading will fail at runtime. If multiple variants are valid the first valid
+    one found will be loaded and used for execution.
   }];
 
   let arguments = (ins
@@ -1978,15 +2066,17 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     OptionalAttr<HAL_ExecutableObjectArrayAttr>:$objects
   );
 
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region
+    SizedRegion<1>:$body
+  );
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
-    `,` `target` `=` $target
-    (`,` `objects` `=` $objects^ )?
+    `target` `(` $target `)`
+    (`objects` `(` $objects^ `)` )?
     attr-dict-with-keyword
-    regions
+    $body
   }];
 
   let skipDefaultBuilders = 1;
@@ -1997,22 +2087,39 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
 
+    IREE::HAL::ExecutableConditionOp getConditionOp() {
+      auto conditionOps = getBody().getOps<IREE::HAL::ExecutableConditionOp>();
+      return !conditionOps.empty() ? *conditionOps.begin() : IREE::HAL::ExecutableConditionOp{};
+    }
+    iterator_range<Region::op_iterator<IREE::HAL::ExecutableConstantBlockOp>>
+    getConstantBlockOps() {
+      return getBody().getOps<IREE::HAL::ExecutableConstantBlockOp>();
+    }
+    iterator_range<Region::op_iterator<IREE::HAL::ExecutableExportOp>>
+    getExportOps() {
+      return getBody().getOps<IREE::HAL::ExecutableExportOp>();
+    }
+
     bool isExternal() {
       return getBlock().getOps<::mlir::ModuleOp>().empty();
     }
 
     ::mlir::ModuleOp getInnerModule() {
-      auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
-      assert(!moduleOps.empty() && "source ops need inner modules");
-      return *moduleOps.begin();
+      auto it = getBlock().getOps<::mlir::ModuleOp>();
+      if (it.empty()) return {};
+      return *it.begin();
     }
 
     // Returns a map of constant key attributes to ordinals across all constant
     // blocks inside the variant.
     DenseMap<Attribute, int> gatherConstantOrdinals();
+
+    // Returns an i1 indicating whether this variant should be selected.
+    Value buildCondition(Value device, OpBuilder &builder);
   }];
 
   let hasCanonicalizer = 1;
+  let hasVerifier = 1;
 }
 
 def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
@@ -2021,6 +2128,59 @@ def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
   ]> {
   let summary = [{terminator pseudo-op for the executable variant op}];
   let assemblyFormat = "attr-dict";
+}
+
+def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
+    IsolatedFromAbove,
+    FunctionOpInterface,
+    CallableOpInterface,
+  ]> {
+  let summary = [{host code to determine if the executable is enabled}];
+  let description = [{
+    Variants are selected based on their target and this optional condition
+    op that returns true if the variant is valid for use on the provided
+    runtime `!hal.device`. If no variants within an executable are valid then
+    loading will fail at runtime. If multiple variants are valid the first valid
+    one found will be loaded and used for execution.
+  }];
+
+  let arguments = (ins
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Add an entry block to an empty function and set up the block arguments
+    /// to match the signature of the function.
+    Block *addEntryBlock();
+    Block *addBlock();
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    LogicalResult verifyType() { return success(); }
+
+    Region *getCallableRegion() { return &getBody(); }
+    ArrayRef<Type> getCallableResults() { return getResultTypes(); }
+
+    ::mlir::ArrayAttr getCallableArgAttrs() { return nullptr; }
+    ::mlir::ArrayAttr getCallableResAttrs() { return nullptr; }
+
+    /// Make symbol optional as this op has no symbol.
+    bool isOptionalSymbol() { return true; }
+  }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_ExecutableConstantBlockOp :

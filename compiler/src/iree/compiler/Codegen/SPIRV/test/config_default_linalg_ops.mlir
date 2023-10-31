@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -7,13 +7,13 @@
   ]>
 ]>
 hal.executable @copy_as_generic {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
-    }> {
+    }>) {
     hal.executable.export @copy_as_generic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_as_generic() {
@@ -51,13 +51,13 @@ hal.executable @copy_as_generic {
   ]>
 ]>
 hal.executable @tensor_insert {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @copy layout(#pipeline_layout)
     builtin.module {
       func.func @copy() {
@@ -97,13 +97,13 @@ hal.executable @tensor_insert {
   ]>
 ]>
 hal.executable @avg_pool {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @avg_pool layout(#pipeline_layout)
     builtin.module {
       func.func @avg_pool() {
@@ -145,13 +145,13 @@ hal.executable @avg_pool {
   ]>
 ]>
 hal.executable @avg_pool {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 4>>
-    }> {
+    }>) {
     hal.executable.export public @avg_pool layout(#pipeline_layout)
     builtin.module {
       func.func @avg_pool() {
@@ -202,13 +202,13 @@ hal.executable @avg_pool {
   ]>
 ]>
 hal.executable @max_pool {
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(#hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @max_pool layout(#pipeline_layout)
     builtin.module  {
       func.func @max_pool() {
@@ -256,13 +256,13 @@ hal.executable @max_pool {
 ]>
 
 hal.executable @elementwise {
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(#hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @elementwise layout(#pipeline_layout)
     builtin.module {
       func.func @elementwise() {
@@ -309,13 +309,13 @@ hal.executable @elementwise {
 #map22 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 
 hal.executable @dwconv_elementwise {
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(#hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @dwconv_elementwise layout(#pipeline_layout)
     builtin.module  {
       func.func @dwconv_elementwise() {
@@ -372,13 +372,13 @@ hal.executable @dwconv_elementwise {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 hal.executable @outermost_reduction {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export @outermost_reduction layout(#pipeline_layout)
     builtin.module {
       func.func @outermost_reduction() {
@@ -423,13 +423,13 @@ hal.executable @outermost_reduction {
 #map1 = affine_map<(d0, d1) -> (d0)>
 
 hal.executable private @innermost_reduction {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @innermost_reduction ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @innermost_reduction() {
@@ -480,13 +480,13 @@ hal.executable private @innermost_reduction {
   ]>
 ]>
 hal.executable @four_dim_elementwise {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
-    }> {
+    }>) {
     hal.executable.export public @four_dim_elementwise ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -530,13 +530,13 @@ hal.executable @four_dim_elementwise {
 ]>
 
 hal.executable private @odd_reduction_dimension_size_501 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @odd_reduction_dimension_size_501 ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @odd_reduction_dimension_size_501() {
@@ -553,7 +553,7 @@ hal.executable private @odd_reduction_dimension_size_501 {
           iterator_types = ["parallel", "reduction"]
         } ins(%2 : tensor<512x501xf32>) outs(%5 : tensor<512xf32>) {
         ^bb0(%in: f32, %out: f32):
-          %8 = arith.maxf %out, %in : f32
+          %8 = arith.maximumf %out, %in : f32
           linalg.yield %8 : f32
         } -> tensor<512xf32>
         %7 = linalg.generic {
@@ -589,13 +589,13 @@ hal.executable private @odd_reduction_dimension_size_501 {
 ]>
 
 hal.executable private @odd_reduction_dimension_size_2809 {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @odd_reduction_dimension_size_2809 ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @odd_reduction_dimension_size_2809() {
@@ -612,7 +612,7 @@ hal.executable private @odd_reduction_dimension_size_2809 {
           iterator_types = ["parallel", "reduction"]
         } ins(%2 : tensor<512x2809xf32>) outs(%5 : tensor<512xf32>) {
         ^bb0(%in: f32, %out: f32):
-          %8 = arith.maxf %out, %in : f32
+          %8 = arith.maximumf %out, %in : f32
           linalg.yield %8 : f32
         } -> tensor<512xf32>
         %7 = linalg.generic {
@@ -648,13 +648,13 @@ hal.executable private @odd_reduction_dimension_size_2809 {
 ]>
 
 hal.executable private @broadcast {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @broadcast ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @broadcast() {
@@ -670,7 +670,7 @@ hal.executable private @broadcast {
           iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         } ins(%2 : tensor<f32>) outs(%3 : tensor<2048x1x1x1xf32>) {
         ^bb0(%in: f32, %out: f32):
-          %5 = arith.maxf %in, %cst : f32
+          %5 = arith.maximumf %in, %cst : f32
           %6 = arith.divf %cst_0, %5 : f32
           linalg.yield %6 : f32
         } -> tensor<2048x1x1x1xf32>

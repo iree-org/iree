@@ -94,7 +94,7 @@ SmallVector<Position> getReturnedValuePositions(Region &region) {
   // This works for closure-like ops that have results in their parent scope.
   if (auto regionOp = dyn_cast<RegionBranchOpInterface>(region.getParentOp())) {
     SmallVector<RegionSuccessor> successors;
-    regionOp.getSuccessorRegions(region.getRegionNumber(), successors);
+    regionOp.getSuccessorRegions(region, successors);
     for (auto &successor : successors) {
       if (successor.isParent()) {
         return llvm::to_vector(getPositions(successor.getSuccessorInputs()));
@@ -107,7 +107,7 @@ SmallVector<Position> getReturnedValuePositions(Region &region) {
   // exits and call sites.
   auto *parentOp = region.getParentOp();
   if (auto callableOp = dyn_cast<CallableOpInterface>(parentOp)) {
-    unsigned resultCount = callableOp.getCallableResults().size();
+    unsigned resultCount = callableOp.getResultTypes().size();
     return llvm::map_to_vector(
         llvm::seq(0u, resultCount), [parentOp](unsigned resultIdx) -> Position {
           return Position::forReturnedValue(parentOp, resultIdx);

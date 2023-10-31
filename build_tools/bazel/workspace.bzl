@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Helper functions for configuring IREE and dependent project WORKSPACE files."""
 
-load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 CUDA_TOOLKIT_ROOT_ENV_KEY = "IREE_CUDA_TOOLKIT_ROOT"
 
@@ -50,7 +50,7 @@ def cuda_auto_configure_impl(repository_ctx):
         Label("%s//:build_tools/third_party/cuda/BUILD.template" % iree_repo_alias),
         {
             "%ENABLED%": "True" if cuda_toolkit_root else "False",
-            "%LIBDEVICE_REL_PATH%": libdevice_rel_path,
+            "%LIBDEVICE_REL_PATH%": libdevice_rel_path if cuda_toolkit_root else "BUILD",
             "%IREE_REPO_ALIAS%": iree_repo_alias,
         },
     )
@@ -115,13 +115,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
     )
 
     maybe(
-        native.new_local_repository,
-        name = "vulkan_memory_allocator",
-        build_file = iree_repo_alias + "//:build_tools/third_party/vulkan_memory_allocator/BUILD.overlay",
-        path = paths.join(iree_path, "third_party/vulkan_memory_allocator"),
-    )
-
-    maybe(
         native.local_repository,
         name = "spirv_headers",
         path = paths.join(iree_path, "third_party/spirv_headers"),
@@ -150,13 +143,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
         name = "spirv_cross",
         build_file = iree_repo_alias + "//:build_tools/third_party/spirv_cross/BUILD.overlay",
         path = paths.join(iree_path, "third_party/spirv_cross"),
-    )
-
-    maybe(
-        native.new_local_repository,
-        name = "torch-mlir-dialects",
-        build_file = iree_repo_alias + "//:build_tools/third_party/torch-mlir-dialects/BUILD.overlay",
-        path = paths.join(iree_path, "third_party/torch-mlir-dialects"),
     )
 
     maybe(

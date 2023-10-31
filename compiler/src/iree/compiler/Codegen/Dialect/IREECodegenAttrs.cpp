@@ -10,6 +10,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
 #define GET_ATTRDEF_CLASSES
@@ -23,48 +24,14 @@ static const char kCompilationInfoAttrName[] = "compilation_info";
 namespace mlir {
 namespace iree_compiler {
 
-//===----------------------------------------------------------------------===//
-// Utility function for common code patterns.
-//===----------------------------------------------------------------------===//
-
-static bool checkIntegerArrayAttr(ArrayAttr arrayAttr) {
-  return !llvm::any_of(
-      arrayAttr, [](Attribute attr) { return !llvm::isa<IntegerAttr>(attr); });
-}
-
-/// Returns an `ArrayAttr` where each element is an `IntegerAttr` of `IndexType`
-/// whose values is obtained from `values`.
-static ArrayAttr getIndexIntegerArrayAttr(MLIRContext *context,
-                                          ArrayRef<int64_t> values) {
-  auto attrs =
-      llvm::map_to_vector(values, [&context](int64_t value) -> Attribute {
-        return IntegerAttr::get(IndexType::get(context), APInt(64, value));
-      });
-  return ArrayAttr::get(context, attrs);
-}
-
 /// Returns an `ArrayAttr` where each element is an `IntegerAttr` of 64-bit
 /// integer type whose values is obtained from `values`.
-static ArrayAttr getI64IntegerArrayAttr(MLIRContext *context,
-                                        ArrayRef<int64_t> values) {
-  auto attrs =
-      llvm::map_to_vector(values, [&context](int64_t value) -> Attribute {
-        return IntegerAttr::get(IntegerType::get(context, 64),
-                                APInt(64, value));
-      });
-  return ArrayAttr::get(context, attrs);
-}
-
-/// Assumes that `arrayAttr` is a list of `IntegerAttr`s and returns the values
-/// in these attributes as a vector.
-static SmallVector<int64_t> getIntegerVals(ArrayAttr arrayAttr) {
-  if (!arrayAttr)
-    return {};
-  SmallVector<int64_t> values(arrayAttr.size());
-  for (auto [index, attr] : llvm::enumerate(arrayAttr)) {
-    values[index] = llvm::cast<IntegerAttr>(attr).getInt();
-  }
-  return values;
+static ArrayAttr getIndexArrayAttr(MLIRContext *context,
+                                   ArrayRef<int64_t> values) {
+  return ArrayAttr::get(
+      context, llvm::map_to_vector(values, [&](int64_t value) -> Attribute {
+        return IntegerAttr::get(IndexType::get(context), APInt(64, value));
+      }));
 }
 
 namespace IREE {
@@ -76,21 +43,15 @@ namespace Codegen {
 
 LogicalResult
 ExportConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                         ArrayAttr workgroupSize) {
-  if (!workgroupSize) {
-    return success();
-  }
+                         ArrayRef<int64_t> workgroupSize) {
   if (workgroupSize.size() > 3) {
     return emitError() << "expected workgroup size to have atmost 3 entries";
   }
-  if (!llvm::all_of(workgroupSize, [](Attribute attr) {
-        auto intAttr = llvm::dyn_cast<IntegerAttr>(attr);
-        return intAttr && intAttr.getType().isIndex();
-      })) {
-    return emitError()
-           << "expected workgroup size to contain values of index type";
-  }
   return success();
+}
+
+ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
+  return getIndexArrayAttr(getContext(), getWorkgroupSize());
 }
 
 //===----------------------------------------------------------------------===//
@@ -99,11 +60,12 @@ ExportConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
+    SymbolRefAttr codegenSpec) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
   return get(context, pipelineAttr, softwarePipelineDepth,
-             softwarePipelineStoreStage);
+             softwarePipelineStoreStage, codegenSpec);
 }
 
 DispatchLoweringPassPipeline
@@ -114,7 +76,8 @@ TranslationInfoAttr::getDispatchLoweringPassPipeline() {
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
+    SymbolRefAttr codegenSpec) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
@@ -123,6 +86,114 @@ LogicalResult TranslationInfoAttr::verify(
     return emitError() << "invalid pass pipeline value : "
                        << stringifyEnum(passPipeline.getValue());
   }
+  auto tdPassPipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen;
+  if (codegenSpec && passPipelineValue != tdPassPipeline) {
+    return emitError()
+           << "transform dialect codegen spec requires pass pipeline : "
+           << stringifyEnum(tdPassPipeline);
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// iree_codegen.lowering_config_level
+//===----------------------------------------------------------------------===//
+
+void LoweringConfigTilingLevelAttr::print(mlir::AsmPrinter &printer) const {
+  auto tileInterchange = getInterchange();
+  auto printTileSizes = [&] {
+    printer << '[';
+    if (getScalableFlags().empty()) {
+      printer.printStrippedAttrOrType(getSizes());
+    } else {
+      llvm::interleaveComma(llvm::zip(getSizes(), getScalableFlags()), printer,
+                            [&](auto pair) {
+                              auto [tileSize, isScalable] = pair;
+                              // Wrap scalable sizes in square brackets.
+                              if (isScalable)
+                                printer << '[';
+                              printer << tileSize;
+                              if (isScalable)
+                                printer << ']';
+                            });
+    }
+    printer << ']';
+  };
+  if (tileInterchange.empty()) {
+    printTileSizes();
+  } else {
+    printer << "{sizes = ";
+    printTileSizes();
+    printer << ", interchange = [";
+    printer.printStrippedAttrOrType(tileInterchange);
+    printer << "]}";
+  }
+}
+
+Attribute LoweringConfigTilingLevelAttr::parse(mlir::AsmParser &parser,
+                                               mlir::Type) {
+  auto loc = parser.getCurrentLocation();
+  auto parseListOfSizes = [&](SmallVector<bool> *scalableFlags = nullptr,
+                              bool prefixChecked =
+                                  false) -> FailureOr<SmallVector<int64_t>> {
+    if (!prefixChecked && parser.parseLSquare())
+      return failure();
+    if (parser.parseOptionalRSquare().succeeded()) {
+      // Empty list.
+      return SmallVector<int64_t>();
+    }
+    SmallVector<int64_t> sizes;
+    bool expectScalableSizes = scalableFlags != nullptr;
+    auto listParse =
+        parser.parseCommaSeparatedList(AsmParser::Delimiter::None, [&] {
+          bool isScalable =
+              expectScalableSizes && parser.parseOptionalLSquare().succeeded();
+          int64_t size = 0;
+          if (parser.parseInteger(size) ||
+              (isScalable && parser.parseRSquare()))
+            return failure();
+          sizes.push_back(size);
+          if (scalableFlags)
+            scalableFlags->push_back(isScalable);
+          return success();
+        });
+    if (failed(listParse) || parser.parseRSquare())
+      return failure();
+    return sizes;
+  };
+  SmallVector<bool> scalableFlags;
+  if (parser.parseOptionalLSquare().succeeded()) {
+    // Case 1: Simple list of tile sizes, e.g.:
+    // [0, [32], 16]
+    auto tileSizes = parseListOfSizes(&scalableFlags, /*prefixChecked=*/true);
+    if (failed(tileSizes))
+      return {};
+    return parser.getChecked<LoweringConfigTilingLevelAttr>(
+        loc, parser.getContext(), *tileSizes, ArrayRef<int64_t>{},
+        scalableFlags);
+  }
+  // Case 2: sizes and interchange, e.g.:
+  // {sizes = [0, [32], 16], interchange = [0, 1, 2]}
+  if (parser.parseLBrace() || parser.parseKeyword("sizes") ||
+      parser.parseEqual())
+    return {};
+  auto tileSizes = parseListOfSizes(&scalableFlags);
+  if (failed(tileSizes) || parser.parseComma() ||
+      parser.parseKeyword("interchange") || parser.parseEqual())
+    return {};
+  auto tileInterchange = parseListOfSizes();
+  if (failed(tileInterchange) || parser.parseRBrace())
+    return {};
+  return parser.getChecked<LoweringConfigTilingLevelAttr>(
+      loc, parser.getContext(), *tileSizes, *tileInterchange, scalableFlags);
+}
+
+LogicalResult LoweringConfigTilingLevelAttr::verify(
+    function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> tileSizes,
+    ArrayRef<int64_t> tileInterchange, ArrayRef<bool> scalableFlags) {
+  if (!scalableFlags.empty() && scalableFlags.size() != tileSizes.size())
+    return emitError() << "scalable flags length does not match tile sizes";
   return success();
 }
 
@@ -130,85 +201,81 @@ LogicalResult TranslationInfoAttr::verify(
 // iree_codegen.lowering_config
 //===----------------------------------------------------------------------===//
 
+LoweringConfigAttr
+LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
+                        ScalableTileFlagsListTypeRef scalableTileFlags,
+                        TileSizesListTypeRef tileInterchange,
+                        ArrayRef<int64_t> nativeVectorSize) {
+  SmallVector<LoweringConfigTilingLevelAttr> tilinglevels;
+  for (auto [level, sizes] : llvm::enumerate(tileSizes)) {
+    ArrayRef<int64_t> interchange = level < tileInterchange.size()
+                                        ? tileInterchange[level]
+                                        : ArrayRef<int64_t>{};
+    ArrayRef<bool> scalableFlags = level < scalableTileFlags.size()
+                                       ? scalableTileFlags[level]
+                                       : ArrayRef<bool>{};
+    tilinglevels.push_back(LoweringConfigTilingLevelAttr::get(
+        context, sizes, interchange, scalableFlags));
+  }
+  return get(context,
+             LoweringConfigTilingLevelsAttr::get(context, tilinglevels),
+             nativeVectorSize);
+}
+
 LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
                                            TileSizesListTypeRef tileSizes,
                                            TileSizesListTypeRef tileInterchange,
                                            ArrayRef<int64_t> nativeVectorSize) {
-  auto attrList = [&](TileSizesListTypeRef lst) {
-    return llvm::map_to_vector(lst, [&](ArrayRef<int64_t> sizes) -> Attribute {
-      return getI64IntegerArrayAttr(context, sizes);
-    });
-  };
-  ArrayAttr tileSizesAttr = ArrayAttr::get(context, attrList(tileSizes));
-  ArrayAttr tileInterchangeAttr =
-      ArrayAttr::get(context, attrList(tileInterchange));
-  ArrayAttr nativeVectorSizeAttr =
-      getI64IntegerArrayAttr(context, nativeVectorSize);
-  return get(context, tileSizesAttr, tileInterchangeAttr, nativeVectorSizeAttr);
+
+  return get(context, tileSizes, {}, tileInterchange, nativeVectorSize);
 }
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() {
-  auto tileSizesAttr = getTileSizes();
-  if (!tileSizesAttr)
-    return {};
   TileSizesListType tileSizes;
-  for (auto attr : tileSizesAttr) {
-    auto vals = getIntegerVals(llvm::cast<ArrayAttr>(attr));
-    tileSizes.emplace_back(std::move(vals));
-  }
+  for (auto &level : getTilingLevels())
+    tileSizes.push_back(SmallVector<int64_t>(level.getSizes()));
   return tileSizes;
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) {
-  ArrayAttr tileSizesAttr = getTileSizes();
-  if (!tileSizesAttr || tileSizesAttr.size() <= level)
+  auto levels = getTilingLevels();
+  if (level >= levels.size())
     return {};
-  return getIntegerVals(llvm::cast<ArrayAttr>(tileSizesAttr[level]));
+  return SmallVector<int64_t>(levels[level].getSizes());
+}
+
+ScalableTileFlagsListType LoweringConfigAttr::getScalableTileFlagVals() {
+  ScalableTileFlagsListType scalableFlags;
+  for (auto &level : getTilingLevels())
+    scalableFlags.push_back(SmallVector<bool>(level.getScalableFlags()));
+  return scalableFlags;
+}
+
+SmallVector<bool> LoweringConfigAttr::getScalableTileFlagVals(unsigned level) {
+  auto levels = getTilingLevels();
+  if (level >= levels.size())
+    return {};
+  SmallVector<bool> scalableFlags(levels[level].getScalableFlags());
+  // Extend the scalable flags with `false` to match the length of the sizes.
+  scalableFlags.resize(levels[level].getSizes().size());
+  return scalableFlags;
 }
 
 SmallVector<int64_t>
 LoweringConfigAttr::getTileInterchangeVals(unsigned level) {
-  ArrayAttr tileInterchangeAttr = getTileInterchange();
-  if (!tileInterchangeAttr || tileInterchangeAttr.size() <= level)
+  auto levels = getTilingLevels();
+  if (level >= levels.size())
     return {};
-  return getIntegerVals(llvm::cast<ArrayAttr>(tileInterchangeAttr[level]));
-}
-
-SmallVector<int64_t> LoweringConfigAttr::getNativeVectorSizeVals() {
-  ArrayAttr nativeVectorSizeAttr = getNativeVectorSize();
-  if (!nativeVectorSizeAttr)
-    return {};
-  return getIntegerVals(nativeVectorSizeAttr);
+  return SmallVector<int64_t>(levels[level].getInterchange());
 }
 
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                           ArrayAttr tileSizes, ArrayAttr tileInterchange,
-                           ArrayAttr nativeVectorSize) {
-  if (!tileSizes) {
-    return emitError() << "expected tile_sizes to be specified (even is "
-                          "specified as empty)";
-  }
-  auto hasNonIntElems = [](ArrayAttr sizes) -> bool {
-    return llvm::any_of(sizes, [](Attribute attr) {
-      auto arrayAttr = llvm::dyn_cast<ArrayAttr>(attr);
-      return !arrayAttr || !checkIntegerArrayAttr(arrayAttr);
-    });
-  };
-  if (hasNonIntElems(tileSizes)) {
-    return emitError()
-           << "expected all elements of tile_sizes to be a list of integers";
-  }
-  if (tileInterchange && hasNonIntElems(tileInterchange)) {
-    return emitError() << "expected all elements of tile_interchange to be a "
-                          "list of integers";
-  }
-  if (nativeVectorSize) {
-    if (!checkIntegerArrayAttr(nativeVectorSize)) {
-      return emitError()
-             << "expected native_vector_size to be a list of integer values";
-    }
-  }
+                           LoweringConfigTilingLevelsAttr levels,
+                           ArrayRef<int64_t> nativeVectorSizes) {
+  (void)nativeVectorSizes;
+  if (!levels)
+    return emitError() << "missing lowering config levels";
   return success();
 }
 
@@ -216,27 +283,16 @@ LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 // iree.compilation_info
 //===----------------------------------------------------------------------===//
 
-CompilationInfoAttr
-CompilationInfoAttr::get(MLIRContext *context, LoweringConfigAttr configAttr,
-                         TranslationInfoAttr translationInfo,
-                         ArrayRef<int64_t> workgroupSize,
-                         std::optional<int64_t> subgroupSize) {
-  ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
-  return get(context, configAttr, translationInfo, workgroupSizeAttr,
-             subgroupSize);
-}
-
 LogicalResult CompilationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     LoweringConfigAttr loweringConfig, TranslationInfoAttr translationInfo,
-    ArrayAttr workgroupSize, std::optional<int64_t> subgroupSize) {
+    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize) {
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
-  if (failed(
-          LoweringConfigAttr::verify(emitError, loweringConfig.getTileSizes(),
-                                     loweringConfig.getTileInterchange(),
-                                     loweringConfig.getNativeVectorSize()))) {
+  if (failed(LoweringConfigAttr::verify(
+          emitError, loweringConfig.getTilingLevels(),
+          loweringConfig.getNativeVectorSize()))) {
     return failure();
   }
   if (!translationInfo) {
@@ -245,22 +301,11 @@ LogicalResult CompilationInfoAttr::verify(
   if (failed(TranslationInfoAttr::verify(
           emitError, translationInfo.getPassPipeline(),
           translationInfo.getSoftwarePipelineDepth(),
-          translationInfo.getSoftwarePipelineStoreStage()))) {
+          translationInfo.getSoftwarePipelineStoreStage(),
+          translationInfo.getCodegenSpec()))) {
     return failure();
   }
-  if (workgroupSize) {
-    if (!checkIntegerArrayAttr(workgroupSize)) {
-      return emitError() << "expected workgroup_size to be a list of integers";
-    }
-  }
   return success();
-}
-
-SmallVector<int64_t> CompilationInfoAttr::getWorkgroupSizeVals() {
-  ArrayAttr workgroupSizeAttr = getWorkgroupSize();
-  if (!workgroupSizeAttr)
-    return {};
-  return getIntegerVals(workgroupSizeAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -291,7 +336,9 @@ getTranslationInfo(IREE::HAL::ExecutableExportOp exportOp) {
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
   if (std::optional<ArrayAttr> workgroupSizeAttrList =
           exportOp.getWorkgroupSize()) {
-    return getIntegerVals(*workgroupSizeAttrList);
+    return llvm::map_to_vector(*workgroupSizeAttrList, [](auto attr) {
+      return llvm::cast<IntegerAttr>(attr).getInt();
+    });
   }
   return {};
 }
@@ -311,8 +358,7 @@ LogicalResult setDispatchConfig(func::FuncOp entryPoint,
     return failure();
   MLIRContext *context = exportOp->getContext();
   if (!workgroupSize.empty()) {
-    auto attr = getIndexIntegerArrayAttr(context, workgroupSize);
-    exportOp->setWorkgroupSizeAttr(attr);
+    exportOp->setWorkgroupSizeAttr(getIndexArrayAttr(context, workgroupSize));
   }
   if (subgroupSize) {
     exportOp->setSubgroupSizeAttr(Builder(context).getIndexAttr(*subgroupSize));
@@ -372,7 +418,7 @@ unsigned getNumTileLevels(Operation *op) {
   IREE::Codegen::LoweringConfigAttr configAttr = getLoweringConfig(op);
   if (!configAttr)
     return 0;
-  return configAttr.getTileSizes().size();
+  return configAttr.getTilingLevels().size();
 }
 
 void setLoweringConfig(Operation *op,

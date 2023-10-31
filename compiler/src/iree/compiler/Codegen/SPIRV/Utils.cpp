@@ -4,11 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- Utils.cpp - Utility functions used in Linalg to SPIR-V lowering ----===//
-//
-// Implementaiton of utility functions used while lowering from Linalg to SPIRV.
-//
-//===----------------------------------------------------------------------===//
+//===- Utils.cpp - Utility functions for SPIR-V CodeGen -------------------===//
 
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 

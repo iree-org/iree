@@ -43,6 +43,12 @@ def _init_dylib():
         raise RuntimeError("Could not find libIREECompiler.so")
     _dylib = cdll.LoadLibrary(dylib_path)
 
+    _setsig(
+        _dylib.ireeCompilerSetupGlobalCL,
+        None,
+        [c_int, POINTER(c_char_p), c_char_p, c_bool],
+    )
+
     # Setup signatures.
     # Error
     _setsig(_dylib.ireeCompilerErrorDestroy, None, [c_void_p])
@@ -163,6 +169,12 @@ def _handle_error(err_p, exc_type=ValueError):
     message = _dylib.ireeCompilerErrorGetMessage(err_p).decode("UTF-8")
     _dylib.ireeCompilerErrorDestroy(err_p)
     raise exc_type(message)
+
+
+def _initializeGlobalCL(*cl_args: str):
+    arg_buffers = [create_string_buffer(s.encode()) for s in cl_args]
+    arg_pointers = (c_char_p * len(cl_args))(*map(addressof, arg_buffers))
+    _dylib.ireeCompilerSetupGlobalCL(len(cl_args), arg_pointers, b"ctypes", False)
 
 
 class Session:
@@ -326,6 +338,7 @@ class Source:
 class PipelineType(IntEnum):
     IREE_COMPILER_PIPELINE_STD = 0
     IREE_COMPILER_PIPELINE_HAL_EXECUTABLE = 1
+    IREE_COMPILER_PIPELINE_PRECOMPILE = 2
 
 
 class Invocation:
@@ -439,8 +452,11 @@ def _probe_iree_compiler_dylib() -> str:
         # Traverse up and find CMakeCache.txt
         build_dir = Path(_mlir_libs.__path__[0]).parent
         while True:
-            anchor_file = build_dir / "CMakeCache.txt"
-            if anchor_file.exists():
+            anchor_files = [
+                build_dir / "tools" / f"iree-compile",
+                build_dir / "tools" / f"iree-compile.exe",
+            ]
+            if any([f.exists() for f in anchor_files]):
                 # Most OS's keep their libs in lib. Windows keeps them
                 # in bin (tools in the dev tree). Just check them all.
                 paths = [build_dir / "lib", build_dir / "tools", build_dir / "bin"]

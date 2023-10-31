@@ -16,19 +16,8 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
 WORKDIR /install-basics
-# Useful utilities for building child images. Best practices would tell us to
-# use multi-stage builds
-# (https://docs.docker.com/develop/develop-images/multistage-build/) but it
-# turns out that Dockerfile is a thoroughly non-composable awful format and that
-# doesn't actually work that well. These deps are pretty small.
-RUN apt-get update \
-  && apt-get install -y \
-    git \
-    unzip \
-    wget \
-    curl \
-    gnupg2 \
-    lsb-release
+COPY build_tools/docker/context/install_basics.sh ./
+RUN ./install_basics.sh && rm -rf /install-basics
 
 # Install the oldest supported compiler tools
 ARG LLVM_VERSION=9
@@ -70,7 +59,7 @@ RUN ./install_bazel.sh && rm -rf /install-bazel
 WORKDIR /install-python
 
 # Minimum supported Python version
-ARG PYTHON_VERSION=3.8
+ARG PYTHON_VERSION=3.9
 
 # Versions for things required to build IREE should match the minimum
 # supported versions in the requirements file. There doesn't appear to be a
@@ -89,18 +78,8 @@ ENV PYTHON_BIN /usr/bin/python3
 WORKDIR /install-rocm
 ARG ROCM_VERSION=5.2.1
 ARG AMDGPU_VERSION=22.20.1
-
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl libnuma-dev gnupg \
-  && curl -sL https://repo.radeon.com/rocm/rocm.gpg.key | apt-key add - \
-  && printf "deb [arch=amd64] https://repo.radeon.com/rocm/apt/$ROCM_VERSION/ ubuntu main" | tee /etc/apt/sources.list.d/rocm.list \
-  && printf "deb [arch=amd64] https://repo.radeon.com/amdgpu/$AMDGPU_VERSION/ubuntu focal main" | tee /etc/apt/sources.list.d/amdgpu.list \
-  && apt-get update \
-  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  libelf1 \
-  kmod \
-  file \
-  rocm-dev \
-  build-essential
+COPY build_tools/docker/context/install_rocm.sh ./
+RUN ./install_rocm.sh "${ROCM_VERSION}" "${AMDGPU_VERSION}" && rm -rf /install-rocm
 WORKDIR /
 ##############
 
@@ -113,13 +92,9 @@ RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR}"
 ######## Vulkan ########
 WORKDIR /install-vulkan
 ARG VULKAN_SDK_VERSION=1.3.250
-
-RUN wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - \
-  && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-${VULKAN_SDK_VERSION}-focal.list https://packages.lunarg.com/vulkan/${VULKAN_SDK_VERSION}/lunarg-vulkan-${VULKAN_SDK_VERSION}-focal.list \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends vulkan-sdk
+COPY build_tools/docker/context/install_vulkan.sh ./
+RUN ./install_vulkan.sh "${VULKAN_SDK_VERSION}" && rm -rf /install-vulkan
 WORKDIR /
-
 ##############
 
 ### Clean up

@@ -6,8 +6,8 @@
 
 # Tests for common transforms.
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -31,8 +31,10 @@ iree_lit_test_suite(
             "nvvm_extract_address_computation.mlir",
             "nvvm_pipeline_test.mlir",
             "nvvm_mma_sync_pipeline_test.mlir",
-            "reduction_pipeline_transform.mlir",
-            "reduction_pipeline.mlir",
+            "reduction_pipeline_cuda.mlir",
+            "reduction_pipeline_rocm.mlir",
+            "reduction_pipeline_transform_cuda.mlir",
+            "reduction_pipeline_transform_rocm.mlir",
             "rocdl_pipeline_test.mlir",
             "set_transform_strategy_batch_matmul.mlir",
             "set_transform_strategy_convolution.mlir",
@@ -56,6 +58,7 @@ iree_lit_test_suite(
             "transform_gpu_pipelining.mlir",
             "transform_vector_to_mma.mlir",
             "transpose_pipeline_test.mlir",
+            "vector_lowering.mlir",
             "vector_to_gpu.mlir",
             "workgroup_specialization_pipeline_test.mlir",
         ],

@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -137,8 +138,26 @@ struct EmulateNarrowTypePass
     populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
 
     if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns))))
+                                      std::move(patterns)))) {
+      getOperation()->emitOpError("failed to emulate bit width");
       return signalPassFailure();
+    }
+
+    RewritePatternSet sinkBroadcast(ctx);
+    vector::populateSinkVectorBroadcastPatterns(sinkBroadcast);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(sinkBroadcast)))) {
+      getOperation()->emitOpError("failed in sinking of broadcasts");
+      return signalPassFailure();
+    }
+
+    // Also do the `bitcast -> extui/extsi` rewrite.
+    RewritePatternSet foldExtPatterns(ctx);
+    vector::populateVectorNarrowTypeRewritePatterns(foldExtPatterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(foldExtPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 } // namespace

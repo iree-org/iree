@@ -44,11 +44,11 @@ static void PopulateDescriptorSetWriteInfos(
     if (binding.length == IREE_WHOLE_BUFFER) {
       buffer_info.range = VK_WHOLE_SIZE;
     } else {
-      // Round up to a multiple of 32-bit. 32-bit is the most native bitwidth on
-      // GPUs; it has the best support compared to other bitwidths. We use VMA
-      // to manage GPU memory for us and VMA should already handled proper
-      // alignment when performing allocations; here we just need to provide the
-      // proper "view" to Vulkan drivers over the allocated memory.
+      // Round up to a multiple of 32-bit. 32-bit is the defacto native bitwidth
+      // on GPUs; it has the best support compared to other bitwidths. The
+      // allocator should already handled proper alignment when performing
+      // allocations; here we just need to provide the proper "view" to Vulkan
+      // drivers over the allocated memory.
       //
       // Note this is needed because we can see unusal buffers like
       // tensor<3xi8>. Depending on GPU capabilities, this might not always be

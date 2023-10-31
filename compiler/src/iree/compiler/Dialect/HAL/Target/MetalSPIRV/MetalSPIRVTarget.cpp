@@ -90,7 +90,8 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
       /*subgroup_size=*/32,
       /*min_subgroup_size=*/std::nullopt,
       /*max_subgroup_size=*/std::nullopt,
-      /*cooperative_matrix_properties_nv=*/ArrayAttr());
+      /*cooperative_matrix_properties_khr=*/ArrayAttr{},
+      /*cooperative_matrix_properties_nv=*/ArrayAttr{});
 
   auto triple = spirv::VerCapExtAttr::get(spirv::Version::V_1_3, capabilities,
                                           extensions, context);

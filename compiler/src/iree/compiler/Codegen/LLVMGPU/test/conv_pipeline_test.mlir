@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target,canonicalize)))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target,canonicalize)))' \
 // RUN:   %s | FileCheck %s
 
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>]}>
@@ -7,7 +7,7 @@
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @conv2d_1x230x230x3_7x7x3x64_dispatch_0 {
-    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @conv2d_1x230x230x3_7x7x3x64 ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index):
         %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
@@ -51,7 +51,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @conv_nchw_dispatch_0 {
-    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @conv_nchw ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index):
         %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
@@ -82,17 +82,17 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //   CHECK-LABEL:  func.func @conv_nchw
 // TODO: hoist the accumulator read and fold the transfer_write.
 //         CHECK:    vector.transfer_write
+// CHECK-COUNT-4:    vector.transfer_read
 //         CHECK:    scf.for
 //         CHECK:      scf.for
-// CHECK-COUNT-3:        vector.transfer_read
-//         CHECK:        vector.contract
-//         CHECK:        vector.transfer_write
 // CHECK-COUNT-2:        vector.transfer_read
 //         CHECK:        vector.contract
-//         CHECK:        vector.transfer_write
-// CHECK-COUNT-2:        vector.transfer_read
+//         CHECK:        vector.transfer_read
 //         CHECK:        vector.contract
-//         CHECK:        vector.transfer_write
-// CHECK-COUNT-2:        vector.transfer_read
+//         CHECK:        vector.transfer_read
 //         CHECK:        vector.contract
-//         CHECK:        vector.transfer_write
+//         CHECK:        vector.transfer_read
+//         CHECK:        vector.contract
+//         CHECK:      scf.yield
+//         CHECK:    scf.yield
+// CHECK-COUNT-4:    vector.transfer_write

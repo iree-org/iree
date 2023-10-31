@@ -43,6 +43,7 @@ iree_cc_library(
     MLIRArithUtils
     MLIRComplexDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRMemRefDialect

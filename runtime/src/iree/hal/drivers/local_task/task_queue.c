@@ -137,7 +137,11 @@ static iree_status_t iree_hal_task_queue_wait_cmd(
 static void iree_hal_task_queue_wait_cmd_cleanup(
     iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_queue_wait_cmd_t* cmd = (iree_hal_task_queue_wait_cmd_t*)task;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_hal_semaphore_list_release(&cmd->wait_semaphores);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Allocates and initializes a iree_hal_task_queue_wait_cmd_t task.
@@ -224,6 +228,7 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
 static void iree_hal_task_queue_issue_cmd_cleanup(
     iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_queue_issue_cmd_t* cmd = (iree_hal_task_queue_issue_cmd_t*)task;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Release command buffers; some may have been released after issuing but this
   // handles leftovers that may appear due to failures.
@@ -231,6 +236,8 @@ static void iree_hal_task_queue_issue_cmd_cleanup(
     iree_hal_command_buffer_release(cmd->command_buffers[i]);
     cmd->command_buffers[i] = NULL;
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Allocates and initializes a iree_hal_task_queue_issue_cmd_t task.
@@ -329,6 +336,7 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
     iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_queue_retire_cmd_t* cmd =
       (iree_hal_task_queue_retire_cmd_t*)task;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Release resources now that all are known to have retired.
   // In success cases we try to do this eagerly to allow for more potential
@@ -354,6 +362,8 @@ static void iree_hal_task_queue_retire_cmd_cleanup(
   iree_arena_allocator_t arena = cmd->arena;
   cmd = NULL;
   iree_arena_deinitialize(&arena);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Allocates and initializes a iree_hal_task_queue_retire_cmd_t task.

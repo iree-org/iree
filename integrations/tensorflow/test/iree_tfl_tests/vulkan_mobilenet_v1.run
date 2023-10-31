@@ -1,4 +1,2 @@
 # REQUIRES: vulkan
 # RUN: %PYTHON -m iree_tfl_tests.mobilenet_v1_test --target_backend=vulkan --artifacts_dir=%t
-# TODO(#14775): Enable the test.
-# XFAIL: *

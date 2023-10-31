@@ -7,271 +7,217 @@
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
 #include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_internal.h"
 
-void iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma(
+static inline void iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 8 && iree_uk_is_po2_u32(M0));
   float* IREE_UK_RESTRICT out_ptr = out_tile;
   const float* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const float* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
-  __m256 acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7;
-  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    acc0 = _mm256_loadu_ps(out_ptr + 0 * 8);
-    acc1 = _mm256_loadu_ps(out_ptr + 1 * 8);
-    acc2 = _mm256_loadu_ps(out_ptr + 2 * 8);
-    acc3 = _mm256_loadu_ps(out_ptr + 3 * 8);
-    acc4 = _mm256_loadu_ps(out_ptr + 4 * 8);
-    acc5 = _mm256_loadu_ps(out_ptr + 5 * 8);
-    acc6 = _mm256_loadu_ps(out_ptr + 6 * 8);
-    acc7 = _mm256_loadu_ps(out_ptr + 7 * 8);
+  __m256 acc[8];
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_loadu_ps(out_ptr + i * 8);
+    }
   } else {
-    acc0 = _mm256_setzero_ps();
-    acc1 = _mm256_setzero_ps();
-    acc2 = _mm256_setzero_ps();
-    acc3 = _mm256_setzero_ps();
-    acc4 = _mm256_setzero_ps();
-    acc5 = _mm256_setzero_ps();
-    acc6 = _mm256_setzero_ps();
-    acc7 = _mm256_setzero_ps();
+    for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_setzero_ps();
+    }
   }
-  for (iree_uk_int32_t k = 0; k < K; ++k) {
+  for (iree_uk_int32_t k = 0; k < params->K; ++k) {
     __m256 rhs = _mm256_loadu_ps(rhs_ptr);
     rhs_ptr += 8;
-    acc0 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 0), rhs, acc0);
-    acc1 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 1), rhs, acc1);
-    acc2 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 2), rhs, acc2);
-    acc3 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 3), rhs, acc3);
-    acc4 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 4), rhs, acc4);
-    acc5 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 5), rhs, acc5);
-    acc6 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 6), rhs, acc6);
-    acc7 = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + 7), rhs, acc7);
-    lhs_ptr += 8;
+    for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_fmadd_ps(_mm256_broadcast_ss(lhs_ptr + i), rhs, acc[i]);
+    }
+    lhs_ptr += M0;
   }
-  _mm256_storeu_ps(out_ptr + 0 * 8, acc0);
-  _mm256_storeu_ps(out_ptr + 1 * 8, acc1);
-  _mm256_storeu_ps(out_ptr + 2 * 8, acc2);
-  _mm256_storeu_ps(out_ptr + 3 * 8, acc3);
-  _mm256_storeu_ps(out_ptr + 4 * 8, acc4);
-  _mm256_storeu_ps(out_ptr + 5 * 8, acc5);
-  _mm256_storeu_ps(out_ptr + 6 * 8, acc6);
-  _mm256_storeu_ps(out_ptr + 7 * 8, acc7);
+  for (int i = 0; i < M0; ++i) {
+    _mm256_storeu_ps(out_ptr + i * 8, acc[i]);
+  }
 }
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+    iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f32f32f32_1x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f32f32f32_2x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f32f32f32_4x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma)
 
 // Shared implementation for f16f16f16 and f16f16f32.
 // In the f16f16f16 case, intermediate roundings are skipped. This function
 // should only be used if IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS is set.
-static void iree_uk_mmt4d_tile_f16f16fXX_8x8x1_x86_64_avx2_fma(
+static inline void iree_uk_mmt4d_tile_f16f16fXX_1x8x1_to_8x8x1_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params,
-    iree_uk_type_t acc_type) {
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, iree_uk_type_t acc_type, int M0) {
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 8 && iree_uk_is_po2_u32(M0));
   const iree_uk_uint16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_uint16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
-  __m256 acc0, acc1, acc2, acc3, acc4, acc5, acc6, acc7;
-  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+  __m256 acc[8];
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     if (acc_type == IREE_UK_TYPE_FLOAT_32) {
       float* IREE_UK_RESTRICT out_ptr = out_tile;
-      acc0 = _mm256_loadu_ps(out_ptr + 0 * 8);
-      acc1 = _mm256_loadu_ps(out_ptr + 1 * 8);
-      acc2 = _mm256_loadu_ps(out_ptr + 2 * 8);
-      acc3 = _mm256_loadu_ps(out_ptr + 3 * 8);
-      acc4 = _mm256_loadu_ps(out_ptr + 4 * 8);
-      acc5 = _mm256_loadu_ps(out_ptr + 5 * 8);
-      acc6 = _mm256_loadu_ps(out_ptr + 6 * 8);
-      acc7 = _mm256_loadu_ps(out_ptr + 7 * 8);
+      for (int i = 0; i < M0; ++i) {
+        acc[i] = _mm256_loadu_ps(out_ptr + i * 8);
+      }
     } else {
       iree_uk_uint16_t* IREE_UK_RESTRICT out_ptr = out_tile;
-      acc0 =
-          _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + 0 * 8)));
-      acc1 =
-          _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + 1 * 8)));
-      acc2 =
-          _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + 2 * 8)));
-      acc3 =
-          _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + 3 * 8)));
-      acc4 =
-          _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + 4 * 8)));
-      acc5 =
-          _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + 5 * 8)));
-      acc6 =
-          _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + 6 * 8)));
-      acc7 =
-          _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + 7 * 8)));
+      for (int i = 0; i < M0; ++i) {
+        acc[i] =
+            _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)(out_ptr + i * 8)));
+      }
     }
   } else {
-    acc0 = _mm256_setzero_ps();
-    acc1 = _mm256_setzero_ps();
-    acc2 = _mm256_setzero_ps();
-    acc3 = _mm256_setzero_ps();
-    acc4 = _mm256_setzero_ps();
-    acc5 = _mm256_setzero_ps();
-    acc6 = _mm256_setzero_ps();
-    acc7 = _mm256_setzero_ps();
+    for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_setzero_ps();
+    }
   }
-  for (iree_uk_int32_t k = 0; k < K; ++k) {
+  for (iree_uk_int32_t k = 0; k < params->K; ++k) {
     __m256 rhs = _mm256_cvtph_ps(_mm_loadu_si128((const __m128i*)rhs_ptr));
     rhs_ptr += 8;
-    acc0 =
-        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[0])), rhs, acc0);
-    acc1 =
-        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[1])), rhs, acc1);
-    acc2 =
-        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[2])), rhs, acc2);
-    acc3 =
-        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[3])), rhs, acc3);
-    acc4 =
-        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[4])), rhs, acc4);
-    acc5 =
-        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[5])), rhs, acc5);
-    acc6 =
-        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[6])), rhs, acc6);
-    acc7 =
-        _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[7])), rhs, acc7);
-    lhs_ptr += 8;
+    for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_fmadd_ps(_mm256_cvtph_ps(_mm_set1_epi16(lhs_ptr[i])), rhs,
+                               acc[i]);
+    }
+    lhs_ptr += M0;
   }
   if (acc_type == IREE_UK_TYPE_FLOAT_32) {
     float* IREE_UK_RESTRICT out_ptr = out_tile;
-    _mm256_storeu_ps(out_ptr + 0 * 8, acc0);
-    _mm256_storeu_ps(out_ptr + 1 * 8, acc1);
-    _mm256_storeu_ps(out_ptr + 2 * 8, acc2);
-    _mm256_storeu_ps(out_ptr + 3 * 8, acc3);
-    _mm256_storeu_ps(out_ptr + 4 * 8, acc4);
-    _mm256_storeu_ps(out_ptr + 5 * 8, acc5);
-    _mm256_storeu_ps(out_ptr + 6 * 8, acc6);
-    _mm256_storeu_ps(out_ptr + 7 * 8, acc7);
+    for (int i = 0; i < M0; ++i) {
+      _mm256_storeu_ps(out_ptr + i * 8, acc[i]);
+    }
   } else {
     iree_uk_uint16_t* IREE_UK_RESTRICT out_ptr = out_tile;
-    _mm_storeu_si128((__m128i*)(out_ptr + 0 * 8),
-                     _mm256_cvtps_ph(acc0, _MM_FROUND_TO_NEAREST_INT));
-    _mm_storeu_si128((__m128i*)(out_ptr + 1 * 8),
-                     _mm256_cvtps_ph(acc1, _MM_FROUND_TO_NEAREST_INT));
-    _mm_storeu_si128((__m128i*)(out_ptr + 2 * 8),
-                     _mm256_cvtps_ph(acc2, _MM_FROUND_TO_NEAREST_INT));
-    _mm_storeu_si128((__m128i*)(out_ptr + 3 * 8),
-                     _mm256_cvtps_ph(acc3, _MM_FROUND_TO_NEAREST_INT));
-    _mm_storeu_si128((__m128i*)(out_ptr + 4 * 8),
-                     _mm256_cvtps_ph(acc4, _MM_FROUND_TO_NEAREST_INT));
-    _mm_storeu_si128((__m128i*)(out_ptr + 5 * 8),
-                     _mm256_cvtps_ph(acc5, _MM_FROUND_TO_NEAREST_INT));
-    _mm_storeu_si128((__m128i*)(out_ptr + 6 * 8),
-                     _mm256_cvtps_ph(acc6, _MM_FROUND_TO_NEAREST_INT));
-    _mm_storeu_si128((__m128i*)(out_ptr + 7 * 8),
-                     _mm256_cvtps_ph(acc7, _MM_FROUND_TO_NEAREST_INT));
+    for (int i = 0; i < M0; ++i) {
+      _mm_storeu_si128((__m128i*)(out_ptr + i * 8),
+                       _mm256_cvtps_ph(acc[i], _MM_FROUND_TO_NEAREST_INT));
+    }
   }
 }
 
-void iree_uk_mmt4d_tile_f16f16f16_8x8x1_x86_64_avx2_fma(
+static inline void iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
-  iree_uk_mmt4d_tile_f16f16fXX_8x8x1_x86_64_avx2_fma(
-      out_tile, lhs_panel, rhs_panel, K, flags, params, IREE_UK_TYPE_FLOAT_16);
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  iree_uk_mmt4d_tile_f16f16fXX_1x8x1_to_8x8x1_x86_64_avx2_fma(
+      out_tile, lhs_panel, rhs_panel, params, IREE_UK_TYPE_FLOAT_32, M0);
 }
 
-void iree_uk_mmt4d_tile_f16f16f32_8x8x1_x86_64_avx2_fma(
+static inline void iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
-  iree_uk_mmt4d_tile_f16f16fXX_8x8x1_x86_64_avx2_fma(
-      out_tile, lhs_panel, rhs_panel, K, flags, params, IREE_UK_TYPE_FLOAT_32);
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  iree_uk_mmt4d_tile_f16f16fXX_1x8x1_to_8x8x1_x86_64_avx2_fma(
+      out_tile, lhs_panel, rhs_panel, params, IREE_UK_TYPE_FLOAT_16, M0);
 }
 
-void iree_uk_mmt4d_tile_i8i8i32_8x8x2_x86_64_avx2_fma(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f32_2x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f32_4x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f32_8x8x1_x86_64_avx2_fma)
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+    iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f16_1x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f16_2x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f16_4x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f16_8x8x1_x86_64_avx2_fma)
+
+static inline void iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
-    const void* IREE_UK_RESTRICT rhs_panel, iree_uk_int32_t K,
-    iree_uk_uint32_t flags, const iree_uk_mmt4d_params_t* params) {
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 18 && iree_uk_is_po2_u32(M0));
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
   const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
-  __m256i acc_0_0123_4_4567;
-  __m256i acc_0_4567_4_0123;
-  __m256i acc_1_0123_5_4567;
-  __m256i acc_1_4567_5_0123;
-  __m256i acc_2_0123_6_4567;
-  __m256i acc_2_4567_6_0123;
-  __m256i acc_3_0123_7_4567;
-  __m256i acc_3_4567_7_0123;
-
-  if (flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    acc_0_0123_4_4567 = iree_uk_avx_loadu_2x128(
-        (__m128i*)(out_ptr + 0 * 8 + 0), (__m128i*)(out_ptr + 4 * 8 + 4));
-    acc_0_4567_4_0123 = iree_uk_avx_loadu_2x128(
-        (__m128i*)(out_ptr + 0 * 8 + 4), (__m128i*)(out_ptr + 4 * 8 + 0));
-    acc_1_0123_5_4567 = iree_uk_avx_loadu_2x128(
-        (__m128i*)(out_ptr + 1 * 8 + 0), (__m128i*)(out_ptr + 5 * 8 + 4));
-    acc_1_4567_5_0123 = iree_uk_avx_loadu_2x128(
-        (__m128i*)(out_ptr + 1 * 8 + 4), (__m128i*)(out_ptr + 5 * 8 + 0));
-    acc_2_0123_6_4567 = iree_uk_avx_loadu_2x128(
-        (__m128i*)(out_ptr + 2 * 8 + 0), (__m128i*)(out_ptr + 6 * 8 + 4));
-    acc_2_4567_6_0123 = iree_uk_avx_loadu_2x128(
-        (__m128i*)(out_ptr + 2 * 8 + 4), (__m128i*)(out_ptr + 6 * 8 + 0));
-    acc_3_0123_7_4567 = iree_uk_avx_loadu_2x128(
-        (__m128i*)(out_ptr + 3 * 8 + 0), (__m128i*)(out_ptr + 7 * 8 + 4));
-    acc_3_4567_7_0123 = iree_uk_avx_loadu_2x128(
-        (__m128i*)(out_ptr + 3 * 8 + 4), (__m128i*)(out_ptr + 7 * 8 + 0));
+  // acc[i][0] contains the 1st half of row i and the 2nd half of row (i+4).
+  // acc[i][1] contains the 2nd half of row i and the 1st half of row (i+4).
+  // This unusual layout is chosen so that the inner arithmetic loop only needs
+  // to perform cheap shuffles within 128bit groups of lanes.
+  __m256i acc[4][2];
+  const int imax = M0 <= 4 ? M0 : 4;
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    for (int i = 0; i < imax; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        if (M0 <= 4) {
+          acc[i][j] = _mm256_castsi128_si256(
+              _mm_loadu_si128((__m128i*)(out_ptr + i * 8 + j * 4)));
+        } else {
+          acc[i][j] = iree_uk_avx_loadu_2x128(
+              (__m128i*)(out_ptr + i * 8 + j * 4),
+              (__m128i*)(out_ptr + (i + 4) * 8 + (1 - j) * 4));
+        }
+      }
+    }
   } else {
-    acc_0_0123_4_4567 = _mm256_setzero_si256();
-    acc_0_4567_4_0123 = _mm256_setzero_si256();
-    acc_1_0123_5_4567 = _mm256_setzero_si256();
-    acc_1_4567_5_0123 = _mm256_setzero_si256();
-    acc_2_0123_6_4567 = _mm256_setzero_si256();
-    acc_2_4567_6_0123 = _mm256_setzero_si256();
-    acc_3_0123_7_4567 = _mm256_setzero_si256();
-    acc_3_4567_7_0123 = _mm256_setzero_si256();
+    for (int i = 0; i < imax; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        acc[i][j] = _mm256_setzero_si256();
+      }
+    }
   }
-  for (iree_uk_int32_t k = 0; k < K; ++k) {
-    __m256i rhs_i16_01234567 =
+
+  for (iree_uk_int32_t k = 0; k < params->K; ++k) {
+    __m256i rhs_i16_perm[2];
+    // rhs_i16_perm[0] is the rhs tile (2x8), sign-extended to i16.
+    rhs_i16_perm[0] =
         _mm256_cvtepi8_epi16(_mm_loadu_si128((const __m128i*)rhs_ptr));
     rhs_ptr += 16;
-    __m256i lhs_i16_01234567 =
-        _mm256_cvtepi8_epi16(_mm_loadu_si128((const __m128i*)lhs_ptr));
-    lhs_ptr += 16;
-    __m256i rhs_i16_45670123 =
-        _mm256_permute2x128_si256(rhs_i16_01234567, rhs_i16_01234567, 0x01);
-    __m256i lhs_i16_00004444 = _mm256_shuffle_epi32(lhs_i16_01234567, 0 * 0x55);
-    __m256i lhs_i16_11115555 = _mm256_shuffle_epi32(lhs_i16_01234567, 1 * 0x55);
-    __m256i lhs_i16_22226666 = _mm256_shuffle_epi32(lhs_i16_01234567, 2 * 0x55);
-    __m256i lhs_i16_33337777 = _mm256_shuffle_epi32(lhs_i16_01234567, 3 * 0x55);
-
-    acc_0_0123_4_4567 =
-        _mm256_add_epi32(acc_0_0123_4_4567,
-                         _mm256_madd_epi16(lhs_i16_00004444, rhs_i16_01234567));
-    acc_0_4567_4_0123 =
-        _mm256_add_epi32(acc_0_4567_4_0123,
-                         _mm256_madd_epi16(lhs_i16_00004444, rhs_i16_45670123));
-    acc_1_0123_5_4567 =
-        _mm256_add_epi32(acc_1_0123_5_4567,
-                         _mm256_madd_epi16(lhs_i16_11115555, rhs_i16_01234567));
-    acc_1_4567_5_0123 =
-        _mm256_add_epi32(acc_1_4567_5_0123,
-                         _mm256_madd_epi16(lhs_i16_11115555, rhs_i16_45670123));
-    acc_2_0123_6_4567 =
-        _mm256_add_epi32(acc_2_0123_6_4567,
-                         _mm256_madd_epi16(lhs_i16_22226666, rhs_i16_01234567));
-    acc_2_4567_6_0123 =
-        _mm256_add_epi32(acc_2_4567_6_0123,
-                         _mm256_madd_epi16(lhs_i16_22226666, rhs_i16_45670123));
-    acc_3_0123_7_4567 =
-        _mm256_add_epi32(acc_3_0123_7_4567,
-                         _mm256_madd_epi16(lhs_i16_33337777, rhs_i16_01234567));
-    acc_3_4567_7_0123 =
-        _mm256_add_epi32(acc_3_4567_7_0123,
-                         _mm256_madd_epi16(lhs_i16_33337777, rhs_i16_45670123));
+    // rhs_i16_perm[1] is that with the halves swapped.
+    rhs_i16_perm[1] =
+        _mm256_permute2x128_si256(rhs_i16_perm[0], rhs_i16_perm[0], 0x01);
+    // lhs_i16 is the lhs tile (M0x2), sign-extended to i16.
+    __m256i lhs_i16;
+    if (M0 == 1) {
+      lhs_i16 = _mm256_cvtepi8_epi16(_mm_loadu_si16(lhs_ptr));
+      lhs_ptr += 2;
+    } else if (M0 == 2) {
+      lhs_i16 = _mm256_cvtepi8_epi16(_mm_loadu_si32(lhs_ptr));
+      lhs_ptr += 4;
+    } else if (M0 == 4) {
+      lhs_i16 = _mm256_cvtepi8_epi16(_mm_loadu_si64(lhs_ptr));
+      lhs_ptr += 8;
+    } else {
+      lhs_i16 = _mm256_cvtepi8_epi16(_mm_loadu_si128((const __m128i*)lhs_ptr));
+      lhs_ptr += 16;
+    }
+    // lhs_i16_dup4[i] is lanes of lhs_i16 shuffled as:
+    // (i, i, i, i, i+4, i+4, i+4, i+4).
+    __m256i lhs_i16_dup4[4];
+    if (M0 >= 1) lhs_i16_dup4[0] = _mm256_shuffle_epi32(lhs_i16, 0 * 0x55);
+    if (M0 >= 2) lhs_i16_dup4[1] = _mm256_shuffle_epi32(lhs_i16, 1 * 0x55);
+    if (M0 >= 4) lhs_i16_dup4[2] = _mm256_shuffle_epi32(lhs_i16, 2 * 0x55);
+    if (M0 >= 4) lhs_i16_dup4[3] = _mm256_shuffle_epi32(lhs_i16, 3 * 0x55);
+    for (int i = 0; i < imax; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        acc[i][j] = _mm256_add_epi32(
+            acc[i][j], _mm256_madd_epi16(lhs_i16_dup4[i], rhs_i16_perm[j]));
+      }
+    }
   }
-  iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + 0 * 8 + 0),
-                           (__m128i*)(out_ptr + 4 * 8 + 4), acc_0_0123_4_4567);
-  iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + 0 * 8 + 4),
-                           (__m128i*)(out_ptr + 4 * 8 + 0), acc_0_4567_4_0123);
-  iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + 1 * 8 + 0),
-                           (__m128i*)(out_ptr + 5 * 8 + 4), acc_1_0123_5_4567);
-  iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + 1 * 8 + 4),
-                           (__m128i*)(out_ptr + 5 * 8 + 0), acc_1_4567_5_0123);
-  iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + 2 * 8 + 0),
-                           (__m128i*)(out_ptr + 6 * 8 + 4), acc_2_0123_6_4567);
-  iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + 2 * 8 + 4),
-                           (__m128i*)(out_ptr + 6 * 8 + 0), acc_2_4567_6_0123);
-  iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + 3 * 8 + 0),
-                           (__m128i*)(out_ptr + 7 * 8 + 4), acc_3_0123_7_4567);
-  iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + 3 * 8 + 4),
-                           (__m128i*)(out_ptr + 7 * 8 + 0), acc_3_4567_7_0123);
+
+  for (int i = 0; i < imax; ++i) {
+    for (int j = 0; j < 2; ++j) {
+      if (M0 <= 4) {
+        _mm_storeu_si128((__m128i*)(out_ptr + i * 8 + j * 4),
+                         _mm256_extracti128_si256(acc[i][j], 0));
+      } else {
+        iree_uk_avx_storeu_2x128(
+            (__m128i*)(out_ptr + i * 8 + j * 4),
+            (__m128i*)(out_ptr + (i + 4) * 8 + (1 - j) * 4), acc[i][j]);
+      }
+    }
+  }
 }
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_2x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_4x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_8x8x2_x86_64_avx2_fma)

@@ -1604,7 +1604,7 @@ func.func @reduction_broadcast_elementwise_unary(%a: tensor<12x16x16xf32>, %b: t
   %38 = linalg.fill ins(%cst_47 : f32) outs(%37 : tensor<12x16xf32>) -> tensor<12x16xf32>
   %39 = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%a : tensor<12x16x16xf32>) outs(%38 : tensor<12x16xf32>) {
     ^bb0(%arg3: f32, %arg4: f32):
-    %780 = arith.maxf %arg3, %arg4 : f32
+    %780 = arith.maximumf %arg3, %arg4 : f32
     linalg.yield %780 : f32
   } -> tensor<12x16xf32>
   %40 = tensor.empty() : tensor<12x16x16xf32>
@@ -1708,7 +1708,7 @@ func.func @reduction_broadcast_elementwise_dynamic(%a: tensor<12x16x?xf32>, %b: 
   %38 = linalg.fill ins(%cst_47 : f32) outs(%37 : tensor<12x16xf32>) -> tensor<12x16xf32>
   %39 = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%a : tensor<12x16x?xf32>) outs(%38 : tensor<12x16xf32>) {
     ^bb0(%arg3: f32, %arg4: f32):
-    %780 = arith.maxf %arg3, %arg4 : f32
+    %780 = arith.maximumf %arg3, %arg4 : f32
     linalg.yield %780 : f32
   } -> tensor<12x16xf32>
   %c2 = arith.constant 2 : index
@@ -1743,7 +1743,7 @@ module {
     %1 = linalg.fill ins(%cst_1 : f32) outs(%0 : tensor<12x128xf32>) -> tensor<12x128xf32>
     %2 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0 : tensor<12x128x128xf32>) outs(%1 : tensor<12x128xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
-      %7 = arith.maxf %arg1, %arg2 : f32
+      %7 = arith.maximumf %arg1, %arg2 : f32
       linalg.yield %7 : f32
     } -> tensor<12x128xf32>
     %3 = tensor.empty() : tensor<12x128x128xf32>
@@ -1850,10 +1850,10 @@ module {
 // -----
 
 func.func @set_encoding_op(%arg0 : tensor<?x?xf32>)
-    -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> {
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   %0 = iree_linalg_ext.set_encoding %arg0
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 }
 //      CHECK: func @set_encoding_op
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
@@ -1865,7 +1865,7 @@ func.func @set_encoding_op(%arg0 : tensor<?x?xf32>)
 // CHECK-NEXT:     %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
 // CHECK-SAME:     %[[INDEXARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[INDEXARG1:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
+// CHECK-SAME:     %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>
 //  CHECK-DAG:     %[[W0:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG0]], 0
 //  CHECK-DAG:     %[[W1:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG1]], 1
 //      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
@@ -1873,7 +1873,7 @@ func.func @set_encoding_op(%arg0 : tensor<?x?xf32>)
 //      CHECK:     %[[ENCODING:.+]] = iree_linalg_ext.set_encoding %[[LOAD]]
 //      CHECK:     flow.dispatch.tensor.store %[[ENCODING]], %[[OUTARG]]
 // CHECK-SAME:         sizes = [%[[W0]], %[[W1]]]
-// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>{%[[W0]], %[[W1]]}
+// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>{%[[W0]], %[[W1]]}
 //      CHECK:     flow.return
 //      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:[a-zA-Z0-9]+]]: index)
 //      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_slice %[[WL0]], %[[WL1]]
@@ -1882,20 +1882,20 @@ func.func @set_encoding_op(%arg0 : tensor<?x?xf32>)
 
 // -----
 
-func.func @unset_encoding_op(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>)
+func.func @unset_encoding_op(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>)
     -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
 //      CHECK: func @unset_encoding_op
-// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[D0]], %[[D1]]](%[[ARG0]], %[[D0]], %[[D1]])
-// CHECK-NEXT:       %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
+// CHECK-NEXT:       %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>
 // CHECK-SAME:       %[[INDEXARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:       %[[INDEXARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:       %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>
@@ -1903,7 +1903,7 @@ func.func @unset_encoding_op(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<u
 //  CHECK-DAG:     %[[D1_W:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG1]], 1
 //      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
 // CHECK-SAME:         sizes = [%[[D0_W]], %[[D1_W]]]
-// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>{%[[D0_W]], %[[D1_W]]}
+// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>{%[[D0_W]], %[[D1_W]]}
 //      CHECK:     %[[ENCODING:.+]] = iree_linalg_ext.unset_encoding %[[LOAD]]
 //      CHECK:     flow.dispatch.tensor.store %[[ENCODING]], %[[OUTARG]]
 // CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[D0_W]], %[[D1_W]]}
@@ -1917,7 +1917,7 @@ func.func @unset_encoding_op(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<u
 
 #map = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 func.func @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
-    -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> {
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant 0.0 : f32
@@ -1930,8 +1930,8 @@ func.func @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
       tensor.yield %cst : f32
     } : tensor<?x?xf32> to tensor<?x?xf32>
   %encoding = iree_linalg_ext.set_encoding %pad
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-  return %encoding : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  return %encoding : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 16) * 16)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
@@ -1949,7 +1949,7 @@ func.func @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 // CHECK-SAME:       %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
 // CHECK-SAME:       %[[PADDED_D0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:       %[[PADDED_D1:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:       %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
+// CHECK-SAME:       %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>
 //  CHECK-DAG:     %[[D1_W:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG1]], 0
 //  CHECK-DAG:     %[[D0_W:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG0]], 1
 //  CHECK-DAG:     %[[PADDED_D0_W:.+]] = flow.dispatch.workload.ordinal %[[PADDED_D0]], 2
@@ -1962,7 +1962,7 @@ func.func @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 //      CHECK:     %[[SET_ENCODING:.+]] = iree_linalg_ext.set_encoding %[[PADDED]]
 //      CHECK:     flow.dispatch.tensor.store %[[SET_ENCODING]], %[[OUTARG]]
 // CHECK-SAME:         sizes = [%[[PADDED_D0_W]], %[[PADDED_D1_W]]]
-// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>{%[[PADDED_D0_W]], %[[PADDED_D1_W]]}
+// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>{%[[PADDED_D0_W]], %[[PADDED_D1_W]]}
 //      CHECK:     flow.return
 //      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:[a-zA-Z0-9]+]]: index,
 // CHECK-SAME:         %[[WL2:[a-zA-Z0-9]+]]: index, %[[WL3:[a-zA-Z0-9]+]]: index)
@@ -1973,16 +1973,16 @@ func.func @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
 // -----
 
 func.func @unset_encoding_and_slice(
-    %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>,
+    %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>,
     %arg1 : index, %arg2 : index) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
   %1 = tensor.extract_slice %0[0, 0] [%arg1, %arg2] [1, 1]
       : tensor<?x?xf32> to tensor<?x?xf32>
   return %1 : tensor<?x?xf32>
 }
 //      CHECK: func @unset_encoding_and_slice
-// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -1990,7 +1990,7 @@ func.func @unset_encoding_and_slice(
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[D0]], %[[D1]], %[[ARG1]], %[[ARG2]]](%[[ARG0]], %[[D0]], %[[D1]], %[[ARG1]], %[[ARG2]])
-// CHECK-NEXT:       %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
+// CHECK-NEXT:       %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>
 // CHECK-SAME:       %[[INDEXARG0:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:       %[[INDEXARG1:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:       %[[INDEXARG2:[a-zA-Z0-9]+]]: index
@@ -2002,7 +2002,7 @@ func.func @unset_encoding_and_slice(
 //  CHECK-DAG:     %[[ARG1_W:.+]] = flow.dispatch.workload.ordinal %[[INDEXARG3]], 3
 //      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
 // CHECK-SAME:         sizes = [%[[D0_W]], %[[D1_W]]]
-// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>{%[[D0_W]], %[[D1_W]]}
+// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>{%[[D0_W]], %[[D1_W]]}
 //      CHECK:     %[[ENCODING:.+]] = iree_linalg_ext.unset_encoding %[[LOAD]]
 //      CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[ENCODING]][0, 0] [%[[ARG0_W]], %[[ARG1_W]]]
 //      CHECK:     flow.dispatch.tensor.store %[[SLICE]], %[[OUTARG]]
@@ -2016,9 +2016,9 @@ func.func @unset_encoding_and_slice(
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @root_on_unset_encoding(
-      %arg0: tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>,
+      %arg0: tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>,
       %arg1: tensor<96xf32>) -> tensor<784x96xf32> {
-    %0 = iree_linalg_ext.unset_encoding %arg0 : tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<784x96xf32>
+    %0 = iree_linalg_ext.unset_encoding %arg0 : tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<784x96xf32>
     %1 = tensor.empty() : tensor<784x96xf32>
     %cst = arith.constant 0.000000e+00 : f32
     %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<784x96xf32>) -> tensor<784x96xf32>
@@ -2038,18 +2038,18 @@ module {
 //      CHECL: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d1)>
 //      CHECK: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //      CHECK: func @root_on_unset_encoding
-// CHECK-SAME:     %[[ARG0:.+]]: tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<96xf32>
 //      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups(%[[ARG0]], %[[ARG1]])
-// CHECK-NEXT:     %[[INARG0:.+]]: !flow.dispatch.tensor<readonly:tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
+// CHECK-NEXT:     %[[INARG0:.+]]: !flow.dispatch.tensor<readonly:tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>
 // CHECK-SAME:     %[[INARG1:.+]]: !flow.dispatch.tensor<readonly:tensor<96xf32>>
 // CHECK-SAME:     %[[OUTARG:.+]]: !flow.dispatch.tensor<writeonly:tensor<784x96xf32>>
 //      CHECK:     %[[LOAD0:.+]] = flow.dispatch.tensor.load %[[INARG0]], offsets = [0, 0], sizes = [784, 96], strides = [1, 1]
-// CHECK-SAME:       : !flow.dispatch.tensor<readonly:tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
+// CHECK-SAME:       : !flow.dispatch.tensor<readonly:tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>
 //      CHECK:     %[[LOAD1:.+]] = flow.dispatch.tensor.load %[[INARG1]], offsets = [0], sizes = [96], strides = [1]
 // CHECK-SAME:       : !flow.dispatch.tensor<readonly:tensor<96xf32>>
 //      CHECK:     %[[OUT:.+]] = tensor.empty() : tensor<784x96xf32>
-//      CHECK:     %[[UNSET:.+]] = iree_linalg_ext.unset_encoding %[[LOAD0]] : tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<784x96xf32>
+//      CHECK:     %[[UNSET:.+]] = iree_linalg_ext.unset_encoding %[[LOAD0]] : tensor<784x96xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<784x96xf32>
 //      CHECK:     %[[GENERIC0:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP1]]],
 // CHECK-SAME:       iterator_types = ["parallel", "parallel"]} ins(%[[LOAD1]], %[[UNSET]]
 // CHECK-SAME:       : tensor<96xf32>, tensor<784x96xf32>) outs(%[[OUT]] : tensor<784x96xf32>)
@@ -2062,26 +2062,26 @@ module {
 // -----
 
 func.func @gemm_encoded(
-    %arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>,
-    %arg1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>,
-    %arg2 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>)
-    -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>> {
+    %arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>,
+    %arg1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>,
+    %arg2 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>)
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>> {
   %0 = linalg.matmul
       ins(%arg0, %arg1
-          : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>,
-            tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>)
-      outs(%arg2 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
-  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
+          : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>,
+            tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>)
+      outs(%arg2 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>
 }
 //      CHECK: func.func @gemm_encoded
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>
 //      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
-// CHECK-NEXT:     %[[LHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
-// CHECK-SAME:     %[[RHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>>
-// CHECK-SAME:     %[[INIT_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>>
+// CHECK-NEXT:     %[[LHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>
+// CHECK-SAME:     %[[RHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>>
+// CHECK-SAME:     %[[INIT_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>>
 //  CHECK-DAG:     %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_IN]]
 //  CHECK-DAG:     %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_IN]]
 //  CHECK-DAG:     %[[INIT:.+]] = flow.dispatch.tensor.load %[[INIT_IN]]
@@ -2093,32 +2093,32 @@ func.func @gemm_encoded(
 // -----
 
 func.func @gemm_fill_encoded(
-    %arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>,
-    %arg1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>)
-    -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>> {
+    %arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>,
+    %arg1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>)
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant 0.0 : f32
-  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>
-  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
-  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>
   %0 = linalg.matmul
       ins(%arg0, %arg1
-          : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>,
-            tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>)
-      outs(%fill : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
-  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>
+          : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>,
+            tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>)
+      outs(%fill : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>
 }
 //      CHECK: func.func @gemm_fill_encoded
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>
 //      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
-// CHECK-NEXT:     %[[LHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>>
-// CHECK-SAME:     %[[RHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RHS>>>
-// CHECK-SAME:     %[[RESULT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = RESULT>>>
+// CHECK-NEXT:     %[[LHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>
+// CHECK-SAME:     %[[RHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32]>>>
+// CHECK-SAME:     %[[RESULT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>>>
 //  CHECK-DAG:     %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_IN]]
 //  CHECK-DAG:     %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_IN]]
 //      CHECK:     %[[EMPTY:.+]] = tensor.empty
@@ -2187,7 +2187,7 @@ func.func @softmax(%source : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
   %2 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<12x128xf32>) -> tensor<12x128xf32>
   %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%source : tensor<12x128x128xf32>) outs(%2 : tensor<12x128xf32>) {
   ^bb0(%in: f32, %out: f32):
-    %9 = arith.maxf %in, %out : f32
+    %9 = arith.maximumf %in, %out : f32
     linalg.yield %9 : f32
   } -> tensor<12x128xf32>
   %4 = tensor.empty() : tensor<12x128x128xf32>

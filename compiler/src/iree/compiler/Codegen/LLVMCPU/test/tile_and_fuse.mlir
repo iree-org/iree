@@ -132,8 +132,8 @@ func.func @shared_out_operand() {
     outs(%11 : tensor<391x384xf32>) {
   ^bb0(%in: f32, %in_1: f32, %out: f32):
     %15 = arith.addf %in, %in_1 : f32
-    %16 = arith.minf %15, %cst_0 : f32
-    %17 = arith.maxf %16, %cst : f32
+    %16 = arith.minimumf %15, %cst_0 : f32
+    %17 = arith.maximumf %16, %cst : f32
     linalg.yield %17 : f32
   } -> tensor<391x384xf32>
   flow.dispatch.tensor.store %14, %7, offsets = [0, 0], sizes = [391, 384], strides = [1, 1] : tensor<391x384xf32> -> !flow.dispatch.tensor<writeonly:tensor<391x384xf32>>
@@ -153,3 +153,83 @@ func.func @shared_out_operand() {
 //      CHECK:       %[[OUT_SLICE2:.+]] = tensor.extract_slice %[[ITER1]]
 //      CHECK:       %{{.+}} = linalg.generic
 // CHECK-SAME:         outs(%[[OUT_SLICE2]]
+
+// -----
+
+// This test is to check it doesnt crash. See #15126
+func.func @softmax() {
+  %c2 = arith.constant 2 : index
+  %c5 = arith.constant 5 : index
+  %cst = arith.constant 0xFF800000 : f32
+  %c10 = arith.constant 10 : index
+  %c1 = arith.constant 1 : index
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -1.000000e+30 : f32
+  %c512 = arith.constant 512 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c512) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x10xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x10xf32>>
+  %2 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x10xf32>> -> tensor<1x10xf32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x10xf32>> -> tensor<1x10xf32>
+  %4 = tensor.empty() : tensor<1xf32>
+  %5 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [0], [0]]>} ins(%cst_1 : f32) outs(%4 : tensor<1xf32>) -> tensor<1xf32>
+  %expanded = tensor.expand_shape %3 [[0], [1, 2]] : tensor<1x10xf32> into tensor<1x5x2xf32>
+  %6 = tensor.empty() : tensor<1x2xf32>
+  %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<1x2xf32>) -> tensor<1x2xf32>
+  %8 = scf.for %arg0 = %c0 to %c5 step %c1 iter_args(%arg1 = %7) -> (tensor<1x2xf32>) {
+    %extracted_slice = tensor.extract_slice %expanded[0, %arg0, 0] [1, 1, 2] [1, 1, 1] : tensor<1x5x2xf32> to tensor<1x1x2xf32>
+    %13 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d2)>], iterator_types = ["parallel", "reduction", "parallel"]} ins(%extracted_slice : tensor<1x1x2xf32>) outs(%arg1 : tensor<1x2xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %14 = arith.maximumf %in, %out : f32
+      linalg.yield %14 : f32
+    } -> tensor<1x2xf32>
+    scf.yield %13 : tensor<1x2xf32>
+  }
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%8 : tensor<1x2xf32>) outs(%5 : tensor<1xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %13 = arith.maximumf %in, %out : f32
+    linalg.yield %13 : f32
+  } -> tensor<1xf32>
+  %10 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [0], [0]]>} ins(%cst_0 : f32) outs(%4 : tensor<1xf32>) -> tensor<1xf32>
+  %11 = scf.for %arg0 = %c0 to %c10 step %c2 iter_args(%arg1 = %10) -> (tensor<1xf32>) {
+    %extracted_slice = tensor.extract_slice %3[0, %arg0] [1, 2] [1, 1] : tensor<1x10xf32> to tensor<1x2xf32>
+    %13 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%extracted_slice, %9 : tensor<1x2xf32>, tensor<1xf32>) outs(%arg1 : tensor<1xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0], [0, 0], [0, 2], [0, 0]]>} {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %14 = arith.subf %in, %in_2 : f32
+      %15 = math.exp %14 : f32
+      %16 = arith.addf %15, %out : f32
+      linalg.yield %16 : f32
+    } -> tensor<1xf32>
+    scf.yield %13 : tensor<1xf32>
+  }
+  %12 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%3, %9, %11 : tensor<1x10xf32>, tensor<1xf32>, tensor<1xf32>) outs(%2 : tensor<1x10xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0], [0, 0], [0, 0], [2, 2]]>} {
+  ^bb0(%in: f32, %in_2: f32, %in_3: f32, %out: f32):
+    %13 = arith.subf %in, %in_2 : f32
+    %14 = math.exp %13 : f32
+    %15 = arith.divf %14, %in_3 : f32
+    linalg.yield %15 : f32
+  } -> tensor<1x10xf32>
+  flow.dispatch.tensor.store %12, %1, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : tensor<1x10xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x10xf32>>
+  return
+}
+// CHECK-LABEL: func @softmax()
+
+// -----
+
+func.func @scalable_matmul(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>) -> tensor<?x?xf32>{
+  // Matrix multiplication (ijk) with scalable tiling in the j-th dimension.
+  %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, [32], 1]]>} ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)
+            outs(%C: tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @scalable_matmul(
+//   CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+//   CHECK-DAG: %[[C32:.*]] = arith.constant 32 : index
+//       CHECK: %[[VSCALE:.*]] = vector.vscale
+//  CHECK-NEXT: %[[SCALABLE_TILE_SIZE:.*]] = arith.muli %[[VSCALE]], %[[C32]] : index
+//       CHECK: scf.for
+//  CHECK-SAME:     step %[[C1]]
+//       CHECK:   scf.for
+//  CHECK-SAME:       step %[[SCALABLE_TILE_SIZE]]
+//       CHECK:     scf.for
+//  CHECK-SAME:         step %[[C1]]

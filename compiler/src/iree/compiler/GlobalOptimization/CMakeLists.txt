@@ -10,22 +10,72 @@
 
 iree_add_all_subdirs()
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  HDRS
+    "PassDetail.h"
+    "Passes.h"
+    "Passes.h.inc"
+  DEPS
+    ::PassesIncGen
+    MLIRPass
+    MLIRTransforms
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     GlobalOptimization
   HDRS
     "Passes.h"
   SRCS
+    "Convert1X1FilterConv2DToMatmul.cpp"
+    "DetachElementwiseFromNamedOps.cpp"
+    "EraseUnusedLinalgOperands.cpp"
+    "ExpandVectors.cpp"
+    "MaterializeHomogeneousEncodings.cpp"
     "Passes.cpp"
+    "RemoveZeroExtentTensors.cpp"
+    "SetEncoding.cpp"
   DEPS
+    ::PassHeaders
+    ::PassesIncGen
+    IREELinalgExtDialect
+    IREELinalgExtTransforms
+    IREELinalgExtUtils
     LLVMSupport
+    MLIRAffineDialect
+    MLIRArithDialect
+    MLIRArithUtils
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
+    MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
+    MLIRMemRefDialect
+    MLIRMemRefTransforms
     MLIRPass
+    MLIRTensorDialect
+    MLIRTensorTransforms
+    MLIRTensorUtils
     MLIRTransforms
+    iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Pipelines::Options
     iree::compiler::Utils
   PUBLIC
 )

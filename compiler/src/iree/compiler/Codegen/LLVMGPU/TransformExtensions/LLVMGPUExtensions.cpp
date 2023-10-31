@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -79,24 +80,13 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     transform::TransformRewriter &rewriter, func::FuncOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    state.getTopLevel()->emitOpError(
-        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp "
-        "toplevel to "
-        "attach the workgroup size information to a nested "
-        "ExecutableExportOp");
-    return emitDefaultDefiniteFailure(target);
-  }
-
-  IREE::HAL::ExecutableExportOp exportOp;
-  state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.getSymName() == target.getName())
-      exportOp = op;
-  });
-  if (!exportOp) {
+  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
+      getEntryPoint(target);
+  if (failed(maybeExportOp)) {
     state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
     return emitDefaultDefiniteFailure(target);
   }
+  IREE::HAL::ExecutableExportOp exportOp = *maybeExportOp;
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
@@ -574,11 +564,13 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
 
 static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
-                                                PatternBenefit benefit) {
-  auto groupReductionFn = [](Location loc, OpBuilder &builder, Value input,
-                             vector::CombiningKind kind, uint32_t size) {
+                                                PatternBenefit benefit,
+                                                unsigned subgroupSize) {
+  auto groupReductionFn = [subgroupSize](
+                              Location loc, OpBuilder &builder, Value input,
+                              vector::CombiningKind kind, uint32_t size) {
     return mlir::iree_compiler::emitGPUGroupReduction(loc, builder, input, kind,
-                                                      size, 32);
+                                                      size, subgroupSize);
   };
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
@@ -604,14 +596,21 @@ static void populateWarpExecuteOnLane0ToScf(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorWarpDistributionOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
+    transform::TransformRewriter &rewriter, func::FuncOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    target->emitOpError(
-        "applies only to isolated-from-above targets because it "
-        "needs to apply "
-        "patterns greedily");
+  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
+      getEntryPoint(target);
+  if (failed(maybeExportOp)) {
+    state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
+    return emitDefaultDefiniteFailure(target);
+  }
+  IREE::HAL::ExecutableExportOp exportOp = *maybeExportOp;
+
+  std::optional<llvm::APInt> subgroupSize = exportOp.getSubgroupSize();
+  if (!subgroupSize) {
+    state.getTopLevel()->emitOpError(
+        "could not extract subgroup size from IREE::HAL::ExecutableExportOp");
     return emitDefaultDefiniteFailure(target);
   }
 
@@ -645,7 +644,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   populateVectorTransferWriteDistribution(target, patterns,
                                           /*benefit=*/2);
   populatePropagateVectorDistribution(target, patterns,
-                                      /*benefit=*/1);
+                                      /*benefit=*/1,
+                                      subgroupSize->getSExtValue());
   if (failed(
           applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
     return mlir::emitDefiniteFailure(
@@ -770,7 +770,7 @@ DiagnosedSilenceableFailure transform_dialect::PromoteOperandsOp::applyToOne(
   for (int64_t index : indices) {
     if ((index >= 0) && (index < numOperands)) {
       FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-          rewriter, loc, target->getOperand(index), false, options, true);
+          rewriter, loc, target->getOperand(index), options);
       if (failed(ret)) {
         return emitDefaultDefiniteFailure(target)
                << "failed to promote operand";

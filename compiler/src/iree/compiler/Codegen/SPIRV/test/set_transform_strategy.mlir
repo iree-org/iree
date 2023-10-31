@@ -1,22 +1,24 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration})))" --iree-spirv-enable-transform-dialect-jit=true | FileCheck %s
+// RUN: iree-opt %s --split-input-file \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))"\
+// RUN:   --iree-spirv-enable-transform-dialect-jit=true | FileCheck %s
 
 hal.executable @matmul {
-hal.executable.variant public @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+hal.executable.variant public @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<
-    #spirv.vce<v1.5,
-    [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-    [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+    #spirv.vce<v1.6,
+    [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+    [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
     #spirv.resource_limits<
-      cooperative_matrix_properties_nv = [
-        #spirv.coop_matrix_props<
+      cooperative_matrix_properties_khr = [
+        #spirv.coop_matrix_props_khr<
           a_type = f32, b_type = f32, c_type = f32, k_size = 8,
-          m_size = 16, n_size = 16, result_type = f32, scope  = <Subgroup>>
+          m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
       ],
       max_compute_shared_memory_size = 49152,
       max_compute_workgroup_invocations = 1024,
       max_compute_workgroup_size = [2147483647, 65535, 65535],
       subgroup_size = 32>
-     >}> {
+     >}>) {
   hal.executable.export public @matmul ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -47,7 +49,7 @@ hal.executable.variant public @vulkan, target = <"vulkan-spirv", "vulkan-spirv-f
 
 /// The specific vector sizes are tested in the LLVMGPU tests and thus omitted
 /// here. This is just to check that masked vectorization is used.
-// CHECK-COUNT-3: transform.structured.masked_vectorize
+// CHECK-COUNT-3: transform.structured.vectorize
 
 // Verify use of WMMA.
 // CHECK: apply_patterns to %{{.*}} {

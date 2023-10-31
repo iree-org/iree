@@ -53,11 +53,6 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
-static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
-                                       Value allocation) {
-  return success();
-}
-
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   bool needsBarrier = false;
@@ -79,10 +74,8 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
 
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn = gpuDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 }
@@ -111,6 +104,20 @@ static void tileAndBufferize(OpPassManager &pm) {
   addBufferizePasses(nestedModulePM);
 }
 
+static void addGPUVectorizationPasses(OpPassManager &pm) {
+  pm.addNestedPass<func::FuncOp>(createDecomposeConvolutionToLowerDimOpsPass());
+  GenericVectorizationPassOptions options;
+  options.vectorizePadding = true;
+  options.vectorizeGatherAccesses = true;
+  options.enableCleanup = false;
+  options.foldCastIntoContract = true;
+  options.maxVectorSize = 4096;
+  pm.addNestedPass<func::FuncOp>(createGenericVectorizationPass(options));
+  pm.addNestedPass<func::FuncOp>(createHoistRedundantVectorTransfersPass());
+  pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(createCSEPass());
+}
+
 //===---------------------------------------------------------------------===//
 // Codegen pipelines.
 //===---------------------------------------------------------------------===//
@@ -132,9 +139,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  addGPUVectorizationPasses(nestedModulePM);
 
   // tensor to memref
   addBufferizePasses(nestedModulePM);
@@ -167,9 +172,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
 
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  addGPUVectorizationPasses(nestedModulePM);
 
   // tensor to memref
   addBufferizePasses(nestedModulePM);
@@ -237,7 +240,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorCoreVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
@@ -300,7 +304,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType::MMA_SYNC));
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
@@ -351,9 +356,7 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
 
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  addGPUVectorizationPasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -381,14 +384,28 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRematerializeParallelOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
-      /*generateContract=*/false, /*maxVectorSize=*/16384));
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    options.enableCleanup = false;
+    options.generateContract = false;
+    options.maxVectorSize = 16384;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -429,9 +446,7 @@ void addGPUPackUnPackPasses(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true));
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+  addGPUVectorizationPasses(nestedModulePM);
 
   addBufferizePasses(nestedModulePM);
 
@@ -471,6 +486,7 @@ void addGPUDefaultPassPipeline(OpPassManager &pm) {
 static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
   pm.addPass(createExtractAddressComputationGPUPass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
+  pm.addPass(memref::createFoldMemRefAliasOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   // Hoist loop invariant variables to give decompose affine pass the right loop
   // dependencies.
@@ -485,9 +501,7 @@ static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
-  // TODO: Remove the following pass the plumb support for #hal.descriptor_type
-  // memory space through the stack.
-  pm.addNestedPass<func::FuncOp>(createEraseHALDescriptorTypeFromMemRefPass());
+  pm.addPass(createConvertHALDescriptorTypeToGPUAddressSpacePass());
 
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -546,8 +560,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
-  pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(memref::createFoldMemRefAliasOpsPass());
+  pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createEmulateNarrowTypePass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
@@ -556,8 +570,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // debug info well.
   pm.addPass(createStripDebugInfoPass());
   // Cast address spaces of all function arguments to generic
-  if (!useROCM)
-    pm.addPass(createLLVMGPUCastAddressSpaceFunction());
+  pm.addPass(createLLVMGPUCastAddressSpaceFunction());
   if (useROCM) {
     // convert to ROCDL.
     pm.addPass(createConvertToROCDLPass());
@@ -567,17 +580,12 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   }
 }
 
-extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag;
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag;
 
 void addGPUTransformDialectPasses(OpPassManager &passManager) {
-  // Give control to the transform dialect.
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clGPUCodegenTransformDialectFileName,
-          clGPUCodegenTransformDialectDebugPayloadTag,
-          clGPUCodegenTransformDialectDebugTransformTag));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -586,10 +594,13 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
-void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
-  addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
-  pm.nest<ModuleOp>().addNestedPass<func::FuncOp>(
-      createRematerializeParallelOpsPass());
+void buildLLVMGPUCodegenStrategyInitializationPassPipeline(OpPassManager &pm) {
+  addCommonTargetExecutablePreprocessingPasses(pm);
+  pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
+}
+
+void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM) {
+  buildLLVMGPUCodegenStrategyInitializationPassPipeline(pm);
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//
@@ -625,14 +636,14 @@ void registerCodegenLLVMGPUPasses() {
       "iree-codegen-linalg-to-nvvm-pipeline",
       "Runs the progressive lowering pipeline from Linalg to NVVM",
       [](OpPassManager &passManager) {
-        buildLLVMGPUTransformPassPipeline(passManager, false);
+        buildLLVMGPUCodegenPassPipeline(passManager, false);
       });
 
   static PassPipelineRegistration<> LinalgROCDLPipeline(
       "iree-codegen-linalg-to-rocdl-pipeline",
       "Runs the progressive lowering pipeline from Linalg to ROCDL",
       [](OpPassManager &passManager) {
-        buildLLVMGPUTransformPassPipeline(passManager, true);
+        buildLLVMGPUCodegenPassPipeline(passManager, true);
       });
 }
 

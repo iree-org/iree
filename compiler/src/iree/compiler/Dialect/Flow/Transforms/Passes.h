@@ -49,11 +49,6 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
-// Apply patterns to erase unused linalg operands and remove dead code
-// associated.
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createEraseUnusedLinalgOperands();
-
 // Expands tensor shape dimensions into SSA values across the program.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
 
@@ -64,10 +59,6 @@ std::unique_ptr<Pass> createCleanupTensorShapesPass();
 // iree-flow-infer-numeric-narrowing.
 std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 
-// Creates a pass to convert linalg convolution ops with 1x1 kernels into
-// linalg.matmul
-std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
-
 // Creates a pass to convert dispatch.region ops to dispatch.workgroups ops.
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 
@@ -75,9 +66,6 @@ std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 // tensor.insert_slice.
 std::unique_ptr<Pass>
 createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses = false);
-
-// Create a pass to detach elementwise ops from named Linalg ops.
-std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 
 // Create a pass that imports upstream patterns to fold unit extent dims
 // but with IREE control.
@@ -119,16 +107,9 @@ std::unique_ptr<Pass> createConvertToFlowPass();
 // iree-flow-infer-numeric-narrowing.
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
-// Sets encoding for tensors to allow tiled execution of operations.
-std::unique_ptr<Pass> createSetEncodingPass();
-
 // Strips the signed/unsigned portion off of tensors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createStripSignednessPass();
-
-// Removes tensors that have 0-extents.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createRemoveZeroExtentTensorsPass();
 
 // Decomposes top-level SCF operations to CFG.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -202,6 +183,9 @@ std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createOutlineDispatchRegionsPass();
+
+// Annotates executable dispatches based on their contents.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateDispatchesPass();
 
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

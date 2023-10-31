@@ -849,6 +849,9 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32SOp>(srcOp, dstType,
                                                           adaptor.getIn());
+    } else if (srcType.isInteger(16) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I64SOp>(srcOp, dstType,
+                                                          adaptor.getIn());
     } else if (srcType.isInteger(32) && dstType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64SOp>(srcOp, dstType,
                                                           adaptor.getIn());
@@ -879,6 +882,9 @@ class TruncateIOpConversion : public OpConversionPattern<arith::TruncIOp> {
       rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
           srcOp, dstType, value,
           rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+    } else if (srcType.isInteger(16) && resultType.isInteger(8)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::TruncI16I8Op>(srcOp, dstType,
+                                                          adaptor.getIn());
     } else if (srcType.isInteger(32) && resultType.isInteger(8)) {
       rewriter.replaceOpWithNewOp<IREE::VM::TruncI32I8Op>(srcOp, dstType,
                                                           adaptor.getIn());
@@ -1079,6 +1085,81 @@ class CondBranchOpConversion : public OpConversionPattern<cf::CondBranchOp> {
   }
 };
 
+class SwitchOpConversion : public OpConversionPattern<cf::SwitchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(cf::SwitchOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Special handling for default only ops: just jump to default.
+    if (srcOp.getCaseDestinations().empty()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::BranchOp>(
+          srcOp, srcOp.getDefaultDestination(), adaptor.getDefaultOperands());
+      return success();
+    }
+
+    // NOTE: cf.switch can have sparse indices but we cannot; instead we fill
+    // any gaps with branches to the default block. This is wasteful but keeps
+    // the runtime super simple - if we have offset or really sparse tables
+    // (default + case 10000 + case 400000) we can optimize those in the
+    // compiler by using multiple branch tables, inverse lookups via a lookup
+    // op, etc.
+    //
+    // To make this simple here we get all cases, sort them, and then walk in
+    // order while filling gaps as need.
+    SmallVector<std::pair<int, int64_t>> caseValues;
+    for (auto [i, value] : llvm::enumerate(srcOp.getCaseValues().value())) {
+      caseValues.push_back(std::make_pair(i, value.getSExtValue()));
+    }
+    llvm::stable_sort(caseValues,
+                      [](std::pair<int, int64_t> a, std::pair<int, int64_t> b) {
+                        return a.second < b.second;
+                      });
+
+    // Sanity check negative values, which are tricky.
+    int64_t minValue = caseValues.front().second;
+    if (minValue < 0) {
+      return rewriter.notifyMatchFailure(
+          srcOp, "negative case indices are not supported by the VM (today); "
+                 "needs positive offsetting");
+    }
+
+    // If the first branch is offset from 0 then we can subtract that out to
+    // avoid holes at the start of the table.
+    Value index = adaptor.getFlag();
+    if (minValue > 0) {
+      index = rewriter.create<IREE::VM::SubI32Op>(
+          srcOp.getLoc(), rewriter.getI32Type(), index,
+          rewriter.create<IREE::VM::ConstI32Op>(
+              srcOp.getLoc(), static_cast<int32_t>(minValue)));
+      for (auto &[i, value] : caseValues) {
+        value -= minValue;
+      }
+    }
+
+    // Emit each dense case, filling interior holes as needed.
+    SmallVector<ValueRange> adaptedCaseOperands = adaptor.getCaseOperands();
+    SmallVector<Block *> caseDestinations;
+    SmallVector<ValueRange> caseOperands;
+    int64_t lastValue = 0;
+    for (auto [i, value] : caseValues) {
+      while (value != lastValue && value - lastValue != 1) {
+        // Hole to fill.
+        caseDestinations.push_back(srcOp.getDefaultDestination());
+        caseOperands.push_back(adaptor.getDefaultOperands());
+        ++lastValue;
+      }
+      caseDestinations.push_back(srcOp.getCaseDestinations()[i]);
+      caseOperands.push_back(adaptedCaseOperands[i]);
+      lastValue = value;
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::VM::BranchTableOp>(
+        srcOp, index, adaptor.getDefaultOperands(), caseOperands,
+        srcOp.getDefaultDestination(), caseDestinations);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateStandardToVMPatterns(MLIRContext *context,
@@ -1087,9 +1168,9 @@ void populateStandardToVMPatterns(MLIRContext *context,
   patterns
       .insert<AssertOpConversion, BranchOpConversion, CallOpConversion,
               CmpI32OpConversion, CmpI64OpConversion, CmpF32OpConversion,
-              CondBranchOpConversion, ModuleOpConversion, FuncOpConversion,
-              ExternalFuncOpConversion, ReturnOpConversion, SelectOpConversion>(
-          typeConverter, context);
+              CondBranchOpConversion, SwitchOpConversion, ModuleOpConversion,
+              FuncOpConversion, ExternalFuncOpConversion, ReturnOpConversion,
+              SelectOpConversion>(typeConverter, context);
 
   // TODO(#2878): figure out how to pass the type converter in a supported way.
   // Right now if we pass the type converter as the first argument - triggering
@@ -1135,30 +1216,29 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                                                 context);
 
   // Floating-point arithmetic ops.
-  patterns
-      .insert<UnaryArithmeticOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
-                                          IREE::VM::AbsF64Op>,
-              BinaryArithmeticOpConversion<arith::AddFOp, IREE::VM::AddF32Op,
-                                           IREE::VM::AddF64Op>,
-              UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
-                                          IREE::VM::CeilF64Op>,
-              UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
-                                          IREE::VM::FloorF64Op>,
-              BinaryArithmeticOpConversion<arith::DivFOp, IREE::VM::DivF32Op,
-                                           IREE::VM::DivF64Op>,
-              BinaryArithmeticOpConversion<arith::MulFOp, IREE::VM::MulF32Op,
-                                           IREE::VM::MulF64Op>,
-              UnaryArithmeticOpConversion<arith::NegFOp, IREE::VM::NegF32Op,
-                                          IREE::VM::NegF64Op>,
-              BinaryArithmeticOpConversion<arith::RemFOp, IREE::VM::RemF32Op,
-                                           IREE::VM::RemF64Op>,
-              BinaryArithmeticOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
-                                           IREE::VM::SubF64Op>,
-              BinaryArithmeticOpConversion<arith::MinFOp, IREE::VM::MinF32Op,
-                                           IREE::VM::MinF64Op>,
-              BinaryArithmeticOpConversion<arith::MaxFOp, IREE::VM::MaxF32Op,
-                                           IREE::VM::MaxF64Op>>(typeConverter,
-                                                                context);
+  patterns.insert<
+      UnaryArithmeticOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
+                                  IREE::VM::AbsF64Op>,
+      BinaryArithmeticOpConversion<arith::AddFOp, IREE::VM::AddF32Op,
+                                   IREE::VM::AddF64Op>,
+      UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
+                                  IREE::VM::CeilF64Op>,
+      UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
+                                  IREE::VM::FloorF64Op>,
+      BinaryArithmeticOpConversion<arith::DivFOp, IREE::VM::DivF32Op,
+                                   IREE::VM::DivF64Op>,
+      BinaryArithmeticOpConversion<arith::MulFOp, IREE::VM::MulF32Op,
+                                   IREE::VM::MulF64Op>,
+      UnaryArithmeticOpConversion<arith::NegFOp, IREE::VM::NegF32Op,
+                                  IREE::VM::NegF64Op>,
+      BinaryArithmeticOpConversion<arith::RemFOp, IREE::VM::RemF32Op,
+                                   IREE::VM::RemF64Op>,
+      BinaryArithmeticOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
+                                   IREE::VM::SubF64Op>,
+      BinaryArithmeticOpConversion<arith::MinimumFOp, IREE::VM::MinF32Op,
+                                   IREE::VM::MinF64Op>,
+      BinaryArithmeticOpConversion<arith::MaximumFOp, IREE::VM::MaxF32Op,
+                                   IREE::VM::MaxF64Op>>(typeConverter, context);
 
   // Floating-point conversion ops.
   patterns.insert<IntToFPOpConversion<arith::SIToFPOp, arith::ExtSIOp,

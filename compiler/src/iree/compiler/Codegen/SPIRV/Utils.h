@@ -21,6 +21,9 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Returns the attribute name carrying information about distribution.
+const char *getSPIRVDistributeAttrName();
+
 /// Given an operation, returns the `spirv.target_env` attribute.
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 
@@ -28,9 +31,6 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 /// querying the hal.executable.export op, and then the SPIR-V target
 /// environment. Returns std::nullopt on failures.
 std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp);
-
-/// Returns the attribute name carrying information about distribution.
-const char *getSPIRVDistributeAttrName();
 
 /// Returns the tile sizes at the given `tilingLevel` for compute ops in
 /// `funcOp`.

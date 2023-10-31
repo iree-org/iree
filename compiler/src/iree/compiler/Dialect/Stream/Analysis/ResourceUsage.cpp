@@ -20,6 +20,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -238,6 +239,9 @@ public:
 private:
   explicit ValueResourceUsage(const Position &pos) : BaseType(pos) {}
 
+  ValueResourceUsage(const ValueResourceUsage &) = delete;
+  ValueResourceUsage &operator=(const ValueResourceUsage &) = delete;
+
   // Starts analysis of the |value| with known bits based on its resource type.
   void initializeValue(Value value, DFX::Solver &solver) override {
     auto resourceType = llvm::cast<IREE::Stream::ResourceType>(value.getType());
@@ -254,17 +258,17 @@ private:
 
     TypeSwitch<Operation *, void>(result.getOwner())
         .Case([&](mlir::arith::SelectOp op) {
-          auto trueUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &trueUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getTrueValue()),
               DFX::Resolution::REQUIRED);
-          auto falseUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &falseUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getFalseValue()),
               DFX::Resolution::REQUIRED);
           getState() ^= trueUsage.getState();
           getState() ^= falseUsage.getState();
         })
         .Case([&](IREE::Util::OptimizationBarrierOp op) {
-          auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getOperand(0)),
               DFX::Resolution::REQUIRED);
           getState() ^= sourceUsage.getState();
@@ -283,28 +287,48 @@ private:
           default:
             break;
           }
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getLoadedGlobalValue()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Util::GlobalLoadIndirectOpInterface op) {
           removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_READ);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getLoadedGlobalValue()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::ResourceStoreOp op) {
           removeAssumedBits(NOT_STAGING_WRITE);
-          auto targetUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
         .Case([&](IREE::Stream::TensorImportOp op) {
-          removeAssumedBits(NOT_MUTATED | NOT_EXTERNAL);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto targetType =
+              llvm::cast<IREE::Stream::ResourceType>(op.getResult().getType());
+          switch (targetType.getLifetime()) {
+          default:
+          case IREE::Stream::Lifetime::External:
+            removeAssumedBits(NOT_MUTATED | NOT_EXTERNAL);
+            break;
+          case IREE::Stream::Lifetime::Staging:
+            removeAssumedBits(NOT_MUTATED | NOT_STAGING_READ |
+                              NOT_STAGING_WRITE);
+            break;
+          case IREE::Stream::Lifetime::Transient:
+            removeAssumedBits(NOT_MUTATED);
+            break;
+          case IREE::Stream::Lifetime::Variable:
+            removeAssumedBits(NOT_MUTATED | NOT_GLOBAL_READ | NOT_GLOBAL_WRITE);
+            break;
+          case IREE::Stream::Lifetime::Constant:
+            removeAssumedBits(NOT_CONSTANT);
+            break;
+          }
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
@@ -312,56 +336,56 @@ private:
         .Case([&](IREE::Stream::AsyncAllocaOp op) {
           // NOTE: allocas imply non-constant/immutable.
           removeAssumedBits(NOT_MUTATED);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncConstantOp op) {
           removeAssumedBits(NOT_CONSTANT | NOT_TRANSFER_WRITE);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncSplatOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncCloneOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
-          auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getSource()),
               DFX::Resolution::OPTIONAL);
           getState() ^= sourceUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncSliceOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
-          auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getSource()),
               DFX::Resolution::OPTIONAL);
           getState() ^= sourceUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncFillOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
-          auto targetUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncUpdateOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
-          auto targetUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncCopyOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
-          auto targetUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
@@ -371,14 +395,14 @@ private:
           // implementation may use either (or both).
           // TODO(#11249): handle source == target aliasing.
           removeAssumedBits(NOT_TRANSFER_WRITE | NOT_DISPATCH_WRITE);
-          auto targetUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncTransferOp op) {
           removeAssumedBits(NOT_TRANSFER_WRITE);
-          auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getSource()),
               DFX::Resolution::OPTIONAL);
           bool isSourceStaging = !(sourceUsage.isAssumed(NOT_STAGING_READ) &&
@@ -421,7 +445,7 @@ private:
         })
         .Case([&](IREE::Stream::AsyncStoreOp op) {
           removeAssumedBits(NOT_STAGING_WRITE);
-          auto targetUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &targetUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getTarget()),
               DFX::Resolution::REQUIRED);
           getState() ^= targetUsage.getState();
@@ -430,12 +454,12 @@ private:
           removeAssumedBits(NOT_DISPATCH_WRITE);
           auto tiedOperand = op.getTiedResultOperand(result);
           if (tiedOperand) {
-            auto tiedUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &tiedUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(tiedOperand),
                 DFX::Resolution::REQUIRED);
             getState() ^= tiedUsage.getState();
           } else {
-            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(result), DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
           }
@@ -446,12 +470,12 @@ private:
           removeAssumedBits(NOT_TRANSFER_WRITE | NOT_DISPATCH_WRITE);
           auto tiedOperand = op.getTiedResultOperand(result);
           if (tiedOperand) {
-            auto tiedUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &tiedUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(tiedOperand),
                 DFX::Resolution::REQUIRED);
             getState() ^= tiedUsage.getState();
           } else {
-            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(result), DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
           }
@@ -470,33 +494,110 @@ private:
     unsigned operandIdx = operand.getOperandNumber();
     TypeSwitch<Operation *, void>(userOp)
         .Case([&](mlir::arith::SelectOp op) {
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
         .Case([&](mlir::BranchOpInterface op) {
-          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op->getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);
           getState() ^= operandUsage.getState();
           solver.getExplorer().walkOutgoingBranchOperandArguments(
               op, operandIdx, [&](Block *targetBlock, BlockArgument arg) {
-                auto argUsage = solver.getElementFor<ValueResourceUsage>(
+                auto &argUsage = solver.getElementFor<ValueResourceUsage>(
                     *this, Position::forValue(arg), DFX::Resolution::OPTIONAL);
                 getState() ^= argUsage;
                 return WalkResult::advance();
               });
         })
+        .Case([&](mlir::scf::ForOp op) {
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op.getOperand(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= operandUsage.getState();
+          if (operandIdx >= op.getNumControlOperands()) {
+            int64_t blockIdx = operandIdx - op.getNumControlOperands();
+            auto &beforeUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(op.getRegionIterArg(blockIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= beforeUsage.getState();
+          }
+        })
+        .Case([&](mlir::scf::WhileOp op) {
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op->getOperand(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= operandUsage.getState();
+          auto &beforeUsage = solver.getElementFor<ValueResourceUsage>(
+              *this,
+              Position::forValue(op.getBeforeBody()->getArgument(operandIdx)),
+              DFX::Resolution::REQUIRED);
+
+          getState() ^= beforeUsage.getState();
+        })
+        .Case([&](mlir::scf::ConditionOp op) {
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
+              *this, Position::forValue(op->getOperand(operandIdx)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= operandUsage.getState();
+          auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
+              *this,
+              Position::forValue(op->getParentOp()->getResult(operandIdx - 1)),
+              DFX::Resolution::REQUIRED);
+          getState() ^= parentUsage.getState();
+          if (auto whileOp =
+                  dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+            auto value = Position::forValue(
+                whileOp.getAfter().getArgument(operandIdx - 1));
+            auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, value, DFX::Resolution::REQUIRED);
+            getState() ^= valueUsage.getState();
+          }
+        })
+        .Case([&](mlir::scf::YieldOp op) {
+          if (isa<scf::IfOp>(op->getParentOp())) {
+            auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(op->getOperand(operandIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= operandUsage.getState();
+            auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
+                *this,
+                Position::forValue(op->getParentOp()->getResult(operandIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= parentUsage.getState();
+          } else if (auto whileOp =
+                         dyn_cast_or_null<scf::WhileOp>(op->getParentOp())) {
+            auto value =
+                Position::forValue(whileOp.getBefore().getArgument(operandIdx));
+            auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, value, DFX::Resolution::REQUIRED);
+            getState() ^= valueUsage.getState();
+          } else if (auto forOp =
+                         dyn_cast_or_null<scf::ForOp>(op->getParentOp())) {
+            auto value = Position::forValue(forOp.getRegionIterArg(operandIdx));
+            auto &valueUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, value, DFX::Resolution::REQUIRED);
+            getState() ^= valueUsage.getState();
+
+            auto &parentUsage = solver.getElementFor<ValueResourceUsage>(
+                *this, Position::forValue(forOp->getResult(operandIdx)),
+                DFX::Resolution::REQUIRED);
+            getState() ^= parentUsage.getState();
+          } else {
+            assert(false && "Unsupported test case");
+          }
+        })
         .Case([&](mlir::func::ReturnOp op) {
-          auto operandUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);
           getState() ^= operandUsage.getState();
           solver.getExplorer().walkIncomingCalls(
               op->getParentOfType<mlir::CallableOpInterface>(),
               [&](mlir::CallOpInterface callOp) {
-                auto argUsage = solver.getElementFor<ValueResourceUsage>(
+                auto &argUsage = solver.getElementFor<ValueResourceUsage>(
                     *this, Position::forValue(callOp->getResult(operandIdx)),
                     DFX::Resolution::OPTIONAL);
                 getState() ^= argUsage;
@@ -504,7 +605,7 @@ private:
               });
         })
         .Case([&](IREE::Util::OptimizationBarrierOp op) {
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult(0)),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
@@ -528,25 +629,54 @@ private:
           removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_WRITE);
         })
         .Case([&](IREE::Stream::TensorExportOp op) {
-          removeAssumedBits(NOT_MUTATED | NOT_EXTERNAL);
+          auto sourceType =
+              llvm::cast<IREE::Stream::ResourceType>(op.getSource().getType());
+          switch (sourceType.getLifetime()) {
+          default:
+          case IREE::Stream::Lifetime::External:
+            removeAssumedBits(NOT_MUTATED | NOT_EXTERNAL);
+            break;
+          case IREE::Stream::Lifetime::Staging:
+            removeAssumedBits(NOT_MUTATED | NOT_STAGING_READ |
+                              NOT_STAGING_WRITE | NOT_TRANSFER_READ |
+                              NOT_TRANSFER_WRITE);
+            break;
+          case IREE::Stream::Lifetime::Transient:
+            removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_READ |
+                              NOT_TRANSFER_WRITE | NOT_DISPATCH_READ |
+                              NOT_DISPATCH_WRITE);
+            break;
+          case IREE::Stream::Lifetime::Variable:
+            removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_READ |
+                              NOT_TRANSFER_WRITE | NOT_DISPATCH_READ |
+                              NOT_DISPATCH_WRITE);
+            break;
+          case IREE::Stream::Lifetime::Constant:
+            removeAssumedBits(NOT_CONSTANT | NOT_TRANSFER_READ |
+                              NOT_DISPATCH_READ);
+            break;
+          }
+        })
+        .Case([&](IREE::Stream::TensorTraceOp op) {
+          removeAssumedBits(NOT_STAGING_READ);
         })
         .Case([&](IREE::Stream::AsyncCloneOp op) {
           removeAssumedBits(NOT_TRANSFER_READ);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::OPTIONAL);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncSliceOp op) {
           removeAssumedBits(NOT_TRANSFER_READ);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::OPTIONAL);
           getState() ^= resultUsage.getState();
         })
         .Case([&](IREE::Stream::AsyncFillOp op) {
           removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
@@ -556,7 +686,7 @@ private:
             removeAssumedBits(NOT_TRANSFER_READ);
           } else {
             removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
-            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(op.getResult()),
                 DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
@@ -567,7 +697,7 @@ private:
             removeAssumedBits(NOT_TRANSFER_READ);
           } else {
             removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE);
-            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(op.getResult()),
                 DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
@@ -582,7 +712,7 @@ private:
           } else {
             removeAssumedBits(NOT_MUTATED | NOT_TRANSFER_WRITE |
                               NOT_DISPATCH_WRITE);
-            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(op.getResult()),
                 DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
@@ -590,7 +720,7 @@ private:
         })
         .Case([&](IREE::Stream::AsyncTransferOp op) {
           removeAssumedBits(NOT_TRANSFER_READ);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::OPTIONAL);
           bool isSourceStaging =
@@ -637,7 +767,7 @@ private:
         })
         .Case([&](IREE::Stream::AsyncStoreOp op) {
           removeAssumedBits(NOT_MUTATED | NOT_STAGING_WRITE);
-          auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+          auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
@@ -646,7 +776,7 @@ private:
           removeAssumedBits(NOT_DISPATCH_READ);
           for (auto result : op.getOperandTiedResults(operandIdx)) {
             removeAssumedBits(NOT_MUTATED | NOT_DISPATCH_WRITE);
-            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(result), DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
           }
@@ -657,7 +787,7 @@ private:
           removeAssumedBits(NOT_TRANSFER_READ | NOT_DISPATCH_READ);
           for (auto result : op.getOperandTiedResults(operandIdx)) {
             removeAssumedBits(NOT_MUTATED | NOT_DISPATCH_WRITE);
-            auto resultUsage = solver.getElementFor<ValueResourceUsage>(
+            auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
                 *this, Position::forValue(result), DFX::Resolution::REQUIRED);
             getState() ^= resultUsage.getState();
           }
@@ -704,6 +834,9 @@ ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
     : explorer(rootOp, TraversalAction::SHALLOW), solver(explorer, allocator) {
   explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
+  explorer.setOpAction<mlir::scf::ForOp>(TraversalAction::RECURSE);
+  explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
+  explorer.setOpAction<mlir::scf::WhileOp>(TraversalAction::RECURSE);
   explorer.setDialectAction<IREE::Stream::StreamDialect>(
       TraversalAction::RECURSE);
   // Ignore the contents of executables (linalg goo, etc).

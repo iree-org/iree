@@ -61,6 +61,26 @@ BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
     input_types=["1x384xi32", "1x384xi32", "1x384xi32"],
 )
 
+GPT2_117M_1x4_FP32_TF = common_definitions.Model(
+    id=unique_ids.MODEL_GPT2_117M_1x4_FP32_TF,
+    name="GPT2_117M_TF_1X4XI32",
+    tags=["fp32", "tensorflow", "gpt2", "batch-1"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
+    source_url="https://storage.googleapis.com/iree-shared-files/tf_gpt2/static_input_seqlen5/stablehlo.mlir",
+    entry_function="forward",
+    input_types=["1x4xi32", "1x4xi32"],
+)
+
+GPT2_117M_1x1_FP32_TF = common_definitions.Model(
+    id=unique_ids.MODEL_GPT2_117M_1x1_FP32_TF,
+    name="GPT2_117M_TF_1X1XI32",
+    tags=["fp32", "tensorflow", "gpt2", "batch-1"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
+    source_url="https://storage.googleapis.com/iree-shared-files/tf_gpt2/static_input_seqlen1/stablehlo.mlir",
+    entry_function="forward",
+    input_types=["1x1xi32", "12x2x1x12x4x64xf32"],
+)
+
 TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975"
 
 ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")

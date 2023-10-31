@@ -31,6 +31,26 @@ def create_simple_mul_module(instance):
     return m
 
 
+def create_multiple_entry_functions_module(instance):
+    binary = iree.compiler.compile_str(
+        """
+      module @test_module {
+        func.func @entry_1(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+          %0 = math.absf %arg0 : tensor<4xf32>
+          return %0 : tensor<4xf32>
+        }
+        func.func @entry_2(%arg0: tensor<2xf32>) -> tensor<2xf32> {
+          %0 = math.absf %arg0 : tensor<2xf32>
+          return %arg0 : tensor<2xf32>
+        }
+      }
+      """,
+        target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
+    )
+    m = iree.runtime.VmModule.from_flatbuffer(instance, binary)
+    return m
+
+
 def create_large_matmul_module(instance):
     binary = iree.compiler.compile_str(
         """
@@ -68,6 +88,28 @@ class BenchmarkTest(unittest.TestCase):
         benchmark_time = float(benchmark_results[0].time.split(" ")[0])
         self.assertGreater(benchmark_time, 0)
 
+    def testBenchmarkModuleWithEntryFunction(self):
+        ctx = iree.runtime.SystemContext()
+        vm_module = create_multiple_entry_functions_module(ctx.instance)
+        arg1 = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+        arg2 = np.array([1.0, 2.0], dtype=np.float32)
+
+        benchmark_results_1 = benchmark_module(
+            vm_module,
+            entry_function="entry_1",
+            device=iree.compiler.core.DEFAULT_TESTING_DRIVER,
+            inputs=[arg1],
+        )
+        self.assertEquals(len(benchmark_results_1), 1)
+
+        benchmark_results_2 = benchmark_module(
+            vm_module,
+            entry_function="entry_2",
+            device=iree.compiler.core.DEFAULT_TESTING_DRIVER,
+            inputs=[arg2],
+        )
+        self.assertEquals(len(benchmark_results_2), 1)
+
     def testBenchmarkModuleTimeout(self):
         ctx = iree.runtime.SystemContext()
         vm_module = create_large_matmul_module(ctx.instance)
@@ -82,3 +124,7 @@ class BenchmarkTest(unittest.TestCase):
                 inputs=[arg0, arg1, arg2],
                 timeout=0.1,
             )
+
+
+if __name__ == "__main__":
+    unittest.main()

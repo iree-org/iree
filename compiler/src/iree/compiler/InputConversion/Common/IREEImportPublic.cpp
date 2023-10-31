@@ -91,7 +91,6 @@ static std::optional<IREE::HAL::DescriptorFlags>
 convertDescriptorFlags(std::optional<IREE::Input::DescriptorFlags> src) {
   if (!src.has_value())
     return std::nullopt;
-
   switch (*src) {
   case IREE::Input::DescriptorFlags::None:
     return IREE::HAL::DescriptorFlags::None;
@@ -109,12 +108,28 @@ convertDescriptorSetBinding(IREE::Input::DescriptorSetBindingAttr src) {
       convertDescriptorFlags(src.getFlags()));
 }
 
+static std::optional<IREE::HAL::DescriptorSetLayoutFlags>
+convertDescriptorSetLayoutFlags(
+    std::optional<IREE::Input::DescriptorSetLayoutFlags> src) {
+  if (!src.has_value())
+    return std::nullopt;
+  switch (*src) {
+  case IREE::Input::DescriptorSetLayoutFlags::None:
+    return IREE::HAL::DescriptorSetLayoutFlags::None;
+  case IREE::Input::DescriptorSetLayoutFlags::Indirect:
+    return IREE::HAL::DescriptorSetLayoutFlags::Indirect;
+  default:
+    return std::nullopt;
+  }
+}
+
 static IREE::HAL::DescriptorSetLayoutAttr
 convertDescriptorSetLayout(IREE::Input::DescriptorSetLayoutAttr src) {
   return IREE::HAL::DescriptorSetLayoutAttr::get(
       src.getContext(), src.getOrdinal(),
       convertAttributes<IREE::HAL::DescriptorSetBindingAttr>(
-          src.getBindings(), convertDescriptorSetBinding));
+          src.getBindings(), convertDescriptorSetBinding),
+      convertDescriptorSetLayoutFlags(src.getFlags()));
 }
 
 static IREE::HAL::PipelineLayoutAttr
@@ -502,6 +517,7 @@ void IREEImportPublicPass::runOnOperation() {
   ONE_TO_ONE(IREE::Input::TensorCloneOp, IREE::Flow::TensorCloneOp);
   ONE_TO_ONE(IREE::Input::TensorLoadOp, IREE::Flow::TensorLoadOp);
   ONE_TO_ONE(IREE::Input::TensorReshapeOp, IREE::Flow::TensorReshapeOp);
+  ONE_TO_ONE(IREE::Input::TensorBitCastOp, IREE::Flow::TensorBitCastOp);
   ONE_TO_ONE(IREE::Input::TensorSliceOp, IREE::Flow::TensorSliceOp);
   ONE_TO_ONE(IREE::Input::TensorSplatOp, IREE::Flow::TensorSplatOp);
   ONE_TO_ONE(IREE::Input::TensorStoreOp, IREE::Flow::TensorStoreOp);

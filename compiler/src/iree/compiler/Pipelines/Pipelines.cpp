@@ -23,9 +23,6 @@
 #ifdef IREE_HAVE_STABLEHLO_INPUT
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-#include "iree/compiler/InputConversion/TMTensor/Passes.h"
-#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #endif // IREE_HAVE_TOSA_INPUT
@@ -33,14 +30,13 @@
 namespace mlir {
 namespace iree_compiler {
 
-void buildIREEVMTransformPassPipeline(
+void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetBackendRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
-    HighLevelOptimizationOptions highLevelOptimizationOptions,
+    GlobalOptimizationOptions globalOptimizationOptions,
     SchedulingOptions schedulingOptions,
-    IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
+    IREE::HAL::TargetOptions executableOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
     IREEVMPipelinePhase compileTo) {
   // If the user specified a set of target devices we attach them to the module
@@ -109,12 +105,6 @@ void buildIREEVMTransformPassPipeline(
                                                               stablehloOptions);
       break;
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-    case InputDialectOptions::Type::tm_tensor:
-      passManager.addNestedPass<func::FuncOp>(
-          TMTensor::createConvertTMTensorToLinalgExtPass());
-      break;
-#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
     case InputDialectOptions::Type::tosa:
       buildTOSAInputConversionPassPipeline(passManager);
@@ -147,30 +137,84 @@ void buildIREEVMTransformPassPipeline(
   if (compileTo == IREEVMPipelinePhase::ABI)
     return; // early-exit
 
-  GlobalOptimization::TransformOptions globalOptOptions;
-  globalOptOptions.constExprHoisting =
-      highLevelOptimizationOptions.constExprHoisting;
-  globalOptOptions.numericPrecisionReduction =
-      highLevelOptimizationOptions.numericPrecisionReduction;
+  GlobalOptimization::TransformOptions globalTransformOptions;
+  globalTransformOptions.options = globalOptimizationOptions;
 
   // Enable const-eval via hook. For debug builds, we assert if enabled
   // without a hook. For release, we just silently skip enabling const-eval.
-  if (highLevelOptimizationOptions.constEval) {
+  if (globalOptimizationOptions.constEval) {
     assert(hooks.buildConstEvalPassPipelineCallback &&
            "if const-eval is enabled the buildConstEvalPassPipelineCallback "
            "hook must be enabled");
   }
-  if (highLevelOptimizationOptions.constEval &&
+  if (globalOptimizationOptions.constEval &&
       hooks.buildConstEvalPassPipelineCallback) {
-    globalOptOptions.buildConstEvalPassPipeline =
+    globalTransformOptions.buildConstEvalPassPipeline =
         hooks.buildConstEvalPassPipelineCallback;
   }
 
-  if (highLevelOptimizationOptions.stripAssertions) {
-    // Strip std.assert & co after we perform optimizations; prior to this we
-    // may use the assertions to derive information during analysis.
-    passManager.addPass(IREE::Util::createStripDebugOpsPass());
+  switch (schedulingOptions.executionModel) {
+  case SchedulingOptions::ExecutionModel::HostOnly:
+    // No flow/stream processing (implies no tensors).
+    break;
+  default:
+    if (compileFrom < IREEVMPipelinePhase::Preprocessing) { // late-entry.
+      // Not a large enough phase for IREE_TRACE_ADD_[BEGIN,END]_FRAME_PASS.
+      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions,
+                                           hooks.pipelineExtensions);
+    }
+    if (compileTo == IREEVMPipelinePhase::Preprocessing)
+      return; // early-exit
+
+    if (compileFrom < IREEVMPipelinePhase::GlobalOptimization) { // late-entry
+      // This pass pipeline recursively invokes the compiler if constEval is
+      // enabled. In that case, we have to be careful to not emit unbalanced
+      // trace frames:
+      //   begin 'GlobalOptimization'
+      //   begin 'Input'
+      //   end   'Input'
+      //   begin 'GlobalOptimization' <-- unbalanced! Use a different name.
+      //   end   'GlobalOptimization'
+      //   ...
+      //   end   'GlobalOptimization'
+      if (globalOptimizationOptions.constEval) {
+        IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimizationConst");
+      } else {
+        IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimization");
+      }
+      GlobalOptimization::buildGlobalOptimizationPassPipeline(
+          passManager, globalTransformOptions);
+      if (globalOptimizationOptions.constEval) {
+        IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimizationConst");
+      } else {
+        IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
+      }
+    }
+    if (compileTo == IREEVMPipelinePhase::GlobalOptimization)
+      return; // early-exit
+
+    break;
   }
+}
+
+void buildIREEVMTransformPassPipeline(
+    const IREE::HAL::TargetBackendRegistry &targetRegistry,
+    BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    PreprocessingOptions preprocessingOptions,
+    GlobalOptimizationOptions globalOptimizationOptions,
+    SchedulingOptions schedulingOptions,
+    IREE::HAL::TargetOptions executableOptions,
+    IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
+    OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
+    IREEVMPipelinePhase compileTo) {
+
+  buildIREEPrecompileTransformPassPipeline(
+      targetRegistry, bindingOptions, inputOptions, preprocessingOptions,
+      globalOptimizationOptions, schedulingOptions, executableOptions, hooks,
+      passManager, compileFrom, compileTo);
+
+  if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
+    return; // early-exit
 
   IREE::Stream::TransformOptions streamOptions;
   // TODO(benvanik): find a way to share the enums w/o circular deps.
@@ -184,22 +228,6 @@ void buildIREEVMTransformPassPipeline(
     // No flow/stream processing (implies no tensors).
     break;
   default:
-    if (compileFrom < IREEVMPipelinePhase::Preprocessing) { // late-entry.
-      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Preprocessing");
-      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions,
-                                           hooks.pipelineExtensions);
-      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Preprocessing");
-    }
-    if (compileTo == IREEVMPipelinePhase::Preprocessing)
-      return; // early-exit
-
-    if (compileFrom < IREEVMPipelinePhase::GlobalOptimization) { // late-entry
-      IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "GlobalOptimization");
-      GlobalOptimization::buildGlobalOptimizationPassPipeline(passManager,
-                                                              globalOptOptions);
-      IREE_TRACE_ADD_END_FRAME_PASS(passManager, "GlobalOptimization");
-    }
-
     IREE::Flow::TransformOptions flowOptions;
     if (compileFrom < IREEVMPipelinePhase::Flow) { // late-entry
       IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "Flow");
@@ -295,7 +323,7 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
 
   // Since a JIT hook cannot be provided in such a default pipeline, we
   // force disable const eval, which relies on the JIT.
-  auto highLevelOptimizations = HighLevelOptimizationOptions::FromFlags::get();
+  auto highLevelOptimizations = GlobalOptimizationOptions::FromFlags::get();
   highLevelOptimizations.constEval = false;
 
   buildIREEVMTransformPassPipeline(

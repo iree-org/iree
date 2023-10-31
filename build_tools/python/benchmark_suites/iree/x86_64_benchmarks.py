@@ -33,7 +33,7 @@ class Linux_x86_64_Benchmarks(object):
         tags=["experimental-flags", "data-tiling", "ukernel"],
         compile_targets=[CASCADELAKE_CPU_TARGET],
         extra_flags=[
-            "--iree-flow-enable-data-tiling",
+            "--iree-opt-data-tiling",
             "--iree-llvmcpu-enable-microkernels",
         ],
     )

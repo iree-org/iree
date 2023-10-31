@@ -210,6 +210,7 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:trace_replay",
+        "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/tooling:yaml_util",
         "//runtime/src/iree/vm",
         "@com_github_yaml_libyaml//:yaml",
@@ -224,7 +225,6 @@ iree_compiler_cc_binary(
     ],
     tags = ["hostonly"],
     deps = [
-        "//build_tools:default_linkopts",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",
@@ -236,6 +236,16 @@ iree_compiler_cc_binary(
 iree_compiler_cc_binary(
     name = "iree-compile",
     srcs = ["iree-compile-main.cc"],
+    tags = ["hostonly"],
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/API:Impl",
+    ],
+)
+
+iree_compiler_cc_binary(
+    name = "iree-reduce",
+    srcs = ["iree-reduce.cc"],
     tags = ["hostonly"],
     deps = [
         "//compiler/bindings/c:headers",

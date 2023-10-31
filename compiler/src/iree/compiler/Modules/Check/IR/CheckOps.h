@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_MODULES_CHECK_IR_CHECK_OPS_H_
 #define IREE_COMPILER_MODULES_CHECK_IR_CHECK_OPS_H_
 
+#include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 

@@ -16,14 +16,14 @@
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Build specific Python versions and packages to custom directory:
-#   override_python_versions="cp38-cp38 cp39-cp39" \
+#   override_python_versions="cp39-cp39 cp310-cp310" \
 #   packages="iree-runtime" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Valid Python versions match a subdirectory under /opt/python in the docker
 # image. Typically:
-#   cp38-cp38 cp39-cp39 cp310-cp310
+#   cp39-cp39 cp310-cp310
 #
 # Valid packages:
 #   iree-runtime
@@ -188,10 +188,12 @@ function build_wheel() {
 function build_iree_runtime() {
   # We install the needed build deps below for the tools.
   IREE_RUNTIME_BUILD_TRACY=ON IREE_RUNTIME_BUILD_TRACY_TOOLS=ON \
+  IREE_EXTERNAL_HAL_DRIVERS="rocm" \
   build_wheel runtime/
 }
 
 function build_iree_compiler() {
+  IREE_TARGET_BACKEND_ROCM=ON IREE_ENABLE_LLD=ON \
   build_wheel compiler/
 }
 
@@ -237,6 +239,7 @@ function install_native_deps() {
     yum update -y
     # Required for Tracy
     yum install -y capstone-devel tbb-devel libzstd-devel
+    yum install -y clang lld
   elif [[ "$uname_m" == "x86_64" ]]; then
     # Check if the output is x86_64
     echo "Running on an architecture which has deps in docker image."

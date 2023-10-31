@@ -153,3 +153,65 @@ func.func @select(%cond: i1, %arg0: tensor<4x?x?x2xf32>, %arg1: tensor<4x?x?x2xf
 
   return
 }
+
+// -----
+
+// CHECK-LABEL: @scf_while
+// CHECK-SAME: %[[ARG0:.+]]: tensor<?xf32>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: i32
+func.func @scf_while(%arg0 : tensor<?xf32>, %arg1 : i32) {
+  %zero = arith.constant 0 : i32
+  %one = arith.constant 1 : i32
+  // CHECK:  %[[TIE:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<?xf32>{%[[ARG1]]}
+  // CHECK:  %[[C0:.+]] = arith.constant 0
+  // CHECK:  %[[C1:.+]] = arith.constant 1
+  // CHECK:  %[[WHILE:.+]]:3 = scf.while (%[[ARG3:.+]] = %[[C0]], %[[ARG4:.+]] = %[[ARG0]], %[[ARG5:.+]] = %[[ARG1]])
+  %0:2 = scf.while(%arg3 = %zero, %arg4 = %arg0) : (i32, tensor<?xf32>) -> (i32, tensor<?xf32>) {
+    // CHECK:    %[[TIE:.+]] = flow.tensor.tie_shape %[[ARG4]] : tensor<?xf32>{%[[ARG5]]}
+    // CHECK:    %[[CMP:.+]] = arith.cmpi slt, %[[ARG3]], %[[ARG2]]
+    // CHECK:    scf.condition(%[[CMP]]) %[[ARG3]], %[[ARG4]], %[[ARG5]]
+    %1 = arith.cmpi slt, %arg3, %arg1 : i32
+    scf.condition(%1) %arg3, %arg4 :  i32, tensor<?xf32>
+  } do {
+   ^bb0(%arg3: i32, %arg4 : tensor<?xf32>) :
+    // CHECK:  ^bb0(%[[ARG3:.+]]: i32, %[[ARG4:.+]]: tensor<?xf32>, %[[ARG5:.+]]: index):
+    // CHECK:    %[[TIE:.+]] = flow.tensor.tie_shape %[[ARG4]] : tensor<?xf32>{%arg5}
+    // CHECK:    %[[ADDI:.+]] = arith.addi %[[ARG3]], %[[C1]]
+    // CHECK:    %[[ADDF:.+]] = arith.addf %[[TIE]], %[[TIE]]
+    // CHECK:    %[[C0:.+]] = arith.constant 0
+    // CHECK:    %[[DIM:.+]] = tensor.dim %[[ADDF]], %[[C0]]
+    // CHECK:    scf.yield %arg3, %6, %dim : i32, tensor<?xf32>, index
+    %1 = arith.addi %arg3, %one : i32
+    %2 = arith.addf %arg4, %arg4 : tensor<?xf32>
+    scf.yield %arg3, %2 :  i32, tensor<?xf32>
+  }
+
+  // CHECK:  %[[TIE:.+]] = flow.tensor.tie_shape %[[WHILE]]#1 : tensor<?xf32>{%[[WHILE]]#2}
+  // CHECK:  %[[BARRIER:.+]] = util.optimization_barrier %[[TIE]]
+  util.optimization_barrier %0#1 : tensor<?xf32>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @scf_if
+// CHECK-SAME: %[[ARG0:.+]]: tensor<?xf32>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: i1
+func.func @scf_if(%arg0 : tensor<?xf32>, %arg1 : i1) {
+  // CHECK:   %[[TIE:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<?xf32>{%[[ARG1]]}
+  // CHECK:   %[[IF:.+]]:2 = scf.if %[[ARG2]] -> (tensor<?xf32>, index) {
+  %0 = scf.if %arg1 -> tensor<?xf32> {
+    // CHECK:     scf.yield %[[ARG0]], %[[ARG1]] : tensor<?xf32>, index
+    scf.yield %arg0 : tensor<?xf32>
+  } else {
+    // CHECK:     %[[ADD:.+]] = arith.addf %[[TIE]], %[[TIE]]
+    // CHECK:     %[[C0:.+]] = arith.constant 0 : index
+    // CHECK:     %[[DIM:.+]] = tensor.dim %[[ADD]], %[[C0]]
+    // CHECK:     scf.yield %[[ADD]], %[[DIM]]
+    %1 = arith.addf %arg0, %arg0 : tensor<?xf32>
+    scf.yield %1 : tensor<?xf32>
+  }
+
+  // CHECK:   %[[TIE:.+]] = flow.tensor.tie_shape %[[IF]]#0 : tensor<?xf32>{%[[IF]]#1}
+  // CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[TIE]] : tensor<?xf32>
+  util.optimization_barrier %0 : tensor<?xf32>
+  return
+}

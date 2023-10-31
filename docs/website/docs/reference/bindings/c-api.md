@@ -391,8 +391,6 @@ A _call_ (`iree_runtime_call_t`) is a stateful VM function call builder.
 
 #### VM
 
-<!-- TODO(scotttodd): VM module diagram (bytecode, HAL, custom) -->
-
 IREE uses its own Virtual Machine (VM) at runtime to interpret program
 instructions on the host system.
 
@@ -411,9 +409,32 @@ dense math into HAL command buffers that are dispatched to hardware backends.
 * VM _instances_ can serve multiple isolated execution _contexts_.
 * VM _contexts_ are effectively sandboxes for loading modules and running
   programs.
-* VM _modules_ provide extra functionality to execution _contexts_, such as
+* VM _modules_ provide all functionality to execution _contexts_, including
   access to hardware accelerators through the HAL. Compiled user programs are
   also modules.
+
+    ```mermaid
+    stateDiagram-v2
+      accTitle: Sample VM Modules
+      accDescr {
+        Bytecode modules contain program state, program functions, and debug
+        information.
+        HAL modules contain devices, executables, HAL functions, and HAL types.
+        Custom modules may contain external functions and custom types.
+      }
+
+      state "Bytecode module" as bytecode {
+        bytecode_contents: Module state<br>Program functions<br>Debug information
+      }
+
+      state "HAL module" as HAL {
+        hal_contents: Devices<br>Executables<br>HAL functions<br>HAL types
+      }
+
+      state "Custom module" as custom {
+        custom_contents: External functions<br>Custom types
+      }
+    ```
 
 #### HAL
 

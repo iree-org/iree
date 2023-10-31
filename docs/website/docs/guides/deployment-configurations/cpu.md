@@ -6,7 +6,7 @@ tags:
 icon: octicons/cpu-16
 ---
 
-# CPU Deployment
+# CPU deployment
 
 IREE supports efficient program execution on CPU devices by using
 [LLVM](https://llvm.org/) to compile all dense computations in each program into
@@ -62,7 +62,7 @@ The core `iree-compiler` package includes the LLVM-based CPU compiler:
 
     ``` shell
     python -m pip install \
-      --find-links https://openxla.github.io/iree/pip-release-links.html \
+      --find-links https://iree.dev/pip-release-links.html \
       --upgrade iree-compiler
     ```
 

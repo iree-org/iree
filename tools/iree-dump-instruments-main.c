@@ -255,6 +255,8 @@ static iree_status_t iree_tooling_dump_instrument_file(
 }
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   if (argc < 2) {
     fprintf(stderr,
             "Syntax: iree-dump-instruments instruments.bin > instruments.txt\n"
@@ -274,7 +276,8 @@ int main(int argc, char** argv) {
             "        --instrument_file=instrument.bin\n"
             "  $ iree-dump-instruments instrument.bin\n"
             "\n");
-    return 1;
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
 
   iree_file_contents_t* file_contents = NULL;
@@ -290,7 +293,9 @@ int main(int argc, char** argv) {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
     return EXIT_FAILURE;
   }
+  IREE_TRACE_APP_EXIT(EXIT_SUCCESS);
   return EXIT_SUCCESS;
 }

@@ -216,6 +216,15 @@ iree_hal_vulkan_populate_enabled_device_extensions(
     } else if (strcmp(extension_name,
                       VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) == 0) {
       extensions.buffer_device_address = true;
+    } else if (strcmp(extension_name, VK_KHR_8BIT_STORAGE_EXTENSION_NAME) ==
+               0) {
+      extensions.shader_8bit_storage = true;
+    } else if (strcmp(extension_name,
+                      VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME) == 0) {
+      extensions.shader_float16_int8 = true;
+    } else if (strcmp(extension_name,
+                      VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME) == 0) {
+      extensions.cooperative_matrix = true;
     }
   }
   return extensions;

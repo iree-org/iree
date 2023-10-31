@@ -12,9 +12,9 @@
 # We use .deb files that we host because we have to pin the version and packages
 # routinely dissapear from the Ubuntu apt repositories. The versions need to be
 # compatible with the host driver (usually <= host driver version).
-ARG NVIDIA_GL_DEB="libnvidia-gl-530_530.41.03-0ubuntu0.22.04.2_amd64.deb"
-ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-530_530.41.03-0ubuntu0.22.04.2_amd64.deb"
-ARG NVIDIA_COMMON_DEB="libnvidia-common-530_530.41.03-0ubuntu0.22.04.2_all.deb"
+ARG NVIDIA_GL_DEB="libnvidia-gl-535_535.113.01-0ubuntu0.22.04.1_amd64.deb"
+ARG NVIDIA_COMPUTE_DEB="libnvidia-compute-535_535.113.01-0ubuntu0.22.04.1_amd64.deb"
+ARG NVIDIA_COMMON_DEB="libnvidia-common-535_535.113.01-0ubuntu0.22.04.1_all.deb"
 ARG NVIDIA_EGL_WAYLAND_DEB="libnvidia-egl-wayland1_1.1.9-1.1_amd64.deb"
 
 
@@ -60,11 +60,11 @@ RUN apt-get update \
   "/tmp/${NVIDIA_EGL_WAYLAND_DEB}"
 
 # Install the CUDA SDK
-RUN wget https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-ubuntu2204-12-1-local_12.1.1-530.30.02-1_amd64.deb \
-  && dpkg --install cuda-repo-ubuntu2204-12-1-local_12.1.1-530.30.02-1_amd64.deb \
-  && cp /var/cuda-repo-ubuntu2204-12-1-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.2.1/local_installers/cuda-repo-ubuntu2204-12-2-local_12.2.1-535.86.10-1_amd64.deb \
+  && dpkg --install cuda-repo-ubuntu2204-12-2-local_12.2.1-535.86.10-1_amd64.deb \
+  && cp /var/cuda-repo-ubuntu2204-12-2-local/cuda-*-keyring.gpg /usr/share/keyrings/ \
   && apt-get update \
-  && apt-get -y install cuda-toolkit-12-1
+  && apt-get -y install cuda-toolkit-12-2
 
 # Adding CUDA binaries to Path
 ENV PATH=${PATH}:/usr/local/cuda/bin/

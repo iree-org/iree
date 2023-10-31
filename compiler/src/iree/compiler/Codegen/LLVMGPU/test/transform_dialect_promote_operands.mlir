@@ -19,8 +19,8 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       // CHECK:      %[[D3:.+]] = flow.dispatch.tensor.load %[[D1]], offsets = [0, 0], sizes = [500, 1020]
       // CHECK:      %[[D4:.+]] = tensor.empty() : tensor<250x1020xf32>
       // CHECK-NEXT: %[[D5:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[D4]] : tensor<250x1020xf32>) -> tensor<250x1020xf32>
-      // CHECK-NEXT: %[[D6:.+]] = bufferization.alloc_tensor() copy(%[[D2]]) {bufferization.escape = [false]} : tensor<250x500xf32>
-      // CHECK-NEXT: %[[D7:.+]] = bufferization.alloc_tensor() copy(%[[D3]]) {bufferization.escape = [false]} : tensor<500x1020xf32>
+      // CHECK-NEXT: %[[D6:.+]] = bufferization.alloc_tensor() copy(%[[D2]]) : tensor<250x500xf32>
+      // CHECK-NEXT: %[[D7:.+]] = bufferization.alloc_tensor() copy(%[[D3]]) : tensor<500x1020xf32>
       // CHECK-NEXT: %[[D8:.+]] = linalg.matmul ins(%[[D6]], %[[D7]] : tensor<250x500xf32>, tensor<500x1020xf32>)
       // CHECK-SAME:                 outs(%[[D5]] : tensor<250x1020xf32>) -> tensor<250x1020xf32>
       %6 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>

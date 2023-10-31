@@ -4,10 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -38,21 +39,30 @@ namespace iree_compiler {
 
 namespace {
 
-// A `dealloc` is converted into a call to `free` on the underlying data buffer.
-// The memref descriptor being an SSA value, there is no need to clean it up
-// in any way.
-struct DropSharedMemoryDeallocOp : public OpRewritePattern<memref::DeallocOp> {
-  using OpRewritePattern::OpRewritePattern;
+int kDefaultCUDACapability = 80;
 
-  LogicalResult matchAndRewrite(memref::DeallocOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!hasSharedMemoryAddressSpace(
-            llvm::cast<MemRefType>(op.getMemref().getType())))
-      return failure();
-    rewriter.eraseOp(op);
-    return success();
+/// Return the CUDA capability of the gpu. Assumes CUDA capability is 80 (sm_80)
+/// if not specified.
+static int getCUDACapbility(Operation *op) {
+  FailureOr<IREE::HAL::ExecutableVariantOp> variantOp =
+      getExecutableVariantOp(op);
+  if (failed(variantOp)) {
+    return kDefaultCUDACapability;
   }
-};
+
+  auto targetAttr = variantOp->getTargetAttr();
+  if (auto config = targetAttr.getConfiguration()) {
+    if (auto attr = config.getAs<StringAttr>("target_arch")) {
+      StringRef targetName = attr.getValue();
+      APInt version;
+      if (targetName.starts_with("sm_") &&
+          !targetName.substr(3).getAsInteger(10, version)) {
+        return version.getZExtValue();
+      }
+    }
+  }
+  return kDefaultCUDACapability;
+}
 
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding NVVM equivalent.
@@ -99,7 +109,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
-      patterns.insert<DropSharedMemoryDeallocOp>(&getContext());
+      populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
@@ -124,6 +134,19 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateGpuRewritePatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
+      }
+    }
+    {
+      // Convert arith::maximumf/minimumf ops on older gpus since the lowering
+      // is faulty for them.
+      // TODO: Remove this once the lowering in LLVM is fixed
+      // (https://github.com/llvm/llvm-project/issues/64606).
+      if (getCUDACapbility(m) < 80) {
+        RewritePatternSet patterns(&getContext());
+        populateReplaceSlowMinMaxOpsPatterns(patterns);
+        if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+          return signalPassFailure();
+        }
       }
     }
     {

@@ -180,8 +180,8 @@ externalizeExecutableOp(IREE::HAL::ExecutableOp executableOp,
   variantOp.setObjectsAttr(builder.getArrayAttr({dataObjectAttr}));
 
   // Drop the inner module if present (may already be external).
-  for (auto moduleOp :
-       llvm::make_early_inc_range(variantOp.getOps<mlir::ModuleOp>())) {
+  for (auto moduleOp : llvm::make_early_inc_range(
+           variantOp.getBody().getOps<mlir::ModuleOp>())) {
     moduleOp.erase();
   }
 

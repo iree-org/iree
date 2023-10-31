@@ -10,7 +10,7 @@
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "mlir/IR/FunctionInterfaces.td"
+include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -660,7 +660,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
     // TODO(benvanik): add compatibility and versioning attributes.
   );
 
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
@@ -676,9 +676,10 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
-
     ::mlir::ModuleOp getInnerModule() {
-      return *getBlock().getOps<::mlir::ModuleOp>().begin();
+      auto it = getBlock().getOps<::mlir::ModuleOp>();
+      if (it.empty()) return {};
+      return *it.begin();
     }
   }];
 
@@ -765,7 +766,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 
   let arguments = (ins
     Variadic<FLOW_Dim>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<AnyType>:$arguments,
     FLOW_ShapeDynamicDims:$argument_dims,
     FLOW_ShapeDynamicDims:$result_dims,
@@ -776,7 +777,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   );
 
   let assemblyFormat = [{
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     `(` $arguments `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($arguments),
@@ -826,8 +827,18 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   ];
 
   let extraClassDeclaration = [{
-    StringAttr executable();
     FunctionType getEntryPointType();
+
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
+    // Returns a human-friendly string name for what is being dispatched.
+    // May not be unique or a valid reference to an executable.
+    std::string getEntryPointName();
 
     // StreamableOpInterface:
     bool isTransfer() { return false; }
@@ -840,6 +851,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     }
   }];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 }
 
@@ -1097,6 +1109,7 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
 
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   FLOW_StreamableOp,
+  AllElementTypesMatch<["source", "result"]>,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
       "getTiedResult",
@@ -1108,6 +1121,62 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   let summary = [{reshapes a tensor}];
   let description = [{
     Reshapes a tensor to a new shape without modifying the contents.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$source,
+    FLOW_ShapeDynamicDims:$source_dims,
+    FLOW_ShapeDynamicDims:$result_dims
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$result_type, "Value":$source, "ValueRange":$target_dims),
+    [{
+      build($_builder, $_state,
+          result_type,
+          source,
+          IREE::Util::buildDynamicDimsForValue($_state.location, source, $_builder),
+          target_dims);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def FLOW_TensorBitCastOp : FLOW_PureOp<"tensor.bitcast", [
+  FLOW_StreamableOp,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{bitcasts a tensor}];
+  let description = [{
+    Bitcasts a tensor to a new type without modifying the contents.
   }];
 
   let arguments = (ins
@@ -1508,21 +1577,37 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let hasFolder = 1;
 }
 
-def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
-  let summary = [{trace value(s) operation}];
+def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_ShapeAwareOp>,
+]> {
+  let summary = [{traces one or more tensor values at runtime}];
   let description = [{
     Traces out to a runtime trace sink (console, log file, etc) the given
-    tensors and titles them with the given key. The key is informational only
-    and useful for titling/marking specific sets of tensors for easier
-    searching.
+    tensors. The key is arbitrary and can be used for identifying the set of
+    values being traced.
   }];
 
   let arguments = (ins
     StrAttr:$key,
-    Variadic<FLOW_Tensor>:$operands
+    Variadic<FLOW_Tensor>:$values,
+    FLOW_ShapeDynamicDims:$value_dims
   );
 
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = [{
+    $key `=` `[`
+    custom<ShapedOperandList>($values, type($values), $value_dims)
+    `]` attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins "StringRef":$key, "ValueRange":$values), [{
+      build($_builder, $_state, key, values,
+            IREE::Util::buildDynamicDimsForValues($_state.location, values, $_builder));
+    }]>,
+  ];
+
+  let hasVerifier = 1;
 }
 
 //===---------------------------------------------------------------------===//

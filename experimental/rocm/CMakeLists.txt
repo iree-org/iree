@@ -24,14 +24,12 @@ set(IREE_ROCM_BC_DIR "${IREE_ROCM_BC_DIR_DEFAULT}" CACHE STRING
 
 iree_add_all_subdirs()
 
-if(NOT ROCM_HEADERS_API_ROOT)
-  set(ROCM_HEADERS_API_ROOT "/opt/rocm/include")
+if(NOT DEFINED ROCM_HEADERS_API_ROOT)
+  set(ROCM_HEADERS_API_ROOT "${IREE_SOURCE_DIR}/third_party/hip-build-deps/include")
 endif()
 
-if(EXISTS ${ROCM_HEADERS_API_ROOT})
-  message(STATUS "ROCm Header Path: ${ROCM_HEADERS_API_ROOT}")
-else()
-  message(SEND_ERROR "Could not locate ROCm: ${ROCM_HEADERS_API_ROOT}")
+if(NOT EXISTS "${ROCM_HEADERS_API_ROOT}/hip/hip_version.h")
+  message(SEND_ERROR "Could not find HIP headers at: ${ROCM_HEADERS_API_ROOT}")
 endif()
 
 iree_cc_library(
@@ -63,6 +61,8 @@ iree_cc_library(
     "pipeline_layout.h"
     "status_util.c"
     "status_util.h"
+    "tracing.c"
+    "tracing.h"
   INCLUDES
     "${CMAKE_CURRENT_LIST_DIR}/../.."
     "${PROJECT_BINARY_DIR}"

@@ -68,7 +68,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             module_generation_config=COMMON_GEN_CONFIG,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_a,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             presets=["preset_x"],
         )
@@ -76,7 +76,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             module_generation_config=COMMON_GEN_CONFIG,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_b,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             presets=["preset_y"],
         )
@@ -84,7 +84,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             module_generation_config=COMMON_GEN_CONFIG,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_c,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             presets=["preset_y", "preset_z"],
         )
@@ -133,21 +133,21 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             module_generation_config=COMMON_GEN_CONFIG,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_a,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         run_config_b = iree_definitions.E2EModelRunConfig.build(
             module_generation_config=COMMON_GEN_CONFIG,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_b,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         run_config_c = iree_definitions.E2EModelRunConfig.build(
             module_generation_config=COMMON_GEN_CONFIG,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_c,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
 
@@ -184,14 +184,14 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             module_generation_config=COMMON_GEN_CONFIG,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_a,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         run_config_b = iree_definitions.E2EModelRunConfig.build(
             module_generation_config=COMMON_GEN_CONFIG,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_b,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
 
@@ -261,7 +261,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             module_generation_config=small_gen_config,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_a,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             presets=["preset_x"],
         )
@@ -269,7 +269,7 @@ class ExportBenchmarkConfigTest(unittest.TestCase):
             module_generation_config=big_gen_config,
             module_execution_config=COMMON_EXEC_CONFIG,
             target_device_spec=device_spec_b,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             presets=["preset_y"],
         )

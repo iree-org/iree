@@ -12,13 +12,13 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/CastInterfaces.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
@@ -31,8 +31,25 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Experimental
+//===----------------------------------------------------------------------===//
+
+// NOTE: this is a placeholder for a util.tree_switch (or something) op that
+// looks like scf.index_switch but with a region per case. For now we emit a
+// sequence of arith.select ops and return the index of the first condition that
+// is true. Would be nicer with some range template magic instead of an index.
+// Returns an index of -1 if no case matches.
+Value buildIfElseTree(
+    Location loc, size_t count,
+    std::function<Value(Location, size_t, OpBuilder &)> caseBuilder,
+    OpBuilder &builder);
+
+//===----------------------------------------------------------------------===//
 // Utils
 //===----------------------------------------------------------------------===//
+
+// Removes duplicate attributes in the array (if any).
+ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr);
 
 // Returns the dynamic size of the value at |index|.
 Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes);

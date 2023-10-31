@@ -1,4 +1,4 @@
 # REQUIRES: llvmcpu
 # RUN: %PYTHON -m iree_tfl_tests.mobilenet_v3-large_uint8_test --target_backend=llvmcpu --artifacts_dir=%t
-# TODO(#14775): Enable the test.
+# TODO(#14830): Enable the test.
 # XFAIL: *

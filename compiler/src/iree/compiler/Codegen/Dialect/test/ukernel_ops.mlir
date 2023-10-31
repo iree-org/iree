@@ -96,7 +96,7 @@ func.func @ukernel_generic_optional_other_operands(
 
 func.func @ukernel_generic_non_tensor_memref_outs(
    %out0 : f32) -> f32 {
-  // expected-error @+1 {{operand #0 must be ranked tensor of any type values or memref of any type values, but got 'f32'}}
+  // expected-error @+1 {{operand #0 must be variadic of ranked tensor of any type values or memref of any type values, but got 'f32'}}
   %0 = iree_codegen.ukernel.generic "foo"
       outs(%out0 : f32) -> f32
   return %0 : f32

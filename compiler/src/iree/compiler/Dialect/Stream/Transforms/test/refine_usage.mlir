@@ -210,3 +210,135 @@ func.func @escapingAlloca() -> !hal.buffer_view {
   %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c123} -> !hal.buffer_view
   return %2 : !hal.buffer_view
 }
+
+// -----
+
+// CHECK-LABEL: @testIf
+func.func @testIf(%arg0: i1, %arg1: !stream.resource<*>, %arg2: !stream.resource<*>) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[IF:.+]] = scf.if
+  // CHECK-SAME: !stream.resource<external>
+  %if = scf.if %arg0 -> (!stream.resource<*>) {
+    // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch
+    // CHECK-SAME: !stream.resource<external>
+    // CHECK-SAME: !stream.resource<external>
+    // CHECK-SAME: -> !stream.resource<external>
+    %disp = stream.async.dispatch @disp(%arg1[%c0 to %c4 for %c4], %arg2[%c0 to %c4 for %c4]) : (!stream.resource<*>{%c4}, !stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    // CHECK: scf.yield
+    // CHECK-SAME: !stream.resource<external>
+    scf.yield %disp : !stream.resource<*>
+  } else {
+    // CHECK: scf.yield
+    // CHECK-SAME: !stream.resource<external>
+    scf.yield %arg1 : !stream.resource<*>
+  }
+  return %if : !stream.resource<*>
+}
+
+// -----
+
+// CHECK: @testWhile
+func.func @testWhile(%arg0: i32, %arg1: !stream.resource<*>) -> (i32, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : i32
+  %c4 = arith.constant 4 : index
+  %c10 = arith.constant 10 : i32
+  // CHECK: scf.while
+  // CHECK-SAME: (i32, !stream.resource<external>)
+  // CHECK-SAME: (i32, !stream.resource<external>)
+  %while:2 = scf.while (%arg2 = %arg0, %arg3 = %arg1) : (i32, !stream.resource<*>) -> (i32, !stream.resource<*>) {
+    %cmp = arith.cmpi slt, %arg2, %c10 : i32
+    // CHECK: scf.condition
+    // CHECK-SAME: !stream.resource<external>
+    scf.condition(%cmp) %arg2, %arg3 : i32, !stream.resource<*>
+  } do {
+  ^bb0(%arg2: i32, %arg3: !stream.resource<*>):
+    %add = arith.addi %arg2, %c1 : i32
+    %disp = stream.async.dispatch @disp(%arg3[%c0 to %c4 for %c4], %arg1[%c0 to %c4 for %c4]) : (!stream.resource<*>{%c4}, !stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    // CHECK: scf.yield
+    // CHECK-SAME: !stream.resource<external>
+    scf.yield %add, %disp : i32, !stream.resource<*>
+  }
+  // CHECK: return %[[IF]]#0, %[[IF]]#1 : i32, !stream.resource<external>
+  return %while#0, %while#1 : i32, !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @testWhileRecurse
+// CHECK-SAME: %[[ARG0:.+]]: !stream.resource<external>
+// CHECK-SAME: -> !stream.resource<external>
+func.func @testWhileRecurse(%arg0 : !stream.resource<*>) -> !stream.resource<external> {
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+
+  // CHECK: %[[SIZE:.+]] = stream.resource.size %[[ARG0]] : !stream.resource<external>
+  %size = stream.resource.size %arg0 : !stream.resource<*>
+
+  // CHECK: %[[WHILE:.+]]:2 = scf.while (%[[ARG1:.+]] = %[[ARG0]], %[[ARG2:.+]] = %[[SIZE]]) : (!stream.resource<external>, index) -> (!stream.resource<external>, index)
+  %while:2 = scf.while (%arg1 = %arg0, %arg2 = %size) : (!stream.resource<*>, index) -> (!stream.resource<*>, index) {
+    // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @dispatch(%[[ARG1]][%[[C0]] to %[[ARG2]] for %[[ARG2]]]) : (!stream.resource<external>{%[[ARG2]]}) -> !stream.resource<transient>{%[[C1]]}
+    %dispatch = stream.async.dispatch @dispatch(%arg1[%c0 to %arg2 for %arg2]) : (!stream.resource<*>{%arg2}) -> !stream.resource<*>{%c1}
+
+    // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[DISPATCH]] : !stream.resource<transient>{%[[C1]]} -> !stream.resource<staging>{%[[C1]]}
+    %transfer = stream.async.transfer %dispatch : !stream.resource<*>{%c1} -> !stream.resource<staging>{%c1}
+
+    // CHECK: %[[LOAD:.+]] = stream.async.load %[[TRANSFER]][%[[C0]]] : !stream.resource<staging>{%[[C1]]} -> i1
+    %load = stream.async.load %transfer[%c0] : !stream.resource<staging>{%c1} -> i1
+
+    // CHECK: scf.condition(%[[LOAD]]) %[[ARG1]], %[[ARG2]] : !stream.resource<external>, index
+    scf.condition(%load) %arg1, %arg2 : !stream.resource<*>, index
+  } do {
+  // CHECK: ^bb0(%[[ARG1:.+]]: !stream.resource<external>, %[[ARG2:.+]]: index):
+  ^bb0(%arg1: !stream.resource<*>, %arg2: index):
+    // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @dispatch(%[[ARG1]][%[[C0]] to %[[ARG2]] for %[[ARG2]]]) : (!stream.resource<external>{%[[ARG2]]}) -> !stream.resource<external>{%[[C4]]}
+    %dispatch = stream.async.dispatch @dispatch(%arg1[%c0 to %arg2 for %arg2]) : (!stream.resource<*>{%arg2}) -> !stream.resource<*>{%c4}
+
+    // CHECK: scf.yield %[[DISPATCH]], %[[C4]] : !stream.resource<external>, index
+    scf.yield %dispatch, %c4 : !stream.resource<*>, index
+  }
+  %transfer = stream.async.transfer %while#0 : !stream.resource<*>{%while#1} -> !stream.resource<external>{%while#1}
+
+  // CHECK: return %[[WHILE]]#0
+  return %transfer : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @testForOp
+// CHECK-SAME: %[[ARG0:.+]]: index
+// CHECK-SAME: %[[ARG1:.+]]: !stream.resource<external>
+func.func @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[C1:.+]] = arith.constant 1 : index
+// CHECK: %[[C4:.+]] = arith.constant 4 : index
+// CHECK: %[[DISP0:.+]] = stream.async.dispatch @dispatch0(%arg1[%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<external>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+  %dispatch6 = stream.async.dispatch @dispatch0(%arg1[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+  // CHECK: %[[FOR:.+]] = scf.for %[[ARG2:.+]] = %[[C0]] to %[[ARG0]] step %[[C1]] iter_args(%[[ARG3:.+]] = %[[DISP0]]) -> (!stream.resource<transient>) {
+  %for = scf.for %i = %c0 to %arg0 step %c1 iter_args(%arg3 = %dispatch6) -> (!stream.resource<*>) {
+
+    // CHECK:   %[[DISP1:.+]] = stream.async.dispatch @dispatch1(%[[ARG3]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+    // CHECK:   %[[DISP2:.+]] = stream.async.dispatch @dispatch2(%[[DISP1]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+    // CHECK:   %[[DISP3:.+]] = stream.async.dispatch @dispatch3(%[[DISP2]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+    %dispatch1 = stream.async.dispatch @dispatch1(%arg3[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    %dispatch2 = stream.async.dispatch @dispatch2(%dispatch1[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    %dispatch3 = stream.async.dispatch @dispatch3(%dispatch2[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+    // CHECK:   scf.yield %[[DISP3]] : !stream.resource<transient>
+    scf.yield %dispatch3 : !stream.resource<*>
+  }
+  // CHECK: %[[DISP4:.+]] = stream.async.dispatch @dispatch4(%[[FOR]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<external>{%[[C4]]}
+  %dispatch5 = stream.async.dispatch @dispatch4(%for[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+  %transfer = stream.async.transfer %dispatch5 : !stream.resource<*>{%arg0} -> !stream.resource<external>{%arg0}
+
+  // CHECK: return %[[DISP4]] : !stream.resource<external>
+  return %transfer : !stream.resource<external>
+}

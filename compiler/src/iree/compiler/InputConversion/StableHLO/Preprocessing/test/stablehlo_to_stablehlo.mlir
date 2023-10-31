@@ -474,3 +474,39 @@ func.func @concat_remove_zero_extents(%arg0: tensor<2x3xi32>, %arg1 : tensor<2x3
   return %0 : tensor<2x6xi32>
 }
 
+// -----
+
+func.func private @top_k_gt_f32_comparator(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> tensor<i1> {
+  %0 = stablehlo.compare  GT, %arg0, %arg1 : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  stablehlo.return %0 : tensor<i1> 
+} 
+
+// CHECK-LABEL: @custom_call_topk
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1x160xf32>
+func.func @custom_call_topk(%arg0 : tensor<1x160xf32>, %arg1 : tensor<f32>, %arg2 : tensor<i32>) -> (tensor<1x16xf32>, tensor<1x16xi32>) {
+  // CHECK: %[[TOPK:.+]], %[[IND:.+]] = chlo.top_k(%[[ARG0]], k = 16)
+  %iota = stablehlo.iota dim = 1 : tensor<1x16xi32>
+  %approx:2 = stablehlo.custom_call @ApproxTopK(%arg0, %iota, %arg1, %arg2) {called_computations = [@top_k_gt_f32_comparator], mhlo.backend_config = {aggregate_to_topk = true, is_fallback = true, recall_target = 8.500000e-01 : f32, reduction_dim = 1 : i64, reduction_input_size_override = -1 : i64, top_k = 16 : i64}} : (tensor<1x160xf32>, tensor<1x16xi32>, tensor<f32>, tensor<i32>) -> (tensor<1x16xf32>, tensor<1x16xi32>)
+
+  // CHECK: return %[[TOPK]], %[[IND]]
+  return %approx#0, %approx#1 : tensor<1x16xf32>, tensor<1x16xi32>
+}
+
+// -----
+
+func.func private @bottom_k_gt_f32_comparator(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> tensor<i1> {
+  %0 = stablehlo.compare  LT, %arg0, %arg1 : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  stablehlo.return %0 : tensor<i1> 
+} 
+
+// CHECK-LABEL: @custom_call_bottomk
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1x160xf32>
+func.func @custom_call_bottomk(%arg0 : tensor<1x160xf32>, %arg1 : tensor<f32>, %arg2 : tensor<i32>) -> (tensor<1x16xf32>, tensor<1x16xi32>) {
+  // CHECK: %[[NEG:.+]] = stablehlo.negate %[[ARG0]]
+  // CHECK: %[[TOPK:.+]], %[[IND:.+]] = chlo.top_k(%[[NEG]], k = 16)
+  %iota = stablehlo.iota dim = 1 : tensor<1x16xi32>
+  %approx:2 = stablehlo.custom_call @ApproxTopK(%arg0, %iota, %arg1, %arg2) {called_computations = [@bottom_k_gt_f32_comparator], mhlo.backend_config = {aggregate_to_topk = true, is_fallback = true, recall_target = 8.500000e-01 : f32, reduction_dim = 1 : i64, reduction_input_size_override = -1 : i64, top_k = 16 : i64}} : (tensor<1x160xf32>, tensor<1x16xi32>, tensor<f32>, tensor<i32>) -> (tensor<1x16xf32>, tensor<1x16xi32>)
+
+  // CHECK: return %[[TOPK]], %[[IND]]
+  return %approx#0, %approx#1 : tensor<1x16xf32>, tensor<1x16xi32>
+}

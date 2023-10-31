@@ -27,7 +27,6 @@ iree_compiler_cc_library(
         "LayoutSlices.cpp",
         "MaterializeBuiltins.cpp",
         "MaterializeCopyOnWrite.cpp",
-        "PackAllocations.cpp",
         "PackConstants.cpp",
         "PackDispatchOperands.cpp",
         "PassDetail.h",
@@ -48,6 +47,7 @@ iree_compiler_cc_library(
     deps = [
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/Stream/Analysis",
         "//compiler/src/iree/compiler/Dialect/Stream/Builtins",

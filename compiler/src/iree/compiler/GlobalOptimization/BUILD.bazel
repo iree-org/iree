@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,23 +12,80 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "PassHeaders",
+    hdrs = [
+        "PassDetail.h",
+        "Passes.h",
+        "Passes.h.inc",
+    ],
+    deps = [
+        ":PassesIncGen",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Transforms",
+    ],
+)
+
 iree_compiler_cc_library(
     name = "GlobalOptimization",
     srcs = [
+        "Convert1X1FilterConv2DToMatmul.cpp",
+        "DetachElementwiseFromNamedOps.cpp",
+        "EraseUnusedLinalgOperands.cpp",
+        "ExpandVectors.cpp",
+        "MaterializeHomogeneousEncodings.cpp",
         "Passes.cpp",
+        "RemoveZeroExtentTensors.cpp",
+        "SetEncoding.cpp",
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
+        ":PassHeaders",
+        ":PassesIncGen",
+        "//compiler/src/iree/compiler/Codegen/Common/CPU:CommonCPUPasses",
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
+        "//compiler/src/iree/compiler/Pipelines:Options",
         "//compiler/src/iree/compiler/Utils",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtUtils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ArithUtils",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:LinalgUtils",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorTransforms",
+        "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:Transforms",
     ],
 )

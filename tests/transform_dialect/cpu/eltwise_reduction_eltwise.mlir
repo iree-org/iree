@@ -49,7 +49,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-flow-transformation-pipeline \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmcpu-enable-transform-dialect-jit | \
 // RUN: FileCheck %s
 
@@ -63,7 +63,7 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 //      CHECK-DAG: %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
 //          CHECK: scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} -> (vector<8xf32>) {
 //          CHECK:   arith.addf %{{.*}} : vector<8x16xf32>
-// CHECK-COUNT-16:   vector.extract %{{.*}} : vector<16x8xf32>{{[[:space:]].*}}arith.addf %{{.*}} : vector<8xf32>
+// CHECK-COUNT-16:   vector.extract %{{.*}} : vector<8xf32> from vector<16x8xf32>{{[[:space:]].*}}arith.addf %{{.*}} : vector<8xf32>
 //          CHECK:   scf.yield %{{.*}} : vector<8xf32>
 //          CHECK: }
 //          CHECK: math.sqrt %{{.*}} : vector<8xf32>

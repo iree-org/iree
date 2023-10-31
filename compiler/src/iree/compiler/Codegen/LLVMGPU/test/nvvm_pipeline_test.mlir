@@ -11,7 +11,7 @@
   ]>
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
@@ -55,7 +55,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @dot_dispatch_0 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -89,17 +89,17 @@ hal.executable @dot_dispatch_0 {
 //     CHECK-LABEL: hal.executable public @dot_dispatch_0
 //           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr -> vector<4xf32>
+//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
 //           CHECK:   llvm.br
 //   CHECK-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
 //  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 // CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr -> vector<4xf32>
+//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
 //           CHECK:   llvm.br
 //   CHECK-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
 //  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 // CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   CHECK-COUNT-4:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//   CHECK-COUNT-4:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -126,7 +126,7 @@ hal.executable @dot_dispatch_0 {
   ]>
 ]>
 hal.executable @dot_dispatch_0 {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -167,7 +167,7 @@ hal.executable @dot_dispatch_0 {
 //         CHECK:   llvm.br
 // CHECK-COUNT-8:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //         CHECK:   llvm.br
-// CHECK-COUNT-2:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+// CHECK-COUNT-2:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -179,7 +179,7 @@ hal.executable @dot_dispatch_0 {
   ]>
 ]>
 hal.executable @conv2d_dispatch_0 {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @conv2d_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
@@ -213,10 +213,10 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL: hal.executable public @conv2d_dispatch_0
 //         CHECK:   hal.executable.variant public @cuda
-// CHECK-COUNT-3:   llvm.load %{{.*}} : !llvm.ptr -> f32
+// CHECK-COUNT-3:   llvm.load %{{.*}} : !llvm.ptr<1> -> f32
 //         CHECK:   lvm.fmul %{{.*}}, %{{.*}}  : f32
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : f32
-//         CHECK:   llvm.store {{.*}} : f32, !llvm.ptr
+//         CHECK:   llvm.store {{.*}} : f32, !llvm.ptr<1>
 
 // -----
 
@@ -227,7 +227,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
@@ -267,7 +267,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @reduction_dispatch {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @reduction layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -314,7 +314,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @vector_add_dispatch {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @vector_add_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
@@ -351,7 +351,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //   CHECK-LABEL: hal.executable public @vector_add_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}}  : vector<4xf32
-//         CHECK:   llvm.store %{{.*}} : vector<4xf32>, !llvm.ptr
+//         CHECK:   llvm.store %{{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -367,7 +367,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @vector_reduction_dispatch {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @vector_reduction_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -413,7 +413,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @mma_fused {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -479,10 +479,10 @@ hal.executable @mma_fused {
 //           CHECK:   vvm.barrier0
 //           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 //           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 //           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 //           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 
 
@@ -496,7 +496,7 @@ hal.executable @mma_fused {
   ]>
 ]>
 hal.executable @mma_fused_fp16 {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -562,7 +562,7 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   vvm.barrier0
 //           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<8xf16>
 //           CHECK:   llvm.fadd {{.*}} : vector<8xf16>
-//           CHECK:   llvm.store {{.*}} : vector<8xf16>, !llvm.ptr
+//           CHECK:   llvm.store {{.*}} : vector<8xf16>, !llvm.ptr<1>
 //           CHECK:   vvm.barrier0
 
 // -----
@@ -583,7 +583,7 @@ hal.executable @mma_fused_fp16 {
 #map5 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
 #map6 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
   hal.executable @large_dot_general_dispatch_0 {
-    hal.executable.variant public @cuda, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.variant public @cuda target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export @large_dot_general_dispatch_0 layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
         %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -641,9 +641,9 @@ hal.executable @mma_fused_fp16 {
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
 //           CHECK:   vvm.barrier0
 //           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 //           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -663,7 +663,7 @@ hal.executable @mma_fused_fp16 {
 #map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
   hal.executable public @split_k_gemm {
-    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @split_k_gemm ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
         %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -711,9 +711,9 @@ hal.executable @mma_fused_fp16 {
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
 //           CHECK:   vvm.barrier0
 //           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 //           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr
+//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -726,7 +726,7 @@ hal.executable @mma_fused_fp16 {
 ]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
   hal.executable public @pooling_dynamic {
-    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @pooling_dynamic ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 :index, %arg4 : index, %arg5 : index, %arg6 : index):
         %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
@@ -771,7 +771,7 @@ hal.executable @mma_fused_fp16 {
   ]>
 ]>
 hal.executable @warp_reduction_dispatch {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @warp_reduction_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -824,7 +824,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @warp_reduction_broadcast_dispatch {
-hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @warp_reduction_broadcast_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -873,8 +873,8 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //         CHECK:     nvvm.barrier0
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> f32
 // CHECK-COUNT-3:     nvvm.shfl.sync  bfly
-//         CHECK:     llvm.fdiv %{{.*}}, %{{.*}} 
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr
+//         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -885,7 +885,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable private @shared_mem_alloc {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @shared_mem_alloc ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5
@@ -901,7 +901,7 @@ hal.executable private @shared_mem_alloc {
         %3 = tensor.empty() : tensor<3x3xf32>
         %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0 * 2 + d3, d1 * 2 + d4, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%2, %3 : tensor<29x29x480xf32>, tensor<3x3xf32>) outs(%cst : tensor<14x14x480xf32>) {
         ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
-          %5 = arith.maxf %arg2, %arg0 : f32
+          %5 = arith.maximumf %arg2, %arg0 : f32
           linalg.yield %5 : f32
         } -> tensor<14x14x480xf32>
         flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [14, 14, 480], strides = [1, 1, 1] : tensor<14x14x480xf32> -> !flow.dispatch.tensor<writeonly:tensor<14x14x480xf32>>
@@ -936,7 +936,7 @@ hal.executable private @shared_mem_alloc {
 #map0 = affine_map<(d0, d1) -> (d1, d0)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 hal.executable private @shared_mem_transpose  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @shared_mem_transpose layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
         %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -965,6 +965,6 @@ hal.executable private @shared_mem_transpose  {
 //   CHECK-LABEL: hal.executable private @shared_mem_transpose
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr -> vector<4xf32>
+//         CHECK:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<1> -> vector<4xf32>
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
 //         CHECK:     nvvm.barrier0

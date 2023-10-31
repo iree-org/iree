@@ -60,7 +60,7 @@ struct CompileOptions {
   BindingOptions bindingOptions;
   InputDialectOptions inputOptions;
   PreprocessingOptions preprocessingOptions;
-  HighLevelOptimizationOptions highLevelOptimizationOptions;
+  GlobalOptimizationOptions globalOptimizationOptions;
   SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions executableOptions;
   IREE::VM::TargetOptions targetOptions;
@@ -336,12 +336,12 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     // Disable constant evaluation for our Jit compilation pipeline.
     // It would make no sense to recursively do constant evaluation, and since
     // we omit the necessary hooks, it is unsupported anyway.
-    options->highLevelOptimizationOptions.constExprHoisting = false;
-    options->highLevelOptimizationOptions.constEval = false;
+    options->globalOptimizationOptions.constExprHoisting = false;
+    options->globalOptimizationOptions.constEval = false;
 
     buildIREEVMTransformPassPipeline(
         targetRegistry, options->bindingOptions, options->inputOptions,
-        options->preprocessingOptions, options->highLevelOptimizationOptions,
+        options->preprocessingOptions, options->globalOptimizationOptions,
         options->schedulingOptions, options->executableOptions,
         options->targetOptions, options->hooks, compilePipeline);
   }

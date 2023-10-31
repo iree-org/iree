@@ -22,10 +22,12 @@ import itertools
 # as this also includes accumulator-specific types like i32.
 @enum.unique
 class MatrixElemTypeId(enum.Enum):
+    NONE = ""
     I8 = "i8"
     I32 = "i32"
     F32 = "f32"
     F16 = "f16"
+    BF16 = "bf16"
 
 
 # Enumerates of the collections of shapes that we can generate tests for.
@@ -46,6 +48,7 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
     LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
     LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
+    SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
     SPIRVVectorizeMali = "SPIRVVectorizeMali"
     SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
 
@@ -90,11 +93,9 @@ class CompilationInfo:
     # Compilation info
     workgroup_size: typing.List[int]
 
-    # Prints the workgroup size as 'index' types
+    # Prints the workgroup size
     def workgroup_size_str(self):
-        return (
-            "[" + ", ".join([f"{size} : index" for size in self.workgroup_size]) + "]"
-        )
+        return "[" + ", ".join(map(str, self.workgroup_size)) + "]"
 
 
 # Returns the list of TestShape's to use for the collection of shapes
@@ -238,6 +239,12 @@ def get_test_compilation_infos(
             TileWorkgroupSizePair([[8, 128, 4]], [32, 1, 1]),
             TileWorkgroupSizePair([[16, 64, 4]], [16, 2, 1]),
             TileWorkgroupSizePair([[1, 128, 8]], [32, 1, 1]),
+        ]
+    elif compilation_info_id == CompilationInfoId.SPIRVCooperativeMatrixVectorize:
+        tile_workgroup_size_pairs = [
+            TileWorkgroupSizePair(
+                [[64, 64], [16, 64], [0, 0, 16], [16, 16, 16]], [64, 4, 1]
+            )
         ]
     elif compilation_info_id == CompilationInfoId.SPIRVVectorizeNVIDIA:
         tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(32)
@@ -426,6 +433,11 @@ def generate_function(
             == "SPIRVVectorizeMali"
         ):
             dispatch_lowering_pass_pipeline = "SPIRVBaseVectorize"
+        elif (
+            compilation_info.dispatch_lowering_pass_pipeline
+            == "SPIRVCooperativeMatrixVectorize"
+        ):
+            dispatch_lowering_pass_pipeline = "SPIRVCooperativeMatrixVectorize"
         elif compilation_info.dispatch_lowering_pass_pipeline == "SPIRVVectorizeNVIDIA":
             # TODO: change to test SPIRVMatmulPromoteVectorize too
             dispatch_lowering_pass_pipeline = "SPIRVBaseVectorize"
@@ -603,9 +615,17 @@ def parse_arguments():
     parser.add_argument(
         "--lhs_rhs_type",
         type=str,
-        choices=["i8", "f32", "f16"],
+        choices=["i8", "f32", "f16", "bf16"],
         help="Numeric type of input matrices",
         required=True,
+    )
+    parser.add_argument(
+        "--acc_type",
+        type=str,
+        choices=["i32", "f32", "f16", "bf16"],
+        help="Numeric type of input matrices",
+        default="",
+        required=False,
     )
     parser.add_argument(
         "--shapes",
@@ -622,7 +642,6 @@ def parse_arguments():
         default="",
         required=False,
     )
-
     parser.add_argument(
         "--module_path",
         type=str,
@@ -694,16 +713,18 @@ def write_trace_file(traces, filename, module_path, requirements):
 # type, so we do that. That is temporary: eventually there will be cases
 # where the same input types are used with different accumulator types, e.g.
 # f16 inputs with both f16 and f32 accumulator.
-def infer_acc_type(lhs_rhs_type: MatrixElemTypeId):
+def infer_acc_type(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId):
+    if acc_type != MatrixElemTypeId.NONE:
+        return acc_type
     if lhs_rhs_type == MatrixElemTypeId.I8:
         return MatrixElemTypeId.I32
-    else:
-        return lhs_rhs_type
+    return lhs_rhs_type
 
 
 def main(args):
     lhs_rhs_type = MatrixElemTypeId(args.lhs_rhs_type)
-    acc_type = infer_acc_type(lhs_rhs_type)
+    acc_type = MatrixElemTypeId(args.acc_type)
+    acc_type = infer_acc_type(lhs_rhs_type, acc_type)
     shapes_id = ShapesId(args.shapes)
     compilation_info_id = CompilationInfoId(args.compilation_info)
     (function_definitions, traces) = generate(

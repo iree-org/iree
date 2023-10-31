@@ -161,7 +161,7 @@ iree_check_single_backend_test_suite(
     srcs = [
         "disable_demote_f64_to_f32.mlir",
     ],
-    compiler_flags = ["-iree-flow-demote-f64-to-f32=false"],
+    compiler_flags = ["-iree-opt-demote-f64-to-f32=false"],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )

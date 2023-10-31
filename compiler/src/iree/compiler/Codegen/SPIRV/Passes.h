@@ -50,6 +50,10 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm);
 ///
 void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm);
 
+/// Populates passes needed to preprocess the input variant before lowering
+/// and select lowering strategies.
+void buildSPIRVCodegenStrategyInitializationPassPipeline(OpPassManager &pm);
+
 /// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via
 /// the structured ops path. The pass manager `pm` here operate on the module
 /// within the IREE::HAL::ExecutableOp.
@@ -99,6 +103,10 @@ createSPIRVFoldProcessorIDUsesPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVGeneralizeNamedOpsPass();
 
+/// Pass to set the lowering strategy for the target variant.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSPIRVSelectLoweringStrategyPass();
+
 /// Main pass to lower executables to scalar + vector code on SPIR-V path.
 /// Invokes one of the pass pipelines that translate the executable to
 /// scalar + vector code.
@@ -136,8 +144,11 @@ createSPIRVVectorToGPUSubgroupMMAOpsPass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
-/// Pass to vectorize Linalg ops with buffer semantics.
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass();
+/// Pass to lower vector ops to meet SPIR-V requirements.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVInitialVectorLoweringPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVFinalVectorLoweringPass();
 
 /// Pass to do vectorization suitable for lowering to SPIR-V cooperative ops.
 std::unique_ptr<OperationPass<func::FuncOp>>

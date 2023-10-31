@@ -161,11 +161,9 @@ public:
           OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
       Value bufferSize =
           initializerBuilder.create<arith::ConstantOp>(loc, bufferSizeAttr);
-      Value buffer = initializerBuilder
-                         .create<IREE::Stream::ResourceAllocOp>(
-                             loc, globalOp.getType(), bufferSize,
-                             /*uninitialized=*/true, /*affinity=*/nullptr)
-                         .getResult(0);
+      Value buffer = initializerBuilder.create<IREE::Stream::ResourceAllocOp>(
+          loc, globalOp.getType(), bufferSize,
+          /*uninitialized=*/true, /*affinity=*/nullptr);
       initializerBuilder.create<IREE::Util::GlobalStoreOp>(loc, buffer,
                                                            globalOp);
       initializerBuilder.create<IREE::Util::InitializerReturnOp>(loc);

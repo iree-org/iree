@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -144,6 +145,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // move across devices. We do it before scheduling waves as lifetime doesn't
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
+
   addCleanupPatterns(passManager);
 
   // Verify all stream.async.* op access ranges that we can by taking advantage
@@ -199,9 +201,6 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
       // This expands packed constants into explicit forms with partitioned
       // storage buffers and upload logic.
       .addPass(IREE::Stream::createPackConstantsPass)
-
-      // Pack fused allocations based on lifetime.
-      .addPass(IREE::Stream::createPackAllocationsPass)
 
       // Layout packed slices to emit the arithmetic required for all resource
       // offsets. This enables us to propagate the subviews across the program

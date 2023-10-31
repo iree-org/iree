@@ -11,7 +11,7 @@ from benchmark_suites.iree import benchmark_presets, module_execution_configs, u
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import riscv_specs
-from e2e_test_framework.models import tflite_models
+from e2e_test_framework.models import tflite_models, tf_models, torch_models
 
 
 class Linux_RV64_Benchmarks(object):
@@ -28,14 +28,16 @@ class Linux_RV64_Benchmarks(object):
         compile_targets=[RV64_CPU_TARGET],
     )
     MODELS = [
-        # TODO(#14775): Re-enable the benchmarks.
-        # tflite_models.DEEPLABV3_FP32,
-        # tflite_models.MOBILEBERT_FP32,
-        # tflite_models.MOBILENET_V1,
-        # tflite_models.MOBILEBERT_INT8,
-        # tflite_models.PERSON_DETECT_INT8,
-        # tflite_models.EFFICIENTNET_INT8,
+        tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
+        tflite_models.DEEPLABV3_FP32,
+        tflite_models.EFFICIENTNET_INT8,
+        tflite_models.MOBILEBERT_FP32,
+        tflite_models.MOBILEBERT_INT8,
+        tflite_models.MOBILENET_V1,
         tflite_models.MOBILENET_V2_INT8,
+        tflite_models.PERSON_DETECT_INT8,
+        # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+        # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     ]
 
     def generate(
@@ -51,7 +53,12 @@ class Linux_RV64_Benchmarks(object):
         ]
         run_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=gen_configs,
-            module_execution_configs=[module_execution_configs.ELF_LOCAL_SYNC_CONFIG],
+            module_execution_configs=[
+                module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
+                module_execution_configs.get_elf_system_scheduling_local_task_config(
+                    thread_num=2
+                ),
+            ],
             device_specs=[riscv_specs.EMULATOR_RISCV_64],
             presets=[benchmark_presets.RISCV],
         )
@@ -72,10 +79,9 @@ class Linux_RV32_Benchmarks(object):
         compile_targets=[RV32_CPU_TARGET],
     )
     MODELS = [
-        # TODO(#14775): Re-enable the benchmarks.
-        # tflite_models.EFFICIENTNET_INT8,
-        # tflite_models.MOBILEBERT_INT8,
-        # tflite_models.PERSON_DETECT_INT8,
+        tflite_models.EFFICIENTNET_INT8,
+        tflite_models.MOBILEBERT_INT8,
+        tflite_models.PERSON_DETECT_INT8,
         tflite_models.MOBILENET_V2_INT8,
     ]
 

@@ -7,7 +7,9 @@ vm.module @my_module {
     %0 = vm.trunc.i32.i8 %arg0 : i32 -> i32
     // CHECK-NEXT: %1 = vm.trunc.i32.i16 %0 : i32 -> i32
     %1 = vm.trunc.i32.i16 %0 : i32 -> i32
-    vm.return %1 : i32
+    // CHECK: %2 = vm.trunc.i16.i8 %1 : i32 -> i32
+    %2 = vm.trunc.i16.i8 %1 : i32 -> i32
+    vm.return %2 : i32
   }
 }
 

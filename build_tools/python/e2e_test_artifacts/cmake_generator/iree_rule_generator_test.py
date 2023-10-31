@@ -194,7 +194,7 @@ class IreeGeneratorTest(unittest.TestCase):
                 host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
                 architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
             ),
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
             presets=["test"],
         )

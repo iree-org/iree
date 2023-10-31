@@ -9,13 +9,13 @@
   ]>
 ]>
 hal.executable @i4_dequant {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 64>>
-    }> {
+    }>) {
     hal.executable.export @i4_dequant layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -52,14 +52,13 @@ hal.executable @i4_dequant {
 
 //   CHECK-LABEL: spirv.func @i4_dequant()
 
-// CHECK-COUNT-4: spirv.BitwiseAnd
-//         CHECK: spirv.CompositeConstruct {{.+}} : (i32, i32, i32, i32) -> vector<4xi32>
-// CHECK-COUNT-4: spirv.BitwiseAnd
-//         CHECK: spirv.CompositeConstruct {{.+}} : (i32, i32, i32, i32) -> vector<4xi32>
-// CHECK-COUNT-4: spirv.BitwiseAnd
-//         CHECK: spirv.CompositeConstruct {{.+}} : (i32, i32, i32, i32) -> vector<4xi32>
-// CHECK-COUNT-4: spirv.BitwiseAnd
-//         CHECK: spirv.CompositeConstruct {{.+}} : (i32, i32, i32, i32) -> vector<4xi32>
+//         CHECK: spirv.VectorShuffle [0 : i32, 1 : i32] {{.*}} : vector<4xi32> -> vector<2xi32>
+//         CHECK: spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32]
+//         CHECK: spirv.BitwiseAnd
+//         CHECK: spirv.ShiftRightLogical
+//         CHECK: spirv.BitwiseAnd
+//         CHECK: spirv.VectorShuffle [2 : i32, 3 : i32] {{.*}} : vector<4xi32> -> vector<2xi32>
+// CHECK-COUNT-3: spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32]
 
 // CHECK-COUNT-4: spirv.ConvertUToF {{.+}} : vector<4xi32> to vector<4xf32>
 // CHECK-COUNT-4: spirv.FSub

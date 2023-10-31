@@ -27,7 +27,7 @@ import urllib.request
 VERSION_LINE_FORMAT_STRING = 'GITHUB_RUNNER_VERSION="${GITHUB_RUNNER_VERSION:-%s}"'
 DIGEST_VARIABLE_FORMAT_STRING = "GITHUB_RUNNER_%s_ARCHIVE_DIGEST"
 DIGEST_LINE_FORMAT_STRING = (
-    DIGEST_VARIABLE_FORMAT_STRING + '="${GITHUB_RUNNER_X86_64_ARCHIVE_DIGEST:-%s}"'
+    DIGEST_VARIABLE_FORMAT_STRING + '="${GITHUB_RUNNER_%s_ARCHIVE_DIGEST:-%s}"'
 )
 
 DIGEST_SEARCH_PATTERN = r"^.*\bBEGIN.SHA linux-(?P<arch>\w+)\b.*\b(?P<digest>[a-fA-F0-9]{64})\b.*END.SHA linux-\w+\b.*$"
@@ -108,7 +108,10 @@ if __name__ == "__main__":
         found = False
         for arch in RUNNER_ARCHITECTURES:
             if line.startswith(DIGEST_VARIABLE_FORMAT_STRING % arch.upper()):
-                print(DIGEST_LINE_FORMAT_STRING % (arch.upper(), arch_to_digest[arch]))
+                print(
+                    DIGEST_LINE_FORMAT_STRING
+                    % (arch.upper(), arch.upper(), arch_to_digest[arch])
+                )
                 found = True
                 break
 

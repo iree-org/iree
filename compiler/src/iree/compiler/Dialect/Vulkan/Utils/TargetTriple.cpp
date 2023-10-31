@@ -194,7 +194,7 @@ void getExtensions(const TargetTriple &triple,
   llvm::append_range(extensions, desktop);
   if (getVendor(triple) == spirv::Vendor::NVIDIA ||
       triple.getArch() == TargetTripleArch::AMD_RDNAv3) {
-    extensions.push_back(Extension::VK_NV_cooperative_matrix);
+    extensions.push_back(Extension::VK_KHR_cooperative_matrix);
   }
 }
 
@@ -239,20 +239,25 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
     auto i32t = builder.getIntegerType(32);
     auto f16t = builder.getF16Type();
     auto f32t = builder.getF32Type();
-    auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
+    auto scope = ScopeKHRAttr::get(context, ScopeKHR::Subgroup);
 
-    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+    // Note: The driver also advertises saturating arithmetic, so we can
+    // declare this when needed.
+    coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/i8t,
-        /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope));
-    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, /*accSat=*/false,
+        /*scope=*/scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
-    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, /*accSat=*/false,
+        /*scope=*/scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
+        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, /*accSat=*/false,
+        /*scope=*/scope));
   }
     LLVM_FALLTHROUGH;
   case TargetTripleArch::AMD_RDNAv1:
@@ -374,20 +379,25 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
     auto i32t = builder.getIntegerType(32);
     auto f16t = builder.getF16Type();
     auto f32t = builder.getF32Type();
-    auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
+    auto scope = ScopeKHRAttr::get(context, ScopeKHR::Subgroup);
 
-    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+    // Note: the driver also advertises other shapes that can enabled when
+    // needed.
+    coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/8, /*nSize=*/8, /*kSize=*/32, /*aType=*/i8t,
-        /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, scope));
-    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        /*bType=*/i8t, /*cType=*/i32t, /*resultType=*/i32t, /*accSat=*/false,
+        /*scope=*/scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
-    coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+        /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, /*accSat=*/false,
+        /*scope=*/scope));
+    coopmatCases.push_back(CooperativeMatrixPropertiesKHRAttr::get(
         context,
         /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
-        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
+        /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, /*accSat=*/false,
+        /*scope=*/scope));
   } break;
   case TargetTripleArch::NV_Pascal:
     // Example: https://vulkan.gpuinfo.org/displayreport.php?id=17937

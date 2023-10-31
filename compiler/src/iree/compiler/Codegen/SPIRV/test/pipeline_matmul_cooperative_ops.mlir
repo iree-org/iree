@@ -1,4 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse)))' \
+// RUN:   %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -11,28 +13,28 @@
 ]>
 
 hal.executable public @matmul_256x1024x128_div_exp {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.5,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 8, n_size = 8, result_type = i32, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x128_div_exp layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -92,13 +94,12 @@ hal.executable public @matmul_256x1024x128_div_exp {
 
 //         CHECK:   spirv.func @matmul_256x1024x128_div_exp
 
-//     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C9:.+]] = spirv.Constant 9 : i32
 //     CHECK-DAG:     %[[C32:.+]] = spirv.Constant 32 : i32
 //     CHECK-DAG:     %[[C128:.+]] = spirv.Constant 128 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
-//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -109,30 +110,30 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
-//         CHECK:     %[[LOCAL_VAR0:.+]] = spirv.Variable : !spirv.ptr<!spirv.NV.coopmatrix<16x16xf16, Subgroup>, Function>
-//         CHECK:     %[[LOCAL_VAR1:.+]] = spirv.Variable : !spirv.ptr<!spirv.NV.coopmatrix<16x16xf16, Subgroup>, Function>
-//         CHECK:     %[[LOCAL_VAR2:.+]] = spirv.Variable : !spirv.ptr<!spirv.NV.coopmatrix<16x16xf16, Subgroup>, Function>
-//         CHECK:     %[[LOCAL_VAR3:.+]] = spirv.Variable : !spirv.ptr<!spirv.NV.coopmatrix<16x16xf16, Subgroup>, Function>
+//         CHECK:     %[[LOCAL_VAR0:.+]] = spirv.Variable : !spirv.ptr<!spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>, Function>
+//         CHECK:     %[[LOCAL_VAR1:.+]] = spirv.Variable : !spirv.ptr<!spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>, Function>
+//         CHECK:     %[[LOCAL_VAR2:.+]] = spirv.Variable : !spirv.ptr<!spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>, Function>
+//         CHECK:     %[[LOCAL_VAR3:.+]] = spirv.Variable : !spirv.ptr<!spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>, Function>
 //         CHECK:     spirv.mlir.loop
-//         CHECK:       %[[LD0:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:       %[[LD1:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:       %[[LD0:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+//         CHECK:       %[[LD1:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
 
-//         CHECK:       %[[LD2:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:       %[[LD3:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:       %[[LD4:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:       %[[LD5:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:       %[[LD2:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+//         CHECK:       %[[LD3:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+//         CHECK:       %[[LD4:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
+//         CHECK:       %[[LD5:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-//         CHECK:       %[[LD6:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:       %[[LD7:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:       %[[LD6:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
+//         CHECK:       %[[LD7:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-//         CHECK:       %[[MA0:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD0]], %[[LD4]], %{{.+}}
-//         CHECK:       %[[MA1:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD1]], %[[LD6]], %[[MA0]]
-//         CHECK:       %[[MA2:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD0]], %[[LD5]], %{{.+}}
-//         CHECK:       %[[MA3:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD1]], %[[LD7]], %[[MA2]]
-//         CHECK:       %[[MA4:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD2]], %[[LD4]], %{{.+}}
-//         CHECK:       %[[MA5:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD3]], %[[LD6]], %[[MA4]]
-//         CHECK:       %[[MA6:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD2]], %[[LD5]], %{{.+}}
-//         CHECK:       %[[MA7:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD3]], %[[LD7]], %[[MA6]]
+//         CHECK:       %[[MA0:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD0]], %[[LD4]], %{{.+}}
+//         CHECK:       %[[MA1:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD1]], %[[LD6]], %[[MA0]]
+//         CHECK:       %[[MA2:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD0]], %[[LD5]], %{{.+}}
+//         CHECK:       %[[MA3:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD1]], %[[LD7]], %[[MA2]]
+//         CHECK:       %[[MA4:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD2]], %[[LD4]], %{{.+}}
+//         CHECK:       %[[MA5:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD3]], %[[LD6]], %[[MA4]]
+//         CHECK:       %[[MA6:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD2]], %[[LD5]], %{{.+}}
+//         CHECK:       %[[MA7:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD3]], %[[LD7]], %[[MA6]]
 
 //         CHECK:       %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:       spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -151,39 +152,39 @@ hal.executable public @matmul_256x1024x128_div_exp {
 
 //         CHECK:       spirv.mlir.merge
 
-//         CHECK:     %[[LD_FN0:.+]] = spirv.Load "Function" %[[LOCAL_VAR3]] : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD_FN1:.+]] = spirv.Load "Function" %[[LOCAL_VAR2]] : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD_FN2:.+]] = spirv.Load "Function" %[[LOCAL_VAR1]] : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD_FN3:.+]] = spirv.Load "Function" %[[LOCAL_VAR0]] : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %[[LD_FN0:.+]] = spirv.Load "Function" %[[LOCAL_VAR3]] : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+//         CHECK:     %[[LD_FN1:.+]] = spirv.Load "Function" %[[LOCAL_VAR2]] : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+//         CHECK:     %[[LD_FN2:.+]] = spirv.Load "Function" %[[LOCAL_VAR1]] : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+//         CHECK:     %[[LD_FN3:.+]] = spirv.Load "Function" %[[LOCAL_VAR0]] : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
-//         CHECK:     %[[LD0:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD1:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %[[LD0:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+//         CHECK:     %[[LD1:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
 
-//         CHECK:     %[[LD2:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD3:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD4:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD5:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %[[LD2:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+//         CHECK:     %[[LD3:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+//         CHECK:     %[[LD4:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
+//         CHECK:     %[[LD5:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-//         CHECK:     %[[LD6:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD7:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %[[LD6:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
+//         CHECK:     %[[LD7:.+]] = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-//         CHECK:     %[[MA0:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD0]], %[[LD4]], %{{.+}}
-//         CHECK:     %[[MA1:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD1]], %[[LD6]], %[[MA0]]
-//         CHECK:     %[[MA2:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD0]], %[[LD5]], %{{.+}}
-//         CHECK:     %[[MA3:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD1]], %[[LD7]], %[[MA2]]
-//         CHECK:     %[[MA4:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD2]], %[[LD4]], %{{.+}}
-//         CHECK:     %[[MA5:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD3]], %[[LD6]], %[[MA4]]
-//         CHECK:     %[[MA6:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD2]], %[[LD5]], %{{.+}}
-//         CHECK:     %[[MA7:.+]] = spirv.NV.CooperativeMatrixMulAdd %[[LD3]], %[[LD7]], %[[MA6]]
+//         CHECK:     %[[MA0:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD0]], %[[LD4]], %{{.+}}
+//         CHECK:     %[[MA1:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD1]], %[[LD6]], %[[MA0]]
+//         CHECK:     %[[MA2:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD0]], %[[LD5]], %{{.+}}
+//         CHECK:     %[[MA3:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD1]], %[[LD7]], %[[MA2]]
+//         CHECK:     %[[MA4:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD2]], %[[LD4]], %{{.+}}
+//         CHECK:     %[[MA5:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD3]], %[[LD6]], %[[MA4]]
+//         CHECK:     %[[MA6:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD2]], %[[LD5]], %{{.+}}
+//         CHECK:     %[[MA7:.+]] = spirv.KHR.CooperativeMatrixMulAdd %[[LD3]], %[[LD7]], %[[MA6]]
 
 //         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %[[MA7]], %[[C9]], %[[COL_MAJOR]]
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %[[AC]], %[[MA7]], %[[C9]], <RowMajor>
 //         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %[[MA5]], %[[C9]], %[[COL_MAJOR]]
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %[[AC]], %[[MA5]], %[[C9]], <RowMajor>
 //         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %[[MA3]], %[[C9]], %[[COL_MAJOR]]
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %[[AC]], %[[MA3]], %[[C9]], <RowMajor>
 //         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %[[MA1]], %[[C9]], %[[COL_MAJOR]]
+//         CHECK:     spirv.KHR.CooperativeMatrixStore %[[AC]], %[[MA1]], %[[C9]], <RowMajor>
 
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 //         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
@@ -216,28 +217,28 @@ hal.executable public @matmul_256x1024x128_div_exp {
   ]>
 ]>
 hal.executable public @batch_matmul_16x128x256x512_div {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.5,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope  = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 8, n_size = 8, result_type = i32, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope  = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope  = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_16x128x256x512_div layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -279,12 +280,11 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 
 //         CHECK:   spirv.func @batch_matmul_16x128x256x512_div
 
-//     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C9:.+]] = spirv.Constant 9 : i32
 //     CHECK-DAG:     %[[C32:.+]] = spirv.Constant 32 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
-//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -296,12 +296,12 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.Variable : !spirv.ptr<!spirv.NV.coopmatrix<16x16xf16, Subgroup>, Function>
+// CHECK-COUNT-4:     %{{.+}} = spirv.Variable : !spirv.ptr<!spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>, Function>
 //         CHECK:     spirv.mlir.loop
-// CHECK-COUNT-4:       %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:       %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-4:       %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-4:       %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-// CHECK-COUNT-8:       %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+// CHECK-COUNT-8:       %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
 //         CHECK:       %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:       spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -315,15 +315,15 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 // CHECK-COUNT-4:       spirv.Store "Function" %{{.+}}, %{{.+}}
 //         CHECK:       spirv.mlir.merge
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-4:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
+// CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C32]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, StorageBuffer> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     %{{.+}} = spirv.FDiv %{{.+}}, %{{.+}} : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C32]], %[[COL_MAJOR]]
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C32]], <RowMajor> : !spirv.ptr<vector<4xf32>, StorageBuffer>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+// CHECK-COUNT-4:     %{{.+}} = spirv.FDiv %{{.+}}, %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+// CHECK-COUNT-4:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C32]], <RowMajor>
 
 
 // -----
@@ -341,28 +341,28 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 ]>
 
 hal.executable public @matmul_32x32x32_div {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.5,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 8, n_size = 8, result_type = i32, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_32x32x32_div layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -398,11 +398,11 @@ hal.executable public @matmul_32x32x32_div {
 }
 
 //   CHECK-LABEL: spirv.module Logical GLSL450
-// CHECK-COUNT-4: spirv.NV.CooperativeMatrixLoad
-// CHECK-COUNT-2: spirv.NV.CooperativeMatrixMulAdd
-//         CHECK: spirv.NV.CooperativeMatrixLoad
-//         CHECK: spirv.FDiv %{{.+}}, %{{.+}} : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//         CHECK: spirv.NV.CooperativeMatrixStore
+// CHECK-COUNT-4: spirv.KHR.CooperativeMatrixLoad
+// CHECK-COUNT-2: spirv.KHR.CooperativeMatrixMulAdd
+//         CHECK: spirv.KHR.CooperativeMatrixLoad
+//         CHECK: spirv.FDiv %{{.+}}, %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+//         CHECK: spirv.KHR.CooperativeMatrixStore
 
 // -----
 
@@ -415,28 +415,28 @@ hal.executable public @matmul_32x32x32_div {
 ]>
 
 hal.executable public @generic_batch_matmul_32x128x512x64 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
-      #spirv.vce<v1.5,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.vce<v1.6,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, NVIDIA:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 8, n_size = 8, result_type = i32, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spirv.coop_matrix_props<
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>,
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f32, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
-       >}> {
+       >}>) {
     hal.executable.export public @generic_batch_matmul_32x128x512x64 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -477,13 +477,12 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 
 //         CHECK:   spirv.func @generic_batch_matmul_32x128x512x64
 
-//     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C9:.+]] = spirv.Constant 9 : i32
 //     CHECK-DAG:     %[[C64:.+]] = spirv.Constant 64 : i32
 //     CHECK-DAG:     %[[C256:.+]] = spirv.Constant 256 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
-//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -495,10 +494,10 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+// CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -510,12 +509,12 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C9]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C9]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+// CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
-// CHECK-COUNT-4:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C64]], %[[COL_MAJOR]]
+// CHECK-COUNT-4:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C64]], <RowMajor>
 
 // -----
 
@@ -530,22 +529,22 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 ]>
 
 hal.executable public @matmul_256x1024x128_div_exp {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @matmul_256x1024x128_div_exp layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -596,13 +595,12 @@ hal.executable public @matmul_256x1024x128_div_exp {
 
 //         CHECK:   spirv.func @matmul_256x1024x128_div_exp
 
-//     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C17:.+]] = spirv.Constant 17 : i32
 //     CHECK-DAG:     %[[C32:.+]] = spirv.Constant 32 : i32
 //     CHECK-DAG:     %[[C128:.+]] = spirv.Constant 128 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
-//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -612,12 +610,12 @@ hal.executable public @matmul_256x1024x128_div_exp {
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-8:     %{{.+}} = spirv.Variable : !spirv.ptr<!spirv.NV.coopmatrix<16x16xf16, Subgroup>, Function>
+// CHECK-COUNT-8:     %{{.+}} = spirv.Variable : !spirv.ptr<!spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>, Function>
 //         CHECK:     spirv.mlir.loop
-// CHECK-COUNT-4:       %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:       %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C17]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-4:       %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-8:       %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C17]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-//CHECK-COUNT-16:       %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+//CHECK-COUNT-16:       %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
 //         CHECK:       %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:       spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -629,13 +627,13 @@ hal.executable public @matmul_256x1024x128_div_exp {
 // CHECK-COUNT-8:       spirv.Store "Function" %{{.+}}, %{{.+}}
 //         CHECK:       spirv.mlir.merge
 
-// CHECK-COUNT-8:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C17]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-8:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C17]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-//CHECK-COUNT-16:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+//CHECK-COUNT-16:     %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
-// CHECK-COUNT-8:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C17]], %[[COL_MAJOR]]
+// CHECK-COUNT-8:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C17]], <RowMajor>
 
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 // CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
@@ -660,22 +658,22 @@ hal.executable public @matmul_256x1024x128_div_exp {
   ]>
 ]>
 hal.executable public @batch_matmul_16x128x256x512_div {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_16x128x256x512_div layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -717,12 +715,11 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 
 //         CHECK:   spirv.func @batch_matmul_16x128x256x512_div
 
-//     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C17:.+]] = spirv.Constant 17 : i32
 //     CHECK-DAG:     %[[C32:.+]] = spirv.Constant 32 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
-//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -732,12 +729,12 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.Variable : !spirv.ptr<!spirv.NV.coopmatrix<16x16xf16, Subgroup>, Function>
+// CHECK-COUNT-4:     %{{.+}} = spirv.Variable : !spirv.ptr<!spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>, Function>
 //         CHECK:     spirv.mlir.loop
-// CHECK-COUNT-4:       %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:       %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C17]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-4:       %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-4:       %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C17]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-// CHECK-COUNT-8:       %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+// CHECK-COUNT-8:       %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
 //         CHECK:       %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:       spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -749,14 +746,14 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 // CHECK-COUNT-4:       spirv.Store "Function" %{{.+}}, %{{.+}}
 //         CHECK:       spirv.mlir.merge
 
-// CHECK-COUNT-8:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-8:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C17]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C17]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
 
-// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C32]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, StorageBuffer> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:     %{{.+}} = spirv.FDiv %{{.+}}, %{{.+}} : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C32]], %[[COL_MAJOR]]
+// CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C32]], <RowMajor> : !spirv.ptr<vector<4xf32>, StorageBuffer>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+// CHECK-COUNT-8:     %{{.+}} = spirv.FDiv %{{.+}}, %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
+// CHECK-COUNT-8:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C32]], <RowMajor>
 
 // -----
 
@@ -769,22 +766,22 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 ]>
 
 hal.executable public @generic_batch_matmul_32x128x512x64 {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @generic_batch_matmul_32x128x512x64 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
@@ -824,13 +821,12 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 
 //         CHECK:   spirv.func @generic_batch_matmul_32x128x512x64
 
-//     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C5:.+]] = spirv.Constant 5 : i32
 //     CHECK-DAG:     %[[C17:.+]] = spirv.Constant 17 : i32
 //     CHECK-DAG:     %[[C64:.+]] = spirv.Constant 64 : i32
 //     CHECK-DAG:     %[[C256:.+]] = spirv.Constant 256 : i32
 //     CHECK-DAG:     %[[F0:.+]] = spirv.Constant 0.000000e+00 : f16
-//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+//         CHECK:     %{{.+}} = spirv.CompositeConstruct %[[F0]] : (f16) -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -840,9 +836,9 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C17]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//CHECK-COUNT-16:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C17]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
+//CHECK-COUNT-16:     %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
 //         CHECK:     %{{.+}} = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
@@ -852,11 +848,11 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //         CHECK:     spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
 //         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C5]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-// CHECK-COUNT-8:     %{{.+}} = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C17]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, Workgroup> as !spirv.NV.coopmatrix<16x16xf16, Subgroup>
-//CHECK-COUNT-16:     %{{.+}} = spirv.NV.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
+// CHECK-COUNT-4:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C5]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixA>
+// CHECK-COUNT-8:     %{{.+}} = spirv.KHR.CooperativeMatrixLoad %{{.+}}, %[[C17]], <RowMajor> : !spirv.ptr<vector<4xf32>, Workgroup>, i32 -> !spirv.coopmatrix<16x16xf16, Subgroup, MatrixB>
+//CHECK-COUNT-16:     %{{.+}} = spirv.KHR.CooperativeMatrixMulAdd %{{.+}}, %{{.+}}, %{{.+}}
 
-// CHECK-COUNT-8:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C64]], %[[COL_MAJOR]]
+// CHECK-COUNT-8:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C64]], <RowMajor>
 
 // -----
 
@@ -874,22 +870,22 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
     workgroup_size = [32, 4, 1], subgroup_size = 32>
 
 hal.executable public @batch_matmul_f16_16x4096x4096x64_truncf_mulf {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
-      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, AMD:DiscreteGPU,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],
+      [SPV_KHR_variable_pointers, SPV_KHR_cooperative_matrix]>, AMD:DiscreteGPU,
       #spirv.resource_limits<
-        cooperative_matrix_properties_nv = [
-          #spirv.coop_matrix_props<
+        cooperative_matrix_properties_khr = [
+          #spirv.coop_matrix_props_khr<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>
+            m_size = 16, n_size = 16, result_type = f16, acc_sat = false, scope = <Subgroup>>
         ],
         max_compute_shared_memory_size = 65536,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 1024],
         subgroup_size = 64>
-       >}> {
+       >}>) {
     hal.executable.export public @batch_matmul_f16_16x4096x4096x64_truncf_mulf layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -934,13 +930,12 @@ hal.executable public @batch_matmul_f16_16x4096x4096x64_truncf_mulf {
 
 //         CHECK:   spirv.func @batch_matmul_f16_16x4096x4096x64_truncf_mulf
 
-//     CHECK-DAG:     %[[COL_MAJOR:.+]] = spirv.Constant [[COL_MAJOR]]
 //     CHECK-DAG:     %[[C512:.+]] = spirv.Constant 512 : i32
 //     CHECK-DAG:     %[[SCALAR:.+]] = spirv.Constant 0.158113882 : f32
 
 
-// CHECK-COUNT-4:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.NV.coopmatrix<16x16xf16, Subgroup>
+// CHECK-COUNT-4:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>
 //         CHECK:     %[[CONVERT:.+]] = spirv.FConvert %[[SCALAR]] : f32 to f16
-// CHECK-COUNT-4:     %{{.+}} = spirv.MatrixTimesScalar %{{.+}}, %[[CONVERT]] : !spirv.NV.coopmatrix<16x16xf16, Subgroup>, f16
+// CHECK-COUNT-4:     %{{.+}} = spirv.MatrixTimesScalar %{{.+}}, %[[CONVERT]] : !spirv.coopmatrix<16x16xf16, Subgroup, MatrixAcc>, f16
 
-// CHECK-COUNT-4:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C512]], %[[COL_MAJOR]]
+// CHECK-COUNT-4:     spirv.KHR.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C512]], <RowMajor>

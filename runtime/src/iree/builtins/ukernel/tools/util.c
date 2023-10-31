@@ -86,6 +86,17 @@ int iree_uk_random_engine_get_minus16_plus15(iree_uk_random_engine_t* e) {
 void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
                                  iree_uk_type_t type,
                                  iree_uk_random_engine_t* engine) {
+  if (iree_uk_type_category(type) == IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS) {
+    // Signless integers mean that the operation that will consume this buffer
+    // should not care if the data is signed or unsigned integers, so let's
+    // randomly exercise both and recurse so that the rest of this function
+    // doesn't have to deal with signless again.
+    iree_uk_type_t resolved_type = iree_uk_random_engine_get_0_1(engine)
+                                       ? iree_uk_integer_type_as_signed(type)
+                                       : iree_uk_integer_type_as_unsigned(type);
+    iree_uk_write_random_buffer(buffer, size_in_bytes, resolved_type, engine);
+    return;
+  }
   iree_uk_index_t elem_size = iree_uk_type_size(type);
   iree_uk_index_t size_in_elems = size_in_bytes / elem_size;
   for (iree_uk_index_t i = 0; i < size_in_elems; ++i) {
@@ -103,11 +114,23 @@ void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
       case IREE_UK_TYPE_BFLOAT_16:
         ((uint16_t*)buffer)[i] = iree_math_f32_to_bf16((float)random_val);
         break;
-      case IREE_UK_TYPE_INT_32:
+      case IREE_UK_TYPE_SINT_32:
         ((int32_t*)buffer)[i] = random_val;
         break;
-      case IREE_UK_TYPE_INT_8:
+      case IREE_UK_TYPE_UINT_32:
+        ((uint32_t*)buffer)[i] = random_val;
+        break;
+      case IREE_UK_TYPE_SINT_16:
+        ((int16_t*)buffer)[i] = random_val;
+        break;
+      case IREE_UK_TYPE_UINT_16:
+        ((uint16_t*)buffer)[i] = random_val;
+        break;
+      case IREE_UK_TYPE_SINT_8:
         ((int8_t*)buffer)[i] = random_val;
+        break;
+      case IREE_UK_TYPE_UINT_8:
+        ((uint8_t*)buffer)[i] = random_val;
         break;
       default:
         IREE_UK_ASSERT(false && "unknown type");
@@ -119,12 +142,12 @@ static const char* iree_uk_type_category_str(const iree_uk_type_t type) {
   switch (type & IREE_UK_TYPE_CATEGORY_MASK) {
     case IREE_UK_TYPE_CATEGORY_OPAQUE:
       return "x";
-    case IREE_UK_TYPE_CATEGORY_INTEGER:
+    case IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS:
       return "i";
     case IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED:
-      return "si";
+      return "s";
     case IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED:
-      return "ui";
+      return "u";
     case IREE_UK_TYPE_CATEGORY_FLOAT_IEEE:
       return "f";
     case IREE_UK_TYPE_CATEGORY_FLOAT_BRAIN:
@@ -210,6 +233,10 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
   }
   if (!strcmp(cpu_features, "avx512_vnni")) {
     out_cpu_data_fields[0] = avx512_base | IREE_CPU_DATA0_X86_64_AVX512VNNI;
+    return;
+  }
+  if (!strcmp(cpu_features, "avx512_bf16")) {
+    out_cpu_data_fields[0] = avx512_base | IREE_CPU_DATA0_X86_64_AVX512BF16;
     return;
   }
 #endif  // defined(IREE_ARCH_X86_64)

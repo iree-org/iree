@@ -8,7 +8,7 @@ func.func @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
   %2 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<12x128xf32>) -> tensor<12x128xf32>
   %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0 : tensor<12x128x128xf32>) outs(%2 : tensor<12x128xf32>) {
   ^bb0(%b0: f32, %b1: f32):
-    %11 = arith.maxf %b0, %b1 : f32
+    %11 = arith.maximumf %b0, %b1 : f32
     linalg.yield %11 : f32
   } -> tensor<12x128xf32>
   %4 = tensor.empty() : tensor<12x128x128xf32>
@@ -406,3 +406,44 @@ func.func @math_sin() {
 //       CHECK:   %[[GENERIC:.+]]:2 = linalg.generic
 //   CHECK-DAG:   check.expect_almost_eq(%[[GENERIC]]#0,
 //   CHECK-DAG:   check.expect_almost_eq(%[[GENERIC]]#1,
+
+// -----
+
+// Check for fix for https://github.com/openxla/iree/issues/14953
+func.func @fix_issue_14953(%arg0: tensor<11008x32x1xf16>, %arg1: tensor<11008x32x1xf16>, %arg2: tensor<1x1x32x128xf16>) -> tensor<1x1x11008xf16> {
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_0 = arith.constant dense<0> : tensor<11008x32x128xi4>
+  %3 = util.optimization_barrier %cst_0 : tensor<11008x32x128xi4>
+  %4 = tensor.empty() : tensor<11008x32x128xf16>
+  %collapsed = tensor.collapse_shape %arg0 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
+  %collapsed_1 = tensor.collapse_shape %arg1 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
+  %collapsed_2 = tensor.collapse_shape %arg2 [[0, 1, 2], [3]] : tensor<1x1x32x128xf16> into tensor<32x128xf16>
+  %5 = tensor.empty() : tensor<11008xf16>
+  %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<11008xf16>) -> tensor<11008xf16>
+  %7 = flow.dispatch.region -> (tensor<11008xf16>) {
+    %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%3, %collapsed, %collapsed_1 : tensor<11008x32x128xi4>, tensor<11008x32xf16>, tensor<11008x32xf16>) outs(%4 : tensor<11008x32x128xf16>) {
+    ^bb0(%in: i4, %in_3: f16, %in_4: f16, %out: f16):
+      %11 = arith.extui %in : i4 to i32
+      %12 = arith.uitofp %11 : i32 to f16
+      %13 = arith.subf %12, %in_4 : f16
+      %14 = arith.mulf %13, %in_3 : f16
+      linalg.yield %14 : f16
+    } -> tensor<11008x32x128xf16>
+    %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%collapsed_2, %9 : tensor<32x128xf16>, tensor<11008x32x128xf16>) outs(%6 : tensor<11008xf16>) {
+    ^bb0(%in: f16, %in_3: f16, %out: f16):
+      %11 = arith.mulf %in, %in_3 : f16
+      %12 = arith.addf %11, %out : f16
+      linalg.yield %12 : f16
+    } -> tensor<11008xf16>
+    flow.return %10 : tensor<11008xf16>
+  }
+  %expanded = tensor.expand_shape %7 [[0, 1, 2]] : tensor<11008xf16> into tensor<1x1x11008xf16>
+  return %expanded : tensor<1x1x11008xf16>
+}
+// CHECK-LABEL: func @fix_issue_14953
+//       CHECK:   flow.dispatch.region
+//       CHECK:     %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel"]
+//       CHECK:     %[[GENERIC1:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC0]] :
+//       CHECK:     flow.return %[[GENERIC1]]

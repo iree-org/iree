@@ -202,9 +202,9 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
 void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
                   DominanceInfo &dominators);
 
-// Track temporary allocations that are never read from. If this is the case
-// it means both the allocations and associated stores can be removed.
-void eraseDeadAllocAndStores(Operation *parentOp);
+// Check if there is a fused linalg op present in the backward slice of any of
+// the inputs.
+bool hasFusedLeadingOp(linalg::LinalgOp rootOp);
 
 } // namespace iree_compiler
 } // namespace mlir

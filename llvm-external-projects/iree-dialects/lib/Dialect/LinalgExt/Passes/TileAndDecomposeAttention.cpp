@@ -250,8 +250,8 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
                                          zero, loc, builder, ops);
 
   // Compute current statistics
-  Value newMax = computeRowwiseReduction<arith::MaxFOp>(qkTranspose, maxSlice,
-                                                        loc, builder, ops);
+  Value newMax = computeRowwiseReduction<arith::MaximumFOp>(
+      qkTranspose, maxSlice, loc, builder, ops);
   Value partialSoftmax =
       computePartialSoftmax(qkTranspose, newMax, loc, builder, ops);
   Value scaledOldSum =
@@ -321,9 +321,10 @@ static Value insertOutputSlice(Value src, Value dst,
 
 } // namespace
 
-SmallVector<Operation *>
-tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
-                          RewriterBase &rewriter) {
+/// Tile iree_linalg_ext.attention.
+/// TODO: Adopt getTiledImplementation with this.
+static SmallVector<Operation *>
+tileAttention(IREE::LinalgExt::AttentionOp attnOp, RewriterBase &rewriter) {
   SmallVector<Operation *> ops;
   Location loc = attnOp.getLoc();
   OpBuilder::InsertionGuard guard(rewriter);
@@ -396,17 +397,22 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
       extractSlices(key, value, query, queryShape, ivs, sequenceTileLength,
                     headDimension, elementType, loc, rewriter);
 
-  // Create body of innermost loop
-  auto [result, newMax, newSum] = createAttentionBody(
-      keySlice, valueSlice, querySlice, iterArgResult, iterArgMax, iterArgSum,
-      sequenceTileLength, headDimension, elementType, ops, loc, rewriter);
+  auto tiledAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
+      attnOp.getLoc(),
+      SmallVector<Type>{accumulatorF32.getType(), sum.getType(), max.getType()},
+      SmallVector<Value>{querySlice, keySlice, valueSlice},
+      SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
+
+  Value tiledResult = tiledAttentionOp.getResult(0);
+  Value newMax = tiledAttentionOp.getResult(1);
+  Value newSum = tiledAttentionOp.getResult(2);
 
   if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
           loopNest.loops.back().getBody()->getTerminator())) {
     OpBuilder::InsertionGuard yieldGuard(rewriter);
     rewriter.setInsertionPoint(yieldOp);
     rewriter.replaceOpWithNewOp<scf::YieldOp>(
-        yieldOp, ValueRange{result, newMax, newSum});
+        yieldOp, ValueRange{tiledResult, newMax, newSum});
   }
 
   OpBuilder::InsertionGuard yieldGuard(rewriter);
@@ -420,6 +426,65 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
                         headDimension, loc, rewriter);
 
   attnOp.getResults()[0].replaceAllUsesWith(loopNest.results[0]);
+  ops.push_back(tiledAttentionOp);
+  return ops;
+}
+
+/// Decompose tiled iree_linalg_ext.attention op.
+/// TODO: Adopt decomposeOperation with this.
+static void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
+                                    SmallVector<Operation *> &ops,
+                                    RewriterBase &rewriter) {
+  Location loc = tiledAttnOp.getLoc();
+  Value keySlice = tiledAttnOp.getKey();
+  Value valueSlice = tiledAttnOp.getValue();
+  Value querySlice = tiledAttnOp.getQuery();
+  Value tiledResult = tiledAttnOp.getOutput();
+  Value max = *tiledAttnOp.getMax();
+  Value sum = *tiledAttnOp.getSum();
+
+  assert(max && "expected max statistic operand to be present");
+  assert(sum && "expected sum statistic operand to be present");
+
+  OpBuilder::InsertionGuard withinScfLoop(rewriter);
+  rewriter.setInsertionPointAfter(tiledAttnOp);
+  SmallVector<OpFoldResult> queryDimValues =
+      tensor::getMixedSizes(rewriter, loc, querySlice);
+  OpFoldResult headDimension = queryDimValues[1];
+  OpFoldResult sequenceTileLength = queryDimValues[0];
+
+  Type elementType = tiledAttnOp.getQueryType().getElementType();
+  auto [result, newMax, newSum] = createAttentionBody(
+      keySlice, valueSlice, querySlice, tiledResult, max, sum,
+      sequenceTileLength, headDimension, elementType, ops, loc, rewriter);
+
+  tiledAttnOp.getResults()[0].replaceAllUsesWith(result);
+  tiledAttnOp.getResults()[1].replaceAllUsesWith(newMax);
+  tiledAttnOp.getResults()[2].replaceAllUsesWith(newSum);
+
+  OpBuilder::InsertionGuard afterScfLoop(rewriter);
+  rewriter.setInsertionPointAfter(tiledAttnOp->getParentOp());
+}
+
+/// Utility function which tiles and then decomposes attention op via
+/// FlashAttention algorithm.
+SmallVector<Operation *>
+tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
+                          RewriterBase &rewriter, bool onlyTile) {
+  SmallVector<Operation *> ops = tileAttention(attnOp, rewriter);
+  if (onlyTile)
+    return ops;
+  auto tiledAttnOp = cast<IREE::LinalgExt::AttentionOp>(ops[ops.size() - 1]);
+  ops.pop_back();
+  Operation *truncateToF16 = NULL;
+  Type elementType = attnOp.getQueryType().getElementType();
+  if (elementType.isF16()) {
+    truncateToF16 = ops[ops.size() - 1];
+    ops.pop_back();
+  }
+  decomposeTiledAttention(tiledAttnOp, ops, rewriter);
+  if (truncateToF16)
+    ops.push_back(truncateToF16);
   return ops;
 }
 
@@ -452,10 +517,10 @@ namespace {
 ///    j. Compute matmul(s, v) and add new_accumulator
 ///
 ///
-LogicalResult reifyAttentionTransform(func::FuncOp funcOp) {
+LogicalResult reifyAttentionTransform(func::FuncOp funcOp, bool onlyTile) {
   IRRewriter rewriter(funcOp.getContext());
   funcOp.walk([&](IREE::LinalgExt::AttentionOp attnOp) {
-    tileAndDecomposeAttention(attnOp, rewriter);
+    tileAndDecomposeAttention(attnOp, rewriter, onlyTile);
     return WalkResult::advance();
   });
   return success();
@@ -471,7 +536,11 @@ struct TileAndDecomposeAttentionPass
         affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
         linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
   }
-
+  TileAndDecomposeAttentionPass() = default;
+  TileAndDecomposeAttentionPass(bool onlyTile) { this->onlyTile = onlyTile; }
+  TileAndDecomposeAttentionPass(const TileAndDecomposeAttentionPass &pass) {
+    onlyTile = pass.onlyTile;
+  }
   void runOnOperation() override;
 };
 } // namespace
@@ -479,7 +548,7 @@ struct TileAndDecomposeAttentionPass
 void TileAndDecomposeAttentionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
-  if (failed(reifyAttentionTransform(getOperation())))
+  if (failed(reifyAttentionTransform(getOperation(), onlyTile)))
     return signalPassFailure();
 }
 

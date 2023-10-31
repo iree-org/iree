@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/EquivalenceClasses.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -22,9 +22,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-schedule-allocation"
@@ -39,22 +37,69 @@ namespace {
 // Alias analysis
 //===----------------------------------------------------------------------===//
 
-using ValueAliasingMap = llvm::MapVector<Value, SmallPtrSet<Value, 16>>;
+// Disjoint-set data structure holding non-overlapping sets of aliasing values.
+class ValueAliasingSet {
+public:
+  void addAlias(Value aliasee, Value aliaser) {
+    auto aliaseeWithId = getWithId(aliasee);
+    auto aliaserWithId = getWithId(aliaser);
+    valueAliasing.unionSets(aliaseeWithId, aliaserWithId);
+  }
+
+  SmallVector<SmallVector<Value>> getValueAliasSets() const {
+    SmallVector<SmallVector<Value>> result;
+    for (auto it = valueAliasing.begin(); it != valueAliasing.end(); ++it) {
+      if (!it->isLeader())
+        continue; // Ignore non-leader sets.
+      auto &aliasSet = result.emplace_back();
+      for (auto mi = valueAliasing.member_begin(it);
+           mi != valueAliasing.member_end(); ++mi) {
+        aliasSet.push_back(mi->value);
+      }
+    }
+    return result;
+  }
+
+  auto getValueAliases(Value value) const {
+    return llvm::make_filter_range(
+        llvm::map_range(
+            llvm::make_range(valueAliasing.findLeader(getWithId(value)),
+                             valueAliasing.member_end()),
+            NumberedValue::getValue),
+        [=](Value aliaser) { return aliaser != value; });
+  }
+
+private:
+  // EquivalenceClasses require ordering for value type to return deterministic
+  // results, so we provide it by assigning id to all values added to the set.
+  struct NumberedValue {
+    Value value;
+    int64_t id;
+
+    static Value getValue(const NumberedValue &value) { return value.value; }
+  };
+
+  struct Comparator {
+    int operator()(const NumberedValue &a, const NumberedValue &b) const {
+      return a.id < b.id;
+    }
+  };
+
+  NumberedValue getWithId(Value value) const {
+    auto [iterator, inserted] = id.try_emplace(value, id.size());
+    return {value, iterator->second};
+  }
+
+  mutable llvm::DenseMap<Value, int64_t> id;
+  llvm::EquivalenceClasses<NumberedValue, Comparator> valueAliasing;
+};
 
 // Builds a map of value aliases from aliasee to a set of aliasers.
 // Only values that alias will be present in the map. The map may contain
 // values nested within the |regionOp|.
 static void computeRegionValueAliases(Operation *regionOp,
-                                      ValueAliasingMap &valueAliases) {
+                                      ValueAliasingSet &valueAliases) {
   auto *block = &regionOp->getRegion(0).front();
-
-  auto propagateAlias = [&](Value streamValue, Value aliasedValue) {
-    auto &baseSet = valueAliases[streamValue];
-    baseSet.insert(aliasedValue);
-    auto &aliasedSet = valueAliases[aliasedValue];
-    baseSet.insert(aliasedSet.begin(), aliasedSet.end());
-    aliasedSet.insert(streamValue);
-  };
 
   // Filter out to only resource results - some regions may return additional
   // things like stream.async.execute returning a timepoint.
@@ -73,7 +118,7 @@ static void computeRegionValueAliases(Operation *regionOp,
         tiedStreamOp.getTiedResultOperandIndex(outerResult.getResultNumber());
     if (tiedOperandIndex.has_value()) {
       auto arg = block->getArgument(tiedOperandIndex.value());
-      propagateAlias(innerResult, arg);
+      valueAliases.addAlias(innerResult, arg);
     }
   }
 
@@ -95,31 +140,18 @@ static void computeRegionValueAliases(Operation *regionOp,
       if (tiedOp) {
         auto tiedOperand = tiedOp.getTiedResultOperand(result);
         if (tiedOperand) {
-          propagateAlias(result, tiedOperand);
-        }
-      }
-    }
-  }
-
-  // Invert the value aliaser->aliasee map so that we have for any particular
-  // value the list of all other values that alias it.
-  for (auto it : valueAliases) {
-    for (auto aliasee : it.second) {
-      for (auto aliaser : it.second) {
-        if (aliaser != aliasee) {
-          valueAliases[aliasee].insert(aliaser);
+          valueAliases.addAlias(result, tiedOperand);
         }
       }
     }
   }
 }
 
-// Builds a map of value aliases from aliasee to a set of aliasers.
-// Only values that alias will be present in the map. The map may contain
-// values nested within the |executeOp|.
-static ValueAliasingMap
+// Builds a set of aliasing sets. Only values that alias will be present in the
+// set. The set may contain values nested within the |executeOp|.
+static ValueAliasingSet
 computeExecutionRegionValueAliases(IREE::Stream::AsyncExecuteOp executeOp) {
-  ValueAliasingMap valueAliases;
+  ValueAliasingSet valueAliases;
   computeRegionValueAliases(executeOp, valueAliases);
   return valueAliases;
 }
@@ -154,7 +186,7 @@ using LivenessIntervalList = SmallVector<LivenessInterval>;
 // lifetime.
 static LivenessIntervalList
 computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
-                                        const ValueAliasingMap &valueAliases) {
+                                        const ValueAliasingSet &valueAliases) {
   // Perform a liveness analysis on the execution region.
   // Fragments have a single block and as such the live-in/live-out block
   // information derived here applies to the entire stream region.
@@ -243,29 +275,37 @@ computeExecutionRegionLivenessIntervals(IREE::Stream::AsyncExecuteOp executeOp,
     }
   }
 
-  // Walk the alias map and union intervals and propagate back.
-  for (auto it : valueAliases) {
-    auto &aliasee = it.first;
-    auto &aliasers = it.second;
-    auto &aliaseeInterval = valueIntervals[aliasee];
-    if (aliaseeInterval.ordinal == -1) {
-      // Aliasee is nested somewhere within the current scope.
-      // We'd need to update this analysis to handle the nesting in order to
-      // compute the ranges here but that's not (currently) required as all
-      // allocated values roll up to the parent scope by way of the yields.
+  // Walk the alias set and union intervals and propagate back.
+  for (auto &aliasSet : valueAliases.getValueAliasSets()) {
+
+    // Return true if value is nested  somewhere within the current scope.
+    auto isNested = [&](Value value) -> bool {
+      return valueIntervals[value].ordinal == -1;
+    };
+
+    // We'd need to update this analysis to handle the nesting in order to
+    // compute the ranges here but that's not (currently) required as all
+    // allocated values roll up to the parent scope by way of the yields.
+    if (llvm::all_of(aliasSet, isNested))
       continue;
-    }
+
+    assert((llvm::all_of(aliasSet, isNested) ||
+            llvm::none_of(aliasSet, isNested)) &&
+           "nested values can't alias values in the current scope");
+
+    auto &aliaseeInterval = valueIntervals[aliasSet.front()];
     int start = aliaseeInterval.start;
     int end = aliaseeInterval.end;
-    for (auto aliaser : aliasers) {
+
+    auto aliasers = ArrayRef(aliasSet).drop_front(1);
+    for (Value aliaser : aliasers) {
       auto &aliaserInterval = valueIntervals[aliaser];
-      assert(aliaserInterval.ordinal != -1);
       start = std::min(start, aliaserInterval.start);
       end = std::max(end, aliaserInterval.end);
     }
-    aliaseeInterval.start = start;
-    aliaseeInterval.end = end;
-    for (auto aliaser : aliasers) {
+
+    // Propagate interval back to all values in the aliasing set.
+    for (Value aliaser : aliasSet) {
       auto &aliaserInterval = valueIntervals[aliaser];
       aliaserInterval.start = start;
       aliaserInterval.end = end;
@@ -336,8 +376,8 @@ struct AllocationScope {
   // Execution region being allocated.
   Operation *getRootOp() const { return rootOp; }
 
-  // Aliasing map for the entire root op, indicating which values are tied.
-  const ValueAliasingMap &getValueAliases() const { return valueAliases; }
+  // Aliasing set for the entire root op, indicating which values are tied.
+  const ValueAliasingSet &getValueAliases() const { return valueAliases; }
 
   // TODO(benvanik): rework this so that we don't do a switcheroo right in the
   // middle of processing.
@@ -391,7 +431,7 @@ struct AllocationScope {
     });
 
     // Propagate alias subranges when present.
-    for (auto alias : valueAliases[resource]) {
+    for (auto alias : valueAliases.getValueAliases(resource)) {
       ResourceRange aliasRange = resourceRange;
       if (auto subviewOp =
               IREE::Stream::ResourceSubviewOp::findSubviewOp(alias)) {
@@ -445,21 +485,18 @@ struct AllocationScope {
   void forEachResourceAlias(Value resource,
                             std::function<void(Value)> callback) const {
     callback(resource);
-    auto it = valueAliases.find(resource);
-    if (it != valueAliases.end()) {
-      for (auto alias : it->second) {
-        callback(alias);
-      }
+    for (Value alias : valueAliases.getValueAliases(resource)) {
+      callback(alias);
     }
   }
 
 private:
   Operation *rootOp;
 
-  // All values that have aliases mapped to a set of all of the values they
-  // alias with. That two things alias does not imply the values can be treated
-  // as equivalent: some values may be subranges of others.
-  ValueAliasingMap valueAliases;
+  // Disjoint-set of values that alias each other. That two things alias does
+  // not imply the values can be treated as equivalent: some values may be
+  // subranges of others.
+  ValueAliasingSet valueAliases;
 
   // Index value -> std.constant index value.
   DenseMap<int64_t, Value> indexConstantMap;
@@ -728,10 +765,9 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   }
 
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.getWorkload(),
-      builder.getArrayAttr({asyncOp.getEntryPoint()}), newOperands,
-      newResources, newResourceSizes, newResourceOffsets, newResourceLengths,
-      builder.getArrayAttr(newResourceAccesses));
+      asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPointsAttr(),
+      newOperands, newResources, newResourceSizes, newResourceOffsets,
+      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
   newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();
@@ -1227,7 +1263,7 @@ static Value findTiedYieldResult(Value seedValue) {
   auto regionOp =
       cast<RegionBranchOpInterface>(seedValue.getParentRegion()->getParentOp());
   SmallVector<RegionSuccessor> regions;
-  regionOp.getSuccessorRegions(0, regions);
+  regionOp.getSuccessorRegions(regionOp->getRegion(0), regions);
   auto results = regions.front().getSuccessorInputs();
   SmallVector<Value> worklist;
   worklist.push_back(seedValue);
@@ -1541,28 +1577,28 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   auto resultAllocation = reserveResultAllocation(resultReservations);
   for (auto &reservationSet : resultAllocation.reservationSets) {
     // Allocate and tie an operand to the result.
-    // TODO(benvanik): change this to an alloca. We may need a higher-level
-    // analysis to decide when to deallocate, or just leave it to be deallocated
-    // as part of garbage collection.
-    auto allocOp = externalBuilder.create<IREE::Stream::ResourceAllocOp>(
-        externalBuilder.getFusedLoc(reservationSet.reservationLocs),
-        reservationSet.reservationTypes, reservationSet.reservationSizes,
-        /*uninitialized=*/externalBuilder.getUnitAttr(),
-        executeOp.getAffinityAttr());
+    auto timepointType = externalBuilder.getType<IREE::Stream::TimepointType>();
+    auto [allocaOp, suballocations] =
+        IREE::Stream::ResourceAllocaOp::createSuballocations(
+            timepointType, reservationSet.reservationTypes.front(),
+            reservationSet.reservationLocs, reservationSet.reservationSizes,
+            executeOp.getAwaitTimepoint(), executeOp.getAffinityAttr(),
+            externalBuilder);
+    newAwaitTimepoints.push_back(allocaOp.getResultTimepoint());
 
     auto asmState = getRootAsmState(executeOp->getParentOp());
     LLVM_DEBUG({
       llvm::dbgs() << "  + alloc for result reservation set: ";
-      allocOp.print(llvm::dbgs(), *asmState);
+      allocaOp.print(llvm::dbgs(), *asmState);
       llvm::dbgs() << ":\n";
     });
 
-    for (auto [reservation, allocResult] :
-         llvm::zip_equal(reservationSet.reservations, allocOp.getResults())) {
-      newOperands.push_back(allocResult);
+    for (auto [reservation, suballocation] :
+         llvm::zip_equal(reservationSet.reservations, suballocations)) {
+      newOperands.push_back(suballocation);
       newOperandSizes.push_back(reservation.resultSize);
       resultReplacements.push_back(
-          std::make_pair(reservation.result, allocResult));
+          std::make_pair(reservation.result, suballocation));
 
       // Insert entry arg for the new operand tied all the way to the yield.
       auto arg =
@@ -1785,9 +1821,12 @@ public:
           callableOp.getCallableRegion()->empty()) {
         continue;
       }
-      for (auto &op : llvm::make_early_inc_range(
-               callableOp.getCallableRegion()->getOps())) {
-        if (failed(TypeSwitch<Operation *, LogicalResult>(&op)
+
+      llvm::SmallVector<Operation *> operations;
+      callableOp.walk([&](Operation *op) { operations.push_back(op); });
+
+      for (auto op : operations) {
+        if (failed(TypeSwitch<Operation *, LogicalResult>(op)
                        .Case([&](IREE::Stream::AsyncExecuteOp op) {
                          return allocateExecutionRegion(op);
                        })

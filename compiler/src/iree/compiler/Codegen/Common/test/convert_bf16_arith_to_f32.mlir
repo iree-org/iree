@@ -119,3 +119,14 @@ func.func @store_reduction_bf16(%arg0 : vector<3xbf16>, %arg1 : vector<3xbf16>, 
 // CHECK:  %[[VAL7:.+]] = vector.broadcast %[[VAL6]] : bf16 to vector<bf16>
 // CHECK:  %[[VAL8:.+]] = vector.extractelement %[[VAL7]][] : vector<bf16>
 // CHECK:  memref.store %[[VAL8]], %arg2[] : memref<bf16>
+
+// -----
+
+// Regression test - preserve the scalability
+
+// CHECK-LABEL: @fma_f32_regression
+func.func @fma_f32_regression(%a : vector<[32]xf32>, %b : vector<[32]xf32>, %c : vector<[32]xf32>) -> vector<[32]xf32> {
+  // CHECK: vector.fma %{{.*}}, %{{.*}}, %{{.*}} : vector<[32]xf32>
+  %res = vector.fma %a, %b, %c : vector<[32]xf32>
+  return %res : vector<[32]xf32>
+}

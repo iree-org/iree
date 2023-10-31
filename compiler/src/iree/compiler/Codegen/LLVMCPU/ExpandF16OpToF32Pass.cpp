@@ -58,7 +58,7 @@ struct ExpandF16OpToF32Pass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
-    patterns.insert<ExpandF16OpToF32Pattern<arith::MaxFOp>>(context);
+    patterns.insert<ExpandF16OpToF32Pattern<arith::MaximumFOp>>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

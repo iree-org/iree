@@ -38,6 +38,7 @@ def HAL_Dialect : Dialect {
   }];
 
   let useDefaultAttributePrinterParser = 0;
+  let usePropertiesForAttributes = 0;
 }
 
 #endif // IREE_DIALECT_HAL_DIALECT

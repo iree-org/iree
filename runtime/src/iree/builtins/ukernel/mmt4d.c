@@ -12,12 +12,11 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
   const iree_uk_uint32_t allflags =
       IREE_UK_FLAG_MMT4D_TYPE_MASK | IREE_UK_FLAG_MMT4D_ACCUMULATE |
-      IREE_UK_FLAG_MMT4D_PREFER_INTRINSICS |
       IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
   iree_uk_uint32_t flags_type = params->flags & IREE_UK_FLAG_MMT4D_TYPE_MASK;
   IREE_UK_ASSERT(flags_type == IREE_UK_FLAG_MMT4D_TYPE_F32F32F32 ||
-                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_I8I8I32 ||
+                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_S8S8S32 ||
                  flags_type == IREE_UK_FLAG_MMT4D_TYPE_F16F16F32 ||
                  flags_type == IREE_UK_FLAG_MMT4D_TYPE_F16F16F16 ||
                  flags_type == IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32 ||
@@ -51,7 +50,6 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
                                           iree_uk_mmt4d_tile_func_t tile_func) {
   const iree_uk_int32_t M = params->M;
   const iree_uk_int32_t N = params->N;
-  const iree_uk_int32_t K = params->K;
   const iree_uk_int16_t M0 = params->M0;
   const iree_uk_int16_t N0 = params->N0;
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
@@ -79,7 +77,7 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
     IREE_UK_PREFETCH_RO(lhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
     IREE_UK_PREFETCH_RO(rhs_panel, IREE_UK_PREFETCH_LOCALITY_L1);
     for (iree_uk_int32_t j = 0; j < N; ++j) {
-      tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
+      tile_func(out_tile, lhs_panel, rhs_panel, params);
       out_tile += out_tile_size;
       rhs_panel += rhs_panel_stride;
     }

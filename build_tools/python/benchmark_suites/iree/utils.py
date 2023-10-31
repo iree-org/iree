@@ -24,7 +24,7 @@ def generate_e2e_model_run_configs(
             module_generation_config=module_generation_config,
             module_execution_config=module_execution_config,
             target_device_spec=device_spec,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=tool,
             tags=tags,
             presets=presets,

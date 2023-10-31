@@ -12,14 +12,26 @@ import subprocess
 import unittest
 
 NOTEBOOKS_TO_SKIP = [
-    # Generally unstable since this installs tf-nightly. tflite_runtime also
-    # requires some deps ("version `GLIBC_2.29' not found") that
+    # matplotlib error when testing:
+    #   FileNotFoundError: [Errno 2] No such file or directory: 'seaborn-whitegrid'
+    # support level for TF-code and samples is also low
+    "tensorflow_mnist_training.ipynb",
+    # tflite_runtime requires some deps ("version `GLIBC_2.29' not found") that
     # samples.Dockerfile does not currently include.
     "tflite_text_classification.ipynb",
+    # PyTorch notebooks using SHARK-Turbine require Python 3.10+ in Docker.
+    "pytorch_aot_simple.ipynb",
+    "pytorch_jit.ipynb",
 ]
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-    # None!
+    # Error:
+    # ```
+    #     module 'tensorflow.python.pywrap_mlir' has no attribute
+    #     'experimental_convert_saved_model_v1'
+    # ```
+    # convert_saved_model_v1 may be broken, but convert_saved_model works?
+    "tensorflow_hub_import.ipynb",
 ]
 
 

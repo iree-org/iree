@@ -6,7 +6,7 @@
   ]>
 ]>
 hal.executable private @ex {
-  hal.executable.variant public @variant, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64"> {
+  hal.executable.variant public @variant target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">) {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):
       %c1 = arith.constant 1 : index

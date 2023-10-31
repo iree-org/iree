@@ -3,13 +3,10 @@
 	url = https://github.com/google/googletest.git
 [submodule "third_party/llvm-project"]
 	path = third_party/llvm-project
-	url = https://github.com/iree-org/iree-llvm-fork.git
+	url = https://github.com/shark-infra/llvm-project.git
 [submodule "third_party/vulkan_headers"]
 	path = third_party/vulkan_headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
-[submodule "third_party/vulkan_memory_allocator"]
-	path = third_party/vulkan_memory_allocator
-	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
 [submodule "third_party/spirv_headers"]
 	path = third_party/spirv_headers
 	url = https://github.com/KhronosGroup/SPIRV-Headers.git
@@ -43,4 +40,13 @@
 	url = https://github.com/powderluv/musl.git
 [submodule "third_party/stablehlo"]
 	path = third_party/stablehlo
-	url = https://github.com/iree-org/stablehlo.git
+	url = https://github.com/shark-infra/stablehlo.git
+[submodule "third_party/torch-mlir"]
+	path = third_party/torch-mlir
+	url = https://github.com/shark-infra/torch-mlir.git
+[submodule "third_party/ROCm-Device-Libs"]
+	path = third_party/ROCm-Device-Libs
+	url = https://github.com/shark-infra/ROCm-Device-Libs
+[submodule "third_party/hip-build-deps"]
+	path = third_party/hip-build-deps
+	url = https://github.com/shark-infra/hip-build-deps.git

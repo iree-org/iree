@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_CPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_COMMON_CPU_PASSES_H_
 
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -22,7 +23,8 @@ namespace iree_compiler {
 ///   linalg_ext.set_encoding   -> tensor.pack
 ///   linalg_ext.unset_encoding -> tensor.unpack
 ///   linalg.matmul             -> linalg.mmt4d
-std::unique_ptr<OperationPass<func::FuncOp>> createCPUMaterializeEncodingPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createCPUMaterializeEncodingPass(
+    IREE::HAL::ExecutableTargetAttr targetAttr = nullptr);
 
 /// Like createLLVMCPUMaterializeEncodingPass, but specifically for
 /// linalg_ext.upper_bound_tile_size, converting it to constants.
@@ -40,7 +42,8 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCPUMaterializeEncodingPass();
 /// that is the largest tile size that we can use in VMVX, and can be adjusted
 // as needed.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCPUMaterializeUpperBoundTileSizePass();
+createCPUMaterializeUpperBoundTileSizePass(
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs = {});
 
 void registerCodegenCommonCPUPasses();
 

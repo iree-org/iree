@@ -14,7 +14,7 @@ flow.executable @single_executable_ex_0 {
 func.func @single_executable(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @single_executable_ex_0::@single_executable_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %0 = flow.dispatch @single_executable_ex_0::@single_executable_entry_0[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch @single_executable_ex_0::@single_executable_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   return %0 : tensor<4xf32>
 }
 
@@ -51,15 +51,28 @@ flow.executable @duplicate_executables_ex_2 {
   }
 }
 // CHECK-LABEL: func.func @duplicate_executables
-func.func @duplicate_executables(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+func.func @duplicate_executables(%arg0: tensor<4xf32>) {
   %c4 = arith.constant 4 : index
-  // CHECK: %0 = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %0 = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %1 = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %1 = flow.dispatch @duplicate_executables_ex_1::@duplicate_executables_entry_1[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %2 = flow.dispatch @duplicate_executables_ex_2::@duplicate_executables_entry_2[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %2 = flow.dispatch @duplicate_executables_ex_2::@duplicate_executables_entry_2[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  return %0 : tensor<4xf32>
+  // CHECK: = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %1 = flow.dispatch @duplicate_executables_ex_1::@duplicate_executables_entry_1[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: = flow.dispatch @duplicate_executables_ex_2::@duplicate_executables_entry_2[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %2 = flow.dispatch @duplicate_executables_ex_2::@duplicate_executables_entry_2[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: = flow.dispatch {@duplicate_executables_ex_0::@duplicate_executables_entry_0, @duplicate_executables_ex_0::@duplicate_executables_entry_0}
+  %3 = flow.dispatch {@duplicate_executables_ex_0::@duplicate_executables_entry_0, @duplicate_executables_ex_1::@duplicate_executables_entry_1}[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  return
+}
+
+// Ensure that symbol renaming is done within initializers.
+// CHECK: util.initializer
+util.initializer {
+  // CHECK: %[[CST:.*]] = arith.constant dense<1.000000e+00>
+  %cst = arith.constant dense<1.000000e+00> : tensor<4xf32>
+  // CHECK: {{.*}} = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0(%[[CST]]) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch @duplicate_executables_ex_1::@duplicate_executables_entry_1(%cst) : (tensor<4xf32>) -> tensor<4xf32>
+  util.optimization_barrier %0 : tensor<4xf32>
+  util.initializer.return
 }
 
 // -----
@@ -88,9 +101,9 @@ flow.executable @same_ops_diff_operands_ex_1 {
 func.func @same_ops_diff_operands(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>) -> tensor<2xi32> {
   %c4 = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @same_ops_diff_operands_ex_0::@entry_0[%c4](%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
-  %0 = flow.dispatch @same_ops_diff_operands_ex_0::@entry_0[%c4] (%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  %0 = flow.dispatch @same_ops_diff_operands_ex_0::@entry_0[%c4](%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
   // CHECK: %1 = flow.dispatch @same_ops_diff_operands_ex_1::@entry_1[%c4](%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
-  %1 = flow.dispatch @same_ops_diff_operands_ex_1::@entry_1[%c4] (%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  %1 = flow.dispatch @same_ops_diff_operands_ex_1::@entry_1[%c4](%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
   return %0 : tensor<2xi32>
 }
 
@@ -131,28 +144,14 @@ func.func @multiple_entry_points(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[C4:.*]] = arith.constant 4
   %c4 = arith.constant 4 : index
   // CHECK:      {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %0 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %1 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %1 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %2 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_0[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %2 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %3 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_1[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %3 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_1[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   return %0 : tensor<4xf32>
-}
-
-// Ensure that symbol renaming is done within initializers.
-util.global private @result : tensor<4xf32>
-// CHECK: util.initializer
-util.initializer {
-  // CHECK: %[[C4:.*]] = arith.constant 4
-  %c4 = arith.constant 4 : index
-  // CHECK: %[[CST:.*]] = arith.constant dense<1.000000e+00>
-  %cst = arith.constant dense<1.000000e+00> : tensor<4xf32>
-  // CHECK: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%[[CST]]) : (tensor<4xf32>) -> tensor<4xf32>
-  %0 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_1[%c4] (%cst) : (tensor<4xf32>) -> tensor<4xf32>
-  util.global.store %0, @result : tensor<4xf32>
-  util.initializer.return
 }
 
 // -----
@@ -181,9 +180,9 @@ flow.executable @different_types_int_ex {
 func.func @different_types(%arg0: tensor<4xf32>) -> tensor<4xi1> {
   %c4 = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @different_types_float_ex::@different_types_float_entry[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xi1>
-  %0 = flow.dispatch @different_types_float_ex::@different_types_float_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xi1>
+  %0 = flow.dispatch @different_types_float_ex::@different_types_float_entry[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xi1>
   // CHECK: %1 = flow.dispatch @different_types_int_ex::@different_types_int_entry[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xi1>
-  %1 = flow.dispatch @different_types_int_ex::@different_types_int_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xi1>
+  %1 = flow.dispatch @different_types_int_ex::@different_types_int_entry[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xi1>
   return %0 : tensor<4xi1>
 }
 
@@ -198,7 +197,7 @@ flow.executable @nested_ops_ex_0 {
       %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
@@ -213,7 +212,7 @@ flow.executable @nested_ops_ex_1 {
       %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
@@ -228,7 +227,7 @@ flow.executable @nested_ops_ex_2 {
       %init = tensor.empty() : tensor<5x6xf32>
       %min = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.minf %arg1, %arg2 : f32
+        %27 = arith.minimumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %min : tensor<5x6xf32>
@@ -239,11 +238,11 @@ flow.executable @nested_ops_ex_2 {
 func.func @nested_ops(%arg0: tensor<5x6xf32>, %arg1: tensor<5x6xf32>) -> tensor<5x6xf32> {
   %c4 = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
-  %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4] (%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
   // CHECK: %1 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
-  %1 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4] (%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  %1 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
   // CHECK: %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
-  %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4] (%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
+  %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
   return %0 : tensor<5x6xf32>
 }
 
@@ -260,7 +259,7 @@ flow.executable @attributes_ex_0 {
       %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
@@ -276,7 +275,7 @@ flow.executable @attributes_ex_1 {
       // map1 instead of map0
       %max = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>
@@ -292,7 +291,7 @@ flow.executable @attributes_ex_2 {
       %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
-        %27 = arith.maxf %arg1, %arg2 : f32
+        %27 = arith.maximumf %arg1, %arg2 : f32
         linalg.yield %27 : f32
       } -> tensor<5x6xf32>
       return %max : tensor<5x6xf32>

@@ -1,4 +1,5 @@
-// RUN: iree-opt --iree-flow-transformation-pipeline --split-input-file %s | FileCheck %s
+// TODO(hanchung): Split the transformation pipeline tests into two mlir files.
+// RUN: iree-opt --iree-global-optimization-transformation-pipeline --iree-flow-transformation-pipeline --split-input-file %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1)>
@@ -94,7 +95,7 @@ module {
 //       CHECK:   arith.subf
 //       CHECK:   arith.mulf
 //       CHECK:   %[[GEN1:.+]] = linalg.generic
-//  CHECK-SAME:       ["parallel", "parallel", "parallel", "reduction", "reduction"]
+//  CHECK-SAME:       ["parallel", "reduction", "reduction"]
 //  CHECK-SAME:       ins(
 //  CHECK-SAME:       %[[GEN0]]
 //  CHECK-SAME:       outs(
@@ -103,4 +104,5 @@ module {
 //       CHECK:   flow.dispatch.tensor.store %[[GEN1]]
 //       CHECK:   func.func @grouped_quantized_matmul(
 //       CHECK:     %[[T0:.+]] = flow.dispatch @[[EXECUTABLE0]]::@[[FUNC0]]
-//       CHECK:     return %[[T0]]
+//       CHECK:     %[[RS:.+]] = flow.tensor.reshape %[[T0]] : tensor<4096xf32> -> tensor<1x1x4096xf32>
+//       CHECK:     return %[[RS]]

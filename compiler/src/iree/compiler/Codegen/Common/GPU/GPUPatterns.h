@@ -27,6 +27,8 @@ void populateCombineVectorTransferReadBroadcastPatterns(
 void populateContractPromotionPatterns(RewritePatternSet &patterns,
                                        ArrayRef<int64_t> operandsToPromote);
 
+void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns);
+
 } // namespace iree_compiler
 } // namespace mlir
 

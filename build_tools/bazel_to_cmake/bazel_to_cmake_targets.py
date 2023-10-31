@@ -17,7 +17,7 @@ class TargetConverter:
         self._update_target_mappings(
             {
                 # Internal utilities to emulate various binary/library options.
-                f"{iree_core_repo}//build_tools:default_linkopts": [],
+                f"{iree_core_repo}//build_tools:pthreads": [],
                 f"{iree_core_repo}//build_tools:dl": ["${CMAKE_DL_LIBS}"],
                 f"{iree_core_repo}//compiler/src/iree/compiler/API:CAPI": [
                     "IREECompilerCAPILib"
@@ -86,10 +86,6 @@ class TargetConverter:
                 "@nccl//:headers": [
                     "nccl::headers",
                 ],
-                # Torch-MLIR.
-                "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
-                    "TorchMLIRTMTensorDialect"
-                ],
                 # Tracy.
                 "@tracy_client//:runtime": ["tracy_client::runtime"],
                 # Vulkan
@@ -103,9 +99,6 @@ class TargetConverter:
                 "@com_google_googletest//:gtest": ["gmock", "gtest"],
                 "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
                 "@cpuinfo": ["${IREE_CPUINFO_TARGET}"],
-                "@vulkan_memory_allocator//:impl_header_only": [
-                    "vulkan_memory_allocator"
-                ],
                 "@webgpu_headers": [],
             }
         )

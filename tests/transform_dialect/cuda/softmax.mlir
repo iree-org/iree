@@ -5,8 +5,8 @@
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target)))' \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/softmax_codegen_spec.mlir \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
@@ -16,7 +16,7 @@
 // RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/softmax_codegen_spec.mlir | \
 // RUN: iree-run-module --module=- --function=softmax --device=cuda | \
 // RUN: FileCheck %s
 
@@ -26,7 +26,7 @@
 !out_tensor_t = tensor<16x128x128xf32>
 
 // Compilation checks that shuffles are produced.
-// CHECK-SHUFFLE: vector.reduction <maxf>
+// CHECK-SHUFFLE: vector.reduction <maximumf>
 // CHECK-SHUFFLE-COUNT-5: gpu.shuffle  xor
 // CHECK-SHUFFLE: vector.reduction <add>
 // CHECK-SHUFFLE-COUNT-5: gpu.shuffle  xor
@@ -53,7 +53,7 @@ func.func @softmax() -> !out_tensor_t {
      ins(%input : !in_tensor_t)
     outs(%input_max_filled : !tmp_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32):
-        %max = arith.maxf %arg0, %arg1 : f32
+        %max = arith.maximumf %arg0, %arg1 : f32
         linalg.yield %max : f32
       } -> !tmp_tensor_t
 

@@ -20,6 +20,21 @@ file(GENERATE
   CONTENT "${_STATIC_LINKED_PLUGINS_CONTENTS}"
 )
 
+# For each statically linked plugin, will define a preprocessor variable of
+# IREE_COMPILER_PLUGIN_HAVE_STATIC_${PLUGIN_ID} (where the plugin id is
+# converted to uppercase). Can be used to make decisions in source code based
+# on whether a plugin has been statically linked.
+iree_cc_library(
+  NAME
+    Defs
+)
+
+foreach(_plugin_id ${_CONFIG_LINKED_PLUGIN_IDS})
+  string(TOUPPER "${_plugin_id}" _plugin_id)
+  target_compile_definitions(iree_compiler_PluginAPI_Config_Defs INTERFACE
+    "IREE_COMPILER_PLUGIN_HAVE_STATIC_${_plugin_id}=1")
+endforeach()
+
 # Uncomment for debugging.
 # message(STATUS "*** STATIC LINKING PLUGIN LIBRARIES: ${_CONFIG_LINKED_PLUGIN_LIBS}")
 iree_cc_library(
@@ -28,5 +43,6 @@ iree_cc_library(
   HDRS
     StaticLinkedPlugins.inc
   DEPS
+    ::Defs
     ${_CONFIG_LINKED_PLUGIN_LIBS}
 )

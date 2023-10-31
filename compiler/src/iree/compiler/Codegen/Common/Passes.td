@@ -158,6 +158,14 @@ def DecomposePackUnPackOps :
   ];
 }
 
+def ReplaceSlowMinMaxOps
+    : Pass<"iree-codegen-replace-slow-min-max-ops", "func::FuncOp"> {
+  let summary =
+      "Replace slow min/max operations that propagate NaNs and distinguish "
+      "between +/-0.0 with faster min/max operations that ignore them.";
+  let constructor = "mlir::iree_compiler::createReplaceSlowMinMaxOpsPass()";
+}
+
 def EliminateEmptyTensors :
     Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
@@ -177,11 +185,18 @@ def EraseDeadAllocAndStores :
       "mlir::iree_compiler::createEraseDeadAllocAndStoresPass()";
 }
 
-def EraseHALDescriptorTypeFromMemRef :
-    Pass<"iree-codegen-erase-hal-descriptor-type-from-memref", "func::FuncOp"> {
+def EraseHALDescriptorTypeFromMemRef
+    : Pass<"iree-codegen-erase-hal-descriptor-type-from-memref"> {
   let summary = "Erase #hal.descriptor_type from MemRef memory space";
   let constructor =
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
+}
+
+def ConvertHALDescriptorTypeToGPUAddressSpace
+    : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
+  let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let constructor =
+      "mlir::iree_compiler::createConvertHALDescriptorTypeToGPUAddressSpacePass()";
 }
 
 def ExtractAddressComputation: Pass<"extract-address-computation"> {
@@ -249,6 +264,16 @@ def GenericVectorization :
       "Rewrite all tensor.pad ops in the function to vector form.">,
     Option<"vectorizeGatherAccesses", "vectorize-gather-accesses", "bool", /*default=*/"false",
       "Enable vectorizaiton of operations that may generate vector.gather operations.">,
+    Option<"enableCleanup", "enable-cleanup", "bool",/*default=*/"true",
+      "Enable cleanups after vectorization. The patterns touch the structure"
+      "generated from tiling so it affects later steps like bufferization and vector hoisting.">,
+    Option<"generateContract", "generate-contract", "bool",/*default=*/"true",
+      "Enable conversion for reduction ops to contraction ops.">,
+    Option<"foldCastIntoContract", "fold-cast-into-contract", "bool",/*default=*/"false",
+      "Enable folding casting ops into vector.contract.">,
+    Option<"maxVectorSize", "max-vector-size", "int64_t",
+            /*default=*/"2147483647",
+           "Max vector size allowed to avoid creating large vectors.">
   ];
   let constructor =
       "mlir::iree_compiler::createGenericVectorizationPass()";
@@ -258,6 +283,12 @@ def HoistRedundantVectorTransfers :
     Pass<"iree-codegen-hoist-redundant-vector-transfers", "func::FuncOp"> {
   let summary = "Hoist redundant vector transfers";
   let constructor = "mlir::iree_compiler::createHoistRedundantVectorTransfersPass()";
+}
+
+def HoistUnrolledVectorExtractInsertSlice :
+    Pass<"iree-codegen-hoist-vector-extract-insert-slice", "func::FuncOp"> {
+  let summary = "Hoist unrolled vector (extract, insert) pairs out of scf.for op";
+  let constructor =  "mlir::iree_compiler::createHoistUnrolledVectorExtractInsertSlicePass()";
 }
 
 def HoistStaticallyBoundAllocations :
@@ -300,6 +331,21 @@ def LowerUKernelOpsToCalls :
     Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
   let summary = "Lower micro-kernel wrapper ops into function calls";
   let constructor = "mlir::iree_compiler::createLowerUKernelOpsToCallsPass()";
+}
+
+def MaterializeEncodingIntoNop :
+    Pass<"iree-codegen-materialize-encoding-into-nop", "func::FuncOp"> {
+  let summary = "";
+  let constructor = "mlir::iree_compiler::createMaterializeEncodingIntoNopPass()";
+}
+
+def MaterializeUserConfigs :
+    Pass<"iree-codegen-materialize-user-configs", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Sets the lowering configs and translation info from user configs";
+  let constructor = "mlir::iree_compiler::createMaterializeUserConfigsPass()";
+  let dependentDialects = [
+      "transform::TransformDialect"
+  ];
 }
 
 def MemrefCopyToLinalgPass :
@@ -413,11 +459,10 @@ def TransformDialectInterpreter :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
-    Option<"transformLibraryFileName",
-           "transform-library-file-name",
+    ListOption<"transformLibraryPaths",
+           "transform-library-paths",
            "std::string",
-           /*default=*/"\"\"",
-           "If non-empty, the name of the file containing definitions of "
+           "If non-empty, the paths to files containing definitions of "
            "external symbols referenced in the transform script. "
            "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",

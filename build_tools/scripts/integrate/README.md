@@ -87,15 +87,15 @@ In this guide, we reference this directory as `$SCRIPTS`.
 
 ### Advancing the mainline branch in forks
 
-The IREE team maintains fork repositories for both llvm-project and stablehlo,
-allowing them to be patched out of band. These repositories are:
+The [shark-infra](https://github.com/shark-infra) org maintains forks of
+key repositories for which we may need to carry local patches. Anyone who
+contributes to the project can request access to create patch branches here.
 
-* https://github.com/iree-org/iree-llvm-fork (`main` branch)
-* https://github.com/iree-org/stablehlo (`main` branch)
-* https://github.com/iree-org/iree-tf-fork (`master` branch)
+* https://github.com/shark-infra/llvm-project (`main` branch)
+* https://github.com/shark-infra/stablehlo (`main` branch)
 
-Iree repository has an
-action named [Advance Upstream Forks](https://github.com/openxla/iree/actions/workflows/advance_upstream_forks.yml)
+The [fork-roller](https://github.com/shark-infra/fork-roller) repository has an
+action named [Advance Upstream Forks](https://github.com/shark-infra/fork-roller/blob/main/.github/workflows/advance_forks.yml)
 to update the forks. Just select `Run Workflow` on that action and give it a
 minute. You should see the fork repository mainline branch move forward. This
 action runs hourly. If needing up to the minute changes, you may need to trigger
@@ -246,8 +246,8 @@ under docker, we can find the hash from CI log.
 An example from a log:
 
 ```
-[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:eb0063d640d8402b077fcec5533f247ba3497921fa86fe47337b97a4a7df7b1a build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
-Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:eb0063d640d8402b077fcec5533f247ba3497921fa86fe47337b97a4a7df7b1a' locally
+[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:1d2424dc512545a32b68e3f6b839541832fa24b5fce78cb253b3a4cd4592d9b2 build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
+Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:1d2424dc512545a32b68e3f6b839541832fa24b5fce78cb253b3a4cd4592d9b2' locally
 sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405: Pulling from iree-oss/frontends-swiftshader
 ```
 
@@ -255,7 +255,7 @@ You can find the hash tag from log and run the below command. It makes sure that
 you have the enviroment as same as CI bot and requires less local setup.
 
 ```
-docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:eb0063d640d8402b077fcec5533f247ba3497921fa86fe47337b97a4a7df7b1a
+docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:1d2424dc512545a32b68e3f6b839541832fa24b5fce78cb253b3a4cd4592d9b2
 ```
 
 To repro failures in `iree/e2e/`:

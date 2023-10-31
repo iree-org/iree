@@ -23,7 +23,6 @@ iree_cc_library(
     "DumpExecutableSources.cpp"
     "ElideRedundantCommands.cpp"
     "FixupLegacySync.cpp"
-    "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
     "MaterializeDispatchInstrumentation.cpp"
     "MaterializeInterfaces.cpp"
@@ -63,7 +62,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::Conversion

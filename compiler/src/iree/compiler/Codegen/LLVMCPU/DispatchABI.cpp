@@ -1011,7 +1011,8 @@ Value HALDispatchABI::loadExecutableConstant(Operation *forOp, StringRef key,
 
   // Load the placeholder global ordinal.
   Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
-  Value ordinalValue = builder.create<LLVM::LoadOp>(loc, globalPtr);
+  Value ordinalValue =
+      builder.create<LLVM::LoadOp>(loc, globalOp.getType(), globalPtr);
 
   // Load constant from the executable constants struct.
   auto constantsPtrValue =
@@ -1051,7 +1052,7 @@ Value HALDispatchABI::loadImportOrdinal(Operation *forOp, StringRef importName,
 
   // Load the placeholder global ordinal.
   Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
-  return builder.create<LLVM::LoadOp>(loc, globalPtr);
+  return builder.create<LLVM::LoadOp>(loc, globalOp.getType(), globalPtr);
 }
 
 std::pair<Value, Value> HALDispatchABI::loadImportFunc(Operation *forOp,
@@ -1082,7 +1083,7 @@ Value HALDispatchABI::isImportFuncAvailable(Operation *forOp,
       loadImportOrdinal(forOp, importName, /*weak=*/true, builder);
   auto importFunc = loadImportFunc(forOp, importOrdinal, builder);
   Value nullPtrValue =
-      builder.create<LLVM::NullOp>(loc, importFunc.first.getType());
+      builder.create<LLVM::ZeroOp>(loc, importFunc.first.getType());
   return builder.create<LLVM::ICmpOp>(loc, builder.getI1Type(),
                                       LLVM::ICmpPredicate::ne, importFunc.first,
                                       nullPtrValue);
@@ -1101,7 +1102,7 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
   // null as in isImportFuncAvailable but we'll need to make the control flow.
   assert(!weak && "calls to weak imports not yet implemented");
 
-  Value nullPtrValue = builder.create<LLVM::NullOp>(
+  Value nullPtrValue = builder.create<LLVM::ZeroOp>(
       loc, LLVM::LLVMPointerType::get(builder.getContext()));
   auto callOp =
       builder.create<LLVM::CallOp>(loc, TypeRange{builder.getI32Type()},

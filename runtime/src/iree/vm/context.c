@@ -225,8 +225,9 @@ static iree_status_t iree_vm_context_resolve_module_imports(
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(
           IREE_STATUS_INTERNAL,
-          "import function signature mismatch between %.*s "
+          "import function %.*s signature mismatch between %.*s "
           "and source %.*s; expected %.*s but got %.*s",
+          (int)full_name.size, full_name.data,
           (int)iree_vm_module_name(module).size,
           iree_vm_module_name(module).data,
           (int)iree_vm_module_name(import_function.module).size,

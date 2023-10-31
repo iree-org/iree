@@ -15,8 +15,10 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -30,134 +32,162 @@ using IREE::HAL::ExecutableTargetAttr;
 
 namespace {
 
-static MatmulTileParams
+static FailureOr<MatmulTileParams>
 chooseMatmulTileParamsGeneric(ExecutableTargetAttr target) {
   if (isVMVXBackend(target) && hasMicrokernels(target)) {
     // VMVX+ukernel uses dynamic tile shapes.
-    return {ShapedType::kDynamic, ShapedType::kDynamic, ShapedType::kDynamic};
+    return MatmulTileParams{ShapedType::kDynamic, ShapedType::kDynamic,
+                            ShapedType::kDynamic};
   } else {
     // Some vaguely reasonable static tile shape.
-    return {8, 4, 8};
+    return MatmulTileParams{8, 4, 8};
   }
 }
 
-static MatmulTileParams
-chooseMatmulTileParamsAArch64(EncodingUser user, ExecutableTargetAttr target) {
-  switch (user) {
-  case EncodingUser::MATMUL_F32F32F32:
-  case EncodingUser::MATMUL_F16F16F32:
-  case EncodingUser::MATMUL_F16F16F16:
-  case EncodingUser::MATMUL_BF16BF16F32:
-  case EncodingUser::MATMUL_BF16BF16BF16:
-  case EncodingUser::BATCH_MATMUL_F32F32F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F16:
-  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
-  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
+static FailureOr<MatmulTileParams>
+chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
+                              ExecutableTargetAttr target) {
+  if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
+    return failure();
+  }
+
+  assert(elementTypes.size() == 3);
+  Type lhs = elementTypes[0];
+  Type rhs = elementTypes[1];
+  Type out = elementTypes[2];
+
+  if (out.isF32() || out.isF16() || out.isBF16()) {
+    if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
+      if (hasFeature(target, "+bf16")) {
+        // Aim to use BFMMLA.
+        return MatmulTileParams{8, 4, 8};
+      }
+    }
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
-    return {8, 1, 8};
-  case EncodingUser::MATMUL_I8I8I32:
-  case EncodingUser::BATCH_MATMUL_I8I8I32:
+    return MatmulTileParams{8, 1, 8};
+  }
+
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+      out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       // Aim to use SMMLA.
-      return {8, 8, 8};
+      return MatmulTileParams{8, 8, 8};
     }
     if (hasFeature(target, "+dotprod")) {
       // Aim to use SDOT.
-      return {8, 4, 8};
+      return MatmulTileParams{8, 4, 8};
     }
-    return {8, 1, 8};
-  default:
-    assert(false);
-    return {};
+    return MatmulTileParams{8, 1, 8};
   }
+
+  return failure();
 }
 
-static MatmulTileParams
-chooseMatmulTileParamsX86_64(EncodingUser user, ExecutableTargetAttr target) {
-  switch (user) {
-  case EncodingUser::MATMUL_F32F32F32:
-  case EncodingUser::MATMUL_F16F16F32:
-  case EncodingUser::MATMUL_F16F16F16:
-  case EncodingUser::MATMUL_BF16BF16F32:
-  case EncodingUser::MATMUL_BF16BF16BF16:
-  case EncodingUser::BATCH_MATMUL_F32F32F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F16:
-  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
-  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
+static FailureOr<MatmulTileParams>
+chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
+                             ExecutableTargetAttr target) {
+  if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
+    return failure();
+  }
+
+  assert(elementTypes.size() == 3);
+  Type lhs = elementTypes[0];
+  Type rhs = elementTypes[1];
+  Type out = elementTypes[2];
+
+  if (out.isF32() || out.isF16() || out.isBF16()) {
+    if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
+      if (hasFeature(target, "+avx512bf16")) {
+        return MatmulTileParams{16, 2, 16};
+      }
+    }
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
     if (hasFeature(target, "+avx512f")) {
-      return {16, 1, 16};
+      return MatmulTileParams{16, 1, 16};
     }
     if (hasFeature(target, "+avx")) {
       // Note: for good performance, most +avx users will also want to add
       // +fma, but that's a local instruction selection detail and the tile
       // layout is unaffected, as there are enough registers even with the
       // need for intermediate product registers when +fma is not used.
-      return {8, 1, 8};
+      return MatmulTileParams{8, 1, 8};
     }
     // SSE fallback.
-    return {8, 1, 4};
-  case EncodingUser::MATMUL_I8I8I32:
-  case EncodingUser::BATCH_MATMUL_I8I8I32:
+    return MatmulTileParams{8, 1, 4};
+  }
+
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+      out.isSignlessInteger(32)) {
     if (hasFeature(target, "+avx512vnni")) {
       // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
       // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
       // call for {16, 4, 16} but we can't use it because of its unsigned LHS.
-      return {16, 2, 16};
+      return MatmulTileParams{16, 2, 16};
     }
     if (hasFeature(target, "+avx512bw")) {
       // Aim to use VPMADDWD (zmm).
-      return {16, 2, 16};
+      return MatmulTileParams{16, 2, 16};
     }
     if (hasFeature(target, "+avx2")) {
       // Aim to use VPMADDWD (ymm).
-      return {8, 2, 8};
+      return MatmulTileParams{8, 2, 8};
     }
     // SSE fallback. Aim to use PMADDWD (xmm).
-    return {8, 2, 4};
-  default:
-    assert(false);
-    return {};
+    return MatmulTileParams{8, 2, 4};
   }
+
+  return failure();
 }
 
-static MatmulTileParams chooseMatmulTileParams(EncodingUser user,
-                                               ExecutableTargetAttr target) {
+static FailureOr<MatmulTileParams>
+chooseMatmulTileParams(EncodingUser user, TypeRange elementTypes,
+                       ExecutableTargetAttr target) {
   if (isAArch64(target)) {
-    return chooseMatmulTileParamsAArch64(user, target);
+    return chooseMatmulTileParamsAArch64(user, elementTypes, target);
   }
   if (isX86_64(target)) {
-    return chooseMatmulTileParamsX86_64(user, target);
+    return chooseMatmulTileParamsX86_64(user, elementTypes, target);
   }
   return chooseMatmulTileParamsGeneric(target);
 }
 
 struct CPUMaterializeEncodingPass
     : public CPUMaterializeEncodingBase<CPUMaterializeEncodingPass> {
+  CPUMaterializeEncodingPass() : targetAttr(nullptr) {}
+  explicit CPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr attr)
+      : targetAttr(attr) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Codegen::IREECodegenDialect>();
   }
   void runOnOperation() override;
+
+private:
+  IREE::HAL::ExecutableTargetAttr targetAttr;
 };
 
 struct CPUMaterializeUpperBoundTileSizePass
     : public CPUMaterializeUpperBoundTileSizeBase<
           CPUMaterializeUpperBoundTileSizePass> {
+  CPUMaterializeUpperBoundTileSizePass() = default;
+  explicit CPUMaterializeUpperBoundTileSizePass(
+      ArrayRef<IREE::HAL::ExecutableTargetAttr> attrs)
+      : targetAttrs(attrs) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect>();
   }
   void runOnOperation() override;
+
+private:
+  SmallVector<IREE::HAL::ExecutableTargetAttr, 4> targetAttrs;
 };
 
 FailureOr<MaterializeEncodingInfo>
@@ -171,9 +201,17 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   }
   auto user = encoding.getUser().getValue();
   auto role = encoding.getRole().getValue();
-  MatmulTileParams tileParams = chooseMatmulTileParams(user, targetAttr);
+  auto elementTypes = llvm::to_vector(
+      llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
+        return a.cast<TypeAttr>().getValue();
+      }));
+  FailureOr<MatmulTileParams> tileParams =
+      chooseMatmulTileParams(user, elementTypes, targetAttr);
+  if (failed(tileParams)) {
+    return failure();
+  }
   auto encodingInfo =
-      IREE::LinalgExt::chooseEncodingInfoForMatmul(user, role, tileParams);
+      IREE::LinalgExt::chooseEncodingInfoForMatmul(user, role, *tileParams);
   auto originalTypeAttr = encoding.getOriginalType();
   auto originalType = originalTypeAttr
                           ? originalTypeAttr.getValue().cast<RankedTensorType>()
@@ -249,7 +287,8 @@ void CPUMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
   RewritePatternSet materializeEncodingPattern(context);
-  auto targetAttr = ExecutableTargetAttr::lookup(operation);
+  if (!targetAttr)
+    targetAttr = ExecutableTargetAttr::lookup(operation);
   auto materializeEncodingFn = getMaterializeEncodingFn(targetAttr);
   if (!materializeEncodingFn) {
     return signalPassFailure();
@@ -283,8 +322,10 @@ void CPUMaterializeEncodingPass::runOnOperation() {
 void CPUMaterializeUpperBoundTileSizePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
-  auto targetAttrs =
-      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(operation);
+  if (targetAttrs.empty()) {
+    targetAttrs =
+        IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(operation);
+  }
   RewritePatternSet patterns(context);
   MaterializeEncodingFn materializeEncodingFn =
       getUpperBoundMaterializeEncodingFn(targetAttrs);
@@ -301,13 +342,14 @@ void CPUMaterializeUpperBoundTileSizePass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createCPUMaterializeEncodingPass() {
-  return std::make_unique<CPUMaterializeEncodingPass>();
+createCPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return std::make_unique<CPUMaterializeEncodingPass>(targetAttr);
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCPUMaterializeUpperBoundTileSizePass() {
-  return std::make_unique<CPUMaterializeUpperBoundTileSizePass>();
+createCPUMaterializeUpperBoundTileSizePass(
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs) {
+  return std::make_unique<CPUMaterializeUpperBoundTileSizePass>(targetAttrs);
 }
 
 } // namespace iree_compiler

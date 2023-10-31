@@ -100,6 +100,15 @@ def LLVMCPUPeel :
       "mlir::iree_compiler::createLLVMCPUPeelPass()";
 }
 
+def LLVMCPUSelectLoweringStrategy :
+    Pass<"iree-llvmcpu-select-lowering-strategy",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUSelectLoweringStrategyPass()";
+}
+
 def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp"> {
   let summary = "Pass to splitReduce linalg operations.";
   let constructor = "mlir::iree_compiler::createLLVMCPUSplitReductionPass()";

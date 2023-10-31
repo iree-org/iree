@@ -29,7 +29,6 @@ iree_cc_library(
     "LayoutSlices.cpp"
     "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"
-    "PackAllocations.cpp"
     "PackConstants.cpp"
     "PackDispatchOperands.cpp"
     "PassDetail.h"
@@ -64,6 +63,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVectorDialect
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::Stream::Builtins

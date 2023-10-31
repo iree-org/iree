@@ -44,6 +44,7 @@ iree_cc_library(
     MLIRAsmParser
     MLIRControlFlowInterfaces
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRSideEffectInterfaces
     MLIRSupport

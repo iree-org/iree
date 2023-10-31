@@ -7,10 +7,12 @@ tags:
 icon: simple/tensorflow
 ---
 
-# TFLite Integration
+# TensorFlow Lite integration
 
-IREE supports compiling and running TensorFlow Lite programs stored as [TFLite
-FlatBuffers](https://www.tensorflow.org/lite/guide). These files can be
+## :octicons-book-16: Overview
+
+IREE supports compiling and running TensorFlow Lite (TFLite) programs stored as
+[TFLite FlatBuffers](https://www.tensorflow.org/lite/guide). These files can be
 imported into an IREE-compatible format then compiled to a series of backends.
 
 ``` mermaid
@@ -71,7 +73,7 @@ graph LR
 
         ``` shell
         python -m pip install \
-          --find-links https://openxla.github.io/iree/pip-release-links.html \
+          --find-links https://iree.dev/pip-release-links.html \
           --upgrade \
           iree-compiler \
           iree-runtime \

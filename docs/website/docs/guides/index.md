@@ -8,10 +8,10 @@
 
 Guides for specific frameworks:
 
-* [TensorFlow](./ml-frameworks/tensorflow.md)
-* [TensorFlow Lite](./ml-frameworks/tflite.md)
-* [JAX](./ml-frameworks/jax.md)
-* [PyTorch](./ml-frameworks/pytorch.md)
+* [:simple-tensorflow: TensorFlow](./ml-frameworks/tensorflow.md) and
+  [:simple-tensorflow: TensorFlow Lite](./ml-frameworks/tflite.md)
+* [:simple-python: JAX](./ml-frameworks/jax.md)
+* [:simple-pytorch: PyTorch](./ml-frameworks/pytorch.md)
 
 ## Deployment configurations
 
@@ -21,11 +21,19 @@ Guides for specific frameworks:
 
 Guides for specific configurations:
 
-* [CPU](./deployment-configurations/cpu.md)
-* [CPU - Bare-Metal](./deployment-configurations/bare-metal.md)
-* [GPU - Vulkan](./deployment-configurations/gpu-vulkan.md)
-* [GPU - CUDA/ROCm](./deployment-configurations/gpu-cuda-rocm.md)
+* [:octicons-cpu-16: CPU](./deployment-configurations/cpu.md) for general
+  purpose CPU deployment
+* [:octicons-cpu-16: CPU - Bare-Metal](./deployment-configurations/bare-metal.md)
+  with minimal platform dependencies
+* [:octicons-server-16: GPU - Vulkan](./deployment-configurations/gpu-vulkan.md)
+  for cross-platform usage and interop with graphics applications
+* [:simple-nvidia: GPU - CUDA](./deployment-configurations/gpu-cuda.md)
+  for NVIDIA-specific solutions
+* [:simple-amd: GPU - ROCm](./deployment-configurations/gpu-rocm.md)
+  for AMD-specific solutions
+* [:simple-apple: GPU - Metal](./deployment-configurations/gpu-metal.md)
+  for running on Apple hardware
 
 ## Other topics
 
-* [Developer tips and tricks](./developer-tips.md)
+* [:material-lightbulb-on: Developer tips and tricks](./developer-tips.md)

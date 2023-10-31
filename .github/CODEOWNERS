@@ -61,13 +61,15 @@
 # Compiler
 /compiler/src/iree/compiler/ @benvanik
 /compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
+/compiler/src/iree/compiler/Codegen/Common @hanhanW @dcaballe
 /compiler/src/iree/compiler/Codegen/LLVMCPU/ @dcaballe @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/TransformStrategies/ @qedawkins @MaheshRavishankar
-/compiler/src/iree/compiler/ConstEval/ @stellaraccident
+/compiler/src/iree/compiler/ConstEval/ @hanhanW @stellaraccident
 /compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/Vulkan/ @antiagainst
+/compiler/src/iree/compiler/GlobalOptimization/ @hanhanW
 /compiler/src/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
 /compiler/src/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
 /compiler/src/iree/compiler/InputConversion/TOSA @MaheshRavishankar @rsuderman

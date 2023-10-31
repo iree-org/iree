@@ -1,10 +1,10 @@
-// RUN: iree-opt %s --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target)))' \
+// RUN: iree-opt %s --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%s | \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=%s | \
 // RUN: FileCheck --check-prefix=CHECK %s
 
 hal.executable @_attention_dispatch_0 {
-  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}> {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
     hal.executable.export public @_attention_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -38,15 +38,15 @@ transform.sequence failures(propagate) {
 
   // Tile and distribute to workgroups
   // ==========================================
-  %forall_grid, %tiled_attention =
-  transform.structured.tile_to_forall_op %attention tile_sizes [1, 128]
+  %tiled_attention, %forall_grid =
+  transform.structured.tile_using_forall %attention tile_sizes [1, 128]
     ( mapping = [#gpu.block<x>, #gpu.block<y>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
 
   // Tile batch dimensions of attention
   // ==========================================
   %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-  %batch_tiled_attn, %loop = transform.structured.tile %attention2 [1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %batch_tiled_attn, %loop = transform.structured.tile_using_for %attention2 [1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
   transform.apply_patterns to %top_level_func {
     transform.apply_patterns.canonicalization
@@ -76,7 +76,7 @@ transform.sequence failures(propagate) {
 
   // Tile and fuse attention ops
   // ==========================================
-  %forall, %tiled_matmul = transform.structured.tile_to_forall_op %promoted_second_matmul tile_sizes [32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_matmul, %forall = transform.structured.tile_using_forall %promoted_second_matmul tile_sizes [32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   %f0, %loop0 = transform.structured.fuse_into_containing_op %scale_acc into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
   %f1, %loop1 = transform.structured.fuse_into_containing_op %truncate into %loop0 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -101,7 +101,7 @@ transform.sequence failures(propagate) {
   // Distribute fills and last truncate
   // ==========================================
   %fills = transform.merge_handles %acc_fill, %max_fill, %sum_fill, %last_truncate : !transform.any_op
-  %fill_grid, %tiled_fill = transform.structured.tile_to_forall_op %fills tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %tiled_fill, %fill_grid = transform.structured.tile_using_forall %fills tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
   // Vectorize function
   // ==========================================
@@ -110,7 +110,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.linalg.fold_unit_extent_dims_via_slices
     transform.apply_patterns.vector.cast_away_vector_leading_one_dim
   } : !transform.any_op
-  %func_3 = transform.structured.vectorize %func : (!transform.any_op) -> (!transform.any_op)
+  %func_3 = transform.structured.vectorize_children_and_apply_patterns %func : (!transform.any_op) -> (!transform.any_op)
 
   // Bufferization
   // ==========================================
@@ -153,7 +153,7 @@ transform.sequence failures(propagate) {
     transform.apply_patterns.canonicalization
   } : !transform.any_op
   transform.iree.apply_cse %func_8 : !transform.any_op
-  transform.iree.apply_buffer_optimizations %func_8 : (!transform.any_op) -> ()
+  transform.memref.erase_dead_alloc_and_stores %func_8 : (!transform.any_op) -> ()
 }
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 128)>
@@ -256,7 +256,7 @@ transform.sequence failures(propagate) {
 // CHECK:          %[[D15:.+]] = vector.contract {indexing_maps = [#[[MAP4]], #[[MAP5]], #[[MAP6]]], iterator_types =
 // CHECK-SAME:       ["parallel", "parallel", "reduction"], kind = #[[VECTOR:.+]].kind<add>} %[[D10]], %[[D14]],
 // CHECK-SAME:       %[[CST_2]] : vector<32x64xf32>, vector<128x64xf32> into vector<32x128xf32>
-// CHECK:          %[[D16:.+]] = vector.multi_reduction <maxf>, %[[D15]], %[[ARG1]] [1] : vector<32x128xf32> to
+// CHECK:          %[[D16:.+]] = vector.multi_reduction <maximumf>, %[[D15]], %[[ARG1]] [1] : vector<32x128xf32> to
 // CHECK-SAME:       vector<32xf32>
 // CHECK:          %[[D17:.+]] = vector.broadcast %[[D16]] : vector<32xf32> to vector<128x32xf32>
 // CHECK:          %[[D18:.+]] = vector.transpose %[[D17]], [1, 0] : vector<128x32xf32> to vector<32x128xf32>
@@ -285,15 +285,12 @@ transform.sequence failures(propagate) {
 // CHECK-SAME:       ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>} %[[D36]], %[[D38]], %[[D34]] :
 // CHECK-SAME:       vector<32x128xf32>, vector<64x128xf32> into vector<32x64xf32>
 // CHECK:          gpu.barrier
-// CHECK:          memref.dealloc %[[ALLOC_10]] : memref<128x64xf16, #[[GPU]].address_space<workgroup>>
-// CHECK:          memref.dealloc %[[ALLOC_11]] : memref<128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:          scf.yield %[[D16]], %[[D24]], %[[D39]] : vector<32xf32>, vector<32xf32>, vector<32x64xf32>
 // CHECK:        }
 // CHECK:        %[[D12:.+]] = arith.truncf %[[D11]]#[[D2:.+]] : vector<32x64xf32> to vector<32x64xf16>
 // CHECK:        vector.transfer_write %[[D12]], %[[ALLOC_7]][%[[C0]], %[[D8]], %[[C0]]] {in_bounds = [true, true]} :
 // CHECK-SAME:     vector<32x64xf16>, memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:        gpu.barrier
-// CHECK:        memref.dealloc %[[ALLOC]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:        gpu.barrier
 // CHECK:        linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]]], iterator_types = ["parallel", "parallel",
 // CHECK-SAME:     "parallel"]} ins(%[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>)
@@ -302,4 +299,3 @@ transform.sequence failures(propagate) {
 // CHECK:          linalg.yield %[[IN]] : f16
 // CHECK:        }
 // CHECK:        gpu.barrier
-// CHECK:        memref.dealloc %[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>

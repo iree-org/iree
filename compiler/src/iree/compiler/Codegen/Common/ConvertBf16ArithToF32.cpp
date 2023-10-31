@@ -80,7 +80,8 @@ struct PrimitiveTypeConverter : public TypeConverter {
     });
     addConversion([&](VectorType type) {
       return VectorType::get(type.getShape(),
-                             convertType(type.getElementType()));
+                             convertType(type.getElementType()),
+                             type.getScalableDims());
     });
     addConversion([&](IREE::Util::PtrType ptrType) {
       return IREE::Util::PtrType::get(convertType(ptrType.getTargetType()));

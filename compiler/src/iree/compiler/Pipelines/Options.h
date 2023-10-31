@@ -47,10 +47,6 @@ struct InputDialectOptions {
     // preprocessing, e.g., flattening of tuples.
     stablehlo_xla,
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TORCH_INPUT
-    // Legalizes input defined over TMTensor ops.
-    tm_tensor,
-#endif // IREE_HAVE_TORCH_INPUT
 #ifdef IREE_HAVE_TOSA_INPUT
     // Legalizes input defined over TOSA ops.
     tosa,
@@ -75,7 +71,17 @@ struct InputDialectOptions {
 };
 
 // Options controlling high level optimizations.
-struct HighLevelOptimizationOptions {
+struct GlobalOptimizationOptions {
+  // Gate various type based demotion passes that run before anything else.
+  bool demoteF64ToF32 = true;
+  bool demoteF32ToF16 = false;
+  bool promoteF16ToF32 = false;
+  bool promoteBF16ToF32 = false;
+  bool demoteI64ToI32 = false;
+
+  // Enables data tiling.
+  bool dataTiling = false;
+
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;
 
@@ -89,8 +95,12 @@ struct HighLevelOptimizationOptions {
   // Strips debug assertions after any useful information has been extracted.
   bool stripAssertions = false;
 
+  // Maximum byte size increase allowed for constant expr hoisting policy to
+  // allow hoisting. The threshold is 1MB by default.
+  int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
+
   void bindOptions(OptionsBinder &binder);
-  using FromFlags = OptionsFromFlags<HighLevelOptimizationOptions>;
+  using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };
 
 // Options controlling scheduling across host/device.

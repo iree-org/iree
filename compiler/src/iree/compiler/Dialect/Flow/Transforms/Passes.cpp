@@ -49,32 +49,6 @@ static llvm::cl::opt<std::string> clTraceDispatch(
                    "occurrences of the dispatch symbol."),
     llvm::cl::init(""));
 
-static llvm::cl::opt<bool> clDemoteI64ToI32(
-    "iree-flow-demote-i64-to-i32",
-    llvm::cl::desc("Converts all i64 ops and values into i32 counterparts "
-                   "unconditionally before main flow conversions."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clDemoteF32ToF16(
-    "iree-flow-demote-f32-to-f16",
-    llvm::cl::desc("Converts all f32 ops and values into f16 counterparts "
-                   "unconditionally before main flow conversions."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clPromoteBF16ToF32(
-    "iree-flow-promote-bf16-to-f32",
-    llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts "
-                   "unconditionally before main flow conversions."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clPromoteF16ToF32(
-    "iree-flow-promote-f16-to-f32",
-    llvm::cl::desc("Converts all f16 ops and values into f32 counterparts "
-                   "unconditionally before main flow conversions."),
-    llvm::cl::init(false));
-static llvm::cl::opt<bool> clDemoteF64ToF32(
-    "iree-flow-demote-f64-to-f32",
-    llvm::cl::desc("Converts all f64 ops and values into f32 counterparts "
-                   "unconditionally before main flow conversions."),
-    llvm::cl::init(true));
-
 static llvm::cl::opt<bool> clDetensoring(
     "iree-flow-enable-detensoring",
     llvm::cl::desc(
@@ -104,11 +78,6 @@ static llvm::cl::opt<bool>
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
     llvm::cl::desc("Generate the workload region."), llvm::cl::init(true));
-
-static llvm::cl::opt<bool>
-    clEnableDataTiling("iree-flow-enable-data-tiling",
-                       llvm::cl::desc("Enable data tiling path."),
-                       llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
@@ -149,28 +118,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
-  // ML frontends have very uneven support for user-controlled types _and_ users
-  // tend to use types not well suited for the work they are doing. These
-  // demotions/promotions allow users to change the types after lowering out of
-  // the frontends. It'll always be better to do this higher up in the stack
-  // as these kind of blanket conversions have corner cases and potential
-  // accuracy/precision losses beyond what the user may expect.
-  if (clDemoteF64ToF32) {
-    passManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
-  }
-  if (clDemoteF32ToF16) {
-    passManager.addPass(IREE::Util::createDemoteF32ToF16Pass());
-  }
-  if (clPromoteF16ToF32) {
-    passManager.addPass(IREE::Util::createPromoteF16ToF32Pass());
-  }
-  if (clDemoteI64ToI32) {
-    passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
-  }
-  if (clPromoteBF16ToF32) {
-    passManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
-  }
-
   // Transform pad operations into linalg.fill + tensor.insert_slice.
   // This is a WAR for not having native pad handling.
   if (!clEnablePadHandling && !clEnableFusePaddingIntoLinalgProducerOps) {
@@ -180,12 +127,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
-      // - Convert all elementwise ops to Linalg
-      // - Remove unit-extent dimensions.
-      .addPass(mlir::createConvertElementwiseToLinalgPass)
-      .addPass(createGeneralizeLinalgNamedOpsPass)
-      .addPass(createFuseDequantizationMatmulPass)
-      .addPass(createFoldUnitExtentDimsPass)
       .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
       .addPass(createCollapseDimsPass)
@@ -208,8 +149,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transpose.
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
-      // Enable data tiling after all linalg level transformations.
-      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),
@@ -253,9 +192,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
         return createInitializeEmptyTensorsPass(clZeroFillEmptyTensors);
       });
 
-  // Module pass to outline the dispatch regions into their own functions
-  // wrapped in executables.
+  // Module pass to outline dispatch regions (and similar ops) into their own
+  // functions wrapped in executables.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
+
+  // Annotate executables based on their contents.
+  // This is optional but can provide useful information during compilation and
+  // runtime profiling/tracing.
+  passManager.addPass(IREE::Flow::createAnnotateDispatchesPass());
 
   // Trace/break dispatches by ordinal in the specified region. There is a
   // similar version of the pass run both before and after deduplication

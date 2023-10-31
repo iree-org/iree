@@ -215,9 +215,9 @@ static LogicalResult replaceBuiltinSplatOp(IREE::Stream::AsyncSplatOp splatOp,
   OpBuilder builder(splatOp);
   auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
       loc, resultTypes, workload,
-      SymbolRefAttr::get(
+      builder.getArrayAttr({SymbolRefAttr::get(
           builder.getStringAttr(builtinName),
-          FlatSymbolRefAttr::get(builder.getContext(), builtinName)),
+          FlatSymbolRefAttr::get(builder.getContext(), builtinName))}),
       operands, operandSizes, operandOffsets, operandEnds, operandLengths,
       resultSizes, builder.getIndexArrayAttr(tiedOperands),
       splatOp.getAffinityAttr());
@@ -311,9 +311,9 @@ static LogicalResult replaceBuiltinFillOp(IREE::Stream::AsyncFillOp fillOp,
   OpBuilder builder(fillOp);
   auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
       loc, resultTypes, workload,
-      SymbolRefAttr::get(
+      builder.getArrayAttr({SymbolRefAttr::get(
           builder.getStringAttr(builtinName),
-          FlatSymbolRefAttr::get(builder.getContext(), builtinName)),
+          FlatSymbolRefAttr::get(builder.getContext(), builtinName))}),
       operands, operandSizes, operandOffsets, operandEnds, operandLengths,
       resultSizes, builder.getIndexArrayAttr(tiedOperands),
       fillOp.getAffinityAttr());

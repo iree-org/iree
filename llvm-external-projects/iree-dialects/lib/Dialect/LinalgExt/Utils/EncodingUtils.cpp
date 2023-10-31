@@ -11,23 +11,19 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
+bool isMatmulEncodingUser(EncodingUser user) {
+  return user == EncodingUser::MATMUL;
+}
+
+bool isBatchMatmulEncodingUser(EncodingUser user) {
+  return user == EncodingUser::BATCH_MATMUL;
+}
+
 MaterializeEncodingInfo
 chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
                             MatmulTileParams tileParams) {
   // Start dim of the MxK (LHS), KxN (RHS), or MxN (RESULT) 2D matrix.
-  int64_t matmulDimBase = 0;
-  switch (user) {
-  case EncodingUser::BATCH_MATMUL_F32F32F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F32:
-  case EncodingUser::BATCH_MATMUL_F16F16F16:
-  case EncodingUser::BATCH_MATMUL_BF16BF16F32:
-  case EncodingUser::BATCH_MATMUL_BF16BF16BF16:
-  case EncodingUser::BATCH_MATMUL_I8I8I32:
-    matmulDimBase = 1;
-    break;
-  default:
-    break;
-  }
+  int64_t matmulDimBase = isBatchMatmulEncodingUser(user) ? 1 : 0;
 
   MaterializeEncodingInfo encodingInfo;
   encodingInfo.innerDimsPos = {matmulDimBase, matmulDimBase + 1};

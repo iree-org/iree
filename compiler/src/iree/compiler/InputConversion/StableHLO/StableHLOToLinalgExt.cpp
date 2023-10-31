@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/InputConversion/StableHLO/LegalizeToLinalgUtils.h"
 #include "iree/compiler/InputConversion/StableHLO/MapStableHLOToScalarOp.h"
 #include "iree/compiler/InputConversion/StableHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
@@ -440,6 +441,166 @@ struct ReverseOpConversion final
 };
 
 //===----------------------------------------------------------------------===//
+// ScanOp
+//===----------------------------------------------------------------------===//
+
+static bool checkUnary(DenseIntElementsAttr attr) {
+  llvm::SmallVector<int64_t> values;
+  values = extract1DVector(attr);
+
+  bool result = true;
+  for (auto value : values) {
+    result = result && (value == 1);
+  }
+  return true;
+}
+
+struct ScanOpConversion final
+    : OpConversionPattern<mlir::stablehlo::ReduceWindowOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (op.getWindowStrides() && !checkUnary(*op.getWindowStrides())) {
+      return rewriter.notifyMatchFailure(op, "non-unary stride");
+    }
+
+    if (op.getWindowDilations() && !checkUnary(*op.getWindowDilations())) {
+      return rewriter.notifyMatchFailure(op, "non-unary window dilations");
+    }
+
+    if (op.getBaseDilations() && !checkUnary(*op.getBaseDilations())) {
+      return rewriter.notifyMatchFailure(op, "non-unary base dilations");
+    }
+
+    auto inputs = op.getInputs();
+    if (inputs.size() != 1) {
+      return rewriter.notifyMatchFailure(op, "more than one input");
+    }
+
+    auto input0 = inputs.front();
+    auto input0Ty = input0.getType().cast<ShapedType>();
+    auto init0 = op.getInitValues().front();
+    auto init0Ty = init0.getType().cast<ShapedType>();
+
+    auto window = extract1DVector(op.getWindowDimensions());
+    llvm::SmallVector<int64_t, 4> reduceAxes;
+    for (int i = 0, s = window.size(); i < s; ++i) {
+      if (window[i] == 1)
+        continue;
+      if (window[i] == input0Ty.getDimSize(i)) {
+        reduceAxes.push_back(i);
+        continue;
+      }
+
+      // Arguably it's still beneficial across a partial window, but this
+      // depends on performance characteristics.
+      return rewriter.notifyMatchFailure(op, "not length-1 or full width");
+    }
+
+    if (reduceAxes.size() != 1) {
+      return rewriter.notifyMatchFailure(op, "non singular reduction axis");
+    }
+
+    const int64_t reduceAxis = reduceAxes.front();
+
+    if (!op.getPadding()) {
+      return rewriter.notifyMatchFailure(op, "no padding values found");
+    }
+
+    auto padding = extract1DVector(*op.getPadding());
+    if (padding.size() < reduceAxis * 2) {
+      return rewriter.notifyMatchFailure(op, "no padding along reduction");
+    }
+
+    for (int i = 0, s = padding.size(); i < s; i += 2) {
+      if (i == reduceAxis * 2)
+        continue;
+      if (padding[i] != 0 || padding[i + 1] != 0) {
+        return rewriter.notifyMatchFailure(op,
+                                           "padding along non-reduction axis");
+      }
+    }
+
+    bool isPrefix =
+        padding[reduceAxis * 2] == (input0Ty.getDimSize(reduceAxis) - 1);
+    bool isPostfix =
+        padding[reduceAxis * 2 + 1] == (input0Ty.getDimSize(reduceAxis) - 1);
+
+    if (isPrefix == isPostfix) {
+      return rewriter.notifyMatchFailure(op, "is not purely prefix or postfix");
+    }
+
+    llvm::SmallVector<Value> outputs;
+    llvm::SmallVector<Value> outputDynDims;
+    for (int i = 0; i < input0Ty.getRank(); ++i) {
+      if (input0Ty.isDynamic(i)) {
+        outputDynDims.push_back(
+            rewriter.createOrFold<tensor::DimOp>(op.getLoc(), input0, i));
+      }
+    }
+
+    llvm::SmallVector<Value> init;
+    llvm::SmallVector<int64_t> initDims;
+    llvm::SmallVector<Value> initDynDims;
+    for (int i = 0; i < input0Ty.getRank(); ++i) {
+      if (i == reduceAxis)
+        continue;
+      initDims.push_back(input0Ty.getDimSize(i));
+      if (initDims.back() == ShapedType::kDynamic) {
+        initDynDims.push_back(
+            rewriter.createOrFold<tensor::DimOp>(op.getLoc(), input0, i));
+      }
+    }
+
+    outputs.push_back(rewriter.create<tensor::EmptyOp>(
+        op.getLoc(), input0Ty.getShape(), input0Ty.getElementType(),
+        outputDynDims));
+
+    Value newInit = rewriter.create<tensor::EmptyOp>(
+        op.getLoc(), initDims, init0Ty.getElementType(), initDynDims);
+
+    SmallVector<AffineMap> indexingMaps{
+        AffineMap::get(initDims.size(), /*symbolCount=*/0, {},
+                       rewriter.getContext()),
+        rewriter.getMultiDimIdentityMap(initDims.size())};
+    SmallVector<utils::IteratorType> iterators(initDims.size(),
+                                               utils::IteratorType::parallel);
+
+    newInit = rewriter
+                  .create<linalg::GenericOp>(
+                      op.getLoc(), init0Ty.clone(initDims), ValueRange{init0},
+                      ValueRange{newInit}, indexingMaps, iterators,
+                      [&](OpBuilder &b, Location loc, ValueRange args) {
+                        b.create<linalg::YieldOp>(loc, args[0]);
+                      })
+                  .getResult(0);
+    outputs.push_back(newInit);
+
+    llvm::SmallVector<Type> outputTys;
+    for (auto output : outputs) {
+      outputTys.push_back(output.getType());
+    }
+
+    auto scanOp = rewriter.create<IREE::LinalgExt::ScanOp>(
+        op.getLoc(), outputTys, inputs, outputs,
+        rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(1));
+
+    rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
+                                scanOp.getRegion().begin());
+
+    // Handle the tensor<*> to * conversion:
+    TypeConverter::SignatureConversion signatureConverter(2);
+    signatureConverter.addInputs(0, input0Ty.getElementType());
+    signatureConverter.addInputs(1, init0Ty.getElementType());
+    rewriter.applySignatureConversion(&scanOp.getRegion(), signatureConverter);
+
+    rewriter.replaceOp(op, scanOp.getResult(0));
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // TopkOp
 //===----------------------------------------------------------------------===//
 
@@ -594,8 +755,9 @@ struct ConvertStableHloToLinalgExt final
 void populateStableHloToLinalgExtConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns) {
-  patterns->add<SortOpConversion, ScatterOpConversion, FftOpConversion,
-                ReverseOpConversion, TopkOpConversion>(typeConverter, context);
+  patterns->add<ScanOpConversion, SortOpConversion, ScatterOpConversion,
+                FftOpConversion, ReverseOpConversion, TopkOpConversion>(
+      typeConverter, context);
 
   // FIXME: It shouldn't be necessary to list every matching StableHlo op
   // here, especially since they're already listed in

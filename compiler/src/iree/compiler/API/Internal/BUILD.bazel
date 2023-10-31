@@ -110,3 +110,20 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:TargetParser",
     ],
 )
+
+iree_compiler_cc_library(
+    name = "IREEReduceToolEntryPoint",
+    srcs = [
+        "IREEReduceToolEntryPoint.cpp",
+    ],
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/src/iree/compiler/Reducer:iree_reduce_lib",
+        "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+    ],
+)

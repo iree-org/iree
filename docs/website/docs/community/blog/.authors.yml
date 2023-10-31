@@ -1,0 +1,30 @@
+# https://squidfunk.github.io/mkdocs-material/setup/setting-up-a-blog/#adding-authors
+
+authors:
+  # Alphabetically sorted mapping from (usually GitHub) usernames to author
+  # information.
+
+  ataei:
+    name: Ahmed Taei
+    description: Software Engineer
+    avatar: https://github.com/ataei.png
+
+  bjacob:
+    name: Benoit Jacob
+    description: Software Engineer
+    avatar: https://github.com/bjacob.png
+
+  jennik:
+    name: Jenni Kilduff
+    description: Software Engineer
+    avatar: https://github.com/not-jenni.png
+
+  rsuderman:
+    name: Rob Suderman
+    description: Software Engineer
+    avatar: https://github.com/rsuderman.png
+
+  thomasraoux:
+    name: Thomas Raoux
+    description: Software Engineer
+    avatar: https://github.com/thomasraoux.png

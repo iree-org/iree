@@ -13,10 +13,10 @@ development environment. The information here is meant to be generic.
 Vulkan adopts a layered architecture, which aims to better support extensiblity.
 There are four components involved in this architecture:
 
-*   The Vulkan Application
-*   [The Vulkan Loader][VulkanLoader]
-*   [Vulkan Layers][VulkanLayer]
-*   [Installable Client Drivers (ICDs)][VulkanICD]
+* The Vulkan Application
+* [The Vulkan Loader][VulkanLoader]
+* [Vulkan Layers][VulkanLayer]
+* [Installable Client Drivers (ICDs)][VulkanICD]
 
 ![High Level View of Loader][VulkanArchPicture]
 
@@ -39,7 +39,7 @@ with one another.
 You need to install the [Vulkan SDK][VulkanSDK] from LunarG to get the Vulkan
 loader.
 
-Typically the Vulkan SDK will be installed at `C:\VulkanSDK\<version>\ ` and
+Typically the Vulkan SDK will be installed at `C:\VulkanSDK\<version>\` and
 there will be an environment variable `VULKAN_SDK` pointing to it. You can run
 the `vulkancube` executable under the `Bin\` subdirectory of the Vulkan SDK to
 make sure everything works properly. If not, you probably need to check whether
@@ -50,22 +50,22 @@ the graphics card is Vulkan capable or update the driver.
 The following packages should be installed for a proper Vulkan runtime to test
 the runtime functions properly:
 
-*   [libvulkan1][PackageLibVulkan1] for the Vulkan loader `libvulkan.so`.
-*   [AMD] [mesa-vulkan-drivers][PackageMesaVulkan] for Mesa AMD Vulkan ICD.
-*   [NVIDIA] [nvidia-vulkan-icd][PackageNvidiaVulkan] for NVIDIA Vulkan ICD.
+* [libvulkan1][PackageLibVulkan1] for the Vulkan loader `libvulkan.so`.
+* [AMD] [mesa-vulkan-drivers][PackageMesaVulkan] for Mesa AMD Vulkan ICD.
+* [NVIDIA] [nvidia-vulkan-icd][PackageNvidiaVulkan] for NVIDIA Vulkan ICD.
 
 The above packages provide the Vulkan loader and ICDs. With them an Vulkan
 application should be able to run. You may additionally want to install
 
-*   [vulkan-tools][PackageVulkanTools] for command-line tools like `vulkaninfo`
+* [vulkan-tools][PackageVulkanTools] for command-line tools like `vulkaninfo`
     (dumping available ICDs and their capabilities) and GUI application like
     `vulkancube` (rendering a rotating cube).
 
 In order to develop Vulkan applications, you additionally need the following
 packages:
 
-*   [libvulkan-dev][PackageVulkanDev] for various Vulkan header files.
-*   [vulkan-validationlayers][PackageVulkanValidation] for Vulkan validation
+* [libvulkan-dev][PackageVulkanDev] for various Vulkan header files.
+* [vulkan-validationlayers][PackageVulkanValidation] for Vulkan validation
     layers like `VkLayer_standard_validation`.
 
 ### Linux
@@ -91,8 +91,8 @@ If you have multiple versions of Vulkan loaders exist, you may also need to set
 For example:
 
 ```shell
-$ LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/
-$ LD_PRELOAD=libvulkan.so.1
+LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/
+LD_PRELOAD=libvulkan.so.1
 ```
 
 This can also be done by sourcing the proper `setup-env.sh` from one of the
@@ -131,7 +131,7 @@ For Qualcomm Adreno GPUs, the vendor Vulkan implementation is at
 `/vendor/lib[64]/hw/vulkan.*.so`. So for example for Snapdragon 865:
 
 ```shell
-$ adb shell ln -s /vendor/lib64/hw/vulkan.kona.so /data/local/tmp/libvulkan.so
+adb shell ln -s /vendor/lib64/hw/vulkan.kona.so /data/local/tmp/libvulkan.so
 ```
 
 For ARM Mali GPUs, there is only one monolithic driver
@@ -140,7 +140,7 @@ driver (`/vendor/lib[64]/hw/vulkan.*.so`) is just a symlink to it. So for
 example:
 
 ```shell
-$ adb shell ln -s /vendor/lib64/libGLES_mali.so /data/local/tmp/libvulkan.so
+adb shell ln -s /vendor/lib64/libGLES_mali.so /data/local/tmp/libvulkan.so
 ```
 
 ## Vulkan debugging and profiling
@@ -158,18 +158,18 @@ applications. It can be downloaded from RenderDoc's
 There are a few environment variables that can alter the default Vulkan loader
 behavior and print verbose information, notably:
 
-*   `VK_LOADER_DEBUG`: enable loader debug messages. Setting it to `all` will
+* `VK_LOADER_DEBUG`: enable loader debug messages. Setting it to `all` will
     enable the most verbose logging from the loader. This is especially useful
     when trying to see what layers/ICDs are searched and used.
-*   `VK_ICD_FILENAMES`: force the loader to use a specific ICD. This is
+* `VK_ICD_FILENAMES`: force the loader to use a specific ICD. This is
     especially useful when you have multiple Vulkan capable devices and want to
     select which one to use manually.
-*   `VK_INSTANCE_LAYERS`: force the loader to enable the given layers. For
+* `VK_INSTANCE_LAYERS`: force the loader to enable the given layers. For
     example, You can force enable `VK_LAYER_LUNARG_api_dump` to have a detailed
     dump of all Vulkan API calls made by the application. You can force enable
     `VK_LAYER_LUNARG_core_validation` to validate the API calls made by the
     application.
-*   `VK_LAYER_PATH`: override the loader's standard layer library search folders.
+* `VK_LAYER_PATH`: override the loader's standard layer library search folders.
 
 Please see the [Vulkan loader's documentation][VulkanLoaderEnvVars] for detailed
 explanation for these variables.
@@ -180,7 +180,7 @@ Bazel runs tests in a sandbox and environment variables must be passed through
 to the test runner. Consider putting environment setup in a `user.bazelrc` to
 save typing. For example:
 
-```
+```starlark
 test --test_env="LD_LIBRARY_PATH=/absolute/path/to/vulkan/sdk/x86_64/lib/"
 test --test_env="LD_PRELOAD=libvulkan.so.1"
 test --test_env="VK_LAYER_PATH=/absolute/path/to/additional/layers/:$VK_LAYER_PATH"
@@ -194,7 +194,7 @@ chrome remote desktop and have problems with physical device enumeration, you
 probably want to check the `DISPLAY` environment and set it to point to a
 display at the server side, for example:
 
-```
+```bash
 export DISPLAY=:0
 ```
 

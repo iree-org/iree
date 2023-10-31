@@ -53,8 +53,7 @@
 // CHECK: %[[GRP_IDX3:.*]] = llvm.shl %[[GRP_IDX2]], %[[C2]]  : i64
 // CHECK: %{{.*}} = llvm.xor %[[SRC:.*]], %[[GRP_IDX3]]  : i64
 // CHECK: %[[ADJ_SRC:.*]] = llvm.add %[[SRC]], %[[C16]]  : i64
-// CHECK: %[[ADJ_SRC1:.*]] = llvm.xor %[[ADJ_SRC]], %[[GRP_IDX3]]  : i64
-// CHECK: %[[INV:.*]] = llvm.add %{{.*}}, %[[ADJ_SRC1]]  : i64
+// CHECK: %[[INV:.*]] = llvm.xor %[[ADJ_SRC]], %[[GRP_IDX3]]  : i64
 //
 // Find the basic block boundary.
 // CHECK: llvm.br ^[[LOOP_BODY:bb[0-9]+]](
@@ -66,7 +65,7 @@
 // CHECK: %[[VAR:.*]] = llvm.mul %[[IV]], %[[C4096]]
 //
 // Add the loop invariant part.
-// CHECK: %[[OFF:.*]] = llvm.add %[[INV]], %[[VAR]]
+// CHECK: %[[OFF:.*]] = llvm.add %{{.*}}, %[[INV]]
 //
 // Store the resulting offset in the memref descriptor.
 // llvm.insert %[[OFF]], %{{.*}}[2]
@@ -77,7 +76,7 @@
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#executable_target_cuda_nvptx_fb], legacy_sync}>
 hal.executable private @matmul_dispatch_0 {
-  hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export public @matmul_dispatch_0_matmul_2560x2560x2560 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
