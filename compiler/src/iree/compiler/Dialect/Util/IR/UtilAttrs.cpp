@@ -439,31 +439,6 @@ serializeGenericElementData(Location loc, DenseElementsAttr elementsAttr,
   return emitError(loc) << "unhandled constant type " << elementsAttr.getType();
 }
 
-static bool canUseRawData(DenseResourceElementsAttr attr,
-                          llvm::support::endianness endian) {
-  Type elementType = attr.getType().getElementType();
-  if (!isa<IntegerType, FloatType, ComplexType>(elementType)) {
-    // We cannot assume composite element types have the raw layout we want,
-    // other than ComplexType, which is effectively vector<2xfN> and goes
-    // through the later logic.
-    return false;
-  }
-
-  int32_t bitWidth = getTypeBitWidth(elementType);
-  if (bitWidth == 8) {
-    // Don't care about endianness at all for single-byte data.
-    return true;
-  } else if (bitWidth % 8 != 0) {
-    // Any non-byte aligned bit width is stored byte aligned.
-    return false;
-  } else if (endian != llvm::support::endian::system_endianness()) {
-    // Can't use raw data if the endianness of the system doesn't match the
-    // endianness of the target.
-    return false;
-  }
-  return true;
-}
-
 // Performs serialization of all of the elements in |resourceElementsAttr|.
 // Throws error if not supported.
 static LogicalResult
@@ -471,11 +446,8 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
                             llvm::support::endianness endian,
                             llvm::raw_ostream &os) {
 
-  if (!canUseRawData(resourceElementsAttr, endian)) {
-    // Fast-path for bulk data copies that don't require endianness handling.
-    // This relies on DenseResourceElementsAttr storing 8-bit values as 8-bit
-    // values.
-    return emitError(loc) << "the endian or sized type of the "
+  if (endian != llvm::support::endian::system_endianness()) {
+    return emitError(loc) << "the endian of the "
                              "DenseResourceElementsAttr is not supported";
   }
   if (llvm::isa<IntegerType>(resourceElementsAttr.getType().getElementType())) {
