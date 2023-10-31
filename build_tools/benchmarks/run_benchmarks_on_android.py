@@ -579,8 +579,16 @@ def main(args):
 
     # Clear the benchmark directory on the Android device first just in case
     # there are leftovers from manual or failed runs.
-    execute_cmd_and_get_stdout(
-        ["adb", "shell", "rm", "-rf", ANDROID_TMPDIR], verbose=args.verbose
+    adb_execute(
+        ["rm", "-rf", str(ANDROID_TMPDIR)],
+        cwd=pathlib.PurePosixPath("/"),
+        verbose=args.verbose,
+    )
+
+    adb_execute(
+        ["mkdir", "-p", str(ANDROID_TMPDIR)],
+        cwd=pathlib.PurePosixPath("/"),
+        verbose=args.verbose,
     )
 
     if not args.no_clean:
