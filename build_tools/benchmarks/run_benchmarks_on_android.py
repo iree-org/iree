@@ -75,6 +75,7 @@ ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
 ADB_SERVER_ADDR = ("localhost", 5037)
 ANDROID_NORMAL_TOOL_DIR = ANDROID_TMPDIR / "normal-tools"
 ANDROID_TRACED_TOOL_DIR = ANDROID_TMPDIR / "traced-tools"
+ANDROID_TRACY_PORT = 8086
 
 
 def adb_push_file(
@@ -532,6 +533,18 @@ def set_gpu_frequency_scaling_policy(policy: str):
     adb_execute_as_root([android_path, policy])
 
 
+def add_port_forwarding(port: int, verbose: bool):
+    """Add adb port forwarding."""
+    execute_cmd_and_get_stdout(
+        ["adb", "forward", f"tcp:{port}", f"tcp:{port}"], verbose=verbose
+    )
+    atexit.register(
+        execute_cmd_and_get_stdout,
+        ["adb", "forward", "--remove", f"tcp:{port}"],
+        verbose=verbose,
+    )
+
+
 def main(args):
     device_info = get_android_device_info(args.verbose)
     if args.verbose:
@@ -579,18 +592,9 @@ def main(args):
         # Also clear temporary directory on the host device.
         atexit.register(shutil.rmtree, args.tmp_dir)
 
-    # Tracy client and server communicate over port 8086 by default. If we want
-    # to capture traces along the way, forward port via adb.
     trace_capture_config = benchmark_config.trace_capture_config
     if trace_capture_config:
-        execute_cmd_and_get_stdout(
-            ["adb", "forward", "tcp:8086", "tcp:8086"], verbose=args.verbose
-        )
-        atexit.register(
-            execute_cmd_and_get_stdout,
-            ["adb", "forward", "--remove", "tcp:8086"],
-            verbose=args.verbose,
-        )
+        add_port_forwarding(port=ANDROID_TRACY_PORT, verbose=args.verbose)
 
     benchmark_driver.run()
 
