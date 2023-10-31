@@ -379,8 +379,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
     return rewriter.notifyMatchFailure(
         emptyOp, "failed to generate runtime tile size query");
   }
-  SmallVector<OpFoldResult> sourceDims = getMixedValues(
-      resultType.getShape(), emptyOp.getDynamicSizes(), rewriter);
+  SmallVector<OpFoldResult> sourceDims = emptyOp.getMixedSizes();
+  (void)foldDynamicIndexList(sourceDims);
   SmallVector<OpFoldResult> newShape =
       PackOp::getResultShape(rewriter, loc, sourceDims, *innerTileSizesOfr,
                              materializeEncodingInfo->innerDimsPos,
