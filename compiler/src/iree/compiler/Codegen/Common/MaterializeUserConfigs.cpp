@@ -59,7 +59,6 @@ struct MaterializeUserConfigsPass
     MLIRContext *context = moduleOp.getContext();
 
     LDBG("MaterializeUserConfigsPass on variant: " << variantOp);
-    // LLVM_DEBUG(llvm::interleaveComma(exportOps, DBGS() << "exportOps: "));
     std::optional<ModuleOp> transformLibrary = std::nullopt;
     if (!clCodegenTransformDialectLibraryFileName.empty()) {
       auto dialect =

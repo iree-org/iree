@@ -463,7 +463,8 @@ def TransformDialectInterpreter :
            /*default=*/[{"__transform_main"}],
            "Entry point of the pass pipeline.">,
     Option<"libraryFileName", "library-file-name", "std::string",
-           /*default=*/[{""}], "">,
+           /*default=*/[{""}], 
+           "File path to load a library of transform dialect strategies from.">,
   ];
 }
 
