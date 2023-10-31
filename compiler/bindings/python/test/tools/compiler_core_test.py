@@ -109,7 +109,7 @@ class CompilerTest(unittest.TestCase):
         with self.assertRaisesRegex(
             ValueError,
             "For input_type= argument, expected one of: "
-            "NONE, AUTO, STABLEHLO, STABLEHLO_XLA, TOSA",
+            "NONE, AUTO, STABLEHLO, STABLEHLO_XLA, TOSA, TM_TENSOR, TORCH",
         ):
             _ = iree.compiler.tools.compile_str(
                 SIMPLE_MUL_ASM,
@@ -133,7 +133,6 @@ class CompilerTest(unittest.TestCase):
     def testOutputFbTextParsed(self):
         text = iree.compiler.tools.compile_str(
             SIMPLE_MUL_ASM,
-            input_type="stablehlo",
             output_format="flatbuffer_text",
             target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS,
         ).decode("utf-8")
