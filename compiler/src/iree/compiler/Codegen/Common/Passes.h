@@ -31,6 +31,10 @@ void registerTransformDialectTranslationDependentDialects(
 /// kicks in.
 void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager);
 
+/// Passes to invoke to implement the transformations specified through
+/// transform dialect
+void addTransformDialectPasses(OpPassManager &passManager);
+
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
 /// CleanupBufferAllocView).

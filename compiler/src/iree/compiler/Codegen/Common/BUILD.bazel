@@ -148,6 +148,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgExtUtils",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineAnalysis",
