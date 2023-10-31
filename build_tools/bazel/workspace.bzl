@@ -109,7 +109,7 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.new_local_repository,
-        name = "vulkan_headers",
+        name = "iree_vulkan_headers",
         build_file = iree_repo_alias + "//:build_tools/third_party/vulkan_headers/BUILD.overlay",
         path = paths.join(iree_path, "third_party/vulkan_headers"),
     )

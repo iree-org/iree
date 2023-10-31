@@ -89,7 +89,7 @@ class TargetConverter:
                 # Tracy.
                 "@tracy_client//:runtime": ["tracy_client::runtime"],
                 # Vulkan
-                "@vulkan_headers": ["Vulkan::Headers"],
+                "@iree_vulkan_headers": ["Vulkan::Headers"],
                 # Misc single targets
                 "@com_google_benchmark//:benchmark": ["benchmark"],
                 "@com_github_dvidelabs_flatcc//:flatcc": ["flatcc"],

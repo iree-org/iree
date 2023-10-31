@@ -16,6 +16,6 @@ cc_library(
         "include/vk_video/*.h",
         "include/vulkan/*.h",
     ]),
-    include_prefix = "third_party/vulkan_headers",
+    #include_prefix = "third_party/vulkan_headers",
     includes = ["include"],
 )

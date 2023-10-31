@@ -84,7 +84,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/hal/utils:semaphore_base",
         "//runtime/src/iree/schemas:spirv_executable_def_c_fbs",
-        "@vulkan_headers",
+        "@iree_vulkan_headers//:vulkan_headers",
     ],
 )
 
@@ -104,7 +104,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:dynamic_library",
         "//runtime/src/iree/hal/drivers/vulkan/util:ref_ptr",
-        "@vulkan_headers",
+        "@iree_vulkan_headers//:vulkan_headers",
     ],
 )
 
