@@ -57,7 +57,6 @@ iree_cc_library(
     "Passes.h"
     "TileSizeSelection.h"
     "Transforms.h"
-    "UserConfig.h"
   SRCS
     "AddFastMathFlags.cpp"
     "BubbleUpOrdinalOps.cpp"
@@ -108,7 +107,6 @@ iree_cc_library(
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
-    "UserConfig.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders
