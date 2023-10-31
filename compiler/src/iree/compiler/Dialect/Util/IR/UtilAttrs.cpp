@@ -471,12 +471,13 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
     // TODO(saienduri): implement float64 support (not neccesary now)
     unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
-      case 32:
-        return serializeResourceRawData(loc, resourceElementsAttr, os);
-       default:
-        return emitError(loc)
-              << "unhandled float element bit width " << bitWidth
-              << " for type " << resourceElementsAttr.getType();
+    case 16:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 32:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    default:
+      return emitError(loc) << "unhandled float element bit width " << bitWidth
+                            << " for type " << resourceElementsAttr.getType();
     }
   }
   return emitError(loc) << "unhandled constant type " << resourceElementsAttr.getType();
