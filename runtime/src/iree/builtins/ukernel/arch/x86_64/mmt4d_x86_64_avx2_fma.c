@@ -258,39 +258,38 @@ static inline void iree_uk_mmt4d_tile_s16s16s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
   }
 
   for (iree_uk_int32_t k = 0; k < params->K; ++k) {
-    __m256i rhs_i16_perm[2];
-    // rhs_i16_perm[0] is the rhs tile (2x8).
-    rhs_i16_perm[0] = _mm256_loadu_si256((const __m256i*)rhs_ptr);
+    __m256i rhs_perm[2];
+    // rhs_perm[0] is the rhs tile (2x8).
+    rhs_perm[0] = _mm256_loadu_si256((const __m256i*)rhs_ptr);
     rhs_ptr += 16;
-    // rhs_i16_perm[1] is that with the halves swapped.
-    rhs_i16_perm[1] =
-        _mm256_permute2x128_si256(rhs_i16_perm[0], rhs_i16_perm[0], 0x01);
-    // lhs_i16 is the lhs tile (M0x2).
-    __m256i lhs_i16;
+    // rhs_perm[1] is that with the halves swapped.
+    rhs_perm[1] = _mm256_permute2x128_si256(rhs_perm[0], rhs_perm[0], 0x01);
+    // lhs is the lhs tile (M0x2).
+    __m256i lhs;
     if (M0 == 1) {
-      lhs_i16 = _mm256_castsi128_si256(_mm_loadu_si32(lhs_ptr));
+      lhs = _mm256_castsi128_si256(_mm_loadu_si32(lhs_ptr));
       lhs_ptr += 2;
     } else if (M0 == 2) {
-      lhs_i16 = _mm256_castsi128_si256(_mm_loadu_si64(lhs_ptr));
+      lhs = _mm256_castsi128_si256(_mm_loadu_si64(lhs_ptr));
       lhs_ptr += 4;
     } else if (M0 == 4) {
-      lhs_i16 = _mm256_castsi128_si256(_mm_loadu_si128((const __m128i*)lhs_ptr));
+      lhs = _mm256_castsi128_si256(_mm_loadu_si128((const __m128i*)lhs_ptr));
       lhs_ptr += 8;
     } else {
-      lhs_i16 = _mm256_loadu_si256((const __m256i*)lhs_ptr);
+      lhs = _mm256_loadu_si256((const __m256i*)lhs_ptr);
       lhs_ptr += 16;
     }
-    // lhs_i16_dup4[i] is lanes of lhs_i16 shuffled as:
+    // lhs_dup4[i] is lanes of lhs shuffled as:
     // (i, i, i, i, i+4, i+4, i+4, i+4).
-    __m256i lhs_i16_dup4[4];
-    if (M0 >= 1) lhs_i16_dup4[0] = _mm256_shuffle_epi32(lhs_i16, 0 * 0x55);
-    if (M0 >= 2) lhs_i16_dup4[1] = _mm256_shuffle_epi32(lhs_i16, 1 * 0x55);
-    if (M0 >= 4) lhs_i16_dup4[2] = _mm256_shuffle_epi32(lhs_i16, 2 * 0x55);
-    if (M0 >= 4) lhs_i16_dup4[3] = _mm256_shuffle_epi32(lhs_i16, 3 * 0x55);
+    __m256i lhs_dup4[4];
+    if (M0 >= 1) lhs_dup4[0] = _mm256_shuffle_epi32(lhs, 0 * 0x55);
+    if (M0 >= 2) lhs_dup4[1] = _mm256_shuffle_epi32(lhs, 1 * 0x55);
+    if (M0 >= 4) lhs_dup4[2] = _mm256_shuffle_epi32(lhs, 2 * 0x55);
+    if (M0 >= 4) lhs_dup4[3] = _mm256_shuffle_epi32(lhs, 3 * 0x55);
     for (int i = 0; i < imax; ++i) {
       for (int j = 0; j < 2; ++j) {
         acc[i][j] = _mm256_add_epi32(
-            acc[i][j], _mm256_madd_epi16(lhs_i16_dup4[i], rhs_i16_perm[j]));
+            acc[i][j], _mm256_madd_epi16(lhs_dup4[i], rhs_perm[j]));
       }
     }
   }
