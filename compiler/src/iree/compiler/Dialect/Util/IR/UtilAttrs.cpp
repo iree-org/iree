@@ -484,6 +484,8 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
     // TODO(aviator19941): test i1
     unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
+    case 1:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 8:
       return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 16:
