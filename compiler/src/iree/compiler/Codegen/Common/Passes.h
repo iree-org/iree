@@ -141,6 +141,9 @@ std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 /// scf.for.
 std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createMaterializeEncodingIntoNopPass();
+
 /// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFuseTensorPadWithConsumerPass();

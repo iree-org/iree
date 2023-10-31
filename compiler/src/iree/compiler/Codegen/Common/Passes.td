@@ -333,6 +333,12 @@ def LowerUKernelOpsToCalls :
   let constructor = "mlir::iree_compiler::createLowerUKernelOpsToCallsPass()";
 }
 
+def MaterializeEncodingIntoNop :
+    Pass<"iree-codegen-materialize-encoding-into-nop", "func::FuncOp"> {
+  let summary = "";
+  let constructor = "mlir::iree_compiler::createMaterializeEncodingIntoNopPass()";
+}
+
 def MaterializeUserConfigs :
     Pass<"iree-codegen-materialize-user-configs", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Sets the lowering configs and translation info from user configs";
