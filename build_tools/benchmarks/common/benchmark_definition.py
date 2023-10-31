@@ -138,7 +138,6 @@ def get_git_commit_hash(commit: str) -> str:
 
 def get_iree_benchmark_module_arguments(
     driver_info: DriverInfo,
-    results_filename: Optional[str] = None,
     benchmark_min_time: Optional[float] = None,
     capture_mode=False,
 ):
@@ -155,15 +154,12 @@ def get_iree_benchmark_module_arguments(
     else:
         repetitions = 10
 
-    cmd = []
-    if results_filename is not None:
-        cmd += [
-            "--time_unit=ns",
-            "--benchmark_format=json",
-            "--benchmark_out_format=json",
-            "--print_statistics=true",
-            f"--benchmark_out={results_filename}",
-        ]
+    cmd = [
+        "--time_unit=ns",
+        "--benchmark_format=json",
+        "--benchmark_out_format=json",
+        "--print_statistics=true",
+    ]
 
     if benchmark_min_time:
         cmd.extend(

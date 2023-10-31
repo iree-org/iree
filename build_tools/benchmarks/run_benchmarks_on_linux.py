@@ -169,7 +169,6 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         if tool_name == "iree-benchmark-module":
             cmd.extend(
                 get_iree_benchmark_module_arguments(
-                    results_filename=str(results_filename),
                     driver_info=benchmark_case.driver_info,
                     benchmark_min_time=self.config.benchmark_min_time,
                 )

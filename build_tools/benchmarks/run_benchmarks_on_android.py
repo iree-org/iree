@@ -57,7 +57,7 @@ from common.benchmark_definition import (
     wait_for_iree_benchmark_module_start,
     parse_iree_benchmark_metrics,
 )
-from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
+from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.android_device_utils import (
     get_android_device_model,
     get_android_device_info,
@@ -70,30 +70,29 @@ from e2e_test_framework.device_specs import device_parameters
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
+ANDROID_NORMAL_TOOL_DIR = ANDROID_TMPDIR / "normal-tools"
+ANDROID_TRACED_TOOL_DIR = ANDROID_TMPDIR / "traced-tools"
 ANDROID_STREAM_RETRIES_LIMIT = 3
 ANDROID_STREAM_PORT = 8085
 ANDROID_TRACY_PORT = 8086
 
-NORMAL_TOOL_REL_DIR = pathlib.PurePosixPath("normal-tools")
-TRACED_TOOL_REL_DIR = pathlib.PurePosixPath("traced-tools")
-
 
 def adb_push_to_tmp_dir(
     content: pathlib.Path,
-    relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    device_dir: pathlib.PurePosixPath,
     verbose: bool = False,
 ) -> pathlib.PurePosixPath:
     """Pushes content onto the Android device.
 
     Args:
       content: the full path to the source file.
-      relative_dir: the directory to push to; relative to ANDROID_TMPDIR.
+      device_dir: the directory to push to on the Android device.
 
     Returns:
       The full path to the content on the Android device.
     """
     filename = content.name
-    android_path = ANDROID_TMPDIR / relative_dir / filename
+    android_path = device_dir / filename
     # When the output is a TTY, keep the default progress info output.
     # In other cases, redirect progress info to null to avoid bloating log files.
     stdout_redirect = None if sys.stdout.isatty() else subprocess.DEVNULL
@@ -107,46 +106,44 @@ def adb_push_to_tmp_dir(
 
 def adb_execute_and_get_output(
     cmd_args: Sequence[str],
-    relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    cwd: pathlib.PurePosixPath = ANDROID_TMPDIR,
     verbose: bool = False,
 ) -> Tuple[str, str]:
     """Executes command with adb shell.
 
-    Switches to `relative_dir` relative to the android tmp directory before
-    executing. Waits for completion and returns the command stdout.
+    Switches to `cwd` before executing. Waits for completion and returns the
+    command stdout.
 
     Args:
       cmd_args: a list containing the command to execute and its parameters
-      relative_dir: the directory to execute the command in; relative to
-        ANDROID_TMPDIR.
+      cwd: the directory to execute the command in
 
     Returns:
       Strings for stdout and stderr.
     """
-    cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
+    cmd = ["adb", "shell", "cd", cwd, "&&"]
     cmd.extend(cmd_args)
     return execute_cmd_and_get_output(cmd, verbose=verbose)
 
 
 def adb_execute(
     cmd_args: Sequence[str],
-    relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    cwd: pathlib.PurePosixPath = ANDROID_TMPDIR,
     verbose: bool = False,
 ) -> subprocess.CompletedProcess:
     """Executes command with adb shell.
 
-    Switches to `relative_dir` relative to the android tmp directory before
-    executing. Waits for completion. Output is streamed to the terminal.
+    Switches to `cwd` before executing. Waits for completion. Output is streamed
+    to the terminal.
 
     Args:
       cmd_args: a list containing the command to execute and its parameters
-      relative_dir: the directory to execute the command in; relative to
-        ANDROID_TMPDIR.
+      cwd: the directory to execute the command in
 
     Returns:
       The completed process.
     """
-    cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
+    cmd = ["adb", "shell", "cd", cwd, "&&"]
     cmd.extend(cmd_args)
     return execute_cmd(cmd, verbose=verbose)
 
@@ -166,7 +163,7 @@ def adb_execute_as_root(cmd_args: Sequence[Any]) -> subprocess.CompletedProcess:
 
 def adb_start_cmd(
     cmd_args: Sequence[str],
-    relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    cwd: pathlib.PurePosixPath = ANDROID_TMPDIR,
     verbose: bool = False,
 ) -> subprocess.Popen:
     """Executes command with adb shell in a directory and returns the handle
@@ -174,13 +171,12 @@ def adb_start_cmd(
 
     Args:
       cmd_args: a list containing the command to execute and its parameters
-      relative_dir: the directory to execute the command in; relative to
-        ANDROID_TMPDIR.
+      cwd: the directory to execute the command in
 
     Returns:
       A Popen object for the started command.
     """
-    cmd = ["adb", "shell", "cd", ANDROID_TMPDIR / relative_dir, "&&"]
+    cmd = ["adb", "shell", "cd", cwd, "&&"]
     cmd.extend(cmd_args)
 
     if verbose:
@@ -188,15 +184,15 @@ def adb_start_cmd(
     return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
 
 
-def adb_path_exists(device_path: pathlib.PurePosixPath, verbose: bool = False):
+def adb_path_exists(android_path: pathlib.PurePosixPath, verbose: bool = False):
     """Run stat to check if the path exists."""
-    proc = adb_start_cmd(["stat", str(device_path)], verbose=verbose)
+    proc = adb_start_cmd(["stat", str(android_path)], verbose=verbose)
     return proc.wait() == 0
 
 
 def adb_fetch_file(
     url: str,
-    device_path: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    device_path: pathlib.PurePosixPath,
     verbose: bool = False,
 ):
     """Fetch file from the URL and stream to the device. This method avoids the
@@ -205,7 +201,8 @@ def adb_fetch_file(
 
     Args:
       url: URL to fetch the file.
-      relative_dir: the path to push to; relative to ANDROID_TMPDIR.
+      device_path: the path to store on the device.
+      verbose: output verbose message.
 
     Returns:
       File path on the device.
@@ -257,19 +254,6 @@ def adb_fetch_file(
     return device_path
 
 
-def get_vmfb_full_path_for_benchmark_case(
-    benchmark_case_dir: pathlib.Path,
-) -> pathlib.Path:
-    flagfile = benchmark_case_dir / MODEL_FLAGFILE_NAME
-    for line in flagfile.read_text().splitlines():
-        flag_name, flag_value = line.strip().split("=")
-        if flag_name == "--module":
-            # Realpath canonicalization matters. The caller may rely on that to track
-            # which files it already pushed.
-            return (benchmark_case_dir / flag_value).resolve()
-    raise ValueError(f"{flagfile} does not contain a --module flag")
-
-
 class AndroidBenchmarkDriver(BenchmarkDriver):
     """Android benchmark driver."""
 
@@ -284,47 +268,46 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         capture_filename: Optional[pathlib.Path],
     ) -> None:
         benchmark_case_dir = benchmark_case.benchmark_case_dir
-        android_case_dir = pathlib.PurePosixPath(
+        android_case_dir = ANDROID_TMPDIR / pathlib.PurePosixPath(
             benchmark_case_dir.relative_to(self.config.root_benchmark_dir)
         )
 
-        self.__check_and_push_file(
+        inputs_dir = None
+        if benchmark_case.input_uri:
+            inputs_dir = self.__fetch_and_unpack_npy(
+                url=benchmark_case.input_uri,
+                device_dir=android_case_dir / "inputs_npy",
+            )
+        expected_outputs_dir = None
+        if self.config.verify and benchmark_case.expected_output_uri:
+            expected_outputs_dir = self.__fetch_and_unpack_npy(
+                url=benchmark_case.expected_output_uri,
+                device_dir=android_case_dir / "expected_outputs_npy",
+            )
+
+        module_path = self.__check_and_push_file(
             benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir
         )
-        device_inputs_dir = None
-        if benchmark_case.input_uri:
-            device_inputs_dir = self.__fetch_and_unpack_npy(
-                url=benchmark_case.input_uri,
-                device_dest_dir=android_case_dir / "inputs_npy",
-            )
-        device_expected_outputs_dir = None
-        if self.config.verify and benchmark_case.expected_output_uri:
-            device_expected_outputs_dir = self.__fetch_and_unpack_npy(
-                url=benchmark_case.expected_output_uri,
-                device_dest_dir=android_case_dir / "expected_outputs_npy",
-            )
 
         run_config = benchmark_case.run_config
         taskset = self.__deduce_taskset_from_run_config(run_config)
-        run_args = run_config.materialize_run_flags(inputs_dir=device_inputs_dir)
-        run_args.append(f"--module={iree_artifacts.MODULE_FILENAME}")
+        run_args = run_config.materialize_run_flags(inputs_dir=inputs_dir)
+        run_args.append(f"--module={module_path}")
 
         if benchmark_results_filename is not None:
             if self.config.normal_benchmark_tool_dir is None:
                 raise ValueError("normal_benchmark_tool_dir can't be None.")
-            if device_expected_outputs_dir:
+            if expected_outputs_dir:
                 self.__run_verify(
-                    tool_dir=self.config.normal_benchmark_tool_dir,
-                    android_case_dir=android_case_dir,
-                    benchmark_case=benchmark_case,
+                    host_tool_dir=self.config.normal_benchmark_tool_dir,
                     run_args=run_args,
-                    device_expected_outputs_dir=device_expected_outputs_dir,
+                    expected_outputs_dir=expected_outputs_dir,
+                    verify_params=benchmark_case.verify_params,
                     taskset=taskset,
                 )
 
             self.__run_benchmark(
-                tool_dir=self.config.normal_benchmark_tool_dir,
-                android_case_dir=android_case_dir,
+                host_tool_dir=self.config.normal_benchmark_tool_dir,
                 benchmark_case=benchmark_case,
                 run_args=run_args,
                 results_filename=benchmark_results_filename,
@@ -332,8 +315,13 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             )
 
         if capture_filename is not None:
+            capture_config = self.config.trace_capture_config
+            if capture_config is None:
+                raise ValueError("Trace capture config can't be None.")
+
             self.__run_capture(
-                android_case_dir=android_case_dir,
+                host_tool_dir=capture_config.traced_benchmark_tool_dir,
+                trace_capture_tool=capture_config.trace_capture_tool,
                 benchmark_case=benchmark_case,
                 run_args=run_args,
                 capture_filename=capture_filename,
@@ -342,45 +330,44 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
     def __run_verify(
         self,
-        tool_dir: pathlib.Path,
-        android_case_dir: pathlib.PurePosixPath,
-        benchmark_case: BenchmarkCase,
+        host_tool_dir: pathlib.Path,
         run_args: Sequence[str],
-        device_expected_outputs_dir: pathlib.PurePosixPath,
+        expected_outputs_dir: pathlib.PurePosixPath,
+        verify_params: Sequence[str],
         taskset: str,
     ):
-        host_tool = tool_dir / "iree-run-module"
-        device_tool = self.__check_and_push_file(host_tool, NORMAL_TOOL_REL_DIR)
+        device_tool = self.__check_and_push_file(
+            host_tool_dir / "iree-run-module", ANDROID_NORMAL_TOOL_DIR
+        )
         cmd = ["taskset", taskset, device_tool]
         cmd += run_args
         # Currently only support single output.
-        cmd.append(f'--expected_output=@{device_expected_outputs_dir / "output_0.npy"}')
-        cmd += benchmark_case.verify_params
-        adb_execute(cmd, relative_dir=android_case_dir, verbose=self.verbose)
+        cmd.append(f'--expected_output=@{expected_outputs_dir / "output_0.npy"}')
+        cmd += verify_params
+        adb_execute(cmd, verbose=self.verbose)
 
     def __run_benchmark(
         self,
-        tool_dir: pathlib.Path,
-        android_case_dir: pathlib.PurePosixPath,
+        host_tool_dir: pathlib.Path,
         benchmark_case: BenchmarkCase,
         run_args: Sequence[str],
         results_filename: pathlib.Path,
         taskset: str,
     ):
         tool_name = benchmark_case.benchmark_tool_name
-        host_tool_path = tool_dir / tool_name
-        android_tool = self.__check_and_push_file(host_tool_path, NORMAL_TOOL_REL_DIR)
-        cmd = ["taskset", taskset, android_tool]
+        device_tool = self.__check_and_push_file(
+            host_tool_dir / tool_name, ANDROID_NORMAL_TOOL_DIR
+        )
+        cmd = ["taskset", taskset, device_tool]
         cmd += run_args
         if tool_name == "iree-benchmark-module":
             cmd += get_iree_benchmark_module_arguments(
-                results_filename=f"'{results_filename.name}'",
                 driver_info=benchmark_case.driver_info,
                 benchmark_min_time=self.config.benchmark_min_time,
             )
 
         benchmark_stdout, benchmark_stderr = adb_execute_and_get_output(
-            cmd, android_case_dir, verbose=self.verbose
+            cmd, verbose=self.verbose
         )
         benchmark_metrics = parse_iree_benchmark_metrics(
             benchmark_stdout, benchmark_stderr
@@ -391,25 +378,23 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
     def __run_capture(
         self,
-        android_case_dir: pathlib.PurePosixPath,
+        host_tool_dir: pathlib.Path,
+        trace_capture_tool: pathlib.Path,
         benchmark_case: BenchmarkCase,
         run_args: Sequence[str],
         capture_filename: pathlib.Path,
         taskset: str,
     ):
-        capture_config = self.config.trace_capture_config
-        if capture_config is None:
-            raise ValueError("capture_config can't be None.")
-
         tool_name = benchmark_case.benchmark_tool_name
-        host_tool_path = capture_config.traced_benchmark_tool_dir / tool_name
-        android_tool = self.__check_and_push_file(host_tool_path, TRACED_TOOL_REL_DIR)
+        device_tool = self.__check_and_push_file(
+            host_tool_dir / tool_name, ANDROID_TRACED_TOOL_DIR
+        )
         run_cmd = [
             "TRACY_NO_EXIT=1",
             f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMPDIR}",
             "taskset",
             taskset,
-            android_tool,
+            device_tool,
         ]
         run_cmd += run_args
         if tool_name == "iree-benchmark-module":
@@ -421,14 +406,14 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
         # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
         # waiting for the adb command to complete as that won't happen.
-        process = adb_start_cmd(run_cmd, android_case_dir, verbose=self.verbose)
+        process = adb_start_cmd(run_cmd, verbose=self.verbose)
 
         wait_for_iree_benchmark_module_start(process, self.verbose)
 
         # Now it's okay to collect the trace via the capture tool. This will
         # send the signal to let the previously waiting benchmark tool to
         # complete.
-        capture_cmd = [capture_config.trace_capture_tool, "-f", "-o", capture_filename]
+        capture_cmd = [trace_capture_tool, "-f", "-o", capture_filename]
         # If verbose, just let the subprocess print its output. The subprocess
         # may need to detect if the output is a TTY to decide whether to log
         # verbose progress info and use ANSI colors, so it's better to use
@@ -461,7 +446,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         raise ValueError(f"Unsupported config to deduce taskset: '{run_config}'.")
 
     def __check_and_push_file(
-        self, host_path: pathlib.Path, relative_dir: pathlib.PurePosixPath
+        self, host_path: pathlib.Path, device_dir: pathlib.PurePosixPath
     ):
         """Checks if the file has been pushed and pushes it if not."""
         android_path = self.already_pushed_files.get(host_path)
@@ -469,33 +454,33 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             return android_path
 
         android_path = adb_push_to_tmp_dir(
-            host_path, relative_dir=relative_dir, verbose=self.verbose
+            host_path, device_dir=device_dir, verbose=self.verbose
         )
         self.already_pushed_files[host_path] = android_path
         return android_path
 
-    def __fetch_and_unpack_npy(self, url: str, device_dest_dir: pathlib.PurePosixPath):
-        if adb_path_exists(device_dest_dir, verbose=self.verbose):
-            return device_dest_dir
+    def __fetch_and_unpack_npy(self, url: str, device_dir: pathlib.PurePosixPath):
+        if adb_path_exists(device_dir, verbose=self.verbose):
+            return device_dir
 
         archive_path = adb_fetch_file(
-            url=url, device_path=device_dest_dir.with_suffix(".tgz")
+            url=url, device_path=device_dir.with_suffix(".tgz")
         )
         adb_execute(
             [
                 "mkdir",
                 "-p",
-                str(device_dest_dir),
+                str(device_dir),
                 "&&",
                 "tar",
                 "-xvf",
                 str(archive_path),
                 "-C",
-                str(device_dest_dir),
+                str(device_dir),
             ],
             verbose=self.verbose,
         )
-        return device_dest_dir
+        return device_dir
 
 
 def set_cpu_frequency_scaling_governor(governor: str):
@@ -506,7 +491,7 @@ def set_cpu_frequency_scaling_governor(governor: str):
         / "benchmarks"
         / "set_android_scaling_governor.sh"
     )
-    android_path = adb_push_to_tmp_dir(cpu_script)
+    android_path = adb_push_to_tmp_dir(content=cpu_script, device_dir=ANDROID_TMPDIR)
     adb_execute_as_root([android_path, governor])
 
 
@@ -523,7 +508,7 @@ def set_gpu_frequency_scaling_policy(policy: str):
         raise RuntimeError(
             f"Unsupported device '{device_model}' for setting GPU scaling policy"
         )
-    android_path = adb_push_to_tmp_dir(gpu_script)
+    android_path = adb_push_to_tmp_dir(content=gpu_script, device_dir=ANDROID_TMPDIR)
     adb_execute_as_root([android_path, policy])
 
 
