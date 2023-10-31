@@ -18,9 +18,9 @@
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
 
-// The maximal number of CUDA graph nodes between barrriers (nodes that can run
-// concurrently) supported in the CUDA HAL driver.
-#define IREE_HAL_CUDA_MAX_CONCURRENT_NODES 32
+// The maximal number of CUDA graph nodes that can run concurrently between
+// barriers.
+#define IREE_HAL_CUDA_MAX_CONCURRENT_GRAPH_NODE_COUNT 32
 
 // Command buffer implementation that directly records into CUDA graphs.
 // The command buffer records the commands on the calling thread without
@@ -45,11 +45,11 @@ typedef struct iree_hal_cuda2_graph_command_buffer_t {
   CUgraphExec cu_graph_exec;
 
   // A node acting as a barrier for all commands added to the command buffer.
-  CUgraphNode barrier_node;
+  CUgraphNode cu_barrier_node;
 
   // Nodes added to the command buffer after the last barrier.
-  CUgraphNode nodes[IREE_HAL_CUDA_MAX_CONCURRENT_NODES];
-  int node_count;
+  CUgraphNode cu_graph_nodes[IREE_HAL_CUDA_MAX_CONCURRENT_GRAPH_NODE_COUNT];
+  int graph_node_count;
 
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
@@ -106,8 +106,8 @@ iree_status_t iree_hal_cuda2_graph_command_buffer_create(
   command_buffer->cu_context = context;
   command_buffer->cu_graph = NULL;
   command_buffer->cu_graph_exec = NULL;
-  command_buffer->barrier_node = NULL;
-  command_buffer->node_count = 0;
+  command_buffer->cu_barrier_node = NULL;
+  command_buffer->graph_node_count = 0;
 
   iree_status_t status =
       iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
@@ -148,8 +148,8 @@ static void iree_hal_cuda2_graph_command_buffer_destroy(
                            cuGraphExecDestroy(command_buffer->cu_graph_exec));
     command_buffer->cu_graph_exec = NULL;
   }
-  command_buffer->barrier_node = NULL;
-  command_buffer->node_count = 0;
+  command_buffer->cu_barrier_node = NULL;
+  command_buffer->graph_node_count = 0;
 
   iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);
@@ -241,8 +241,8 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_end(
       iree_hal_cuda2_graph_command_buffer_flush_collectives(command_buffer));
 
   // Reset state used during recording.
-  command_buffer->barrier_node = NULL;
-  command_buffer->node_count = 0;
+  command_buffer->cu_barrier_node = NULL;
+  command_buffer->graph_node_count = 0;
 
   // Compile the graph.
   CUgraphNode error_node = NULL;
@@ -285,32 +285,32 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_execution_barrier(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   iree_hal_cuda2_graph_command_buffer_t* command_buffer =
       iree_hal_cuda2_graph_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   IREE_RETURN_IF_ERROR(
       iree_hal_cuda2_graph_command_buffer_flush_collectives(command_buffer));
 
-  IREE_ASSERT_GT(command_buffer->node_count, 0,
+  IREE_ASSERT_GT(command_buffer->graph_node_count, 0,
                  "expected at least one node before a barrier");
 
-  // Use last node as a barrier to avoid creating redundant empty nodes.
-  if (IREE_LIKELY(command_buffer->node_count == 1)) {
-    command_buffer->barrier_node = command_buffer->nodes[0];
-    command_buffer->node_count = 0;
+  // Use the last node as a barrier to avoid creating redundant empty nodes.
+  if (IREE_LIKELY(command_buffer->graph_node_count == 1)) {
+    command_buffer->cu_barrier_node = command_buffer->cu_graph_nodes[0];
+    command_buffer->graph_node_count = 0;
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
 
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddEmptyNode(&command_buffer->barrier_node,
-                          command_buffer->cu_graph, command_buffer->nodes,
-                          command_buffer->node_count),
+      cuGraphAddEmptyNode(
+          &command_buffer->cu_barrier_node, command_buffer->cu_graph,
+          command_buffer->cu_graph_nodes, command_buffer->graph_node_count),
       "cuGraphAddEmptyNode");
 
-  command_buffer->node_count = 0;
+  command_buffer->graph_node_count = 0;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -424,17 +424,19 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_fill_buffer(
       .value = pattern_4byte,
   };
 
-  CUgraphNode dep[] = {command_buffer->barrier_node};
-  size_t numDeps = command_buffer->barrier_node ? 1 : 0;
+  if (command_buffer->graph_node_count >=
+      IREE_HAL_CUDA_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "exceeded max concurrent node limit");
+  }
 
-  IREE_ASSERT_LT(command_buffer->node_count, IREE_HAL_CUDA_MAX_CONCURRENT_NODES,
-                 "number of concurrent graph nodes larger than expected");
-
+  size_t dependency_count = command_buffer->cu_barrier_node ? 1 : 0;
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddMemsetNode(&command_buffer->nodes[command_buffer->node_count++],
-                           command_buffer->cu_graph, dep, numDeps, &params,
-                           command_buffer->cu_context),
+      cuGraphAddMemsetNode(
+          &command_buffer->cu_graph_nodes[command_buffer->graph_node_count++],
+          command_buffer->cu_graph, &command_buffer->cu_barrier_node,
+          dependency_count, &params, command_buffer->cu_context),
       "cuGraphAddMemsetNode");
 
   IREE_TRACE_ZONE_END(z0);
@@ -482,17 +484,19 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_update_buffer(
       .Depth = 1,
   };
 
-  CUgraphNode dep[] = {command_buffer->barrier_node};
-  size_t numDeps = command_buffer->barrier_node ? 1 : 0;
+  if (command_buffer->graph_node_count >=
+      IREE_HAL_CUDA_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "exceeded max concurrent node limit");
+  }
 
-  IREE_ASSERT_LT(command_buffer->node_count, IREE_HAL_CUDA_MAX_CONCURRENT_NODES,
-                 "number of concurrent graph nodes larger than expected");
-
+  size_t dependency_count = command_buffer->cu_barrier_node ? 1 : 0;
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddMemcpyNode(&command_buffer->nodes[command_buffer->node_count++],
-                           command_buffer->cu_graph, dep, numDeps, &params,
-                           command_buffer->cu_context),
+      cuGraphAddMemcpyNode(
+          &command_buffer->cu_graph_nodes[command_buffer->graph_node_count++],
+          command_buffer->cu_graph, &command_buffer->cu_barrier_node,
+          dependency_count, &params, command_buffer->cu_context),
       "cuGraphAddMemcpyNode");
 
   IREE_TRACE_ZONE_END(z0);
@@ -536,17 +540,19 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_copy_buffer(
       .Depth = 1,
   };
 
-  CUgraphNode dep[] = {command_buffer->barrier_node};
-  size_t numDeps = command_buffer->barrier_node ? 1 : 0;
+  if (command_buffer->graph_node_count >=
+      IREE_HAL_CUDA_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "exceeded max concurrent node limit");
+  }
 
-  IREE_ASSERT_LT(command_buffer->node_count, IREE_HAL_CUDA_MAX_CONCURRENT_NODES,
-                 "number of concurrent graph nodes larger than expected");
-
+  size_t dependency_count = command_buffer->cu_barrier_node ? 1 : 0;
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddMemcpyNode(&command_buffer->nodes[command_buffer->node_count++],
-                           command_buffer->cu_graph, dep, numDeps, &params,
-                           command_buffer->cu_context),
+      cuGraphAddMemcpyNode(
+          &command_buffer->cu_graph_nodes[command_buffer->graph_node_count++],
+          command_buffer->cu_graph, &command_buffer->cu_barrier_node,
+          dependency_count, &params, command_buffer->cu_context),
       "cuGraphAddMemcpyNode");
 
   IREE_TRACE_ZONE_END(z0);
@@ -713,16 +719,19 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_dispatch(
       .sharedMemBytes = kernel_info.shared_memory_size,
   };
 
-  CUgraphNode dep[] = {command_buffer->barrier_node};
-  size_t numDeps = command_buffer->barrier_node ? 1 : 0;
+  if (command_buffer->graph_node_count >=
+      IREE_HAL_CUDA_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "exceeded max concurrent node limit");
+  }
 
-  IREE_ASSERT_LT(command_buffer->node_count, IREE_HAL_CUDA_MAX_CONCURRENT_NODES,
-                 "number of concurrent graph nodes larger than expected");
-
+  size_t dependency_count = command_buffer->cu_barrier_node ? 1 : 0;
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      cuGraphAddKernelNode(&command_buffer->nodes[command_buffer->node_count++],
-                           command_buffer->cu_graph, dep, numDeps, &params),
+      cuGraphAddKernelNode(
+          &command_buffer->cu_graph_nodes[command_buffer->graph_node_count++],
+          command_buffer->cu_graph, &command_buffer->cu_barrier_node,
+          dependency_count, &params),
       "cuGraphAddKernelNode");
 
   IREE_TRACE_ZONE_END(z0);
