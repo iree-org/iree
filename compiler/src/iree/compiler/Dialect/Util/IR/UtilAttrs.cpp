@@ -453,7 +453,6 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
   if (llvm::isa<IntegerType>(resourceElementsAttr.getType().getElementType())) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
-    // TODO(aviator19941): test i1
     unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
     case 1:
