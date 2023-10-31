@@ -49,7 +49,7 @@ typedef struct iree_hal_cuda2_graph_command_buffer_t {
 
   // Nodes added to the command buffer after the last barrier.
   CUgraphNode cu_graph_nodes[IREE_HAL_CUDA_MAX_CONCURRENT_GRAPH_NODE_COUNT];
-  int graph_node_count;
+  iree_host_size_t graph_node_count;
 
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
