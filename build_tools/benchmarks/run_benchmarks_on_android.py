@@ -188,9 +188,15 @@ def adb_start_cmd(
     return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
 
 
-def adb_fetch_to_tmp_dir(
+def adb_path_exists(device_path: pathlib.PurePosixPath, verbose: bool = False):
+    """Run stat to check if the path exists."""
+    proc = adb_start_cmd(["stat", str(device_path)], verbose=verbose)
+    return proc.wait() == 0
+
+
+def adb_fetch_file(
     url: str,
-    relative_path: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+    device_path: pathlib.PurePosixPath = pathlib.PurePosixPath(),
     verbose: bool = False,
 ):
     """Fetch file from the URL and stream to the device. This method avoids the
@@ -200,9 +206,14 @@ def adb_fetch_to_tmp_dir(
     Args:
       url: URL to fetch the file.
       relative_dir: the path to push to; relative to ANDROID_TMPDIR.
+
+    Returns:
+      File path on the device.
     """
 
-    android_path = ANDROID_TMPDIR / relative_path
+    if adb_path_exists(device_path, verbose):
+        return
+
     # Start a one-time netcat server to receive and save the file.
     netcat_server = adb_start_cmd(
         [
@@ -213,8 +224,9 @@ def adb_fetch_to_tmp_dir(
             str(ANDROID_STREAM_PORT),
             "-l",
             ">",
-            android_path.as_posix(),
-        ]
+            str(device_path),
+        ],
+        verbose=verbose,
     )
 
     retry_times = ANDROID_STREAM_RETRIES_LIMIT
@@ -223,7 +235,7 @@ def adb_fetch_to_tmp_dir(
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(("127.0.0.1", ANDROID_STREAM_PORT))
         if verbose:
-            print(f"Streaming file {url} to {android_path}.")
+            print(f"Streaming file {url} to {device_path}.")
         try:
             for data in req.iter_content(chunk_size=4 * 1024 * 1024):
                 sock.sendall(data)
@@ -241,6 +253,8 @@ def adb_fetch_to_tmp_dir(
     retcode = netcat_server.wait()
     if retcode != 0:
         raise ValueError(f"Netcat server ended with error {retcode}.")
+
+    return device_path
 
 
 def get_vmfb_full_path_for_benchmark_case(
@@ -277,13 +291,39 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         self.__check_and_push_file(
             benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir
         )
+        device_inputs_dir = None
+        if benchmark_case.input_uri:
+            device_inputs_dir = self.__fetch_and_unpack_npy(
+                url=benchmark_case.input_uri,
+                device_dest_dir=android_case_dir / "inputs_npy",
+            )
+        device_expected_outputs_dir = None
+        if self.config.verify and benchmark_case.expected_output_uri:
+            device_expected_outputs_dir = self.__fetch_and_unpack_npy(
+                url=benchmark_case.expected_output_uri,
+                device_dest_dir=android_case_dir / "expected_outputs_npy",
+            )
+
         run_config = benchmark_case.run_config
         taskset = self.__deduce_taskset_from_run_config(run_config)
-        run_args = run_config.materialize_run_flags()
+        run_args = run_config.materialize_run_flags(inputs_dir=device_inputs_dir)
         run_args.append(f"--module={iree_artifacts.MODULE_FILENAME}")
 
         if benchmark_results_filename is not None:
+            if self.config.normal_benchmark_tool_dir is None:
+                raise ValueError("normal_benchmark_tool_dir can't be None.")
+            if device_expected_outputs_dir:
+                self.__run_verify(
+                    tool_dir=self.config.normal_benchmark_tool_dir,
+                    android_case_dir=android_case_dir,
+                    benchmark_case=benchmark_case,
+                    run_args=run_args,
+                    device_expected_outputs_dir=device_expected_outputs_dir,
+                    taskset=taskset,
+                )
+
             self.__run_benchmark(
+                tool_dir=self.config.normal_benchmark_tool_dir,
                 android_case_dir=android_case_dir,
                 benchmark_case=benchmark_case,
                 run_args=run_args,
@@ -300,19 +340,35 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                 taskset=taskset,
             )
 
+    def __run_verify(
+        self,
+        tool_dir: pathlib.Path,
+        android_case_dir: pathlib.PurePosixPath,
+        benchmark_case: BenchmarkCase,
+        run_args: Sequence[str],
+        device_expected_outputs_dir: pathlib.PurePosixPath,
+        taskset: str,
+    ):
+        host_tool = tool_dir / "iree-run-module"
+        device_tool = self.__check_and_push_file(host_tool, NORMAL_TOOL_REL_DIR)
+        cmd = ["taskset", taskset, device_tool]
+        cmd += run_args
+        # Currently only support single output.
+        cmd.append(f'--expected_output=@{device_expected_outputs_dir / "output_0.npy"}')
+        cmd += benchmark_case.verify_params
+        adb_execute(cmd, relative_dir=android_case_dir, verbose=self.verbose)
+
     def __run_benchmark(
         self,
+        tool_dir: pathlib.Path,
         android_case_dir: pathlib.PurePosixPath,
         benchmark_case: BenchmarkCase,
         run_args: Sequence[str],
         results_filename: pathlib.Path,
         taskset: str,
     ):
-        if self.config.normal_benchmark_tool_dir is None:
-            raise ValueError("normal_benchmark_tool_dir can't be None.")
-
         tool_name = benchmark_case.benchmark_tool_name
-        host_tool_path = self.config.normal_benchmark_tool_dir / tool_name
+        host_tool_path = tool_dir / tool_name
         android_tool = self.__check_and_push_file(host_tool_path, NORMAL_TOOL_REL_DIR)
         cmd = ["taskset", taskset, android_tool]
         cmd += run_args
@@ -417,6 +473,29 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         )
         self.already_pushed_files[host_path] = android_path
         return android_path
+
+    def __fetch_and_unpack_npy(self, url: str, device_dest_dir: pathlib.PurePosixPath):
+        if adb_path_exists(device_dest_dir, verbose=self.verbose):
+            return device_dest_dir
+
+        archive_path = adb_fetch_file(
+            url=url, device_path=device_dest_dir.with_suffix(".tgz")
+        )
+        adb_execute(
+            [
+                "mkdir",
+                "-p",
+                str(device_dest_dir),
+                "&&",
+                "tar",
+                "-xvf",
+                str(archive_path),
+                "-C",
+                str(device_dest_dir),
+            ],
+            verbose=self.verbose,
+        )
+        return device_dest_dir
 
 
 def set_cpu_frequency_scaling_governor(governor: str):
