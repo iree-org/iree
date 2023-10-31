@@ -43,8 +43,13 @@ struct TargetOptions {
   // Default path to write executable files into.
   std::string executableFilesPath;
 
-  // A path to write individual executable source listings into.
+  // A path to write individual executable source listings into (before
+  // configuration).
   std::string executableSourcesPath;
+
+  // A path to write individual executable source listings into (after
+  // configuration).
+  std::string executableConfigurationsPath;
 
   // A path to write standalone executable benchmarks into.
   std::string executableBenchmarksPath;
@@ -149,6 +154,34 @@ public:
     return {};
   }
 
+  // Inserts passes used to configure the `hal.executable.variant` op contents
+  // for translation. The pass manager will be nested on `hal.executable` such
+  // that the pipeline will only run on executable contents.
+  //
+  // The primary purpose of this pipeline is to do the minimum necessary
+  // preprocessing on variants necessary for translation, as well as set any
+  // strategy specific information needed for translation. This is to inform
+  // later passes on how to expand/contract variants for multiple targets that
+  // might be known to translate to the same thing. As such, this pipeline is
+  // optional.
+  //
+  // The expected input to this pipeline might look like:
+  //   hal.executable @some_executable {
+  //     hal.interface @main_io {
+  //       hal.interface.binding @arg0, set=0, binding=0, ...
+  //       hal.interface.binding @arg1, set=0, binding=1, ...
+  //     }
+  //     hal.executable.variant @target, target="target-backend" {
+  //       hal.executable.export @main interface(@main_io) {
+  //         ordinal = 0 : index
+  //       }
+  //       module { ... }
+  //     }
+  //   }
+  virtual void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                 OpPassManager &passManager){};
+
   // Inserts passes used to translate the `hal.executable.variant` op contents.
   // The pass manager will be nested on `hal.executable` such that the pipeline
   // will only run on executable contents.
@@ -168,7 +201,7 @@ public:
   //       hal.executable.export @main interface(@main_io) {
   //         ordinal = 0 : index
   //       }
-  //       module { ... }
+  //       module { ... (annotated for translation) }
   //     }
   //   }
   //

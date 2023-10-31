@@ -126,6 +126,16 @@ public:
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
+  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                      OpPassManager &passManager) override {
+    // For now we disable configuration if the variant has external object
+    // files.
+    if (variantOp.isExternal())
+      return;
+
+    buildSPIRVCodegenConfigurationPassPipeline(passManager);
+  }
+
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
     // For now we disable translation if the variant has external object files.

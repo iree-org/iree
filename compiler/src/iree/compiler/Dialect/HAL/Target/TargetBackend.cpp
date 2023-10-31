@@ -50,6 +50,8 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::callback([&](const std::string &path) {
         if (executableSourcesPath.empty())
           executableSourcesPath = path;
+        if (executableConfigurationsPath.empty())
+          executableConfigurationsPath = path;
         if (executableBenchmarksPath.empty())
           executableBenchmarksPath = path;
         if (executableIntermediatesPath.empty())
@@ -63,6 +65,13 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       "iree-hal-dump-executable-sources-to", executableSourcesPath,
       llvm::cl::desc("Path to write individual hal.executable input "
                      "source listings into (- for stdout)."),
+      llvm::cl::cat(halTargetOptionsCategory));
+
+  binder.opt<std::string>(
+      "iree-hal-dump-executable-configurations-to",
+      executableConfigurationsPath,
+      llvm::cl::desc("Path to write individual hal.executable input source "
+                     "listings into, after configuration (- for stdout)."),
       llvm::cl::cat(halTargetOptionsCategory));
 
   binder.opt<std::string>(

@@ -31,6 +31,9 @@ enum class PipelinePhase {
   Start,
   // Runs the transform pipeline up to executable sources (pre translation).
   ExecutableSources,
+  // Runs the transform pipeline up to executable configurations (before
+  // strategy selection).
+  ExecutableConfigurations,
   // Runs the transform pipeline until just after executable translation.
   ExecutableTargets,
   // Runs the full pipeline.
@@ -105,7 +108,7 @@ createMaterializeInterfacesPass();
 
 // Dumps individual hal.executable source listings to |path|.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createDumpExecutableSourcesPass(StringRef path);
+createDumpExecutableSourcesPass(StringRef path, StringRef prefix = "");
 
 // Dumps standalone hal.executable benchmarks to |path|.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
@@ -130,6 +133,15 @@ createPreprocessExecutablesWithPipelinePass(std::string pipeline);
 // Preprocesses each executable with an external tool.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createPreprocessExecutablesWithToolPass(std::string command);
+
+// Configures hal.executable.variant ops via a nested translation pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createConfigureExecutablesPass(const TargetBackendRegistry &targetRegistry);
+
+// Configures hal.executable.variant ops for the specified |target| backend.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createConfigureTargetExecutableVariantsPass(
+    const TargetBackendRegistry &targetRegistry, StringRef target);
 
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
@@ -202,6 +214,9 @@ inline void registerHALPasses() {
   auto targetOptions = TargetOptions::FromFlags::get();
   createAssignTargetDevicesPass(TargetBackendRegistry::getGlobal(), {});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
+  createConfigureExecutablesPass(TargetBackendRegistry::getGlobal());
+  createConfigureTargetExecutableVariantsPass(
+      TargetBackendRegistry::getGlobal(), "");
   createConvertToHALPass();
   createDumpExecutableSourcesPass("");
   createElideRedundantCommandsPass();

@@ -594,13 +594,12 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
-void buildLLVMGPUCodegenStrategyInitializationPassPipeline(OpPassManager &pm) {
+void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
   pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM) {
-  buildLLVMGPUCodegenStrategyInitializationPassPipeline(pm);
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//
@@ -631,6 +630,13 @@ namespace {
 void registerCodegenLLVMGPUPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> LLVMGPUConfigPipeline(
+      "iree-codegen-llvmgpu-configuration-pipeline",
+      "Runs the strategy configuration pipeline for lowering Linalg",
+      [](OpPassManager &passManager) {
+        buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
+      });
 
   static PassPipelineRegistration<> LinalgNVVMPipeline(
       "iree-codegen-linalg-to-nvvm-pipeline",

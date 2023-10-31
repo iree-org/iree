@@ -35,7 +35,10 @@ class DumpExecutableSourcesPass
 public:
   DumpExecutableSourcesPass() = default;
   DumpExecutableSourcesPass(const DumpExecutableSourcesPass &pass) {}
-  DumpExecutableSourcesPass(StringRef path) { this->path = path.str(); }
+  DumpExecutableSourcesPass(StringRef path, StringRef prefix) {
+    this->path = path.str();
+    this->prefix = prefix.str();
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
@@ -63,8 +66,11 @@ public:
       auto originalVisibility = executableOp.getVisibility();
       executableOp.setVisibility(SymbolTable::Visibility::Public);
 
+      std::string maybePrefix = prefix.empty() ? "" : prefix + "_";
+
       auto fileName =
-          (moduleName + "_" + executableOp.getName() + ".mlir").str();
+          (maybePrefix + moduleName + "_" + executableOp.getName() + ".mlir")
+              .str();
       if (path.empty() || path == "-") {
         dumpExecutableToStream(executableOp, fileName, llvm::outs());
       } else {
@@ -90,11 +96,15 @@ private:
   Option<std::string> path{
       *this, "path",
       llvm::cl::desc("Path to write hal.executable source files into.")};
+
+  Option<std::string> prefix{
+      *this, "prefix",
+      llvm::cl::desc("String to prefix the written files with.")};
 };
 
 std::unique_ptr<OperationPass<ModuleOp>>
-createDumpExecutableSourcesPass(StringRef path) {
-  return std::make_unique<DumpExecutableSourcesPass>(path);
+createDumpExecutableSourcesPass(StringRef path, StringRef prefix) {
+  return std::make_unique<DumpExecutableSourcesPass>(path, prefix);
 }
 
 static PassRegistration<DumpExecutableSourcesPass> pass([] {
