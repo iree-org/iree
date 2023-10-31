@@ -38,6 +38,14 @@ iree_hal_cuda2_descriptor_set_layout_cast(
   return (iree_hal_cuda2_descriptor_set_layout_t*)base_value;
 }
 
+static const iree_hal_cuda2_descriptor_set_layout_t*
+iree_hal_cuda2_descriptor_set_layout_const_cast(
+    const iree_hal_descriptor_set_layout_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value,
+                       &iree_hal_cuda2_descriptor_set_layout_vtable);
+  return (const iree_hal_cuda2_descriptor_set_layout_t*)base_value;
+}
+
 iree_status_t iree_hal_cuda2_descriptor_set_layout_create(
     iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
@@ -67,9 +75,10 @@ iree_status_t iree_hal_cuda2_descriptor_set_layout_create(
 }
 
 iree_host_size_t iree_hal_cuda2_descriptor_set_layout_binding_count(
-    iree_hal_descriptor_set_layout_t* base_descriptor_set_layout) {
-  iree_hal_cuda2_descriptor_set_layout_t* descriptor_set_layout =
-      iree_hal_cuda2_descriptor_set_layout_cast(base_descriptor_set_layout);
+    const iree_hal_descriptor_set_layout_t* base_descriptor_set_layout) {
+  const iree_hal_cuda2_descriptor_set_layout_t* descriptor_set_layout =
+      iree_hal_cuda2_descriptor_set_layout_const_cast(
+          base_descriptor_set_layout);
   return descriptor_set_layout->binding_count;
 }
 
@@ -126,6 +135,13 @@ static iree_hal_cuda2_pipeline_layout_t* iree_hal_cuda2_pipeline_layout_cast(
     iree_hal_pipeline_layout_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda2_pipeline_layout_vtable);
   return (iree_hal_cuda2_pipeline_layout_t*)base_value;
+}
+
+static const iree_hal_cuda2_pipeline_layout_t*
+iree_hal_cuda2_pipeline_layout_const_cast(
+    const iree_hal_pipeline_layout_t* base_value) {
+  IREE_HAL_ASSERT_TYPE(base_value, &iree_hal_cuda2_pipeline_layout_vtable);
+  return (const iree_hal_cuda2_pipeline_layout_t*)base_value;
 }
 
 iree_status_t iree_hal_cuda2_pipeline_layout_create(
@@ -195,24 +211,48 @@ static void iree_hal_cuda2_pipeline_layout_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+iree_host_size_t iree_hal_cuda2_pipeline_layout_descriptor_set_count(
+    const iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  const iree_hal_cuda2_pipeline_layout_t* pipeline_layout =
+      iree_hal_cuda2_pipeline_layout_const_cast(base_pipeline_layout);
+  return pipeline_layout->set_layout_count;
+}
+
+const iree_hal_descriptor_set_layout_t*
+iree_hal_cuda2_pipeline_layout_descriptor_set_layout(
+    const iree_hal_pipeline_layout_t* base_pipeline_layout, uint32_t set) {
+  const iree_hal_cuda2_pipeline_layout_t* pipeline_layout =
+      iree_hal_cuda2_pipeline_layout_const_cast(base_pipeline_layout);
+  if (set < pipeline_layout->set_layout_count) {
+    return pipeline_layout->set_layouts[set].set_layout;
+  }
+  return NULL;
+}
+
 iree_host_size_t iree_hal_cuda2_pipeline_layout_base_binding_index(
-    iree_hal_pipeline_layout_t* base_pipeline_layout, uint32_t set) {
-  iree_hal_cuda2_pipeline_layout_t* pipeline_layout =
-      iree_hal_cuda2_pipeline_layout_cast(base_pipeline_layout);
+    const iree_hal_pipeline_layout_t* base_pipeline_layout, uint32_t set) {
+  const iree_hal_cuda2_pipeline_layout_t* pipeline_layout =
+      iree_hal_cuda2_pipeline_layout_const_cast(base_pipeline_layout);
   return pipeline_layout->set_layouts[set].base_index;
 }
 
+iree_host_size_t iree_hal_cuda2_pipeline_layout_total_binding_count(
+    const iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  return iree_hal_cuda2_pipeline_layout_push_constant_index(
+      base_pipeline_layout);
+}
+
 iree_host_size_t iree_hal_cuda2_pipeline_layout_push_constant_index(
-    iree_hal_pipeline_layout_t* base_pipeline_layout) {
-  iree_hal_cuda2_pipeline_layout_t* pipeline_layout =
-      iree_hal_cuda2_pipeline_layout_cast(base_pipeline_layout);
+    const iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  const iree_hal_cuda2_pipeline_layout_t* pipeline_layout =
+      iree_hal_cuda2_pipeline_layout_const_cast(base_pipeline_layout);
   return pipeline_layout->push_constant_base_index;
 }
 
 iree_host_size_t iree_hal_cuda2_pipeline_layout_push_constant_count(
-    iree_hal_pipeline_layout_t* base_pipeline_layout) {
-  iree_hal_cuda2_pipeline_layout_t* pipeline_layout =
-      iree_hal_cuda2_pipeline_layout_cast(base_pipeline_layout);
+    const iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  const iree_hal_cuda2_pipeline_layout_t* pipeline_layout =
+      iree_hal_cuda2_pipeline_layout_const_cast(base_pipeline_layout);
   return pipeline_layout->push_constant_count;
 }
 
