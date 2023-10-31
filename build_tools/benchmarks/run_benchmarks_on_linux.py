@@ -234,6 +234,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 get_iree_benchmark_module_arguments(
                     driver_info=benchmark_case.driver_info,
                     benchmark_min_time=self.config.benchmark_min_time,
+                    dump_results=False,
                     capture_mode=True,
                 )
             )
