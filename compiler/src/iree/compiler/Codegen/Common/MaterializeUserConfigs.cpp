@@ -40,6 +40,31 @@ namespace {
 
 static const char kTranslationInfoAttrName[] = "translation_info";
 
+/// Sets compilation configuration annotated in the incoming IR.
+LogicalResult
+setUserConfig(func::FuncOp entryPointFn, Operation *computeOp,
+              IREE::Codegen::CompilationInfoAttr compilationInfo) {
+  if (auto translationInfo = getTranslationInfo(entryPointFn)) {
+    return computeOp->emitOpError(
+        "multiple ops within dispatch trying to set the translation "
+        "info");
+  }
+
+  auto info = compilationInfo.getTranslationInfo();
+  if (failed(setTranslationInfo(entryPointFn, info)))
+    return failure();
+
+  SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
+  std::optional<int64_t> subgroupSize = compilationInfo.getSubgroupSize();
+  if (failed(setDispatchConfig(entryPointFn, workgroupSize, subgroupSize))) {
+    return failure();
+  }
+
+  setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
+  eraseCompilationInfo(computeOp);
+  return success();
+}
+
 static void createEmptyTransformStrategy(ModuleOp innerModule) {
   Location loc = innerModule.getLoc();
   OpBuilder b = OpBuilder::atBlockEnd(innerModule.getBody());
