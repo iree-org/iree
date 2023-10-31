@@ -67,6 +67,23 @@ iree_hal_vulkan_instance_extensions_t
 iree_hal_vulkan_populate_enabled_instance_extensions(
     const iree_hal_vulkan_string_list_t* enabled_extension);
 
+// Struct for miscellaneous device capabilities.
+typedef struct iree_hal_vulkan_device_capabilities_t {
+  // VkSubgroupFeatureFlags from VkPhysicalDeviceSubgroupProperties showing
+  // the set of supported subgroup features. Corresponds to a mask of the
+  // following bitfield. The basic bit should always be set.
+  //   VK_SUBGROUP_FEATURE_BASIC_BIT = 0x00000001,
+  //   VK_SUBGROUP_FEATURE_VOTE_BIT = 0x00000002,
+  //   VK_SUBGROUP_FEATURE_ARITHMETIC_BIT = 0x00000004,
+  //   VK_SUBGROUP_FEATURE_BALLOT_BIT = 0x00000008,
+  //   VK_SUBGROUP_FEATURE_SHUFFLE_BIT = 0x00000010,
+  //   VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT = 0x00000020,
+  //   VK_SUBGROUP_FEATURE_CLUSTERED_BIT = 0x00000040,
+  //   VK_SUBGROUP_FEATURE_QUAD_BIT = 0x00000080,
+  //   VK_SUBGROUP_FEATURE_PARTITIONED_BIT_NV = 0x00000100,
+  uint32_t subgroup_operations;
+} iree_hal_vulkan_device_capabilities_t;
+
 // Bits for enabled device extensions.
 // We must use this to query support instead of just detecting symbol names as
 // ICDs will resolve the functions sometimes even if they don't support the

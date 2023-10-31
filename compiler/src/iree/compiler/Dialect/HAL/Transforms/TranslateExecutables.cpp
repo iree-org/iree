@@ -73,6 +73,19 @@ public:
                             << variantOp.getTarget();
       return signalPassFailure();
     }
+
+    // Currently this is run immediately after variant translation, but in
+    // the future there could be a deduplication phase between translation
+    // (or linking) and building the conditional region. This limits the
+    // amount of repetition in the decision trees for variant conditioning.
+    if (!variantOp.getConditionOp()) {
+      if (failed(targetBackend->buildVariantConditionRegion(variantOp))) {
+        variantOp.emitError()
+            << "failed to construct variant conditional region for backend "
+            << variantOp.getTarget();
+        return signalPassFailure();
+      }
+    }
   }
 
 private:

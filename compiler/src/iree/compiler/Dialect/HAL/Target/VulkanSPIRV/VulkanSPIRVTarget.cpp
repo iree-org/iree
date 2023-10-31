@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVQueryBuilder.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
@@ -160,6 +162,14 @@ public:
       return;
 
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+  }
+
+  LogicalResult buildVariantConditionRegion(Operation *op) const override {
+    auto variantOp = dyn_cast<IREE::HAL::ExecutableVariantOp>(op);
+    if (!variantOp) {
+      return failure();
+    }
+    return buildVulkanSPIRVDeviceRequirementQueries(variantOp);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {

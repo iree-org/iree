@@ -1250,6 +1250,20 @@ Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
   return selected;
 }
 
+Value ExecutableVariantOp::emplaceConditionOp(OpBuilder &builder) {
+  assert(!getConditionOp() && "Trying to emplace a condition on a variant that "
+                              "already has a condition.");
+
+  builder.setInsertionPointToStart(&getRegion().front());
+  // Create a default condition op.
+  auto conditionOp = builder.create<IREE::HAL::ExecutableConditionOp>(getLoc());
+  Block *entryPoint = conditionOp.addEntryBlock();
+  Value device = entryPoint->getArgument(0);
+
+  builder.setInsertionPointToStart(entryPoint);
+  return device;
+}
+
 //===----------------------------------------------------------------------===//
 // hal.executable.condition
 //===----------------------------------------------------------------------===//

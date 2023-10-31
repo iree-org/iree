@@ -233,6 +233,14 @@ public:
   buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                OpPassManager &passManager) = 0;
 
+  // Constructs the necessary device queries to determine whether the target
+  // config is supported by the target device. This is optional if and only if
+  // the all devices configurations are always supported.
+  virtual LogicalResult
+  buildVariantConditionRegion(Operation *variantOp) const {
+    return success();
+  }
+
   // Inserts passes used to link `hal.executable.variant` ops together.
   // The pass manager will be nested on the parent module of `hal.executable`
   // ops and the pipeline will need to find relevant variant ops itself.

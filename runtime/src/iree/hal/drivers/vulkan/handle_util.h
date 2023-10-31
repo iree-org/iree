@@ -41,12 +41,14 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
  public:
   VkDeviceHandle(DynamicSymbols* syms, VkPhysicalDevice physical_device,
                  iree_hal_vulkan_features_t enabled_features,
+                 iree_hal_vulkan_device_capabilities_t device_capabilities,
                  iree_hal_vulkan_device_extensions_t enabled_extensions,
                  bool owns_device, iree_allocator_t host_allocator,
                  const VkAllocationCallbacks* allocator = nullptr)
       : syms_(add_ref(syms)),
         physical_device_(physical_device),
         enabled_features_(enabled_features),
+        device_capabilities_(device_capabilities),
         enabled_extensions_(enabled_extensions),
         owns_device_(owns_device),
         allocator_(allocator),
@@ -61,6 +63,7 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
                      static_cast<VkPhysicalDevice>(VK_NULL_HANDLE))),
         value_(exchange(other.value_, static_cast<VkDevice>(VK_NULL_HANDLE))),
         syms_(std::move(other.syms_)),
+        device_capabilities_(other.device_capabilities_),
         enabled_extensions_(other.enabled_extensions_),
         owns_device_(other.owns_device_),
         allocator_(other.allocator_),
@@ -89,6 +92,10 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
     return enabled_features_;
   }
 
+  iree_hal_vulkan_device_capabilities_t device_capabilities() const {
+    return device_capabilities_;
+  }
+
   const iree_hal_vulkan_device_extensions_t& enabled_extensions() const {
     return enabled_extensions_;
   }
@@ -98,6 +105,7 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
   VkDevice value_ = VK_NULL_HANDLE;
   ref_ptr<DynamicSymbols> syms_;
   iree_hal_vulkan_features_t enabled_features_;
+  iree_hal_vulkan_device_capabilities_t device_capabilities_;
   iree_hal_vulkan_device_extensions_t enabled_extensions_;
   bool owns_device_;
   const VkAllocationCallbacks* allocator_ = nullptr;

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "query_device_support.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck

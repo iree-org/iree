@@ -18,11 +18,14 @@ iree_cc_library(
   NAME
     VulkanSPIRV
   HDRS
+    "VulkanSPIRVQueryBuilder.h"
     "VulkanSPIRVTarget.h"
   SRCS
+    "VulkanSPIRVQueryBuilder.cpp"
     "VulkanSPIRVTarget.cpp"
   DEPS
     LLVMSupport
+    MLIRArithDialect
     MLIRAsmParser
     MLIRGPUDialect
     MLIRIR
@@ -34,6 +37,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils

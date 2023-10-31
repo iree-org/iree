@@ -23,9 +23,11 @@ endif()
 iree_compiler_cc_library(
     name = "VulkanSPIRV",
     srcs = [
+        "VulkanSPIRVQueryBuilder.cpp",
         "VulkanSPIRVTarget.cpp",
     ],
     hdrs = [
+        "VulkanSPIRVQueryBuilder.h",
         "VulkanSPIRVTarget.h",
     ],
     deps = [
@@ -33,12 +35,14 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/SPIRV",
         "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/Vulkan/IR",
         "//compiler/src/iree/compiler/Dialect/Vulkan/Utils",
         "//compiler/src/iree/compiler/Utils",
         "//runtime/src/iree/schemas:spirv_executable_def_c_fbs",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:AsmParser",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",

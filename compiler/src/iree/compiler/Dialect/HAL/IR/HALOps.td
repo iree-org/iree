@@ -2168,6 +2168,10 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
 
     // Returns an i1 indicating whether this variant should be selected.
     Value buildCondition(Value device, OpBuilder &builder);
+
+    // Creates a new `hal.executable.condition` op and sets the insertion point
+    // for the provided builder to the beginning of the new region.
+    Value emplaceConditionOp(OpBuilder &builder);
   }];
 
   let hasCanonicalizer = 1;

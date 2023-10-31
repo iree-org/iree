@@ -498,6 +498,8 @@ typedef struct iree_hal_vulkan_device_t {
   iree_hal_vulkan_device_flags_t flags;
   // Which optional extensions are active and available on the device.
   iree_hal_vulkan_device_extensions_t device_extensions;
+  // Which capabilities are active and available on the device.
+  iree_hal_vulkan_device_capabilities_t device_capabilities;
 
   VkInstance instance;
   VkPhysicalDevice physical_device;
@@ -689,6 +691,7 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
     iree_hal_vulkan_features_t enabled_features,
     const iree_hal_vulkan_device_options_t* options, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
+    const iree_hal_vulkan_device_capabilities_t* device_capabilities,
     const iree_hal_vulkan_device_extensions_t* device_extensions,
     const iree_hal_vulkan_queue_set_t* compute_queue_set,
     const iree_hal_vulkan_queue_set_t* transfer_queue_set,
@@ -720,6 +723,7 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
       identifier, &device->identifier, (char*)buffer_ptr);
   device->flags = options->flags;
 
+  device->device_capabilities = *device_capabilities;
   device->device_extensions = *device_extensions;
   device->instance = instance;
   device->physical_device = physical_device;
@@ -844,6 +848,34 @@ static iree_status_t iree_hal_vulkan_device_query_extensibility_set(
       requested_features, set, out_string_list->count, &out_string_list->count,
       out_string_list->values));
   return iree_ok_status();
+}
+
+// Populate relevant capabilities from any physical device properties.
+static iree_hal_vulkan_device_capabilities_t
+iree_hal_vulkan_get_device_capabilities(DynamicSymbols* instance_syms,
+                                        VkPhysicalDevice physical_device) {
+  iree_hal_vulkan_device_capabilities_t device_capabilities;
+  memset(&device_capabilities, 0, sizeof(device_capabilities));
+
+  // Subgroup features.
+  VkPhysicalDeviceSubgroupProperties subgroup_properties;
+  memset(&subgroup_properties, 0, sizeof(subgroup_properties));
+  subgroup_properties.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+  subgroup_properties.pNext = NULL;
+
+  VkPhysicalDeviceProperties2 physical_device_properties;
+  memset(&physical_device_properties, 0, sizeof(physical_device_properties));
+  physical_device_properties.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  physical_device_properties.pNext = &subgroup_properties;
+
+  instance_syms->vkGetPhysicalDeviceProperties2(physical_device,
+                                                &physical_device_properties);
+
+  device_capabilities.subgroup_operations =
+      subgroup_properties.supportedOperations;
+  return device_capabilities;
 }
 
 iree_status_t iree_hal_vulkan_device_create(
@@ -1100,8 +1132,12 @@ iree_status_t iree_hal_vulkan_device_create(
     enabled_features2.pNext = &available_coop_matrix_features;
   }
 
+  // Populate relevant capabilities from any physical device properties.
+  iree_hal_vulkan_device_capabilities_t device_capabilities =
+      iree_hal_vulkan_get_device_capabilities(instance_syms, physical_device);
+
   auto logical_device = new VkDeviceHandle(
-      instance_syms, physical_device, enabled_features,
+      instance_syms, physical_device, enabled_features, device_capabilities,
       enabled_device_extensions,
       /*owns_device=*/true, host_allocator, /*allocator=*/NULL);
 
@@ -1128,8 +1164,9 @@ iree_status_t iree_hal_vulkan_device_create(
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_device_create_internal(
         driver, identifier, enabled_features, options, instance,
-        physical_device, logical_device, &enabled_device_extensions,
-        &compute_queue_set, &transfer_queue_set, host_allocator, out_device);
+        physical_device, logical_device, &device_capabilities,
+        &enabled_device_extensions, &compute_queue_set, &transfer_queue_set,
+        host_allocator, out_device);
   }
 
   logical_device->ReleaseReference();
@@ -1174,9 +1211,14 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
+  // We can still retrieve the correct device capabilities though.
+  iree_hal_vulkan_device_capabilities_t device_capabilities =
+      iree_hal_vulkan_get_device_capabilities(device_syms.get(),
+                                              physical_device);
+
   // Wrap the provided VkDevice with a VkDeviceHandle for use within the HAL.
   auto logical_device_handle = new VkDeviceHandle(
-      device_syms.get(), physical_device, enabled_features,
+      device_syms.get(), physical_device, enabled_features, device_capabilities,
       enabled_device_extensions,
       /*owns_device=*/false, host_allocator, /*allocator=*/NULL);
   *logical_device_handle->mutable_value() = logical_device;
@@ -1184,8 +1226,9 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   // Allocate and initialize the device.
   iree_status_t status = iree_hal_vulkan_device_create_internal(
       /*driver=*/NULL, identifier, enabled_features, options, instance,
-      physical_device, logical_device_handle, &enabled_device_extensions,
-      compute_queue_set, transfer_queue_set, host_allocator, out_device);
+      physical_device, logical_device_handle, &device_capabilities,
+      &enabled_device_extensions, compute_queue_set, transfer_queue_set,
+      host_allocator, out_device);
 
   logical_device_handle->ReleaseReference();
   return status;
@@ -1254,6 +1297,26 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
                        ? 1
                        : 0;
     }
+    return iree_ok_status();
+  }
+
+  if (iree_string_view_equal(
+          category,
+          iree_make_cstring_view("hal.device.vulkan.subgroup_operations"))) {
+    uint32_t requested_subgroup_operations = 0;
+    if (!iree_string_view_atoi_uint32(key, &requested_subgroup_operations)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "invalid subgroup operation key value '%.*s :: %.*s'",
+          (int)category.size, category.data, (int)key.size, key.data);
+    }
+
+    *out_value =
+        iree_all_bits_set(
+            device->logical_device->device_capabilities().subgroup_operations,
+            requested_subgroup_operations)
+            ? 1
+            : 0;
     return iree_ok_status();
   }
 
