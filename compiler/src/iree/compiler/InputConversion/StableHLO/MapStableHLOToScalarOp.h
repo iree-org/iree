@@ -812,7 +812,8 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::BitcastConvertOp>(
   Type resultType = getElementTypeOrSelf(resultTypes.front());
 
   // Skip needless casts.
-  if (argType == resultType) return adaptor.getOperand();
+  if (argType == resultType)
+    return adaptor.getOperand();
 
   if (!isa<FloatType, IntegerType>(resultType) ||
       !isa<FloatType, IntegerType>(argType))
