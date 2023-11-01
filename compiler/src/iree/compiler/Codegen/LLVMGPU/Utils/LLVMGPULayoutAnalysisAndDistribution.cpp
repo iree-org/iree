@@ -372,7 +372,7 @@ static void propagateLayoutToFor(scf::ForOp forOp,
     BlockArgument &arg = argIndex.value();
     if (!layoutMap.count(arg))
       continue;
-    OpOperand &operand = forOp.getOpOperandForRegionIterArg(arg);
+    OpOperand &operand = *forOp.getTiedLoopInit(arg);
     Value result = forOp.getResult(argIndex.index());
     Layout newLayout = layoutMap.at(arg);
     layoutMap.try_emplace(operand.get(), newLayout);
