@@ -59,8 +59,8 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
+  INPUT_TYPE
+    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -111,8 +111,8 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "local-task"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
+  INPUT_TYPE
+    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -165,8 +165,9 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-sync"
   COMPILER_FLAGS
-    "--iree-input-type=tosa"
     "--iree-vmvx-enable-microkernels"
+  INPUT_TYPE
+    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -217,8 +218,8 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
+  INPUT_TYPE
+    "tosa"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -691,6 +691,7 @@ class BuildFileFunctions(object):
         target_backend,
         driver=None,
         compiler_flags=None,
+        input_type=None,
         target_backends_and_drivers=None,
         runner_args=None,
         tags=None,
@@ -709,6 +710,7 @@ class BuildFileFunctions(object):
         compiler_flags_block = self._convert_string_list_block(
             "COMPILER_FLAGS", compiler_flags
         )
+        input_type_block = self._convert_string_arg_block("INPUT_TYPE", input_type)
         runner_args_block = self._convert_string_list_block("RUNNER_ARGS", runner_args)
         labels_block = self._convert_string_list_block("LABELS", tags)
         target_cpu_features_block = self._convert_string_arg_block(
@@ -723,6 +725,7 @@ class BuildFileFunctions(object):
             f"{target_backend_block}"
             f"{driver_block}"
             f"{compiler_flags_block}"
+            f"{input_type_block}"
             f"{runner_args_block}"
             f"{labels_block}"
             f"{target_cpu_features_block}"
