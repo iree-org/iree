@@ -105,7 +105,8 @@ void mlir::iree_compiler::createTransformRegion(
   auto sequence = b.create<transform::NamedSequenceOp>(
       loc,
       /*symName=*/
-      std::string(transform::TransformDialect::kTransformEntryPointSymbolName.str()),
+      std::string(
+          transform::TransformDialect::kTransformEntryPointSymbolName.str()),
       /*rootType*/ anyOpType,
       /*resultTypes=*/TypeRange{},
       /*bodyBuilder=*/[&](OpBuilder &b, Location loc, Value variantH) {
@@ -114,7 +115,7 @@ void mlir::iree_compiler::createTransformRegion(
         b.create<transform::YieldOp>(loc);
       });
   (void)sequence;
-  
+
   LDBG("transformation script:\n");
   LDBG("verification: " << sequence.verify().succeeded() << "\n");
 }
