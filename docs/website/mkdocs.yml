@@ -200,10 +200,6 @@ plugins:
   - tags:
       tags_file: community/tags.md
 
-  # https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#revisioning
-  - git-revision-date-localized:
-      enable_creation_date: false
-
   # https://github.com/mkdocs/mkdocs-redirects
   - redirects:
       redirect_maps:  # old -> new
