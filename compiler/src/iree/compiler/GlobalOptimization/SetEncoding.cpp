@@ -15,10 +15,12 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -136,17 +138,37 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
       getAttr(narrow.M), getAttr(narrow.N));
 }
 
+static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
+                               Value castResult,
+                               IREE::LinalgExt::EncodingAttr encodingAttr) {
+  auto encodedType = cast<RankedTensorType>(encoded.getType());
+  auto castResultType = cast<RankedTensorType>(castResult.getType());
+  auto castedType = RankedTensorType::get(
+      encodedType.getShape(), castResultType.getElementType(), encodingAttr);
+  Operation *castOp = getDefiningCastOp(castResult);
+  return builder
+      .create(loc, castOp->getName().getIdentifier(), encoded, castedType,
+              castOp->getAttrs())
+      ->getResult(0);
+}
+
 static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
                                IREE::LinalgExt::EncodingUser user,
                                IREE::LinalgExt::EncodingRole role,
                                TypeRange operandTypes,
-                               MatmulNarrowSizes narrow) {
-  // No need to specify original_type in the encoding passed to pad(), because
+                               MatmulNarrowSizes narrow,
+                               bool castResult = false) {
+  Value padSource = source;
+  if (castResult) {
+    auto castOp = source.getDefiningOp();
+    padSource = castOp->getOperand(0);
+  }
+  // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
   auto encodingForPad = makeEncoding(builder, user, role, operandTypes,
                                      /*originalType=*/Type{}, narrow);
-  Value padded = pad(builder, loc, source, encodingForPad);
+  Value padded = pad(builder, loc, padSource, encodingForPad);
   // For setEncoding() below, we potentially need to specify an encoding with an
   // explicit original_type, because the operand there is the padded tensor
   // returned by pad() above, but we want setEncoding to be aware of the
@@ -154,11 +176,16 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // verbosity, we only specify the original original_type when it differs from
   // the tensor type that the encoding is applied to.
   auto encodingForSetEncoding = encodingForPad;
-  if (padded.getType() != source.getType()) {
-    encodingForSetEncoding = makeEncoding(builder, user, role, operandTypes,
-                                          source.getType(), narrow);
+  if (padded.getType() != padSource.getType()) {
+    encodingForSetEncoding =
+        makeEncoding(builder, user, role, operandTypes, padSource.getType(), narrow);
   }
-  return setEncoding(builder, loc, padded, encodingForSetEncoding);
+  Value encoded = setEncoding(builder, loc, padded, encodingForSetEncoding);
+  if (castResult) {
+    encoded = castEncodedResult(builder, loc, encoded, source,
+                                encodingForSetEncoding);
+  }
+  return encoded;
 }
 
 static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
@@ -297,8 +324,12 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
       }
       return {};
     };
-    Type lhsElemType = getElemType(origLhs);
-    Type rhsElemType = getElemType(origRhs);
+    bool lhsCasted = (bool)getCastElemType(origLhs);
+    bool rhsCasted = (bool)getCastElemType(origRhs);
+    Type lhsElemType =
+        lhsCasted ? getCastElemType(origLhs) : getElemType(origLhs);
+    Type rhsElemType =
+        rhsCasted ? getCastElemType(origRhs) : getElemType(origRhs);
     Type outElemType = getElemType(origOut);
 
     if (!lhsElemType || !rhsElemType || !outElemType) {
@@ -310,16 +341,26 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
     MatmulNarrowSizes narrowSizes =
         getMatmulNarrowSizes(origOut.getType().cast<ShapedType>());
     Location loc = matmulOp.getLoc();
-    TypeRange operandTypes = matmulOp->getOperandTypes();
+    auto getUncastedType = [](Value v, bool isCasted) -> Type {
+      if (!isCasted || !getCastElemType(v)) {
+        return v.getType();
+      }
+      auto vType =
+          cast<RankedTensorType>(v.getDefiningOp()->getOperand(0).getType());
+      return RankedTensorType::get(vType.getShape(), getCastElemType(v));
+    };
+    SmallVector<Type> operandTypes(matmulOp->getOperandTypes());
+    operandTypes[0] = getUncastedType(origLhs, lhsCasted);
+    operandTypes[1] = getUncastedType(origRhs, rhsCasted);
     Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
                                          IREE::LinalgExt::EncodingRole::LHS,
-                                         operandTypes, narrowSizes);
+                                         operandTypes, narrowSizes, lhsCasted);
     Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
                                          IREE::LinalgExt::EncodingRole::RHS,
-                                         operandTypes, narrowSizes);
-    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
-                                         IREE::LinalgExt::EncodingRole::RESULT,
-                                         operandTypes, narrowSizes);
+                                         operandTypes, narrowSizes, rhsCasted);
+    Value encodedOut =
+        padAndSetEncoding(rewriter, loc, origOut, user,
+                          IREE::LinalgExt::EncodingRole::RESULT, operandTypes, narrowSizes);
 
     Value matmulTiled = rewriter
                             .create<linalg::BatchMatmulOp>(

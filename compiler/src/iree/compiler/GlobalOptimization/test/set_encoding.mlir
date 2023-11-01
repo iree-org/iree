@@ -669,3 +669,68 @@ func.func @preset_compilation_info(
 // CHECK-NOT:     unset_encoding
 // CHECK:         linalg.matmul
 // CHECK:         linalg.batch_matmul
+
+// -----
+
+func.func @batch_matmul_casted_i8i8i32(%arg0 : tensor<64x100x250xi8>, %arg1 : tensor<64x250x500xi8>,
+      %arg2 : tensor<64x100x500xi32>) -> tensor<64x100x500xi32> {
+  %0 = tensor.empty() : tensor<64x250x500xi32>
+  %casted0 = arith.extui %arg0 : tensor<64x100x250xi8> to tensor<64x100x250xi32>
+  %casted1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, 
+                                              affine_map<(d0, d1, d2) -> (d0, d1, d2)>], 
+                              iterator_types = ["parallel", "parallel", "parallel"]} 
+                              ins(%arg1 : tensor<64x250x500xi8>) 
+                              outs(%0 : tensor<64x250x500xi32>) {
+  ^bb0(%in: i8, %out: i32):
+      %2 = arith.extsi %in : i8 to i32
+      linalg.yield %2 : i32
+  } -> tensor<64x250x500xi32>
+  %1 = linalg.batch_matmul ins(%casted0, %casted1 : tensor<64x100x250xi32>, tensor<64x250x500xi32>)
+      outs(%arg2 : tensor<64x100x500xi32>) -> tensor<64x100x500xi32>
+  return %1 : tensor<64x100x500xi32>
+  }
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
+//      CHECK: func @batch_matmul_casted_i8i8i32(
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<64x100x250xi8>
+// CHECK-SAME:     %[[ARG1:.+]]: tensor<64x250x500xi8>
+// CHECK-SAME:     %[[ARG2:.+]]: tensor<64x100x500xi32>
+//  CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
+//  CHECK-DAG:     %[[C100:.+]] = arith.constant 100 : index
+//  CHECK-DAG:     %[[C250:.+]] = arith.constant 250 : index
+//  CHECK-DAG:     %[[C500:.+]] = arith.constant 500 : index
+//      CHECK:   %[[LHS_TILE_SIZE:.+]]:3 = iree_linalg_ext.upper_bound_tile_size tensor<64x100x250xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [ui8, i8, i32]>> -> index, index, index
+//      CHECK:   %[[LHS_PADDING_SIZE0:.+]] = affine.apply #[[MAP]]()[%[[LHS_TILE_SIZE]]#0, %[[C64]]]
+//      CHECK:   %[[LHS_PADDING_SIZE1:.+]] = affine.apply #[[MAP]]()[%[[LHS_TILE_SIZE]]#1, %[[C100]]]
+//      CHECK:   %[[LHS_PADDING_SIZE2:.+]] = affine.apply #[[MAP]]()[%[[LHS_TILE_SIZE]]#2, %[[C250]]]
+//      CHECK:   %[[LHS_PAD:.+]] = tensor.pad %[[ARG0]] low[0, 0, 0] high[%[[LHS_PADDING_SIZE0]], %[[LHS_PADDING_SIZE1]], %[[LHS_PADDING_SIZE2]]]
+//      CHECK:       tensor<64x100x250xi8> to tensor<?x?x?xi8>
+//      CHECK:   %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[LHS_PAD]]
+// CHECK-SAME:       tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [ui8, i8, i32], original_type = tensor<64x100x250xi8>>>
+//      CHECK:   %[[LHS_CASTED:.+]] = arith.extui %[[LHS]] : 
+// CHECK-SAME:       tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [ui8, i8, i32], original_type = tensor<64x100x250xi8>>>
+// CHECK-SAME:       to tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [ui8, i8, i32], original_type = tensor<64x100x250xi8>>>
+//      CHECK:   %[[RHS_TILE_SIZE:.+]]:3 = iree_linalg_ext.upper_bound_tile_size tensor<64x250x500xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [ui8, i8, i32]>> -> index, index, index
+//      CHECK:   %[[RHS_PADDING_SIZE0:.+]] = affine.apply #[[MAP]]()[%[[RHS_TILE_SIZE]]#0, %[[C64]]]
+//      CHECK:   %[[RHS_PADDING_SIZE1:.+]] = affine.apply #[[MAP]]()[%[[RHS_TILE_SIZE]]#1, %[[C250]]]
+//      CHECK:   %[[RHS_PADDING_SIZE2:.+]] = affine.apply #[[MAP]]()[%[[RHS_TILE_SIZE]]#2, %[[C500]]]
+//      CHECK:   %[[RHS_PAD:.+]] = tensor.pad %[[ARG1]] low[0, 0, 0] high[%[[RHS_PADDING_SIZE0]], %[[RHS_PADDING_SIZE1]], %[[RHS_PADDING_SIZE2]]]
+//      CHECK:       tensor<64x250x500xi8> to tensor<?x?x?xi8>
+//      CHECK:   %[[RHS:.+]] = iree_linalg_ext.set_encoding %[[RHS_PAD]]
+// CHECK-SAME:       tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [ui8, i8, i32], original_type = tensor<64x250x500xi8>>>
+//      CHECK:   %[[RHS_CASTED:.+]] = arith.extsi %[[RHS]] : 
+// CHECK-SAME:       tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [ui8, i8, i32], original_type = tensor<64x250x500xi8>>>
+// CHECK-SAME:       to tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [ui8, i8, i32], original_type = tensor<64x250x500xi8>>>
+//      CHECK:   %[[OUTS_TILE_SIZE:.+]]:3 = iree_linalg_ext.upper_bound_tile_size tensor<64x100x500xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [ui8, i8, i32]>> -> index, index, index
+//      CHECK:   %[[OUTS_PADDING_SIZE0:.+]] = affine.apply #[[MAP]]()[%[[OUTS_TILE_SIZE]]#0, %[[C64]]]
+//      CHECK:   %[[OUTS_PADDING_SIZE1:.+]] = affine.apply #[[MAP]]()[%[[OUTS_TILE_SIZE]]#1, %[[C100]]]
+//      CHECK:   %[[OUTS_PADDING_SIZE2:.+]] = affine.apply #[[MAP]]()[%[[OUTS_TILE_SIZE]]#2, %[[C500]]]
+//      CHECK:   %[[OUTS_PAD:.+]] = tensor.pad %[[ARG2]] low[0, 0, 0] high[%[[OUTS_PADDING_SIZE0]], %[[OUTS_PADDING_SIZE1]], %[[OUTS_PADDING_SIZE2]]]
+//      CHECK:       tensor<64x100x500xi32> to tensor<?x?x?xi32>
+//      CHECK:   %[[OUTS:.+]] = iree_linalg_ext.set_encoding %[[OUTS_PAD]]
+// CHECK-SAME:       tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [ui8, i8, i32], original_type = tensor<64x100x500xi32>>>
+//      CHECK:   %[[BATCH_MATMUL:.+]] = linalg.batch_matmul
+// CHECK-SAME:       ins(%[[LHS_CASTED]], %[[RHS_CASTED]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   %[[RESULT_PADDED:.+]] = iree_linalg_ext.unset_encoding %[[BATCH_MATMUL]]
+//      CHECK:   %[[RESULT:.+]] = tensor.extract_slice %[[RESULT_PADDED]][0, 0, 0] [64, 100, 500] [1, 1, 1]
+//      CHECK:   return %[[RESULT]]
