@@ -1,11 +1,11 @@
 // RUN: iree-opt %s  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/transform_dialect_codegen_bufferize_spec.mlir | \
+// RUN:     --iree-codegen-transform-dialect-library=%p/transform_dialect_codegen_bufferize_spec.mlir | \
 // RUN: FileCheck %s
 
 // RUN: iree-opt %s  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/transform_dialect_codegen_foreach_to_gpu_spec.mlir | \
+// RUN:     --iree-codegen-transform-dialect-library=%p/transform_dialect_codegen_foreach_to_gpu_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=FOREACH-TO-GPU
 
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>]}>
@@ -14,7 +14,11 @@
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @matmul_static_dispatch_0 {
     hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
-      hal.executable.export public @matmul_static_dispatch_0 ordinal(0) layout(#pipeline_layout)
+      hal.executable.export public @matmul_static_dispatch_0 ordinal(0) layout(#pipeline_layout){
+      ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+        hal.return %x, %y, %z : index, index, index
+      }
       builtin.module {
         func.func @matmul_static_dispatch_0() {
           %c0 = arith.constant 0 : index

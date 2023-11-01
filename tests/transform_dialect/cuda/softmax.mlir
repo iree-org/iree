@@ -6,7 +6,8 @@
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target)))' \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/softmax_codegen_spec.mlir \
+// RUN:     --iree-codegen-transform-dialect-library=%p/softmax_codegen_spec.mlir \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
@@ -16,7 +17,8 @@
 // RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/softmax_codegen_spec.mlir | \
+// RUN:     --iree-codegen-transform-dialect-library=%p/softmax_codegen_spec.mlir \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen | \
 // RUN: iree-run-module --module=- --function=softmax --device=cuda | \
 // RUN: FileCheck %s
 

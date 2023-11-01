@@ -16,7 +16,8 @@ func.func @matmul_static(
 // RUN:   --iree-stream-transformation-pipeline \
 // RUN:   --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmcpu-lower-executable-target)))' \
-// RUN:   --iree-codegen-use-transform-dialect-strategy=%p/matmul_codegen_default_spec.mlir | \
+// RUN:   --iree-codegen-transform-dialect-library=%p/matmul_codegen_default_spec.mlir \
+// RUN:   --iree-codegen-use-transform-dialect-strategy=codegen | \
 // RUN: FileCheck %s --check-prefixes=CODEGEN-DEFAULT
 
 // CODEGEN-DEFAULT:     hal.executable.export public @matmul_static_dispatch_0_matmul_3x3x5

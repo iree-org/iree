@@ -4,13 +4,6 @@
 // added to IREE in https://github.com/openxla/iree/pull/14373, as a workaround
 // for other patterns being sensitive to these exact transforms.
 
-transform.sequence failures(propagate) {
-^bb1(%func_op: !transform.op<"func.func">):
-  transform.apply_patterns to %func_op {
-    transform.apply_patterns.iree.fold_tensor_slice_into_transfer
-  } : !transform.op<"func.func">
-}
-
 // CHECK-LABEL: func @transfer_read_of_extract_slice(
 //  CHECK-SAME:     %[[t:.*]]: tensor<?x?xf32>, %[[s1:.*]]: index, %[[s2:.*]]: index
 //   CHECK-DAG:   %[[c4:.*]] = arith.constant 4 : index
@@ -106,3 +99,12 @@ func.func @insert_slice_of_transfer_write_rank_extending(%t1 : tensor<?x?x12xf32
   %1 = tensor.insert_slice %0 into %t1[4, 3, %s] [1, 5, 6] [1, 1, 1] : tensor<5x6xf32> into tensor<?x?x12xf32>
   return %1 : tensor<?x?x12xf32>
 }
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%func_op: !transform.op<"func.func"> {transform.readonly}) {
+    transform.apply_patterns to %func_op {
+      transform.apply_patterns.iree.fold_tensor_slice_into_transfer
+    } : !transform.op<"func.func">
+    transform.yield 
+  }
+} // module

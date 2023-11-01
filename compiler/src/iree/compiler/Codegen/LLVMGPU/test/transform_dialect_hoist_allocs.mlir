@@ -14,12 +14,14 @@ func.func @non_entry_bb_allocs() {
 //  CHECK-NEXT:   ^bb1:
 //  CHECK-NEXT:   return
 
-transform.sequence failures(propagate) {
-^bb1(%module: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module: !transform.any_op {transform.readonly}) {
     %func = transform.structured.match ops{["func.func"]} in %module
       : (!transform.any_op) -> !transform.op<"func.func">
     transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
-}
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -45,12 +47,14 @@ func.func @nested_op_alloc_subview_use_static(%arg0 : index, %o0 : index, %o1 : 
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   memref.dealloc %[[ALLOC]] : memref<16x16xi32>
 
-transform.sequence failures(propagate) {
-^bb1(%module: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module: !transform.any_op {transform.readonly}) {
     %func = transform.structured.match ops{["func.func"]} in %module
       : (!transform.any_op) -> !transform.op<"func.func">
     transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
-}
+    transform.yield
+  } // @__transform_main
+} // module
 
 // -----
 
@@ -77,9 +81,11 @@ func.func @nested_op_alloc_subview_use_dynamic(%arg0 : index, %o0 : index, %o1 :
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   memref.dealloc %[[ALLOC]] : memref<16x16xi32>
 
-transform.sequence failures(propagate) {
-^bb1(%module: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module: !transform.any_op {transform.readonly}) {
     %func = transform.structured.match ops{["func.func"]} in %module
       : (!transform.any_op) -> !transform.op<"func.func">
     transform.iree.hoist_static_alloc %func : (!transform.op<"func.func">) -> ()
-}
+    transform.yield
+  } // @__transform_main
+} // module

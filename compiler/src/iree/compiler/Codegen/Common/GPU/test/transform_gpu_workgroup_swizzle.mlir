@@ -28,11 +28,15 @@ func.func @matmul() {
   return
 }
 
-transform.sequence failures(propagate) {
-^bb1(%arg1: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.iree.workgroup_swizzle %0 { log_tile = 3 } : (!transform.any_op) -> ()
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(
+      %variant_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.workgroup_swizzle %0 { log_tile = 3 } : (!transform.any_op) -> ()
+    transform.yield 
+  }
+} // module
+
 
 //    CHECK-LABEL: func.func @matmul
 //          CHECK: %[[WORKGROUPIDX:.*]] = hal.interface.workgroup.id[0] : index

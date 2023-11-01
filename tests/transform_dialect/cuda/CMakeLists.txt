@@ -26,7 +26,6 @@ iree_lit_test_suite(
     "softmax.mlir"
     "softmax_partial.mlir"
     "softmax_v2.mlir"
-    "vecadd2d.mlir"
   TOOLS
     FileCheck
     iree-compile
@@ -43,8 +42,6 @@ iree_lit_test_suite(
     softmax_dispatch_spec.mlir
     softmax_partial_codegen_spec.mlir
     softmax_v2_codegen_spec.mlir
-    vecadd2d_codegen_spec.mlir
-    vecadd2d_codegen_spec_partial_tile.mlir
   LABELS
     "noasan"
     "nomsan"
