@@ -1,4 +1,4 @@
-# Debugging compile time regressions
+# Compile time regression debugging
 
 So the IREE compiler used to compile a program quickly, but it is now slower.
 What do you do?
@@ -183,6 +183,8 @@ This is easy data to collect, especially remotely over SSH, but it might not
 paint a complete picture and requires waiting for compilation to finish.
 
 ### Using Tracy
+
+<!-- TODO(scotttodd): update link -->
 
 See our documentation on
 [profiling with Tracy](../developing_iree/profiling_with_tracy.md). For compile

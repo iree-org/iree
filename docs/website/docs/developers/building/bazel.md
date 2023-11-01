@@ -6,7 +6,8 @@ This page walks through building IREE from source using the
 !!! warning
 
     Bazel build support is primarily for internal project infrastructure. We
-    strongly recommend [using CMake](../building-from-source/index.md) instead.
+    strongly recommend [using CMake](../../building-from-source/index.md)
+    instead.
 
     Our Bazel configuration is also _only_ tested on Linux. Windows and macOS
     may be unstable.
