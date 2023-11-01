@@ -68,8 +68,8 @@ LLVM_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
-    compiler_flags = ["--iree-input-type=tosa"],
     driver = "local-task",
+    input_type = "tosa",
     target_backend = "llvm-cpu",
 )
 
@@ -125,10 +125,8 @@ VMVX_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task",
     srcs = VMVX_SRCS,
-    compiler_flags = [
-        "--iree-input-type=tosa",
-    ],
     driver = "local-task",
+    input_type = "tosa",
     target_backend = "vmvx",
 )
 
@@ -183,11 +181,11 @@ iree_check_single_backend_test_suite(
     name = "check_vmvx_local-sync_microkernels",
     srcs = VMVX_MICROKERNELS_SRCS,
     compiler_flags = [
-        "--iree-input-type=tosa",
         "--iree-vmvx-enable-microkernels",
     ],
     # Sync has more strict runtime error checking for mis-compiled programs.
     driver = "local-sync",
+    input_type = "tosa",
     target_backend = "vmvx",
 )
 
@@ -243,8 +241,8 @@ VULKAN_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = VULKAN_SRCS,
-    compiler_flags = ["--iree-input-type=tosa"],
     driver = "vulkan",
+    input_type = "tosa",
     target_backend = "vulkan-spirv",
 )
 
