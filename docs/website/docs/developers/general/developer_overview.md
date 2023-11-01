@@ -1,12 +1,9 @@
-# Developer Overview
+# Developer overview
 
 This guide provides an overview of IREE's project structure and main tools for
 developers.
 
-**Note: project layout is evolving at the moment, see
-<https://github.com/openxla/iree/issues/8955>**
-
-## Project Code Layout
+## Project code layout
 
 * [/compiler/](https://github.com/openxla/iree/blob/main/compiler/):
   MLIR dialects, LLVM compiler passes, module translation code, etc.
@@ -25,7 +22,7 @@ developers.
 * [/samples/](https://github.com/openxla/iree/blob/main/samples/): Also see the
   separate <https://github.com/iree-org/iree-samples> repository
 
-## IREE Compiler Code Layout
+## IREE compiler code layout
 
 * [API/](https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/API):
   Public C API
@@ -36,7 +33,7 @@ developers.
 * [InputConversion/](https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/InputConversion):
   Conversions from input dialects and preprocessing
 
-## IREE Runtime Code Layout
+## IREE runtime code layout
 
 * [base/](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/):
   Common types and utilities used throughout the runtime
@@ -55,7 +52,7 @@ developers.
   Bytecode **V**irtual **M**achine used to work with IREE modules and invoke
   IREE functions
 
-## Developer Tools
+## Developer tools
 
 IREE's core compiler accepts programs in supported input MLIR dialects (e.g.
 `stablehlo`, `tosa`, `linalg`). Import tools and APIs may be used to convert
@@ -189,13 +186,11 @@ For example, to inspect the module translated above:
 
 ### Useful generic flags
 
-There are a few useful generic flags when working with IREE tools:
-
 #### Read inputs from a file
 
 All the IREE tools support reading input values from a file. This is quite
-useful for debugging. Use `-help` for each tool to see what the flag to set. The
-inputs are expected to be newline-separated. Each input should be either a
+useful for debugging. Use `--help` for each tool to see what the flag to set.
+The inputs are expected to be newline-separated. Each input should be either a
 scalar or a buffer. Scalars should be in the format `type=value` and buffers
 should be in the format `[shape]xtype=[value]`. For example:
 
@@ -204,7 +199,7 @@ should be in the format `[shape]xtype=[value]`. For example:
 1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1
 ```
 
-#### `iree-flow-trace-dispatch-tensors`
+#### `--iree-flow-trace-dispatch-tensors`
 
 This flag will enable tracing inputs and outputs for each dispatch function. It
 is easier to narrow down test cases, since IREE breaks a ML workload into

@@ -1,4 +1,4 @@
-# Using Address/Memory/Thread Sanitizers
+# Sanitizers (ASan/MSan/TSan)
 
 [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html),
 [MemorySanitizer](https://clang.llvm.org/docs/MemorySanitizer.html) and
@@ -14,15 +14,15 @@ They all incur large overhead, so only enable them while debugging.
 
 Tool   | Detects | Helps debug what? | Slowdown | Memory overhead | Android support
 ------ | ------- | ----------------- | -------- | --------------- | ---------------
-ASan   | Out-of-bounds accesses,<br>Use-after-free,<br>Use-after-return,<br>Memory leaks (*), ... | Crashes,<br>non-deterministic results,<br>memory leaks (*) | 2x | 3x | Yes
+ASan   | Out-of-bounds accesses, use-after-free, use-after-return, memory leaks | Crashes, non-deterministic results, memory leaks | 2x | 3x | Yes
 MSan   | Uninitialized memory reads | Non-deterministic results | 3x | ? | Yes
 TSan   | Data races | Many bugs in multi-thread code | 5x-15x | 5x-10x | [No](https://github.com/android/ndk/issues/1171)
 
-Notes:
+!!! note
 
-* (*) See [this
-  documentation](https://clang.llvm.org/docs/AddressSanitizer.html#memory-leak-detection)
-  on leak detection. It is only enabled by default on some platforms.
+    See
+    [this documentation](https://clang.llvm.org/docs/AddressSanitizer.html#memory-leak-detection)
+    on leak detection. It is only enabled by default on some platforms.
 
 ## Support status and how to enable each sanitizer
 
@@ -71,7 +71,7 @@ That ensures that all tests succeed: no test is expected to fail with TSan.
 If you know what you're doing (i.e. if you are not building targets that
 internally involve a LLVM/CPU `iree_bytecode_module`), feel free to locally
 comment out the CMake error and only set `IREE_ENABLE_TSAN`. Also see a
-[past attempt]((<https://github.com/openxla/iree/pull/8966>) to relax that CMake
+[past attempt](https://github.com/openxla/iree/pull/8966) to relax that CMake
 validation.
 
 ### MSan (MemorySanitizer)
@@ -125,9 +125,12 @@ ANDROID_NDK=~/android-ndk-r21d ./build_tools/scripts/android_symbolize.sh < /tmp
 
 Where `/tmp/asan.txt` is where you've pasted the raw sanitizer report.
 
-**Tip:** this script will happily just echo any line that isn't a stack frame.
-That means you can feed it the whole `ASan` report at once, and it will output a
-symbolized version of it. DO NOT run it on a single stack at a time! That is
-unlike the symbolizer tool that's being added in NDK r22, and one of the reasons
-why we prefer to keep our own script. For more details see [this
-comment](https://github.com/android/ndk/issues/753#issuecomment-719719789)
+!!! tip
+
+    This script will happily just echo any line that isn't a stack frame.
+    That means you can feed it the whole `ASan` report at once, and it will
+    output a symbolized version of it. DO NOT run it on a single stack at a
+    time! That is unlike the symbolizer tool that's being added in NDK r22, and
+    one of the reasons why we prefer to keep our own script. For more details
+    see
+    [this comment](https://github.com/android/ndk/issues/753#issuecomment-719719789).

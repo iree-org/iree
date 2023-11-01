@@ -1,4 +1,4 @@
-# Debugging releases playbook
+# Release debugging playbook
 
 ## Tools and Locations
 
