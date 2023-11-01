@@ -2138,20 +2138,23 @@ iree_status_t LoadedExecutableInstance::BatchExecute(
 }
 
 static void BindUndefineds(PJRT_Api* api) {
-#define _STUB(API)                                                       \
-  api->API = +[](API##_Args* args) -> PJRT_Error* {                      \
-    return MakeError(iree_make_status(IREE_STATUS_UNIMPLEMENTED, #API)); \
+#define _STUB(API)                                               \
+  api->API = +[](API##_Args* args) -> decltype(api->API(args)) { \
+    return (decltype(api->API(args)))MakeError(                  \
+        iree_make_status(IREE_STATUS_UNIMPLEMENTED, #API));      \
   }
 
+  // This is basically `sed 's/_PJRT_API_STRUCT_FIELD/_STUB/'` on the struct.
+  _STUB(PJRT_Error_Destroy);
+  _STUB(PJRT_Error_Message);
+  _STUB(PJRT_Error_GetCode);
   _STUB(PJRT_Plugin_Initialize);
   _STUB(PJRT_Plugin_Attributes);
-
   _STUB(PJRT_Event_Destroy);
   _STUB(PJRT_Event_IsReady);
   _STUB(PJRT_Event_Error);
   _STUB(PJRT_Event_Await);
   _STUB(PJRT_Event_OnReady);
-
   _STUB(PJRT_Client_Create);
   _STUB(PJRT_Client_Destroy);
   _STUB(PJRT_Client_PlatformName);
@@ -2165,27 +2168,23 @@ static void BindUndefineds(PJRT_Api* api) {
   _STUB(PJRT_Client_Compile);
   _STUB(PJRT_Client_DefaultDeviceAssignment);
   _STUB(PJRT_Client_BufferFromHostBuffer);
-
   _STUB(PJRT_DeviceDescription_Id);
   _STUB(PJRT_DeviceDescription_ProcessIndex);
   _STUB(PJRT_DeviceDescription_Attributes);
   _STUB(PJRT_DeviceDescription_Kind);
   _STUB(PJRT_DeviceDescription_DebugString);
   _STUB(PJRT_DeviceDescription_ToString);
-
   _STUB(PJRT_Device_GetDescription);
   _STUB(PJRT_Device_IsAddressable);
   _STUB(PJRT_Device_LocalHardwareId);
   _STUB(PJRT_Device_AddressableMemories);
   _STUB(PJRT_Device_DefaultMemory);
   _STUB(PJRT_Device_MemoryStats);
-
   _STUB(PJRT_Memory_Id);
   _STUB(PJRT_Memory_Kind);
   _STUB(PJRT_Memory_DebugString);
   _STUB(PJRT_Memory_ToString);
   _STUB(PJRT_Memory_AddressableByDevices);
-
   _STUB(PJRT_Executable_Destroy);
   _STUB(PJRT_Executable_Name);
   _STUB(PJRT_Executable_NumReplicas);
@@ -2196,7 +2195,6 @@ static void BindUndefineds(PJRT_Api* api) {
   _STUB(PJRT_Executable_OutputMemoryKinds);
   _STUB(PJRT_Executable_OptimizedProgram);
   _STUB(PJRT_Executable_Serialize);
-
   _STUB(PJRT_LoadedExecutable_Destroy);
   _STUB(PJRT_LoadedExecutable_GetExecutable);
   _STUB(PJRT_LoadedExecutable_AddressableDevices);
@@ -2205,7 +2203,6 @@ static void BindUndefineds(PJRT_Api* api) {
   _STUB(PJRT_LoadedExecutable_Execute);
   _STUB(PJRT_Executable_DeserializeAndLoad);
   _STUB(PJRT_LoadedExecutable_Fingerprint);
-
   _STUB(PJRT_Buffer_Destroy);
   _STUB(PJRT_Buffer_ElementType);
   _STUB(PJRT_Buffer_Dimensions);
@@ -2225,13 +2222,11 @@ static void BindUndefineds(PJRT_Api* api) {
   _STUB(PJRT_Buffer_IncreaseExternalReferenceCount);
   _STUB(PJRT_Buffer_DecreaseExternalReferenceCount);
   _STUB(PJRT_Buffer_OpaqueDeviceMemoryDataPointer);
-
   _STUB(PJRT_CopyToDeviceStream_Destroy);
   _STUB(PJRT_CopyToDeviceStream_AddChunk);
   _STUB(PJRT_CopyToDeviceStream_TotalBytes);
   _STUB(PJRT_CopyToDeviceStream_GranuleSize);
   _STUB(PJRT_CopyToDeviceStream_CurrentBytes);
-
   _STUB(PJRT_TopologyDescription_Create);
   _STUB(PJRT_TopologyDescription_Destroy);
   _STUB(PJRT_TopologyDescription_PlatformName);
@@ -2239,17 +2234,13 @@ static void BindUndefineds(PJRT_Api* api) {
   _STUB(PJRT_TopologyDescription_GetDeviceDescriptions);
   _STUB(PJRT_TopologyDescription_Serialize);
   _STUB(PJRT_TopologyDescription_Attributes);
-
   _STUB(PJRT_Compile);
-
-  // Always add new fields to the end of the struct. Move fields below to their
-  // corresponding places after each major version bump.
   _STUB(PJRT_Executable_OutputElementTypes);
   _STUB(PJRT_Executable_OutputDimensions);
-
   _STUB(PJRT_Buffer_CopyToMemory);
-
   _STUB(PJRT_Client_CreateViewOfDeviceBuffer);
+  _STUB(PJRT_Executable_Fingerprint);
+
 }
 
 //===----------------------------------------------------------------------===//
