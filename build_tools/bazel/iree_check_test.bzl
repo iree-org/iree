@@ -59,7 +59,7 @@ def iree_check_test(
     ] + compiler_flags + input_type_flags
     bytecode_module_name = name + "_bytecode_module"
     iree_bytecode_module(
-        name = bytecode_module_name,        
+        name = bytecode_module_name,
         src = src,
         flags = flags,
         visibility = ["//visibility:private"],
