@@ -38,8 +38,10 @@ public:
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     transform::TransformOptions options;
-    if (entryPoint.empty())
-      entryPoint = "__transform_main";
+    if (entryPoint.empty()) {
+      entryPoint =
+          transform::TransformDialect::kTransformEntryPointSymbolName.str();
+    }
     auto dialect = context->getOrLoadDialect<
         mlir::iree_compiler::IREE::Codegen::IREECodegenDialect>();
     FailureOr<ModuleOp> maybeTransformLibrary;

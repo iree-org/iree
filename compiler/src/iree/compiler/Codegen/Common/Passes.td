@@ -456,11 +456,11 @@ def TransformDialectInterpreter :
   let description = [{
     This pass runs the transform dialect interpreter and applies the named
     sequence transformation specified by the provided name (defaults to
-    `__transform_main`).
+    `TransformDialect::kTransformEntryPointSymbolName` (i.e. `__transform_main`)).
   }];
   let options = [
     Option<"entryPoint", "entry-point", "std::string",
-           /*default=*/[{"__transform_main"}],
+           /*default=*/[{"transform::TransformDialect::kTransformEntryPointSymbolName.str()"}],
            "Entry point of the pass pipeline.">,
     Option<"libraryFileName", "library-file-name", "std::string",
            /*default=*/[{""}], 

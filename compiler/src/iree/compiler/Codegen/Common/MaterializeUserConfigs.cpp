@@ -15,6 +15,7 @@
 #include "llvm/ADT/iterator_range.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -81,14 +82,20 @@ struct MaterializeUserConfigsPass
     // Here we always set the pipeline strategy to transform dialect if the
     // flag is non-empty to ensure we pick the right lowering pipeline in the
     // event a strategy symbol is defined.
-    if (!clCodegenTransformDialectStrategyName.empty()) {
+    if (!clCodegenTransformDialectLibraryFileName.empty() ||
+        !clCodegenTransformDialectStrategyName.empty()) {
+      StringRef strategyName =
+          (clCodegenTransformDialectStrategyName.empty())
+              ? StringRef(
+                    transform::TransformDialect::kTransformEntryPointSymbolName)
+              : clCodegenTransformDialectStrategyName;
       clTranslationInfo = IREE::Codegen::TranslationInfoAttr::get(
           context, tdPipeline,
           /*softwarePipelineDepth=*/0,
           /*softwarePipelineStoreStage=*/1,
           /*codegenSpec=*/
-          SymbolRefAttr::get(
-              context, llvm::StringRef(clCodegenTransformDialectStrategyName)));
+          SymbolRefAttr::get(context, llvm::StringRef(strategyName)));
+      LDBG("--clTranslationInfo: " << clTranslationInfo);
     }
 
     LDBG("--start iterating over: "

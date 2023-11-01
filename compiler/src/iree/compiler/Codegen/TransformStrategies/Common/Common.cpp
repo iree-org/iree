@@ -104,7 +104,8 @@ void mlir::iree_compiler::createTransformRegion(
   auto anyOpType = transform::AnyOpType::get(b.getContext());
   auto sequence = b.create<transform::NamedSequenceOp>(
       loc,
-      /*symName=*/std::string("__transform_main"),
+      /*symName=*/
+      std::string(transform::TransformDialect::kTransformEntryPointSymbolName.str()),
       /*rootType*/ anyOpType,
       /*resultTypes=*/TypeRange{},
       /*bodyBuilder=*/[&](OpBuilder &b, Location loc, Value variantH) {
