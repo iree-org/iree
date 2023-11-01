@@ -1027,12 +1027,13 @@ jobs:
             arch: x86_64
             docker_image: "gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33"
             run_scripts: "./build_tools/cmake/test_benchmark_suites_on_linux.sh"
+            # Requires Intel CascadeLake CPU.
             host_machine: c2s16
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
-      - ${{ matrix.target.host_machine || 'cpu' }}
+      - ${{ matrix.target.host_machine || 'cpu' }} # Default to generic x86_64 VM.
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
