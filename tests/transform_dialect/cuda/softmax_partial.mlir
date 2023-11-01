@@ -16,7 +16,7 @@
 /// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-transform-dialect-library=%p/softmax_partial_codegen_spec.mlir \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen | \
 // RUN: iree-run-module --module=- --function=softmax_partial --device=cuda | \
 // RUN: FileCheck %s
 
