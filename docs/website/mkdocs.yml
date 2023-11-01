@@ -165,6 +165,8 @@ nav:
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"
           - Extensions: "reference/extensions.md"
+  - "Developers":
+      - "developers/index.md"
   - "Community":
       - "community/index.md"
       - "Blog":
