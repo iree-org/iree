@@ -167,6 +167,10 @@ nav:
           - Extensions: "reference/extensions.md"
   - "Developers":
       - "developers/index.md"
+      - "developers/building_with_bazel.md"
+      - "developers/building_with_emscripten.md"
+      - "developers/cmake_options_and_variables.md"
+      - Vulkan environment setup: "developers/vulkan_environment_setup.md"
   - "Community":
       - "community/index.md"
       - "Blog":

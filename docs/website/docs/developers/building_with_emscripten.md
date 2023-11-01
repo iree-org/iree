@@ -1,4 +1,4 @@
-# Getting Started With Emscripten
+# Building with Emscripten
 
 [Emscripten](https://emscripten.org/index.html) is a complete compiler
 toolchain to WebAssembly, using LLVM, with a special focus on speed, size, and
@@ -24,9 +24,9 @@ Read <https://emscripten.org/docs/getting_started/downloads.html> and run
 source ./emsdk_env.sh
 ```
 
-## Building IREE's Runtime with Emscripten
+## Building IREE's runtime with Emscripten
 
-### Host Configuration
+### Host configuration
 
 Build and install at least the compiler tools on your host machine, or install
 them from a binary distribution:
@@ -40,7 +40,7 @@ $ cmake -G Ninja -B ../iree-build-host/ \
 $ cmake --build ../iree-build-host/ --target install
 ```
 
-### Target Configuration
+### Target configuration
 
 ```shell
 $ emcmake cmake -G Ninja -B ../iree-build-emscripten/ \
@@ -58,7 +58,7 @@ cmake --build ../iree-build-emscripten/ \
   --target iree_samples_simple_embedding_simple_embedding_vmvx_sync
 ```
 
-### Load into a WebAssembly Environment
+### Load into a WebAssembly environment
 
 Copy the outputs from the build process (e.g. `simple_embedding_vmvx_sync.js`
 and `simple_embedding_vmvx_sync.wasm`) into your application and follow
