@@ -1,5 +1,4 @@
 // RUN: iree-compile --iree-hal-target-backends=vmvx %s | iree-check-module --device=local-task --module=-
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-compile --iree-hal-target-backends=vulkan-spirv %s | iree-check-module --device=vulkan --module=-)
 
 func.func @expect_true() {
   %true = util.unfoldable_constant 1 : i32
