@@ -10,6 +10,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -92,9 +93,29 @@ struct ExpandVectors
     auto newVectorOutTy =
         RankedTensorType::get(expandedOutDims, vectorOutTy.getElementType());
     Location loc = linalgOp.getLoc();
-    Value expandedIn =
-        rewriter.create<tensor::ExpandShapeOp>(loc, newVectorInTy, vectorIn, ri)
-            .getResult();
+    Value expandedIn;
+    if (Operation *castOp = getDefiningCastOp(vectorIn)) {
+      Value castIn = vectorIn.getDefiningOp()->getOperand(0);
+      Type castSrcElemType = castOp->getOperand(0).getType();
+      if (auto castTensorType = dyn_cast<RankedTensorType>(castSrcElemType)) {
+        castSrcElemType = castTensorType.getElementType();
+      }
+      auto newVectorCastInTy =
+          RankedTensorType::get(expandedInDims, castSrcElemType);
+      expandedIn =
+          rewriter
+              .create<tensor::ExpandShapeOp>(loc, newVectorCastInTy, castIn, ri)
+              .getResult();
+      expandedIn = rewriter
+                       .create(loc, castOp->getName().getIdentifier(),
+                               expandedIn, newVectorInTy, castOp->getAttrs())
+                       ->getResult(0);
+    } else {
+      expandedIn =
+          rewriter
+              .create<tensor::ExpandShapeOp>(loc, newVectorInTy, vectorIn, ri)
+              .getResult();
+    }
     Value expandedOut =
         rewriter
             .create<tensor::ExpandShapeOp>(loc, newVectorOutTy, vectorOut, ri)
