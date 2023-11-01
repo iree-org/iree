@@ -112,7 +112,10 @@ class BuildFileFunctions(object):
         target = target.replace("::", "_")
         return self._convert_string_arg_block(name, target, quote=False)
 
-    def _convert_srcs_block(self, srcs):
+    def _convert_srcs_block(self, srcs, name="SRCS", allowed_suffix=None):
+        if allowed_suffix:
+            srcs = [s for s in srcs if s.endswith(allowed_suffix)]
+
         if not srcs:
             return ""
         # Bazel allows srcs to reference targets in the current package (leading
@@ -121,9 +124,10 @@ class BuildFileFunctions(object):
         #      ':generated.c' -> 'generated.c'
         # - dropping any leading '//', and internal ':' by '/', as in:
         #      '//path/to/package:generated.c' ->  'path/to/package/generated.c'
+        # TODO: support reference to rules.
         srcs = [s.lstrip("//").lstrip(":").replace(":", "/") for s in srcs]
 
-        return self._convert_string_list_block("SRCS", srcs, sort=True)
+        return self._convert_string_list_block(name, srcs, sort=True)
 
     def _convert_td_file_block(self, td_file):
         if td_file.startswith("//iree"):
@@ -507,6 +511,8 @@ class BuildFileFunctions(object):
     def iree_bitcode_library(self, name, arch, srcs, internal_hdrs=None, copts=None):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
+        hdrs_block = self._convert_srcs_block(
+                internal_hdrs, name="INTERNAL_HDRS", allowed_suffix=".h")
         srcs_block = self._convert_srcs_block(srcs)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
 
@@ -514,6 +520,7 @@ class BuildFileFunctions(object):
             f"iree_bitcode_library(\n"
             f"{name_block}"
             f"{arch_block}"
+            f"{hdrs_block}"
             f"{srcs_block}"
             f"{copts_block}"
             f")\n\n"

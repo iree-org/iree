@@ -18,6 +18,12 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_entry_points
   ARCH
     wasm_64
+  INTERNAL_HDRS
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_entry_point.c"
     "pack_x86_64_entry_point.c"
@@ -30,6 +36,12 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx2_fma
   ARCH
     x86_64
+  INTERNAL_HDRS
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx2_fma.c"
     "pack_x86_64_avx2_fma.c"
@@ -46,6 +58,12 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx512_base
   ARCH
     x86_64
+  INTERNAL_HDRS
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_base.c"
     "pack_x86_64_avx512_base.c"
@@ -67,6 +85,12 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx512_vnni
   ARCH
     x86_64
+  INTERNAL_HDRS
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_vnni.c"
   COPTS
@@ -87,6 +111,12 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx512_bf16
   ARCH
     x86_64
+  INTERNAL_HDRS
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_bf16.c"
   COPTS

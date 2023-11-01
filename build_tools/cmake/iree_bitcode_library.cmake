@@ -21,7 +21,7 @@ function(iree_bitcode_library)
     _RULE
     ""
     "NAME;OUT;ARCH"
-    "SRCS;COPTS"
+    "INTERNAL_HDRS;SRCS;COPTS"
     ${ARGN}
   )
 
@@ -86,6 +86,7 @@ function(iree_bitcode_library)
       DEPENDS
         "${IREE_CLANG_BINARY}"
         "${_SRC}"
+	"${_RULE_INTERNAL_HDRS}"
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM
