@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-cpu-materialize-encoding --canonicalize --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-cpu-materialize-encoding --canonicalize --cse --split-input-file %s | FileCheck %s
 
 func.func @matmul_lowering_i8i8i32_vmvx_ukernel() attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = true}>

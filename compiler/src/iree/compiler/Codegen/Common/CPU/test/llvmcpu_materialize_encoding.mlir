@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-cpu-materialize-encoding --canonicalize --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-cpu-materialize-encoding --canonicalize --cse --split-input-file %s | FileCheck %s
 
 func.func @set_encoding_7x7x7_matmul_LHS() attributes {
    hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma"}>
