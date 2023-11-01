@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -28,17 +28,6 @@ namespace GlobalOptimization {
 
 namespace {
 
-template <typename T, unsigned int N>
-mlir::raw_ostream &operator<<(mlir::raw_ostream &s,
-                              const SmallVector<T, N> &v) {
-  s << "[ ";
-  for (const auto &e : v) {
-    s << e << " ";
-  }
-  s << "]";
-  return s;
-}
-
 bool isCastOfBlockArgument(Operation *op) {
   return isa<CastOpInterface>(op) && op->getNumOperands() == 1 &&
          isa<BlockArgument>(op->getOperand(0));
@@ -55,6 +44,11 @@ bool isCastOrInputBlockArgument(Value input, int64_t numInputs) {
   } else {
     return input.cast<BlockArgument>().getArgNumber() != numInputs;
   }
+}
+
+static bool isBlockArgumentAtIndex(Value input, int64_t index) {
+  return input.isa<BlockArgument>() &&
+         input.cast<BlockArgument>().getArgNumber() == index;
 }
 
 // Returns true if the linalg::GenericOp has a body like a matmul. This
@@ -74,16 +68,17 @@ bool isCastOrInputBlockArgument(Value input, int64_t numInputs) {
 //    2) The other arith.add operand comes from arith.mul
 //    3) Both arith.mul operands are either block input arguments, or produced
 //       by a `CastOpInterface` of a block input argument
-static bool hasMatmulBody(linalg::GenericOp genericOp) {
+static LogicalResult hasMatmulBody(RewriterBase &rewriter,
+                                   linalg::GenericOp genericOp) {
   int numInputs = genericOp.getNumDpsInputs();
   if (numInputs != 2) {
-    LLVM_DEBUG(llvm::dbgs() << "op does not have exactly 2 inputs\n");
-    return false;
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "op does not have exactly 2 inputs\n");
   }
   int numOutputs = genericOp.getNumDpsInits();
   if (numOutputs != 1) {
-    LLVM_DEBUG(llvm::dbgs() << "op does not have exactly 1 output\n");
-    return false;
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "op does not have exactly 1 output\n");
   }
 
   auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
@@ -92,45 +87,39 @@ static bool hasMatmulBody(linalg::GenericOp genericOp) {
   // Check that yielded value is an arith.add op, and is accumulating
   Operation *addOp = yieldedValue.getDefiningOp();
   if (!addOp) {
-    LLVM_DEBUG(llvm::dbgs() << "linalg.yield operand has no defining op\n");
-    return false;
+    return rewriter.notifyMatchFailure(
+        genericOp, "linalg.yield operand has no defining op\n");
   }
-  if (!isa<arith::AddFOp>(*addOp) && !isa<arith::AddIOp>(*addOp)) {
-    LLVM_DEBUG(llvm::dbgs() << "no arith.add body op\n");
-    return false;
+  if (!isa<arith::AddFOp, arith::AddIOp>(*addOp)) {
+    return rewriter.notifyMatchFailure(genericOp, "no arith.add body op\n");
   }
   Value add0 = addOp->getOperand(0);
   Value add1 = addOp->getOperand(1);
-  if (!(add0.isa<BlockArgument>() &&
-        add0.cast<BlockArgument>().getArgNumber() == numInputs) &&
-      !(add1.isa<BlockArgument>() &&
-        add1.cast<BlockArgument>().getArgNumber() == numInputs)) {
+  if (!isBlockArgumentAtIndex(add0, numInputs) &&
+      !isBlockArgumentAtIndex(add1, numInputs)) {
     LLVM_DEBUG(llvm::dbgs()
                << "arith.add body op not accumulating on output\n");
-    return false;
   }
 
   // Check that the producer of the add is an arith.mul op
   Operation *mulOp =
       add0.isa<BlockArgument>() ? add1.getDefiningOp() : add0.getDefiningOp();
   if (!mulOp) {
-    LLVM_DEBUG(llvm::dbgs() << "arith.add operand has no defining op\n");
-    return false;
+    return rewriter.notifyMatchFailure(
+        genericOp, "arith.add operand has no defining op\n");
   }
-  if (!isa<arith::MulFOp>(*mulOp) && !isa<arith::MulIOp>(*mulOp)) {
-    LLVM_DEBUG(llvm::dbgs() << "no arith.mul body op\n");
-    return false;
+  if (!isa<arith::MulFOp, arith::MulIOp>(*mulOp)) {
+    return rewriter.notifyMatchFailure(genericOp, "no arith.mul body op\n");
   }
 
   // Check that non block args come from arith.ext ops
   if (!isCastOrInputBlockArgument(mulOp->getOperand(0), numInputs) ||
       !isCastOrInputBlockArgument(mulOp->getOperand(1), numInputs)) {
-    LLVM_DEBUG(
-        llvm::dbgs()
-        << "arith.mul operands are not CastOpInterface or BlockArgument\n");
-    return false;
+    return rewriter.notifyMatchFailure(
+        genericOp,
+        "arith.mul operands are not CastOpInterface or BlockArgument\n");
   }
-  return true;
+  return success();
 }
 
 static Value transposeTensor(Location loc, PatternRewriter &rewriter,
@@ -166,8 +155,7 @@ static FailureOr<Value> castTensor(Location loc, PatternRewriter &rewriter,
       RankedTensorType::get(inputType.getShape(), outputType.getElementType());
   for (auto bodyOp : genericOp.getBody()->getOps<CastOpInterface>()) {
     Value castInput = bodyOp->getOperand(0);
-    if (castInput.isa<BlockArgument>() &&
-        castInput.cast<BlockArgument>().getArgNumber() == inputIdx) {
+    if (isBlockArgumentAtIndex(castInput, inputIdx)) {
       return rewriter
           .create(bodyOp->getLoc(), bodyOp->getName().getIdentifier(), input,
                   castedType, bodyOp->getAttrs())
@@ -186,9 +174,6 @@ liftGenericOp(PatternRewriter &rewriter, linalg::GenericOp genericOp,
                  std::is_same<OpTy, linalg::BatchMatvecOp>::value ||
                  std::is_same<OpTy, linalg::BatchMatmulOp>::value) &&
                 "expected only BatchVecmatOp, BatchMatvecOp, or BatchMatmulOp");
-  LLVM_DEBUG(llvm::dbgs() << "lhsPerm: " << lhsPerm << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "rhsPerm: " << rhsPerm << "\n");
-  LLVM_DEBUG(llvm::dbgs() << "outPerm: " << outPerm << "\n");
   Location loc = genericOp.getLoc();
   Value transposedLhs =
       transposeTensor(loc, rewriter, genericOp.getInputs()[0], lhsPerm);
@@ -224,19 +209,24 @@ liftGenericOp(PatternRewriter &rewriter, linalg::GenericOp genericOp,
 }
 
 static LogicalResult
-raiseToBatchVecmat(PatternRewriter &rewriter, linalg::GenericOp genericOp,
-                   linalg::ContractionDimensions contractionDims) {
-  assert(contractionDims.batch.size() == 1 && contractionDims.m.size() == 0 &&
-         contractionDims.n.size() == 1 && contractionDims.k.size() == 1 &&
-         "expected batch vecmat contraction dims");
+liftToBatchVecmat(PatternRewriter &rewriter, linalg::GenericOp genericOp,
+                  linalg::ContractionDimensions contractionDims) {
+  if (contractionDims.batch.size() != 1 || contractionDims.m.size() != 0 ||
+      contractionDims.n.size() != 1 || contractionDims.k.size() != 1) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "expected batch vecmat contraction dims\n\n");
+  }
   AffineMap vecMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0));
   AffineMap matMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(1));
   AffineMap outMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
-  assert(vecMap.getNumResults() == 2 && matMap.getNumResults() == 3 &&
-         outMap.getNumResults() == 2 && "wrong numResults for indexing maps");
+  if (vecMap.getNumResults() != 2 || matMap.getNumResults() != 3 ||
+      outMap.getNumResults() != 2) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "wrong numResults for indexing maps\n\n");
+  }
 
   auto getResultIndex = [&](AffineMap map, int64_t dimIndex) {
     return *(map.getResultPosition(rewriter.getAffineDimExpr(dimIndex)));
@@ -260,19 +250,24 @@ raiseToBatchVecmat(PatternRewriter &rewriter, linalg::GenericOp genericOp,
 }
 
 static LogicalResult
-raiseToBatchMatvec(PatternRewriter &rewriter, linalg::GenericOp genericOp,
-                   linalg::ContractionDimensions contractionDims) {
-  assert(contractionDims.batch.size() == 1 && contractionDims.m.size() == 1 &&
-         contractionDims.n.size() == 0 && contractionDims.k.size() == 1 &&
-         "expected batch matvec contraction dims");
+liftToBatchMatvec(PatternRewriter &rewriter, linalg::GenericOp genericOp,
+                  linalg::ContractionDimensions contractionDims) {
+  if (contractionDims.batch.size() != 1 || contractionDims.m.size() != 1 ||
+      contractionDims.n.size() != 0 || contractionDims.k.size() != 1) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "expected batch matvec contraction dims\n\n");
+  }
   AffineMap matMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0));
   AffineMap vecMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(1));
   AffineMap outMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
-  assert(vecMap.getNumResults() == 2 && matMap.getNumResults() == 3 &&
-         outMap.getNumResults() == 2 && "wrong numResults for indexing maps");
+  if (vecMap.getNumResults() != 2 || matMap.getNumResults() != 3 ||
+      outMap.getNumResults() != 2) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "wrong numResults for indexing maps\n\n");
+  }
 
   auto getResultIndex = [&](AffineMap map, int64_t dimIndex) {
     return *(map.getResultPosition(rewriter.getAffineDimExpr(dimIndex)));
@@ -296,8 +291,13 @@ raiseToBatchMatvec(PatternRewriter &rewriter, linalg::GenericOp genericOp,
 }
 
 static LogicalResult
-raiseToBatchMatmul(PatternRewriter &rewriter, linalg::GenericOp genericOp,
-                   linalg::ContractionDimensions contractionDims) {
+liftToBatchMatmul(PatternRewriter &rewriter, linalg::GenericOp genericOp,
+                  linalg::ContractionDimensions contractionDims) {
+  if (contractionDims.batch.size() != 1 || contractionDims.m.size() != 1 ||
+      contractionDims.n.size() != 1 || contractionDims.k.size() != 1) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "expected batch matmul contraction dims\n\n");
+  }
   assert(contractionDims.batch.size() == 1 && contractionDims.m.size() == 1 &&
          contractionDims.n.size() == 1 && contractionDims.k.size() == 1 &&
          "expected batch matmul contraction dims");
@@ -307,8 +307,11 @@ raiseToBatchMatmul(PatternRewriter &rewriter, linalg::GenericOp genericOp,
       genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(1));
   AffineMap outMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
-  assert(lhsMap.getNumResults() == 3 && rhsMap.getNumResults() == 3 &&
-         outMap.getNumResults() == 3 && "wrong numResults for indexing maps");
+  if (lhsMap.getNumResults() != 3 || rhsMap.getNumResults() != 3 ||
+      outMap.getNumResults() != 3) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "wrong numResults for indexing maps\n\n");
+  }
 
   auto getResultIndex = [&](AffineMap map, int64_t dimIndex) {
     return *(map.getResultPosition(rewriter.getAffineDimExpr(dimIndex)));
@@ -333,7 +336,8 @@ raiseToBatchMatmul(PatternRewriter &rewriter, linalg::GenericOp genericOp,
                                               rhsPerm, outPerm);
 }
 
-// Converts linalg.conv_2d_input_nhwc_filter_nhwc op to linalg.matmul
+// Converts linalg.generic op to linalg.batch_matmul, linalg.batch_matvec,
+// or linalg.batch_vecmat, plus linalg.transpose ops on the inputs
 class LiftGenericToTransposeBatchMatmul
     : public OpRewritePattern<linalg::GenericOp> {
 public:
@@ -341,20 +345,12 @@ public:
 
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    LLVM_DEBUG(llvm::dbgs() << "LiftGenericToTransposeBatchMatmul on "
-                            << genericOp << "\n\n\n");
-
     FailureOr<linalg::ContractionDimensions> contractionDims =
         linalg::inferContractionDims(genericOp);
     if (failed(contractionDims)) {
-      LLVM_DEBUG(llvm::dbgs() << "failed to infer contraction dims\n\n");
-      return failure();
+      return rewriter.notifyMatchFailure(
+          genericOp, "failed to infer contraction dims\n\n");
     }
-
-    LLVM_DEBUG(llvm::dbgs() << "batch: " << contractionDims->batch << "\n");
-    LLVM_DEBUG(llvm::dbgs() << "m: " << contractionDims->m << "\n");
-    LLVM_DEBUG(llvm::dbgs() << "n: " << contractionDims->n << "\n");
-    LLVM_DEBUG(llvm::dbgs() << "k: " << contractionDims->k << "\n");
 
     auto lhsType =
         dyn_cast<RankedTensorType>(genericOp.getOperands()[0].getType());
@@ -363,35 +359,26 @@ public:
     auto outType =
         dyn_cast<RankedTensorType>(genericOp.getResults()[0].getType());
     if (!lhsType || !rhsType || !outType) {
-      LLVM_DEBUG(llvm::dbgs() << "Operands do not have RankedTensorType\n\n");
-      return failure();
+      return rewriter.notifyMatchFailure(
+          genericOp, "Operands do not have RankedTensorType\n\n");
     }
 
-    if (!hasMatmulBody(genericOp)) {
-      LLVM_DEBUG(llvm::dbgs() << "genericOp does not have a matmul body\n\n");
-      return failure();
+    if (failed(hasMatmulBody(rewriter, genericOp))) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "genericOp does not have a matmul body\n\n");
     }
 
-    if (contractionDims->batch.size() == 1 && contractionDims->m.size() == 0 &&
-        contractionDims->n.size() == 1 && contractionDims->k.size() == 1) {
-      LLVM_DEBUG(llvm::dbgs() << "Lifting to linalg.batch_vecmat\n");
-      return raiseToBatchVecmat(rewriter, genericOp, *contractionDims);
-    } else if (contractionDims->batch.size() == 1 &&
-               contractionDims->m.size() == 1 &&
-               contractionDims->n.size() == 0 &&
-               contractionDims->k.size() == 1) {
-      LLVM_DEBUG(llvm::dbgs() << "Lifting to linalg.batch_matvec\n");
-      return raiseToBatchMatvec(rewriter, genericOp, *contractionDims);
-    } else if (contractionDims->batch.size() == 1 &&
-               contractionDims->m.size() == 1 &&
-               contractionDims->n.size() == 1 &&
-               contractionDims->k.size() == 1) {
-      LLVM_DEBUG(llvm::dbgs() << "Lifting to linalg.batch_matmul\n");
-      return raiseToBatchMatmul(rewriter, genericOp, *contractionDims);
-    } else {
-      LLVM_DEBUG(llvm::dbgs() << "Did not match any batch case\n\n");
-      return failure();
-    }
+    // TODO(#15373) Support non-batch cases
+    if (!failed(liftToBatchVecmat(rewriter, genericOp, *contractionDims))) {
+      return success();
+    };
+    if (!failed(liftToBatchMatvec(rewriter, genericOp, *contractionDims))) {
+      return success();
+    };
+    if (!failed(liftToBatchMatmul(rewriter, genericOp, *contractionDims))) {
+      return success();
+    };
+    return failure();
   }
 };
 
