@@ -11,12 +11,44 @@
 
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
+
+// If the producer is a CastOpInterface, or a linalg::GenericOp that performs
+// only a CastOpInterface on its input, return the CastOpInterface op
+static Operation *getDefiningCastOp(Value input) {
+  Operation *op = input.getDefiningOp();
+  if (!op) {
+    return nullptr;
+  }
+  auto castOp = dyn_cast<CastOpInterface>(op);
+  if (castOp) {
+    return op;
+  }
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp || genericOp.getNumDpsInputs() != 1 ||
+      genericOp.getNumDpsInits() != 1 ||
+      genericOp.getBody()->getOperations().size() != 2 ||
+      !isElementwise(genericOp)) {
+    return nullptr;
+  }
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+  castOp = yieldOp->getOperand(0).getDefiningOp<CastOpInterface>();
+  if (!castOp) {
+    return nullptr;
+  }
+  Value castIn = castOp->getOperand(0);
+  if (castIn.isa<BlockArgument>() &&
+      castIn.cast<BlockArgument>().getArgNumber() != 0) {
+    return nullptr;
+  }
+  return castOp;
+}
 
 namespace {
 
@@ -92,9 +124,29 @@ struct ExpandVectors
     auto newVectorOutTy =
         RankedTensorType::get(expandedOutDims, vectorOutTy.getElementType());
     Location loc = linalgOp.getLoc();
-    Value expandedIn =
-        rewriter.create<tensor::ExpandShapeOp>(loc, newVectorInTy, vectorIn, ri)
-            .getResult();
+    Value expandedIn;
+    if (Operation *castOp = getDefiningCastOp(vectorIn)) {
+      Value castIn = vectorIn.getDefiningOp()->getOperand(0);
+      Type castSrcElemType = castOp->getOperand(0).getType();
+      if (auto castTensorType = dyn_cast<RankedTensorType>(castSrcElemType)) {
+        castSrcElemType = castTensorType.getElementType();
+      }
+      auto newVectorCastInTy =
+          RankedTensorType::get(expandedInDims, castSrcElemType);
+      expandedIn =
+          rewriter
+              .create<tensor::ExpandShapeOp>(loc, newVectorCastInTy, castIn, ri)
+              .getResult();
+      expandedIn = rewriter
+                       .create(loc, castOp->getName().getIdentifier(),
+                               expandedIn, newVectorInTy, castOp->getAttrs())
+                       ->getResult(0);
+    } else {
+      expandedIn =
+          rewriter
+              .create<tensor::ExpandShapeOp>(loc, newVectorInTy, vectorIn, ri)
+              .getResult();
+    }
     Value expandedOut =
         rewriter
             .create<tensor::ExpandShapeOp>(loc, newVectorOutTy, vectorOut, ri)
