@@ -1,11 +1,11 @@
-# Vulkan development environment setup and troubleshooting
+# Vulkan environment setup
 
 [Vulkan](https://www.khronos.org/vulkan/) is a new generation graphics and
 compute API that provides high-efficiency, cross-platform access to modern GPUs
 used in a wide variety of devices from PCs and consoles to mobile phones and
 embedded platforms.
 
-This page lists steps and tips for setting up and trouble shooting a Vulkan
+This page lists steps and tips for setting up and troubleshooting a Vulkan
 development environment. The information here is meant to be generic.
 
 ## Vulkan architecture

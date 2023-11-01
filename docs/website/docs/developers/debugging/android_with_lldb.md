@@ -1,8 +1,8 @@
+# Android debugging with LLDB
+
 This doc shows how to use LLDB to debug native binaries on Android. For a more
 complete explanation, see the
 [official LLDB documentation on remote debugging](https://lldb.llvm.org/use/remote.html).
-
-# Debugging with LLDB on Android
 
 ## Prerequisites
 

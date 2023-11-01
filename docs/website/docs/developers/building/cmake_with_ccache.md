@@ -1,4 +1,4 @@
-# Using `ccache` to build IREE
+# CMake with `ccache`
 
 [`ccache`](https://ccache.dev/) is a compilation cache. In principle, just
 prepending compiler invocations with `ccache` is all one needs to enable it,

@@ -1,4 +1,4 @@
-# Debugging Compile Time Regressions
+# Debugging compile time regressions
 
 So the IREE compiler used to compile a program quickly, but it is now slower.
 What do you do?
@@ -7,26 +7,26 @@ What do you do?
 
 Try to answer as many of these questions as you can:
 
-* **When did compilation get slower?**
+> **When did compilation get slower?**
 
   A specific git commit is ideal, but "sometime in the last week" is a good
   starting point. You'll ultimately want to find a culprit release or git
   commit that changed the compiler code.
 
-* **How much slower did compilation get?**
+> **How much slower did compilation get?**
 
   Be specific - did it jump from 1 minute to 2 minutes, or 1 minute to 1 hour?
   Identifying the scale of the regression can help set the priority to
   investigate it.
 
-* **What is the full compile command?**
+> **What is the full compile command?**
 
   Try to extract the input program and full list of flags passed to the
   compiler binary so that others can reproduce what you're seeing. Try to
   distill this as much as possible to using just native tools (no Python or
   other framework layers).
 
-* **What environment is the compiler running in?**
+> **What environment is the compiler running in?**
 
   Are you using a `Debug` build, or a release build? What operating system and
   size machine is running the compiler (e.g. Linux developer machine, or a
@@ -44,7 +44,7 @@ Building the compiler from source and using
 specific commits in IREE, though it typically won't let you step through changes
 in submodules (e.g. MLIR updates in `third_party/llvm-project/`).
 
-**Tip**: [Configure ccache](../developing_iree/ccache.md) if you'll be
+**Tip**: [Configure ccache](../building/cmake_with_ccache.md) if you'll be
 rebuilding the compiler while bisecting
 
 A manual workflow with `git bisect` looks like this:
@@ -81,9 +81,7 @@ git bisect bad [<rev>]
 git bisect run run_bisect.sh
 ```
 
-Other sample scripts:
-
-#### Compile executable sources individually with a timeout
+#### Sample: compile executable sources individually with a timeout
 
 ```bash
 #!/bin/bash

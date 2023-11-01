@@ -291,7 +291,7 @@ cmake -G Ninja \
 ```
 
 To repro failures in CI `bazel_linux_x86-swiftshader_core`, we can follow the
-[developer doc](https://iree.dev/developers/bazel) to build IREE using bazel.
+[developer doc](https://iree.dev/developers/building/bazel) to build IREE using bazel.
 E.g.,
 
 ```bash
