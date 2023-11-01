@@ -2,6 +2,7 @@ site_name: IREE
 site_url: https://iree.dev/
 repo_url: https://github.com/openxla/iree
 repo_name: openxla/iree
+edit_uri: blob/main/docs/website/docs/
 
 theme:
   name: material
@@ -9,6 +10,7 @@ theme:
   logo_alt: IREE
   icon:
     repo: fontawesome/brands/github
+    edit: material/file-eye-outline
   font:
     text: Noto
     code: Noto Sans Mono
@@ -18,6 +20,7 @@ theme:
   custom_dir: overrides
 
   features:
+    - content.action.edit # Link to view/edit documentation source on GitHub
     - content.code.annotate # Allow inline annotations
     - content.code.copy # Enable copy button
     - content.tabs.link # Link content tabs across site (e.g. Windows/Linux)
@@ -196,6 +199,10 @@ plugins:
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-tags/
   - tags:
       tags_file: community/tags.md
+
+  # https://squidfunk.github.io/mkdocs-material/setup/adding-a-git-repository/#revisioning
+  - git-revision-date-localized:
+      enable_creation_date: false
 
   # https://github.com/mkdocs/mkdocs-redirects
   - redirects:
