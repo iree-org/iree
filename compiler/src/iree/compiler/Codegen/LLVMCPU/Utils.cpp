@@ -103,7 +103,7 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
 bool hasByteAlignedElementTypes(linalg::LinalgOp linalgOp) {
   return llvm::all_of(linalgOp->getOperands(), [](Value operand) {
     auto bitwidth =
-        getElementTypeOrSelf(operand.getType()).getIntOrFloatBitWidth();
+        IREE::Util::getTypeBitWidth(getElementTypeOrSelf(operand.getType()));
     return bitwidth % 8 == 0;
   });
 }
