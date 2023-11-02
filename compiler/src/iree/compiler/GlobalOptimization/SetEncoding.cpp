@@ -139,12 +139,12 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
 }
 
 static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
-                               Value castResult, CastOpInterface castOp,
+                               CastOpInterface castOp,
                                IREE::LinalgExt::EncodingAttr encodingAttr) {
   auto encodedType = cast<RankedTensorType>(encoded.getType());
-  auto castResultType = cast<RankedTensorType>(castResult.getType());
-  auto castedType = RankedTensorType::get(
-      encodedType.getShape(), castResultType.getElementType(), encodingAttr);
+  auto castResultElemType = getElementTypeOrSelf(castOp->getResultTypes()[0]);
+  auto castedType = RankedTensorType::get(encodedType.getShape(),
+                                          castResultElemType, encodingAttr);
   return builder
       .create(loc, castOp->getName().getIdentifier(), encoded, castedType,
               castOp->getAttrs())
@@ -177,7 +177,7 @@ padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   }
   Value encoded = setEncoding(builder, loc, padded, encodingForSetEncoding);
   if (castOp) {
-    encoded = castEncodedResult(builder, loc, encoded, source, castOp.value(),
+    encoded = castEncodedResult(builder, loc, encoded, castOp.value(),
                                 encodingForSetEncoding);
   }
   return encoded;
