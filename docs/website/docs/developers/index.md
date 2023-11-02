@@ -1,7 +1,6 @@
 # Developers
 
-TODO
+These pages cover topics useful for project maintainers and contributors.
 
-* Disclaimer about freshness
-* Overview for each section
-* Difference between this category and the other website categories
+!!! caution
+    Some of these pages may be stale. Contributions are always welcome!
