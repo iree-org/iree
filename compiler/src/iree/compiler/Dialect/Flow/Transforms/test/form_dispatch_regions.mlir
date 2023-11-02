@@ -443,10 +443,10 @@ func.func @grouped_quantized_matmul(%arg0: tensor<4096x32x128xi8>, %arg1: tensor
     linalg.yield %8 : f32
   } -> tensor<4096x32x128xf32>
   %4 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>, 
-                        affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>, 
-                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>], 
-      iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} 
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>,
+                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]}
       ins(%arg1, %3 : tensor<1x1x32x128xf32>, tensor<4096x32x128xf32>) outs(%2 : tensor<1x1x4096xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %5 = arith.mulf %in, %in_0 : f32
