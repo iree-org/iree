@@ -140,3 +140,13 @@ MOBILENET_V2_INT8 = common_definitions.Model(
     entry_function="main",
     input_types=["1x224x224x3xui8"],
 )
+
+VIT_INT8_TFL = common_definitions.Model(
+    name="Vit_int8",
+    id=unique_ids.MODEL_VIT_INT8_TFL,
+    tags=["int8", "vision-transformer"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/tflite/tflite_models_1698315913/VIT_CLASSIFICATION_INT8_TFLITE_3X224X224XINT8/model_int8.tflite",
+    entry_function="main",
+    input_types=["1x3x224x224xi8"],
+)
