@@ -1,4 +1,4 @@
-# Copyright 2022 The IREE Authors
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -19,10 +19,8 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
-            "assign_constant_ordinals.mlir",
-            "link_executables.mlir",
-            "lower_linalg_microkernels.mlir",
-            "pipeline.mlir",
+            "llvmcpu_materialize_encoding.mlir",
+            "vmvx_materialize_encoding.mlir",
         ],
         include = ["*.mlir"],
     ),

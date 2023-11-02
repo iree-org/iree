@@ -110,7 +110,7 @@ $ build/tools/iree-compile \
   --iree-input-type=stablehlo \
   --iree-flow-export-benchmark-funcs \
   --iree-hal-target-backends=vmvx \
-  tests/e2e/models/fullyconnected.mlir \
+  tests/e2e/stablehlo_models/fullyconnected.mlir \
   -o /tmp/fullyconnected.vmfb
 ```
 

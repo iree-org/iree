@@ -374,6 +374,9 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
     if (!operandType || !operandType.hasStaticShape()) {
       return failure();
     }
+    if (!op.getFftLength().isSplat()) {
+      return rewriter.notifyMatchFailure(op, "non-splat length");
+    }
     int fftLength = op.getFftLength().getSplatValue<IntegerAttr>().getInt();
     if (fftLength & (fftLength - 1)) {
       return rewriter.notifyMatchFailure(
@@ -381,6 +384,10 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
     }
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
+    // Skip else getBitReversalOrder produces invalid dense elements attr.
+    if (isa<ComplexType>(getElementTypeOrSelf(adaptor.getOperand().getType())))
+      return rewriter.notifyMatchFailure(op, "expected real types");
+
     SmallVector<Value> results =
         getBitReversalOrder(b, adaptor.getOperand(), fftLength);
     int lognPlus1 = std::log(fftLength) / std::log(2) + 1;

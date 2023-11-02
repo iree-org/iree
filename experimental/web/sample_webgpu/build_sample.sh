@@ -59,10 +59,10 @@ compile_sample() {
 
 compile_sample "simple_abs"       "none"      "${ROOT_DIR?}/samples/models/simple_abs.mlir"
 compile_sample "multiple_results" "none"      "${SOURCE_DIR?}/multiple_results.mlir"
-compile_sample "fullyconnected"   "stablehlo" "${ROOT_DIR?}/tests/e2e/models/fullyconnected.mlir"
+compile_sample "fullyconnected"   "stablehlo" "${ROOT_DIR?}/tests/e2e/stablehlo_models/fullyconnected.mlir"
 
 # Does not run yet (uses internal readback, which needs async buffer mapping?)
-# compile_sample "collatz" "stablehlo" "${ROOT_DIR?}/tests/e2e/models/collatz.mlir"
+# compile_sample "collatz" "stablehlo" "${ROOT_DIR?}/tests/e2e/stablehlo_models/collatz.mlir"
 
 # Slow, so just run on demand
 # TODO(scotttodd): iree-import-tflite (see generate_web_metrics.sh script)

@@ -70,8 +70,8 @@ compile_sample() {
 
 echo "=== Compiling sample MLIR files to VM FlatBuffer outputs (.vmfb) ==="
 compile_sample "simple_abs"     "${ROOT_DIR}/samples/models/simple_abs.mlir"
-compile_sample "fullyconnected" "${ROOT_DIR}/tests/e2e/models/fullyconnected.mlir"
-compile_sample "collatz"        "${ROOT_DIR}/tests/e2e/models/collatz.mlir"
+compile_sample "fullyconnected" "${ROOT_DIR}/tests/e2e/stablehlo_models/fullyconnected.mlir"
+compile_sample "collatz"        "${ROOT_DIR}/tests/e2e/stablehlo_models/collatz.mlir"
 
 ###############################################################################
 # Build the web artifacts using Emscripten                                    #

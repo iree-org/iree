@@ -93,14 +93,14 @@ $ ../iree-build/tools/iree-opt \
 
 For a more complex example, here's how to run IREE's complete transformation
 pipeline targeting the VMVX backend on the
-[fullyconnected.mlir](https://github.com/openxla/iree/blob/main/tests/e2e/models/fullyconnected.mlir)
+[fullyconnected.mlir](https://github.com/openxla/iree/blob/main/tests/e2e/stablehlo_models/fullyconnected.mlir)
 model file:
 
 ```shell
 $ ../iree-build/tools/iree-opt \
   --iree-transformation-pipeline \
   --iree-hal-target-backends=vmvx \
-  $PWD/tests/e2e/models/fullyconnected.mlir
+  $PWD/tests/e2e/stablehlo_models/fullyconnected.mlir
 ```
 
 ### iree-compile

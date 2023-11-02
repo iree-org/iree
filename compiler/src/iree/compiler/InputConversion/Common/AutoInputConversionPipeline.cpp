@@ -183,6 +183,8 @@ void AutoInputConversionPipelinePass::getDependentDialects(
 #ifdef IREE_HAVE_TOSA_INPUT
   appendPipelineDialects(buildTOSAInputConversionPassPipeline);
 #endif // IREE_HAVE_TOSA_INPUT
+
+  (void)appendPipelineDialects;
 }
 } // namespace
 

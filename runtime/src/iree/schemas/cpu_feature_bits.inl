@@ -114,3 +114,11 @@ IREE_CPU_FEATURE_BIT(X86_64, 0, 32, AVX512FP16, "avx512fp16")
 IREE_CPU_FEATURE_BIT(X86_64, 0, 50, AMXTILE, "amx-tile")
 IREE_CPU_FEATURE_BIT(X86_64, 0, 51, AMXINT8, "amx-int8")
 IREE_CPU_FEATURE_BIT(X86_64, 0, 52, AMXBF16, "amx-bf16")
+
+//===----------------------------------------------------------------------===//
+// IREE_ARCH_RISCV_64 / riscv64
+//===----------------------------------------------------------------------===//
+
+// General features and high-level switches.
+// RISCV vector extension.
+IREE_CPU_FEATURE_BIT(RISCV_64, 0, 0, RVV, "rvv")

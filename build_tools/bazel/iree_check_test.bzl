@@ -21,6 +21,7 @@ def iree_check_test(
         target_backend,
         driver = None,
         compiler_flags = [],
+        input_type = None,
         runner_args = [],
         tags = [],
         target_cpu_features = None,
@@ -37,6 +38,7 @@ def iree_check_test(
           rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode output
           format and backend flags are passed automatically.
+      input_type: Value to pass to --iree-input-type.
       runner_args: additional runner_args to pass to iree-check-module. The
           driver and input file are passed automatically.
       tags: additional tags to apply to the generated test. A tag
@@ -49,14 +51,17 @@ def iree_check_test(
 
     if target_cpu_features:
         fail("target_cpu_features must currently be empty")
-
+    input_type_flags = []
+    if input_type:
+        input_type_flags = ["--iree-input-type=%s" % input_type]
+    flags = [
+        "--iree-hal-target-backends=%s" % target_backend,
+    ] + compiler_flags + input_type_flags
     bytecode_module_name = name + "_bytecode_module"
     iree_bytecode_module(
         name = bytecode_module_name,
         src = src,
-        flags = [
-            "--iree-hal-target-backends=%s" % target_backend,
-        ] + compiler_flags,
+        flags = flags,
         visibility = ["//visibility:private"],
     )
 
@@ -82,6 +87,7 @@ def iree_check_single_backend_test_suite(
         target_backend,
         driver = None,
         compiler_flags = [],
+        input_type = None,
         runner_args = [],
         tags = [],
         target_cpu_features = None,
@@ -100,6 +106,7 @@ def iree_check_single_backend_test_suite(
           rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode output
           format and backend flags are passed automatically.
+      input_type: Value to pass to --iree-input-type.
       runner_args: additional runner_args to pass to the underlying
           iree-check-module tests. The driver and input file are passed
           automatically. To use different runner_args per test, create a
@@ -130,6 +137,7 @@ def iree_check_single_backend_test_suite(
             target_backend = target_backend,
             driver = driver,
             compiler_flags = compiler_flags,
+            input_type = input_type,
             runner_args = runner_args,
             tags = tags,
             timeout = timeout,

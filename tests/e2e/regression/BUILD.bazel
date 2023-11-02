@@ -65,10 +65,10 @@ iree_check_single_backend_test_suite(
         "associative_reordering.mlir",
     ],
     compiler_flags = [
-        "--iree-input-type=stablehlo",
         "--iree-llvmcpu-reassociate-fp-reductions=false",
     ],
     driver = "local-task",
+    input_type = "stablehlo",
     target_backend = "llvm-cpu",
 )
 
@@ -79,8 +79,8 @@ iree_check_single_backend_test_suite(
         "lowering_config.mlir",
         "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir",
     ] + BACKEND_TESTS,
-    compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "local-task",
+    input_type = "stablehlo",
     target_backend = "llvm-cpu",
 )
 
@@ -92,8 +92,8 @@ iree_check_single_backend_test_suite(
         # so this tests provides e2e coverage for that pass.
         "linalg_quantized_matmul_vs_linalg_matmul.mlir",
     ],
-    compiler_flags = ["--iree-input-type=tosa"],
     driver = "local-task",
+    input_type = "tosa",
     target_backend = "llvm-cpu",
 )
 
@@ -102,8 +102,8 @@ iree_check_single_backend_test_suite(
     srcs = [
         "layernorm.mlir",
     ] + BACKEND_TESTS,
-    compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "local-task",
+    input_type = "stablehlo",
     target_backend = "vmvx",
 )
 
@@ -111,8 +111,8 @@ iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
     # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
     srcs = BACKEND_TESTS,
-    compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "vulkan",
+    input_type = "stablehlo",
     target_backend = "vulkan-spirv",
 )
 
@@ -122,8 +122,8 @@ iree_check_single_backend_test_suite(
         "large_reduction.mlir",
         "layernorm.mlir",
     ] + BACKEND_TESTS,
-    compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "cuda",
+    input_type = "stablehlo",
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",
@@ -191,8 +191,8 @@ iree_check_single_backend_test_suite(
         "dynamic_tosa_quantized_fully_connected_issue_10859.mlir",
     ],
     compiler_flags = [
-        "--iree-input-type=tosa",
         "--iree-vmvx-enable-microkernels",
     ],
+    input_type = "tosa",
     target_backend = "vmvx",
 )
