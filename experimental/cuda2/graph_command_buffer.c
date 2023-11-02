@@ -319,29 +319,13 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_execution_barrier(
 static iree_status_t iree_hal_cuda2_graph_command_buffer_signal_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  iree_hal_cuda2_graph_command_buffer_t* command_buffer =
-      iree_hal_cuda2_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda2_graph_command_buffer_flush_collectives(command_buffer));
-
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
-  return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
 }
 
 static iree_status_t iree_hal_cuda2_graph_command_buffer_reset_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  iree_hal_cuda2_graph_command_buffer_t* command_buffer =
-      iree_hal_cuda2_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda2_graph_command_buffer_flush_collectives(command_buffer));
-
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
-  return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
 }
 
 static iree_status_t iree_hal_cuda2_graph_command_buffer_wait_events(
@@ -353,15 +337,7 @@ static iree_status_t iree_hal_cuda2_graph_command_buffer_wait_events(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  iree_hal_cuda2_graph_command_buffer_t* command_buffer =
-      iree_hal_cuda2_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_cuda2_graph_command_buffer_flush_collectives(command_buffer));
-
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
-  return iree_ok_status();
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
 }
 
 static iree_status_t iree_hal_cuda2_graph_command_buffer_discard_buffer(
