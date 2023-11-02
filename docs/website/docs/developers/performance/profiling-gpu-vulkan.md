@@ -1,6 +1,6 @@
 # Profiling GPUs using Vulkan
 
-[Tracy](./profiling_with_tracy.md) offers great insights into CPU/GPU
+[Tracy](./profiling-with-tracy.md) offers great insights into CPU/GPU
 interactions and Vulkan API usage
 details. However, information at a finer granularity, especially inside a
 particular shader dispatch, is missing. To supplement general purpose tools

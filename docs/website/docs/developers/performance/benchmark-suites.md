@@ -130,7 +130,7 @@ Note that:
 - To run x86_64 benchmarks, right now `--cpu_uarch` needs to be provided and
     only `CascadeLake` is available currently.
 - To build traced benchmark tools, see
-    [Profiling with Tracy](profiling_with_tracy.md).
+    [Profiling with Tracy](profiling-with-tracy.md).
 
 Filters can be used to select the benchmarks:
 

@@ -539,7 +539,7 @@ IREE_API_EXPORT iree_string_view_t iree_vm_function_lookup_attr_by_name(
 // of the module. Note that not all functions have reflection attributes.
 //
 // For more information on the function ABI and its reflection metadata see:
-// docs/developers/design_docs/function_abi.md
+// https://iree.dev/developers/design-docs/function-abi/.
 //
 // Returns IREE_STATUS_OUT_OF_RANGE if index >= the number of attributes for
 // the function.

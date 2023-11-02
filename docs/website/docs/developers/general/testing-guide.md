@@ -127,7 +127,7 @@ export CTEST_PARALLEL_LEVEL=$(nproc)
 To use the Vulkan backend as test driver, you may need to select between a
 Vulkan implementation from SwiftShader and multiple Vulkan-capable hardware
 devices. This can be done via environment variables. See the
-[generic Vulkan setup](../vulkan_environment_setup.md#useful-environment-variables)
+[generic Vulkan setup](../vulkan-environment-setup.md#useful-environment-variables)
 page for details regarding these variables.
 
 For Bazel, you can persist the configuration in `user.bazelrc` to save typing.
@@ -226,7 +226,7 @@ To run e2e model tests in
 [generated_e2e_model_tests.cmake](https://github.com/openxla/iree/tree/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake),
 because of their dependencies, `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON` needs to be
 set when configuring CMake. Also see
-[IREE Benchmark Suite Prerequisites](../performance/benchmark_suites.md#prerequisites)
+[IREE Benchmark Suite Prerequisites](../performance/benchmark-suites.md#prerequisites)
 for required packages.
 
 ### Running a Test

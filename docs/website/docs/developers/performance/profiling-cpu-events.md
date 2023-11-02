@@ -87,7 +87,7 @@ report` and `perf annotate`.
 `perf report` breaks down the event counts by symbol. In the default case where
 what was sampled was time, this is just an ordinary profile by symbol name, no
 different than what could be viewed in other profilers such as
-[Tracy](profiling_with_tracy.md). Where it gets really interesting is when the
+[Tracy](profiling-with-tracy.md). Where it gets really interesting is when the
 profile was recording a specific event type, as in the above `-e
 L1-dcache-load-misses` example:
 
@@ -183,7 +183,7 @@ of achieving the same thing.
 However:
 
 * The common case of annotating by time, as opposed to annotating by CPU event,
-  is supported by [Tracy](profiling_with_tracy.md).
+  is supported by [Tracy](profiling-with-tracy.md).
 * Annotating by CPU event is inherently not working due to hardware limitations
   of the ARM CPUs found in Android devices. That is, the hardware is too
   imprecise at pinning an event to a particular instruction.

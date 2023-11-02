@@ -90,7 +90,7 @@ this behavior can be disabled with `skip-llvm-integrate-benchmark`. The
 as part of benchmarking. It accepts a comma-separated list of benchmark presets.
 This combines with labels added to the PR (which are a more limited set of
 options). See the
-[benchmark suites documentation](../performance/benchmark_suites.md).
+[benchmark suites documentation](../performance/benchmark-suites.md).
 
 The `runner-env` option controls which runner environment to target for our
 self-hosted runners. We maintain a test environment to allow testing out new
@@ -128,18 +128,18 @@ runs.
 
 For example, this PR opted in to running the `build_test_all_windows` job:
 
-![ci-extra](./contributing_ci-extra.png)
+![ci-extra](./contributing-ci-extra.png)
 
 The enabled jobs can be viewed from the Summary page of an action run:
 
-![ci_enabled_jobs](./contributing_ci_enabled_jobs.png)
+![ci_enabled_jobs](./contributing-ci-enabled-jobs.png)
 
 ## Contributor tips
 
 These are opinionated tips documenting workflows that some members of the team
 have found useful. They are focused on meta-tooling, not on IREE code
 specifically (you will find the latter in the
-[Developer Overview](./developer_overview.md)).
+[Developer Overview](./developer-overview.md)).
 
 !!! note
 
@@ -160,7 +160,7 @@ of `git` and GitHub and suggests some specific ways of using it.
 * VSCode: <https://code.visualstudio.com/>. The most commonly used IDE amongst
     IREE developers.
 * [Ccache](https://ccache.dev/), a fast C/C++ compiler cache. See our
-  [CMake with `ccache`](../building/cmake_with_ccache.md) page
+  [CMake with `ccache`](../building/cmake-with-ccache.md) page
 
 ### Git structure
 

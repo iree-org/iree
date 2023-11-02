@@ -137,7 +137,7 @@ $ ../iree-build/tools/iree-run-module \
 The `iree-check-module` program takes an already translated IREE module as input
 and executes it as a series of
 [googletest](https://github.com/google/googletest) tests. This is the test
-runner for the IREE [check framework](./testing_guide.md#end-to-end-tests).
+runner for the IREE [check framework](./testing-guide.md#end-to-end-tests).
 
 ```shell
 $ ../iree-build/tools/iree-compile \

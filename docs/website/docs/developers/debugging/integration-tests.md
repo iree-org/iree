@@ -10,7 +10,7 @@ Feel free to reach out to @hanhanW or ask questions on Discord for more help.
 * Models themselves can be large, and IREE breaks models into dispatches/kernels
 and then launches those individually. Program outputs could diverge starting
 from any individual launch. To get a smaller reproducer, you can use
-[--iree-flow-trace-dispatch-tensors](../general/developer_overview.md#-iree-flow-trace-dispatch-tensors).
+[--iree-flow-trace-dispatch-tensors](../general/developer-overview.md#-iree-flow-trace-dispatch-tensors).
 * You can compare the logs between builds/backends to get an idea about which
 dispatch results in wrong outputs. The dumped inputs can be reused in a
 flagfile.

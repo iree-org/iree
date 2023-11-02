@@ -44,7 +44,7 @@ Building the compiler from source and using
 specific commits in IREE, though it typically won't let you step through changes
 in submodules (e.g. MLIR updates in `third_party/llvm-project/`).
 
-**Tip**: [Configure ccache](../building/cmake_with_ccache.md) if you'll be
+**Tip**: [Configure ccache](../building/cmake-with-ccache.md) if you'll be
 rebuilding the compiler while bisecting
 
 A manual workflow with `git bisect` looks like this:
@@ -187,7 +187,7 @@ paint a complete picture and requires waiting for compilation to finish.
 <!-- TODO(scotttodd): update link -->
 
 See our documentation on
-[profiling with Tracy](../performance/profiling_with_tracy.md). For compile
+[profiling with Tracy](../performance/profiling-with-tracy.md). For compile
 time regressions, pay particular attention to the different compilation phases
 (Flow/Stream/HAL), how many times `TranslateExecutablesPass` runs, and if there
 are outlier passes that take significantly longer to run than others.

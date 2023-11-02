@@ -33,6 +33,6 @@ request that some feature make the cut.
 2. Open the release on GitHub. Rename the release from "candidate" to "stable",
     uncheck the option for "pre-release", and check the option for "latest".
 
-    ![rename_release](./release_renaming.png)
+    ![rename_release](./release-renaming.png)
 
-    ![promote_release](./release_promotion.png)
+    ![promote_release](./release-promotion.png)
