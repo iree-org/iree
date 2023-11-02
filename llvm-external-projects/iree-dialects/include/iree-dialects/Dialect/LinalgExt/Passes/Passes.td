@@ -83,14 +83,6 @@ def ConvertConv2DToWinograd :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToWinogradPass()";
 }
 
-def DecomposeSoftmax :
-    Pass<"iree-linalg-ext-decompose-softmax", "func::FuncOp"> {
-  let summary =
-      "Decomposes softmax op into a sequence of linalg ops";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createDecomposeSoftmaxPass()";
-}
-
 def TileAndDecomposeAttention :
     Pass<"iree-linalg-ext-tile-and-decompose-attention", "func::FuncOp"> {
   let summary =
@@ -101,6 +93,14 @@ def TileAndDecomposeAttention :
     Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
            "Choose whether to only tile or go through till decomposition">,
   ];
+}
+
+def DecomposeAggregateOps :
+    Pass<"iree-linalg-decompose", "func::FuncOp"> {
+  let summary =
+      "Decomposes aggregate ops into a sequence of linalg ops";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createDecomposeAggregateOpsPass()";
 }
 
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

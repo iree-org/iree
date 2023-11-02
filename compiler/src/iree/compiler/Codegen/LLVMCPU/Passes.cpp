@@ -139,6 +139,8 @@ static void addTileAndDistributePasses(OpPassManager &pm) {
       IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createDecomposeAggregateOpsPass());
 }
 
 //===---------------------------------------------------------------------===//

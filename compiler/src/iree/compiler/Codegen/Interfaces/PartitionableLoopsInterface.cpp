@@ -263,6 +263,10 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
     IREE::LinalgExt::AttentionOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::AttentionOp>>(*ctx);
   });
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    linalg::SoftmaxOp::attachInterface<
+        AllParallelAsPartitionableLoops<linalg::SoftmaxOp>>(*ctx);
+  });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::PackOp::attachInterface<
         OuterParallelAsPartitionableLoops<tensor::PackOp>>(*ctx);

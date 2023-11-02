@@ -1,7 +1,7 @@
 add_mlir_library(IREELinalgExtPasses
   ConvertConv2DToWinograd.cpp
   ConvertToLoops.cpp
-  DecomposeSoftmax.cpp
+  DecomposeAggregateOps.cpp
   MaterializeEncoding.cpp
   PadContractionToBlockSize.cpp
   Passes.cpp

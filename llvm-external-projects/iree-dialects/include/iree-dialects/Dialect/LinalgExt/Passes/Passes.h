@@ -167,10 +167,6 @@ createTileAndDecomposeWinogradTransformPass();
 // tranformation.
 std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 
-// Creates a pass to convert the softmax op into a sequence of
-// linalg generic ops.
-std::unique_ptr<Pass> createDecomposeSoftmaxPass();
-
 // Transform dialect version of tile and decompose attention wrapper.
 SmallVector<Operation *>
 tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
@@ -179,6 +175,9 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
 std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
+
+// Creates a pass to decompose aggregate ops into a sequence of linalg ops.
+std::unique_ptr<Pass> createDecomposeAggregateOpsPass();
 
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
