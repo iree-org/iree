@@ -54,7 +54,7 @@ static llvm::cl::opt<bool> clDisableDistribution(
     llvm::cl::desc("disable thread distribution in codegen"),
     llvm::cl::init(false));
 
-static llvm::cl::list<int> mmt4dDistributionTileSizes(
+static llvm::cl::list<int> clMmt4dDistributionTileSizes(
     "iree-codegen-llvm-mmt4d-distribution-tile-sizes",
     llvm::cl::desc("linalg.mmt4d distribution tile size"),
     llvm::cl::ZeroOrMore);
@@ -1176,9 +1176,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::Mmt4DOp mmt4dOp) {
   assert(!getLoweringConfig(mmt4dOp) && "expected lowering_config is not set");
   auto getDistTileSizes = [&]() -> SmallVector<int64_t> {
-    if (!mmt4dDistributionTileSizes.empty()) {
-      return SmallVector<int64_t>(mmt4dDistributionTileSizes.begin(),
-                                  mmt4dDistributionTileSizes.end());
+    if (!clMmt4dDistributionTileSizes.empty()) {
+      return SmallVector<int64_t>(clMmt4dDistributionTileSizes.begin(),
+                                  clMmt4dDistributionTileSizes.end());
     }
     unsigned numLoops = mmt4dOp.getNumLoops();
     SmallVector<int64_t> minTileSizes(numLoops, 0);
@@ -1193,6 +1193,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   };
 
   auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
+    if (!mmt4dL1TileSizes.empty()) {
+      return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
+                                  mmt4dL1TileSizes.end());
+    }
     auto lhsShape =
         llvm::cast<ShapedType>(mmt4dOp.getInputs()[0].getType()).getShape();
     auto rhsShape =
@@ -1200,10 +1204,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     int M0 = lhsShape[2];
     int N0 = rhsShape[2];
     int K0 = lhsShape[3];
-    if (!mmt4dL1TileSizes.empty()) {
-      return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
-                                  mmt4dL1TileSizes.end());
-    }
+
     return {1, 1, 1, M0, N0, K0};
   };
 
@@ -1214,6 +1215,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
   TileSizesListType tileSizes = {getDistTileSizes(), parallelTileSizes,
                                  reductionTileSizes};
+
+  LLVM_DEBUG(KD_DBGS() << "Parallel tile sizes: " << parallelTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Reduction tile sizes: " << reductionTileSizes
+                       << "\n");
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes,
@@ -1227,13 +1232,13 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   assert(!getLoweringConfig(batchMmt4dOp) &&
          "expected lowering_config is not set");
   auto getDistTileSizes = [&]() -> SmallVector<int64_t> {
-    if (!mmt4dDistributionTileSizes.empty()) {
+    if (!clMmt4dDistributionTileSizes.empty()) {
       SmallVector<int64_t> tileSizes;
-      // If mmt4dDistributionTileSizes is set, tile batch dim to 1 + the
+      // If clMmt4dDistributionTileSizes is set, tile batch dim to 1 + the
       // specified mmt4d tile sizes.
       tileSizes.push_back(1);
-      tileSizes.append(mmt4dDistributionTileSizes.begin(),
-                       mmt4dDistributionTileSizes.end());
+      tileSizes.append(clMmt4dDistributionTileSizes.begin(),
+                       clMmt4dDistributionTileSizes.end());
       return tileSizes;
     }
     unsigned numLoops = batchMmt4dOp.getNumLoops();
