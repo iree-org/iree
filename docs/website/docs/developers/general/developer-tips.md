@@ -1,8 +1,9 @@
----
+<!-- TODO(scotttodd): add icons to all developers/ pages -->
+<!-- ---
 icon: material/lightbulb-on
----
+--- -->
 
-# IREE developer tips and tricks
+# Developer tips and tricks
 
 The IREE compiler is built using [MLIR](https://mlir.llvm.org/), so it naturally
 supports the common

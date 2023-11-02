@@ -1,4 +1,4 @@
-# IREE best practices
+# Usage best practices
 
 This page contains a list of best practices for getting the most out of IREE,
 spanning model authoring, ahead-of-time compilation, and runtime use. Treat

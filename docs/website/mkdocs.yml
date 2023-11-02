@@ -139,9 +139,6 @@ nav:
           - GPU - CUDA: "guides/deployment-configurations/gpu-cuda.md"
           - GPU - ROCm: "guides/deployment-configurations/gpu-rocm.md"
           - GPU - Metal: "guides/deployment-configurations/gpu-metal.md"
-      # TODO(scotttodd): move tips guide to the top level "Developers" section
-      - "Other topics":
-          - Developer tips and tricks: "guides/developer-tips.md"
   - "Reference":
       - "reference/index.md"
       - "API bindings":
@@ -174,6 +171,7 @@ nav:
       - "General development topics":
           - "developers/general/contributing.md"
           - "developers/general/developer_overview.md"
+          - "developers/general/developer-tips.md"
           - "developers/general/release_management.md"
           - "developers/general/testing_guide.md"
       - "Building":
@@ -200,7 +198,7 @@ nav:
           - "developers/design_docs/function_abi.md"
           - "developers/design_docs/invocation_execution_model.md"
       - "Other topics":
-          - "developers/iree_best_practices.md"
+          - "developers/usage_best_practices.md"
           - "developers/vulkan_environment_setup.md"
   - "Community":
       - "community/index.md"
@@ -256,3 +254,6 @@ plugins:
         # Some blog post names/paths changed when setting up the blog plugin
         "community/blog/2021-07-19-tflite-tosa.md": "community/blog/posts/tflite-tosa.md"
         "community/blog/2021-10-13-mmt4d.md": "community/blog/posts/mmt4d.md"
+
+        # "Developers" section was added
+        "guides/developer-tips.md": "developers/general/developer-tips.md"
