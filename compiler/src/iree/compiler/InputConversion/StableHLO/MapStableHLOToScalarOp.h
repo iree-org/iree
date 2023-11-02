@@ -811,6 +811,14 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::BitcastConvertOp>(
   Type argType = getElementTypeOrSelf(argTypes.front());
   Type resultType = getElementTypeOrSelf(resultTypes.front());
 
+  // Skip needless casts.
+  if (argType == resultType)
+    return adaptor.getOperand();
+
+  if (!isa<FloatType, IntegerType>(resultType) ||
+      !isa<FloatType, IntegerType>(argType))
+    return nullptr;
+
   if (resultType.getIntOrFloatBitWidth() != argType.getIntOrFloatBitWidth())
     return nullptr;
 
@@ -1188,8 +1196,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::SignOp>(
 inline Value selectShiftedOrSaturated(ImplicitLocOpBuilder &lb, Value rhs,
                                       Value shifted, Value saturated,
                                       Type type) {
-  Type etype =
-      type.isa<ShapedType>() ? type.cast<ShapedType>().getElementType() : type;
+  Type etype = getElementTypeOrSelf(type);
   auto bitWidthInt = etype.getIntOrFloatBitWidth();
   Value bitWidth = getConstantOrSplat(&lb, lb.getLoc(), type,
                                       lb.getIntegerAttr(etype, bitWidthInt));
@@ -1238,8 +1245,7 @@ inline Value mapStableHloOpToStdScalarOp<stablehlo::ShiftRightArithmeticOp>(
   Value lhs = adaptor.getLhs();
   Value rhs = adaptor.getRhs();
   Type type = lhs.getType();
-  Type etype =
-      type.isa<ShapedType>() ? type.cast<ShapedType>().getElementType() : type;
+  Type etype = getElementTypeOrSelf(type);
   auto bitWidthInt = etype.getIntOrFloatBitWidth();
 
   // "Saturate" if the shift is greater than the bitwidth of the type
