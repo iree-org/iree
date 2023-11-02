@@ -512,7 +512,8 @@ class BuildFileFunctions(object):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
         hdrs_block = self._convert_srcs_block(
-                internal_hdrs, name="INTERNAL_HDRS", allowed_suffix=".h")
+            internal_hdrs, name="INTERNAL_HDRS", allowed_suffix=".h"
+        )
         srcs_block = self._convert_srcs_block(srcs)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
 
