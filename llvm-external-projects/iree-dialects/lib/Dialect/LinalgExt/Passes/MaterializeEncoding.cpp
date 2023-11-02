@@ -530,7 +530,19 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
         this->materializeEncodingValueFn);
     if (failed(convertedOp))
       return failure();
-    rewriter.replaceOp(op, convertedOp.value()->getResults());
+
+    SmallVector<Value> replacements;
+    for (auto [type, res] : llvm::zip_equal(
+             op->getResultTypes(), convertedOp.value()->getResults())) {
+      Type targetType = this->getTypeConverter()->convertType(type);
+      if (targetType == res.getType()) {
+        replacements.push_back(res);
+      } else {
+        replacements.push_back(
+            rewriter.create<tensor::CastOp>(op.getLoc(), targetType, res));
+      }
+    }
+    rewriter.replaceOp(op, replacements);
     return success();
   }
 };
