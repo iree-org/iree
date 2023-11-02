@@ -11,6 +11,7 @@ from e2e_test_framework.device_specs import (
     gcp_specs,
     moto_edge_x30_specs,
     pixel_6_pro_specs,
+    pixel_8_pro_specs,
     riscv_specs,
 )
 
@@ -56,6 +57,9 @@ ALL_DEVICE_SPECS = [
     pixel_6_pro_specs.BIG_CORES,
     pixel_6_pro_specs.ALL_CORES,
     pixel_6_pro_specs.GPU,
+    # Pixel 8 Pro
+    pixel_8_pro_specs.BIG_CORES,
+    pixel_8_pro_specs.GPU,
     # Moto Edge X30
     moto_edge_x30_specs.GPU,
     # GCP machines
