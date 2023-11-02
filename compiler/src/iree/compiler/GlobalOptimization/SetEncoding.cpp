@@ -139,30 +139,25 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
 }
 
 static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
-                               Value castResult,
+                               Value castResult, CastOpInterface castOp,
                                IREE::LinalgExt::EncodingAttr encodingAttr) {
   auto encodedType = cast<RankedTensorType>(encoded.getType());
   auto castResultType = cast<RankedTensorType>(castResult.getType());
   auto castedType = RankedTensorType::get(
       encodedType.getShape(), castResultType.getElementType(), encodingAttr);
-  Operation *castOp = getDefiningCastOp(castResult);
   return builder
       .create(loc, castOp->getName().getIdentifier(), encoded, castedType,
               castOp->getAttrs())
       ->getResult(0);
 }
 
-static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                               IREE::LinalgExt::EncodingUser user,
-                               IREE::LinalgExt::EncodingRole role,
-                               TypeRange operandTypes,
-                               MatmulNarrowSizes narrow,
-                               bool castResult = false) {
-  Value padSource = source;
-  if (castResult) {
-    auto castOp = source.getDefiningOp();
-    padSource = castOp->getOperand(0);
-  }
+static Value
+padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
+                  IREE::LinalgExt::EncodingUser user,
+                  IREE::LinalgExt::EncodingRole role, TypeRange operandTypes,
+                  MatmulNarrowSizes narrow,
+                  std::optional<CastOpInterface> castOp = std::nullopt) {
+  Value padSource = castOp ? source.getDefiningOp()->getOperand(0) : source;
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
@@ -181,8 +176,8 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
         makeEncoding(builder, user, role, operandTypes, padSource.getType(), narrow);
   }
   Value encoded = setEncoding(builder, loc, padded, encodingForSetEncoding);
-  if (castResult) {
-    encoded = castEncodedResult(builder, loc, encoded, source,
+  if (castOp) {
+    encoded = castEncodedResult(builder, loc, encoded, source, castOp.value(),
                                 encodingForSetEncoding);
   }
   return encoded;
@@ -324,12 +319,12 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
       }
       return {};
     };
-    bool lhsCasted = (bool)getCastElemType(origLhs);
-    bool rhsCasted = (bool)getCastElemType(origRhs);
-    Type lhsElemType =
-        lhsCasted ? getCastElemType(origLhs) : getElemType(origLhs);
-    Type rhsElemType =
-        rhsCasted ? getCastElemType(origRhs) : getElemType(origRhs);
+    std::optional<CastOpInterface> maybeLhsCastOp = getDefiningCastOp(origLhs);
+    std::optional<CastOpInterface> maybeRhsCastOp = getDefiningCastOp(origRhs);
+    Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
+                                      : getElemType(origLhs);
+    Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()
+                                      : getElemType(origRhs);
     Type outElemType = getElemType(origOut);
 
     if (!lhsElemType || !rhsElemType || !outElemType) {
@@ -341,23 +336,17 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
     MatmulNarrowSizes narrowSizes =
         getMatmulNarrowSizes(origOut.getType().cast<ShapedType>());
     Location loc = matmulOp.getLoc();
-    auto getUncastedType = [](Value v, bool isCasted) -> Type {
-      if (!isCasted || !getCastElemType(v)) {
-        return v.getType();
-      }
-      auto vType =
-          cast<RankedTensorType>(v.getDefiningOp()->getOperand(0).getType());
-      return RankedTensorType::get(vType.getShape(), getCastElemType(v));
-    };
     SmallVector<Type> operandTypes(matmulOp->getOperandTypes());
-    operandTypes[0] = getUncastedType(origLhs, lhsCasted);
-    operandTypes[1] = getUncastedType(origRhs, rhsCasted);
+    operandTypes[0] =
+        cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
+    operandTypes[1] =
+        cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
     Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
                                          IREE::LinalgExt::EncodingRole::LHS,
-                                         operandTypes, narrowSizes, lhsCasted);
+                                         operandTypes, narrowSizes, maybeLhsCastOp);
     Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
                                          IREE::LinalgExt::EncodingRole::RHS,
-                                         operandTypes, narrowSizes, rhsCasted);
+                                         operandTypes, narrowSizes, maybeRhsCastOp);
     Value encodedOut =
         padAndSetEncoding(rewriter, loc, origOut, user,
                           IREE::LinalgExt::EncodingRole::RESULT, operandTypes, narrowSizes);

@@ -6,30 +6,27 @@
 #ifndef IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_
 #define IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_
 
+#include <optional>
+
 namespace mlir {
-class MLIRContext;
-class IntegerType;
 class Type;
-class Operation;
 class Value;
+class CastOpInterface;
 
 namespace iree_compiler {
 namespace GlobalOptimization {
 
 // If the producer is a CastOpInterface, or a linalg::GenericOp that performs
 // only a CastOpInterface on its input, return the CastOpInterface op.
+// Otherwise, return std::nullopt.
 //
 // **Note: If the CastOpInterface has been generalized, the return Operation
 //         is the body CastOpInterface op, not the linalg::GenericOp.
-Operation *getDefiningCastOp(Value input);
-
-// Returns an IntegerType with the specified bitwidth and signedness.
-IntegerType getIntegerTypeWithSignedness(MLIRContext *ctx, int bitWidth,
-                                         bool isSigned);
+std::optional<CastOpInterface> getDefiningCastOp(Value input);
 
 // Returns the source element type of the defining CastOpInterface of `input`,
-// if there is one.
-Type getCastElemType(Value input);
+// if there is one. Otherwise return std::nullopt.
+std::optional<Type> getCastElemType(Value input);
 
 } // namespace GlobalOptimization
 } // namespace iree_compiler

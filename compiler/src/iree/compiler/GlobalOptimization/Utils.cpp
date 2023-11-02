@@ -1,4 +1,4 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -13,69 +13,43 @@ namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
 
-// If the producer is a CastOpInterface, or a linalg::GenericOp that performs
-// only a CastOpInterface on its input, return the CastOpInterface op.
-//
-// **Note: If the CastOpInterface has been generalized, the return Operation
-//         is the body CastOpInterface op, not the linalg::GenericOp.
-Operation *getDefiningCastOp(Value input) {
-  Operation *op = input.getDefiningOp();
-  if (!op) {
-    return nullptr;
-  }
-  auto castOp = dyn_cast<CastOpInterface>(op);
+std::optional<CastOpInterface> getDefiningCastOp(Value input) {
+  auto castOp = input.getDefiningOp<CastOpInterface>();
   if (castOp) {
-    return op;
+    return castOp;
   }
-  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  auto genericOp = input.getDefiningOp<linalg::GenericOp>();
   if (!genericOp || genericOp.getNumDpsInputs() != 1 ||
       genericOp.getNumDpsInits() != 1 ||
       genericOp.getBody()->getOperations().size() != 2 ||
       !isElementwise(genericOp)) {
-    return nullptr;
+    return std::nullopt;
   }
   auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
   castOp = yieldOp->getOperand(0).getDefiningOp<CastOpInterface>();
   if (!castOp) {
-    return nullptr;
+    return std::nullopt;
   }
   Value castIn = castOp->getOperand(0);
   if (castIn.isa<BlockArgument>() &&
       castIn.cast<BlockArgument>().getArgNumber() != 0) {
-    return nullptr;
+    return std::nullopt;
   }
   return castOp;
 }
 
-// Returns an IntegerType with the specified bitwidth and signedness.
-IntegerType getIntegerTypeWithSignedness(MLIRContext *ctx, int bitWidth,
-                                         bool isSigned) {
-  return IntegerType::get(ctx, bitWidth,
-                          isSigned
-                              ? IntegerType::SignednessSemantics::Signed
-                              : IntegerType::SignednessSemantics::Unsigned);
-}
-
-// Returns the source element type of the defining CastOpInterface of `input`,
-// if there is one.
-Type getCastElemType(Value input) {
-  if (auto tensorType = llvm::dyn_cast<RankedTensorType>(input.getType())) {
-    Operation *castOp = getDefiningCastOp(input);
-    if (!castOp) {
-      return {};
-    }
-    Type castSrcElemType = castOp->getOperand(0).getType();
-    if (auto castTensorType = dyn_cast<RankedTensorType>(castSrcElemType)) {
-      castSrcElemType = castTensorType.getElementType();
-    }
-    if (isa<arith::ExtUIOp>(castOp)) {
-      int64_t bitWidth = castSrcElemType.getIntOrFloatBitWidth();
-      castSrcElemType =
-          getIntegerTypeWithSignedness(castOp->getContext(), bitWidth, false);
-    }
-    return castSrcElemType;
+std::optional<Type> getCastElemType(Value input) {
+  std::optional<CastOpInterface> castOp = getDefiningCastOp(input);
+  if (!castOp) {
+    return std::nullopt;
   }
-  return {};
+  Type castSrcElemType = getElementTypeOrSelf(castOp.value()->getOperand(0));
+  if (isa<arith::ExtUIOp>(castOp.value())) {
+    int64_t bitWidth = castSrcElemType.getIntOrFloatBitWidth();
+    return IntegerType::get(castOp->getContext(), bitWidth,
+                            IntegerType::SignednessSemantics::Unsigned);
+  }
+  return castSrcElemType;
 }
 
 } // namespace GlobalOptimization
