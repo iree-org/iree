@@ -195,14 +195,11 @@ nav:
           - "developers/performance/profiling_gpu_vulkan.md"
           - "developers/performance/profiling_with_tracy.md"
       - "Design docs":
-          - "developers/design_docs/codegen_passes.md"
           - "developers/design_docs/cuda_backend.md"
-          - "developers/design_docs/dynamic_shapes.md"
-          - "developers/design_docs/execution_model.md"
+          - "developers/design_docs/design_roadmap.md"
           - "developers/design_docs/function_abi.md"
-          - "developers/design_docs/hal_driver_features.md"
+          - "developers/design_docs/invocation_execution_model.md"
       - "Other topics":
-          - "developers/design_roadmap.md"
           - "developers/iree_best_practices.md"
           - "developers/vulkan_environment_setup.md"
   - "Community":

@@ -10,7 +10,7 @@ trigger the benchmark runs. The results will be compared with
 <https://perf.iree.dev> and post in the comments.
 
 Information about the definitions of the benchmark suites can be found in the
-[IREE Benchmark Suites Configurations](/build_tools/python/benchmark_suites/iree/README.md).
+[IREE Benchmark Suites Configurations](https://github.com/openxla/iree/blob/main/build_tools/python/benchmark_suites/iree/README.md).
 
 ## Running benchmark suites locally
 
@@ -126,11 +126,11 @@ Note that:
         - `c2-standard-16` for x86_64 CPU benchmarks.
         - `a2-highgpu-1g` for NVIDIA GPU benchmarks.
     - All device names are defined under
-        [build_tools/python/e2e_test_framework/device_specs](/build_tools/python/e2e_test_framework/device_specs).
+        [build_tools/python/e2e_test_framework/device_specs](https://github.com/openxla/iree/tree/main/build_tools/python/e2e_test_framework/device_specs).
 - To run x86_64 benchmarks, right now `--cpu_uarch` needs to be provided and
     only `CascadeLake` is available currently.
 - To build traced benchmark tools, see
-    [Profiling with Tracy](/docs/developers/developing_iree/profiling_with_tracy.md).
+    [Profiling with Tracy](profiling_with_tracy.md).
 
 Filters can be used to select the benchmarks:
 
@@ -174,7 +174,7 @@ benchmark suites as the tool collects information from its build log.
 ### Show execution / compilation benchmark results
 
 If you want to generate a comparison report locally, you can use
-[diff_local_benchmarks.py](/build_tools/benchmarks/diff_local_benchmarks.py)
+[diff_local_benchmarks.py](https://github.com/openxla/iree/blob/main/build_tools/benchmarks/diff_local_benchmarks.py)
 script to compare two result json files and generate the report. For example:
 
 ```sh
@@ -245,7 +245,7 @@ build_tools/benchmarks/benchmark_helper.py dump-cmds \
   --compilation_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
-## Fetching benchmark Aartifacts from CI
+## Fetching benchmark Artifacts from CI
 
 ### 1. Find the corresponding CI workflow run
 

@@ -187,7 +187,7 @@ paint a complete picture and requires waiting for compilation to finish.
 <!-- TODO(scotttodd): update link -->
 
 See our documentation on
-[profiling with Tracy](../developing_iree/profiling_with_tracy.md). For compile
+[profiling with Tracy](../performance/profiling_with_tracy.md). For compile
 time regressions, pay particular attention to the different compilation phases
 (Flow/Stream/HAL), how many times `TranslateExecutablesPass` runs, and if there
 are outlier passes that take significantly longer to run than others.

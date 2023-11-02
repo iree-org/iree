@@ -88,7 +88,8 @@ this behavior can be disabled with `skip-llvm-integrate-benchmark`. The
 `benchmark-extra` option allows specifying additional benchmark presets to run
 as part of benchmarking. It accepts a comma-separated list of benchmark presets.
 This combines with labels added to the PR (which are a more limited set of
-options). See the [benchmark suites documentation](./benchmark_suites.md).
+options). See the
+[benchmark suites documentation](../performance/benchmark_suites.md).
 
 The `runner-env` option controls which runner environment to target for our
 self-hosted runners. We maintain a test environment to allow testing out new

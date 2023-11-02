@@ -226,7 +226,7 @@ To run e2e model tests in
 [generated_e2e_model_tests.cmake](https://github.com/openxla/iree/tree/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake),
 because of their dependencies, `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON` needs to be
 set when configuring CMake. Also see
-[IREE Benchmark Suite Prerequisites](/docs/developers/developing_iree/benchmark_suites.md#prerequisites)
+[IREE Benchmark Suite Prerequisites](../performance/benchmark_suites.md#prerequisites)
 for required packages.
 
 ### Running a Test

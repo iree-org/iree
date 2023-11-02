@@ -52,7 +52,7 @@ one place where IREE will warn about performance issues, allowing programs that
 perform suboptimally but encouraging authors to adjust their input model to
 enable better behavior. The IREE VM also has specific support for hiding
 readback latency in an efficient way via
-[coroutines](coroutines-for-batching-and-cooperative-scheduling).
+[coroutines](#coroutines-for-batching-and-cooperative-scheduling).
 
 The most common case we are currently seeing in the IR is that of dynamic copies
 where the offsets are dependent on the result of previous computations. Source
@@ -422,7 +422,7 @@ not be possible to continue recording commands even if we are able to ensure
 execution is appropriately synchronized. This is where indirect dispatch,
 [predication](#predication-of-flowdispatch),
 [indirect command buffers](#indirect-command-bufferon-accelerator-execution),
-and [VM coroutines](coroutines-for-batching-and-cooperative-scheduling) can all
+and [VM coroutines](#coroutines-for-batching-and-cooperative-scheduling) can all
 help cover for the times where we are unable to transform away the indirection
 or emit shape logic without data dependencies.
 

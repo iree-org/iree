@@ -16,7 +16,7 @@ IREE. Refer to [Profiling with Tracy](./profiling_with_tracy.md).
 interactions and Vulkan API usage details. However, information at a finer
 granularity, especially inside a particular shader dispatch, is missing. To
 supplement general purpose tools like Tracy, vendor-specific tools can be used.
-Refer to [Profiling GPUs using Vulkan](./profiling_vulkan_gpu.md).
+Refer to [Profiling GPUs using Vulkan](./profiling_gpu_vulkan.md).
 
 ## CPU cache and other CPU event profiling
 
