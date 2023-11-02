@@ -267,6 +267,12 @@ static inline uint64_t iree_math_round_up_to_pow2_u64(uint64_t n) {
 // FP16 and BFloat16 support
 //==============================================================================
 
+// NOTE: We used to have code here using built-in _Float16 type support.
+// It worked well (https://godbolt.org/z/3a6WM39M1) until it didn't for
+// some people (#14549). It's not worth the hassle, this is only used
+// in slow generic fallbacks or test code, and we weren't able to use
+// a builtin for bf16 anyway.
+
 #define IREE_MATH_FP_FORMAT_CONSTANTS(prefix, bits, ebits)                   \
   const int prefix##exp_bits IREE_ATTRIBUTE_UNUSED = ebits;                  \
   const int prefix##mantissa_bits IREE_ATTRIBUTE_UNUSED =                    \
@@ -385,46 +391,15 @@ static inline uint16_t iree_math_f32_to_generic_fp16(float value,
   return f16_value;
 }
 
-// https://godbolt.org/z/3a6WM39M1 shows that _Float16 <-> float conversions
-// work on:
-// * Clang >= 15 on x86-64
-// * Clang >= 13 on riscv32
-// * Clang >= 9 on arm64 and arm32
-// * GCC >= 13 on arm64 and riscv32
-// * GCC >= 12 on x86-64
-// We have to limit this to x86 and Arm architectures at the moment, because:
-// * On RISC-V this compiles, but the resulting references to builtin functions
-//   cause linking error in some of our CI configurations.
-// * On Wasm this just fails to compile.
-#if (defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64) ||  \
-     defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64)) && \
-    ((defined(__clang__) && __clang_major__ >= 15) ||           \
-     (defined(__GNUC__) && __GNUC__ >= 13))
-#define IREE_HAVE_BUILTIN_FLOAT16
-#endif  // Compiler version checks for _Float16.
-
 // Converts a fp16 value to a 32-bit C `float`.
 static inline float iree_math_f16_to_f32(uint16_t f16_value) {
-#ifdef IREE_HAVE_BUILTIN_FLOAT16
-  _Float16 builtin_float16_value;
-  memcpy(&builtin_float16_value, &f16_value, sizeof f16_value);
-  return (float)builtin_float16_value;
-#else
   return iree_math_generic_fp16_to_f32(f16_value, 5);
-#endif
 }
 
 // Converts a 32-bit C `float` value to a fp16 value, rounding to nearest
 // even.
 static inline uint16_t iree_math_f32_to_f16(float value) {
-#ifdef IREE_HAVE_BUILTIN_FLOAT16
-  _Float16 builtin_float16_value = (_Float16)value;
-  uint16_t f16_value;
-  memcpy(&f16_value, &builtin_float16_value, sizeof f16_value);
-  return f16_value;
-#else
   return iree_math_f32_to_generic_fp16(value, 5);
-#endif
 }
 
 // Rounds of 32-bit C `float` value to nearest 16-bit value and returns
@@ -432,14 +407,6 @@ static inline uint16_t iree_math_f32_to_f16(float value) {
 static inline float iree_math_round_to_nearest_f16(float f32_value) {
   return iree_math_f16_to_f32(iree_math_f32_to_f16(f32_value));
 }
-
-// TODO(bjacob): Use the built-in compiler type __bf16 when available.
-// It is mentioned at
-//   https://clang.llvm.org/docs/LanguageExtensions.html#half-precision-floating-point
-// but at the moment the only place where it seems to be supported is GCC 13 and
-// only on some architectures (arm64 and x86_64, but not arm32 or riscv32):
-//   https://godbolt.org/z/5Wz3jPh69
-// Revisit that compiler explorer link in the future.
 
 // Converts a bfloat16 value to a 32-bit C `float`.
 static inline float iree_math_bf16_to_f32(uint16_t bf16_value) {
