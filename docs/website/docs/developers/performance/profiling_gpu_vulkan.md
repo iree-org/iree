@@ -1,4 +1,4 @@
-# Vulkan GPU Profiling
+# Profiling GPUs using Vulkan
 
 [Tracy](./profiling_with_tracy.md) offers great insights into CPU/GPU
 interactions and Vulkan API usage

@@ -1,12 +1,12 @@
-# CPU cache and other CPU event profiling
+# Profiling CPUs
 
 CPUs are able to
 [record](https://en.wikipedia.org/wiki/Hardware_performance_counter) certain
 events that may be relevant when investigating the performance of a program. A
-common example of such an event is a ["cache
-miss"](https://en.wikipedia.org/wiki/CPU_cache#Cache_miss), when the program
-tries to access data in memory that isn't already in some CPU cache, causing
-that access to be slower than it could otherwise be.
+common example of such an event is a
+["cache miss"](https://en.wikipedia.org/wiki/CPU_cache#Cache_miss), when the
+program tries to access data in memory that isn't already in some CPU cache,
+causing that access to be slower than it could otherwise be.
 
 Querying and analyzing this data can be useful, but is hard in two distinct
 ways:
@@ -34,7 +34,7 @@ events) and software events from the kernel (such as page faults and context
 switches). Anyone may use this system call to implement a profiler, but Linux
 readily offers one, [`perf`](https://perf.wiki.kernel.org/index.php/Main_Page).
 
-### Preserving Artifacts
+### Preserving artifacts
 
 By default IREE cleans up any temporary files it creates while running. Tools
 like perf, however, require those files exist even after the process has exited.
@@ -45,7 +45,7 @@ the files. This is only needed for the CPU path when using the system loader.
 export IREE_PRESERVE_DYLIB_TEMP_FILES=1
 ```
 
-### Desktop Linux
+### Desktop linux
 
 On desktop Linux we can use
 [`perf`](https://perf.wiki.kernel.org/index.php/Main_Page). It is provided on

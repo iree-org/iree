@@ -1,4 +1,4 @@
-# IREE Benchmark Suites
+# Benchmark suites
 
 IREE Benchmarks Suites is a collection of benchmarks for IREE developers to
 track performance improvements/regressions during development.
@@ -12,7 +12,7 @@ trigger the benchmark runs. The results will be compared with
 Information about the definitions of the benchmark suites can be found in the
 [IREE Benchmark Suites Configurations](/build_tools/python/benchmark_suites/iree/README.md).
 
-## Running Benchmark Suites Locally
+## Running benchmark suites locally
 
 ### Prerequisites
 
@@ -22,7 +22,7 @@ Install `iree-import-tf` and `iree-import-tflite` in your Python environment
 and
 [TFLite Integration](https://iree.dev/guides/ml-frameworks/tflite/)).
 
-### Choose Benchmark Presets
+### Choose benchmark presets
 
 IREE Benchmark Suites contain many benchmarks for different devices and model
 sizes, which can take lots of space and time to build all of them. So benchmarks
@@ -56,7 +56,7 @@ export EXECUTION_BENCHMARK_PRESETS="cuda,x86_64"
 export COMPILATION_BENCHMARK_PRESETS="comp-stats"
 ```
 
-### Build Benchmark Suites
+### Build benchmark suites
 
 Configure IREE with `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON`:
 
@@ -92,7 +92,7 @@ export E2E_TEST_ARTIFACTS_DIR="${IREE_BUILD_DIR?}/e2e_test_artifacts"
 > TODO(#13683): Each preset should have its own target to further reduce
 > unnecessary builds
 
-### Run Benchmarks
+### Run benchmarks
 
 Export the execution benchmark config:
 
@@ -148,7 +148,7 @@ build_tools/benchmarks/run_benchmarks_on_linux.py \
   --mode_regex="4-thread"
 ```
 
-### Generate Compilation Statistics (Compilation Benchmarks)
+### Generate compilation statistics (compilation benchmarks)
 
 Export the compilation benchmark config:
 
@@ -171,7 +171,7 @@ build_tools/benchmarks/collect_compilation_statistics.py \
 Note that you need to use [Ninja](https://ninja-build.org/) to build the
 benchmark suites as the tool collects information from its build log.
 
-### Show Execution / Compilation Benchmark Results
+### Show execution / compilation benchmark results
 
 If you want to generate a comparison report locally, you can use
 [diff_local_benchmarks.py](/build_tools/benchmarks/diff_local_benchmarks.py)
@@ -193,7 +193,7 @@ build_tools/benchmarks/diff_local_benchmarks.py \
   > report.md
 ```
 
-### Find Compile and Run Commands to Reproduce Benchmarks
+### Find compile and run commands to reproduce benchmarks
 
 Each benchmark has its benchmark ID in the benchmark suites, you will see a
 benchmark ID at:
@@ -232,7 +232,7 @@ build_tools/benchmarks/benchmark_helper.py dump-cmds \
   --benchmark_id="<benchmark_id>"
 ```
 
-### Get Full List of Benchmarks
+### Get full list of benchmarks
 
 The commands below output the full list of execution and compilation benchmarks,
 including the benchmark names and their flags:
@@ -245,7 +245,7 @@ build_tools/benchmarks/benchmark_helper.py dump-cmds \
   --compilation_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
-## Fetching Benchmark Artifacts from CI
+## Fetching benchmark Aartifacts from CI
 
 ### 1. Find the corresponding CI workflow run
 

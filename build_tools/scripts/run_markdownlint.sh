@@ -17,9 +17,6 @@ declare -a included_files_patterns=(
 
   # .md files for the website.
   "./docs/website/**/*.md"
-
-  # Some developer documentation .md files that we may move to the website.
-  "./docs/developers/developing_iree/*.md"
 )
 
 declare -a excluded_files_patterns=(

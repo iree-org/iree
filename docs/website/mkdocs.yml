@@ -187,8 +187,23 @@ nav:
           - "developers/debugging/integration_tests.md"
           - "developers/debugging/releases.md"
           - "developers/debugging/sanitizers.md"
+      - "Performance":
+          - "developers/performance/benchmarking.md"
+          - "developers/performance/benchmark_suites.md"
+          - "developers/performance/profiling.md"
+          - "developers/performance/profiling_cpu_events.md"
+          - "developers/performance/profiling_gpu_vulkan.md"
+          - "developers/performance/profiling_with_tracy.md"
+      - "Design docs":
+          - "developers/design_docs/codegen_passes.md"
+          - "developers/design_docs/cuda_backend.md"
+          - "developers/design_docs/dynamic_shapes.md"
+          - "developers/design_docs/execution_model.md"
+          - "developers/design_docs/function_abi.md"
+          - "developers/design_docs/hal_driver_features.md"
       - "Other topics":
-          - "developers/best_practices.md"
+          - "developers/design_roadmap.md"
+          - "developers/iree_best_practices.md"
           - "developers/vulkan_environment_setup.md"
   - "Community":
       - "community/index.md"
