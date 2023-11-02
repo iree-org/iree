@@ -1,10 +1,10 @@
 # IREE User-Facing Documentation Website
 
-This directory contains the source and assets for IREE's website, hosted on
-[GitHub Pages](https://pages.github.com/).
+This directory contains the source and assets for <https://iree.dev/>.
 
 The website is generated using [MkDocs](https://www.mkdocs.org/), with the
-[Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) theme.
+[Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) theme and
+is served using [GitHub Pages](https://pages.github.com/).
 
 ## How to edit this documentation
 
