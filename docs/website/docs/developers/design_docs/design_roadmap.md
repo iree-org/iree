@@ -452,9 +452,9 @@ or `%sz = std.muli %cst, %dyn_dim : index` bytes doesn't materially change how
 the allocations are performed. Since almost all usage involves simple write head
 bumps there is no need for ahead-of-time memory planning or large fixed
 allocations, and since no buffer within the ringbuffer can alias we can have
-coarse (*read: low overhead*) guarantees about the availability of certain
-regions of the ringbuffer (*"when this event is signaled all prior ringbuffer
-writes have completed"*).
+coarse (_read: low overhead_) guarantees about the availability of certain
+regions of the ringbuffer (_"when this event is signaled all prior ringbuffer
+writes have completed"_).
 
 Usually any planning we may want to perform can be done in IR via code motion.
 For example applying traditional algorithms used to reduce register pressure

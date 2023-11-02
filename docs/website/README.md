@@ -46,7 +46,7 @@ For more details on how this is set up, see
 (though note that the website organization has changed since then).
 
 For documentation language and style, the guide at
-https://developers.google.com/style offers good advice.
+<https://developers.google.com/style> offers good advice.
 
 ### Building from source
 

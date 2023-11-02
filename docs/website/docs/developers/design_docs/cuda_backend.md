@@ -110,6 +110,7 @@ dialect to LLVM+NVVM dialect.
 ## Example
 
 Save the following mlir in /tmp/add.mlir
+
 ```mlir
 func.func @add(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %0 = tensor.empty() : tensor<4xf32>

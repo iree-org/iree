@@ -175,6 +175,7 @@ signal_fence.wait()
 ```
 
 To the user this would appear as:
+
 ```mermaid
 sequenceDiagram
     User->>@some_func: invoke

@@ -28,7 +28,6 @@ request that some feature make the cut.
 1. (Authorized users only) Push to PyPI using
     [pypi_deploy.sh](https://github.com/openxla/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh)
 
-
     * For Googlers, the password is stored at <http://go/iree-pypi-password>
 
 2. Open the release on GitHub. Rename the release from "candidate" to "stable",

@@ -12,7 +12,7 @@ performed in as similar way as possible in various target languages. In general,
 this requires additional metadata on top of the raw characteristics of a
 function. Where possible, this is done by attaching attributes to a function.
 
--   `iree.abi` : JSON encoded description of the function's calling convention.
+- `iree.abi` : JSON encoded description of the function's calling convention.
 
 ## V1 ABI
 
@@ -25,24 +25,24 @@ results are composed of the following types:
 
 ### Value Types:
 
--   Byte aligned integer type (i8, i16, i32, i64)
--   Floating point value (f16, f32, f64)
+- Byte aligned integer type (i8, i16, i32, i64)
+- Floating point value (f16, f32, f64)
 
 ### Reference Types:
 
--   ND-Array buffers of Value Types:
+- ND-Array buffers of Value Types:
 
-    -   Simple: Packed, C-layout
-    -   Strided: Arbitrary layout with strides (future)
+    - Simple: Packed, C-layout
+    - Strided: Arbitrary layout with strides (future)
 
--   String (byte arrays)
+- String (byte arrays)
 
--   Opaque reference object
+- Opaque reference object
 
 ### Sequence Types:
 
--   Tuples: fixed length lists where each position has its own type bound
--   Homogenous list: lists of arbitrary size where a single type bound applies
+- Tuples: fixed length lists where each position has its own type bound
+- Homogenous list: lists of arbitrary size where a single type bound applies
     to all elements
 
 The intent with these low level types is that calling conventions can be
@@ -53,39 +53,39 @@ these types, possibly by way of additional reflection metadata.
 
 The above are all representable with native constructs in the VM:
 
--   ValueType:
+- ValueType:
 
-    -   Runtime:
+    - Runtime:
         [`iree_vm_value`](https://github.com/openxla/iree/blob/main/iree/vm/value.h)
-    -   Compile Time: primitive MLIR integer/floating point types
+    - Compile Time: primitive MLIR integer/floating point types
 
--   Simple ND-Array Buffer:
+- Simple ND-Array Buffer:
 
-    -   Runtime:
+    - Runtime:
         [`iree_hal_buffer_view`](https://github.com/openxla/iree/blob/main/iree/hal/buffer_view.h)
-    -   Compile Time: `tensor<>`
+    - Compile Time: `tensor<>`
 
--   String:
+- String:
 
-    -   Runtime:
+    - Runtime:
         [`iree_vm_list`](https://github.com/openxla/iree/blob/main/iree/vm/list.h)
         containing `i8`
-    -   Compile Time: `!util.list<i8>`
+    - Compile Time: `!util.list<i8>`
 
--   Tuple:
+- Tuple:
 
-    -   Runtime:
+    - Runtime:
         [`iree_vm_list`](https://github.com/openxla/iree/blob/main/iree/vm/list.h)
         of variant
-    -   Compile Time: `!util.list<?>`
-    -   Note that these are statically type erased at the boundary.
+    - Compile Time: `!util.list<?>`
+    - Note that these are statically type erased at the boundary.
 
--   TypedList (homogenous):
+- TypedList (homogenous):
 
-    -   Runtime:
+    - Runtime:
         [`iree_vm_list`](https://github.com/openxla/iree/blob/main/iree/vm/list.h)
         of `T`
-    -   Compile Time: `!util.list<T>`
+    - Compile Time: `!util.list<T>`
 
 ### Extended Type Calling Conventions
 
@@ -115,9 +115,9 @@ calling convention (i.e. `!util.list` of variant type). The order of the
 elements of the tuple are the natural order of the structure, where that is
 either:
 
--   For a C-like system where order is determinate, it is the order of
+- For a C-like system where order is determinate, it is the order of
     declaration.
--   For a name-based system (i.e. bind to `dict`) where no order is defined, the
+- For a name-based system (i.e. bind to `dict`) where no order is defined, the
     natural order will be the lexically sorted order of the keys.
 
 #### String
@@ -152,42 +152,42 @@ reflection attribute with key `d`, containing a serialized JSON object.
 
 The JSON object contains:
 
--   `a` (array): List of type records for each argument.
--   `r` (array): List of type records for each argument.
+- `a` (array): List of type records for each argument.
+- `r` (array): List of type records for each argument.
 
 Type records are one of:
 
--   A string naming a primitive type:
+- A string naming a primitive type:
 
-    -   `i[0-9]+`: Integer type with given bit width
-    -   `f[0-9]+`: IEEE floating point type with given bit width
-    -   `bf16`: BFloat16
+    - `i[0-9]+`: Integer type with given bit width
+    - `f[0-9]+`: IEEE floating point type with given bit width
+    - `bf16`: BFloat16
 
--   JSON `null`: A null reference value
+- JSON `null`: A null reference value
 
--   `"unknown"`: An unknown/unmapped type
+- `"unknown"`: An unknown/unmapped type
 
--   An array, interpreted as a tuple describing a compound type.
+- An array, interpreted as a tuple describing a compound type.
 
 ##### Compound type tuples
 
 A compound type tuple has a type identifier as its first element, followed with
 type specific fields:
 
--   `["named", "key", {slot_type}]`: Associates a name with a slot. This is
+- `["named", "key", {slot_type}]`: Associates a name with a slot. This is
     used with the root argument list to denote named arguments that can be
     passed positionally or by keyword.
--   `["ndarray", {element_type}, {rank}, {dim...}]`: For unknown rank, the
+- `["ndarray", {element_type}, {rank}, {dim...}]`: For unknown rank, the
     `rank` will be `null` and there will be no dims. Any unknown dim will be
     `null`.
--   `["slist", {slot_type...}]`: An anonymous structured list of fixed arity and
+- `["slist", {slot_type...}]`: An anonymous structured list of fixed arity and
     slot specific types. If there are gaps in the list, empty slots will have a
     `null` type.
--   `["stuple", {slot_type...}]`: Same as `slist` but some languages
+- `["stuple", {slot_type...}]`: Same as `slist` but some languages
     differentiate between sequences represented as lists and those represented
     as tuples (read-only lists).
--   `["sdict", ["key", {slot_type}]...]`: An anonymous structure with named
+- `["sdict", ["key", {slot_type}]...]`: An anonymous structure with named
     slots. Note that when passing these types, the keys are not passed to the
     function (only the slot values).
--   `["py_homogeneous_list", {element_type}]`: A Python list of unknown size
+- `["py_homogeneous_list", {element_type}]`: A Python list of unknown size
     with elements sharing a common type bound given by `element_type`.

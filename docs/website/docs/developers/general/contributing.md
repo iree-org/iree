@@ -48,11 +48,12 @@ for some platforms that are more trouble to configure ourselves (e.g. Mac).
 ### CI behavior manipulation
 
 The setup step of the CI determines which CI jobs to run. This is controlled by
-the [configure_ci.py](https://github.com/openxla/iree/blob/main/build_tools/github_actions/configure_ci.py) script. It
-will generally run a pre-determined set of jobs on presubmit with some jobs kept
-as post-submit only. If changes are only to a certain set of excluded files that
-we know don't affect CI (e.g. docs), then it will skip the jobs. You can
-customize which jobs run using
+the
+[configure_ci.py](https://github.com/openxla/iree/blob/main/build_tools/github_actions/configure_ci.py)
+script. It will generally run a pre-determined set of jobs on presubmit with
+some jobs kept as post-submit only. If changes are only to a certain set of
+excluded files that we know don't affect CI (e.g. docs), then it will skip the
+jobs. You can customize which jobs run using
 [git trailers](https://git-scm.com/docs/git-interpret-trailers) in the PR
 description. The available options are
 
