@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
@@ -2591,13 +2592,15 @@ setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
   // Ignore the tile sizes adjustment.
   auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
   if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
-    if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
+    if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation)) &&
+        !hasMicrokernels(targetAttr)) {
       return failure();
     }
 
     // Set vector level tile sizes for other operations individually.
     if (failed(setLoweringConfigForComputeOps(entryPointFn, computeOps,
-                                              rootOperation))) {
+                                              rootOperation)) &&
+        !hasMicrokernels(targetAttr)) {
       return failure();
     }
   }

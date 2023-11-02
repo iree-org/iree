@@ -79,16 +79,17 @@ void buildGlobalOptimizationPassPipeline(
             clEnableQuantizedMatmulReassociation);
       })
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass)
-      // Expand all vectors in vecmat/matvec ops into matrices for tiling.
-      .addPredicatedPass(transformOptions.options.dataTiling,
-                         createExpandVectorsPass)
-      // Enable data tiling after they are in a canonical form.
-      .addPredicatedPass(transformOptions.options.dataTiling,
-                         createSetEncodingPass)
-      .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
-  mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
+
+  // Enable data tiling after they are in a canonical form.
+  if (transformOptions.options.dataTiling) {
+    // Expand all vectors in vecmat/matvec ops into matrices for tiling.
+    mainPassManager.addPass(createExpandVectorsPass());
+    mainPassManager.addPass(createSetEncodingPass());
+    mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
+    mainPassManager.addPass(createCanonicalizerPass());
+    mainPassManager.addPass(createCSEPass());
+  }
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
@@ -101,6 +102,8 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(IREE::Util::createApplyPatternsPass());
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
   pipeline.addPass(IREE::Util::createIPOPass());
+  pipeline.addPass(createCanonicalizerPass());
+  pipeline.addPass(createCSEPass());
 
   if (transformOptions.options.constExprHoisting) {
     pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass(
