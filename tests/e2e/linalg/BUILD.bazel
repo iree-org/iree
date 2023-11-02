@@ -8,6 +8,7 @@
 # Each test file should have a name matching the corresponding TOSA op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
 # written using the IREE Check framework.
+# See https://iree.dev/developers/general/testing-guide/#iree-core-end-to-end-e2e-tests.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
