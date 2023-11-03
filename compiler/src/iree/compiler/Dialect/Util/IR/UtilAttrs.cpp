@@ -446,7 +446,7 @@ serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr reso
                             llvm::support::endianness endian,
                             llvm::raw_ostream &os) {
 
-  if (endian != llvm::support::endian::system_endianness()) {
+  if (endian != llvm::endianness::native) {
     return emitError(loc) << "the endian of the "
                              "DenseResourceElementsAttr is not supported";
   }
