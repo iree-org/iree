@@ -669,6 +669,10 @@ public:
         return variantOp.emitError()
                << "failed to compile LLVM-IR module to an object file";
       }
+      if (!options.dumpIntermediatesPath.empty()) {
+        dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                       variantOp.getName(), ".o", objectData);
+      }
       auto objectFile = Artifact::createTemporary(libraryName, "o");
       auto &os = objectFile.outputFile->os();
       os << objectData;
