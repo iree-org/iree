@@ -216,7 +216,7 @@ def adb_fetch_file(
     adb_execute(["mkdir", "-p", str(device_path.parent)], verbose=verbose)
 
     # Start a one-time netcat server to receive and save the file.
-    netcat_server = adb_execute(
+    netcat_server = adb_start_cmd(
         [
             "netcat",
             "-s",
@@ -229,6 +229,8 @@ def adb_fetch_file(
         ],
         verbose=verbose,
     )
+
+    time.sleep(5.0)
 
     retry_times = ANDROID_STREAM_RETRIES_LIMIT
     while not netcat_server.poll():
