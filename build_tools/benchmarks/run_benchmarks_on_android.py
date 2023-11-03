@@ -261,8 +261,9 @@ def adb_fetch_file(
 class AndroidBenchmarkDriver(BenchmarkDriver):
     """Android benchmark driver."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, e2e_test_artifacts_url: str, **kwargs):
         super().__init__(*args, **kwargs)
+        self.e2e_test_artifacts_url = e2e_test_artifacts_url
         self.already_pushed_files = {}
 
     def run_benchmark_case(
@@ -271,10 +272,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         benchmark_results_filename: Optional[pathlib.Path],
         capture_filename: Optional[pathlib.Path],
     ) -> None:
-        benchmark_case_dir = benchmark_case.benchmark_case_dir
-        android_case_dir = ANDROID_TMPDIR / pathlib.PurePosixPath(
-            benchmark_case_dir.relative_to(self.config.root_benchmark_dir)
+        benchmark_case_dir = benchmark_case.benchmark_case_dir.relative_to(
+            self.config.root_benchmark_dir
         )
+        android_case_dir = ANDROID_TMPDIR / benchmark_case_dir
 
         inputs_dir = None
         if benchmark_case.input_uri:
@@ -289,8 +290,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                 device_dir=android_case_dir / "expected_outputs_npy",
             )
 
-        module_path = self.__check_and_push_file(
-            benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir
+        module_path = adb_fetch_file(
+            f"{self.e2e_test_artifacts_url}/{benchmark_case_dir.as_posix()}",
+            android_case_dir / android_case_dir,
+            verbose=self.verbose,
         )
 
         run_config = benchmark_case.run_config
@@ -550,6 +553,7 @@ def main(args):
         benchmark_config=benchmark_config,
         benchmark_suite=benchmark_suite,
         benchmark_grace_time=1.0,
+        e2e_test_artifacts_url=args.e2e_test_artifacts_url,
         verbose=args.verbose,
     )
 

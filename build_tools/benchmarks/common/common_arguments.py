@@ -49,6 +49,12 @@ class Parser(argparse.ArgumentParser):
             required=True,
             help="Path to the IREE e2e test artifacts directory.",
         )
+        self.add_argument(
+            "--e2e_test_artifacts_url",
+            type=str,
+            default=None,
+            help="TODO",
+        )
 
         self.add_argument(
             "--normal_benchmark_tool_dir",
