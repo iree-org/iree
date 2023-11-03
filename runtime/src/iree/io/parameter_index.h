@@ -50,6 +50,12 @@ IREE_API_EXPORT void iree_io_parameter_index_retain(
 IREE_API_EXPORT void iree_io_parameter_index_release(
     iree_io_parameter_index_t* index);
 
+// Returns the number of entries in the index at the time the method is called.
+// New entries may be added by other threads between when the value is queried
+// and when the caller enumerates entries. Use this only for debugging.
+IREE_API_EXPORT iree_host_size_t
+iree_io_parameter_index_count(iree_io_parameter_index_t* index);
+
 // Reserves storage for at least |new_capacity| entries in the index.
 // Ignored if storage capacity is already sufficient.
 IREE_API_EXPORT iree_status_t iree_io_parameter_index_reserve(
@@ -62,6 +68,12 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_index_reserve(
 IREE_API_EXPORT iree_status_t
 iree_io_parameter_index_add(iree_io_parameter_index_t* index,
                             const iree_io_parameter_index_entry_t* entry);
+
+// Returns the entry at index |i| in [0, iree_io_parameter_index_count).
+// The returned |out_entry| is valid for the lifetime of the index.
+IREE_API_EXPORT iree_status_t iree_io_parameter_index_get(
+    iree_io_parameter_index_t* index, iree_host_size_t i,
+    const iree_io_parameter_index_entry_t** out_entry);
 
 // Performs a file entry lookup of |key| in the index and returns it.
 // The returned |out_entry| is valid for the lifetime of the index.

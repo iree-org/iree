@@ -67,4 +67,18 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    scope_map
+  HDRS
+    "scope_map.h"
+  SRCS
+    "scope_map.c"
+  DEPS
+    ::parameter_index
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
