@@ -207,8 +207,11 @@ public:
 
   std::optional<IREE::HAL::DeviceTargetAttr>
   getHostDeviceTarget(MLIRContext *context) const override {
-    return getDeviceTargetFromTarget(context, LLVMTarget::getForHost(),
-                                     defaultAddlConfig_);
+    std::optional<LLVMTarget> maybeTarget = LLVMTarget::createForHost();
+    if (!maybeTarget) {
+      return {};
+    }
+    return getDeviceTargetFromTarget(context, *maybeTarget, defaultAddlConfig_);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,

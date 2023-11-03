@@ -35,8 +35,8 @@ createTargetMachine(const LLVMTarget &target) {
   if (!llvmTarget)
     return nullptr;
   std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
-      target.getTriple(), target.getCpu() /* cpu e.g k8*/,
-      target.getCpuFeatures() /* cpu features e.g avx512fma*/,
+      target.getTriple(), target.getCpu() /* cpu e.g k8 */,
+      target.getCpuFeatures() /* cpu features e.g avx512f */,
       target.llvmTargetOptions, llvm::Reloc::Model::PIC_, {},
       target.codeGenOptLevel,
       /*JIT=*/false));
