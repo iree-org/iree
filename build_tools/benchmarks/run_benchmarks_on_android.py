@@ -40,6 +40,7 @@ import json
 import requests
 import shutil
 import socket
+import struct
 import subprocess
 import tarfile
 import time
@@ -213,49 +214,30 @@ def adb_fetch_file(
     if adb_path_exists(device_path, verbose):
         return device_path
 
-    adb_execute(["mkdir", "-p", str(device_path.parent)], verbose=verbose)
+    if verbose:
+        print(f"Streaming file {url} to {device_path}.")
 
-    # Start a one-time netcat server to receive and save the file.
-    netcat_server = adb_start_cmd(
-        [
-            "netcat",
-            "-s",
-            "127.0.0.1",
-            "-p",
-            str(ANDROID_STREAM_PORT),
-            "-l",
-            ">",
-            str(device_path),
-        ],
-        verbose=verbose,
-    )
+    resp = requests.get(url, stream=True, timeout=60)
+    if not resp.ok:
+        raise RuntimeError(f"Failed to fetch: {resp.status_code} - {resp.text}")
 
-    time.sleep(5.0)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(("127.0.0.1", 5037))
 
-    retry_times = ANDROID_STREAM_RETRIES_LIMIT
-    while not netcat_server.poll():
-        req = requests.get(url, stream=True, timeout=60)
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("127.0.0.1", ANDROID_STREAM_PORT))
-        if verbose:
-            print(f"Streaming file {url} to {device_path}.")
-        try:
-            for data in req.iter_content(chunk_size=4 * 1024 * 1024):
-                sock.sendall(data)
-        except OSError as e:
-            if retry_times == 0:
-                raise RuntimeError("Failed to stream file.") from e
-            retry_times -= 1
-            # Netcat server might not be ready. Wait before retry.
-            time.sleep(1.0)
-            continue
-        finally:
-            sock.close()
-        break
+    sock.sendall(b"0012host:transport-usb")
+    print(sock.recv(4))
+    sock.sendall(b"0005sync:")
+    print(sock.recv(4))
 
-    retcode = netcat_server.wait()
-    if retcode != 0:
-        raise ValueError(f"Netcat server ended with error {retcode}.")
+    payload = f"{device_path},0644".encode("utf-8")
+    sock.sendall(b"SEND" + struct.pack("I", len(payload)) + payload)
+
+    for data in resp.iter_content(chunk_size=64 * 1024):
+        sock.sendall(b"DATA" + struct.pack("I", len(data)) + data)
+
+    sock.sendall(b"DONE" + struct.pack("I", int(time.time())))
+    print(sock.recv(4))
+    sock.close()
 
     return device_path
 
