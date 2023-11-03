@@ -41,7 +41,7 @@ iree_lit_test_suite(
         ],
         include = [
             "*.mlir",
-            "iree-dump-parameters.txt",
+            "*.txt",
         ],
     ),
     cfg = "//tools:lit.cfg.py",
