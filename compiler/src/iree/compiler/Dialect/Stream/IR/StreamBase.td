@@ -292,6 +292,16 @@ def Stream_PartitioningConfigAttr :
   let hasCustomAssemblyFormat = 1;
 }
 
+def Stream_MemoryModel_Unified : I32EnumAttrCase<"Unified", 0>;
+def Stream_MemoryModel_Discrete : I32EnumAttrCase<"Discrete", 1>;
+def Stream_MemoryModelAttr :
+    I32EnumAttr<"MemoryModel", "stream resource memory model", [
+      Stream_MemoryModel_Unified,
+      Stream_MemoryModel_Discrete,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+}
+
 def Stream_ResourceConfigAttr :
     AttrDef<Stream_Dialect, "ResourceConfig", []> {
   let mnemonic = "resource_config";
@@ -323,7 +333,9 @@ def Stream_ResourceConfigAttr :
     // Number of bits in `index` values as passed across device boundaries.
     "int64_t":$indexBits,
     // Fuses bindings that are mutable instead of leaving them split.
-    "bool":$aliasMutableBindings
+    "bool":$aliasMutableBindings,
+    // Memory model used for host-device memory access.
+    "IREE::Stream::MemoryModel":$memoryModel
   );
 
   let valueType = NoneType;
@@ -363,6 +375,38 @@ def Stream_ResourceAccessBitfieldAttr :
 def Stream_ResourceAccessArrayAttr :
     TypedArrayAttrBase<Stream_ResourceAccessBitfieldAttr,
                        "access array attribute"> {}
+
+//===----------------------------------------------------------------------===//
+// Parameter storage attributes
+//===----------------------------------------------------------------------===//
+
+def Stream_NamedParameterAttr :
+    AttrDef<Stream_Dialect, "NamedParameter", [
+      TypedAttrInterface,
+      DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
+        "getStorageSize",
+      ]>,
+    ]> {
+  let mnemonic = "parameter.named";
+  let summary = [{named parameter referenced an optional scope and key}];
+  let description = [{
+    Species an externally-defined parameter that can be referenced by an
+    optional scope defining a set of parameters and a key uniquely identifying
+    the parameter within its scope.
+  }];
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type,
+    OptionalParameter<"StringAttr">:$scope,
+    AttrParameter<"StringAttr", "">:$key,
+    OptionalParameter<"DictionaryAttr">:$config
+  );
+  let assemblyFormat = [{
+    `<`
+    custom<ParameterReference>($scope, $key)
+    (`,` $config^)?
+    `>`
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // Stream synchronization types

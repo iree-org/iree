@@ -96,7 +96,7 @@ iree_gentbl_cc_library(
 )
 
 iree_tablegen_doc(
-    name = "HALLoaderDialecDocGen",
+    name = "HALLoaderDialectDocGen",
     tbl_outs = [
         (
             [

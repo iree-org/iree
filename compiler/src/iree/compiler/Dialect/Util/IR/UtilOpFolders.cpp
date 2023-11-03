@@ -812,8 +812,8 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   // During A->B->C dialect conversion, the type may not be legal so be
   // defensive.
   auto operand = getOperand();
-  if (auto sizeAwareType = llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
-          operand.getType())) {
+  if (auto sizeAwareType =
+          dyn_cast<IREE::Util::SizeAwareTypeInterface>(operand.getType())) {
     Operation *op = this->getOperation();
     if (auto sizeValue = sizeAwareType.findSizeValue(operand, op->getBlock(),
                                                      Block::iterator(op))) {
@@ -824,11 +824,10 @@ OpFoldResult BufferSizeOp::fold(FoldAdaptor operands) {
   // If the source is a constant then we can calculate that immediately.
   if (auto constantOp = dyn_cast_or_null<IREE::Util::BufferConstantOp>(
           operand.getDefiningOp())) {
-    if (auto attr =
-            llvm::dyn_cast_if_present<IREE::Util::SerializableAttrInterface>(
-                constantOp.getValue())) {
-      return IntegerAttr::get(IndexType::get(attr.getContext()),
-                              attr.getStorageSize());
+    if (auto storageAttr = dyn_cast_if_present<IREE::Util::SizedStorageAttr>(
+            constantOp.getValue())) {
+      return IntegerAttr::get(IndexType::get(storageAttr.getContext()),
+                              storageAttr.getStorageSize());
     }
   }
 

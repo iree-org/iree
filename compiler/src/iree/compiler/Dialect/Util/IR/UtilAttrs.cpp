@@ -532,9 +532,8 @@ CompositeAttr CompositeAttr::get(MLIRContext *context,
                                  ArrayRef<Attribute> valueAttrs) {
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
-    if (auto serializableAttr =
-            llvm::dyn_cast<SerializableAttrInterface>(valueAttr)) {
-      calculatedLength += serializableAttr.getStorageSize();
+    if (auto storageAttr = llvm::dyn_cast<SizedStorageAttr>(valueAttr)) {
+      calculatedLength += storageAttr.getStorageSize();
     } else {
       return {};
     }
@@ -548,9 +547,8 @@ CompositeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                       int64_t totalLength, ArrayAttr valueAttrs) {
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
-    if (auto serializableAttr =
-            llvm::dyn_cast<SerializableAttrInterface>(valueAttr)) {
-      calculatedLength += serializableAttr.getStorageSize();
+    if (auto storageAttr = llvm::dyn_cast<SizedStorageAttr>(valueAttr)) {
+      calculatedLength += storageAttr.getStorageSize();
     } else {
       return emitError() << "value is not serializable: " << valueAttr;
     }
@@ -650,6 +648,42 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
 }
 
 //===----------------------------------------------------------------------===//
+// SizedStorageAttr implementations
+//===----------------------------------------------------------------------===//
+
+struct SizedStorageDenseElementsAttrModel
+    : public SizedStorageAttr::ExternalModel<SizedStorageDenseElementsAttrModel,
+                                             DenseIntOrFPElementsAttr> {
+  int64_t getStorageSize(Attribute baseAttr) const {
+    auto attr = llvm::cast<ElementsAttr>(baseAttr);
+    return IREE::Util::getRoundedPhysicalStorageSize(
+        attr.getNumElements(),
+        cast<ShapedType>(attr.getType()).getElementType());
+  }
+};
+
+struct SizedStorageDenseResourceElementsAttrModel
+    : public SizedStorageAttr::ExternalModel<
+          SizedStorageDenseResourceElementsAttrModel,
+          DenseResourceElementsAttr> {
+  int64_t getStorageSize(Attribute baseAttr) const {
+    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
+    return IREE::Util::getRoundedPhysicalStorageSize(
+        attr.getNumElements(), attr.getType().getElementType());
+  }
+};
+
+// We don't include NUL terminators as it's 2023.
+struct SizedStorageStringAttrModel
+    : public SizedStorageAttr::ExternalModel<SizedStorageStringAttrModel,
+                                             StringAttr> {
+  int64_t getStorageSize(Attribute baseAttr) const {
+    auto attr = llvm::cast<StringAttr>(baseAttr);
+    return attr.getValue().size();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // SerializableAttrInterface implementations
 //===----------------------------------------------------------------------===//
 
@@ -658,17 +692,10 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
 struct SerializableDenseElementsAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
-  int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<ElementsAttr>(baseAttr);
-    return IREE::Util::getRoundedPhysicalStorageSize(
-        attr.getNumElements(),
-        cast<ShapedType>(attr.getType()).getElementType());
-  }
-
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
                                   llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {
-    buffer.resize(getStorageSize(baseAttr));
+    buffer.resize(cast<SizedStorageAttr>(baseAttr).getStorageSize());
     return serializeToBuffer(baseAttr, loc, endian, buffer);
   }
 
@@ -684,7 +711,7 @@ struct SerializableDenseElementsAttrModel
                                   llvm::raw_ostream &os) const {
     // NOTE: not all ostream implementations handle this but for buffering ones
     // it can really help.
-    os.reserveExtraSpace(getStorageSize(baseAttr));
+    os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
 
     auto elementsAttr = llvm::cast<DenseElementsAttr>(baseAttr);
     if (elementsAttr.isSplat()) {
@@ -711,16 +738,10 @@ struct SerializableDenseResourceElementsAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableDenseResourceElementsAttrModel,
           DenseResourceElementsAttr> {
-  int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
-    return IREE::Util::getRoundedPhysicalStorageSize(
-        attr.getNumElements(), attr.getType().getElementType());
-  }
-
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
                                   llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {
-    buffer.resize(getStorageSize(baseAttr));
+    buffer.resize(cast<SizedStorageAttr>(baseAttr).getStorageSize());
     return serializeToBuffer(baseAttr, loc, endian, buffer);
   }
 
@@ -747,7 +768,7 @@ struct SerializableDenseResourceElementsAttrModel
                   "values or pass --iree-util-zero-fill-elided-attrs for "
                   "testing and expect invalid execution results";
       }
-      os.write_zeros(getStorageSize(baseAttr));
+      os.write_zeros(cast<SizedStorageAttr>(baseAttr).getStorageSize());
       return success();
     }
 
@@ -761,15 +782,10 @@ struct SerializableDenseResourceElementsAttrModel
 struct SerializableStringAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableStringAttrModel, StringAttr> {
-  int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<StringAttr>(baseAttr);
-    return attr.getValue().size();
-  }
-
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
                                   llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {
-    buffer.resize(getStorageSize(baseAttr));
+    buffer.resize(cast<SizedStorageAttr>(baseAttr).getStorageSize());
     return serializeToBuffer(baseAttr, loc, endian, buffer);
   }
 
@@ -785,7 +801,7 @@ struct SerializableStringAttrModel
                                   llvm::raw_ostream &os) const {
     // NOTE: not all ostream implementations handle this but for buffering ones
     // it can really help.
-    os.reserveExtraSpace(getStorageSize(baseAttr));
+    os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
     auto stringAttr = llvm::cast<StringAttr>(baseAttr);
     os.write(stringAttr.data(), stringAttr.size());
     return success();
@@ -813,13 +829,17 @@ void UtilDialect::registerAttributes() {
   // up in the stack - things that end up here are generally already in a target
   // encoding.
   auto &context = *getContext();
-  DenseIntElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
+  DenseIntElementsAttr::attachInterface<SizedStorageDenseElementsAttrModel,
+                                        SerializableDenseElementsAttrModel>(
       context);
-  DenseFPElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
+  DenseFPElementsAttr::attachInterface<SizedStorageDenseElementsAttrModel,
+                                       SerializableDenseElementsAttrModel>(
       context);
   DenseResourceElementsAttr::attachInterface<
+      SizedStorageDenseResourceElementsAttrModel,
       SerializableDenseResourceElementsAttrModel>(context);
-  StringAttr::attachInterface<SerializableStringAttrModel>(context);
+  StringAttr::attachInterface<SizedStorageStringAttrModel,
+                              SerializableStringAttrModel>(context);
 }
 
 } // namespace Util

@@ -19,6 +19,9 @@ include "mlir/IR/OpBase.td"
 
 def Util_BytePatternAttr : AttrDef<Util_Dialect, "BytePattern", [
   TypedAttrInterface,
+  DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
+    "getStorageSize",
+  ]>,
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
     "serializeToBuffer",
     "serializeToStream",
@@ -64,6 +67,9 @@ def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
 //===----------------------------------------------------------------------===//
 
 def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
+  DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
+    "getStorageSize",
+  ]>,
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
     "serializeToBuffer",
     "serializeToStream",
