@@ -441,10 +441,9 @@ serializeGenericElementData(Location loc, DenseElementsAttr elementsAttr,
 
 // Performs serialization of all of the elements in |resourceElementsAttr|.
 // Throws error if not supported.
-static LogicalResult
-serializeGenericResourceElementData(Location loc, DenseResourceElementsAttr resourceElementsAttr,
-                            llvm::support::endianness endian,
-                            llvm::raw_ostream &os) {
+static LogicalResult serializeGenericResourceElementData(
+    Location loc, DenseResourceElementsAttr resourceElementsAttr,
+    llvm::endianness endian, llvm::raw_ostream &os) {
 
   if (endian != llvm::endianness::native) {
     return emitError(loc) << "the endian of the "
