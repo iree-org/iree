@@ -1,0 +1,4341 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://iree.dev/developers/design-docs/design-roadmap/">
+      
+      
+        <link rel="prev" href="../cuda-backend/">
+      
+      
+        <link rel="next" href="../function-abi/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.3">
+    
+    
+      
+        <title>Design roadmap - IREE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.0e669242.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.85d0ee34.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto:300,300i,400,400i,700,700i%7CNoto+Sans+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Noto";--md-code-font:"Noto Sans Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/openxla.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-roadmap" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      <!--
+  Copyright (c) 2016-2023 Martin Donath <martin.donath@squidfunk.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+-->
+
+<!-- Determine classes -->
+
+
+  
+
+
+<!-- Header -->
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav
+    class="md-header__inner md-grid"
+    aria-label="Header"
+  >
+
+    <!-- Link to community home -->
+    <a
+      href="https://github.com/openxla/community"
+      title="OpenXLA"
+      class="md-header__button md-logo"
+      aria-label="OpenXLA"
+      data-md-component="logo"
+    >
+      
+  <img src="../../../assets/images/openxla-logo-lockup-white.svg" alt="logo">
+
+    </a>
+
+    <!-- Link to site home -->
+    <a
+      href="https://iree.dev/"
+      title="IREE"
+      class="md-header__button md-logo"
+      aria-label="IREE"
+      data-md-component="logo"
+    >
+    <div class="md-header__title">
+      IREE
+    </div>
+    </a>
+
+    <!-- Button to open drawer -->
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+
+    <!-- Header title -->
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Design roadmap
+            
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Color palette -->
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+          
+            
+            
+            
+            <input
+              class="md-option"
+              data-md-color-media="(prefers-color-scheme: light)"
+              data-md-color-scheme="default"
+              data-md-color-primary="indigo"
+              data-md-color-accent="indigo"
+              
+                aria-label="Switch to dark mode"
+              
+              type="radio"
+              name="__palette"
+              id="__palette_1"
+            />
+            
+              <label
+                class="md-header__button md-icon"
+                title="Switch to dark mode"
+                for="__palette_2"
+                hidden
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg>
+              </label>
+            
+          
+            
+            
+            
+            <input
+              class="md-option"
+              data-md-color-media="(prefers-color-scheme: dark)"
+              data-md-color-scheme="slate"
+              data-md-color-primary="indigo"
+              data-md-color-accent="indigo"
+              
+                aria-label="Switch to light mode"
+              
+              type="radio"
+              name="__palette"
+              id="__palette_2"
+            />
+            
+              <label
+                class="md-header__button md-icon"
+                title="Switch to light mode"
+                for="__palette_1"
+                hidden
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12c0-2.42-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg>
+              </label>
+            
+          
+        </form>
+      
+    
+
+    <!-- Site language selector -->
+    
+
+    <!-- Button to open search modal -->
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+
+      <!-- Search interface -->
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+
+    <!-- Repository information -->
+    
+      <div class="md-header__source">
+        <a href="https://github.com/openxla/iree" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openxla/iree
+  </div>
+</a>
+      </div>
+    
+  </nav>
+
+  <!-- Navigation tabs (sticky) -->
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../building-from-source/" class="md-tabs__link">
+          
+  
+    
+  
+  Building from source
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../guides/" class="md-tabs__link">
+          
+  
+    
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../reference/" class="md-tabs__link">
+          
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+    
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../community/" class="md-tabs__link">
+          
+  
+    
+  
+  Community
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    <!--
+  Copyright (c) 2016-2023 Martin Donath <martin.donath@squidfunk.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+-->
+
+
+
+<!-- Determine classes -->
+
+
+  
+
+
+
+<!-- Navigation -->
+<nav
+  class="md-nav md-nav--primary md-nav--lifted"
+  aria-label="Navigation"
+  data-md-level="0"
+>
+
+  <!-- Community site logo / home page link -->
+  <label class="md-nav__title" for="__drawer">
+    <a
+      href="https://github.com/openxla/community"
+      title="IREE"
+      class="md-nav__button md-logo"
+      aria-label="IREE"
+      data-md-component="logo"
+    >
+      
+  <img src="../../../assets/images/openxla-logo-lockup-white.svg" alt="logo">
+
+    </a>
+    <!-- Site title (nav item below links to site home) -->
+    IREE
+  </label>
+
+  <!-- Repository information -->
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/openxla/iree" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openxla/iree
+  </div>
+</a>
+    </div>
+  
+
+  <!-- Navigation list -->
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../building-from-source/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Building from source
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_2">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Building from source
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/getting-started/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3 2.75C3 1.784 3.784 1 4.75 1h6.5c.966 0 1.75.784 1.75 1.75v11.5a.75.75 0 0 1-1.227.579L8 11.722l-3.773 3.107A.751.751 0 0 1 3 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.91l3.023-2.489a.75.75 0 0 1 .954 0l3.023 2.49V2.75a.25.25 0 0 0-.25-.25Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/android/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.523 15.341a1 1 0 0 1 0-1.999 1 1 0 0 1 0 2m-11.046 0a1 1 0 0 1 0-2 1 1 0 0 1 0 2m11.405-6.02 1.997-3.46a.416.416 0 0 0-.152-.567.416.416 0 0 0-.568.152L17.137 8.95c-1.547-.706-3.284-1.1-5.137-1.1s-3.59.394-5.137 1.1L4.841 5.447a.416.416 0 0 0-.568-.152.416.416 0 0 0-.152.567l1.997 3.46C2.688 11.186.343 14.658 0 18.76h24c-.344-4.102-2.69-7.574-6.119-9.44"/></svg>
+  
+  <span class="md-ellipsis">
+    Android cross-compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/ios/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+  
+  <span class="md-ellipsis">
+    iOS cross-compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/riscv/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
+  
+  <span class="md-ellipsis">
+    RISC-V cross-compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Guides
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_3">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Guides
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/ml-frameworks/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    ML frameworks
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_3_2">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            ML frameworks
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/ml-frameworks/tensorflow/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1.292 5.856 11.54 0v24l-4.095-2.378V7.603l-6.168 3.564.015-5.31zm21.43 5.311-.014-5.31L12.46 0v24l4.095-2.378V14.87l3.092 1.788-.018-4.618-3.074-1.756V7.603l6.168 3.564z"/></svg>
+  
+  <span class="md-ellipsis">
+    TensorFlow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/ml-frameworks/tflite/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1.292 5.856 11.54 0v24l-4.095-2.378V7.603l-6.168 3.564.015-5.31zm21.43 5.311-.014-5.31L12.46 0v24l4.095-2.378V14.87l3.092 1.788-.018-4.618-3.074-1.756V7.603l6.168 3.564z"/></svg>
+  
+  <span class="md-ellipsis">
+    TensorFlow Lite
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/ml-frameworks/jax/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg>
+  
+  <span class="md-ellipsis">
+    JAX
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/ml-frameworks/pytorch/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.005 0 4.952 7.053a9.865 9.865 0 0 0 0 14.022 9.866 9.866 0 0 0 14.022 0c3.984-3.9 3.986-10.205.085-14.023l-1.744 1.743c2.904 2.905 2.904 7.634 0 10.538s-7.634 2.904-10.538 0-2.904-7.634 0-10.538l4.647-4.646.582-.665zm3.568 3.899a1.327 1.327 0 0 0-1.327 1.327 1.327 1.327 0 0 0 1.327 1.328A1.327 1.327 0 0 0 16.9 5.226 1.327 1.327 0 0 0 15.573 3.9z"/></svg>
+  
+  <span class="md-ellipsis">
+    PyTorch
+  </span>
+  
+    
+  
+  
+    <span class="md-status md-status--new" title="Recently updated">
+    </span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/deployment-configurations/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Deployment configurations
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_3_3">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment configurations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/cpu/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
+  
+  <span class="md-ellipsis">
+    CPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/bare-metal/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
+  
+  <span class="md-ellipsis">
+    CPU - Bare-Metal
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-vulkan/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - Vulkan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-cuda/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851a3.67 3.67 0 0 1-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964a6.46 6.46 0 0 1-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - CUDA
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-rocm/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.324 9.137 1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273.791 1.932H2.008zm17.137.307-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - ROCm
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-metal/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - Metal
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../reference/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_4">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../reference/bindings/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    API bindings
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_4_2">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            API bindings
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bindings/c-api/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg>
+  
+  <span class="md-ellipsis">
+    C API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bindings/python/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg>
+  
+  <span class="md-ellipsis">
+    Python
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../reference/mlir-dialects/" class="md-nav__link ">
+              
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16.245 16.245 0 0 0-1.19 1.487 5.773 5.773 0 0 0-.446.719 2.88 2.88 0 0 0-.249.596.497.497 0 0 0-.033.177v.004a.297.297 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8.001 8.001 0 0 1-.434 2.327c-.016-.01-.03-.014-.04-.013-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.37.37 0 0 0-.03.14.249.249 0 0 0 .01.088c.01.037.022.058.022.058a6.836 6.836 0 0 1-.003.007.144.144 0 0 0-.028.067l-.012.029a6.836 6.836 0 0 1-.257.527l-.077.142a6.836 6.836 0 0 1-.07.115.157.157 0 0 0-.022-.014.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.384 1.384 0 0 1-.32.114 14.1 14.1 0 0 0 .248-2.07 5.072 5.072 0 0 0-.064-1.057c.003-.01.003-.017.003-.017l-.005.01a4.345 4.345 0 0 0-.104-.458 3.554 3.554 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002c0-.008 0-.015.002-.022.02-.098.024-.127-.087-.032a.872.872 0 0 0-.057.054 2.986 2.986 0 0 0-.146.007.716.716 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.553.553 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.14 1.14 0 0 0-.13.348c-.032.015-.063.03-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.634 1.634 0 0 0-.146.406 1.6 1.6 0 0 0-.105.08 2.7 2.7 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a1.832 1.832 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3.42 3.42 0 0 0 .014.33c.02.238.057.438.107.605-.095.13-.103.689-.01.818.073.104.496.35.586.399a.367.367 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32.178.036.415-.023.463-.118.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.727.727 0 0 1-.201.172c.12.005.24-.051.304-.087a.77.77 0 0 0 .07.045 1.015 1.015 0 0 1-.05.05.506.506 0 0 0 .109-.022.295.295 0 0 0 .084.022c.155.012.57-.368.57-.439 0-.018-.015-.04-.038-.063-.042-.045-.12-.1-.207-.177a1.03 1.03 0 0 1-.11-.116.723.723 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.045 3.045 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a4.616 4.616 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a3.98 3.98 0 0 1-.066.193.956.956 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a5.62 5.62 0 0 1-.101.237.746.746 0 0 0-.08.017c-.142.036-.088.05-.024.09a.52.52 0 0 1 .04.027 6.783 6.783 0 0 1-.107.214.76.76 0 0 0-.153.025c-.14.036-.087.05-.023.09.034.02.06.04.08.059a8.021 8.021 0 0 1-.094.165l-.023.036a.59.59 0 0 0-.206.024c-.142.036-.088.05-.024.09a.67.67 0 0 1 .104.079 8.61 8.61 0 0 1-.126.18.514.514 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.85.85 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a.978.978 0 0 0-.228.059l-.034-.02a11.03 11.03 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3.32 3.32 0 0 0-.338-.277 2.157 2.157 0 0 0-.242-.166 3.57 3.57 0 0 1-.088-.127 11.485 11.485 0 0 1-.363-.628 10.455 10.455 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.62 5.62 0 0 1-.148-.923 2.257 2.257 0 0 1 .004-.242.411.411 0 0 0 .158-.323.411.411 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8a.411.411 0 0 0-.027.033 18.69 18.69 0 0 0-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a3.948 3.948 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.69 4.69 0 0 1 .552-.67 3.58 3.58 0 0 1 .54-.435c.032.11.063.204.093.276-.02-.097-.036-.19-.052-.282.107.01.538.066 1.206.393.343.168.609.395.798.595a.167.167 0 0 0-.014.006s.123.112.269.403a2.416 2.416 0 0 0-.73.084 2.913 2.913 0 0 0-.098-.19.484.484 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.397.397 0 0 0-.104-.073.225.225 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a4.964 4.964 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963a.412.412 0 0 1-.014-.028l.014.021a1.626 1.626 0 0 1-.167-1.03l.008-.002c.046.03.091.07.134.126.128.172.188.349.212.47a.528.528 0 0 0 .067.383 18.33 18.33 0 0 1-.72.501c-.23.15-.49.313-.757.47-.14.08-.279.158-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.284 1.284 0 0 0 .552 1.38l.012.008c.013.01.026.017.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a3.5 3.5 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982.1.054.202.108.306.166 2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.05.05 0 0 0-.02-.006v.006a5.46 5.46 0 0 1-.647-.05l-.03-.004v-.003a.267.267 0 0 0-.001.002 6.25 6.25 0 0 1-1.556-.436 7.792 7.792 0 0 1-.745-.362 57.065 57.065 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09a1.14 1.14 0 0 1 .053-.022c.04-.01.078-.023.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715.064-.027.13-.05.2-.067.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053c.143-.108.252-.21.334-.305a.97.97 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.433.433 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.297 1.297 0 0 1-.166.092.725.725 0 0 0-.055-.116c.16-.096.326-.2.494-.308.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.795 1.795 0 0 1 .481.344 2.12 2.12 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18.188 18.188 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a6.45 6.45 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.57 1.57 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a13.689 13.689 0 0 0-.89.994l-.075.095a.203.203 0 0 0-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09a.351.351 0 0 1 .012.006zm-.263 2.606c.088.044.19.106.303.194h-.005a.484.484 0 0 0-.155.07.956.956 0 0 1-.126-.224zm-4.855 1.57c.132 0 .276.013.432.047l.02.005.017.004c.11.027.223.062.337.102l.057.021c.191.074.395.156.611.248.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542z"/></svg>
+  
+  <span class="md-ellipsis">
+    MLIR dialects
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_4_3">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            MLIR dialects
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_2" >
+        
+          <label class="md-nav__link" for="__nav_4_3_2" id="__nav_4_3_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Internal dialects
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            Internal dialects
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/Check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/Flow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Flow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/HAL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    HAL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/HALInline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    HALInline
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/HALLoader/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    HALLoader
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/Stream/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Stream
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/Util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Util
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/VM/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VM
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/VMVX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VMVX
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_3" >
+        
+          <label class="md-nav__link" for="__nav_4_3_3" id="__nav_4_3_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Public dialects
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            Public dialects
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/IREEInput/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREEInput
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/IREELinalgExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREELinalgExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4" >
+        
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Other topics
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            Other topics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/glossary/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Glossary
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/optimization-options/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.752 8.752 0 0 1-2.564 6.186l-.458.459c-.314.314-.641.616-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.749.749 0 0 1-1.11-.418l-.954-3.102a1.214 1.214 0 0 1-.145-.125L3.754 9.816a1.218 1.218 0 0 1-.124-.145L.528 8.717a.749.749 0 0 1-.418-1.11l1.71-2.774A1.748 1.748 0 0 1 3.31 4h3.204c.288-.338.59-.665.904-.979l.459-.458A8.749 8.749 0 0 1 14.064 0ZM8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.249 7.249 0 0 0-5.125 2.123ZM3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.234.234 0 0 1-.201-.064.234.234 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12Zm6.94-3.935c-.088.06-.177.118-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766c.058-.09.117-.178.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Optimization options
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/extensions/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8.2 8.2 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63.27.385.506.792.704 1.218.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294.016.257.016.515 0 .772-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a7.977 7.977 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a5.909 5.909 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8.006 8.006 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a5.738 5.738 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8.12 8.12 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6.214 6.214 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a7.92 7.92 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071.214-.143.437-.272.668-.386.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03 7.53.01 7.764 0 8 0Zm-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189-.173.086-.34.183-.5.29-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045-.22.312-.412.644-.573.99-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a4.709 4.709 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19.162.346.353.677.573.989.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27.161.107.328.204.501.29.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189.173-.086.34-.183.5-.29.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045.22-.313.411-.644.573-.99.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a4.709 4.709 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.464 6.464 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.44 4.44 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Extensions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_5">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_2" >
+        
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    General development topics
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            General development topics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../general/contributing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../general/developer-overview/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../general/developer-tips/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer tips
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../general/release-management/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Release management
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../general/testing-guide/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Building
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            Building
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/bazel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building with Bazel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/emscripten/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building with Emscripten
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/cmake-options-and-variables/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CMake options and variables
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/cmake-with-ccache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CMake with ccache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Debugging
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            Debugging
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/android-with-lldb/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Android debugging with LLDB
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/compile-time-regressions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Compile time regression debugging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/integration-tests/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integration test debugging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/releases/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Release debugging playbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/sanitizers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sanitizers (ASan/MSan/TSan)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            Performance
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/benchmarking/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Benchmarking
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/benchmark-suites/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Benchmark suites
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/profiling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Profiling overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/profiling-cpu-events/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Profiling CPUs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/profiling-gpu-vulkan/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Profiling GPUs using Vulkan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/profiling-with-tracy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Profiling with Tracy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_6" checked>
+        
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Design docs
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_6">
+            <span class="md-nav__icon md-icon"></span>
+            Design docs
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cuda-backend/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CUDA backend
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Design roadmap
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Design roadmap
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#input-dialects" class="md-nav__link">
+    Input Dialects
+  </a>
+  
+    <nav class="md-nav" aria-label="Input Dialects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quantization" class="md-nav__link">
+    Quantization
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flow-data-and-execution-flow-modeling" class="md-nav__link">
+    flow: Data- and Execution-Flow Modeling
+  </a>
+  
+    <nav class="md-nav" aria-label="flow: Data- and Execution-Flow Modeling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#avoiding-readbacks-with-flowstream" class="md-nav__link">
+    Avoiding Readbacks with flow.stream
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threading-flowstream-through-the-cfg" class="md-nav__link">
+    Threading flow.stream through the CFG
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#predication-of-flowdispatch" class="md-nav__link">
+    Predication of flow.dispatch
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deduping-flowexecutables" class="md-nav__link">
+    Deduping flow.executables
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rematerializing-csed-expressions" class="md-nav__link">
+    Rematerializing CSE'd Expressions
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-placement" class="md-nav__link">
+    Device Placement
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hal-hardware-abstraction-layer-and-multi-architecture-executables" class="md-nav__link">
+    hal: Hardware Abstraction Layer and Multi-Architecture Executables
+  </a>
+  
+    <nav class="md-nav" aria-label="hal: Hardware Abstraction Layer and Multi-Architecture Executables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#allow-targets-to-specify-halinterfaces" class="md-nav__link">
+    Allow Targets to Specify hal.interfaces
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-specific-scheduling-specialization" class="md-nav__link">
+    Target-specific Scheduling Specialization
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer-usage-tracking" class="md-nav__link">
+    Buffer Usage Tracking
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batched-executable-caching-and-precompilation" class="md-nav__link">
+    Batched Executable Caching and Precompilation
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-aware-executable-compression" class="md-nav__link">
+    Target-aware Executable Compression
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-aware-constant-compression" class="md-nav__link">
+    Target-aware Constant Compression
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer-stateful-deduplication" class="md-nav__link">
+    Command Buffer Stateful Deduplication
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resource-timeline" class="md-nav__link">
+    Resource Timeline
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transient-tensor-ringbuffer" class="md-nav__link">
+    Transient Tensor Ringbuffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeline-semaphores-on-the-module-abi" class="md-nav__link">
+    Timeline Semaphores on the Module ABI
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-like-cpu-scheduling" class="md-nav__link">
+    GPU-like CPU Scheduling
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vm-lightweight-virtual-machine" class="md-nav__link">
+    vm: Lightweight Virtual Machine
+  </a>
+  
+    <nav class="md-nav" aria-label="vm: Lightweight Virtual Machine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coroutines-for-batching-and-cooperative-scheduling" class="md-nav__link">
+    Coroutines for Batching and Cooperative Scheduling
+  </a>
+  
+    <nav class="md-nav" aria-label="Coroutines for Batching and Cooperative Scheduling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cellular-batching" class="md-nav__link">
+    Cellular Batching
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lowering-to-llvm-ir" class="md-nav__link">
+    Lowering to LLVM IR
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved-type-support" class="md-nav__link">
+    Improved Type Support
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indirect-command-bufferon-accelerator-execution" class="md-nav__link">
+    Indirect Command Buffer/On-Accelerator Execution
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../function-abi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Function ABI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../invocation-execution-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Invocation execution model
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_7" >
+        
+          <label class="md-nav__link" for="__nav_5_7" id="__nav_5_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Other topics
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_7">
+            <span class="md-nav__icon md-icon"></span>
+            Other topics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage-best-practices/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Usage best practices
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vulkan-environment-setup/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Vulkan environment setup
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../community/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Community
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_6">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Community
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../community/blog/" class="md-nav__link ">
+              
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Blog
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_6_2">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            Blog
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2_2" >
+        
+          <label class="md-nav__link" for="__nav_6_2_2" id="__nav_6_2_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Archive
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            Archive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/blog/archive/2021/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    2021
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2_3" >
+        
+          <label class="md-nav__link" for="__nav_6_2_3" id="__nav_6_2_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Categories
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            Categories
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/blog/category/platforms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Platforms
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/blog/category/performance/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/blog/category/frontends/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Frontends
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/tags/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 0 1 0 2.474l-5.026 5.026a1.75 1.75 0 0 1-2.474 0l-6.25-6.25A1.752 1.752 0 0 1 1 7.775Zm1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 0 0 .354 0l5.025-5.025a.25.25 0 0 0 0-.354l-6.25-6.25a.25.25 0 0 0-.177-.073H2.75a.25.25 0 0 0-.25.25ZM6 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Tags
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#input-dialects" class="md-nav__link">
+    Input Dialects
+  </a>
+  
+    <nav class="md-nav" aria-label="Input Dialects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quantization" class="md-nav__link">
+    Quantization
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flow-data-and-execution-flow-modeling" class="md-nav__link">
+    flow: Data- and Execution-Flow Modeling
+  </a>
+  
+    <nav class="md-nav" aria-label="flow: Data- and Execution-Flow Modeling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#avoiding-readbacks-with-flowstream" class="md-nav__link">
+    Avoiding Readbacks with flow.stream
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threading-flowstream-through-the-cfg" class="md-nav__link">
+    Threading flow.stream through the CFG
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#predication-of-flowdispatch" class="md-nav__link">
+    Predication of flow.dispatch
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deduping-flowexecutables" class="md-nav__link">
+    Deduping flow.executables
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rematerializing-csed-expressions" class="md-nav__link">
+    Rematerializing CSE'd Expressions
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device-placement" class="md-nav__link">
+    Device Placement
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hal-hardware-abstraction-layer-and-multi-architecture-executables" class="md-nav__link">
+    hal: Hardware Abstraction Layer and Multi-Architecture Executables
+  </a>
+  
+    <nav class="md-nav" aria-label="hal: Hardware Abstraction Layer and Multi-Architecture Executables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#allow-targets-to-specify-halinterfaces" class="md-nav__link">
+    Allow Targets to Specify hal.interfaces
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-specific-scheduling-specialization" class="md-nav__link">
+    Target-specific Scheduling Specialization
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer-usage-tracking" class="md-nav__link">
+    Buffer Usage Tracking
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batched-executable-caching-and-precompilation" class="md-nav__link">
+    Batched Executable Caching and Precompilation
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-aware-executable-compression" class="md-nav__link">
+    Target-aware Executable Compression
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-aware-constant-compression" class="md-nav__link">
+    Target-aware Constant Compression
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer-stateful-deduplication" class="md-nav__link">
+    Command Buffer Stateful Deduplication
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resource-timeline" class="md-nav__link">
+    Resource Timeline
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transient-tensor-ringbuffer" class="md-nav__link">
+    Transient Tensor Ringbuffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeline-semaphores-on-the-module-abi" class="md-nav__link">
+    Timeline Semaphores on the Module ABI
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-like-cpu-scheduling" class="md-nav__link">
+    GPU-like CPU Scheduling
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vm-lightweight-virtual-machine" class="md-nav__link">
+    vm: Lightweight Virtual Machine
+  </a>
+  
+    <nav class="md-nav" aria-label="vm: Lightweight Virtual Machine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coroutines-for-batching-and-cooperative-scheduling" class="md-nav__link">
+    Coroutines for Batching and Cooperative Scheduling
+  </a>
+  
+    <nav class="md-nav" aria-label="Coroutines for Batching and Cooperative Scheduling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cellular-batching" class="md-nav__link">
+    Cellular Batching
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lowering-to-llvm-ir" class="md-nav__link">
+    Lowering to LLVM IR
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved-type-support" class="md-nav__link">
+    Improved Type Support
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indirect-command-bufferon-accelerator-execution" class="md-nav__link">
+    Indirect Command Buffer/On-Accelerator Execution
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/design-docs/design-roadmap.md" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.15 8.15 0 0 1-1.23-2Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="design-roadmap">Design roadmap<a class="headerlink" href="#design-roadmap" title="Permanent link">link</a></h1>
+<p>A not-so-concise walkthrough of various IREE features that are in the design
+process and planned for future versions. A lot of the questions around how the
+IREE IR is designed and why certain components exist (such as the VM) hopefully
+become much clearer when seeing where we want to go with the infrastructure we
+are building (as opposed to where we currently are with our MVP slice). This
+document is not meant to encompass the entire design of any individual feature
+and if there's interest please say hi on the
+<a href="https://groups.google.com/forum/#!forum/iree-discuss">iree-discuss</a> mailing
+list.</p>
+<div class="toc">
+<ul>
+<li><a href="#design-roadmap">Design roadmap</a><ul>
+<li><a href="#input-dialects">Input Dialects</a><ul>
+<li><a href="#quantization">Quantization</a></li>
+</ul>
+</li>
+<li><a href="#flow-data-and-execution-flow-modeling">flow: Data- and Execution-Flow Modeling</a><ul>
+<li><a href="#avoiding-readbacks-with-flowstream">Avoiding Readbacks with flow.stream</a></li>
+<li><a href="#threading-flowstream-through-the-cfg">Threading flow.stream through the CFG</a></li>
+<li><a href="#predication-of-flowdispatch">Predication of flow.dispatch</a></li>
+<li><a href="#deduping-flowexecutables">Deduping flow.executables</a></li>
+<li><a href="#rematerializing-csed-expressions">Rematerializing CSE'd Expressions</a></li>
+<li><a href="#device-placement">Device Placement</a></li>
+</ul>
+</li>
+<li><a href="#hal-hardware-abstraction-layer-and-multi-architecture-executables">hal: Hardware Abstraction Layer and Multi-Architecture Executables</a><ul>
+<li><a href="#allow-targets-to-specify-halinterfaces">Allow Targets to Specify hal.interfaces</a></li>
+<li><a href="#target-specific-scheduling-specialization">Target-specific Scheduling Specialization</a></li>
+<li><a href="#buffer-usage-tracking">Buffer Usage Tracking</a></li>
+<li><a href="#batched-executable-caching-and-precompilation">Batched Executable Caching and Precompilation</a></li>
+<li><a href="#target-aware-executable-compression">Target-aware Executable Compression</a></li>
+<li><a href="#target-aware-constant-compression">Target-aware Constant Compression</a></li>
+<li><a href="#command-buffer-stateful-deduplication">Command Buffer Stateful Deduplication</a></li>
+<li><a href="#resource-timeline">Resource Timeline</a></li>
+<li><a href="#transient-tensor-ringbuffer">Transient Tensor Ringbuffer</a></li>
+<li><a href="#timeline-semaphores-on-the-module-abi">Timeline Semaphores on the Module ABI</a></li>
+<li><a href="#gpu-like-cpu-scheduling">GPU-like CPU Scheduling</a></li>
+</ul>
+</li>
+<li><a href="#vm-lightweight-virtual-machine">vm: Lightweight Virtual Machine</a><ul>
+<li><a href="#coroutines-for-batching-and-cooperative-scheduling">Coroutines for Batching and Cooperative Scheduling</a><ul>
+<li><a href="#cellular-batching">Cellular Batching</a></li>
+</ul>
+</li>
+<li><a href="#lowering-to-llvm-ir">Lowering to LLVM IR</a></li>
+<li><a href="#improved-type-support">Improved Type Support</a></li>
+<li><a href="#indirect-command-bufferon-accelerator-execution">Indirect Command Buffer/On-Accelerator Execution</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<h2 id="input-dialects">Input Dialects<a class="headerlink" href="#input-dialects" title="Permanent link">link</a></h2>
+<h3 id="quantization">Quantization<a class="headerlink" href="#quantization" title="Permanent link">link</a></h3>
+<p>It's assumed that any work related to quantization/compression has happened
+prior to lowering into IREE dialects. Our plan is to use the proposed
+<a href="https://llvm.discourse.group/t/rfc-a-proposal-for-implementing-quantization-transformations-in-mlir/655">Quantization Transforms</a>
+to achieve both training and inference-time quantization of types in a way that
+preserves maximum accuracy. IREE will support running with original unquantized
+floats in all cases, allowing for a smooth on-ramp to quantization and the gains
+in performance and reduction in model size that come from it.</p>
+<p>As future work IREE would like to move beyond these transformation-directed
+approaches to quantization and interface directly to frontends which have a
+defined enough type system to represent accurate quantized (and otherwise
+compressed) computations directly, not relying exclusively on compiler-side type
+inference transforms.</p>
+<h2 id="flow-data-and-execution-flow-modeling"><code>flow</code>: Data- and Execution-Flow Modeling<a class="headerlink" href="#flow-data-and-execution-flow-modeling" title="Permanent link">link</a></h2>
+<p>The <code>flow</code> dialect is designed to allow us to extract as much concurrency as
+possible from a program and partition IR into the scheduling and execution
+domains. Today we have the IR structure and transformation flow in place but
+have not yet got to the most interesting things such an infrastructure enables.
+A majority of the largest performance, latency, and memory usage improvements
+IREE can offer are determined first here and all following lowerings benefit.
+<em>The fastest code is the code you don't execute and the smallest allocation is
+the allocation you don't make</em> ;)</p>
+<h3 id="avoiding-readbacks-with-flowstream">Avoiding Readbacks with <code>flow.stream</code><a class="headerlink" href="#avoiding-readbacks-with-flowstream" title="Permanent link">link</a></h3>
+<p>A majority of the readbacks we have today (manifested as <code>flow.tensor.load.*</code>
+ops) will be removed when we have an
+<a href="#xla-hlo-tensor-to-primitive-conversion">HLO tensor-&gt;primitive conversion</a>.
+There will still be cases when readbacks are required for correctness but they
+usually fall into a small set of usage patterns. For those that don't this is
+one place where IREE will warn about performance issues, allowing programs that
+perform suboptimally but encouraging authors to adjust their input model to
+enable better behavior. The IREE VM also has specific support for hiding
+readback latency in an efficient way via
+<a href="#coroutines-for-batching-and-cooperative-scheduling">coroutines</a>.</p>
+<p>The most common case we are currently seeing in the IR is that of dynamic copies
+where the offsets are dependent on the result of previous computations. Source
+models may have top-k + gather operations, for example. These appear as a
+<code>flow.stream</code>, a <code>flow.tensor.load</code>, and then another <code>flow.stream</code> that uses
+the loaded value for a <code>flow.tensor.update</code> (or other operation):</p>
+<div class="highlight"><pre><span></span><code>%index_tensor = flow.ex.stream.fragment(...) -&gt; tensor&lt;i32&gt; { ... }
+%index = flow.tensor.load %index_tensor : tensor&lt;i32&gt;
+%result = flow.ex.stream.fragment(%arg0 = %index : i32, ...) -&gt; ... {
+  %0 = flow.dispatch ...
+  %1 = flow.tensor.update %0, %arg2[%index] : tensor&lt;10xf32&gt; -&gt; tensor&lt;1x10xf32&gt;
+  ...
+}
+</code></pre></div>
+<p>Today the <code>flow.tensor.update</code> turns into HAL command buffer transfer operations
+that must have their offsets known at recording time. This is a limitation of
+<code>vkCmdCopyBuffer</code> but not a fundamental limitation of any hardware. In fact
+several drivers implement copies as small built-in shader programs meaning that
+we could perform the same expansion here with the right primitives. This would
+allow, in the above example, both the index to be computed and the tensor to be
+updated within the same stream to entirely remove the host round-trip.</p>
+<h3 id="threading-flowstream-through-the-cfg">Threading <code>flow.stream</code> through the CFG<a class="headerlink" href="#threading-flowstream-through-the-cfg" title="Permanent link">link</a></h3>
+<p>The current <code>flow.ex.stream.fragment</code>, as denoted by the <code>ex</code>perimental tag, is
+a temporary implementation designed to get the concept of streams lowered to the
+HAL dialect. For streams to be effective at modeling larger concurrency scopes
+they need to be able to move across branches in the CFG. This intuitively
+follows exactly what one would do if recording commands in C:</p>
+<div class="highlight"><pre><span></span><code><span class="n">vkCmdCopyBuffer</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">some_flag</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">vkCmdBindPipeline</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="p">...,</span><span class="w"> </span><span class="n">pipeline_a</span><span class="p">);</span>
+<span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">vkCmdBindPipeline</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="p">...,</span><span class="w"> </span><span class="n">pipeline_b</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">vkCmdDispatch</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span>
+</code></pre></div>
+<p>The corresponding <code>flow</code> IR:</p>
+<div class="highlight"><pre><span></span><code>  flow.stream.append[%s0](...) {
+    flow.tensor.update ...
+  }
+  %b = arith.cmpi ne %some_flag, ...
+  cond_br %b, ^a(%s0), ^b(%s0)
+^a(%s1):
+  flow.stream.append[%s1](...) {
+    flow.dispatch @pipeline_a, ...
+  }
+  br ^end(%s1)
+^b(%s2):
+  flow.stream.append[%s2](...) {
+    flow.dispatch @pipeline_b, ...
+  }
+  br ^end(%s2)
+^end(%s3):
+  ...
+</code></pre></div>
+<p>This allows the entire stream to be lowered into one command buffer without the
+need for any host round-trips. The conversion into the <code>flow</code> dialect will walk
+the CFG and attempt to thread the <code>flow.stream</code> values through so long as there
+are no external dependencies.</p>
+<h3 id="predication-of-flowdispatch">Predication of <code>flow.dispatch</code><a class="headerlink" href="#predication-of-flowdispatch" title="Permanent link">link</a></h3>
+<p>While the
+<a href="#threading-flowstream-through-the-cfg"><code>flow.stream</code> threading through the CFG</a>
+can remove many of the simpler conditional dispatches there will always be some
+that will have their execution dependent on the result of prior dispatches. For
+these a <code>flow.cond_dispatch</code> will allow a condition to be provided that must be
+true for the dispatch to actually be performed.</p>
+<p>For targets that natively support predication in their command buffers (such as
+D3D12's
+<a href="https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-setpredication">ID3D12GraphicsCommandList::SetPredication</a>)
+this provides a host round-trip-free way of conditionally executing dispatches
+and transfers. Unfortunately Vulkan support is still lacking, though Nvidia
+supports the
+<a href="https://www.saschawillems.de/blog/2018/09/05/vulkan-conditional-rendering/">VK_EXT_conditional_rendering</a>
+extension that exposes the same behavior.</p>
+<p>For targets that do not support predication natively it's still possible to
+emulate predication with
+<a href="https://github.com/gpuweb/gpuweb/issues/31">indirect dispatches</a>. In this model
+the workgroup counts normally used to dispatch execution are sourced from
+another device buffer at the time the dispatch is made instead of sourced from
+the command buffer at the time the dispatch is recorded. Degenerate dispatches
+with counts of <code>0, 0, 0</code> allow for effective neutering of the dispatch with
+minimal overhead (vs. the significant penalty of a host round-trip!).</p>
+<p>By modeling such predication at the <code>flow</code> level we are able to lower into the
+HAL with target-aware predication semantics and fuse indirect dispatch workgroup
+count calculations into existing dispatches already being performed such that
+overhead is reduced.</p>
+<h3 id="deduping-flowexecutables">Deduping <code>flow.executable</code>s<a class="headerlink" href="#deduping-flowexecutables" title="Permanent link">link</a></h3>
+<p>While still in the <code>flow</code> dialect, the executables are target-agnostic. This
+makes simple IR tree diffing a potential solution to deduplication. Since most
+of the dispatches originate from the same source-language library calls in input
+frameworks there's a high likelihood of duplication, and depending on when
+inlining is performed we may have stronger or weaker ability to perform the
+deduplication. Thanks to the MLIR canonicalization pass (that ensures ops are
+rearranged into consistent canonical representations) the IR comparisons can be
+done rather trivially.</p>
+<h3 id="rematerializing-csed-expressions">Rematerializing CSE'd Expressions<a class="headerlink" href="#rematerializing-csed-expressions" title="Permanent link">link</a></h3>
+<p>Common subexpression elimination is performed many times during lowering,
+however there comes a point where the CSE can introduce false dependencies and
+additional allocations that are otherwise avoidable. For example if a
+broadcasting operation is CSE'd and then the result is used by two or more
+operations that are scheduled independently what would have been a relatively
+cheap lowering of the broadcast to a simple index remapping now becomes an
+additional dispatch, materialization of an intermediate tensor, and a barrier:</p>
+<div class="highlight"><pre><span></span><code>%bcast = &quot;mhlo.broadcast_in_dim&quot;(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
+%mul1 = mhlo.multiply %arg0, %bcast : tensor&lt;1024x10xf32&gt;
+// (pretend something here that prevents fusion)
+%mul2 = mhlo.multiply %arg1, %bcast : tensor&lt;1024x10xf32&gt;
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>%bcast = flow.dispatch.region(%cst : tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt; {
+  %0 = &quot;mhlo.broadcast_in_dim&quot;(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
+  return %0 : tensor&lt;1024x10xf32&gt;
+}
+// a barrier will be required here
+%mul1 = flow.dispatch.region(%arg0 : tensor&lt;1024x10xf32&gt;, %bcast : tensor&lt;1024x10xf32&gt;) -&gt; tensor&lt;1024x10xf32&gt; {
+  %1 = mhlo.multiply %arg0, %bcast : tensor&lt;1024x10xf32&gt;
+  return %1 : tensor&lt;1024x10xf32&gt;
+}
+%mul2 = flow.dispatch.region(%arg1 : tensor&lt;1024x10xf32&gt;, %bcast : tensor&lt;1024x10xf32&gt;) -&gt; tensor&lt;1024x10xf32&gt; {
+  %2 = mhlo.multiply %arg1, %bcast : tensor&lt;1024x10xf32&gt;
+  return %2 : tensor&lt;1024x10xf32&gt;
+}
+</code></pre></div>
+<p>Instead the broadcast should be rematerialized inside of both dispatch regions
+as the cost of doing so is significantly less in compute resources and then the
+intermediate tensor will not be required at all. Though at first it may seem
+counter-intuitive to undo such a critical optimization as CSE (both to code size
+and often to compute) but here it's something we must carefully balance while
+looking at the whole system. It gets even more important when considering
+multi-device execution as the cost of sharing memory and synchronizing may be
+extremely non-trivial.</p>
+<h3 id="device-placement">Device Placement<a class="headerlink" href="#device-placement" title="Permanent link">link</a></h3>
+<p>While still within the <code>flow</code> dialect we have the ability to easily split
+streams and safely shuffle around operations. Target execution backends can opt
+into such behavior to ensure that device restrictions such as maximum in-flight
+memory, maximum scheduling depth, and capabilities are observed. For
+heterogeneous configurations the intent is that certain operations, dispatches,
+and streams can be attributed to specify which device categories they should be
+lowered. The constraint solving that takes place can be provided with generic
+heuristics ("big GEMMs go on the accelerator"), profile-guided databases based
+on benchmarks, learned traits via ML, etc.</p>
+<h2 id="hal-hardware-abstraction-layer-and-multi-architecture-executables"><code>hal</code>: Hardware Abstraction Layer and Multi-Architecture Executables<a class="headerlink" href="#hal-hardware-abstraction-layer-and-multi-architecture-executables" title="Permanent link">link</a></h2>
+<p>As the IREE HAL is designed almost 1:1 with a compute-only Vulkan API many of
+the techniques classically used in real-time graphics apply. The benefit we have
+by modeling our usage of such a low-level API in IR is that the normal work -
+some of which is very non-trivial - for managing allocations, tracking resource
+lifetime, and ensuring proper synchronization/barriers is something we can apply
+the full force of an offline compiler against.</p>
+<h3 id="allow-targets-to-specify-halinterfaces">Allow Targets to Specify <code>hal.interface</code>s<a class="headerlink" href="#allow-targets-to-specify-halinterfaces" title="Permanent link">link</a></h3>
+<p>The <code>hal.interface</code> op specifies the ABI between the scheduler and the device
+containing the buffer bindings and additional non-buffer data (parameters,
+shapes, specialization flags, etc). Today a naïve ordering is used uniformly for
+all targets however it is possible for target backends to opt into providing
+their own interfaces based on target configuration. The same <code>hal.executable</code>
+may have multiple interfaces and the same backend may use one or more. This is
+useful for when target capabilities may vary at runtime, such as the
+<a href="https://vulkan.gpuinfo.org/displaydevicelimit.php?name=maxPerStageDescriptorStorageBuffers&amp;platform=android">number of available storage buffer bindings</a>
+in Vulkan. By exposing a few <code>hal.interface</code> variants with different binding
+amounts the Vulkan backend could make better use of the larger number of
+bindings available at runtime while still providing support for smaller
+configurations.</p>
+<p>Once we have multiple <code>hal.interface</code>s defined for executables the scheduler
+needs to emit HAL ops that properly switch between them. By having a canonical
+form for bindings we can ensure that only the differences between the interfaces
+will need additional code.</p>
+<h3 id="target-specific-scheduling-specialization">Target-specific Scheduling Specialization<a class="headerlink" href="#target-specific-scheduling-specialization" title="Permanent link">link</a></h3>
+<p>Though the <code>flow</code> dialect attempts to fuse as many ops as possible into dispatch
+regions, it's not always possible for all target backends to schedule a region
+as a single dispatch. A classic example is algorithms like
+<a href="https://en.wikipedia.org/wiki/Reduction_Operator#PRAM-algorithm">parallel reduction</a>
+commonly used on GPUs that may require many dispatches to identical executables,
+while other algorithms may vary the executables they use based on the input
+parameters such as shape or the target runtime device support.</p>
+<p>By default the <code>flow.dispatch</code> executable translation to <code>hal.executable</code>s is
+performed 1:1 and it is assumed that a single dispatch is required. Extending
+target backends with scheduling interfaces (enabling them to opt into different
+scheduling behavior) will allow the backends to emit any number of
+<code>hal.executable</code>s and any stream commands (such as additional dispatches or
+transfers) they may need. This is effectively equivalent to what would be done
+at runtime only because we are still operating on IR prior to buffer allocation
+and can use the <code>hal</code> ringbuffer primitive. Through this we can elide many of
+the allocations that would otherwise be required at runtime (and the
+concurrency-limiting false dependencies that usually come along with scratch
+memory).</p>
+<p>Since the algorithm used may vary based on the parameters of the dispatch (such
+as the shape of the reduction which may be dynamically determined) scheduling
+specialization may occur even when targeting a single backend. In many cases
+folding and canonicalization can eliminate the overhead as whether one
+dynamically computed workgroup size is used instead of another the same IR is
+present.</p>
+<h3 id="buffer-usage-tracking">Buffer Usage Tracking<a class="headerlink" href="#buffer-usage-tracking" title="Permanent link">link</a></h3>
+<p>Many explicit hardware APIs require knowing how buffers are used alongside with
+where they should be located. For example this additional information determines
+caching policy on buffer accesses (write-through, write-back, etc), visibility
+of writes across compute units, and the possible MMU properties that may need to
+be maintained/matched for the buffer. By using the SSA-form value-semantics of
+the MLIR <code>tensor</code> as used in the <code>flow</code> dialect we have complete information of
+where buffers may be used or at least where they enter or leave regions where we
+can derive such information.</p>
+<p>Analysis passes can run over IR to attribute tensors such that when allocation
+is performed when lowering to the <code>hal</code> dialect we do so from an allocator
+compatible with where the buffer will be used, with memory types chosen based on
+the potential cost and location of operations performed (write-only on host vs.
+read-write on host and device, etc), and with usage bits indicating what kind of
+operations may be performed on the buffer. Many of these are local
+transformations as most buffers are only live within very small regions such as
+the <code>flow.stream</code> encompassing their usage.</p>
+<p>Traditional systems need to either use very permissive buffer properties or
+heuristics that can introduce additional non-trivial overhead when such
+heuristics are incorrect. For example,
+<a href="https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glBufferData.xhtml">OpenGL had several such usage hints</a>
+that drivers were then able to use but almost no drivers behaved as desired in
+all cases and it lead to additional memory ghosting, copies, readbacks, and
+unpredictable performance. For almost all uses of the buffers within an IREE
+invocation we instead can know precisely where and how buffers may need to be
+moved and do it a minimum number of times if it is required.</p>
+<h3 id="batched-executable-caching-and-precompilation">Batched Executable Caching and Precompilation<a class="headerlink" href="#batched-executable-caching-and-precompilation" title="Permanent link">link</a></h3>
+<p>For targets that may require runtime preprocessing of their executables prior to
+dispatch, such as SPIR-V or MSL, the IREE HAL provides a caching and batch
+compilation mechanism based on Vulkan's
+<a href="https://vulkan.lunarg.com/doc/view/1.0.26.0/linux/vkspec.chunked/ch09s06.html">Pipeline Cache</a>.</p>
+<p>Today each executable is compiled on-demand and cached only for the process
+lifetime. Though some drivers may provide their own caching we can make better
+use of the explicit caching and compilation behavior with the additional
+information we have in the compiler.</p>
+<p>For any given entry point (or group of entry points) into an IREE module we can
+perform reachability analysis to know which executables may be executed when
+that entry point is invoked. In this way we can emit pre-invocation compilation
+checks (similar to an <code>std::call_once</code> block) that provides all required
+executables for compilation and allows more efficient compilation through
+multithreading the compiler invocations. These same compilation caching function
+can be exposed and invoked manually by an application to force pre-compilation
+when it is least likely to impact the user, such as a post-install/first-run
+step or concurrently while other application features are loading.</p>
+<p>We can use zero or more scoped caches for executables within a module.
+Completely dynamic modules (such as those emitted in eager-mode usage) may avoid
+the caching overhead entirely, while modules that have several primary usage
+modes (such as training and inference) may choose to use independent caches for
+each such mode.</p>
+<p>The caches generated can then be retrieved and saved by the hosting application.
+Upon the next execution the application can provide the caches and if still
+valid they will be used to avoid compilation.</p>
+<h3 id="target-aware-executable-compression">Target-aware Executable Compression<a class="headerlink" href="#target-aware-executable-compression" title="Permanent link">link</a></h3>
+<p>An advantage of representing executable binaries in IR after translation is that
+we can apply various post-compilation compression and minification techniques
+while still know precisely where the executable will be used. This is extremely
+important for SPIR-V as it is not designed to be a small at-rest format. Though
+the biggest lever we have to control generated code size is higher-level
+deduplication and specialization there will still be a sufficiently large number
+of executable binaries we will need to embed within the final modules and having
+targeted approaches for reducing their size beyond just "gzip everything" is
+very powerful.</p>
+<p>For example, <a href="https://github.com/aras-p/smol-v">SMOL-V</a> is a fantastic lossless
+SPIR-V compression technique that, when coupled with modern dictionary-based
+compression algorithms, can save significant binary size. As a data point, the
+SPIR-V corpus SMOL-V uses for testing goes from 4.8MiB of raw SPIR-V to 348KiB
+of compressed SMOL-V.</p>
+<p>Combined with
+<a href="#batched-executable-caching-and-precompilation">Batched Executable Caching and Precompilation</a>
+we can easily use shared dictionaries and other cross-artifact compression in a
+relatively plug-in way.</p>
+<h3 id="target-aware-constant-compression">Target-aware Constant Compression<a class="headerlink" href="#target-aware-constant-compression" title="Permanent link">link</a></h3>
+<p>It's still an area that needs more research but one goal of the IREE design was
+to enable efficient target- and context-aware compression of large constants
+(typically model weights/parameters/embeddings). This may mean reusing existing
+hardware compression formats on GPUs, ML accelerator-specific formats, or
+very-low-bit-depth (1-4 bit per value) quantization techniques that cannot be
+directly used without first decompressing. The inspiration here is formats like
+<a href="https://github.com/BinomialLLC/crunch">Crunch</a> and
+<a href="https://github.com/BinomialLLC/basis_universal">Basis Universal</a> that perform
+<a href="http://gamma.cs.unc.edu/GST/gst.pdf">"supercompression"</a>, and we may even be
+able to use these directly as then we can make use of GPU hardware samplers to
+do the 4-bit to 32-bit decompression, etc.</p>
+<h3 id="command-buffer-stateful-deduplication">Command Buffer Stateful Deduplication<a class="headerlink" href="#command-buffer-stateful-deduplication" title="Permanent link">link</a></h3>
+<p>The IREE HAL - much like Vulkan it is based on - eschews much of the state that
+traditional APIs have in favor of (mostly) immutable state objects (pipeline
+layouts, pipeline states, descriptor sets, etc). There are still a few stateful
+entry points in the API, though, and deduplicating or reordering redundant calls
+can reduce both IR, API, and execution overhead.</p>
+<p>The key place this will have the largest impact is around descriptor set
+bindings and push descriptors, both of which are state and can have non-trivial
+setup overhead. A canonicalization for such commands that inspects the target
+<code>hal.command_buffer</code> to see if the same state was set prior and code motion to
+move such commands out of loop bodies when possible would be helpful.</p>
+<h3 id="resource-timeline">Resource Timeline<a class="headerlink" href="#resource-timeline" title="Permanent link">link</a></h3>
+<p>A core concept of the IREE scheduler that allows for overlapping in-flight
+invocations is that of the resource timeline. This identifies module state that
+can be in use by multiple invocations and assigns timeline milestones denoting
+when the resource will be in the appropriate state for the current invocation to
+proceed. Conceptually it is like a epoch-based synchronization mechanism as
+commonly found in garbage collectors to allow for lock-free asynchronous memory
+reclamation.</p>
+<p>The advantage we have in the IR is that we know both the usage of all resources
+thanks to <a href="#buffer-usage-tracking">buffer usage tracking</a> and the
+synchronization domains of all resources (in most cases). This allows us to
+effectively assign one timeline semaphore per writeable resource while in
+practice having far fewer than 1:1, as for example if two resources are only
+ever written in the same command buffer only one semaphore is needed to signal
+the completion of both writes.</p>
+<p>By transforming IR to sink all resource reads and writes closest to where the
+value is used we can enlarge the time windows that can overlap across
+invocations that may share those resources. This is similar to what out-of-order
+CPUs do with register renaming/reorder buffers/etc and something we can apply
+some traditional instruction scheduling techniques to (only here our
+'instructions' are entire command buffer dispatches/transfers).</p>
+<p>Two degenerate cases of this approach are that of resource indirection
+(<code>util.ptr&lt;tensor&lt;T&gt;&gt;</code>) and dynamic resource shapes. In these two cases it may
+not be possible to continue recording commands even if we are able to ensure
+execution is appropriately synchronized. This is where indirect dispatch,
+<a href="#predication-of-flowdispatch">predication</a>,
+<a href="#indirect-command-bufferon-accelerator-execution">indirect command buffers</a>,
+and <a href="#coroutines-for-batching-and-cooperative-scheduling">VM coroutines</a> can all
+help cover for the times where we are unable to transform away the indirection
+or emit shape logic without data dependencies.</p>
+<h3 id="transient-tensor-ringbuffer">Transient Tensor Ringbuffer<a class="headerlink" href="#transient-tensor-ringbuffer" title="Permanent link">link</a></h3>
+<p>(When properly implemented) almost all buffers required during execution never
+escape the command buffers they are used in or a single VM invocation. We can
+trivially identify this from the explicit captures of <code>flow.stream</code> and
+<code>flow.dispatch</code> ops and the fact that all tensor types have value-semantics.
+Only those tensor values loaded-from/stored-to module state or that cross the
+exported module function boundary need special consideration while almost
+everything else can live transiently only so long as it is required during
+execution.</p>
+<p>Thanks to this information about buffer usage and lifetime we can use a
+<a href="https://en.wikipedia.org/wiki/Circular_buffer">ringbuffer</a> to store the
+transient tensor data and other required data reservations such as uniform
+buffers used to pass dynamic parameters (shapes, flags, etc) into dispatches.
+This gives the compiler and the application a knob that allows them to control
+maximum concurrency (by having a very large ringbuffer) or maximum memory usage
+(by having a minimally small ringbuffer).</p>
+<p>Allocating tensors from the ringbuffer does not require sophisticated runtime
+packing as we can emit IR to calculate required sizes for dynamically shaped
+tensors. Whether a basic block reserves <code>%sz = arith.constant 42 : index</code> bytes
+or <code>%sz = std.muli %cst, %dyn_dim : index</code> bytes doesn't materially change how
+the allocations are performed. Since almost all usage involves simple write head
+bumps there is no need for ahead-of-time memory planning or large fixed
+allocations, and since no buffer within the ringbuffer can alias we can have
+coarse (<em>read: low overhead</em>) guarantees about the availability of certain
+regions of the ringbuffer (<em>"when this event is signaled all prior ringbuffer
+writes have completed"</em>).</p>
+<p>Usually any planning we may want to perform can be done in IR via code motion.
+For example applying traditional algorithms used to reduce register pressure
+will help us attain narrower live windows within the ringbuffer leading to a
+larger number of in-flight operations for the same ringbuffer memory usage.</p>
+<p>We may end up using both a classical ringbuffer and a variant known as the
+<a href="https://www.codeproject.com/Articles/3479/The-Bip-Buffer-The-Circular-Buffer-with-a-Twist">bip buffer</a>
+because it is better for descriptor set utilization (as we can provide many
+dispatch parameters with a single base offset bound once at the beginning of a
+region).</p>
+<h3 id="timeline-semaphores-on-the-module-abi">Timeline Semaphores on the Module ABI<a class="headerlink" href="#timeline-semaphores-on-the-module-abi" title="Permanent link">link</a></h3>
+<p>Functions calls made across modules (either from C++ into the VM, VM-&gt;VM, or
+VM-&gt;C++) should be able to define timeline semaphores used to wait and signal on
+the call. We can do this by making all exports automatically have the semaphores
+and then make invocations populate them if they were not provided by the caller.
+In this way we can allow multiple invocations of exported functions to chain
+naturally with internal asynchronous workloads, turning most IREE invocations
+into just recording of command buffers that can never block.</p>
+<p>When combined with
+<a href="#coroutines-for-batching-and-cooperative-scheduling">VM coroutine support</a> we
+even have the ability to interleave any required host execution between the wait
+and signal semaphores provided such that the caller never knows on which device
+execution is taking place. It's still possible to provide synchronous wrappers
+that emulate blocking behavior but by having the core system designed around a
+single system-supported primitive we avoid the need for additional things like
+interrupt watchdog threads, implicit blocking, and other pitfalls.</p>
+<h3 id="gpu-like-cpu-scheduling">GPU-like CPU Scheduling<a class="headerlink" href="#gpu-like-cpu-scheduling" title="Permanent link">link</a></h3>
+<p>One approach to using multiple cores on a CPU is to perform interior
+parallelization of operations such as OpenMP or library-call-based custom thread
+pools (gemmlowp). This works when each individual operation is relatively costly
+vs. potential pipeline bubbles caused by work spinning down near the end of an
+operation and spinning up at the beginning of the next.</p>
+<p>IREE is designed to handle many more workloads - some of which have very narrow
+shapes but very deep pipelines (like search algorithms) - such that the above
+approach of multithreading within ops becomes a bottleneck. These workloads are
+traditionally very poorly handled by frameworks and issues with
+oversubscription, pipeline stalls, and suboptimal system schedulers (such as on
+Android) can lead to more time being spent thrashing about than actually
+executing real work.</p>
+<p>The approach we take here is to treat the cores of a CPU as if they were
+computation units on a GPU, each able to perform some set of heterogeneous work
+independent of others units. This means that the concurrency we are trying to
+model at the <code>flow</code> level and communicate to the runtime via the <code>hal</code> that
+explicitly states which dispatches can overlap and the size of the workgroups
+can trivially be used to distribute this work over many cores exactly as a GPU
+would do it. Integration with library calls that may require their own threading
+(such as Ruy) requires that they be able to use the IREE thread pool instead of
+their own.</p>
+<p>In this way we can avoid pipeline bubbles and other latency-inducing
+unpredictable scheduling. This does not mean that we treat individual units of
+work at the same scale as we would for GPUs, but instead that we tile and have
+one or more processing units that allows us to work on those tiles. Whether the
+tile size is defined by a library call contract, heuristics, or empirically is
+TBD, but expect workgroup sizes in the thousands to millions of invocations vs.
+normal GPU workgroup sizes in the dozens to hundreds of invocations.</p>
+<p>To achieve this style of scheduling efficiently we'll likely use something like
+<a href="https://github.com/google/marl">marl</a> as the scheduler. Marl provides
+cross-platform low-overhead fibers and is compatible with this style of
+scheduling as it was built for the Swiftshader software rasterizer.</p>
+<p>Even if IREE was only targeting CPUs the assertion is that we would still want
+to schedule this way and it's only an incidental benefit that if building for
+heterogeneous targets the scheduling code may be shared (just with a different
+divisor for workgroup count calculations).</p>
+<h2 id="vm-lightweight-virtual-machine"><code>vm</code>: Lightweight Virtual Machine<a class="headerlink" href="#vm-lightweight-virtual-machine" title="Permanent link">link</a></h2>
+<p>The VM is designed as a dynamic linkage ABI, stable bytecode representation, and
+intermediate lowering IR. Many of the optimizations we can perform on it will
+benefit all use cases (such as when lowering to LLVM IR) by allowing
+higher-level program transformations around synchronization that are difficult
+to perform on arbitrary LLVM IR.</p>
+<h3 id="coroutines-for-batching-and-cooperative-scheduling">Coroutines for Batching and Cooperative Scheduling<a class="headerlink" href="#coroutines-for-batching-and-cooperative-scheduling" title="Permanent link">link</a></h3>
+<p>One of the largest features currently missing from the VM is coroutines (aka
+user-mode fiber scheduling). Coroutines are what will allow us to have multiple
+in-flight invocations into a module - some of which may be waiting on external
+events - without the need for complex multithreading logic or state machine
+machinations.</p>
+<p>In many cases
+<a href="#timeline-semaphores-on-the-module-abi">once semaphores are exposed to callers</a>
+we will not need to yield in the VM. The user will call into the module with
+provided semaphores, the work to perform will be recorded to one or more command
+buffers and submitted to the device, and then control return will return to the
+caller immediately.</p>
+<p>In cases requiring host readbacks that we were not able to remove, however,
+additional VM code may need to run prior to when the final semaphore is
+signaled. To preserve the asynchronous interface and immediate execution
+guarantees the compiler can emit explicit yield points (<code>vm.yield</code>) that are
+known-good locations for yielding (such as most resources not required after the
+yield having been flushed/discarded, partial synchronization scope availability
+if other work may be able to execute concurrently irrespective of the yielded
+coroutine, etc).</p>
+<p>When the VM encounters the yield at runtime it will suspend the coroutine until
+a defined condition is met. Many coroutines can be in various states at any
+given time and - thanks to the resource timeline - can still be memory safe. For
+example if two stateless invocations are made with a common wait semaphore both
+can be recorded and submitted without waiting on each other. If there is
+internal module state accessed the invocations are implicitly ordered by
+invocation order (similar to what Vulkan calls
+<a href="https://vulkan.lunarg.com/doc/view/1.0.26.0/linux/vkspec.chunked/ch02s02.html#fundamentals-queueoperation-apiorder">API order</a>)
+based on internal resource timeline semaphores.</p>
+<p>Waking the coroutines can be performed by either an application-provided
+callback in the case of the application already having a periodic event which is
+doing bookkeeping (such as frame end callbacks when rendering or Looper idle
+events on Android), giving direct control over the frequency and location which
+IREE utilizes to perform additional work. A helper will be provided as well that
+runs a dedicated IREE thread to do this, but the expectation is that
+applications can often do a better (and importantly more predictable) job.</p>
+<p>By utilizing coroutines IREE will have a way to fill traditional pipeline
+bubbles even with execution from the same module (let alone across modules) in
+the situation where host readbacks or other logic is required. This increases
+overall throughput and utilization while reducing host wakeups as many
+coroutines can be processed at once to submit new work to the device queues,
+though it does not help reduce per-invocation latency.</p>
+<p>External code such as the HAL implementation or user ops may provide the wait
+handles used for continuation. For example, the HAL can expose a function that
+yields and wakes only when one or more timeline semaphores reach their target
+values:</p>
+<div class="highlight"><pre><span></span><code>// submit work
+hal.device.yield %semaphore4 &gt;= %sem4_target, %semaphore5 &gt;= %sem5_target
+// continue here, possibly much later in time
+</code></pre></div>
+<h4 id="cellular-batching">Cellular Batching<a class="headerlink" href="#cellular-batching" title="Permanent link">link</a></h4>
+<p>Though coroutines help throughput there is a way we've found to reduce latency
+that's been documented as
+<a href="http://madsys.cs.tsinghua.edu.cn/publications/EUROSYS2018-gao.pdf">cellular batching</a>.
+This same technique has been implemented in prior internal systems and is one of
+the motivating design goals for IREE's creation. The core idea is to identify
+small uniform work that can be partitioned and scheduled greedily such as to
+enable batching or reduce associated invocation costs (such as refreshing
+accelerator SRAM/caches with new parameters). This usually manifests as finding
+large GEMM/GEMV operations using the same fixed parameters and either
+dynamically increasing the batch size by adding the waiting work (without
+deferring the actual execution time) or sequencing them back to back to ensure
+better cache utilization. Which approach is taken depends on any data
+dependencies that may be present (such as LSTM state feedback edges).</p>
+<p>With the foundation of coroutines in IREE it's possible to yield execution at
+any given point - including during command buffer recording - and wake on
+specific conditions. A majority of the logic can be built into the module itself
+with very little need for runtime machinery, as shared VM variables can be used
+to track pending work across invocations (even from different parts of the
+program) and flush based on logic wholly controlled by the user or compiler
+(such as count/max time latency/etc limits). This allows for the large variety
+of scheduling behavior various applications may want to use, such as a
+zero-latency batch-only-within-this-invocation to a
+<a href="https://en.wikipedia.org/wiki/Nagle%27s_algorithm">Nagle's Algorithm</a>-esque
+time or limit based behavior or even some learned model-specific windowing.</p>
+<p>Design work is still required on how to represent this in IR but the current
+thought is to model the regions in which deferred execution is possible and
+beneficial and allow during lowering to the VM additional transformations. This
+is similar to how the async-await behavior works in C# where the async keyword
+is just sugar that expands to additional generated helper utilities.</p>
+<p>A simple strawman representation for sequential dispatch may look like:</p>
+<div class="highlight"><pre><span></span><code>hal.scheduling_policy @defer_policy {
+  // max time, max count, max live memory, etc
+}
+...
+hal.command_buffer.dispatch.deferred @defer_policy, @dispatch, ...
+// vm.yield added here during lowering
+</code></pre></div>
+<p>There are many cases to explore and as cellular batching can have performance
+benefits of several orders of magnitudes it'll be one of the primary areas of
+research in the long-term.</p>
+<h3 id="lowering-to-llvm-ir">Lowering to LLVM IR<a class="headerlink" href="#lowering-to-llvm-ir" title="Permanent link">link</a></h3>
+<p>For scenarios where dynamic module loading is not required and entire modules
+can be compiled into applications we can lower the VM IR to LLVM IR within
+MLIR's transformation pipeline. Instead of embedding <code>vm.call</code> ops that are
+dispatched at runtime to things like the HAL we can instead lower to
+<code>llvm::CallInst</code> to runtime-resolved function pointers. This still enables all
+of the flexibility of heterogeneous/runtime-determined devices, pluggable
+diagnostics, and backend composition without any need for FlatBuffers or the VM
+bytecode interpreter.</p>
+<p>The VM was designed to make such a lowering easy and the C-style struct-based
+function pointer registration for runtime modules was designed to make emitting
+code that used it fairly robust even when linked in dynamically such as when
+embedded in shared objects.</p>
+<p>An extension of this is what we've been calling 'runtimeless mode', where the
+IREE VM linkage code is statically linked into the binary alongside the
+generated module LLVM IR. If only a single HAL backend is linked in then (with
+some build-fu) we should be able to get call devirtualization to reduce code
+size to precisely the functionality used by the module.</p>
+<h3 id="improved-type-support">Improved Type Support<a class="headerlink" href="#improved-type-support" title="Permanent link">link</a></h3>
+<p>Currently the VM only supports two types: <code>i32</code> and <code>vm.ref&lt;T&gt;</code>. This is an
+intentional limitation such that we can determine what is really needed to
+express the scheduling we perform, with the idea being that such a limited model
+will make it easier to use techniques like
+<a href="#indirect-command-bufferon-accelerator-execution">indirect command buffers</a> to
+compile the VM itself to an accelerator executable that dispatches work without
+host involvement.</p>
+<p>As we port more models we may find a few primitives that are worth bringing into
+the VM design such that it's worth potential complications to future porting.
+These includes types like <code>f32</code> (for simple float calculations/comparisons),
+<code>list</code>/<code>dict</code> (easier python compatibility), and <code>vector&lt;4xf32&gt;</code> (for simple
+inline calculations that are not worth dispatch overhead/synchronization).</p>
+<h3 id="indirect-command-bufferon-accelerator-execution">Indirect Command Buffer/On-Accelerator Execution<a class="headerlink" href="#indirect-command-bufferon-accelerator-execution" title="Permanent link">link</a></h3>
+<p>Though IREE will use many different tricks such as
+<a href="#predication-of-flowdispatch">predication</a> to build deep pipelines there is
+still the requirement that the command recording and submission happens on the
+host CPU. Though the cost of this in terms of latency and power use can be
+minimized by coalescing and timelines there is still the possibility of
+non-trivial roundtrips being introduced that limit performance. For particular
+applications like low-power always-on compute or where there is significantly
+branchy behavior (such as search algorithms) it is important that the decision
+making logic as to what is dispatched runs as close to real-time as possible
+within the execution pipeline.</p>
+<p>The IREE VM is designed to be runnable on-device in a secure and cooperative way
+(no pointers, indirect buffer handles to allow for memory space rearrangement
+op-to-op, deterministic execution and explicit yield points, etc).</p>
+<p>The recent efforts to bring indirect command buffers to Vulkan and Metal's
+<a href="https://developer.apple.com/documentation/metal/indirect_command_buffers/encoding_indirect_command_buffers_on_the_gpu">Indirect Command Buffers</a>
+(that both derive inspiration from
+<a href="https://www.khronos.org/registry/OpenGL/extensions/NV/NV_command_list.txt">NV_command_list</a>)
+are one such target for this. Either by
+<a href="#lowering-to-llvm-ir">lowering the VM IR to LLVM IR</a> or SPIR-V, by a special
+conversion to target-specific forms, or by actually executing the VM bytecode
+directly on-device (it's ~1000 LoC) we should be able to prototype what full
+on-device usage is like. Even if only some VM functions the compiler deems
+useful to schedule on the device are used and the rest run on the host
+(particularly those functions calling imported functions) some of the most
+costly logic that creates tight coupling of the host and device scheduling can
+be limited.</p>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+            Back to top
+          </button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 The IREE Authors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/openxla/iree" target="_blank" rel="noopener" title="IREE on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://discord.gg/26P4xW4" target="_blank" rel="noopener" title="IREE Discord Server" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M524.531 69.836a1.5 1.5 0 0 0-.764-.7A485.065 485.065 0 0 0 404.081 32.03a1.816 1.816 0 0 0-1.923.91 337.461 337.461 0 0 0-14.9 30.6 447.848 447.848 0 0 0-134.426 0 309.541 309.541 0 0 0-15.135-30.6 1.89 1.89 0 0 0-1.924-.91 483.689 483.689 0 0 0-119.688 37.107 1.712 1.712 0 0 0-.788.676C39.068 183.651 18.186 294.69 28.43 404.354a2.016 2.016 0 0 0 .765 1.375 487.666 487.666 0 0 0 146.825 74.189 1.9 1.9 0 0 0 2.063-.676A348.2 348.2 0 0 0 208.12 430.4a1.86 1.86 0 0 0-1.019-2.588 321.173 321.173 0 0 1-45.868-21.853 1.885 1.885 0 0 1-.185-3.126 251.047 251.047 0 0 0 9.109-7.137 1.819 1.819 0 0 1 1.9-.256c96.229 43.917 200.41 43.917 295.5 0a1.812 1.812 0 0 1 1.924.233 234.533 234.533 0 0 0 9.132 7.16 1.884 1.884 0 0 1-.162 3.126 301.407 301.407 0 0 1-45.89 21.83 1.875 1.875 0 0 0-1 2.611 391.055 391.055 0 0 0 30.014 48.815 1.864 1.864 0 0 0 2.063.7A486.048 486.048 0 0 0 610.7 405.729a1.882 1.882 0 0 0 .765-1.352c12.264-126.783-20.532-236.912-86.934-334.541ZM222.491 337.58c-28.972 0-52.844-26.587-52.844-59.239s23.409-59.241 52.844-59.241c29.665 0 53.306 26.82 52.843 59.239 0 32.654-23.41 59.241-52.843 59.241Zm195.38 0c-28.971 0-52.843-26.587-52.843-59.239s23.409-59.241 52.843-59.241c29.667 0 53.307 26.82 52.844 59.239 0 32.654-23.177 59.241-52.844 59.241Z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://groups.google.com/forum/#!forum/iree-discuss" target="_blank" rel="noopener" title="IREE Discuss Google Group" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M144 0a80 80 0 1 1 0 160 80 80 0 1 1 0-160zm368 0a80 80 0 1 1 0 160 80 80 0 1 1 0-160zM0 298.7C0 239.8 47.8 192 106.7 192h42.7c15.9 0 31 3.5 44.6 9.7-1.3 7.2-1.9 14.7-1.9 22.3 0 38.2 16.8 72.5 43.3 96H21.3C9.6 320 0 310.4 0 298.7zM405.3 320h-.7c26.6-23.5 43.3-57.8 43.3-96 0-7.6-.7-15-1.9-22.3 13.6-6.3 28.7-9.7 44.6-9.7h42.7c58.9 0 106.7 47.8 106.7 106.7 0 11.8-9.6 21.3-21.3 21.3H405.3zM224 224a96 96 0 1 1 192 0 96 96 0 1 1-192 0zm-96 261.3c0-73.6 59.7-133.3 133.3-133.3h117.4c73.6 0 133.3 59.7 133.3 133.3 0 14.7-11.9 26.7-26.7 26.7H154.7c-14.7 0-26.7-11.9-26.7-26.7z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "toc.follow"], "search": "../../../assets/javascripts/workers/search.dfff1995.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.78eede0e.min.js"></script>
+      
+    
+  </body>
+</html>

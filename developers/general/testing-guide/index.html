@@ -1,0 +1,3855 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://iree.dev/developers/general/testing-guide/">
+      
+      
+        <link rel="prev" href="../release-management/">
+      
+      
+        <link rel="next" href="../../building/bazel/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.2.3">
+    
+    
+      
+        <title>Testing guide - IREE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.0e669242.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.85d0ee34.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noto:300,300i,400,400i,700,700i%7CNoto+Sans+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Noto";--md-code-font:"Noto Sans Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/openxla.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#testing-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      <!--
+  Copyright (c) 2016-2023 Martin Donath <martin.donath@squidfunk.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+-->
+
+<!-- Determine classes -->
+
+
+  
+
+
+<!-- Header -->
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav
+    class="md-header__inner md-grid"
+    aria-label="Header"
+  >
+
+    <!-- Link to community home -->
+    <a
+      href="https://github.com/openxla/community"
+      title="OpenXLA"
+      class="md-header__button md-logo"
+      aria-label="OpenXLA"
+      data-md-component="logo"
+    >
+      
+  <img src="../../../assets/images/openxla-logo-lockup-white.svg" alt="logo">
+
+    </a>
+
+    <!-- Link to site home -->
+    <a
+      href="https://iree.dev/"
+      title="IREE"
+      class="md-header__button md-logo"
+      aria-label="IREE"
+      data-md-component="logo"
+    >
+    <div class="md-header__title">
+      IREE
+    </div>
+    </a>
+
+    <!-- Button to open drawer -->
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+
+    <!-- Header title -->
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Testing guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Color palette -->
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+          
+            
+            
+            
+            <input
+              class="md-option"
+              data-md-color-media="(prefers-color-scheme: light)"
+              data-md-color-scheme="default"
+              data-md-color-primary="indigo"
+              data-md-color-accent="indigo"
+              
+                aria-label="Switch to dark mode"
+              
+              type="radio"
+              name="__palette"
+              id="__palette_1"
+            />
+            
+              <label
+                class="md-header__button md-icon"
+                title="Switch to dark mode"
+                for="__palette_2"
+                hidden
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg>
+              </label>
+            
+          
+            
+            
+            
+            <input
+              class="md-option"
+              data-md-color-media="(prefers-color-scheme: dark)"
+              data-md-color-scheme="slate"
+              data-md-color-primary="indigo"
+              data-md-color-accent="indigo"
+              
+                aria-label="Switch to light mode"
+              
+              type="radio"
+              name="__palette"
+              id="__palette_2"
+            />
+            
+              <label
+                class="md-header__button md-icon"
+                title="Switch to light mode"
+                for="__palette_1"
+                hidden
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12c0-2.42-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg>
+              </label>
+            
+          
+        </form>
+      
+    
+
+    <!-- Site language selector -->
+    
+
+    <!-- Button to open search modal -->
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+
+      <!-- Search interface -->
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+
+    <!-- Repository information -->
+    
+      <div class="md-header__source">
+        <a href="https://github.com/openxla/iree" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openxla/iree
+  </div>
+</a>
+      </div>
+    
+  </nav>
+
+  <!-- Navigation tabs (sticky) -->
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../building-from-source/" class="md-tabs__link">
+          
+  
+    
+  
+  Building from source
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../guides/" class="md-tabs__link">
+          
+  
+    
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../reference/" class="md-tabs__link">
+          
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+    
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../community/" class="md-tabs__link">
+          
+  
+    
+  
+  Community
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    <!--
+  Copyright (c) 2016-2023 Martin Donath <martin.donath@squidfunk.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+-->
+
+
+
+<!-- Determine classes -->
+
+
+  
+
+
+
+<!-- Navigation -->
+<nav
+  class="md-nav md-nav--primary md-nav--lifted"
+  aria-label="Navigation"
+  data-md-level="0"
+>
+
+  <!-- Community site logo / home page link -->
+  <label class="md-nav__title" for="__drawer">
+    <a
+      href="https://github.com/openxla/community"
+      title="IREE"
+      class="md-nav__button md-logo"
+      aria-label="IREE"
+      data-md-component="logo"
+    >
+      
+  <img src="../../../assets/images/openxla-logo-lockup-white.svg" alt="logo">
+
+    </a>
+    <!-- Site title (nav item below links to site home) -->
+    IREE
+  </label>
+
+  <!-- Repository information -->
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/openxla/iree" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    openxla/iree
+  </div>
+</a>
+    </div>
+  
+
+  <!-- Navigation list -->
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../building-from-source/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Building from source
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_2">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Building from source
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/getting-started/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M3 2.75C3 1.784 3.784 1 4.75 1h6.5c.966 0 1.75.784 1.75 1.75v11.5a.75.75 0 0 1-1.227.579L8 11.722l-3.773 3.107A.751.751 0 0 1 3 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.91l3.023-2.489a.75.75 0 0 1 .954 0l3.023 2.49V2.75a.25.25 0 0 0-.25-.25Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/android/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.523 15.341a1 1 0 0 1 0-1.999 1 1 0 0 1 0 2m-11.046 0a1 1 0 0 1 0-2 1 1 0 0 1 0 2m11.405-6.02 1.997-3.46a.416.416 0 0 0-.152-.567.416.416 0 0 0-.568.152L17.137 8.95c-1.547-.706-3.284-1.1-5.137-1.1s-3.59.394-5.137 1.1L4.841 5.447a.416.416 0 0 0-.568-.152.416.416 0 0 0-.152.567l1.997 3.46C2.688 11.186.343 14.658 0 18.76h24c-.344-4.102-2.69-7.574-6.119-9.44"/></svg>
+  
+  <span class="md-ellipsis">
+    Android cross-compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/ios/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+  
+  <span class="md-ellipsis">
+    iOS cross-compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../building-from-source/riscv/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
+  
+  <span class="md-ellipsis">
+    RISC-V cross-compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Guides
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_3">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Guides
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/ml-frameworks/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    ML frameworks
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_3_2">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            ML frameworks
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/ml-frameworks/tensorflow/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1.292 5.856 11.54 0v24l-4.095-2.378V7.603l-6.168 3.564.015-5.31zm21.43 5.311-.014-5.31L12.46 0v24l4.095-2.378V14.87l3.092 1.788-.018-4.618-3.074-1.756V7.603l6.168 3.564z"/></svg>
+  
+  <span class="md-ellipsis">
+    TensorFlow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/ml-frameworks/tflite/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1.292 5.856 11.54 0v24l-4.095-2.378V7.603l-6.168 3.564.015-5.31zm21.43 5.311-.014-5.31L12.46 0v24l4.095-2.378V14.87l3.092 1.788-.018-4.618-3.074-1.756V7.603l6.168 3.564z"/></svg>
+  
+  <span class="md-ellipsis">
+    TensorFlow Lite
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/ml-frameworks/jax/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg>
+  
+  <span class="md-ellipsis">
+    JAX
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/ml-frameworks/pytorch/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.005 0 4.952 7.053a9.865 9.865 0 0 0 0 14.022 9.866 9.866 0 0 0 14.022 0c3.984-3.9 3.986-10.205.085-14.023l-1.744 1.743c2.904 2.905 2.904 7.634 0 10.538s-7.634 2.904-10.538 0-2.904-7.634 0-10.538l4.647-4.646.582-.665zm3.568 3.899a1.327 1.327 0 0 0-1.327 1.327 1.327 1.327 0 0 0 1.327 1.328A1.327 1.327 0 0 0 16.9 5.226 1.327 1.327 0 0 0 15.573 3.9z"/></svg>
+  
+  <span class="md-ellipsis">
+    PyTorch
+  </span>
+  
+    
+  
+  
+    <span class="md-status md-status--new" title="Recently updated">
+    </span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/deployment-configurations/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Deployment configurations
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_3_3">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            Deployment configurations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/cpu/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
+  
+  <span class="md-ellipsis">
+    CPU
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/bare-metal/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
+  
+  <span class="md-ellipsis">
+    CPU - Bare-Metal
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-vulkan/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - Vulkan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-cuda/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851a3.67 3.67 0 0 1-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964a6.46 6.46 0 0 1-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - CUDA
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-rocm/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.324 9.137 1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273.791 1.932H2.008zm17.137.307-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - ROCm
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-metal/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+  
+  <span class="md-ellipsis">
+    GPU - Metal
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../reference/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_4">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../reference/bindings/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    API bindings
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_4_2">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            API bindings
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bindings/c-api/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg>
+  
+  <span class="md-ellipsis">
+    C API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/bindings/python/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg>
+  
+  <span class="md-ellipsis">
+    Python
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../reference/mlir-dialects/" class="md-nav__link ">
+              
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m20.83 2.978-.086.095a16.245 16.245 0 0 0-1.19 1.487 5.773 5.773 0 0 0-.446.719 2.88 2.88 0 0 0-.249.596.497.497 0 0 0-.033.177v.004a.297.297 0 0 0-.21.29.3.3 0 0 0 .187.284c.038.371.08 1.142.07 2.2l-.004.142a8.001 8.001 0 0 1-.434 2.327c-.016-.01-.03-.014-.04-.013-.03.003-.11.12-.19.251-.058.09-.119.195-.154.291a.37.37 0 0 0-.03.14.249.249 0 0 0 .01.088c.01.037.022.058.022.058a6.836 6.836 0 0 1-.003.007.144.144 0 0 0-.028.067l-.012.029a6.836 6.836 0 0 1-.257.527l-.077.142a6.836 6.836 0 0 1-.07.115.157.157 0 0 0-.022-.014.16.16 0 0 0-.113.024c-.047.035-.151.194-.498.368a1.384 1.384 0 0 1-.32.114 14.1 14.1 0 0 0 .248-2.07 5.072 5.072 0 0 0-.064-1.057c.003-.01.003-.017.003-.017l-.005.01a4.345 4.345 0 0 0-.104-.458 3.554 3.554 0 0 0-.724-1.385c-.631-.754-1.496-1.14-2.256-1.165l-.125-.002c0-.008 0-.015.002-.022.02-.098.024-.127-.087-.032a.872.872 0 0 0-.057.054 2.986 2.986 0 0 0-.146.007.716.716 0 0 1-.003-.108c.004-.076.024-.127-.087-.032a.553.553 0 0 0-.142.167c-.05.008-.08.015-.08.015l.045-.002-.047.008c-.016-.042-.053-.105-.048-.16.01-.118.043-.14-.037-.065-.098.09-.202.226-.22.3l-.096.03c-.018-.019-.074-.07-.086-.179-.013-.11-.012-.166-.08-.05a1.14 1.14 0 0 0-.13.348c-.032.015-.063.03-.093.046a.27.27 0 0 1-.057-.173c-.005-.144.04-.26-.067-.068a1.634 1.634 0 0 0-.146.406 1.6 1.6 0 0 0-.105.08 2.7 2.7 0 0 1-.008-.17c-.002-.143.021-.296-.067-.026a1.832 1.832 0 0 0-.07.321c-.404.385-.65.917-.644 1.572v.007a3.42 3.42 0 0 0 .014.33c.02.238.057.438.107.605-.095.13-.103.689-.01.818.073.104.496.35.586.399a.367.367 0 0 1 .094.093c.115.188.115.567.027.762-.107.238.107.285.285.32.178.036.415-.023.463-.118.047-.095-.154-.31-.237-.748-.084-.439.13-.474.13-.474s.095.024.237.249c.11.175.227.313.336.413a.727.727 0 0 1-.201.172c.12.005.24-.051.304-.087a.77.77 0 0 0 .07.045 1.015 1.015 0 0 1-.05.05.506.506 0 0 0 .109-.022.295.295 0 0 0 .084.022c.155.012.57-.368.57-.439 0-.018-.015-.04-.038-.063-.042-.045-.12-.1-.207-.177a1.03 1.03 0 0 1-.11-.116.723.723 0 0 1-.141-.374v-.01l-.003-.031s.007-.007.016-.02v.004l.004-.01c.052-.08.15-.379-.47-1.078a3.045 3.045 0 0 0-.924-.706c-.042-.472.15-.913.626-1.13l-.005.005.008-.006c.227-.102.517-.155.877-.136.69.036 1.22.36 1.59.845.514.712.738 1.78.575 2.856-.068.065-.055.075-.013.077a4.616 4.616 0 0 1-.055.273l-.027.015c-.123.074-.071.073 0 .092l-.006.02a3.98 3.98 0 0 1-.066.193.956.956 0 0 0-.087.03c-.135.053-.08.06-.012.09l.044.023a5.62 5.62 0 0 1-.101.237.746.746 0 0 0-.08.017c-.142.036-.088.05-.024.09a.52.52 0 0 1 .04.027 6.783 6.783 0 0 1-.107.214.76.76 0 0 0-.153.025c-.14.036-.087.05-.023.09.034.02.06.04.08.059a8.021 8.021 0 0 1-.094.165l-.023.036a.59.59 0 0 0-.206.024c-.142.036-.088.05-.024.09a.67.67 0 0 1 .104.079 8.61 8.61 0 0 1-.126.18.514.514 0 0 0-.23-.005c-.144.02-.092.04-.033.086.068.053.1.099.118.118l-.062.084c-.044-.058-.15-.124-.246-.193a.85.85 0 0 0-.29-.13c-.048 0-.2.268-1.017.197-.819-.071-.87-.15-.942-.15a.978.978 0 0 0-.228.059l-.034-.02a11.03 11.03 0 0 1-.972-.674c-.464-.37-.72-.647-.72-.647s.137-.125-.047-.284a3.32 3.32 0 0 0-.338-.277 2.157 2.157 0 0 0-.242-.166 3.57 3.57 0 0 1-.088-.127 11.485 11.485 0 0 1-.363-.628 10.455 10.455 0 0 1-.25-.527c-.16-.36-.27-.682-.346-.964a5.62 5.62 0 0 1-.148-.923 2.257 2.257 0 0 1 .004-.242.411.411 0 0 0 .158-.323.411.411 0 0 0-.358-.407c-.204-.427-.982-1.477-3.881-3.68l-.127-.097.005.004-.036-.027C7.067 6.599 7.644 7.587 7.795 8a.411.411 0 0 0-.027.033 18.69 18.69 0 0 0-.018-.013c.018 0 .025-.005.025-.005s-.672-.546-1.787-1.23c-1.118-.687-1.748-.849-1.88-.877l-.026-.006s.206.19.174.285c-.01.032-.168.022-.421.028a3.948 3.948 0 0 0-.725.07 4.1 4.1 0 0 0-1.567.63C.238 7.785 0 8.401 0 8.401s.55-.768 1.58-1.305c-.014.337-.047 1.97.445 4.12.53 2.32 1.53 4.487 1.614 4.665.004.178.016.272.016.272s.148-1.79.756-3.647c.175.283.758 1.117 2.075 2.096 1.628 1.21 2.37 1.536 2.4 1.548.001.157.005.24.005.24s.005-.1.018-.263a4.69 4.69 0 0 1 .552-.67 3.58 3.58 0 0 1 .54-.435c.032.11.063.204.093.276-.02-.097-.036-.19-.052-.282.107.01.538.066 1.206.393.343.168.609.395.798.595a.167.167 0 0 0-.014.006s.123.112.269.403a2.416 2.416 0 0 0-.73.084 2.913 2.913 0 0 0-.098-.19.484.484 0 0 0-.039-.134c-.027-.061-.095-.1-.164-.14a.397.397 0 0 0-.104-.073.225.225 0 0 1-.055-.073c-.084-.184-.798.012-.942.18-.175.204-.209.464-.14.608.021.045.07.082.138.11.002.22.137.75.404 1.133a4.964 4.964 0 0 1-.108-.666c-.009-.16 0-.274.015-.35.047.328.174.684.577 1.124-.248-.54-.22-.861-.195-1.143l.01-.044.005-.001c.036.263.142.534.482.963a.412.412 0 0 1-.014-.028l.014.021a1.626 1.626 0 0 1-.167-1.03l.008-.002c.046.03.091.07.134.126.128.172.188.349.212.47a.528.528 0 0 0 .067.383 18.33 18.33 0 0 1-.72.501c-.23.15-.49.313-.757.47-.14.08-.279.158-.414.23l-.135-.077h.002l-.008-.004c-.97-.559-1.69-.932-2.518-1.082-.93-.166-1.786.283-1.982 1.082a1.284 1.284 0 0 0 .552 1.38l.012.008c.013.01.026.017.04.026l.06.036h.002a2.1 2.1 0 0 0 .69.237l.028.005h.006a3.5 3.5 0 0 0 .412.044c.975.047 2.156-.408 3.323-.982.1.054.202.108.306.166 2.547 1.403 4.098 1.585 6.154.728-.502.151-1.208.356-2.094.344a.05.05 0 0 0-.02-.006v.006a5.46 5.46 0 0 1-.647-.05l-.03-.004v-.003a.267.267 0 0 0-.001.002 6.25 6.25 0 0 1-1.556-.436 7.792 7.792 0 0 1-.745-.362 57.065 57.065 0 0 1-1.006-.569c.348-.178.692-.363 1.026-.545.355-.189.672-.362.918-.5l.009-.004h.007s.083-.019.16-.043c.17-.052.41-.149.695-.283.028.117.095.215.195.253.235.091.407.027.522-.102l.018-.01.047-.037c.05-.03.107-.067.156-.09a1.14 1.14 0 0 1 .053-.022c.04-.01.078-.023.116-.037l.033-.01c-.145.297-.091.581-.091.581.043-.37.22-.608.392-.715.064-.027.13-.05.2-.067.064 0 .116.023.144.07.07.12.217.194.364.226.024.15-.045.404-.4.866l.09-.062.004-.003.072-.053c.143-.108.252-.21.334-.305a.97.97 0 0 0 .19-.305c.013.2-.042.507-.31 1.036 0 0 .317-.276.514-.63.006.191-.01.443-.063.785.345-.673.325-1.085.239-1.326l-.01-.036a.433.433 0 0 0-.01-.065l.042-.057c.118-.166-.048-.344-.154-.414-.06-.04-.2-.154-.454-.157-.225-.27-.51-.15-.958.145a1.297 1.297 0 0 1-.166.092.725.725 0 0 0-.055-.116c.16-.096.326-.2.494-.308.317-.207.553-.416.728-.615.51-.517.69-1.02 1.21-1.446h-.013l.06-.031c.854-.458 1.306-.547 1.338-.553l-.003.128.018-.125a1.795 1.795 0 0 1 .481.344 2.12 2.12 0 0 1 .362.487l.044.3s0-.116-.01-.33c.153-.151 1.02-1.043 1.724-2.466.694-1.404.944-2.523 1.017-2.924a18.188 18.188 0 0 1 .665 2.466s-.002-.133-.03-.374c.096-.336.515-1.872.626-3.756.1-1.68-.065-2.78-.14-3.173.648.536.995 1.306.995 1.306s-.04-.163-.188-.437l.02.027s-.236-.455-.644-.904a6.45 6.45 0 0 0-.157-.172c-.432-.46-.854-.617-1.17-.672a1.57 1.57 0 0 0-.308-.03h-.019c-.125-.003-.2.002-.207-.026-.02-.095.11-.285.11-.285s-.177.046-.554.33c-.23.167-.52.41-.853.76a13.689 13.689 0 0 0-.89.994l-.075.095a.203.203 0 0 0-.023-.017c.076-.33.362-1.117 1.788-3.111zM11.92 14.09a.351.351 0 0 1 .012.006zm-.263 2.606c.088.044.19.106.303.194h-.005a.484.484 0 0 0-.155.07.956.956 0 0 1-.126-.224zm-4.855 1.57c.132 0 .276.013.432.047l.02.005.017.004c.11.027.223.062.337.102l.057.021c.191.074.395.156.611.248.32.14.62.277.838.375l.183.088c-.22.106-.424.196-.577.261-1.014.416-1.83.536-2.338.391-.944-.269-.76-1.536.42-1.542z"/></svg>
+  
+  <span class="md-ellipsis">
+    MLIR dialects
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_4_3">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            MLIR dialects
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_2" >
+        
+          <label class="md-nav__link" for="__nav_4_3_2" id="__nav_4_3_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Internal dialects
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            Internal dialects
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/Check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/Flow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Flow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/HAL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    HAL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/HALInline/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    HALInline
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/HALLoader/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    HALLoader
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/Stream/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Stream
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/Util/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Util
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/VM/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VM
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/VMVX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    VMVX
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3_3" >
+        
+          <label class="md-nav__link" for="__nav_4_3_3" id="__nav_4_3_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Public dialects
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            Public dialects
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/IREEInput/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREEInput
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-dialects/IREELinalgExt/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    IREELinalgExt
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4" >
+        
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Other topics
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            Other topics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/glossary/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Glossary
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/optimization-options/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.752 8.752 0 0 1-2.564 6.186l-.458.459c-.314.314-.641.616-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.749.749 0 0 1-1.11-.418l-.954-3.102a1.214 1.214 0 0 1-.145-.125L3.754 9.816a1.218 1.218 0 0 1-.124-.145L.528 8.717a.749.749 0 0 1-.418-1.11l1.71-2.774A1.748 1.748 0 0 1 3.31 4h3.204c.288-.338.59-.665.904-.979l.459-.458A8.749 8.749 0 0 1 14.064 0ZM8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.249 7.249 0 0 0-5.125 2.123ZM3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.234.234 0 0 1-.201-.064.234.234 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12Zm6.94-3.935c-.088.06-.177.118-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766c.058-.09.117-.178.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Optimization options
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/extensions/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8.2 8.2 0 0 1 .701.031C9.444.095 9.99.645 10.16 1.29l.288 1.107c.018.066.079.158.212.224.231.114.454.243.668.386.123.082.233.09.299.071l1.103-.303c.644-.176 1.392.021 1.82.63.27.385.506.792.704 1.218.315.675.111 1.422-.364 1.891l-.814.806c-.049.048-.098.147-.088.294.016.257.016.515 0 .772-.01.147.038.246.088.294l.814.806c.475.469.679 1.216.364 1.891a7.977 7.977 0 0 1-.704 1.217c-.428.61-1.176.807-1.82.63l-1.102-.302c-.067-.019-.177-.011-.3.071a5.909 5.909 0 0 1-.668.386c-.133.066-.194.158-.211.224l-.29 1.106c-.168.646-.715 1.196-1.458 1.26a8.006 8.006 0 0 1-1.402 0c-.743-.064-1.289-.614-1.458-1.26l-.289-1.106c-.018-.066-.079-.158-.212-.224a5.738 5.738 0 0 1-.668-.386c-.123-.082-.233-.09-.299-.071l-1.103.303c-.644.176-1.392-.021-1.82-.63a8.12 8.12 0 0 1-.704-1.218c-.315-.675-.111-1.422.363-1.891l.815-.806c.05-.048.098-.147.088-.294a6.214 6.214 0 0 1 0-.772c.01-.147-.038-.246-.088-.294l-.815-.806C.635 6.045.431 5.298.746 4.623a7.92 7.92 0 0 1 .704-1.217c.428-.61 1.176-.807 1.82-.63l1.102.302c.067.019.177.011.3-.071.214-.143.437-.272.668-.386.133-.066.194-.158.211-.224l.29-1.106C6.009.645 6.556.095 7.299.03 7.53.01 7.764 0 8 0Zm-.571 1.525c-.036.003-.108.036-.137.146l-.289 1.105c-.147.561-.549.967-.998 1.189-.173.086-.34.183-.5.29-.417.278-.97.423-1.529.27l-1.103-.303c-.109-.03-.175.016-.195.045-.22.312-.412.644-.573.99-.014.031-.021.11.059.19l.815.806c.411.406.562.957.53 1.456a4.709 4.709 0 0 0 0 .582c.032.499-.119 1.05-.53 1.456l-.815.806c-.081.08-.073.159-.059.19.162.346.353.677.573.989.02.03.085.076.195.046l1.102-.303c.56-.153 1.113-.008 1.53.27.161.107.328.204.501.29.447.222.85.629.997 1.189l.289 1.105c.029.109.101.143.137.146a6.6 6.6 0 0 0 1.142 0c.036-.003.108-.036.137-.146l.289-1.105c.147-.561.549-.967.998-1.189.173-.086.34-.183.5-.29.417-.278.97-.423 1.529-.27l1.103.303c.109.029.175-.016.195-.045.22-.313.411-.644.573-.99.014-.031.021-.11-.059-.19l-.815-.806c-.411-.406-.562-.957-.53-1.456a4.709 4.709 0 0 0 0-.582c-.032-.499.119-1.05.53-1.456l.815-.806c.081-.08.073-.159.059-.19a6.464 6.464 0 0 0-.573-.989c-.02-.03-.085-.076-.195-.046l-1.102.303c-.56.153-1.113.008-1.53-.27a4.44 4.44 0 0 0-.501-.29c-.447-.222-.85-.629-.997-1.189l-.289-1.105c-.029-.11-.101-.143-.137-.146a6.6 6.6 0 0 0-1.142 0ZM11 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9.5 8a1.5 1.5 0 1 0-3.001.001A1.5 1.5 0 0 0 9.5 8Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Extensions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_5">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" checked>
+        
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    General development topics
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            General development topics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-overview/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-tips/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Developer tips
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-management/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Release management
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Testing guide
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Testing guide
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#compiler-tests" class="md-nav__link">
+    Compiler tests
+  </a>
+  
+    <nav class="md-nav" aria-label="Compiler tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-a-test" class="md-nav__link">
+    Running a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-test" class="md-nav__link">
+    Writing a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuring-the-build-system" class="md-nav__link">
+    Configuring the build system
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-tests" class="md-nav__link">
+    Runtime tests
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-a-test_1" class="md-nav__link">
+    Running a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-test-environments" class="md-nav__link">
+    Setting test environments
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-test_1" class="md-nav__link">
+    Writing a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuring-the-build-system_1" class="md-nav__link">
+    Configuring the build system
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iree-core-end-to-end-e2e-tests" class="md-nav__link">
+    IREE core end-to-end (e2e) tests
+  </a>
+  
+    <nav class="md-nav" aria-label="IREE core end-to-end (e2e) tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#building-e2e-tests" class="md-nav__link">
+    Building e2e tests
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-a-test_2" class="md-nav__link">
+    Running a Test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-test-environments_1" class="md-nav__link">
+    Setting test environments
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-test_2" class="md-nav__link">
+    Writing a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuring-the-build-system_2" class="md-nav__link">
+    Configuring the build system
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Building
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            Building
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/bazel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building with Bazel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/emscripten/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Building with Emscripten
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/cmake-options-and-variables/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CMake options and variables
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../building/cmake-with-ccache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CMake with ccache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Debugging
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            Debugging
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/android-with-lldb/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Android debugging with LLDB
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/compile-time-regressions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Compile time regression debugging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/integration-tests/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integration test debugging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/releases/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Release debugging playbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../debugging/sanitizers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sanitizers (ASan/MSan/TSan)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            Performance
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/benchmarking/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Benchmarking
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/benchmark-suites/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Benchmark suites
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/profiling/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Profiling overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/profiling-cpu-events/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Profiling CPUs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/profiling-gpu-vulkan/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Profiling GPUs using Vulkan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/profiling-with-tracy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Profiling with Tracy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
+        
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Design docs
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_6">
+            <span class="md-nav__icon md-icon"></span>
+            Design docs
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-docs/cuda-backend/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CUDA backend
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-docs/design-roadmap/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Design roadmap
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-docs/function-abi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Function ABI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-docs/invocation-execution-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Invocation execution model
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_7" >
+        
+          <label class="md-nav__link" for="__nav_5_7" id="__nav_5_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Other topics
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_7">
+            <span class="md-nav__icon md-icon"></span>
+            Other topics
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage-best-practices/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Usage best practices
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vulkan-environment-setup/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Vulkan environment setup
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../community/" class="md-nav__link ">
+              
+  
+  <span class="md-ellipsis">
+    Community
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_6">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Community
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2" >
+        
+          
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../community/blog/" class="md-nav__link ">
+              
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Blog
+  </span>
+  
+
+            </a>
+            
+              <label class="md-nav__link " for="__nav_6_2">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            Blog
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2_2" >
+        
+          <label class="md-nav__link" for="__nav_6_2_2" id="__nav_6_2_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Archive
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            Archive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/blog/archive/2021/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    2021
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2_3" >
+        
+          <label class="md-nav__link" for="__nav_6_2_3" id="__nav_6_2_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Categories
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            Categories
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/blog/category/platforms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Platforms
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/blog/category/performance/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/blog/category/frontends/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Frontends
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../community/tags/" class="md-nav__link">
+        
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 0 1 0 2.474l-5.026 5.026a1.75 1.75 0 0 1-2.474 0l-6.25-6.25A1.752 1.752 0 0 1 1 7.775Zm1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 0 0 .354 0l5.025-5.025a.25.25 0 0 0 0-.354l-6.25-6.25a.25.25 0 0 0-.177-.073H2.75a.25.25 0 0 0-.25.25ZM6 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>
+  
+  <span class="md-ellipsis">
+    Tags
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#compiler-tests" class="md-nav__link">
+    Compiler tests
+  </a>
+  
+    <nav class="md-nav" aria-label="Compiler tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-a-test" class="md-nav__link">
+    Running a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-test" class="md-nav__link">
+    Writing a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuring-the-build-system" class="md-nav__link">
+    Configuring the build system
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-tests" class="md-nav__link">
+    Runtime tests
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-a-test_1" class="md-nav__link">
+    Running a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-test-environments" class="md-nav__link">
+    Setting test environments
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-test_1" class="md-nav__link">
+    Writing a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuring-the-build-system_1" class="md-nav__link">
+    Configuring the build system
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iree-core-end-to-end-e2e-tests" class="md-nav__link">
+    IREE core end-to-end (e2e) tests
+  </a>
+  
+    <nav class="md-nav" aria-label="IREE core end-to-end (e2e) tests">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#building-e2e-tests" class="md-nav__link">
+    Building e2e tests
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-a-test_2" class="md-nav__link">
+    Running a Test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setting-test-environments_1" class="md-nav__link">
+    Setting test environments
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#writing-a-test_2" class="md-nav__link">
+    Writing a test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuring-the-build-system_2" class="md-nav__link">
+    Configuring the build system
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/general/testing-guide.md" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.15 8.15 0 0 1-1.23-2Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="testing-guide">Testing guide<a class="headerlink" href="#testing-guide" title="Permanent link">link</a></h1>
+<p>Like the IREE project in general, IREE tests are divided into a few different
+components and use different tooling depending on the needs of that component.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Test type</th>
+<th style="text-align: left;">Test</th>
+<th>Build system</th>
+<th>Supported platforms</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Compiler tests</td>
+<td style="text-align: left;">iree_lit_test</td>
+<td>Bazel/CMake</td>
+<td>Host</td>
+</tr>
+<tr>
+<td style="text-align: left;">Runtime tests</td>
+<td style="text-align: left;">iree_cc_test</td>
+<td>Bazel/CMake</td>
+<td>Host/Device</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">iree_native_test</td>
+<td>Bazel/CMake</td>
+<td>Host/Device</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">iree_hal_cts_test_suite</td>
+<td>CMake</td>
+<td>Host/Device</td>
+</tr>
+<tr>
+<td style="text-align: left;">Core E2E tests</td>
+<td style="text-align: left;">iree_check_test</td>
+<td>Bazel/CMake</td>
+<td>Host/Device</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">iree_trace_runner_test</td>
+<td>Bazel/CMake</td>
+<td>Host/Device</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">iree_generated_trace_runner_test</td>
+<td>Bazel/CMake</td>
+<td>Host/Device</td>
+</tr>
+<tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;">iree_static_linker_test</td>
+<td>CMake</td>
+<td>Host/Device</td>
+</tr>
+</tbody>
+</table>
+<p>There are also more <code>*_test_suite</code> targets that groups test targets with the
+same configuration together.</p>
+<h2 id="compiler-tests">Compiler tests<a class="headerlink" href="#compiler-tests" title="Permanent link">link</a></h2>
+<p>Tests for the IREE compilation pipeline are written as lit tests in the same
+style as MLIR.</p>
+<p>By convention, IREE includes tests for</p>
+<ul>
+<li>printing and parsing of ops in <code>.../IR/test/{OP_CATEGORY}_ops.mlir</code> files</li>
+<li>folding and canonicalization in <code>.../IR/test/{OP_CATEGORY}_folding.mlir</code> files</li>
+<li>compiler passes and pipelines in other <code>.../test/*.mlir</code> files</li>
+</ul>
+<h3 id="running-a-test">Running a test<a class="headerlink" href="#running-a-test" title="Permanent link">link</a></h3>
+<p>For the test
+<a href="https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir"><code>iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir</code></a></p>
+<p>With CMake, run this from the build directory:</p>
+<div class="highlight"><pre><span></span><code>ctest<span class="w"> </span>-R<span class="w"> </span>iree/compiler/Dialect/VM/Conversion/MathToVM/test/arithmetic_ops.mlir.test
+</code></pre></div>
+<p>With Bazel, run this from the repo root:</p>
+<div class="highlight"><pre><span></span><code>bazel<span class="w"> </span><span class="nb">test</span><span class="w"> </span>//compiler/src/iree/compiler/Dialect/VM/Conversion/MathToVM/test:arithmetic_ops.mlir.test
+</code></pre></div>
+<h3 id="writing-a-test">Writing a test<a class="headerlink" href="#writing-a-test" title="Permanent link">link</a></h3>
+<p>For advice on writing MLIR compiler tests, see the
+<a href="https://mlir.llvm.org/getting_started/TestingGuide/">MLIR testing guide</a>. Tests
+should be <code>.mlir</code> files in <code>test</code> directory adjacent to the functionality they
+are testing. Instead of <code>mlir-opt</code>, use <code>iree-opt</code>, which registers IREE
+dialects and passes and doesn't register some unnecessary core ones.</p>
+<p>As with most parts of the IREE compiler, these should not have a dependency on
+the runtime.</p>
+<h3 id="configuring-the-build-system">Configuring the build system<a class="headerlink" href="#configuring-the-build-system" title="Permanent link">link</a></h3>
+<p>In the Bazel BUILD file, create a <code>iree_lit_test_suite</code> rule. We usually create
+a single suite that globs all <code>.mlir</code> files in the directory and is called
+"lit".</p>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//iree/build_tools/bazel:iree_lit_test.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_lit_test_suite&quot;</span><span class="p">)</span>
+
+<span class="n">iree_lit_test_suite</span><span class="p">(</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;lit&quot;</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="n">glob</span><span class="p">([</span><span class="s2">&quot;*.mlir&quot;</span><span class="p">]),</span>
+    <span class="n">tools</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">&quot;@llvm-project//llvm:FileCheck&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;//tools:iree-opt&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>There is a corresponding CMake function, calls to which will be generated by our
+<a href="https://github.com/openxla/iree/tree/main/build_tools/bazel_to_cmake/bazel_to_cmake.py">Bazel to CMake converter</a>.</p>
+<div class="highlight"><pre><span></span><code><span class="nb">iree_lit_test_suite</span><span class="p">(</span>
+<span class="w">  </span><span class="s">NAME</span>
+<span class="w">    </span><span class="s">lit</span>
+<span class="w">  </span><span class="s">SRCS</span>
+<span class="w">    </span><span class="s2">&quot;arithmetic_ops.mlir&quot;</span>
+<span class="w">  </span><span class="s">DATA</span>
+<span class="w">    </span><span class="s">FileCheck</span>
+<span class="w">    </span><span class="s">iree-opt</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>You can also create a test for a single file with <code>iree_lit_test</code>.</p>
+<h2 id="runtime-tests">Runtime tests<a class="headerlink" href="#runtime-tests" title="Permanent link">link</a></h2>
+<p>Tests for the runtime C++ code use the
+<a href="https://github.com/google/googletest">GoogleTest</a> testing framework. They
+should generally follow the style and best practices of that framework.</p>
+<h3 id="running-a-test_1">Running a test<a class="headerlink" href="#running-a-test_1" title="Permanent link">link</a></h3>
+<p>For the test
+<a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/base/bitfield_test.cc"><code>/runtime/src/iree/base/bitfield_test.cc</code></a>:</p>
+<p>With CMake, run this from the build directory:</p>
+<div class="highlight"><pre><span></span><code>ctest<span class="w"> </span>-R<span class="w"> </span>iree/base/bitfield_test
+</code></pre></div>
+<p>With Bazel, run this from the repo root:</p>
+<div class="highlight"><pre><span></span><code>bazel<span class="w"> </span><span class="nb">test</span><span class="w"> </span>//runtime/src/iree/base:arena_test
+</code></pre></div>
+<h3 id="setting-test-environments">Setting test environments<a class="headerlink" href="#setting-test-environments" title="Permanent link">link</a></h3>
+<p>Parallel testing for <code>ctest</code> can be enabled via the <code>CTEST_PARALLEL_LEVEL</code>
+environment variable. For example:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">CTEST_PARALLEL_LEVEL</span><span class="o">=</span><span class="k">$(</span>nproc<span class="k">)</span>
+</code></pre></div>
+<p>To use the Vulkan backend as test driver, you may need to select between a
+Vulkan implementation from SwiftShader and multiple Vulkan-capable hardware
+devices. This can be done via environment variables. See the
+<a href="../../vulkan-environment-setup/#useful-environment-variables">generic Vulkan setup</a>
+page for details regarding these variables.</p>
+<p>For Bazel, you can persist the configuration in <code>user.bazelrc</code> to save typing.
+For example:</p>
+<div class="highlight"><pre><span></span><code>test:vkswiftshader<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">&quot;LD_LIBRARY_PATH=...&quot;</span>
+test:vkswiftshader<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">&quot;VK_LAYER_PATH=...&quot;</span>
+test:vknative<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">&quot;LD_LIBRARY_PATH=...&quot;</span>
+test:vknative<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">&quot;VK_LAYER_PATH=...&quot;</span>
+</code></pre></div>
+<p>Then you can use <code>bazel test --config=vkswiftshader</code> to select SwiftShader as
+the Vulkan implementation. Similarly for other implementations.</p>
+<h3 id="writing-a-test_1">Writing a test<a class="headerlink" href="#writing-a-test_1" title="Permanent link">link</a></h3>
+<p>For advice on writing tests in the GoogleTest framework, see the
+<a href="https://github.com/google/googletest/blob/main/docs/primer.md">GoogleTest primer</a>.
+Test files for source file <code>foo.cc</code> with build target <code>foo</code> should live in the
+same directory with source file <code>foo_test.cc</code> and build target <code>foo_test</code>. You
+should <code>#include</code> <code>iree/testing/gtest.h</code> instead of any of the gtest or gmock
+headers.</p>
+<p>As with all parts of the IREE runtime, these should not have a dependency on the
+compiler.</p>
+<h3 id="configuring-the-build-system_1">Configuring the build system<a class="headerlink" href="#configuring-the-build-system_1" title="Permanent link">link</a></h3>
+<p>In the Bazel BUILD file, create a <code>cc_test</code> target with your test file as the
+source and any necessary dependencies. Usually, you can link in a standard gtest
+main function. Use <code>iree/testing:gtest_main</code> instead of the <code>gtest_main</code> that
+comes with gtest.</p>
+<div class="highlight"><pre><span></span><code><span class="n">cc_test</span><span class="p">(</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;arena_test&quot;</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;arena_test.cc&quot;</span><span class="p">],</span>
+    <span class="n">deps</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">&quot;:arena&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;//iree/testing:gtest_main&quot;</span><span class="p">,</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>We have created a corresponding CMake function <code>iree_cc_test</code> that mirrors the
+Bazel rule's behavior. Our
+<a href="https://github.com/openxla/iree/tree/main/build_tools/bazel_to_cmake/bazel_to_cmake.py">Bazel to CMake converter</a>
+should generally derive the <code>CMakeLists.txt</code> file from the BUILD file:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">iree_cc_test</span><span class="p">(</span>
+<span class="w">  </span><span class="s">NAME</span>
+<span class="w">    </span><span class="s">arena_test</span>
+<span class="w">  </span><span class="s">SRCS</span>
+<span class="w">    </span><span class="s2">&quot;arena_test.cc&quot;</span>
+<span class="w">  </span><span class="s">DEPS</span>
+<span class="w">    </span><span class="s">::arena</span>
+<span class="w">    </span><span class="s">iree::testing::gtest_main</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>There are other more specific test targets, such as <code>iree_hal_cts_test_suite</code>,
+which are designed to test specific runtime support with template configuration
+and is not supported by Bazel rules.</p>
+<h2 id="iree-core-end-to-end-e2e-tests">IREE core end-to-end (e2e) tests<a class="headerlink" href="#iree-core-end-to-end-e2e-tests" title="Permanent link">link</a></h2>
+<p>Here "end-to-end" means from the input accepted by the IREE core compiler
+(dialects like TOSA, StableHLO, Linalg) to execution using the IREE runtime
+components. It does not include tests of the integrations with ML frameworks
+(e.g. TensorFlow, PyTorch) or bindings to other languages (e.g. Python).</p>
+<p>We avoid using the more traditional <code>lit</code> tests used elsewhere in the compiler
+for runtime execution tests. Lit tests require running the compiler tools on
+the test platform through shell or python scripts that act on files from a local
+file system. On platforms like Android, the web, and embedded systems, each of
+these features is either not available or is severely limited.</p>
+<p>Instead, to test these flows we use a custom framework called <code>check</code>. The check
+framework compiles test programs on the host machine into standalone test binary
+files that can be pushed to test devices (such as Android phones) where they
+run with gtest style assertions (e.g. <code>check.expect_almost_eq(lhs, rhs)</code>).</p>
+<h3 id="building-e2e-tests">Building e2e tests<a class="headerlink" href="#building-e2e-tests" title="Permanent link">link</a></h3>
+<p>The files needed by these tests are not built by default with CMake. You'll
+need to build the special <code>iree-test-deps</code> target to generate test files prior
+to running CTest (from the build directory):</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>.<span class="w"> </span>--target<span class="w"> </span>iree-test-deps
+</code></pre></div>
+<p>To run e2e model tests in
+<a href="https://github.com/openxla/iree/tree/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake">generated_e2e_model_tests.cmake</a>,
+because of their dependencies, <code>-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON</code> needs to be
+set when configuring CMake. Also see
+<a href="../../performance/benchmark-suites/#prerequisites">IREE Benchmark Suite Prerequisites</a>
+for required packages.</p>
+<h3 id="running-a-test_2">Running a Test<a class="headerlink" href="#running-a-test_2" title="Permanent link">link</a></h3>
+<p>For the test
+<a href="https://github.com/openxla/iree/tree/main/tests/e2e/xla_ops/floor.mlir"><code>tests/e2e/xla_ops/floor.mlir</code></a>
+compiled for the VMVX target backend and running on the VMVX driver (here they
+match exactly, but in principle there's a many-to-many mapping from backends to
+drivers).</p>
+<p>With CMake, run this from the build directory:</p>
+<div class="highlight"><pre><span></span><code>ctest<span class="w"> </span>-R<span class="w"> </span>tests/e2e/xla_ops/check_vmvx_local-task_floor.mlir
+</code></pre></div>
+<p>With Bazel, run this from the repo root:</p>
+<div class="highlight"><pre><span></span><code>bazel<span class="w"> </span><span class="nb">test</span><span class="w"> </span>tests/e2e/xla_ops:check_vmvx_local-task_floor.mlir
+</code></pre></div>
+<h3 id="setting-test-environments_1">Setting test environments<a class="headerlink" href="#setting-test-environments_1" title="Permanent link">link</a></h3>
+<p>Similarly, you can use environment variables to select Vulkan implementations
+for running tests as explained in the <a href="#runtime-tests">Runtime tests</a> section.</p>
+<h3 id="writing-a-test_2">Writing a test<a class="headerlink" href="#writing-a-test_2" title="Permanent link">link</a></h3>
+<p>These tests live in <code>tests/e2e</code>. A single test consists of a <code>.mlir</code> source
+file specifying an IREE module where each exported function takes no inputs and
+returns no results and corresponds to a single test case.</p>
+<p>As an example, here are some tests for the MHLO floor operation:</p>
+<div class="highlight"><pre><span></span><code>func.func @tensor() {
+  %input = util.unfoldable_constant dense&lt;[0.0, 1.1, 2.5, 4.9]&gt; : tensor&lt;4xf32&gt;
+  %result = &quot;mhlo.floor&quot;(%input) : (tensor&lt;4xf32&gt;) -&gt; tensor&lt;4xf32&gt;
+  check.expect_almost_eq_const(%result, dense&lt;[0.0, 1.0, 2.0, 4.0]&gt; : tensor&lt;4xf32&gt;): tensor&lt;4xf32&gt;
+  return
+}
+
+func.func @scalar() {
+  %input = util.unfoldable_constant dense&lt;101.3&gt; : tensor&lt;f32&gt;
+  %result = &quot;mhlo.floor&quot;(%input) : (tensor&lt;f32&gt;) -&gt; tensor&lt;f32&gt;
+  check.expect_almost_eq_const(%result, dense&lt;101.0&gt; : tensor&lt;f32&gt;): tensor&lt;f32&gt;
+  return
+}
+
+func.func @negative() {
+  %input = util.unfoldable_constant dense&lt;-1.1&gt; : tensor&lt;f32&gt;
+  %result = &quot;mhlo.floor&quot;(%input) : (tensor&lt;f32&gt;) -&gt; tensor&lt;f32&gt;
+  check.expect_almost_eq_const(%result, dense&lt;-2.0&gt; : tensor&lt;f32&gt;): tensor&lt;f32&gt;
+  return
+}
+</code></pre></div>
+<p>Test cases are created in gtest for each public function exported by the module.</p>
+<p>Note the use of <code>util.unfoldable_constant</code> to specify test constants. If we were
+to use a regular constant the compiler would fold away everything at compile
+time and our test would not actually test the runtime. <code>unfoldable_constant</code>
+adds a barrier that prevents folding. To prevent folding/constant propagate on
+an arbitrary SSA-value you can use <code>util.optimization_barrier</code>.</p>
+<p>Next we use this input constant to exercise the runtime feature under test (in
+this case, just a single floor operation). Finally, we use a check dialect
+operation to make an assertion about the output. There are a few different
+<a href="../../../reference/mlir-dialects/Check/">assertion operations</a>.
+Here we use the <code>expect_almost_eq_const</code> op: <em>almost</em> because we are comparing
+floats and want to allow for floating-point imprecision, and <em>const</em> because we
+want to compare it to a constant value. This last part is just syntactic sugar
+around</p>
+<div class="highlight"><pre><span></span><code>%expected = arith.constant dense&lt;101.0&gt; : tensor&lt;f32&gt;
+check.expect_almost_eq(%result, %expected) : tensor&lt;f32&gt;
+</code></pre></div>
+<p>The output of running this test looks like:</p>
+<div class="highlight"><pre><span></span><code>[==========] Running 4 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 4 tests from module
+[ RUN      ] module.tensor
+[       OK ] module.tensor (76 ms)
+[ RUN      ] module.scalar
+[       OK ] module.scalar (79 ms)
+[ RUN      ] module.double
+[       OK ] module.double (55 ms)
+[ RUN      ] module.negative
+[       OK ] module.negative (54 ms)
+[----------] 4 tests from module (264 ms total)
+
+[----------] Global test environment tear-down
+[==========] 4 tests from 1 test suite ran. (264 ms total)
+[  PASSED  ] 4 tests.
+</code></pre></div>
+<p>The "module" name for the test suite comes from the default name for an implicit
+MLIR module. To give the test suite a more descriptive name, use an explicit
+named top-level module in this file.</p>
+<h3 id="configuring-the-build-system_2">Configuring the build system<a class="headerlink" href="#configuring-the-build-system_2" title="Permanent link">link</a></h3>
+<p>A single <code>.mlir</code> source file can be turned into a test target with the
+<code>iree_check_test</code> Bazel macro (and corresponding CMake function).</p>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//build_tools/bazel:iree_check_test.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_check_test&quot;</span><span class="p">)</span>
+
+<span class="n">iree_check_test</span><span class="p">(</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;check_vmvx_local-task_floor.mlir&quot;</span><span class="p">,</span>
+    <span class="n">src</span> <span class="o">=</span> <span class="s2">&quot;floor.mlir&quot;</span><span class="p">,</span>
+    <span class="n">driver</span> <span class="o">=</span> <span class="s2">&quot;local-task&quot;</span><span class="p">,</span>
+    <span class="n">target_backend</span> <span class="o">=</span> <span class="s2">&quot;vmvx&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>The target naming convention is "check_backend_driver_src". The generated test
+will automatically be tagged with a "driver=vmvx" tag, which can help filter
+tests by backend (especially when many tests are generated, as below).</p>
+<p>Usually we want to create a suite of tests across many backends and drivers.
+This can be accomplished with additional macros. For a single backend/driver
+pair:</p>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//build_tools/bazel:iree_check_test.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_check_single_backend_test_suite&quot;</span><span class="p">)</span>
+
+<span class="n">iree_check_single_backend_test_suite</span><span class="p">(</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;check_vmvx_local-task&quot;</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="n">glob</span><span class="p">([</span><span class="s2">&quot;*.mlir&quot;</span><span class="p">]),</span>
+    <span class="n">driver</span> <span class="o">=</span> <span class="s2">&quot;local-task&quot;</span><span class="p">,</span>
+    <span class="n">target_backend</span> <span class="o">=</span> <span class="s2">&quot;vmvx&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>This will generate a separate test target for each file in <code>srcs</code> with a name
+following the convention above as well as a Bazel
+<a href="https://bazel.build/reference/be/general#test_suite">test_suite</a>
+called "check_vmvx_local-task" that will run all the generated tests.</p>
+<p>You can also generate suites across multiple pairs:</p>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//build_tools/bazel:iree_check_test.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_check_test_suite&quot;</span><span class="p">)</span>
+
+<span class="n">iree_check_test_suite</span><span class="p">(</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;check&quot;</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;success.mlir&quot;</span><span class="p">],</span>
+    <span class="c1"># Leave this argument off to run on all supported backend/driver pairs.</span>
+    <span class="n">target_backends_and_drivers</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s2">&quot;vmvx&quot;</span><span class="p">,</span> <span class="s2">&quot;local-task&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">&quot;vulkan-spirv&quot;</span><span class="p">,</span> <span class="s2">&quot;vulkan&quot;</span><span class="p">),</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>This will create a test per source file and backend/driver pair, a test suite
+per backend/driver pair, and a test suite, "check", that will run all the tests.</p>
+<p>The CMake functions follow a similar pattern. The calls to them are generated in
+our <code>CMakeLists.txt</code> file by
+<a href="https://github.com/openxla/iree/tree/main/build_tools/bazel_to_cmake/bazel_to_cmake.py">bazel_to_cmake</a>.</p>
+<p>There are other test targets that generate tests based on template configuraton
+and platform detection, such as <code>iree_static_linker_test</code>. Those targets are
+not supported by Bazel rules at this point.</p>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+            Back to top
+          </button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2023 The IREE Authors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/openxla/iree" target="_blank" rel="noopener" title="IREE on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://discord.gg/26P4xW4" target="_blank" rel="noopener" title="IREE Discord Server" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M524.531 69.836a1.5 1.5 0 0 0-.764-.7A485.065 485.065 0 0 0 404.081 32.03a1.816 1.816 0 0 0-1.923.91 337.461 337.461 0 0 0-14.9 30.6 447.848 447.848 0 0 0-134.426 0 309.541 309.541 0 0 0-15.135-30.6 1.89 1.89 0 0 0-1.924-.91 483.689 483.689 0 0 0-119.688 37.107 1.712 1.712 0 0 0-.788.676C39.068 183.651 18.186 294.69 28.43 404.354a2.016 2.016 0 0 0 .765 1.375 487.666 487.666 0 0 0 146.825 74.189 1.9 1.9 0 0 0 2.063-.676A348.2 348.2 0 0 0 208.12 430.4a1.86 1.86 0 0 0-1.019-2.588 321.173 321.173 0 0 1-45.868-21.853 1.885 1.885 0 0 1-.185-3.126 251.047 251.047 0 0 0 9.109-7.137 1.819 1.819 0 0 1 1.9-.256c96.229 43.917 200.41 43.917 295.5 0a1.812 1.812 0 0 1 1.924.233 234.533 234.533 0 0 0 9.132 7.16 1.884 1.884 0 0 1-.162 3.126 301.407 301.407 0 0 1-45.89 21.83 1.875 1.875 0 0 0-1 2.611 391.055 391.055 0 0 0 30.014 48.815 1.864 1.864 0 0 0 2.063.7A486.048 486.048 0 0 0 610.7 405.729a1.882 1.882 0 0 0 .765-1.352c12.264-126.783-20.532-236.912-86.934-334.541ZM222.491 337.58c-28.972 0-52.844-26.587-52.844-59.239s23.409-59.241 52.844-59.241c29.665 0 53.306 26.82 52.843 59.239 0 32.654-23.41 59.241-52.843 59.241Zm195.38 0c-28.971 0-52.843-26.587-52.843-59.239s23.409-59.241 52.843-59.241c29.667 0 53.307 26.82 52.844 59.239 0 32.654-23.177 59.241-52.844 59.241Z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://groups.google.com/forum/#!forum/iree-discuss" target="_blank" rel="noopener" title="IREE Discuss Google Group" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M144 0a80 80 0 1 1 0 160 80 80 0 1 1 0-160zm368 0a80 80 0 1 1 0 160 80 80 0 1 1 0-160zM0 298.7C0 239.8 47.8 192 106.7 192h42.7c15.9 0 31 3.5 44.6 9.7-1.3 7.2-1.9 14.7-1.9 22.3 0 38.2 16.8 72.5 43.3 96H21.3C9.6 320 0 310.4 0 298.7zM405.3 320h-.7c26.6-23.5 43.3-57.8 43.3-96 0-7.6-.7-15-1.9-22.3 13.6-6.3 28.7-9.7 44.6-9.7h42.7c58.9 0 106.7 47.8 106.7 106.7 0 11.8-9.6 21.3-21.3 21.3H405.3zM224 224a96 96 0 1 1 192 0 96 96 0 1 1-192 0zm-96 261.3c0-73.6 59.7-133.3 133.3-133.3h117.4c73.6 0 133.3 59.7 133.3 133.3 0 14.7-11.9 26.7-26.7 26.7H154.7c-14.7 0-26.7-11.9-26.7-26.7z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "toc.follow"], "search": "../../../assets/javascripts/workers/search.dfff1995.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.78eede0e.min.js"></script>
+      
+    
+  </body>
+</html>
