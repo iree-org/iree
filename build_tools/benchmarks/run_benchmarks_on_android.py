@@ -291,8 +291,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             )
 
         module_path = adb_fetch_file(
-            f"{self.e2e_test_artifacts_url}/{benchmark_case_dir.as_posix()}",
-            android_case_dir / android_case_dir,
+            f"{self.e2e_test_artifacts_url}/{benchmark_case_dir.as_posix()}/{iree_artifacts.MODULE_FILENAME}",
+            android_case_dir / android_case_dir / iree_artifacts.MODULE_FILENAME,
             verbose=self.verbose,
         )
 
