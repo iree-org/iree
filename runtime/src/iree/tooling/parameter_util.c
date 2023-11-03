@@ -13,92 +13,8 @@
 #include "iree/io/formats/safetensors/safetensors_format.h"
 #include "iree/io/parameter_index.h"
 #include "iree/io/parameter_index_provider.h"
+#include "iree/io/scope_map.h"
 #include "iree/modules/io/parameters/module.h"
-
-//===----------------------------------------------------------------------===//
-// Scope -> index mapping
-//===----------------------------------------------------------------------===//
-
-typedef struct iree_io_scope_map_entry_t {
-  iree_string_view_t scope;
-  iree_io_parameter_index_t* index;
-} iree_io_scope_map_entry_t;
-
-typedef struct iree_io_scope_map_t {
-  iree_allocator_t host_allocator;
-  iree_host_size_t count;
-  iree_host_size_t capacity;
-  iree_io_scope_map_entry_t** entries;
-} iree_io_scope_map_t;
-
-static void iree_io_scope_map_initialize(iree_allocator_t host_allocator,
-                                         iree_io_scope_map_t* out_scope_map) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  out_scope_map->host_allocator = host_allocator;
-  out_scope_map->count = 0;
-  out_scope_map->capacity = 0;
-  out_scope_map->entries = NULL;
-  IREE_TRACE_ZONE_END(z0);
-}
-
-static void iree_io_scope_map_deinitialize(iree_io_scope_map_t* scope_map) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_allocator_t host_allocator = scope_map->host_allocator;
-  for (iree_host_size_t i = 0; i < scope_map->count; ++i) {
-    iree_io_scope_map_entry_t* entry = scope_map->entries[i];
-    iree_io_parameter_index_release(entry->index);
-    iree_allocator_free(host_allocator, entry);
-  }
-  iree_allocator_free(host_allocator, scope_map->entries);
-  IREE_TRACE_ZONE_END(z0);
-}
-
-static iree_status_t iree_io_scope_map_lookup(
-    iree_io_scope_map_t* scope_map, iree_string_view_t scope,
-    iree_io_parameter_index_t** out_index) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, scope.data, scope.size);
-
-  for (iree_host_size_t i = 0; i < scope_map->count; ++i) {
-    iree_io_scope_map_entry_t* entry = scope_map->entries[i];
-    if (iree_string_view_equal(scope, entry->scope)) {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, "hit");
-      *out_index = entry->index;
-      return iree_ok_status();
-    }
-  }
-  IREE_TRACE_ZONE_APPEND_TEXT(z0, "miss");
-
-  if (scope_map->count == scope_map->capacity) {
-    iree_host_size_t new_capacity = iree_max(8, scope_map->capacity * 2);
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_allocator_realloc(
-                scope_map->host_allocator,
-                new_capacity * sizeof(iree_io_scope_map_entry_t*),
-                (void**)&scope_map->entries));
-    scope_map->capacity = new_capacity;
-  }
-
-  iree_io_scope_map_entry_t* entry = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(scope_map->host_allocator,
-                                sizeof(*entry) + scope.size, (void**)&entry));
-  entry->scope =
-      iree_make_string_view((const char*)entry + sizeof(*entry), scope.size);
-  memcpy((char*)entry->scope.data, scope.data, scope.size);
-
-  iree_status_t status =
-      iree_io_parameter_index_create(scope_map->host_allocator, &entry->index);
-
-  if (iree_status_is_ok(status)) {
-    scope_map->entries[scope_map->count++] = entry;
-    *out_index = entry->index;
-  } else {
-    iree_allocator_free(scope_map->host_allocator, entry);
-  }
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
 
 //===----------------------------------------------------------------------===//
 // Parameter file I/O
@@ -212,16 +128,11 @@ static iree_status_t iree_io_append_parameter_file_to_index(
   return status;
 }
 
-iree_status_t iree_tooling_create_parameters_module_from_flags(
-    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
-    iree_vm_module_t** out_module) {
+iree_status_t iree_tooling_build_parameter_indices_from_flags(
+    iree_io_scope_map_t* scope_map) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_io_scope_map_t scope_map;
-  iree_io_scope_map_initialize(host_allocator, &scope_map);
-
   // Create one index per scope and add parameters to each.
-  iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < FLAG_parameters_list().count; ++i) {
     // Parse the `scope=path` flag. Note that the scope is optional.
     iree_string_view_t flag = FLAG_parameters_list().values[i];
@@ -233,15 +144,31 @@ iree_status_t iree_tooling_create_parameters_module_from_flags(
     }
 
     // Lookup (or create) the index for the given scope.
-    iree_io_parameter_index_t* index = NULL;
-    status = iree_io_scope_map_lookup(&scope_map, scope, &index);
-    if (!iree_status_is_ok(status)) break;
+    iree_io_parameter_index_t* index = NULL;  // unowned
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_io_scope_map_lookup(scope_map, scope, &index));
 
     // Index the file.
-    status =
-        iree_io_append_parameter_file_to_index(path, index, host_allocator);
-    if (!iree_status_is_ok(status)) break;
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_io_append_parameter_file_to_index(path, index,
+                                                   scope_map->host_allocator));
   }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_status_t iree_tooling_create_parameters_module_from_flags(
+    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_io_scope_map_t scope_map;
+  iree_io_scope_map_initialize(host_allocator, &scope_map);
+
+  // Parse all parameter files and build out their indices.
+  iree_status_t status =
+      iree_tooling_build_parameter_indices_from_flags(&scope_map);
 
   // Create one provider per scope.
   iree_host_size_t provider_count = 0;

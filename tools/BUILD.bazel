@@ -116,6 +116,19 @@ iree_runtime_cc_binary(
 )
 
 iree_runtime_cc_binary(
+    name = "iree-dump-parameters",
+    srcs = ["iree-dump-parameters-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/io:parameter_index",
+        "//runtime/src/iree/io:scope_map",
+        "//runtime/src/iree/tooling:parameter_util",
+    ],
+)
+
+iree_runtime_cc_binary(
     name = "iree-fatelf",
     srcs = ["iree-fatelf.c"],
     deps = [

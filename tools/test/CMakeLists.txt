@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "executable_benchmarks.mlir"
     "executable_sources.mlir"
     "iree-benchmark-module.mlir"
+    "iree-dump-parameters.txt"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
     "iree-run-module-outputs.mlir"

@@ -21,9 +21,9 @@ Dialect                     | Description
 [Check](./Check.md)         | Defines assertions for IREE tests
 [Flow](./Flow.md)           | Models execution data flow and partitioning
 [HAL](./HAL.md)             | Represents operations against the IREE HAL[^1]
-[HALInline](./HALInline.md) | Inline HAL interop runtime module dialect
-[HALLoader](./HALLoader.md) | HAL inline executable loader runtime module dialect
-[IOParameters](./IOParameters.md) | External parameter resource management APIs
+[HAL/Inline](./HALInline.md) | Inline HAL interop runtime module dialect
+[HAL/Loader](./HALLoader.md) | HAL inline executable loader runtime module dialect
+[IO/Parameters](./IOParameters.md) | External parameter resource management APIs
 [Stream](./Stream.md)       | Model execution partitioning and scheduling
 [Util](./Util.md)           | Types and ops common across IREE subdialects
 [VM](./VM.md)               | Represents operations against an abstract virtual machine

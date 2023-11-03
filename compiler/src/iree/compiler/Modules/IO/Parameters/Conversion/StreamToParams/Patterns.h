@@ -12,7 +12,6 @@
 
 namespace mlir::iree_compiler {
 
-// Populates conversion patterns for stream->HAL (loader).
 void populateStreamToIOParametersPatterns(MLIRContext *context,
                                           ConversionTarget &conversionTarget,
                                           TypeConverter &typeConverter,
