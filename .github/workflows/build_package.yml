@@ -40,21 +40,37 @@ jobs:
         include:
           # Ubuntu packages.
           - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
+            build-family: linux-x86_64
             build-package: main-dist-linux
             experimental: false
+          - runs-on: [<todo>, os-family=Linux, runner-group=releaser]
+            build-family: linux-aarch64
+            build-package: main-dist-linux
+            experimental: true
           - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
+            build-family: linux-x86_64
             build-package: py-compiler-pkg
             experimental: false
+          - runs-on: [<todo>, os-family=Linux, runner-group=releaser]
+            build-family: linux-aarch64
+            build-package: py-compiler-pkg
+            experimental: true
           - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
+            build-family: linux-x86_64
             build-package: py-runtime-pkg
             experimental: false
+          - runs-on: [<todo>, os-family=Linux, runner-group=releaser]
+            build-family: linux-aarch64
+            build-package: py-runtime-pkg
+            experimental: true
           - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
+            build-family: linux-x86_64
             build-package: py-tf-compiler-tools-pkg
             experimental: false
+          - runs-on: [<todo>, os-family=Linux, runner-group=releaser]
+            build-family: linux-aarch64
+            build-package: py-tf-compiler-tools-pkg
+            experimental: true
 
           # MacOS packages.
           - runs-on:
@@ -85,6 +101,7 @@ jobs:
 
     env:
       MANYLINUX_X86_64_IMAGE: ghcr.io/nod-ai/manylinux_x86_64:main
+      MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
 
     steps:
       - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
@@ -149,8 +166,8 @@ jobs:
       # is not enough to just invoke it directly because then pip managed
       # console scripts (like cmake, ninja) will not be on the path.
       ##########################################################################
-      - name: Main distribution (Linux)
-        if: "matrix.build-package == 'main-dist-linux'"
+      - name: Main distribution (Linux-x86_64)
+        if: "matrix.build-package == 'main-dist-linux' && matrix.build-family == 'linux-x86_64'"
         shell: bash
         run: |
           docker run --rm -w=/work \
@@ -158,14 +175,34 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
 
+      - name: Main distribution (Linux-AArch64)
+        if: "matrix.build-package == 'main-dist-linux' && matrix.build-family == 'linux-aarch64'"
+        shell: bash
+        run: |
+          docker run --rm -w=/work \
+            -v $PWD:/work \
+            "${MANYLINUX_AARCH64_IMAGE}" \
+            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
+
       ##########################################################################
       # py-runtime-pkg
       # Builds the iree-runtime wheels.
-      # One step per OS.
+      # One step per OS (and CPU architecture for Linux).
       ##########################################################################
 
-      - name: Build runtime wheels (Linux)
-        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'linux'"
+      - name: Build runtime wheels (Linux-x86_64)
+        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'linux-x86_64'"
+        shell: bash
+        env:
+          package_suffix: ${{ github.event.inputs.package_suffix }}
+          packages: "iree-runtime"
+          output_dir: "${{ github.workspace }}/bindist"
+        run: |
+          [ -e ./bindist/* ] && rm ./bindist/*
+          ./c/build_tools/python_deploy/build_linux_packages.sh
+
+      - name: Build runtime wheels (Linux-AArch64)
+        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'linux-aarch64'"
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
@@ -204,10 +241,21 @@ jobs:
       ##########################################################################
       # py-compiler-pkg
       # Builds the iree-compiler wheel.
-      # One step per OS.
+      # One step per OS (and CPU architecture for Linux).
       ##########################################################################
-      - name: Build compiler wheels (Linux)
-        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'linux'"
+      - name: Build compiler wheels (Linux-x86_64)
+        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'linux-x86_64'"
+        shell: bash
+        env:
+          package_suffix: ${{ github.event.inputs.package_suffix }}
+          packages: "iree-compiler"
+          output_dir: "${{ github.workspace }}/bindist"
+        run: |
+          [ -e ./bindist/* ] && rm ./bindist/*
+          ./c/build_tools/python_deploy/build_linux_packages.sh
+
+      - name: Build compiler wheels (Linux-AArch64)
+        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'linux-aarch64'"
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
@@ -249,13 +297,22 @@ jobs:
       # code (no C/C++), so just build for one examplar python version on Linux.
       ##########################################################################
 
-      - name: Build TF Compiler Tools wheels
-        if: "matrix.build-package == 'py-tf-compiler-tools-pkg'"
+      - name: Build TF Compiler Tools wheels (Linux-Linux-x86_64)
+        if: "matrix.build-package == 'py-tf-compiler-tools-pkg' && matrix.build-family == 'linux-x86_64'"
         shell: bash
         run: |
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_X86_64_IMAGE}" \
+            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
+
+      - name: Build TF Compiler Tools wheels (Linux-AArch64)
+        if: "matrix.build-package == 'py-tf-compiler-tools-pkg' && matrix.build-family == 'linux-aarch64'"
+        shell: bash
+        run: |
+          docker run --rm -w=/work \
+            -v $PWD:/work \
+            "${MANYLINUX_AARCH64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
       - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
