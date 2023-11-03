@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Utilities for handling the benchmark suite.
 
-See docs/developers/developing_iree/benchmark_suites.md for how to build the
-benchmark suite.
+See https://iree.dev/developers/performance/benchmark-suites/ for how to build
+the benchmark suite.
 """
 
 import pathlib
