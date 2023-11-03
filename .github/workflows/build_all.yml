@@ -21,10 +21,6 @@ on:
       write-caches:
         required: true
         type: string
-      machine-type:
-        required: false
-        type: string
-        default: cpu
     outputs:
       build-dir:
         description: |
@@ -53,14 +49,10 @@ jobs:
       - self-hosted # must come first
       - runner-group=${{ inputs.runner-group }}
       - environment=${{ inputs.runner-env }}
-      - ${{ inputs.machine-type }}
+      - cpu
       - os-family=Linux
     env:
-      BUILD_DIR: >-
-        ${{
-          (inputs.machine-type == 'arm64' && 'full-build-dir-arm64') ||
-                                             'full-build-dir'
-        }}
+      BUILD_DIR: full-build-dir
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
@@ -74,21 +66,13 @@ jobs:
           submodules: true
       - name: "Building IREE"
         env:
-          MACHINE_TYPE: ${{ inputs.machine-type }}
           IREE_WRITE_REMOTE_CCACHE: ${{ inputs.write-caches }}
         run: |
-          set -eou pipefail
-          if [[ "${MACHINE_TYPE}" == "arm64" ]]; then
-            BASE_DOCKER_IMAGE="gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353"
-          else
-            BASE_DOCKER_IMAGE="gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33"
-          fi
-
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=${BASE_DOCKER_IMAGE}" \
-            "${BASE_DOCKER_IMAGE}" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33" \
+            gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       # The archive step below doesn't include these files. Remove them first to
