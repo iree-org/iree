@@ -40,6 +40,7 @@ iree_lit_test_suite(
     iree-benchmark-module
     iree-benchmark-trace
     iree-compile
+    iree-dump-parameters
     iree-opt
     iree-run-mlir
     iree-run-module
