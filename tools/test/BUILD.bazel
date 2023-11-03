@@ -60,6 +60,7 @@ iree_lit_test_suite(
         "//tools:iree-benchmark-module",
         "//tools:iree-benchmark-trace",
         "//tools:iree-compile",
+        "//tools:iree-dump-parameters",
         "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "//tools:iree-run-module",
