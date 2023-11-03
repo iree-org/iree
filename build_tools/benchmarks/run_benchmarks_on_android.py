@@ -216,7 +216,7 @@ def adb_fetch_file(
     adb_execute(["mkdir", "-p", str(device_path.parent)], verbose=verbose)
 
     # Start a one-time netcat server to receive and save the file.
-    netcat_server = adb_start_cmd(
+    netcat_server = adb_execute(
         [
             "netcat",
             "-s",
