@@ -178,7 +178,7 @@ nav:
       - "Building":
           - "developers/building/bazel.md"
           - "developers/building/emscripten.md"
-          - "developers/building/cmake-options-and-variables.md"
+          - "developers/building/cmake-options.md"
           - "developers/building/cmake-with-ccache.md"
       - "Debugging":
           - "developers/debugging/android-with-lldb.md"
@@ -258,3 +258,4 @@ plugins:
 
         # "Developers" section was added
         "guides/developer-tips.md": "developers/general/developer-tips.md"
+        "developers/building/cmake-options-and-variables.md": "developers/building/cmake-options.md"

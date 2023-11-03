@@ -1,3 +1,7 @@
+---
+icon: material/lightbulb-on
+---
+
 # Usage best practices
 
 This page contains a list of best practices for getting the most out of IREE,

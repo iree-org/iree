@@ -1,3 +1,7 @@
+---
+icon: octicons/bug-16
+---
+
 # Integration test debugging
 
 This document includes tips for triaging integration test correctness issues.

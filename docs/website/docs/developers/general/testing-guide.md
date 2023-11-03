@@ -1,3 +1,7 @@
+---
+icon: octicons/code-16
+---
+
 # Testing guide
 
 Like the IREE project in general, IREE tests are divided into a few different

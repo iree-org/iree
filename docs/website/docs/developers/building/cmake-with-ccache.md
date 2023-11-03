@@ -1,3 +1,7 @@
+---
+icon: octicons/rocket-16
+---
+
 # CMake with `ccache`
 
 [`ccache`](https://ccache.dev/) is a compilation cache. In principle, just

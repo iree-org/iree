@@ -1,3 +1,7 @@
+---
+icon: octicons/book-16
+---
+
 # Developer overview
 
 This guide provides an overview of IREE's project structure and main tools for

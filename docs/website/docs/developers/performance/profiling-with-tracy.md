@@ -1,3 +1,7 @@
+---
+icon: material/chart-line
+---
+
 # Profiling with Tracy
 
 [Tracy](https://github.com/wolfpld/tracy) is a profiler that puts together in a

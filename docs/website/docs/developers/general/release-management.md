@@ -1,3 +1,7 @@
+---
+icon: octicons/package-16
+---
+
 # Release management
 
 IREE cuts automated releases via a workflow that is

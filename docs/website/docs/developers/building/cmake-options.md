@@ -1,6 +1,10 @@
-# CMake options and variables
+---
+icon: simple/cmake
+---
 
-## Frequently-used CMake variables
+# CMake options
+
+## Frequently-used CMake options
 
 ### `CMAKE_BUILD_TYPE`
 
@@ -17,7 +21,7 @@ This is the command that will be used as the `<LANG>` compiler, which are `C`
 and `CXX` in IREE. These variables are set to compile IREE with `clang` or
 rather `clang++`. Once set, these variables can not be changed.
 
-## IREE-specific CMake options and variables
+## IREE-specific CMake options
 
 This gives a brief explanation of IREE specific CMake options and variables.
 

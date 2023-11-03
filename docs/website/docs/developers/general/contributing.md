@@ -1,3 +1,7 @@
+---
+icon: octicons/code-review-16
+---
+
 # Contributing
 
 This is a more detailed version of the top-level

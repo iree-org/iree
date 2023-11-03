@@ -1,3 +1,7 @@
+---
+icon: octicons/stack-16
+---
+
 # Benchmark suites
 
 IREE Benchmarks Suites is a collection of benchmarks for IREE developers to

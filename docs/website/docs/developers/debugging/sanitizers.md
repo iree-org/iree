@@ -1,3 +1,7 @@
+---
+icon: material/broom
+---
+
 # Sanitizers (ASan/MSan/TSan)
 
 [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html),

@@ -1,4 +1,12 @@
-# CUDA backend
+---
+hide:
+  - tags
+tags:
+  - GPU
+  - CUDA
+---
+
+# CUDA backend design
 
 !!! note - "Authored March, 2021"
 
