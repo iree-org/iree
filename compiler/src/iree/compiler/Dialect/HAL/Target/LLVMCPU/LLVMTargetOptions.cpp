@@ -436,11 +436,12 @@ LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
   std::optional<LLVMTarget> maybeTarget =
       LLVMTarget::create(clTargetTriple, clTargetCPU, clTargetCPUFeatures,
                          /*requestLinkEmbedded=*/clLinkEmbedded);
-  if (!maybeTarget) {
+  if (maybeTarget) {
+    targetOptions.target = *maybeTarget;
+  } else {
     llvm::errs() << "Inconsistency in iree-llvmcpu-target-cpu-* command-line "
                     "flags. The target CPU is not properly defined.\n";
   }
-  targetOptions.target = *maybeTarget;
   LLVMTarget &target = targetOptions.target;
 
   static llvm::cl::opt<bool> llvmLoopInterleaving(
