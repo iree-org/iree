@@ -20,6 +20,14 @@ extern "C" {
 // iree_hal_cuda2_device_t
 //===----------------------------------------------------------------------===//
 
+// How command buffers are recorded and executed.
+typedef enum iree_hal_cuda_command_buffer_mode_e {
+  // Command buffers are recorded into CUDA graphs.
+  IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH = 0,
+  // Command buffers are directly issued against a CUDA stream.
+  IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM = 1,
+} iree_hal_cuda2_command_buffer_mode_t;
+
 // ncclUniqueId exposed without exporting the NCCL headers.
 typedef struct {
   char data[128];
@@ -65,6 +73,9 @@ typedef struct iree_hal_cuda2_device_params_t {
   // creating semaphore values quicker, though with increased memory
   // consumption.
   iree_host_size_t event_pool_capacity;
+
+  // Specifies how command buffers are recorded and executed.
+  iree_hal_cuda2_command_buffer_mode_t command_buffer_mode;
 
   // Enables tracing of command buffers when IREE tracing is enabled.
   // May take advantage of additional extensions for more accurate timing or

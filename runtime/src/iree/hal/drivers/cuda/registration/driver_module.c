@@ -6,7 +6,6 @@
 
 #include "iree/hal/drivers/cuda/registration/driver_module.h"
 
-#include <inttypes.h>
 #include <stddef.h>
 #include <stdlib.h>
 
