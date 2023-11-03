@@ -68,7 +68,7 @@ write access).
 ## Details
 
 For further details, see our
-[detailed contributing guide](/docs/developers/developing_iree/contributing.md), which is
+[detailed contributing guide](https://iree.dev/developers/contributing/), which is
 separate to avoid notifying everyone every time it changes.
 
 ## Community Guidelines
