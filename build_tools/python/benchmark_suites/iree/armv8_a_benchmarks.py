@@ -23,10 +23,7 @@ class Android_ARMv8_A_Benchmarks(object):
         tf_models.GPT2_117M_1x4_FP32_TF,
         tf_models.GPT2_117M_1x1_FP32_TF,
     ]
-    QUANT_MODELS = [
-        tflite_models.MOBILEBERT_INT8,
-        tflite_models.VIT_INT8_TFL,
-    ]
+    QUANT_MODELS = [tflite_models.MOBILEBERT_INT8]
 
     ARMV8_A_CPU_TARGET = iree_definitions.CompileTarget(
         target_architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,

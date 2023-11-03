@@ -138,9 +138,6 @@ X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
     common_definitions.CpuBenchmarkConfig(
         model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[8]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.VIT_INT8_TFL, threads=[8]
-    ),
 ]
 
 X86_64_BENCHMARK_CONFIG_LONG = [
