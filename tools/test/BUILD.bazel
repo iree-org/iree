@@ -18,12 +18,14 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "benchmark_flags.txt",
             "compile_pipelines.mlir",
             "compile_to_continuation.mlir",
             "compile_to_phase.mlir",
             "executable_benchmarks.mlir",
             "executable_sources.mlir",
             "iree-benchmark-module.mlir",
+            "iree-dump-parameters.txt",
             "iree-run-mlir.mlir",
             "iree-run-module.mlir",
             "iree-run-module-expected.mlir",
@@ -37,7 +39,10 @@ iree_lit_test_suite(
             "repeated_return.mlir",
             "scalars.mlir",
         ],
-        include = ["*.mlir"],
+        include = [
+            "*.mlir",
+            "*.txt",
+        ],
     ),
     cfg = "//tools:lit.cfg.py",
     data = [
@@ -62,19 +67,5 @@ iree_lit_test_suite(
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
         "@llvm-project//llvm:not",
-    ],
-)
-
-iree_lit_test_suite(
-    name = "benchmark_flags",
-    srcs = ["benchmark_flags.txt"],
-    cfg = "//tools:lit.cfg.py",
-    tags = [
-        "hostonly",
-    ],
-    tools = [
-        "//tools:iree-benchmark-module",
-        "//tools:iree-compile",
-        "@llvm-project//llvm:FileCheck",
     ],
 )

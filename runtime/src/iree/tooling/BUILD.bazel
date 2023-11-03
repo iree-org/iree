@@ -159,6 +159,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:parameter_index_provider",
         "//runtime/src/iree/io:parameter_provider",
+        "//runtime/src/iree/io:scope_map",
         "//runtime/src/iree/io/formats/gguf",
         "//runtime/src/iree/io/formats/safetensors",
         "//runtime/src/iree/modules/io/parameters",

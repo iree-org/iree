@@ -8,18 +8,17 @@
 #define IREE_TOOLING_PARAMETER_UTIL_H_
 
 #include "iree/base/api.h"
-#include "iree/io/parameter_provider.h"
 #include "iree/vm/api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
-// Creates a parameter provider from the file at |path|, if supported.
-iree_status_t iree_tooling_create_parameter_provider_from_file(
-    iree_string_view_t scope, iree_string_view_t path,
-    iree_allocator_t host_allocator,
-    iree_io_parameter_provider_t** out_provider);
+typedef struct iree_io_scope_map_t iree_io_scope_map_t;
+
+// Populates |scope_map| with parameter indices as specified by flags.
+iree_status_t iree_tooling_build_parameter_indices_from_flags(
+    iree_io_scope_map_t* scope_map);
 
 // Builds an I/O parameters module based on the runtime flags provided.
 iree_status_t iree_tooling_create_parameters_module_from_flags(

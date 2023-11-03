@@ -184,6 +184,7 @@ iree_cc_library(
     iree::io::parameter_index
     iree::io::parameter_index_provider
     iree::io::parameter_provider
+    iree::io::scope_map
     iree::modules::io::parameters
     iree::vm
   PUBLIC

@@ -72,3 +72,18 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
     ],
 )
+
+iree_runtime_cc_library(
+    name = "scope_map",
+    srcs = [
+        "scope_map.c",
+    ],
+    hdrs = [
+        "scope_map.h",
+    ],
+    deps = [
+        ":parameter_index",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)

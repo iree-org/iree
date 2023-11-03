@@ -87,6 +87,15 @@ IREE_API_EXPORT void iree_io_parameter_index_release(
   }
 }
 
+IREE_API_EXPORT iree_host_size_t
+iree_io_parameter_index_count(iree_io_parameter_index_t* index) {
+  IREE_ASSERT_ARGUMENT(index);
+  iree_slim_mutex_lock(&index->mutex);
+  iree_host_size_t count = index->entry_count;
+  iree_slim_mutex_unlock(&index->mutex);
+  return count;
+}
+
 static iree_status_t iree_io_parameter_index_reserve_unsafe(
     iree_io_parameter_index_t* index, iree_host_size_t new_capacity) {
   IREE_ASSERT_ARGUMENT(index);
@@ -166,6 +175,28 @@ iree_io_parameter_index_add(iree_io_parameter_index_t* index,
 
   iree_slim_mutex_unlock(&index->mutex);
   IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_io_parameter_index_get(
+    iree_io_parameter_index_t* index, iree_host_size_t i,
+    const iree_io_parameter_index_entry_t** out_entry) {
+  IREE_ASSERT_ARGUMENT(index);
+  IREE_ASSERT_ARGUMENT(out_entry);
+  *out_entry = NULL;
+  iree_slim_mutex_lock(&index->mutex);
+
+  iree_status_t status = iree_ok_status();
+  if (i < index->entry_count) {
+    *out_entry = index->entries[i];
+  } else {
+    status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "entry %" PRIhsz " out of range (have %" PRIhsz
+                              " entries in the index)",
+                              i, index->entry_count);
+  }
+
+  iree_slim_mutex_unlock(&index->mutex);
   return status;
 }
 
