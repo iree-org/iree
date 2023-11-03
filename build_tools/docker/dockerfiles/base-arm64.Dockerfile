@@ -29,13 +29,6 @@ COPY build_tools/docker/context/install_iree_deps.sh ./
 RUN  DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC ./install_iree_deps.sh "${LLVM_VERSION}" \
   && rm -rf /install-basics
 
-######## ccache ########
-
-WORKDIR /install-ccache
-
-COPY build_tools/docker/context/install_ccache.sh ./
-RUN ./install_ccache.sh && rm -rf /install-ccache
-
 ######## CMake ########
 WORKDIR /install-cmake
 
@@ -44,6 +37,13 @@ ENV CMAKE_VERSION="3.21.6"
 
 COPY build_tools/docker/context/install_cmake.sh ./
 RUN ./install_cmake.sh "${CMAKE_VERSION}" && rm -rf /install-cmake
+
+######## ccache ########
+
+WORKDIR /install-ccache
+
+COPY build_tools/docker/context/install_ccache.sh ./
+RUN ./install_ccache.sh && rm -rf /install-ccache
 
 ##############
 
