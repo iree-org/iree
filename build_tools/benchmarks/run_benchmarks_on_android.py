@@ -211,7 +211,7 @@ def adb_fetch_file(
     """
 
     if adb_path_exists(device_path, verbose):
-        return
+        return device_path
 
     adb_execute(["mkdir", "-p", str(device_path.parent)])
 
