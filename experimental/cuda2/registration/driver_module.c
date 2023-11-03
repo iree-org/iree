@@ -14,6 +14,14 @@
 #include "iree/base/internal/flags.h"
 
 IREE_FLAG(
+    bool, cuda2_use_streams, false,
+    "Use CUDA streams (instead of graphs) for executing command buffers.");
+
+IREE_FLAG(bool, cuda2_allow_inline_execution, false,
+          "Allow command buffers to execute inline against CUDA streams when\n"
+          "possible.");
+
+IREE_FLAG(
     bool, cuda2_async_allocations, true,
     "Enables CUDA asynchronous stream-ordered allocations when supported.");
 
@@ -90,6 +98,10 @@ static iree_status_t iree_hal_cuda2_driver_factory_try_create(
 
   iree_hal_cuda2_device_params_t device_params;
   iree_hal_cuda2_device_params_initialize(&device_params);
+  if (FLAG_cuda2_use_streams) {
+    device_params.command_buffer_mode =
+        IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
+  }
   device_params.stream_tracing = FLAG_cuda2_tracing;
   device_params.async_allocations = FLAG_cuda2_async_allocations;
 
