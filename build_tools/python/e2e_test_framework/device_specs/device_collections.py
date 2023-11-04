@@ -53,11 +53,10 @@ class DeviceCollection(object):
 
 ALL_DEVICE_SPECS = [
     # Pixel 6 Pro
-    # TODO(pzread): Re-enable Pixel 6 once the device is fixed.
-    # pixel_6_pro_specs.LITTLE_CORES,
-    # pixel_6_pro_specs.BIG_CORES,
-    # pixel_6_pro_specs.ALL_CORES,
-    # pixel_6_pro_specs.GPU,
+    pixel_6_pro_specs.LITTLE_CORES,
+    pixel_6_pro_specs.BIG_CORES,
+    pixel_6_pro_specs.ALL_CORES,
+    pixel_6_pro_specs.GPU,
     # Moto Edge X30
     moto_edge_x30_specs.GPU,
     # GCP machines
