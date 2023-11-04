@@ -565,7 +565,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
 
   // Bufferize and distribute.
   // We bufferize before distributing to threads there; so we are still at the
-  // block level. Therefore, need to allocate shared memory.
+  // block level. Therefore, need to allocate workgroup memory.
   addSPIRVBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
   // Perform various vector-level cross-op optimizations like load-store
