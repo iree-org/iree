@@ -5,6 +5,11 @@ on:
     - cron: "0 10 * * *"
 
   workflow_dispatch:
+    inputs:
+      release-commit:
+        description: "Explicit commit to release at (overrides green commit check)"
+        required: false
+        default: ""
 
 jobs:
   tag_release:
@@ -22,9 +27,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          latest_green="$(./build_tools/scripts/get_latest_green.sh)"
-          git checkout "${latest_green}"
-          echo "latest-green=${latest_green}" >> "${GITHUB_OUTPUT}"
+          if [ -z "${{ github.event.inputs.release-commit }}" ]; then
+            release_commit="$(./build_tools/scripts/get_latest_green.sh)"
+          else
+            release_commit="${{ github.event.inputs.release-commit }}"
+          fi
+          git checkout "${release_commit}"
+          echo "release-commit=${release_commit}" >> "${GITHUB_OUTPUT}"
 
       - name: Compute version
         run: |
@@ -48,7 +57,7 @@ jobs:
         with:
           tag_name: ${{ env.tag_name }}
           release_name: iree candidate ${{ env.tag_name }}
-          commitish: ${{ steps.last_green_commit.outputs.latest-green }}
+          commitish: ${{ steps.last_green_commit.outputs.release-commit }}
           body: |
             Automatic candidate release of iree.
           draft: true
@@ -65,5 +74,5 @@ jobs:
               "package_suffix": "",
               "package_version": "${{ env.package_version }}",
               "release_id": "${{ steps.create_release.outputs.id }}",
-              "commit": "${{ steps.last_green_commit.outputs.latest-green }}"
+              "commit": "${{ steps.last_green_commit.outputs.release-commit }}"
             }
