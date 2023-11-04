@@ -83,9 +83,9 @@ def GPUTileReduction :
   let constructor = "mlir::iree_compiler::createGPUTileReductionPass()";
 }
 
-def VectorReduceToGPU :
-    Pass<"iree-codegen-reduction-to-gpu", "func::FuncOp"> {
-  let summary = "Convert vector reduction to gpu ops.";
+def VectorReductionToGPU :
+    Pass<"iree-codegen-vector-reduction-to-gpu", "func::FuncOp"> {
+  let summary = "Convert vector reduction to GPU ops.";
   let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
 }
 
