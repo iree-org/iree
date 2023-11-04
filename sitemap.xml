@@ -326,11 +326,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://iree.dev/reference/mlir-dialects/IOParameters/</loc>
-         <lastmod>2023-11-04</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://iree.dev/reference/mlir-dialects/IREEInput/</loc>
          <lastmod>2023-11-04</lastmod>
          <changefreq>daily</changefreq>
