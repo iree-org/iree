@@ -48,7 +48,9 @@ imgui.ini
 # Source indexing files
 compile_commands.json
 .cache/clangd
-.clangd/
+
+# Language server configuration files
+.clangd
 
 # Pyenv files
 .python-version
