@@ -59,7 +59,7 @@ TEST(SafetensorsFormatTest, SingleTensor) {
       iree_io_parameter_index_lookup(index, IREE_SV("tensor0"), &entry0));
   EXPECT_TRUE(iree_string_view_equal(IREE_SV("tensor0"), entry0->key));
   EXPECT_TRUE(iree_const_byte_span_is_empty(entry0->metadata));
-  EXPECT_EQ(entry0->offset, 72);
+  EXPECT_EQ(entry0->storage.file.offset, 72);
   EXPECT_EQ(entry0->length, 16);
 
   iree_io_parameter_index_release(index);
@@ -79,7 +79,7 @@ TEST(SafetensorsFormatTest, MultipleTensors) {
       iree_io_parameter_index_lookup(index, IREE_SV("tensor0"), &entry0));
   EXPECT_TRUE(iree_string_view_equal(IREE_SV("tensor0"), entry0->key));
   EXPECT_TRUE(iree_const_byte_span_is_empty(entry0->metadata));
-  EXPECT_EQ(entry0->offset, 200);
+  EXPECT_EQ(entry0->storage.file.offset, 200);
   EXPECT_EQ(entry0->length, 16);
 
   const iree_io_parameter_index_entry_t* entry1 = NULL;
@@ -87,7 +87,7 @@ TEST(SafetensorsFormatTest, MultipleTensors) {
       iree_io_parameter_index_lookup(index, IREE_SV("tensor1"), &entry1));
   EXPECT_TRUE(iree_string_view_equal(IREE_SV("tensor1"), entry1->key));
   EXPECT_TRUE(iree_const_byte_span_is_empty(entry1->metadata));
-  EXPECT_EQ(entry1->offset, 216);
+  EXPECT_EQ(entry1->storage.file.offset, 216);
   EXPECT_EQ(entry1->length, 8);
 
   const iree_io_parameter_index_entry_t* entry2 = NULL;
@@ -95,7 +95,7 @@ TEST(SafetensorsFormatTest, MultipleTensors) {
       iree_io_parameter_index_lookup(index, IREE_SV("tensor2"), &entry2));
   EXPECT_TRUE(iree_string_view_equal(IREE_SV("tensor2"), entry2->key));
   EXPECT_TRUE(iree_const_byte_span_is_empty(entry2->metadata));
-  EXPECT_EQ(entry2->offset, 224);
+  EXPECT_EQ(entry2->storage.file.offset, 224);
   EXPECT_EQ(entry2->length, 48);
 
   iree_io_parameter_index_release(index);
