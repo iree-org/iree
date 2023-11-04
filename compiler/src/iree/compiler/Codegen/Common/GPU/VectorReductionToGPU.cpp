@@ -17,12 +17,19 @@
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-codegen-reduction-distribution"
+#define DEBUG_TYPE "iree-codegen-vector-reduction-to-gpu"
 
 namespace mlir {
 namespace iree_compiler {
+
+void debugPrint(func::FuncOp funcOp, const char *message) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- " << message << " ---//\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+}
 
 /// Emit shared local memory allocation in case it is needed when lowering the
 /// warp operations.
@@ -155,10 +162,11 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
   return result;
 }
 
-class VectorReduceToGPUPass
-    : public VectorReduceToGPUBase<VectorReduceToGPUPass> {
+class VectorReductionToGPUPass
+    : public VectorReductionToGPUBase<VectorReductionToGPUPass> {
 public:
-  explicit VectorReduceToGPUPass(std::function<int(func::FuncOp)> getWarpSize)
+  explicit VectorReductionToGPUPass(
+      std::function<int(func::FuncOp)> getWarpSize)
       : getWarpSize(getWarpSize) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -184,12 +192,7 @@ public:
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs()
-          << "\n--- After Step 1: Preprocessing of reduction ops ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #1: preprocessing reduction ops");
 
     auto workgroupSize = llvm::map_to_vector(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
@@ -214,20 +217,12 @@ public:
     builder.setInsertionPointToEnd(&warpOp.getWarpRegion().getBlocks().back());
     builder.create<vector::YieldOp>(loc);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Step 2: Adding the distribution op ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #2: wrapping code with the warp execute op");
 
     // 3. Hoist the scalar code outside of the warp region.
     moveScalarAndBindingUniformCode(warpOp);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Step 3: Hoist uniform code ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #3: hosting uniform code");
 
     // 4. Distribute transfer write operations and propagate vector
     // distribution.
@@ -259,11 +254,7 @@ public:
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Step 4: Propagate distribution ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #4: propagating distribution");
 
     // 5. Lower the remaining WarpExecuteOnLane0 ops.
     {
@@ -278,11 +269,7 @@ public:
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Step 5: Lower remaining ops ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #5: lowering remaing ops");
   }
 
 private:
@@ -294,7 +281,7 @@ private:
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
     std::function<int(func::FuncOp)> getWarpSize) {
-  return std::make_unique<VectorReduceToGPUPass>(getWarpSize);
+  return std::make_unique<VectorReductionToGPUPass>(getWarpSize);
 }
 
 } // namespace iree_compiler
