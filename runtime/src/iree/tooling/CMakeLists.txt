@@ -180,6 +180,7 @@ iree_cc_library(
     iree::base::internal::path
     iree::hal
     iree::io::formats::gguf
+    iree::io::formats::irpa
     iree::io::formats::safetensors
     iree::io::parameter_index
     iree::io::parameter_index_provider

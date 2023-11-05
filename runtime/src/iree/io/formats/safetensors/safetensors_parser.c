@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/io/formats/safetensors/safetensors_format.h"
+#include "iree/io/formats/safetensors/safetensors_parser.h"
 
 #include <ctype.h>
 
@@ -455,7 +455,7 @@ static iree_status_t iree_io_enumerate_safetensors_entries(
   return iree_io_parameter_index_add(entry_state->index, &entry);
 }
 
-IREE_API_EXPORT iree_status_t iree_io_parse_safetensors_index_from_memory(
+static iree_status_t iree_io_parse_safetensors_index_from_memory(
     iree_io_file_handle_t* file_handle, iree_const_byte_span_t file_contents,
     iree_io_parameter_index_t* index) {
   // Reads the header JSON blob out of the file contents and calculates the base

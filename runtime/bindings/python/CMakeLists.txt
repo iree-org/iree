@@ -89,6 +89,7 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::base::internal::path
   iree::io::file_handle
   iree::io::formats::gguf
+  iree::io::formats::irpa
   iree::io::formats::safetensors
   iree::io::parameter_index
   iree::io::parameter_index_provider
@@ -140,6 +141,8 @@ iree_py_library(
     "iree/_runtime/scripts/iree_benchmark_trace/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_module/__main__.py"
     "iree/_runtime/scripts/iree_cpuinfo/__main__.py"
+    "iree/_runtime/scripts/iree_convert_parameters/__main__.py"
+    "iree/_runtime/scripts/iree_create_parameters/__main__.py"
     "iree/_runtime/scripts/iree_dump_module/__main__.py"
     "iree/_runtime/scripts/iree_dump_parameters/__main__.py"
     "iree/_runtime/scripts/iree_run_trace/__main__.py"
@@ -163,8 +166,20 @@ iree_symlink_tool(
 
 iree_symlink_tool(
   TARGET runtime
+  FROM_TOOL_TARGET iree-convert-parameters
+  TO_EXE_NAME iree/_runtime_libs/iree-convert-parameters
+)
+
+iree_symlink_tool(
+  TARGET runtime
   FROM_TOOL_TARGET iree-cpuinfo
   TO_EXE_NAME iree/_runtime_libs/iree-cpuinfo
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-create-parameters
+  TO_EXE_NAME iree/_runtime_libs/iree-create-parameters
 )
 
 iree_symlink_tool(
@@ -315,6 +330,8 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
     iree-cpuinfo
     iree-benchmark-module
     iree-benchmark-trace
+    iree-convert-parameters
+    iree-create-parameters
     iree-dump-module
     iree-dump-parameters
     iree-run-module

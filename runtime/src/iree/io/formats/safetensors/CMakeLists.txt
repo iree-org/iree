@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     safetensors
   HDRS
-    "safetensors_format.h"
+    "safetensors_parser.h"
   SRCS
-    "safetensors_format.c"
+    "safetensors_parser.c"
   DEPS
     iree::base
     iree::io::file_handle
@@ -26,17 +26,14 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
-    safetensors_format_test
+    safetensors_parser_test
   SRCS
-    "safetensors_format_test.cc"
+    "safetensors_parser_test.cc"
   DEPS
     ::safetensors
-    iree::base::internal::file_io
     iree::io::formats::safetensors::testdata::safetensors_files
     iree::testing::gtest
     iree::testing::gtest_main
-  LABELS
-    "requires-filesystem"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_IO_FORMATS_SAFETENSORS_SAFETENSORS_FORMAT_H_
-#define IREE_IO_FORMATS_SAFETENSORS_SAFETENSORS_FORMAT_H_
+#ifndef IREE_IO_FORMATS_SAFETENSORS_SAFETENSORS_PARSER_H_
+#define IREE_IO_FORMATS_SAFETENSORS_SAFETENSORS_PARSER_H_
 
 #include "iree/base/api.h"
 #include "iree/io/file_handle.h"
@@ -38,4 +38,4 @@ IREE_API_EXPORT iree_status_t iree_io_parse_safetensors_index(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_IO_FORMATS_SAFETENSORS_SAFETENSORS_FORMAT_H_
+#endif  // IREE_IO_FORMATS_SAFETENSORS_SAFETENSORS_PARSER_H_
