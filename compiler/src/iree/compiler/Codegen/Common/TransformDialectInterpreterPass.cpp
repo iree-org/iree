@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
@@ -20,62 +21,66 @@ namespace {
 /// This needs to be its own pass because the registration mechanism and ops
 /// available are different than for other interpreters.
 class TransformDialectInterpreterPass
-    : public mlir::transform::TransformInterpreterPassBase<
-          TransformDialectInterpreterPass,
-          iree_compiler::TransformDialectInterpreterBase> {
+    : public iree_compiler::TransformDialectInterpreterBase<
+          TransformDialectInterpreterPass> {
 public:
+  TransformDialectInterpreterPass(StringRef libraryFileName = StringRef(),
+                                  StringRef entryPoint = StringRef()) {
+    this->libraryFileName = libraryFileName.str();
+    this->entryPoint = entryPoint.str();
+  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::iree_compiler::registerTransformDialectTranslationDependentDialects(
         registry);
   }
 
-  // We don't register libraries here because we expect them to be pre-loaded
-  // much earlier on in the compiler pipeline.
-  TransformDialectInterpreterPass(
-      StringRef transformFileName = StringRef(),
-      StringRef debugPayloadRootTag = StringRef(),
-      StringRef debugTransformRootTag = StringRef()) {
-    this->transformFileName = transformFileName.str();
-    this->debugPayloadRootTag = debugPayloadRootTag.str();
-    this->debugTransformRootTag = debugTransformRootTag.str();
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    transform::TransformOptions options;
+    if (entryPoint.empty()) {
+      entryPoint =
+          transform::TransformDialect::kTransformEntryPointSymbolName.str();
+    }
+    auto dialect = context->getOrLoadDialect<
+        mlir::iree_compiler::IREE::Codegen::IREECodegenDialect>();
+    FailureOr<ModuleOp> maybeTransformLibrary;
+    if (!libraryFileName.empty()) {
+      maybeTransformLibrary =
+          dialect->getOrLoadTransformLibraryModule(libraryFileName);
+    }
+
+    Operation *payloadRoot = getOperation();
+    ModuleOp transformModule =
+        succeeded(maybeTransformLibrary) ? *maybeTransformLibrary : ModuleOp();
+    Operation *transformEntryPoint = transform::detail::findTransformEntryPoint(
+        getOperation(), transformModule, entryPoint);
+    if (!transformEntryPoint) {
+      Operation *transformModuleOrPayloadRoot =
+          transformModule ? transformModule : payloadRoot;
+      transformModuleOrPayloadRoot->emitError()
+          << "failed to find transform entry point '" << entryPoint << "'";
+      return signalPassFailure();
+    }
+    if (failed(transform::applyTransformNamedSequence(
+            payloadRoot, transformEntryPoint, transformModule,
+            options.enableExpensiveChecks(true))))
+      return signalPassFailure();
   }
-  TransformDialectInterpreterPass(const TransformDialectInterpreterPass &pass) =
-      default;
 };
 } // namespace
 
 namespace mlir {
 namespace iree_compiler {
 
-extern llvm::cl::opt<std::string> clCodegenTransformDialectTestName;
-static llvm::cl::opt<std::string> clCodegenTransformDialectDebugPayloadTag(
-    "iree-codegen-transform-dialect-debug-payload-tag",
-    llvm::cl::desc("tag attribute value for the transform dialect interpreter "
-                   "payload root operation"),
-    llvm::cl::init(""));
-static llvm::cl::opt<std::string> clCodegenTransformDialectDebugTransformTag(
-    "iree-codegen-transform-dialect-debug-transform-tag",
-    llvm::cl::desc(
-        "tag attribute value for the transform dialect transform op container"),
-    llvm::cl::init(""));
+extern llvm::cl::opt<std::string> clCodegenTransformDialectStrategyName;
+extern llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName;
 
 /// Create a Transform dialect interpreter pass.
-std::unique_ptr<Pass>
-createTransformDialectInterpreterPass(llvm::StringRef transformFileName,
-                                      llvm::StringRef debugPayloadRootTag,
-                                      llvm::StringRef debugTransformRootTag) {
-  // If the strategy filename is prefixed with `@`, it refers to a library
-  // call.
-  std::string clFileName = !clCodegenTransformDialectTestName.empty() &&
-                                   clCodegenTransformDialectTestName[0] != '@'
-                               ? clCodegenTransformDialectTestName
-                               : std::string();
+std::unique_ptr<Pass> createTransformDialectInterpreterPass() {
   return std::make_unique<TransformDialectInterpreterPass>(
-      transformFileName.empty() ? clFileName : transformFileName,
-      debugPayloadRootTag.empty() ? clCodegenTransformDialectDebugPayloadTag
-                                  : debugPayloadRootTag,
-      debugTransformRootTag.empty() ? clCodegenTransformDialectDebugTransformTag
-                                    : debugTransformRootTag);
+      clCodegenTransformDialectLibraryFileName,
+      clCodegenTransformDialectStrategyName);
 }
 } // namespace iree_compiler
 } // namespace mlir

@@ -81,7 +81,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 }
 
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 // CHECK:   transform.iree.register_match_callbacks
 // CHECK:   %[[MATCH:.+]]:2 = transform.iree.match_callback failures(propagate) "batch_matmul"
 // CHECK:   %[[TILED:.+]], %[[FORALL:.+]] = transform.structured.tile_using_forall %[[MATCH]]#1
@@ -98,7 +98,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   %[[PADDED:.+]], %{{.*}}, %{{.+}} = transform.structured.pad %tiled_linalg_op
 // CHECK:     pack_paddings = [1, 1, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3]
 // CHECK:     padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
-// CHECK:   %[[V3:.+]] = get_producer_of_operand %[[PADDED]][2]
+// CHECK:   %[[V3:.+]] = transform.get_producer_of_operand %[[PADDED]][2]
 // CHECK:   transform.structured.hoist_pad %{{.*}} by 1 loops
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
@@ -109,8 +109,8 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.apply_cse
 // CHECK:   transform.structured.match ops{["tensor.parallel_insert_slice"]}
 // CHECK:   transform.structured.insert_slice_to_copy
-// CHECK:   %[[LHS:.+]] = get_producer_of_operand %[[PADDED]][0]
-// CHECK:   %[[RHS:.+]] = get_producer_of_operand %[[PADDED]][1]
+// CHECK:   %[[LHS:.+]] = transform.get_producer_of_operand %[[PADDED]][0]
+// CHECK:   %[[RHS:.+]] = transform.get_producer_of_operand %[[PADDED]][1]
 // CHECK:   %[[RHS_DPS:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS]]
 
 // CHECK:   transform.structured.tile_using_forall %[[LHS]] 

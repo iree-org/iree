@@ -198,7 +198,7 @@ void GenericVectorizationPass::runOnOperation() {
     if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
       candidates.push_back(op);
   });
-  for (auto op : candidates) {
+  for (Operation *op : candidates) {
     SmallVector<int64_t> vectorSizes;
     SmallVector<bool> scalableVecDims;
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {

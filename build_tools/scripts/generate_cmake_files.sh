@@ -17,4 +17,4 @@ cd "${ROOT_DIR}"
   --output_dir ./tests/e2e/test_artifacts
 
 ./build_tools/testing/generate_cmake_e2e_model_tests.py \
-  --output ./tests/e2e/models/generated_e2e_model_tests.cmake
+  --output ./tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake

@@ -44,6 +44,7 @@ iree_lit_test_suite(
     "iree_comprehensive_bufferize.mlir"
     "iree_expand_strided_metadata.mlir"
     "lower_ukernel_to_calls.mlir"
+    "materialize_encoding_into_nop.mlir"
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"
     "reductions.mlir"
@@ -55,14 +56,12 @@ iree_lit_test_suite(
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
     "transform_buffer_opt.mlir"
-    "transform_dialect_apply_pattern_op.mlir"
     "transform_match_partial_reduction.mlir"
     "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
     "type_propagation_packing.mlir"
     "vectorize_tensor_pad.mlir"
-    "warp_reduction.mlir"
     "workgroup_specialization.mlir"
   TOOLS
     FileCheck

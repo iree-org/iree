@@ -550,7 +550,8 @@ int main(int argc, char** argv) {
 
   // Parse command line flags.
   iree_flags_set_usage("iree-dump-module",
-                       "Dumps IREE VM module details to stdout.\n");
+                       "Dumps IREE VM module details to stdout.\n"
+                       "$ iree-dump-module [--output=...] module.vmfb\n");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
 
   if (argc < 2) {

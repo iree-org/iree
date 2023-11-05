@@ -72,6 +72,10 @@ public:
     return getActualLevel(VectorCommonParallelTiles);
   }
 
+  /// Returns true if the tiling configuration has vector inner parallel
+  /// dimensions
+  bool hasVectorInnerParallelLevel() { return getNumTilingLevels() > 3; }
+
   /// Returns the tiling level for vector inner parallel dimensions.
   unsigned getVectorInnerParallelLevel() {
     return getActualLevel(VectorInnerParallelTiles);

@@ -9,9 +9,12 @@
 #include <mutex>
 
 #include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/AArch64TargetParser.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/TargetParser/Triple.h"
@@ -25,29 +28,88 @@ namespace HAL {
 
 namespace {
 
-// Defaults for key fields on the host that we use in various logic below.
-struct HostDefaults {
-  std::string triple;
-  std::string cpu;
-  std::string cpuFeatures;
-
-  static const HostDefaults &get() {
-    static HostDefaults hostDefaults = ([]() {
-      // Get process target triple along with host CPU name and features.
-      std::string triple = llvm::sys::getProcessTriple();
-      std::string cpu = llvm::sys::getHostCPUName().str();
-      llvm::SubtargetFeatures features;
-      llvm::StringMap<bool> hostFeatures;
-      if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
-        for (auto &feature : hostFeatures) {
-          features.AddFeature(feature.first(), feature.second);
-        }
+bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
+                              llvm::StringRef inCpuFeatures,
+                              const llvm::Triple &triple, std::string &outCpu,
+                              std::string &outCpuFeatures) {
+  // Resolve "host"
+  if (inCpu == "host" || inCpuFeatures == "host") {
+    // If either Cpu or CpuFeatures is "host", the other must be either also
+    // host or the default value.
+    bool isCpuHostOrDefault =
+        inCpu.empty() || inCpu == "host" || inCpu == "generic";
+    bool isCpuFeaturesHostOrDefault =
+        inCpuFeatures.empty() || inCpuFeatures == "host";
+    if (!(isCpuHostOrDefault && isCpuFeaturesHostOrDefault)) {
+      llvm::errs()
+          << "error: If either cpu or CpuFeatures is `host`, the other must "
+             "be either also `host` or the default value\n";
+      return false;
+    }
+    outCpu = llvm::sys::getHostCPUName().str();
+    llvm::SubtargetFeatures features;
+    llvm::StringMap<bool> hostFeatures;
+    if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
+      for (auto &feature : hostFeatures) {
+        features.AddFeature(feature.first(), feature.second);
       }
-      return HostDefaults{triple, cpu, features.getString()};
-    })();
-    return hostDefaults;
+    }
+    outCpuFeatures = features.getString();
+  } else {
+    outCpu = inCpu;
+    outCpuFeatures = inCpuFeatures;
   }
-};
+
+  // Target-specific CPU feature tweaks that we need unconditionally.
+  if (triple.isAArch64()) {
+    llvm::SubtargetFeatures targetCpuFeatures(outCpuFeatures);
+    // x18 is platform-reserved per the Aarch64 procedure call specification.
+    targetCpuFeatures.AddFeature("reserve-x18", true);
+    outCpuFeatures = targetCpuFeatures.getString();
+  }
+
+  // If CPU is non-host and non-generic then we need to populate the
+  // corresponding features.
+  if (inCpu == "host" || inCpu == "generic" || inCpu.starts_with("generic-")) {
+    return true;
+  }
+  if (triple.isX86()) {
+    llvm::SubtargetFeatures targetCpuFeatures(outCpuFeatures);
+    llvm::SmallVector<llvm::StringRef> cpuFeatureList;
+    llvm::X86::getFeaturesForCPU(outCpu, cpuFeatureList);
+    for (auto &feature : cpuFeatureList) {
+      targetCpuFeatures.AddFeature(feature);
+    }
+    outCpuFeatures = targetCpuFeatures.getString();
+  } else if (triple.isAArch64()) {
+    std::vector<std::string> UpdatedFeaturesVec;
+    std::optional<llvm::AArch64::CpuInfo> cpuInfo =
+        llvm::AArch64::parseCpu(outCpu);
+    if (!cpuInfo) {
+      llvm::errs() << "error: Failed to resolve AArch64 CPU features for the "
+                      "specified CPU.\n";
+      return false;
+    }
+    auto cpuExts = cpuInfo->getImpliedExtensions();
+    std::vector<StringRef> cpuExtFeatures;
+    llvm::AArch64::getExtensionFeatures(cpuExts, cpuExtFeatures);
+    for (auto feature : cpuExtFeatures) {
+      if (!outCpuFeatures.empty()) {
+        outCpuFeatures.append(",");
+      }
+      outCpuFeatures.append(feature);
+    }
+  } else {
+    llvm::errs()
+        << "error: Resolution of target CPU to target CPU features is not "
+           "implemented on "
+           "this target architecture. Pass explicit CPU features "
+           "instead of a CPU "
+           "on this architecture, or implement that.\n";
+    return false;
+  }
+  return true;
+}
 
 } // namespace
 
@@ -72,60 +134,39 @@ LLVMTarget::LLVMTarget() {
   llvmTargetOptions.UniqueSectionNames = true;
 }
 
-LLVMTarget::LLVMTarget(std::string_view triple, std::string_view cpu,
-                       std::string_view cpuFeatures, bool requestLinkEmbedded)
-    : LLVMTarget() {
-  const HostDefaults &hostDefaults = HostDefaults::get();
-  this->linkEmbedded = requestLinkEmbedded;
-  this->triple = triple;
-  if (cpu == "host") {
-    this->cpu = hostDefaults.cpu;
-  } else {
-    this->cpu = cpu;
-  }
-  if (cpuFeatures == "host") {
-    this->cpuFeatures = hostDefaults.cpuFeatures;
-  } else {
-    this->cpuFeatures = cpuFeatures;
-  }
-  if (cpu != "host" && cpu != "generic") {
-    addTargetCPUFeaturesForCPU();
-  }
+std::optional<LLVMTarget> LLVMTarget::create(std::string_view triple,
+                                             std::string_view cpu,
+                                             std::string_view cpuFeatures,
+                                             bool requestLinkEmbedded) {
+  LLVMTarget target;
+  target.linkEmbedded = requestLinkEmbedded;
 
-  llvm::Triple targetTriple(this->triple);
-  // TODO(muralivi): Move this into `addTargetCPUFeaturesForCPU`, after fixing
-  // the predicate for when `addTargetCPUFeaturesForCPU` is called (i.e.
-  // removing the condition that clTargetCPU is neither host nor generic).
-  if (llvm::Triple(this->triple).isAArch64()) {
-    llvm::SubtargetFeatures targetCpuFeatures(this->cpuFeatures);
-    targetCpuFeatures.AddFeature("reserve-x18", true);
-    this->cpuFeatures = targetCpuFeatures.getString();
-  }
-
+  target.triple = triple;
+  llvm::Triple targetTriple(target.triple);
   // Special casing if linkEmbedded.
   if (targetTriple.isWasm()) {
     // The embedded ELF loader is not supported on WebAssembly, so force it off.
-    this->linkEmbedded = false;
+    target.linkEmbedded = false;
   }
-  if (this->linkEmbedded) {
+  if (target.linkEmbedded) {
     // Force the triple to something compatible with embedded linking.
     targetTriple.setVendor(llvm::Triple::VendorType::UnknownVendor);
     targetTriple.setEnvironment(llvm::Triple::EnvironmentType::EABI);
     targetTriple.setOS(llvm::Triple::OSType::UnknownOS);
     targetTriple.setObjectFormat(llvm::Triple::ObjectFormatType::ELF);
-    this->triple = targetTriple.str();
+    target.triple = targetTriple.str();
   }
+  if (!resolveCPUAndCPUFeatures(cpu, cpuFeatures, llvm::Triple(triple),
+                                target.cpu, target.cpuFeatures)) {
+    return {};
+  }
+  return target;
 }
 
-const LLVMTarget &LLVMTarget::getForHost() {
-  static LLVMTarget hostTarget = ([]() {
-    const HostDefaults &hostDefaults = HostDefaults::get();
-    return LLVMTarget(hostDefaults.triple, hostDefaults.cpu,
-                      hostDefaults.cpuFeatures,
-                      /*requestLinkEmbedded=*/true);
-  })();
-
-  return hostTarget;
+std::optional<LLVMTarget> LLVMTarget::createForHost() {
+  return LLVMTarget::create(llvm::sys::getProcessTriple(), /*cpu=*/"host",
+                            /*cpuFeatures=*/"host",
+                            /*requestLinkEmbedded=*/true);
 }
 
 void LLVMTarget::print(llvm::raw_ostream &os) const {
@@ -269,15 +310,15 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
                         "accompanied by 'target_triple'";
       return {};
     }
-    target.triple = *triple;
-    target.cpu = cpu ? *cpu : "generic";
-    target.cpuFeatures = cpuFeatures ? *cpuFeatures : "";
-    target.linkEmbedded = linkEmbedded;
+    std::optional<LLVMTarget> maybeTarget =
+        LLVMTarget::create(*triple, cpu ? *cpu : "generic",
+                           cpuFeatures ? *cpuFeatures : "", linkEmbedded);
+    if (!maybeTarget) {
+      return {};
+    }
+    target.copy(*maybeTarget);
   } else {
-    target.triple = defaultTarget.triple;
-    target.cpu = defaultTarget.cpu;
-    target.cpuFeatures = defaultTarget.cpuFeatures;
-    target.linkEmbedded = defaultTarget.linkEmbedded;
+    target.copy(defaultTarget);
   }
 
   // Loose items.
@@ -329,20 +370,6 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   return target;
 }
 
-void LLVMTarget::addTargetCPUFeaturesForCPU() {
-  if (!llvm::Triple(triple).isX86()) {
-    // Currently only implemented on x86.
-    return;
-  }
-  llvm::SubtargetFeatures targetCpuFeatures(cpuFeatures);
-  llvm::SmallVector<llvm::StringRef> cpuFeatureList;
-  llvm::X86::getFeaturesForCPU(cpu, cpuFeatureList);
-  for (auto &feature : cpuFeatureList) {
-    targetCpuFeatures.AddFeature(feature);
-  }
-  cpuFeatures = targetCpuFeatures.getString();
-}
-
 void LLVMTargetOptions::initializeTargetInvariantFlags() {
   static llvm::cl::opt<std::string> clSystemLinkerPath(
       "iree-llvmcpu-system-linker-path",
@@ -374,21 +401,23 @@ void LLVMTargetOptions::initializeTargetInvariantFlags() {
 
 LLVMTargetOptions LLVMTargetOptions::getHostOptions() {
   LLVMTargetOptions targetOptions;
-  targetOptions.target = LLVMTarget::getForHost();
+  std::optional<LLVMTarget> maybeTarget = LLVMTarget::createForHost();
+  if (!maybeTarget)
+    return {};
+  targetOptions.target = *maybeTarget;
   targetOptions.initializeTargetInvariantFlags();
   return targetOptions;
 }
 
 LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
   LLVMTargetOptions targetOptions;
-  const HostDefaults &hostDefaults = HostDefaults::get();
   targetOptions.initializeTargetInvariantFlags();
 
   // Target parameters.
   static llvm::cl::opt<std::string> clTargetTriple(
       "iree-llvmcpu-target-triple",
       llvm::cl::desc("LLVM target machine triple"),
-      llvm::cl::init(hostDefaults.triple));
+      llvm::cl::init(llvm::sys::getProcessTriple()));
   static llvm::cl::opt<std::string> clTargetCPU(
       "iree-llvmcpu-target-cpu",
       llvm::cl::desc(
@@ -404,9 +433,15 @@ LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
       llvm::cl::desc("Links binaries into a platform-agnostic ELF to be loaded "
                      "by the embedded IREE ELF loader"),
       llvm::cl::init(LLVMTarget::DEFAULT_LINK_EMBEDDED));
-  targetOptions.target =
-      LLVMTarget(clTargetTriple, clTargetCPU, clTargetCPUFeatures,
-                 /*requestLinkEmbedded=*/clLinkEmbedded);
+  std::optional<LLVMTarget> maybeTarget =
+      LLVMTarget::create(clTargetTriple, clTargetCPU, clTargetCPUFeatures,
+                         /*requestLinkEmbedded=*/clLinkEmbedded);
+  if (maybeTarget) {
+    targetOptions.target = *maybeTarget;
+  } else {
+    llvm::errs() << "Inconsistency in iree-llvmcpu-target-cpu-* command-line "
+                    "flags. The target CPU is not properly defined.\n";
+  }
   LLVMTarget &target = targetOptions.target;
 
   static llvm::cl::opt<bool> llvmLoopInterleaving(

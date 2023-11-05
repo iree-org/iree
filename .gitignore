@@ -25,6 +25,10 @@ build-*/
 # Bazel artifacts
 **/bazel-*
 
+# Executables
+*.exe
+*.out
+
 # Local-only config options
 configured.bazelrc
 user.bazelrc
@@ -44,7 +48,9 @@ imgui.ini
 # Source indexing files
 compile_commands.json
 .cache/clangd
-.clangd/
+
+# Language server configuration files
+.clangd
 
 # Pyenv files
 .python-version

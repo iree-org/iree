@@ -74,7 +74,7 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
     auto arg = llvm::cast<BlockArgument>(v);
     return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
-          Value initOperand = forOp.getOpOperandForRegionIterArg(arg).get();
+          Value initOperand = forOp.getTiedLoopInit(arg)->get();
           if (plan.isEquivalent(arg, initOperand)) {
             return isFromReadOnlyTensor(initOperand, plan);
           }

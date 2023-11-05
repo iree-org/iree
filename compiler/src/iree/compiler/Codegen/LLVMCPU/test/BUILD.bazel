@@ -6,8 +6,8 @@
 
 # Tests for common transforms.
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -38,7 +38,6 @@ iree_lit_test_suite(
             "lower_to_ukernel_ops.mlir",
             "materialize_aarch64_launch_configuration.mlir",
             "materialize_configuration_without_distribution.mlir",
-            "materialize_encoding.mlir",
             "materialize_riscv_launch_configuration.mlir",
             "materialize_vmvx_launch_configuration.mlir",
             "materialize_x86_64_launch_configuration.mlir",
@@ -56,7 +55,6 @@ iree_lit_test_suite(
             "tile.mlir",
             "tile_and_fuse.mlir",
             "transform_dialect_bufferize.mlir",
-            "transform_dialect_iree_tile_to_forall.mlir",
             "transpose_avx2_lowering.mlir",
             "unfused_fma.mlir",
             "vector_contract_to_arm_asm.mlir",

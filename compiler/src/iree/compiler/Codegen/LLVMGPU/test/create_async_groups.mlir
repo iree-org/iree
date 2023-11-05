@@ -21,13 +21,15 @@ builtin.module {
     // CHECK: nvgpu.device_async_wait %[[G]]
     return
   }
+}
 
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.create_async_groups %top_level_func {use_mma_sync} : (!transform.any_op) -> ()
+    transform.yield 
   }
-}
+} // module
 
 // -----
 
@@ -53,13 +55,15 @@ builtin.module {
     // CHECK: nvgpu.device_async_wait %[[G]]
     return
   }
+}
 
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.create_async_groups %top_level_func : (!transform.any_op) -> ()
+    transform.yield 
   }
-}
+} // module
 
 // -----
 
@@ -80,15 +84,17 @@ builtin.module {
     vector.transfer_write %2, %0[%c0, %c4, %c0] {in_bounds = [true]} : vector<1xf32>, memref<4x32x16xf32, #gpu.address_space<workgroup>>
     return
   }
+}
 
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %vector_transfer = transform.structured.match ops{["memref.alloc"]} in %top_level_func : (!transform.any_op) -> !transform.any_op
     // expected-error@below {{transform applied to the wrong op kind}}
     transform.iree.create_async_groups %vector_transfer : (!transform.any_op) -> ()
+    transform.yield 
   }
-}
+} // module
 
 // -----
 
@@ -112,13 +118,15 @@ builtin.module {
     // CHECK: nvgpu.device_async_wait %[[G]]
     return
   }
+}
 
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.create_async_groups %top_level_func : (!transform.any_op) -> ()
+    transform.yield 
   }
-}
+} // module
 
 // -----
 
@@ -148,10 +156,12 @@ builtin.module {
     // CHECK-NOT: nvgpu.device_async_create_group
     return
   }
+}
 
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.create_async_groups %top_level_func : (!transform.any_op) -> ()
+    transform.yield 
   }
-}
+} // module

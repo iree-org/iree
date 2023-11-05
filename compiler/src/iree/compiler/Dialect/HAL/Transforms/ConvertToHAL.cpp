@@ -21,6 +21,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Modules/IO/Parameters/IR/IOParametersDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -51,6 +52,9 @@ public:
     registry.insert<IREE::HAL::HALDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
+
+    // TODO(benvanik): add a registration system for extra dialects?
+    registry.insert<IREE::IO::Parameters::IOParametersDialect>();
   }
 
   StringRef getArgument() const override { return "iree-hal-conversion"; }

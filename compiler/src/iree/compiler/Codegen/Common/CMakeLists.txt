@@ -91,6 +91,7 @@ iree_cc_library(
     "IREEExpandStridedMetadata.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LowerUKernelsToCalls.cpp"
+    "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
     "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"
@@ -115,6 +116,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms
+    IREELinalgExtUtils
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect

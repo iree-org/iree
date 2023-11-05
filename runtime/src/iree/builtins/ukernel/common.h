@@ -461,14 +461,17 @@ enum {
   IREE_UK_TYPE_OPAQUE_16 = IREE_UK_TYPE_CATEGORY_OPAQUE | 4,
   IREE_UK_TYPE_OPAQUE_32 = IREE_UK_TYPE_CATEGORY_OPAQUE | 5,
   IREE_UK_TYPE_OPAQUE_64 = IREE_UK_TYPE_CATEGORY_OPAQUE | 6,
+  IREE_UK_TYPE_INT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 2,
   IREE_UK_TYPE_INT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 3,
   IREE_UK_TYPE_INT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 4,
   IREE_UK_TYPE_INT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 5,
   IREE_UK_TYPE_INT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 6,
+  IREE_UK_TYPE_SINT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 2,
   IREE_UK_TYPE_SINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 3,
   IREE_UK_TYPE_SINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 4,
   IREE_UK_TYPE_SINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 5,
   IREE_UK_TYPE_SINT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 6,
+  IREE_UK_TYPE_UINT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 2,
   IREE_UK_TYPE_UINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 3,
   IREE_UK_TYPE_UINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 4,
   IREE_UK_TYPE_UINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 5,
@@ -531,7 +534,9 @@ static inline iree_uk_uint8_t iree_uk_integer_type_as_unsigned(
 // The current implementation might return a negative value, but don't rely on
 // that.
 static inline int iree_uk_type_size_log2(iree_uk_type_t t) {
-  return iree_uk_type_bit_count_log2(t) - 3;
+  int bit_count_log2 = iree_uk_type_bit_count_log2(t);
+  IREE_UK_ASSERT(bit_count_log2 >= 3);
+  return bit_count_log2 - 3;
 }
 
 static inline int iree_uk_type_bit_count(iree_uk_type_t t) {
@@ -543,6 +548,21 @@ static inline int iree_uk_type_bit_count(iree_uk_type_t t) {
 // compiler to assume this can't happen.
 static inline int iree_uk_type_size(iree_uk_type_t t) {
   return 1 << iree_uk_type_size_log2(t);
+}
+
+// Helper to correctly convert a bit-size to a byte-size, rounding up if the
+// bit-size is not a multiple of 8.
+static inline iree_uk_index_t iree_uk_bits_to_bytes_rounding_up(
+    iree_uk_index_t bits) {
+  return (bits + 7) / 8;
+}
+
+// Helper to correctly convert a bit-size to a byte-size, asserting that the
+// bit-size is a multiple of 8.
+static inline iree_uk_index_t iree_uk_bits_to_bytes_exact(
+    iree_uk_index_t bits) {
+  IREE_UK_ASSERT(!(bits % 8));
+  return bits / 8;
 }
 
 //===----------------------------------------------------------------------===//
@@ -683,6 +703,12 @@ static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
 // Adapted from runtime/src/iree/base/internal/math.h.
 //===----------------------------------------------------------------------===//
 
+// NOTE: We used to have code here using built-in _Float16 type support.
+// It worked well (https://godbolt.org/z/3a6WM39M1) until it didn't for
+// some people (#14549). It's not worth the hassle, this is only used
+// in slow generic fallbacks or test code, and we weren't able to use
+// a builtin for bf16 anyway.
+
 #define IREE_UK_FP_FORMAT_CONSTANTS(prefix, bits, ebits)            \
   const int prefix##exp_bits IREE_UK_ATTRIBUTE_UNUSED = ebits;      \
   const int prefix##mantissa_bits IREE_UK_ATTRIBUTE_UNUSED =        \
@@ -804,55 +830,16 @@ static inline iree_uk_uint16_t iree_uk_f32_to_generic_fp16(float value,
   return f16_value;
 }
 
-// https://godbolt.org/z/3a6WM39M1 shows that _Float16 <-> float conversions
-// work on:
-// * Clang >= 15 on x86-64
-// * Clang >= 13 on riscv32
-// * Clang >= 9 on arm64 and arm32
-// * GCC >= 13 on arm64 and riscv32
-// * GCC >= 12 on x86-64
-// We have to limit this to x86 and Arm architectures at the moment, because:
-// * On RISC-V this compiles, but the resulting references to builtin functions
-//   cause linking error in some of our CI configurations.
-// * On Wasm this just fails to compile.
-#if (defined(IREE_UK_ARCH_X86_32) || defined(IREE_UK_ARCH_X86_64) ||  \
-     defined(IREE_UK_ARCH_ARM_32) || defined(IREE_UK_ARCH_ARM_64)) && \
-    (IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(15, 0) ||                \
-     IREE_UK_COMPILER_GCC_VERSION_AT_LEAST(13, 0))
-#define IREE_UK_HAVE_BUILTIN_FLOAT16
-#endif  // Compiler and architecture checks for _Float16.
-
 // Converts a fp16 value to a 32-bit C `float`.
 static inline float iree_uk_f16_to_f32(iree_uk_uint16_t f16_value) {
-#ifdef IREE_UK_HAVE_BUILTIN_FLOAT16
-  _Float16 builtin_float16_value;
-  iree_uk_memcpy(&builtin_float16_value, &f16_value, sizeof f16_value);
-  return (float)builtin_float16_value;
-#else
   return iree_uk_generic_fp16_to_f32(f16_value, 5);
-#endif
 }
 
 // Converts a 32-bit C `float` value to a fp16 value, rounding to nearest
 // even.
 static inline iree_uk_uint16_t iree_uk_f32_to_f16(float value) {
-#ifdef IREE_UK_HAVE_BUILTIN_FLOAT16
-  _Float16 builtin_float16_value = (_Float16)value;
-  iree_uk_uint16_t f16_value;
-  iree_uk_memcpy(&f16_value, &builtin_float16_value, sizeof f16_value);
-  return f16_value;
-#else
   return iree_uk_f32_to_generic_fp16(value, 5);
-#endif
 }
-
-// TODO(bjacob): Use the built-in compiler type __bf16 when available.
-// It is mentioned at
-//   https://clang.llvm.org/docs/LanguageExtensions.html#half-precision-floating-point
-// but at the moment the only place where it seems to be supported is GCC 13 and
-// only on some architectures (arm64 and x86_64, but not arm32 or riscv32):
-//   https://godbolt.org/z/5Wz3jPh69
-// Revisit that compiler explorer link in the future.
 
 // Converts a bfloat16 value to a 32-bit C `float`.
 static inline float iree_uk_bf16_to_f32(iree_uk_uint16_t bf16_value) {

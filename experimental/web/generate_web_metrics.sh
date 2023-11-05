@@ -85,7 +85,7 @@ wget -nc https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallSta
 ###############################################################################
 
 # Note: you can also download imported programs from CI runs:
-# https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/benchmark_suites.md#fetching-benchmark-artifacts-from-ci
+# https://iree.dev/developers/performance/benchmark-suites/#fetching-benchmark-artifacts-from-ci
 
 IREE_IMPORT_TFLITE_PATH=iree-import-tflite
 

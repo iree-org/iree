@@ -591,9 +591,8 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
   if (newTimepoints.empty()) {
     op.getAwaitTimepointMutable().clear();
   } else {
-    auto newTimepoint = builder.createOrFold<IREE::Stream::TimepointJoinOp>(
-        op.getLoc(), builder.getType<IREE::Stream::TimepointType>(),
-        newTimepoints.takeVector());
+    auto newTimepoint = IREE::Stream::TimepointJoinOp::join(
+        op.getLoc(), newTimepoints.takeVector(), builder);
     op.getAwaitTimepointMutable().assign(newTimepoint);
   }
   op.getResourceOperandsMutable().assign(newOperands);

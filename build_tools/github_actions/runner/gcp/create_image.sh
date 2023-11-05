@@ -33,13 +33,13 @@ case "${RUNNER_TYPE}" in
     BASE_IMAGE_ARCH=""
     ;;
 esac
-BASE_IMAGE="${BASE_IMAGE:-projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy${BASE_IMAGE_ARCH}-v20230727}"
+BASE_IMAGE="${BASE_IMAGE:-projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy${BASE_IMAGE_ARCH}-v20231030}"
 
 # We create the image using n1 machines with attached T4 GPUs. This image works
 # for the A100 machines as well though.
 GPU_MACHINE_TYPE="n1-standard-16"
-CPU_MACHINE_TYPE="e2-medium"
-ARMM64_MACHINE_TYPE="t2a-standard-8"
+X86_64_MACHINE_TYPE="e2-medium"
+ARM64_MACHINE_TYPE="t2a-standard-8"
 CPU_IMAGE_SIZE_GB=10
 # We need enough space to fetch Docker images that we test with
 # TODO(gcmn): See if we can make the image smaller, e.g. by resizing after setup
@@ -154,13 +154,13 @@ function create_image() {
     echo "Creating instance '${INSTANCE_NAME}' for boot disk"
     case "${RUNNER_TYPE}" in
       cpu)
-        local machine_type="${CPU_MACHINE_TYPE}"
+        local machine_type="${X86_64_MACHINE_TYPE}"
         local image_size_gb="${CPU_IMAGE_SIZE_GB}"
         local maintenance_policy=MIGRATE
         local -a extra_args=()
         ;;
       arm64)
-        local machine_type="${ARMM64_MACHINE_TYPE}"
+        local machine_type="${ARM64_MACHINE_TYPE}"
         local image_size_gb="${CPU_IMAGE_SIZE_GB}"
         local maintenance_policy=MIGRATE
         local -a extra_args=()

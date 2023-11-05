@@ -107,13 +107,13 @@ module attributes {hal.device.targets = [#hal.device.target<"vulkan", {executabl
 }
 
 /// We test first with threading off so that the printers are legible.
-// RUN: iree-compile %s --iree-hal-target-backends=vulkan \
-// RUN:   --iree-codegen-use-transform-dialect-strategy=@transform_main \
-// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir \
-// RUN:   --compile-from=executable-sources \
-// RUN:   --compile-to=executable-targets \
-// RUN:   --mlir-disable-threading | \
-// RUN: FileCheck %s --check-prefixes=CODEGEN-PRINTER
+// R-UN: iree-compile %s --iree-hal-target-backends=vulkan \
+// R-UN:   --iree-codegen-use-transform-dialect-strategy=transform_main \
+// R-UN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir \
+// R-UN:   --compile-from=executable-sources \
+// R-UN:   --compile-to=executable-targets \
+// R-UN:   --mlir-disable-threading | \
+// R-UN: FileCheck %s --check-prefixes=CODEGEN-PRINTER
 
 // CODEGEN-PRINTER:     IR printer: Setting matmul strategy to default top-level
 // CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<TransformDialectCodegen codegen_spec = @transform_main

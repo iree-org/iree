@@ -15,8 +15,10 @@ func.func @store_to_load(%arg: vector<4xf32>) -> vector<4xf32> {
   return %r : vector<4xf32>
 }
 
-transform.sequence failures(propagate) {
-^bb1(%arg1: !transform.any_op):
-  %0 = transform.structured.match ops{["func.func"]} in %arg1 : (!transform.any_op) -> !transform.any_op
-  transform.memref.erase_dead_alloc_and_stores %0 : (!transform.any_op) -> ()
-}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.memref.erase_dead_alloc_and_stores %0 : (!transform.any_op) -> ()
+    transform.yield
+  } // @__transform_main
+} // module

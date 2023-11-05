@@ -24,6 +24,7 @@ iree_lit_test_suite(
     "gpu_workgroup_swizzle.mlir"
     "reduce_bank_conflicts.mlir"
     "transform_gpu_workgroup_swizzle.mlir"
+    "vector_reduction_to_gpu.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -42,6 +42,8 @@ endfunction()
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
 #   DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
+#   INPUT_TYPE: The value for the --iree-input-type= flag. Also disables tests
+#       if no compiled support for that configuration.
 function(iree_check_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -58,13 +60,24 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME;INPUT_TYPE"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DEPENDS;TIMEOUT"
     ${ARGN}
   )
 
   iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
   if(_EXCLUDED_BY_LABELS)
+    return()
+  endif()
+
+  # Exclude based on input type availability.
+  if("${_RULE_INPUT_TYPE}" STREQUAL "stablehlo" AND NOT IREE_INPUT_STABLEHLO)
+    return()
+  endif()
+  if("${_RULE_INPUT_TYPE}" STREQUAL "tosa" AND NOT IREE_INPUT_TOSA)
+    return()
+  endif()
+  if("${_RULE_INPUT_TYPE}" STREQUAL "torch" AND NOT IREE_INPUT_TORCH)
     return()
   endif()
 
@@ -82,6 +95,10 @@ function(iree_check_test)
   set(_BASE_COMPILER_FLAGS
     "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
   )
+
+  if(_RULE_INPUT_TYPE)
+    list(APPEND _BASE_COMPILER_FLAGS "--iree-input-type=${_RULE_INPUT_TYPE}")
+  endif()
 
   if (_RULE_TARGET_CPU_FEATURES)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
@@ -159,6 +176,8 @@ endfunction()
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
 #   DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
+#   INPUT_TYPE: The value for the --iree-input-type= flag. Also disables tests
+#       if no compiled support for that configuration.
 function(iree_check_single_backend_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -171,7 +190,7 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER"
+    "NAME;TARGET_BACKEND;DRIVER;INPUT_TYPE"
     "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DEPENDS;TIMEOUT"
     ${ARGN}
   )
@@ -238,6 +257,8 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_DRIVER}
       COMPILER_FLAGS
         ${_RULE_COMPILER_FLAGS}
+      INPUT_TYPE
+        ${_RULE_INPUT_TYPE}
       RUNNER_ARGS
         ${_RULE_RUNNER_ARGS}
       LABELS

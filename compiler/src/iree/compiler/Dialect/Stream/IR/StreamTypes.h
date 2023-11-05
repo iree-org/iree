@@ -11,6 +11,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -57,6 +58,10 @@ static inline AsmPrinter &operator<<(
 
 } // namespace mlir
 
+namespace mlir::iree_compiler::IREE::Stream {
+class AffinityAttr;
+} // namespace mlir::iree_compiler::IREE::Stream
+
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Stream/IR/StreamAttrs.h.inc" // IWYU pragma: keep
@@ -64,27 +69,16 @@ static inline AsmPrinter &operator<<(
 
 #include "iree/compiler/Dialect/Stream/IR/StreamAttrInterfaces.h.inc" // IWYU pragma: export
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
-
+namespace mlir::iree_compiler::IREE::Stream {
 #include "iree/compiler/Dialect/Stream/IR/StreamTypeInterfaces.h.inc" // IWYU pragma: export
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_TYPEDEF_CLASSES
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 struct AsyncAccessRange {
   ResourceAccessBitfield access;
@@ -96,9 +90,20 @@ struct AsyncAccessRange {
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOpInterfaces.h.inc" // IWYU pragma: export
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+//===----------------------------------------------------------------------===//
+// custom<ParameterReference>($scope, $key)
+//===----------------------------------------------------------------------===//
+
+ParseResult parseParameterReference(AsmParser &parser, StringAttr &scopeAttr,
+                                    StringAttr &keyAttr);
+void printParameterReference(AsmPrinter &p, StringAttr scopeAttr,
+                             StringAttr keyAttr);
+static inline void printParameterReference(AsmPrinter &p, Operation *op,
+                                           StringAttr scopeAttr,
+                                           StringAttr keyAttr) {
+  printParameterReference(p, scopeAttr, keyAttr);
+}
+
+} // namespace mlir::iree_compiler::IREE::Stream
 
 #endif // IREE_COMPILER_DIALECT_STREAM_IR_STREAMTYPES_H_

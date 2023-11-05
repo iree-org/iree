@@ -33,7 +33,3 @@ Guides for specific configurations:
   for AMD-specific solutions
 * [:simple-apple: GPU - Metal](./deployment-configurations/gpu-metal.md)
   for running on Apple hardware
-
-## Other topics
-
-* [:material-lightbulb-on: Developer tips and tricks](./developer-tips.md)

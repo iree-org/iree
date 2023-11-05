@@ -25,7 +25,8 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/reduction_codegen_spec.mlir | \
+// RUN:     --iree-codegen-transform-dialect-library=%p/reduction_codegen_spec.mlir \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
@@ -33,7 +34,8 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 /// Constant JIT'ing must be disabled because the transform-dialect debug
 /// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/reduction_codegen_spec.mlir | \
+// RUN:     --iree-codegen-transform-dialect-library=%p/reduction_codegen_spec.mlir \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen | \
 // RUN: iree-run-module --module=- --function=reduce --device=cuda --input="8x64xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 

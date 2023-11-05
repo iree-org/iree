@@ -35,7 +35,6 @@ iree_lit_test_suite(
         "softmax_v2.mlir",
         # First few ops of softmax only, acts as a proxy example.
         "softmax_partial.mlir",
-        "vecadd2d.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,
@@ -57,8 +56,6 @@ iree_lit_test_suite(
         "softmax_dispatch_spec.mlir",
         # First few ops of softmax only, acts as a proxy example.
         "softmax_partial_codegen_spec.mlir",
-        "vecadd2d_codegen_spec.mlir",
-        "vecadd2d_codegen_spec_partial_tile.mlir",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.

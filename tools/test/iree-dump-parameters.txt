@@ -1,0 +1,12 @@
+// RUN: (iree-dump-parameters \
+// RUN:   --parameters=a=%p/parameters_a.safetensors \
+// RUN:   --parameters=b=%p/parameters_b.safetensors) | \
+// RUN:  FileCheck %s
+
+// CHECK: Parameter scope `a`
+// CHECK: 120 | 152 | 32 | `a0`
+// CHECK: 152 | 184 | 32 | `a1`
+
+// CHECK: Parameter scope `b`
+// CHECK: 128 | 192 | 64 | `b0`
+// CHECK: 192 | 320 | 128 | `b1`

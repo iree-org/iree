@@ -2,7 +2,7 @@
 
 This directory contains the Python scripts that define the benchmark
 configrations. To run the benchmark suites, see
-[IREE Benchmark Suites](/docs/developers/developing_iree/benchmark_suites.md).
+[IREE Benchmark Suites](https://iree.dev/developers/performance/benchmark-suites/).
 
 ## Updating Benchmarks
 

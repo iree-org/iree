@@ -28,6 +28,8 @@ IREE_CU_PFN_DECL(cuEventQuery, CUevent)
 IREE_CU_PFN_DECL(cuEventRecord, CUevent, CUstream)
 IREE_CU_PFN_DECL(cuEventSynchronize, CUevent)
 IREE_CU_PFN_DECL(cuGetProcAddress, const char*, void**, int, cuuint64_t)
+IREE_CU_PFN_DECL(cuGraphAddEmptyNode, CUgraphNode*, CUgraph, const CUgraphNode*,
+                 size_t)
 IREE_CU_PFN_DECL(cuGraphAddMemcpyNode, CUgraphNode*, CUgraph,
                  const CUgraphNode*, size_t, const CUDA_MEMCPY3D*, CUcontext)
 IREE_CU_PFN_DECL(cuGraphAddMemsetNode, CUgraphNode*, CUgraph,

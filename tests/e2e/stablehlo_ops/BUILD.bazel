@@ -8,7 +8,7 @@
 # Each test file should have a name matching the corresponding StableHLO op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
 # written using the IREE Check framework and should always pass on the reference VMVX backend.
-# See https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
+# See https://iree.dev/developers/general/testing-guide/#iree-core-end-to-end-e2e-tests.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
@@ -87,8 +87,8 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [],
     ),
-    compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "local-task",
+    input_type = "stablehlo",
     target_backend = "llvm-cpu",
 )
 
@@ -162,8 +162,8 @@ iree_check_single_backend_test_suite(
             "exponential_fp16.mlir",
         ],
     ),
-    compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "local-task",
+    input_type = "stablehlo",
     target_backend = "vmvx",
 )
 
@@ -237,8 +237,8 @@ iree_check_single_backend_test_suite(
             "reverse.mlir",  # TODO(#12415): disabled due to miscompilation on Pixel 6.
         ],
     ),
-    compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "vulkan",
+    input_type = "stablehlo",
     target_backend = "vulkan-spirv",
 )
 
@@ -313,10 +313,10 @@ iree_check_single_backend_test_suite(
         exclude = [],
     ),
     compiler_flags = [
-        "--iree-input-type=stablehlo",
         "--iree-llvmcpu-target-cpu-features=host",
     ],
     driver = "local-task",
+    input_type = "stablehlo",
     # Building and testing must be on the same architecture, which doesn't work
     # with remote execution in general.
     tags = [
@@ -406,11 +406,11 @@ iree_check_single_backend_test_suite(
         exclude = [],
     ),
     compiler_flags = [
-        "--iree-input-type=stablehlo",
         # TODO(#13984): memset emulation required for graphs.
         "--iree-stream-emulate-memset",
     ],
     driver = "cuda",
+    input_type = "stablehlo",
     runner_args = ["--cuda_use_streams=false"],
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -493,8 +493,8 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [],
     ),
-    compiler_flags = ["--iree-input-type=stablehlo"],
     driver = "cuda",
+    input_type = "stablehlo",
     runner_args = ["--cuda_use_streams=true"],
     tags = [
         # CUDA cuInit fails with sanitizer on.

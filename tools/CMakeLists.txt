@@ -150,6 +150,20 @@ iree_cc_binary(
     iree::vm::bytecode::module
 )
 
+iree_cc_binary(
+  NAME
+    iree-dump-parameters
+  SRCS
+    "iree-dump-parameters-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::io::parameter_index
+    iree::io::scope_map
+    iree::tooling::parameter_util
+)
+
 # Only enable fatelf tool when we're compiling it in.
 # Currently it requires that the host and target both support embedded ELFs as
 # the ELF implementation is only compiled when the target supports it.

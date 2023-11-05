@@ -13,7 +13,7 @@ C++ module wrapper layer in [`module.cc`](./module.cc), and called by example in
 [`main.c`](./main.c).
 
 This document uses terminology that can be found in the documentation of
-[IREE's execution model](https://github.com/openxla/iree/blob/main/docs/developers/design_docs/execution_model.md).
+[IREE's execution model](https://iree.dev/developers/design-docs/invocation-execution-model/).
 See [IREE's extensibility mechanisms](https://iree.dev/reference/extensions/)
 documentation for more information specific to extenting IREE and
 alternative approaches to doing so.

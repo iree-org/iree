@@ -33,20 +33,27 @@ void iree_uk_assert_fail(const char* file, int line, const char* function,
 iree_uk_index_t iree_uk_2d_buffer_length(iree_uk_type_t type,
                                          iree_uk_index_t size0,
                                          iree_uk_index_t stride0) {
-  // Just for testing purposes, so it's OK to overestimate size.
-  return size0 * stride0 << iree_uk_type_size_log2(type);
+  // As we require strides to be multiples of 8 bits, the stride value in bytes
+  // is exact.
+  return size0 * iree_uk_bits_to_bytes_exact(
+                     stride0 << iree_uk_type_bit_count_log2(type));
 }
 
 bool iree_uk_2d_buffers_equal(const void* buf1, const void* buf2,
                               iree_uk_type_t type, iree_uk_index_t size0,
                               iree_uk_index_t size1, iree_uk_index_t stride0) {
-  iree_uk_index_t elem_size = iree_uk_type_size(type);
+  // Sizes don't have to be multiples of 8 bits.
+  iree_uk_index_t size1_bytes = iree_uk_bits_to_bytes_rounding_up(
+      size1 << iree_uk_type_bit_count_log2(type));
+  // Strides are required to be multiples of 8 bits.
+  iree_uk_index_t stride0_bytes =
+      iree_uk_bits_to_bytes_exact(stride0 << iree_uk_type_bit_count_log2(type));
   const char* buf1_ptr = buf1;
   const char* buf2_ptr = buf2;
   for (iree_uk_index_t i0 = 0; i0 < size0; ++i0) {
-    if (memcmp(buf1_ptr, buf2_ptr, elem_size * size1)) return false;
-    buf1_ptr += elem_size * stride0;
-    buf2_ptr += elem_size * stride0;
+    if (memcmp(buf1_ptr, buf2_ptr, size1_bytes)) return false;
+    buf1_ptr += stride0_bytes;
+    buf2_ptr += stride0_bytes;
   }
   return true;
 }
@@ -73,6 +80,11 @@ int iree_uk_random_engine_get_0_65535(iree_uk_random_engine_t* e) {
   return (v >> 8) & 0xffff;
 }
 
+int iree_uk_random_engine_get_0_255(iree_uk_random_engine_t* e) {
+  int v = iree_uk_random_engine_get_0_65535(e);
+  return v & 0xff;
+}
+
 int iree_uk_random_engine_get_0_1(iree_uk_random_engine_t* e) {
   int v = iree_uk_random_engine_get_0_65535(e);
   return v & 1;
@@ -97,6 +109,16 @@ void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
     iree_uk_write_random_buffer(buffer, size_in_bytes, resolved_type, engine);
     return;
   }
+  // Special-case sub-byte-size integer types. Due to their narrow range, we
+  // want to generate values over their entire range, and then it's down to
+  // just generating random bytes.
+  if (iree_uk_type_is_integer(type) && iree_uk_type_bit_count(type) < 8) {
+    for (iree_uk_index_t i = 0; i < size_in_bytes; ++i) {
+      ((uint8_t*)buffer)[i] = iree_uk_random_engine_get_0_255(engine);
+    }
+    return;
+  }
+  // All other element types.
   iree_uk_index_t elem_size = iree_uk_type_size(type);
   iree_uk_index_t size_in_elems = size_in_bytes / elem_size;
   for (iree_uk_index_t i = 0; i < size_in_elems; ++i) {

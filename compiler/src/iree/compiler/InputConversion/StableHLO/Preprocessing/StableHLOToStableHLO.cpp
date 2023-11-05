@@ -1220,6 +1220,13 @@ struct FuseWidenOperands final : OpRewritePattern<Op> {
       if (convertOp) {
         auto inputType = getElementTypeOrSelf(convertOp.getOperand().getType());
         auto castedType = getElementTypeOrSelf(convertOp.getResult().getType());
+        if (!isa<FloatType, IntegerType>(inputType) ||
+            !isa<FloatType, IntegerType>(castedType)) {
+          return rewriter.notifyMatchFailure(
+              op, "non-integer or floating point type");
+          ;
+        }
+
         if (inputType.getIntOrFloatBitWidth() <
             castedType.getIntOrFloatBitWidth()) {
           operands.push_back(convertOp.getOperand());

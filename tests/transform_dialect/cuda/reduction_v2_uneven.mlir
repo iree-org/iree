@@ -25,12 +25,14 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target)))' \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/reduction_v2_codegen_spec.mlir | \
+// RUN:     --iree-codegen-transform-dialect-library=%p/reduction_v2_codegen_spec.mlir \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen | \
 // RUN: FileCheck %s --check-prefix=CHECK
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=%p/reduction_v2_codegen_spec.mlir | \
+// RUN:     --iree-codegen-transform-dialect-library=%p/reduction_v2_codegen_spec.mlir \
+// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen | \
 // RUN: iree-run-module --module=- --function=reduce --device=cuda --input="33x34567xf32=1" |\
 // RUN: FileCheck %s --check-prefix=EXEC
 

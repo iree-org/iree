@@ -15,12 +15,7 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
       IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
   iree_uk_uint32_t flags_type = params->flags & IREE_UK_FLAG_MMT4D_TYPE_MASK;
-  IREE_UK_ASSERT(flags_type == IREE_UK_FLAG_MMT4D_TYPE_F32F32F32 ||
-                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_S8S8S32 ||
-                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_F16F16F32 ||
-                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_F16F16F16 ||
-                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32 ||
-                 flags_type == IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16);
+  IREE_UK_ASSERT(flags_type < IREE_UK_FLAG_MMT4D_TYPE_END);
   // Some implementations may wish to avoid supporting absurdly wide types. For
   // instance, K is the innermost (i.e. hottest) loop bound, so some 32bit
   // targets may benefit from K being int32, not int64. We still let K be of
@@ -33,8 +28,22 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
   IREE_UK_ASSERT(IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(params->M0, 15));
   IREE_UK_ASSERT(IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(params->N0, 15));
   IREE_UK_ASSERT(IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(params->K0, 15));
-  // Ensure iree_uk_mmt4d_tile_generic_max_bytes large enough for this tile.
+
+  // Requirements on sub-byte element type cases
+  // - Ensure that the output type is not sub-byte.
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
+  IREE_UK_ASSERT(iree_uk_type_bit_count(iree_uk_mmt4d_out_type(mmt4d_type)) >=
+                 8);
+  // - Ensure that (K0 * {LHS,RHS} element bits) is a multiple of 8 bits.
+  int lhs_bits = iree_uk_type_bit_count(iree_uk_mmt4d_lhs_type(mmt4d_type));
+  int rhs_bits = iree_uk_type_bit_count(iree_uk_mmt4d_lhs_type(mmt4d_type));
+  IREE_UK_ASSERT(!((params->K0 * lhs_bits) % 8));
+  IREE_UK_ASSERT(!((params->K0 * rhs_bits) % 8));
+  // - Ensure that {LHS,RHS} strides are multiples of 8 bits.
+  IREE_UK_ASSERT(!((params->lhs_stride0 * lhs_bits) % 8));
+  IREE_UK_ASSERT(!((params->rhs_stride0 * rhs_bits) % 8));
+
+  // Ensure iree_uk_mmt4d_tile_generic_max_bytes large enough for this tile.
   IREE_UK_ASSERT(params->M0 * params->N0 *
                      iree_uk_type_size(iree_uk_mmt4d_out_type(mmt4d_type)) <=
                  iree_uk_mmt4d_tile_generic_max_bytes);
@@ -56,18 +65,24 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
   const iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(mmt4d_type);
   const iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(mmt4d_type);
   const iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
-  const iree_uk_int16_t lhs_elem_size_log2 = iree_uk_type_size_log2(lhs_type);
-  const iree_uk_int16_t rhs_elem_size_log2 = iree_uk_type_size_log2(rhs_type);
+  const iree_uk_int16_t lhs_elem_bits_log2 =
+      iree_uk_type_bit_count_log2(lhs_type);
+  const iree_uk_int16_t rhs_elem_bits_log2 =
+      iree_uk_type_bit_count_log2(rhs_type);
   const iree_uk_int16_t out_elem_size_log2 = iree_uk_type_size_log2(out_type);
   char* out_tile_row =
       (char*)params->out_buffer + (params->out_offset << out_elem_size_log2);
-  const char* lhs_panel = (const char*)params->lhs_buffer +
-                          (params->lhs_offset << lhs_elem_size_log2);
-  const char* rhs_panel_start = (const char*)params->rhs_buffer +
-                                (params->rhs_offset << rhs_elem_size_log2);
+  const char* lhs_panel =
+      (const char*)params->lhs_buffer +
+      iree_uk_bits_to_bytes_exact(params->lhs_offset << lhs_elem_bits_log2);
+  const char* rhs_panel_start =
+      (const char*)params->rhs_buffer +
+      iree_uk_bits_to_bytes_exact(params->rhs_offset << rhs_elem_bits_log2);
   iree_uk_int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
-  iree_uk_index_t lhs_panel_stride = params->lhs_stride0 << lhs_elem_size_log2;
-  iree_uk_index_t rhs_panel_stride = params->rhs_stride0 << rhs_elem_size_log2;
+  iree_uk_index_t lhs_panel_stride =
+      iree_uk_bits_to_bytes_exact(params->lhs_stride0 << lhs_elem_bits_log2);
+  iree_uk_index_t rhs_panel_stride =
+      iree_uk_bits_to_bytes_exact(params->rhs_stride0 << rhs_elem_bits_log2);
   iree_uk_index_t out_stride = params->out_stride0 << out_elem_size_log2;
   for (iree_uk_int32_t i = 0; i < M; ++i) {
     char* out_tile = out_tile_row;

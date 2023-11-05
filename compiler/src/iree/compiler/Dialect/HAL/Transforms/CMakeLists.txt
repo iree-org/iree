@@ -67,6 +67,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Modules::IO::Parameters::IR::IOParametersDialect
     iree::compiler::Utils
     iree::schemas::instruments
     iree::schemas::instruments::dispatch_def_c_fbs

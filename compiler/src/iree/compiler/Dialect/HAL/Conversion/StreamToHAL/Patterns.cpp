@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Patterns.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -13,7 +14,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -23,315 +23,63 @@
 namespace mlir {
 namespace iree_compiler {
 
-static llvm::cl::opt<bool> clExternalResourcesMappable(
-    "iree-stream-external-resources-mappable",
-    llvm::cl::desc("Allocates external resources as host-visible and mappable. "
-                   "This can degrade performance and introduce allocation "
-                   "overhead and staging buffers for readback on the host "
-                   "should be managed by the calling application instead."),
-    llvm::cl::init(false));
-
 namespace {
-
-static Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
-  // TODO(benvanik): make this do multi-device lookup and other fancy things.
-  auto lookupOp = builder.create<IREE::HAL::ExSharedDeviceOp>(op->getLoc());
-  return lookupOp.getResult();
-}
 
 // Returns the device queue affinity mask indicating which device queues the
 // operations are allowed to execute on.
-static Value buildQueueAffinityMaskFor(Operation *op, Value device,
-                                       OpBuilder &builder) {
+static Value buildQueueAffinityMask(Location loc,
+                                    IREE::Stream::AffinityAttr affinityAttr,
+                                    Value device, OpBuilder &builder) {
   // Try to find a specified affinity. This may be on the op provided or one of
   // its parent regions.
-  auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
   if (auto queueAffinityAttr =
           llvm::dyn_cast_if_present<IREE::HAL::AffinityQueueAttr>(
               affinityAttr)) {
     return builder.create<arith::ConstantIntOp>(
-        op->getLoc(), queueAffinityAttr.getMask(), 64);
+        loc, queueAffinityAttr.getMask(), 64);
   }
 
   // No affinity specified; use default (any) affinity.
-  return builder.create<arith::ConstantIntOp>(op->getLoc(), -1, 64);
+  return builder.create<arith::ConstantIntOp>(loc, -1, 64);
 }
 
-static std::tuple<Value, Value>
-lookupDeviceAndQueueAffinityFor(Operation *op, OpBuilder &builder) {
-  // NOTE: we have this combined method so that we can reuse any expensive
-  // lookups we need to do. Today we aren't duplicating the lookups and don't
-  // bother.
+struct ContextResolveOpPattern
+    : public StreamConversionPattern<IREE::Stream::ContextResolveOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Stream::ContextResolveOp resolveOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto resultTypes = llvm::to_vector(resolveOp.getResultTypes());
+    assert(!resultTypes.empty() && "must have at least one result");
 
-  // Get a device handle used to create resources and schedule work.
-  // It may be shared across many mutually-exclusive devices at runtime.
-  Value device = lookupDeviceFor(op, builder);
+    // TODO(benvanik): make this do multi-device lookup and other fancy things.
+    Value device =
+        rewriter.create<IREE::HAL::ExSharedDeviceOp>(resolveOp.getLoc());
 
-  // Derive the queue affinity mask from the op and device combination.
-  Value queueAffinity = buildQueueAffinityMaskFor(op, device, builder);
-
-  return std::make_tuple(device, queueAffinity);
-}
-
-static Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
-  auto device = lookupDeviceFor(op, builder);
-  auto allocatorOp =
-      builder.create<IREE::HAL::DeviceAllocatorOp>(op->getLoc(), device);
-  return allocatorOp.getResult();
-}
-
-static std::tuple<Value, Value>
-lookupAllocatorAndQueueAffinityFor(Operation *op, OpBuilder &builder) {
-  // NOTE: we have this combined method so that we can reuse any expensive
-  // lookups we need to do. Today we aren't duplicating the lookups and don't
-  // bother.
-
-  // Get a device handle used to create resources and schedule work.
-  // It may be shared across many mutually-exclusive devices at runtime.
-  Value device = lookupDeviceFor(op, builder);
-
-  // Each device has a single allocator that may itself present multiple.
-  Value allocator =
-      builder.create<IREE::HAL::DeviceAllocatorOp>(op->getLoc(), device);
-
-  // Derive the queue affinity mask from the op and device combination.
-  Value queueAffinity = buildQueueAffinityMaskFor(op, device, builder);
-
-  return std::make_tuple(allocator, queueAffinity);
-}
-
-// Returns the |timepointFence| or a util.null.
-static Value getOrCreateWaitFence(Location loc, Value timepointFence,
-                                  OpBuilder &builder) {
-  if (timepointFence)
-    return timepointFence;
-  return builder.create<IREE::Util::NullOp>(
-      loc, builder.getType<IREE::HAL::FenceType>());
-}
-
-// Finds a !hal.fence bound to |timepoint| via a chain op and returns it if
-// it is usable at the builder insertion point. The chain ops is only used if
-// it is the only consumer of the timepoint and it is removed upon return.
-static Value consumeBoundFence(Value timepoint,
-                               ConversionPatternRewriter &rewriter) {
-  // Must only have one use. We can't consume a fence multiple times.
-  if (!timepoint.hasOneUse())
-    return nullptr; // >1 use
-
-  // The use must be an export to a fence.
-  auto chainOp = dyn_cast<IREE::Stream::TimepointChainExternalOp>(
-      *timepoint.getUsers().begin());
-  if (!chainOp)
-    return nullptr; // non-export use
-  assert(!chainOp.getExternalValues().empty());
-  auto fence = chainOp.getExternalValues().front();
-  if (!fence || !llvm::isa<IREE::HAL::FenceType>(fence.getType()))
-    return nullptr;
-
-  // Try really hard to figure out if the fence can be used. A larger analysis
-  // pass running prior to conversion that did some code motion could help
-  // ensure the fence SSA value is usable in the places it is needed - for now
-  // we just do this local check that satisfies most common programs today. IPO
-  // would do something like add the fence as an argument to function calls so
-  // that the functions could consume it but inlining is pretty aggressive now.
-  if (!IREE::Util::isValueUsableForOp(fence, rewriter.getBlock(),
-                                      rewriter.getInsertionPoint())) {
-    return nullptr; // unusable
-  }
-
-  // Consume the op by erasing it.
-  rewriter.eraseOp(chainOp);
-
-  return fence; // usable
-}
-
-// Returns the a new fence for |timepoint| or an existing fence if one was
-// associated with an external fence. Returns util.null if no one observes the
-// fence.
-static Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
-                                    ConversionPatternRewriter &rewriter) {
-  // Check to see if anyone is consuming the timepoint - if not then we don't
-  // need create a fence.
-  if (timepoint.use_empty()) {
-    return rewriter.create<IREE::Util::NullOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>());
-  }
-
-  // Check to see if the timepoint is associated with a fence. In common cases
-  // when along ABI boundaries we can usually find an association.
-  auto fence = consumeBoundFence(timepoint, rewriter);
-  if (fence)
-    return fence;
-
-  // Create a new fence.
-  return rewriter.create<IREE::HAL::FenceCreateOp>(
-      loc, rewriter.getType<IREE::HAL::FenceType>(), device,
-      IREE::HAL::FenceFlagBitfield::None);
-}
-
-// Scans all of the stream.cmd.* ops in the region to derive a command category.
-static IREE::HAL::CommandCategoryBitfield
-deriveCommandCategories(Region &region) {
-  auto bits = IREE::HAL::CommandCategoryBitfield::None;
-  for (auto &block : region) {
-    for (auto &op : block) {
-      if (isa<IREE::Stream::CmdCollectiveOp>(op) ||
-          isa<IREE::Stream::CmdCallOp>(op)) {
-        // Calls may do anything and collectives may be implemented as either
-        // transfers or dispatches.
-        bits = bits | IREE::HAL::CommandCategoryBitfield::Dispatch |
-               IREE::HAL::CommandCategoryBitfield::Transfer;
-      } else if (isa<IREE::Stream::CmdDispatchOp>(op)) {
-        bits = bits | IREE::HAL::CommandCategoryBitfield::Dispatch;
-      } else {
-        bits = bits | IREE::HAL::CommandCategoryBitfield::Transfer;
-      }
-      for (auto &nestedRegion : op.getRegions()) {
-        bits = bits | deriveCommandCategories(nestedRegion);
-      }
-    }
-  }
-  return bits;
-}
-
-// Maps a resource type to the corresponding HAL memory types and buffer usage.
-// This will fail if the resource type is not directly mappable to HAL bits.
-// The bits set here are those that must be set for the buffer to be used as the
-// buffer within the program with its defined resource lifetime.
-static LogicalResult
-deriveRequiredResourceBufferBits(Location loc,
-                                 IREE::Stream::ResourceType resourceType,
-                                 IREE::HAL::MemoryTypeBitfield &memoryTypes,
-                                 IREE::HAL::BufferUsageBitfield &bufferUsage) {
-  memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-  bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  switch (resourceType.getLifetime()) {
-  default:
-    return mlir::emitError(loc)
-           << "unsupported resource lifetime: "
-           << IREE::Stream::stringifyLifetime(resourceType.getLifetime());
-  case IREE::Stream::Lifetime::Constant:
-    // Device local; copies required to get into external resources.
-    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-    bufferUsage =
-        bufferUsage | IREE::HAL::BufferUsageBitfield::SharingImmutable;
-    break;
-  case IREE::Stream::Lifetime::Variable:
-    // Device local; copies required to get into external resources.
-    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-    break;
-  case IREE::Stream::Lifetime::External:
-    // We only require device-visible for external buffers (as we don't today
-    // do anything else with them on the host). They may be mappable for user
-    // convenience. Ideally they would have been placed in device-local memory
-    // but so long as they are device visible the program will execute
-    // correctly.
-    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceVisible;
-    break;
-  case IREE::Stream::Lifetime::Staging:
-    // Host local; copies required to get into device resources.
-    // We could vary this based on staging usage (upload/download) by
-    // making it device-local|host-visible, but host-local means we have
-    // a better chance of mapping it during uploads.
-    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::HostLocal |
-                  IREE::HAL::MemoryTypeBitfield::DeviceVisible;
-    bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                  IREE::HAL::BufferUsageBitfield::Mapping;
-    break;
-  case IREE::Stream::Lifetime::Transient:
-    // Device local; copies required to get into external resources.
-    memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
-    break;
-  }
-
-  // TODO(benvanik): refine usage based on analysis.
-  bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Transfer |
-                IREE::HAL::BufferUsageBitfield::DispatchStorage;
-
-  return success();
-}
-
-// Maps a resource type to the corresponding HAL memory types and buffer usage.
-// This will fail if the resource type is not directly mappable to HAL bits.
-// The bits set here represent the superset of required and allowed bits and
-// are useful for providing buffers back to users via the ABI that may need to
-// be used for more than just what the internal program requires.
-static LogicalResult
-deriveAllowedResourceBufferBits(Location loc,
-                                IREE::Stream::ResourceType resourceType,
-                                IREE::HAL::MemoryTypeBitfield &memoryTypes,
-                                IREE::HAL::BufferUsageBitfield &bufferUsage) {
-  memoryTypes = IREE::HAL::MemoryTypeBitfield::None;
-  bufferUsage = IREE::HAL::BufferUsageBitfield::None;
-  if (failed(deriveRequiredResourceBufferBits(loc, resourceType, memoryTypes,
-                                              bufferUsage))) {
-    return failure();
-  }
-  switch (resourceType.getLifetime()) {
-  default:
-    break;
-  case IREE::Stream::Lifetime::External:
-    if (clExternalResourcesMappable) {
-      // #yolo; these come from/go to outside the program.
-      // Today we assume they are device-local|host-visible just for
-      // practical purposes but that does not have to be true. We really
-      // want this to be something we analyze and handle on the edges
-      // (transferring devices/etc if needed).
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                    IREE::HAL::MemoryTypeBitfield::HostVisible;
-      // NOTE: we may not map it but users may after they get them back.
-      // Another reason we should annotate this - having a buffer be
-      // mappable is potentially expensive (may get a 2nd copy in memory!).
-      bufferUsage = bufferUsage | IREE::HAL::BufferUsageBitfield::Mapping;
+    SmallVector<Value> results;
+    if (resultTypes[0].isa<IREE::HAL::DeviceType>()) {
+      results.push_back(device);
+    } else if (resultTypes[0].isa<IREE::HAL::AllocatorType>()) {
+      results.push_back(rewriter.create<IREE::HAL::DeviceAllocatorOp>(
+          resolveOp.getLoc(), device));
     } else {
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
+      return rewriter.notifyMatchFailure(
+          resolveOp, "unrecognized context resolve types for a HAL target");
     }
-    break;
+    if (resultTypes.size() > 1) {
+      if (resultTypes[1].isa<IntegerType>()) {
+        results.push_back(buildQueueAffinityMask(
+            resolveOp.getLoc(), resolveOp.getAffinityAttr(), device, rewriter));
+      } else {
+        return rewriter.notifyMatchFailure(
+            resolveOp,
+            "unrecognized context resolve types for a HAL target (extended)");
+      }
+    }
+
+    rewriter.replaceOp(resolveOp, results);
+    return success();
   }
-  return success();
-}
-
-class StreamConversionMapping {
-public:
-  // Maps the stream dialect |executeOp| to the hal dialect |commandBuffer|
-  // value used during recording. Patterns can use this to find the SSA value
-  // they need to make hal.command_buffer.* ops.
-  void mapCommandBuffer(IREE::Stream::CmdExecuteOp executeOp,
-                        Value commandBuffer) {
-    assert(commandBuffers.insert(std::make_pair(executeOp, commandBuffer))
-               .second &&
-           "multiple command buffers cannot be registered for the same op");
-
-    // Map all ops nested within the command buffer so we can query later.
-    executeOp.walk([&](Operation *op) {
-      commandBuffers.insert(std::make_pair(op, commandBuffer));
-      return WalkResult::advance();
-    });
-  }
-
-  // Looks up a mapped command buffer SSA value that can be used by the given
-  // stream.cmd.* op.
-  Value lookupCommandBufferFor(Operation *cmdOp) const {
-    auto it = commandBuffers.find(cmdOp);
-    assert(it != commandBuffers.end() &&
-           "command buffer must have been registered during conversion");
-    return it->second;
-  }
-
-private:
-  // Ops within stream.cmd.execute ops -> !hal.command_buffer.
-  DenseMap<Operation *, Value> commandBuffers;
-};
-
-template <typename OpT>
-struct StreamConversionPattern : public OpConversionPattern<OpT> {
-  StreamConversionPattern(std::shared_ptr<StreamConversionMapping> mapping,
-                          TypeConverter &typeConverter, MLIRContext *context,
-                          PatternBenefit benefit = 1)
-      : OpConversionPattern<OpT>(typeConverter, context, benefit),
-        mapping(std::move(mapping)) {}
-
-  std::shared_ptr<StreamConversionMapping> mapping;
 };
 
 struct ResourceAllocOpPattern
@@ -1548,6 +1296,8 @@ void populateStreamToHALPatterns(MLIRContext *context,
   patterns.insert<GlobalTimepointConversionPattern>(typeConverter, context);
 
   auto mapping = std::make_shared<StreamConversionMapping>();
+
+  patterns.insert<ContextResolveOpPattern>(mapping, typeConverter, context);
 
   patterns.insert<ResourceAllocOpPattern, ResourceAllocaOpPattern,
                   ResourceDeallocaOpPattern, ResourceSizeOpPattern,
