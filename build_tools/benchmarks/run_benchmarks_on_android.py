@@ -388,6 +388,20 @@ def set_gpu_frequency_scaling_policy(policy: str):
     adb_execute_as_root([android_path, policy])
 
 
+def is_pixel_device():
+    device_model = get_android_device_model()
+    return device_model.startswith("Pixel")
+
+
+def set_pixel_frequency_scaling_policy(policy: str):
+    git_root = execute_cmd_and_get_stdout(["git", "rev-parse", "--show-toplevel"])
+    benchmarks_tool_dir = pathlib.Path(git_root) / "build_tools" / "benchmarks"
+    script = benchmarks_tool_dir / "set_pixel_scaling_governor.sh"
+
+    android_path = adb_push_to_tmp_dir(script)
+    adb_execute_as_root([android_path, policy])
+
+
 def main(args):
     device_info = get_android_device_info(args.verbose)
     if args.verbose:
@@ -411,6 +425,16 @@ def main(args):
         benchmark_grace_time=1.0,
         verbose=args.verbose,
     )
+
+    # Turn off thermal throttling. CPU frequencies are throttled when the device is warm.
+    adb_execute_as_root(["setprop", "persist.vendor.disable.thermal.control", "1"])
+
+    # Fake screen-on status. Performance may be affected when screen is off.
+    # This only works on later versions of Android. Disable for now.
+    # adb_execute_as_root(["sendhint", "-m", "DISPLAY_INACTIVE", "-e", "0"])
+
+    if is_pixel_device():
+        set_pixel_frequency_scaling_policy("performance")
 
     if args.pin_cpu_freq:
         set_cpu_frequency_scaling_governor("performance")
