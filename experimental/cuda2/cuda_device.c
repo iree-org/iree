@@ -88,10 +88,6 @@ typedef struct iree_hal_cuda2_device_t {
 
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
-
-  // A CUDA stream-based command buffer used to apply deferred command buffers.
-  // TODO: have one cached per stream once there are multiple streams.
-  iree_hal_command_buffer_t* deferred_command_buffer;
 } iree_hal_cuda2_device_t;
 
 static const iree_hal_device_vtable_t iree_hal_cuda2_device_vtable;
@@ -197,18 +193,6 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
         cuda_symbols, cu_device, dispatch_stream,
         device->supports_memory_pools ? &device->memory_pools : NULL,
         host_allocator, &device->device_allocator);
-  }
-
-  if (iree_status_is_ok(status) &&
-      params->command_buffer_mode == IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM) {
-    status = iree_hal_cuda2_stream_command_buffer_create(
-        (iree_hal_device_t*)device, device->cuda_symbols, device->nccl_symbols,
-        device->tracing_context,
-        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
-            IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED,
-        IREE_HAL_COMMAND_CATEGORY_ANY, /*binding_capacity=*/0,
-        device->dispatch_cu_stream, &device->block_pool, device->host_allocator,
-        &device->deferred_command_buffer);
   }
 
   if (iree_status_is_ok(status)) {
@@ -328,8 +312,6 @@ static void iree_hal_cuda2_device_destroy(iree_hal_device_t* base_device) {
   // Destroy the pending workload queue.
   iree_hal_cuda2_pending_queue_actions_destroy(
       (iree_hal_resource_t*)device->pending_queue_actions);
-
-  iree_hal_command_buffer_release(device->deferred_command_buffer);
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
@@ -534,6 +516,19 @@ static iree_status_t iree_hal_cuda2_device_create_channel(
   return iree_hal_cuda2_nccl_channel_create(
       device->cuda_symbols, device->nccl_symbols, &id, params.rank,
       params.count, device->host_allocator, out_channel);
+}
+
+iree_status_t iree_hal_cuda2_device_create_stream_command_buffer(
+    iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories,
+    iree_host_size_t binding_capacity,
+    iree_hal_command_buffer_t** out_command_buffer) {
+  iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
+  return iree_hal_cuda2_stream_command_buffer_create(
+      base_device, device->cuda_symbols, device->nccl_symbols,
+      device->tracing_context, mode, command_categories, binding_capacity,
+      device->dispatch_cu_stream, &device->block_pool, device->host_allocator,
+      out_command_buffer);
 }
 
 static iree_status_t iree_hal_cuda2_device_create_command_buffer(
@@ -759,10 +754,9 @@ static iree_status_t iree_hal_cuda2_device_queue_execute(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_hal_cuda2_pending_queue_actions_enqueue_execution(
-      device->dispatch_cu_stream, device->callback_cu_stream,
-      device->deferred_command_buffer, device->pending_queue_actions,
-      wait_semaphore_list, signal_semaphore_list, command_buffer_count,
-      command_buffers);
+      base_device, device->dispatch_cu_stream, device->callback_cu_stream,
+      device->pending_queue_actions, wait_semaphore_list, signal_semaphore_list,
+      command_buffer_count, command_buffers);
   if (iree_status_is_ok(status)) {
     // Try to advance the pending workload queue.
     status = iree_hal_cuda2_pending_queue_actions_issue(
