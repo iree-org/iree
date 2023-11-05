@@ -59,7 +59,13 @@ static void iree_io_parameter_index_destroy(iree_io_parameter_index_t* index) {
 
   for (iree_host_size_t i = 0; i < index->entry_count; ++i) {
     iree_io_parameter_index_entry_t* entry = index->entries[i];
-    iree_io_file_handle_release(entry->file_handle);
+    switch (entry->type) {
+      default:
+        break;
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE:
+        iree_io_file_handle_release(entry->storage.file.handle);
+        break;
+    }
     iree_allocator_free(host_allocator, entry);
   }
   if (index->entries) {
@@ -161,10 +167,19 @@ iree_io_parameter_index_add(iree_io_parameter_index_t* index,
             : iree_make_const_byte_span(
                   (uint8_t*)cloned_entry->key.data + cloned_entry->key.size,
                   entry->metadata.data_length);
-    cloned_entry->file_handle = entry->file_handle;
-    iree_io_file_handle_retain(cloned_entry->file_handle);
-    cloned_entry->offset = entry->offset;
     cloned_entry->length = entry->length;
+    cloned_entry->type = entry->type;
+    switch (entry->type) {
+      default:
+        break;
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT:
+        cloned_entry->storage.splat = entry->storage.splat;
+        break;
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE:
+        cloned_entry->storage.file = entry->storage.file;
+        iree_io_file_handle_retain(cloned_entry->storage.file.handle);
+        break;
+    }
     memcpy((void*)cloned_entry->key.data, entry->key.data, entry->key.size);
     memcpy((void*)cloned_entry->metadata.data, entry->metadata.data,
            entry->metadata.data_length);

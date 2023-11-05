@@ -118,6 +118,8 @@ static bool iree_io_parameter_index_provider_query_support(
 // Resolves a parameter with |key| for use on the given |device|.
 // Returns the entry containing the parameter metadata and a retained
 // HAL file that stores it (must be released by the caller).
+// If the parameter is synthetic and not backed by a file then the returned
+// file will be NULL.
 static iree_status_t iree_io_parameter_index_provider_resolve(
     iree_io_parameter_index_provider_t* provider, iree_hal_device_t* device,
     iree_hal_queue_affinity_t queue_affinity, iree_string_view_t scope,
@@ -138,10 +140,13 @@ static iree_status_t iree_io_parameter_index_provider_resolve(
   // Get (or import) the HAL file backing the entry.
   // NOTE: file is retained!
   iree_hal_file_t* file = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_file_cache_lookup(
-              provider->file_cache, device, queue_affinity, access,
-              entry->file_handle, IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, &file));
+  if (entry->type == IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE) {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_hal_file_cache_lookup(provider->file_cache, device, queue_affinity,
+                                   access, entry->storage.file.handle,
+                                   IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, &file));
+  }
 
   *out_entry = entry;
   *out_file = file;
@@ -155,18 +160,31 @@ static iree_status_t iree_io_validate_parameter_range(
     const iree_io_parameter_index_entry_t* entry, uint64_t offset,
     uint64_t length) {
   iree_hal_memory_access_t allowed_access = IREE_HAL_MEMORY_ACCESS_NONE;
-  if (iree_all_bits_set(iree_io_file_handle_access(entry->file_handle),
-                        IREE_IO_FILE_ACCESS_READ)) {
-    allowed_access |= IREE_HAL_MEMORY_ACCESS_READ;
-  }
-  if (iree_all_bits_set(iree_io_file_handle_access(entry->file_handle),
-                        IREE_IO_FILE_ACCESS_WRITE)) {
-    allowed_access |=
-        IREE_HAL_MEMORY_ACCESS_WRITE | IREE_HAL_MEMORY_ACCESS_DISCARD;
+  switch (entry->type) {
+    case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT:
+      // Synthetic entries are read-only.
+      allowed_access = IREE_HAL_MEMORY_ACCESS_READ;
+      break;
+    case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE:
+      // Access to the entry depends on the access of the file backing it.
+      if (iree_all_bits_set(
+              iree_io_file_handle_access(entry->storage.file.handle),
+              IREE_IO_FILE_ACCESS_READ)) {
+        allowed_access |= IREE_HAL_MEMORY_ACCESS_READ;
+      }
+      if (iree_all_bits_set(
+              iree_io_file_handle_access(entry->storage.file.handle),
+              IREE_IO_FILE_ACCESS_WRITE)) {
+        allowed_access |=
+            IREE_HAL_MEMORY_ACCESS_WRITE | IREE_HAL_MEMORY_ACCESS_DISCARD;
+      }
+      break;
+    default:
+      // Unknown entries are inaccessible.
+      allowed_access = IREE_HAL_MEMORY_ACCESS_NONE;
+      break;
   }
   if (!iree_all_bits_set(allowed_access, required_access)) {
-    return iree_make_status(IREE_STATUS_PERMISSION_DENIED,
-                            "access denied to parameter backing file");
 #if IREE_STATUS_MODE
     iree_bitfield_string_temp_t temp0, temp1;
     iree_string_view_t allowed_memory_access_str =
@@ -214,7 +232,7 @@ static iree_status_t iree_io_parameter_index_provider_load(
 
   // Lookup the parameter metadata and get its backing file.
   const iree_io_parameter_index_entry_t* source_entry = NULL;
-  iree_hal_file_t* source_file = NULL;  // retained
+  iree_hal_file_t* source_file = NULL;  // retained, NULL if splat
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_io_parameter_index_provider_resolve(
               provider, device, queue_affinity, source_scope, source_key,
@@ -233,10 +251,11 @@ static iree_status_t iree_io_parameter_index_provider_load(
   // map files that we already have open via other mechanisms (FILE, fd, etc).
   iree_hal_buffer_t* target_buffer = NULL;
   if (iree_status_is_ok(status) &&
-      iree_io_file_handle_type(source_entry->file_handle) ==
+      source_entry->type == IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE &&
+      iree_io_file_handle_type(source_entry->storage.file.handle) ==
           IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     iree_byte_span_t host_allocation =
-        iree_io_file_handle_primitive(source_entry->file_handle)
+        iree_io_file_handle_primitive(source_entry->storage.file.handle)
             .value.host_allocation;
     iree_hal_external_buffer_t external_buffer = {
         .type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
@@ -252,9 +271,9 @@ static iree_status_t iree_io_parameter_index_provider_load(
     };
     iree_hal_buffer_release_callback_t release_callback = {
         .fn = iree_io_file_handle_buffer_release,
-        .user_data = source_entry->file_handle,
+        .user_data = source_entry->storage.file.handle,
     };
-    iree_io_file_handle_retain(source_entry->file_handle);
+    iree_io_file_handle_retain(source_entry->storage.file.handle);
     iree_status_t import_status = iree_hal_allocator_import_buffer(
         iree_hal_device_allocator(device), target_params, &external_buffer,
         release_callback, &target_buffer);
@@ -267,7 +286,7 @@ static iree_status_t iree_io_parameter_index_provider_load(
       // Failed to import - that's ok as we'll just do the full allocate + read.
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "import failed");
       import_status = iree_status_ignore(import_status);
-      iree_io_file_handle_release(source_entry->file_handle);
+      iree_io_file_handle_release(source_entry->storage.file.handle);
     }
   }
 
@@ -294,10 +313,28 @@ static iree_status_t iree_io_parameter_index_provider_load(
 
     // Queue the file read into the target buffer.
     if (iree_status_is_ok(status)) {
-      status = iree_hal_device_queue_read(
-          device, queue_affinity, alloca_semaphore_list, signal_semaphore_list,
-          source_file, source_entry->offset + source_offset, target_buffer, 0,
-          length, 0);
+      switch (source_entry->type) {
+        case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT:
+          status = iree_hal_device_queue_fill(
+              device, queue_affinity, alloca_semaphore_list,
+              signal_semaphore_list, target_buffer, 0, length,
+              source_entry->storage.splat.pattern,
+              source_entry->storage.splat.pattern_length);
+          break;
+        case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE:
+          status = iree_hal_device_queue_read(
+              device, queue_affinity, alloca_semaphore_list,
+              signal_semaphore_list, source_file,
+              source_entry->storage.file.offset + source_offset, target_buffer,
+              0, length, 0);
+          break;
+        default:
+          status =
+              iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                               "reads not supported from parameters of type %d",
+                               (int)source_entry->type);
+          break;
+      }
     }
 
     iree_hal_semaphore_release(temporary_semaphore);
@@ -328,7 +365,7 @@ static iree_status_t iree_io_parameter_index_provider_read(
 
   // Lookup the parameter metadata and get its backing file.
   const iree_io_parameter_index_entry_t* source_entry = NULL;
-  iree_hal_file_t* source_file = NULL;  // retained
+  iree_hal_file_t* source_file = NULL;  // retained, NULL if splat
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_io_parameter_index_provider_resolve(
               provider, device, queue_affinity, source_scope, source_key,
@@ -340,10 +377,26 @@ static iree_status_t iree_io_parameter_index_provider_read(
 
   // Queue the file read into the target buffer.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_device_queue_read(
-        device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-        source_file, source_entry->offset + source_offset, target_buffer,
-        target_offset, length, 0);
+    switch (source_entry->type) {
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT:
+        status = iree_hal_device_queue_fill(
+            device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+            target_buffer, 0, length, source_entry->storage.splat.pattern,
+            source_entry->storage.splat.pattern_length);
+        break;
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE:
+        status = iree_hal_device_queue_read(
+            device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+            source_file, source_entry->storage.file.offset + source_offset,
+            target_buffer, target_offset, length, 0);
+        break;
+      default:
+        status =
+            iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                             "reads not supported from parameters of type %d",
+                             (int)source_entry->type);
+        break;
+    }
   }
 
   iree_hal_file_release(source_file);
@@ -370,7 +423,7 @@ static iree_status_t iree_io_parameter_index_provider_write(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_io_parameter_index_provider_resolve(
               provider, device, queue_affinity, target_scope, target_key,
-              IREE_HAL_MEMORY_ACCESS_READ, &target_entry, &target_file));
+              IREE_HAL_MEMORY_ACCESS_WRITE, &target_entry, &target_file));
 
   // Validate the parameter range is in-bounds.
   iree_status_t status = iree_io_validate_parameter_range(
@@ -378,10 +431,20 @@ static iree_status_t iree_io_parameter_index_provider_write(
 
   // Queue the file write from the source buffer.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_device_queue_write(
-        device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-        source_buffer, source_offset, target_file,
-        target_entry->offset + target_offset, length, 0);
+    switch (target_entry->type) {
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE:
+        status = iree_hal_device_queue_write(
+            device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+            source_buffer, source_offset, target_file,
+            target_entry->storage.file.offset + target_offset, length, 0);
+        break;
+      default:
+        status =
+            iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                             "writes not supported to parameters of type %d",
+                             (int)target_entry->type);
+        break;
+    }
   }
 
   iree_hal_file_release(target_file);
@@ -462,9 +525,16 @@ static iree_status_t iree_io_parameter_index_provider_gather_scatter(
   }
   IREE_TRACE_ZONE_END(z_init);
 
+  // If any of the operations are splats or copies we'll record them into a
+  // single command buffer allocated on first use. When done walking all entries
+  // we'll submit the command buffer if it was used.
+  iree_hal_command_buffer_t* transfer_command_buffer = NULL;
+  uint64_t transfer_bytes = 0;
+
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < count; ++i) {
-      IREE_TRACE_ZONE_BEGIN(z_entry);
+      IREE_TRACE_ZONE_BEGIN_NAMED(
+          z_entry, "iree_io_parameter_index_provider_gather_scatter_entry");
       IREE_TRACE_ZONE_APPEND_VALUE_I64(z_entry, i);
 
       // Fetch the next parameter to copy and its buffer range.
@@ -474,7 +544,7 @@ static iree_status_t iree_io_parameter_index_provider_gather_scatter(
 
       // Lookup the parameter metadata and get its backing file.
       const iree_io_parameter_index_entry_t* entry = NULL;
-      iree_hal_file_t* file = NULL;  // retained
+      iree_hal_file_t* file = NULL;  // retained, NULL if splat
       if (iree_status_is_ok(status)) {
         IREE_TRACE_ZONE_APPEND_TEXT(z_entry, key.data, key.size);
         status = iree_io_parameter_index_provider_resolve(
@@ -488,55 +558,117 @@ static iree_status_t iree_io_parameter_index_provider_gather_scatter(
             access, entry, span.parameter_offset, span.length);
       }
 
-      // Queue the file operation.
+      // Queue the file operation or append to the fill command buffer.
       if (iree_status_is_ok(status)) {
-        // Operations are tracked on as many timelines as there is concurrency.
-        // We distribute operations onto timelines based on which has the fewest
-        // outstanding I/O bytes.
-        const iree_host_size_t timeline_index = iree_io_select_timeline_bucket(
-            concurrency, timeline_bytes_outstanding);
-        timeline_bytes_outstanding[timeline_index] += span.length;
-        iree_hal_semaphore_t* timeline_semaphore =
-            timeline_semaphores[timeline_index];
-        uint64_t previous_timeline_value = timeline_values[timeline_index];
-        uint64_t next_timeline_value = ++timeline_values[timeline_index];
-        IREE_TRACE_ZONE_APPEND_VALUE_I64(z_entry, (uint64_t)timeline_index);
+        switch (entry->type) {
+          case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT: {
+            // Splats get routed to a fill command buffer that we'll submit at
+            // the end. This avoids the need for us to check all of the
+            // operations ahead of time at the cost of potentially acquiring
+            // more semaphores than we need in cases where everything is a
+            // splat. Splats are pretty much only useful for
+            // testing/development, though, so it's ok to not be super efficient
+            // here.
+            if (!transfer_command_buffer) {
+              status = iree_hal_command_buffer_create(
+                  device, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+                  IREE_HAL_COMMAND_CATEGORY_TRANSFER, queue_affinity, 0,
+                  &transfer_command_buffer);
+            }
+            if (iree_status_is_ok(status)) {
+              transfer_bytes += span.length;
+              status = iree_hal_command_buffer_fill_buffer(
+                  transfer_command_buffer, buffer, span.buffer_offset,
+                  span.length, entry->storage.splat.pattern,
+                  entry->storage.splat.pattern_length);
+            }
+            break;
+          }
+          case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE: {
+            // Operations are tracked on as many timelines as there is
+            // concurrency. We distribute operations onto timelines based on
+            // which has the fewest outstanding I/O bytes.
+            const iree_host_size_t timeline_index =
+                iree_io_select_timeline_bucket(concurrency,
+                                               timeline_bytes_outstanding);
+            timeline_bytes_outstanding[timeline_index] += span.length;
+            iree_hal_semaphore_t* timeline_semaphore =
+                timeline_semaphores[timeline_index];
+            uint64_t previous_timeline_value = timeline_values[timeline_index];
+            uint64_t next_timeline_value = ++timeline_values[timeline_index];
+            IREE_TRACE_ZONE_APPEND_VALUE_I64(z_entry, (uint64_t)timeline_index);
 
-        // The first wave of operations all wait on the provided wait
-        // semaphores. All others wait on their own internal concurrent
-        // timelines.
-        iree_hal_semaphore_list_t entry_wait_semaphore_list;
-        if (i < concurrency) {
-          entry_wait_semaphore_list = wait_semaphore_list;
-        } else {
-          entry_wait_semaphore_list = (iree_hal_semaphore_list_t){
-              .count = 1,
-              .semaphores = &timeline_semaphore,
-              .payload_values = &previous_timeline_value,
-          };
+            // The first wave of operations all wait on the provided wait
+            // semaphores. All others wait on their own internal concurrent
+            // timelines.
+            iree_hal_semaphore_list_t entry_wait_semaphore_list;
+            if (i < concurrency) {
+              entry_wait_semaphore_list = wait_semaphore_list;
+            } else {
+              entry_wait_semaphore_list = (iree_hal_semaphore_list_t){
+                  .count = 1,
+                  .semaphores = &timeline_semaphore,
+                  .payload_values = &previous_timeline_value,
+              };
+            }
+
+            // All operations signal their concurrency timelines and we'll put a
+            // barrier at the end so that we can join them all.
+            iree_hal_semaphore_list_t entry_signal_semaphore_list = {
+                .count = 1,
+                .semaphores = &timeline_semaphore,
+                .payload_values = &next_timeline_value,
+            };
+
+            // Perform the operation.
+            status =
+                operation(device, queue_affinity, entry_wait_semaphore_list,
+                          entry_signal_semaphore_list, file,
+                          entry->storage.file.offset + span.parameter_offset,
+                          buffer, span.buffer_offset, span.length, 0);
+            break;
+          }
+          default: {
+            status = iree_make_status(
+                IREE_STATUS_FAILED_PRECONDITION,
+                "gather/scatter not supported with parameters of type %d",
+                (int)entry->type);
+            break;
+          }
         }
 
-        // All operations signal their concurrency timelines and we'll put a
-        // barrier at the end so that we can join them all.
-        iree_hal_semaphore_list_t entry_signal_semaphore_list = {
-            .count = 1,
-            .semaphores = &timeline_semaphore,
-            .payload_values = &next_timeline_value,
-        };
+        iree_hal_file_release(file);
 
-        // Perform the operation.
-        status = operation(device, queue_affinity, entry_wait_semaphore_list,
-                           entry_signal_semaphore_list, file,
-                           entry->offset + span.parameter_offset, buffer,
-                           span.buffer_offset, span.length, 0);
+        IREE_TRACE_ZONE_END(z_entry);
+        if (!iree_status_is_ok(status)) break;
       }
-
-      iree_hal_file_release(file);
-
-      IREE_TRACE_ZONE_END(z_entry);
-      if (!iree_status_is_ok(status)) break;
     }
   }
+
+  // If any transfers were performed we'll need to submit the command buffer we
+  // built during enumeration above. Order doesn't matter so we can issue it
+  // alongside all of the other work by just appending it to a random timeline.
+  if (iree_status_is_ok(status) && transfer_command_buffer) {
+    IREE_TRACE_ZONE_BEGIN_NAMED(
+        z_transfer, "iree_io_parameter_index_provider_gather_scatter_transfer");
+    const iree_host_size_t timeline_index =
+        iree_io_select_timeline_bucket(concurrency, timeline_bytes_outstanding);
+    timeline_bytes_outstanding[timeline_index] += transfer_bytes;
+    iree_hal_semaphore_t* timeline_semaphore =
+        timeline_semaphores[timeline_index];
+    uint64_t next_timeline_value = ++timeline_values[timeline_index];
+    IREE_TRACE_ZONE_APPEND_VALUE_I64(z_transfer, (uint64_t)timeline_index);
+    iree_hal_semaphore_list_t transfer_signal_semaphore_list = {
+        .count = 1,
+        .semaphores = &timeline_semaphore,
+        .payload_values = &next_timeline_value,
+    };
+    status = iree_hal_device_queue_execute(
+        device, queue_affinity, wait_semaphore_list,
+        transfer_signal_semaphore_list, 1, &transfer_command_buffer);
+    IREE_TRACE_ZONE_END(z_transfer);
+  }
+  iree_hal_command_buffer_release(transfer_command_buffer);
 
   // Join all concurrent timelines and continue the user-provided timeline.
   if (iree_status_is_ok(status)) {

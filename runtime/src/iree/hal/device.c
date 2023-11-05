@@ -208,6 +208,55 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_fill(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
+    iree_device_size_t length, const void* pattern,
+    iree_host_size_t pattern_length) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(target_buffer);
+  IREE_ASSERT_ARGUMENT(pattern);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)length);
+
+  // If we are starting execution immediately then we can reduce latency by
+  // allowing inline command buffer execution.
+  iree_hal_command_buffer_mode_t command_buffer_mode =
+      IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT;
+  if (wait_semaphore_list.count == 0) {
+    command_buffer_mode |= IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION;
+  }
+
+  iree_hal_transfer_command_t command = {
+      .type = IREE_HAL_TRANSFER_COMMAND_TYPE_FILL,
+      .fill =
+          {
+              .target_buffer = target_buffer,
+              .target_offset = target_offset,
+              .length = length,
+              .pattern = pattern,
+              .pattern_length = pattern_length,
+          },
+  };
+
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_create_transfer_command_buffer(device, command_buffer_mode,
+                                                  queue_affinity, 1, &command,
+                                                  &command_buffer));
+
+  iree_status_t status =
+      iree_hal_device_queue_execute(device, queue_affinity, wait_semaphore_list,
+                                    signal_semaphore_list, 1, &command_buffer);
+
+  iree_hal_command_buffer_release(command_buffer);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_device_queue_copy(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,

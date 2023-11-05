@@ -441,9 +441,16 @@ static iree_status_t iree_io_enumerate_safetensors_entries(
   iree_io_parameter_index_entry_t entry = {
       .key = key,
       .metadata = iree_const_byte_span_empty(),
-      .file_handle = entry_state->file_handle,
-      .offset = entry_state->base_offset + begin,
       .length = end - begin,
+      .type = IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE,
+      .storage =
+          {
+              .file =
+                  {
+                      .handle = entry_state->file_handle,
+                      .offset = entry_state->base_offset + begin,
+                  },
+          },
   };
   return iree_io_parameter_index_add(entry_state->index, &entry);
 }

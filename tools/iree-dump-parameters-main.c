@@ -61,9 +61,26 @@ static iree_status_t iree_tooling_dump_parameter_index(
   for (iree_host_size_t i = 0; i < entry_count; ++i) {
     const iree_io_parameter_index_entry_t* entry = NULL;
     IREE_RETURN_IF_ERROR(iree_io_parameter_index_get(index, i, &entry));
-    fprintf(stdout, "%16" PRIu64 " | %16" PRIu64 " | %16" PRIu64 " | `%.*s`\n",
-            entry->offset, entry->offset + entry->length, entry->length,
-            (int)entry->key.size, entry->key.data);
+    switch (entry->type) {
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT:
+        fprintf(stdout,
+                "               - |                - | %16" PRIu64
+                " | `%.*s`\n",
+                entry->length, (int)entry->key.size, entry->key.data);
+        break;
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE:
+        fprintf(stdout,
+                "%16" PRIu64 " | %16" PRIu64 " | %16" PRIu64 " | `%.*s`\n",
+                entry->storage.file.offset,
+                entry->storage.file.offset + entry->length, entry->length,
+                (int)entry->key.size, entry->key.data);
+        break;
+      default:
+        fprintf(stdout,
+                "               ? |               ? | %16" PRIu64 " | `%.*s`\n",
+                entry->length, (int)entry->key.size, entry->key.data);
+        break;
+    }
   }
   fprintf(stdout, "\n");
   return iree_ok_status();
@@ -105,17 +122,23 @@ static iree_status_t iree_tooling_extract_parameter(
   fprintf(stdout, "%.*s` (%" PRIu64 "b) to `%.*s`...\n", (int)key.size,
           key.data, entry->length, (int)path.size, path.data);
 
+  if (entry->type != IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "cannot extract parameters of type %d",
+                            (int)entry->type);
+  }
+
   // TODO(benvanik): support generic file handle IO instead of memory-only.
-  if (iree_io_file_handle_type(entry->file_handle) !=
+  if (iree_io_file_handle_type(entry->storage.file.handle) !=
       IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
         "only host allocation file handles are supported today");
   }
   iree_byte_span_t file_contents =
-      iree_io_file_handle_value(entry->file_handle).host_allocation;
+      iree_io_file_handle_value(entry->storage.file.handle).host_allocation;
   iree_const_byte_span_t entry_contents = iree_make_const_byte_span(
-      file_contents.data + entry->offset, entry->length);
+      file_contents.data + entry->storage.file.offset, entry->length);
   char* path_str = (char*)iree_alloca(path.size + 1);
   memcpy(path_str, path.data, path.size);
   path_str[path.size] = 0;

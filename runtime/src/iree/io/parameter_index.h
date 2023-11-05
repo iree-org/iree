@@ -14,18 +14,52 @@
 extern "C" {
 #endif  // __cplusplus
 
+// Dictates the interpretation of a parameter index entry.
+typedef enum iree_io_parameter_index_entry_storage_type_e {
+  // Parameter is a read-only splatted value (repeated sequence of bytes to a
+  // certain length). No backing storage is required and requests to read the
+  // parameter will receive the provided pattern.
+  IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT = 0u,
+  // Parameter is backed by a range of bytes within a file. Access rights are
+  // inherited from the file handle.
+  IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE,
+} iree_io_parameter_index_entry_storage_type_t;
+
 // An entry in an in-memory file index.
 typedef struct iree_io_parameter_index_entry_t {
   // Key used to reference this file.
   iree_string_view_t key;
   // Optional metadata.
   iree_const_byte_span_t metadata;
-  // File handle backing this entry, retained.
-  iree_io_file_handle_t* file_handle;
-  // Offset of the entry in bytes relative to the base file offset.
-  uint64_t offset;
   // Length of the entry in bytes.
   uint64_t length;
+  // Type of the parameter dictating how storage is handled.
+  iree_io_parameter_index_entry_storage_type_t type;
+  // Defines the backing storage of a parameter based on its type.
+  union {
+    // Describes a synthetic parameter comprised of some repeated sequence of
+    // bytes. Sized to allow for up to complex128 (2xf64) values.
+    // Valid when type is IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT.
+    struct {
+      // Length of the pattern in bytes defining how many bytes of the pattern
+      // field are valid from index 0.
+      uint8_t pattern_length;
+      // Little-endian pattern used to fill the range in memory.
+      // Examples:
+      //         0xAA: pattern_length=1 pattern=[0xAA ...]
+      //       0xBBAA: pattern_length=2 pattern=[0xAA 0xBB ...]
+      //   0xDDCCBBAA: pattern_length=4 pattern=[0xAA 0xBB 0xCC 0xDD ...]
+      uint8_t pattern[16];
+    } splat;
+    // Describes a file-backed parameter.
+    // Valid when type is IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE.
+    struct {
+      // File handle backing this entry, retained.
+      iree_io_file_handle_t* handle;
+      // Offset of the entry in bytes relative to the base file offset.
+      uint64_t offset;
+    } file;
+  } storage;
 } iree_io_parameter_index_entry_t;
 
 // An in-memory file index mapping keys to byte ranges in referenced files.

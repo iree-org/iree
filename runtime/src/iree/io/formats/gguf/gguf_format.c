@@ -534,9 +534,16 @@ static iree_status_t iree_io_gguf_append_tensor_info(
   iree_io_parameter_index_entry_t entry = {
       .key = tensor_info->name,
       .metadata = iree_const_byte_span_empty(),
-      .file_handle = parser->file_handle,
-      .offset = parser->tensor_data_offset + begin,
       .length = storage_size,
+      .type = IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE,
+      .storage =
+          {
+              .file =
+                  {
+                      .handle = parser->file_handle,
+                      .offset = parser->tensor_data_offset + begin,
+                  },
+          },
   };
   return iree_io_parameter_index_add(parser->index, &entry);
 }
