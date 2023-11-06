@@ -4568,8 +4568,8 @@ only the non-padded part of the output.</p>
 <div class="highlight"><pre><span></span><code>#iree_linalg_ext.encoding&lt;
   EncodingUserAttr,   # user
   EncodingRoleAttr,   # role
-  ArrayAttr,   # elementTypes
-  TypeAttr   # originalType
+  ArrayAttr,   # element_types
+  TypeAttr   # original_type
 &gt;
 </code></pre></div>
 <p>This attribute describes the change in the layout for
@@ -4601,12 +4601,12 @@ through operations like pack/unpack.</p>
 <td>role of this tensor as an operand</td>
 </tr>
 <tr>
-<td style="text-align: center;">elementTypes</td>
+<td style="text-align: center;">element_types</td>
 <td style="text-align: center;"><code>ArrayAttr</code></td>
 <td>element types of the user's operands</td>
 </tr>
 <tr>
-<td style="text-align: center;">originalType</td>
+<td style="text-align: center;">original_type</td>
 <td style="text-align: center;"><code>TypeAttr</code></td>
 <td>type of the original tensor type before padding</td>
 </tr>
