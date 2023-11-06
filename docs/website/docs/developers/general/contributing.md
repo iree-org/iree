@@ -56,7 +56,6 @@ they are applied consistently across the project.
     [`build_tools/scripts/lint.sh`](https://github.com/openxla/iree/blob/main/build_tools/scripts/lint.sh)
     can also be used to run the full suite of lint checks.
 
-
 ### :octicons-code-review-16: Code reviews
 
 All submissions, including submissions by maintainers, require review. We
