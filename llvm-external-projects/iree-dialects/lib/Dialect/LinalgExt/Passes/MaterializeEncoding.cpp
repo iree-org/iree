@@ -116,7 +116,7 @@ chooseEncodingInfo(RankedTensorType tensorType) {
   case EncodingUser::MATMUL:
   case EncodingUser::BATCH_MATMUL:
     if (tensorType.getElementType().isF32()) {
-      return chooseEncodingInfoForMatmul(user, role, /*tileParams=*/{8, 4, 8});
+      return getEncodingInfoForMatmul(user, role, /*tileParams=*/{8, 8, 4});
     }
   }
   return failure();

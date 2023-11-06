@@ -16,6 +16,8 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -32,42 +34,43 @@ using IREE::HAL::ExecutableTargetAttr;
 
 namespace {
 
-/// Returns true if the 'targetAttr' contains '+sve' or '+sve2' in its cpu
-/// features.
-/// TODO(hanchung): Move the method to a proper place. We can not simply use
-/// it from LLVMCPU/Utils.h because of cyclic deps.
-static bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2");
-}
-
-static FailureOr<MatmulTileParams>
-chooseMatmulTileParamsGeneric(EncodingUser user, ExecutableTargetAttr target) {
-  if (isVMVXBackend(target)) {
-    // VMVX+ukernel uses dynamic tile shapes.
-    if (hasMicrokernels(target)) {
-      // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
-      // does not support batch_matmul atm.
-      if (user == EncodingUser::BATCH_MATMUL) {
-        return failure();
-      }
-      return MatmulTileParams{ShapedType::kDynamic, ShapedType::kDynamic,
-                              ShapedType::kDynamic};
+// Enumerate tile sizes to choose from when no specific architecture is
+// targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
+// narrow-N cases are handled by transposition in chooseMatmulTile.
+SmallVector<TileMxNxK>
+enumerateMatmulTilesGeneric(EncodingUser user, ExecutableTargetAttr target) {
+  if (isVMVXBackend(target) && hasMicrokernels(target)) {
+    // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
+    // does not support batch_matmul atm.
+    if (user == EncodingUser::BATCH_MATMUL) {
+      return {};
     }
+    // VMVX+ukernel uses dynamic tile shapes.
+    return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
+                      ShapedType::kDynamic}};
   }
-  // Some vaguely reasonable static tile shape.
-  return MatmulTileParams{8, 4, 8};
+
+  return {
+      TileMxNxK{8, 8, 4}, // Some vaguely reasonable static tile shape.
+      TileMxNxK{4, 8, 4}, // Truncation of the above.
+      TileMxNxK{2, 8, 4}, // Truncation of the above.
+      TileMxNxK{1, 8, 4}, // Truncation of the above.
+  };
 }
 
-static FailureOr<MatmulTileParams>
-chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
-                              ExecutableTargetAttr target) {
+// Enumerate tile sizes to choose from on arm64.
+// For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
+// are handled by transposition in chooseMatmulTile.
+SmallVector<TileMxNxK> enumerateMatmulTileArm64(EncodingUser user,
+                                                TypeRange elementTypes,
+                                                ExecutableTargetAttr target) {
   if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
-    return failure();
+    return {};
   }
 
   // Data-tiling for SVE is not implemented yet.
-  if (hasAnySVEFeature(target)) {
-    return failure();
+  if (hasFeature(target, "+sve") || hasFeature(target, "+sve2")) {
+    return {};
   }
 
   assert(elementTypes.size() == 3);
@@ -76,41 +79,68 @@ chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
   Type out = elementTypes[2];
 
   if (out.isF32() || out.isF16() || out.isBF16()) {
-    if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
-      if (hasFeature(target, "+bf16")) {
-        // Aim to use BFMMLA.
-        return MatmulTileParams{8, 4, 8};
-      }
+    if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32()) &&
+        hasFeature(target, "+bf16")) {
+      return {
+          TileMxNxK{8, 8, 4}, // Aim to use BFMMLA.
+          TileMxNxK{4, 8, 4}, // Truncation of the above.
+          TileMxNxK{2, 8, 4}, // Truncation of the above.
+          TileMxNxK{1, 8, 4}, // Truncation of the above.
+      };
     }
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
-    // accumulator itself is f16/bf16.
-    return MatmulTileParams{8, 1, 8};
+    // accumulator itself is f16/bf16, as we could typically have a 2x wider
+    // tile in that case. However, on current CPUs, the existing tiles seem
+    // wide enough already to approach peak performance.
+    return {
+        TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
+        TileMxNxK{4, 8, 1}, // Truncation of the above.
+        TileMxNxK{2, 8, 1}, // Truncation of the above.
+        TileMxNxK{1, 8, 1}, // Truncation of the above.
+    };
   }
 
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
       out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
-      // Aim to use SMMLA.
-      return MatmulTileParams{8, 8, 8};
+      return {
+          TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
+          TileMxNxK{4, 8, 8}, // Truncation of the above.
+          TileMxNxK{2, 8, 8}, // Truncation of the above.
+          TileMxNxK{1, 8, 8}, // Truncation of the above.
+      };
     }
     if (hasFeature(target, "+dotprod")) {
-      // Aim to use SDOT.
-      return MatmulTileParams{8, 4, 8};
+      return {
+          TileMxNxK{8, 8, 4}, // Aim to use SDOT.
+          TileMxNxK{4, 8, 4}, // Truncation of the above.
+          TileMxNxK{2, 8, 4}, // Truncation of the above.
+          TileMxNxK{1, 8, 4}, // Truncation of the above.
+      };
     }
-    return MatmulTileParams{8, 1, 8};
+    return {
+        TileMxNxK{8, 8, 1}, // Aim to use SMLAL.
+        TileMxNxK{4, 8, 1}, // Truncation of the above.
+        TileMxNxK{2, 8, 1}, // Truncation of the above.
+        TileMxNxK{1, 8, 1}, // Truncation of the above.
+    };
   }
 
-  return failure();
+  // Fallback - no architecture-optimized tile size for this case.
+  return enumerateMatmulTilesGeneric(user, target);
 }
 
-static FailureOr<MatmulTileParams>
-chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
-                             ExecutableTargetAttr target) {
+// Enumerate tile sizes to choose from on x86-64.
+// For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
+// are handled by transposition in chooseMatmulTile.
+SmallVector<TileMxNxK> enumerateMatmulTileX86_64(EncodingUser user,
+                                                 TypeRange elementTypes,
+                                                 ExecutableTargetAttr target) {
   if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
-    return failure();
+    return {};
   }
 
   assert(elementTypes.size() == 3);
@@ -121,7 +151,13 @@ chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
   if (out.isF32() || out.isF16() || out.isBF16()) {
     if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
       if (hasFeature(target, "+avx512bf16")) {
-        return MatmulTileParams{16, 2, 16};
+        return {
+            TileMxNxK{16, 16, 2}, // Aim to use VDPBF16PS (zmm).
+            TileMxNxK{8, 16, 2},  // Truncation of the above.
+            TileMxNxK{4, 16, 2},  // Truncation of the above.
+            TileMxNxK{2, 16, 2},  // Truncation of the above.
+            TileMxNxK{1, 16, 2},  // Truncation of the above.
+        };
       }
     }
     // Note: 16-bit floating point types currently use the same tile size as
@@ -130,56 +166,163 @@ chooseMatmulTileParamsX86_64(EncodingUser user, TypeRange elementTypes,
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
     if (hasFeature(target, "+avx512f")) {
-      return MatmulTileParams{16, 1, 16};
+      return {
+          TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+          TileMxNxK{8, 16, 1},  // Truncation of the above.
+          TileMxNxK{4, 16, 1},  // Truncation of the above.
+          TileMxNxK{2, 16, 1},  // Truncation of the above.
+          TileMxNxK{1, 16, 1},  // Truncation of the above.
+      };
     }
     if (hasFeature(target, "+avx")) {
       // Note: for good performance, most +avx users will also want to add
       // +fma, but that's a local instruction selection detail and the tile
       // layout is unaffected, as there are enough registers even with the
       // need for intermediate product registers when +fma is not used.
-      return MatmulTileParams{8, 1, 8};
+      return {
+          TileMxNxK{8, 8, 1}, // Aim to use VFMADD* (ymm).
+          TileMxNxK{4, 8, 1}, // Truncation of the above.
+          TileMxNxK{2, 8, 1}, // Truncation of the above.
+          TileMxNxK{1, 8, 1}, // Truncation of the above.
+      };
     }
     // SSE fallback.
-    return MatmulTileParams{8, 1, 4};
+    return {
+        TileMxNxK{8, 4, 1}, // Aim to use MULPS/ADDPS (xmm).
+        TileMxNxK{4, 4, 1}, // Truncation of the above.
+        TileMxNxK{2, 4, 1}, // Truncation of the above.
+        TileMxNxK{1, 4, 1}, // Truncation of the above.
+    };
   }
 
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
       out.isSignlessInteger(32)) {
     if (hasFeature(target, "+avx512vnni")) {
-      // Aim to use VPDPWSSD. This is the same tile size as with VPMADDWD
-      // as the only difference is that VPDPWSSD accumulates. VPDPBUSD would
-      // call for {16, 4, 16} but we can't use it because of its unsigned LHS.
-      return MatmulTileParams{16, 2, 16};
+      // This is the same tile size as with VPMADDWD as the only difference
+      // is that VPDPWSSD accumulates. VPDPBUSD would call for {16, 16, 4} but
+      // we can't easily use it because of its unsigned*signed semantics.
+      return {
+          TileMxNxK{16, 16, 2}, // Aim to use VPDPWSSD (zmm).
+          TileMxNxK{8, 16, 2},  // Truncation of the above.
+          TileMxNxK{4, 16, 2},  // Truncation of the above.
+          TileMxNxK{2, 16, 2},  // Truncation of the above.
+          TileMxNxK{1, 16, 2},  // Truncation of the above.
+      };
     }
     if (hasFeature(target, "+avx512bw")) {
-      // Aim to use VPMADDWD (zmm).
-      return MatmulTileParams{16, 2, 16};
+      return {
+          TileMxNxK{16, 16, 2}, // Aim to use VPMADDWD (zmm).
+          TileMxNxK{8, 16, 2},  // Truncation of the above.
+          TileMxNxK{4, 16, 2},  // Truncation of the above.
+          TileMxNxK{2, 16, 2},  // Truncation of the above.
+          TileMxNxK{1, 16, 2},  // Truncation of the above.
+      };
     }
     if (hasFeature(target, "+avx2")) {
-      // Aim to use VPMADDWD (ymm).
-      return MatmulTileParams{8, 2, 8};
+      return {
+          TileMxNxK{8, 8, 2}, // Aim to use VPMADDWD (ymm).
+          TileMxNxK{4, 8, 2}, // Truncation of the above.
+          TileMxNxK{2, 8, 2}, // Truncation of the above.
+          TileMxNxK{1, 8, 2}, // Truncation of the above.
+      };
     }
-    // SSE fallback. Aim to use PMADDWD (xmm).
-    return MatmulTileParams{8, 2, 4};
+    // SSE fallback.
+    return {
+        TileMxNxK{8, 4, 2}, // Aim to use PMADDWD (xmm).
+        TileMxNxK{4, 4, 2}, // Truncation of the above.
+        TileMxNxK{2, 4, 2}, // Truncation of the above.
+        TileMxNxK{1, 4, 2}, // Truncation of the above.
+    };
   }
 
-  return failure();
+  // Fallback - no architecture-optimized tile size for this case.
+  return enumerateMatmulTilesGeneric(user, target);
 }
 
-static FailureOr<MatmulTileParams>
-chooseMatmulTileParams(EncodingUser user, TypeRange elementTypes,
-                       ExecutableTargetAttr target) {
+TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
+                           int64_t matmulNarrowM, int64_t matmulNarrowN) {
+  // Handle narrow-N by transposing to reduce to narrow-M. Note: the
+  // enumeratedTiles currently only enumerate narrow-M cases.
+  if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
+    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0);
+    std::swap(tile.M, tile.N);
+    return tile;
+  }
+  // Handle kDynamic: currently this is only used with VMVX, where there is only
+  // one enumerated tile and it has all three M/N/K dimensions dynamic, so for
+  // now we only support that. Generalize that as needed when more dynamic tile
+  // sizes are used outside of VMVX, e.g. perhaps some day with Arm SVE. Decide
+  // how to incorporate the handling of kDynamic in the cost-model evaluation
+  // below to decide when to prefer a dynamic vs a static tile shape.
+  for (auto tile : enumeratedTiles) {
+    if (tile.M == ShapedType::kDynamic || tile.N == ShapedType::kDynamic ||
+        tile.K == ShapedType::kDynamic) {
+      assert(enumeratedTiles.size() == 1);
+      assert(tile.M == ShapedType::kDynamic && tile.N == ShapedType::kDynamic &&
+             tile.K == ShapedType::kDynamic);
+      return tile;
+    }
+  }
+  // We're going to "rate" the enumerated tiles.
+  struct RatedTileMxNxK : TileMxNxK {
+    RatedTileMxNxK() {}
+    RatedTileMxNxK(TileMxNxK tile) : TileMxNxK(tile) {}
+    // Penalize tiles that are wider in the M dimension than matmulNarrowM.
+    int64_t paddingPenalty = 0;
+    // Favor larger tiles, as long as they still minimize paddingPenalty.
+    int64_t productMxNxK = 0;
+  };
+  SmallVector<RatedTileMxNxK> ratedTiles;
+  ratedTiles.reserve(enumeratedTiles.size());
+  int64_t bestPaddingPenalty = INT64_MAX;
+  for (auto tile : enumeratedTiles) {
+    RatedTileMxNxK ratedTile(tile);
+    ratedTile.paddingPenalty = 0;
+    // If we are choosing a tile for a narrow-M case, we want to minimize
+    // padding along the M dimension.
+    // The PowerOf2Ceil is so that we are OK with padding up to the next
+    // power of two, we just try to avoid padding beyond that. For example,
+    // if matmulNarrowM==7 and we have enumerated tiles with M=8,4,2,1, we
+    // are OK with the tile that has M==8 even though it requires some padding.
+    // Otherwise, we would be penalizing the tiles with M==8,4,2 and we would
+    // end up selecting the vecmat tile (M==1) for that case!
+    if (matmulNarrowM) {
+      ratedTile.paddingPenalty =
+          std::max<int64_t>(tile.M - llvm::PowerOf2Ceil(matmulNarrowM), 0);
+    }
+    ratedTile.productMxNxK = tile.M * tile.N * tile.K;
+    ratedTiles.push_back(ratedTile);
+    bestPaddingPenalty = std::min(bestPaddingPenalty, ratedTile.paddingPenalty);
+  }
+  RatedTileMxNxK bestRatedTile;
+  for (auto ratedTile : ratedTiles) {
+    // Choose only among tiles that minimize paddingPenalty. Among those,
+    // maximize productMxNxK.
+    if (ratedTile.paddingPenalty == bestPaddingPenalty &&
+        bestRatedTile.productMxNxK < ratedTile.productMxNxK) {
+      bestRatedTile = ratedTile;
+    }
+  }
+  // Sanity check. This assert can only fail if there's a programming mistake
+  // locally here.
+  assert(bestRatedTile.paddingPenalty == bestPaddingPenalty);
+  return bestRatedTile;
+}
+
+SmallVector<TileMxNxK> enumerateMatmulTileMxNxK(EncodingUser user,
+                                                TypeRange elementTypes,
+                                                ExecutableTargetAttr target) {
   if (isAArch64(target)) {
-    return chooseMatmulTileParamsAArch64(user, elementTypes, target);
+    return enumerateMatmulTileArm64(user, elementTypes, target);
   }
   if (isX86_64(target)) {
-    return chooseMatmulTileParamsX86_64(user, elementTypes, target);
+    return enumerateMatmulTileX86_64(user, elementTypes, target);
   }
   // Data-tiling for RISCV is not implemented yet.
   if (isRISCV(target)) {
-    return failure();
+    return {};
   }
-  return chooseMatmulTileParamsGeneric(user, target);
+  return enumerateMatmulTilesGeneric(user, target);
 }
 
 struct CPUMaterializeEncodingPass
@@ -222,28 +365,46 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (!encoding) {
     return failure();
   }
+  // We only know about matmuls at the moment.
   auto user = encoding.getUser().getValue();
-  auto role = encoding.getRole().getValue();
+  if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
+    return failure();
+  }
+  // Enumerate available tile shapes for the given encoding and target.
   auto elementTypes = llvm::to_vector(
       llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
         return a.cast<TypeAttr>().getValue();
       }));
-  FailureOr<MatmulTileParams> tileParams =
-      chooseMatmulTileParams(user, elementTypes, targetAttr);
-  if (failed(tileParams)) {
+  SmallVector<TileMxNxK> enumeratedTileMxNxK =
+      enumerateMatmulTileMxNxK(user, elementTypes, targetAttr);
+  if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
-  auto encodingInfo =
-      IREE::LinalgExt::chooseEncodingInfoForMatmul(user, role, *tileParams);
-  auto originalTypeAttr = encoding.getOriginalType();
-  auto originalType = originalTypeAttr
-                          ? originalTypeAttr.getValue().cast<RankedTensorType>()
-                          : tensorType;
-  // TODO(bjacob): not sure why this causes buffer issues with VMVX.
-  if (!isVMVXBackend(targetAttr)) {
-    adjustTileSizesToNarrowStaticShape(encodingInfo, originalType.getShape());
-  }
-  return encodingInfo;
+  // Check if the encoding specifies static narrow sizes for the M/N dimensions.
+  // This can be used to choose a correspondingly narrow tile shape.
+  // With microkernels, we keep this logic in sync with the set of actual
+  // optimized microkernel tile functions to avoid a tile shape specialization
+  // causing a fallback to a slow generic tile function. At the moment,
+  // microkernel tile functions are only specialize for narrow M, not for narrow
+  // N. Accordingly, we leave matmulNarrowN as 0 (default) when microkernels are
+  // used. Generally it would be best to deal with narrow-N cases by transposing
+  // the whole matmul and swapping LHS<->RHS, reducing the narrow-N case to
+  // narrow-M.
+  auto getIntOrZero = [](IntegerAttr a) {
+    return a == IntegerAttr() ? 0 : a.getInt();
+  };
+  int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
+  int64_t matmulNarrowN = hasMicrokernels(targetAttr)
+                              ? 0
+                              : getIntOrZero(encoding.getMatmulNarrow_N());
+  // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
+  // taking narrow dimensions into account.
+  TileMxNxK chosenTileMxNxK =
+      chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
+  // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
+  // based on its role in the matmul.
+  auto role = encoding.getRole().getValue();
+  return IREE::LinalgExt::getEncodingInfoForMatmul(user, role, chosenTileMxNxK);
 }
 
 MaterializeEncodingFn
