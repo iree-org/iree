@@ -256,7 +256,7 @@ def adb_fetch_and_push_file(
         # Switch to sync mode.
         sock.sendall(b"0005sync:")
         wait_ack_ok(sock)
-        # Send the dest file path and file permissions.
+        # Send the dest file path and file permissions 0644 (rw-r-r).
         file_attr = f"{dest},{0o644}".encode("utf-8")
         sock.sendall(b"SEND" + struct.pack("I", len(file_attr)) + file_attr)
         # Stream the file chunks. 64k bytes is the max chunk size for adb.
