@@ -8,10 +8,12 @@
 #define IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
-#include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+
+// Forward declare from iree/compiler/PluginAPI/Client.h.
+class PipelineExtensions;
 
 namespace mlir {
 namespace iree_compiler {

@@ -96,6 +96,7 @@ iree_cc_library(
     MLIRLinalgUtils
     MLIRPass
     MLIRTransforms
+    iree::compiler::PluginAPI
   PUBLIC
 )
 
