@@ -116,7 +116,7 @@ class BenchmarkConfig:
             )
 
         root_benchmark_dir = args.e2e_test_artifacts_dir
-        if not str(root_benchmark_dir).startswith("gs://"):
+        if not str(root_benchmark_dir).startswith("https://"):
             root_benchmark_dir = pathlib.Path(root_benchmark_dir)
 
         return BenchmarkConfig(
