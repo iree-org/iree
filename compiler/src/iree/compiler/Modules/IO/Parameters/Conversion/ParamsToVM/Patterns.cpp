@@ -57,6 +57,7 @@ struct LoadOpConversion
             getStringRodata(loadOp.getLoc(), adaptor.getSourceKeyAttr(),
                             rewriter),
             adaptor.getSourceOffset(),
+            adaptor.getQueueAffinity(),
             rewriter.create<IREE::VM::ConstI32Op>(
                 loadOp.getLoc(), (uint32_t)adaptor.getMemoryTypes()),
             rewriter.create<IREE::VM::ConstI32Op>(
