@@ -94,9 +94,10 @@ struct ExpandVectors
         RankedTensorType::get(expandedOutDims, vectorOutTy.getElementType());
     Location loc = linalgOp.getLoc();
     Value expandedIn;
-    if (Operation *castOp = getDefiningCastOp(vectorIn)) {
+    std::optional<CastOpInterface> castOp = getDefiningCastOp(vectorIn);
+    if (castOp) {
       Value castIn = vectorIn.getDefiningOp()->getOperand(0);
-      Type castSrcElemType = castOp->getOperand(0).getType();
+      Type castSrcElemType = castOp.value()->getOperand(0).getType();
       if (auto castTensorType = dyn_cast<RankedTensorType>(castSrcElemType)) {
         castSrcElemType = castTensorType.getElementType();
       }
@@ -106,10 +107,11 @@ struct ExpandVectors
           rewriter
               .create<tensor::ExpandShapeOp>(loc, newVectorCastInTy, castIn, ri)
               .getResult();
-      expandedIn = rewriter
-                       .create(loc, castOp->getName().getIdentifier(),
-                               expandedIn, newVectorInTy, castOp->getAttrs())
-                       ->getResult(0);
+      expandedIn =
+          rewriter
+              .create(loc, castOp.value()->getName().getIdentifier(),
+                      expandedIn, newVectorInTy, castOp.value()->getAttrs())
+              ->getResult(0);
     } else {
       expandedIn =
           rewriter
