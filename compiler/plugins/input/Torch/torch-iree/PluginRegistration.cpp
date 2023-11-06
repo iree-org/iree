@@ -84,7 +84,7 @@ struct TorchSession
     const Dialect *tmTensorDialect = ctx->getLoadedDialect("tm_tensor");
 
     std::string typeMnemonic = "";
-    auto res = module.walk([&](Operation *op) {
+    module.walk([&](Operation *op) {
       Dialect *d = op->getDialect();
       if (d == torchDialect || d == torchConversionDialect) {
         typeMnemonic = "torch";
