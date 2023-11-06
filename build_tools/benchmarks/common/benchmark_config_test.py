@@ -6,12 +6,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import pathlib
-import stat
 import unittest
 import tempfile
-import os
 
-from common import benchmark_config, common_arguments
+from common import benchmark_config, benchmark_definition, common_arguments
 
 
 class BenchmarkConfigTest(unittest.TestCase):
@@ -70,7 +68,9 @@ class BenchmarkConfigTest(unittest.TestCase):
         )
         expected_config = benchmark_config.BenchmarkConfig(
             tmp_dir=per_commit_tmp_dir,
-            root_benchmark_dir=self.e2e_test_artifacts_dir,
+            root_benchmark_dir=benchmark_definition.ResourceLocation.build_local_path(
+                self.e2e_test_artifacts_dir
+            ),
             benchmark_results_dir=per_commit_tmp_dir / "benchmark-results",
             git_commit_hash="abcd",
             normal_benchmark_tool_dir=self.normal_tool_dir,
@@ -117,7 +117,9 @@ class BenchmarkConfigTest(unittest.TestCase):
             args=args, git_commit_hash="abcd"
         )
 
-        self.assertEqual(config.root_benchmark_dir, "https://example.com/testdata")
+        self.assertEqual(
+            config.root_benchmark_dir.get_url(), "https://example.com/testdata"
+        )
 
     def test_build_from_args_invalid_capture_args(self):
         args = common_arguments.Parser().parse_args(

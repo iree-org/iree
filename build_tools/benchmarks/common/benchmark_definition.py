@@ -14,10 +14,12 @@ import json
 import pathlib
 import re
 import subprocess
+import urllib.parse
+import urllib.request
 
 import dataclasses
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from e2e_test_framework.definitions import common_definitions
 
@@ -39,6 +41,43 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "nvidia-a100-sxm4-40gb": common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
     "nvidia-geforce-rtx-3090": common_definitions.DeviceArchitecture.NVIDIA_AMPERE,
 }
+
+
+@dataclasses.dataclass(frozen=True)
+class ResourceLocation:
+    """Class to represent either local resource path or an URL."""
+
+    local_path: Optional[pathlib.Path]
+    url: Optional[str]
+
+    def get_local_path(self) -> Optional[pathlib.Path]:
+        """Returns the local path or None if it is an URL."""
+        return self.local_path
+
+    def get_url(self) -> Optional[str]:
+        """Returns the URL or None if it is a local path."""
+        return self.url
+
+    def __truediv__(self, sub_path: Union[str, pathlib.PurePath]) -> "ResourceLocation":
+        """Appends the sub path and returns the new location."""
+        local_path = self.get_local_path()
+        if local_path:
+            return self.__class__.build_local_path(local_path / sub_path)
+        url = self.get_url()
+        assert url is not None
+        sub_url_path = urllib.request.pathname2url(str(sub_path))
+        # urljoin requires the directly URL ended with "/".
+        return self.__class__.build_url(urllib.parse.urljoin(url + "/", sub_url_path))
+
+    @classmethod
+    def build_local_path(cls, path: Union[pathlib.Path, str]) -> "ResourceLocation":
+        """Build from a local path."""
+        return cls(local_path=pathlib.Path(path), url=None)
+
+    @classmethod
+    def build_url(cls, url: str) -> "ResourceLocation":
+        """Build from an URL."""
+        return cls(local_path=None, url=url)
 
 
 @dataclasses.dataclass

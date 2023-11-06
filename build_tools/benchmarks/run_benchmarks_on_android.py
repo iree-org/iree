@@ -44,12 +44,12 @@ import struct
 import subprocess
 import tarfile
 import time
-import urllib.parse
-from typing import Any, Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Sequence, Tuple
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
+from common import benchmark_definition
 from common.benchmark_definition import (
     execute_cmd,
     execute_cmd_and_get_stdout,
@@ -193,7 +193,7 @@ def adb_path_exists(android_path: pathlib.PurePosixPath, verbose: bool = False):
 
 
 def adb_fetch_and_push_file(
-    source: Union[str, pathlib.Path],
+    source: benchmark_definition.ResourceLocation,
     dest: pathlib.PurePosixPath,
     verbose: bool = False,
 ):
@@ -215,13 +215,16 @@ def adb_fetch_and_push_file(
         return dest
 
     # If the source is a local file, push directly.
-    if isinstance(source, pathlib.Path):
-        return adb_push_file(source, dest, verbose=verbose)
+    local_path = source.get_local_path()
+    if local_path:
+        return adb_push_file(local_path, dest, verbose=verbose)
 
     if verbose:
         print(f"Streaming file {source} to {dest}.")
 
-    req = requests.get(source, stream=True, timeout=60)
+    url = source.get_url()
+    assert url is not None
+    req = requests.get(url, stream=True, timeout=60)
     if not req.ok:
         raise RuntimeError(f"Failed to fetch {source}: {req.status_code} - {req.text}")
 
@@ -287,13 +290,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         )
         android_case_dir = ANDROID_TMPDIR / module_rel_dir
 
-        module_dir = benchmark_case.module_dir
-        if isinstance(module_dir, pathlib.Path):
-            module_path = module_dir / iree_artifacts.MODULE_FILENAME
-        else:
-            module_path = urllib.parse.urljoin(
-                module_dir, iree_artifacts.MODULE_FILENAME
-            )
+        module_path = benchmark_case.module_dir / iree_artifacts.MODULE_FILENAME
         module_device_path = adb_fetch_and_push_file(
             source=module_path,
             dest=android_case_dir / iree_artifacts.MODULE_FILENAME,

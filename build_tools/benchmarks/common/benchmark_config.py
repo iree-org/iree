@@ -7,9 +7,11 @@
 
 from argparse import Namespace
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional
 import pathlib
 import re
+
+from common import benchmark_definition
 
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
 CAPTURES_REL_PATH = "captures"
@@ -62,7 +64,7 @@ class BenchmarkConfig:
     """
 
     tmp_dir: pathlib.Path
-    root_benchmark_dir: Union[str, pathlib.Path]
+    root_benchmark_dir: benchmark_definition.ResourceLocation
     benchmark_results_dir: pathlib.Path
     git_commit_hash: str
 
@@ -118,8 +120,14 @@ class BenchmarkConfig:
 
         root_benchmark_dir = args.e2e_test_artifacts_dir
         # Convert the local path into Path object.
-        if not re.match("^[^:]+://", str(root_benchmark_dir)):
-            root_benchmark_dir = pathlib.Path(root_benchmark_dir)
+        if re.match("^[^:]+://", str(root_benchmark_dir)):
+            root_benchmark_dir = benchmark_definition.ResourceLocation.build_url(
+                root_benchmark_dir
+            )
+        else:
+            root_benchmark_dir = benchmark_definition.ResourceLocation.build_local_path(
+                root_benchmark_dir
+            )
 
         return BenchmarkConfig(
             tmp_dir=per_commit_tmp_dir,

@@ -16,7 +16,8 @@ import urllib.request
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple
+from common import benchmark_definition
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -46,7 +47,7 @@ class BenchmarkCase:
     driver_info: DriverInfo
     benchmark_tool_name: str
     run_config: iree_definitions.E2EModelRunConfig
-    module_dir: Union[str, pathlib.Path]
+    module_dir: benchmark_definition.ResourceLocation
     input_uri: Optional[str] = None
     expected_output_uri: Optional[str] = None
     verify_params: List[str] = dataclasses.field(default_factory=list)
@@ -173,7 +174,7 @@ class BenchmarkSuite(object):
     @staticmethod
     def load_from_run_configs(
         run_configs: Sequence[iree_definitions.E2EModelRunConfig],
-        root_benchmark_dir: Union[str, pathlib.Path],
+        root_benchmark_dir: benchmark_definition.ResourceLocation,
     ):
         """Loads the benchmarks from the run configs.
 
@@ -202,15 +203,8 @@ class BenchmarkSuite(object):
             target_arch = target_device_spec.architecture
             model = module_gen_config.imported_model.model
 
-            module_dir = iree_artifacts.get_module_dir_path(module_gen_config)
-            if isinstance(root_benchmark_dir, pathlib.Path):
-                module_dir = root_benchmark_dir / module_dir
-            else:
-                # urljoin requires the directory URL ended with "/".
-                url_path = urllib.request.pathname2url(str(module_dir))
-                module_dir = (
-                    urllib.parse.urljoin(root_benchmark_dir + "/", url_path) + "/"
-                )
+            module_rel_dir = iree_artifacts.get_module_dir_path(module_gen_config)
+            module_dir = root_benchmark_dir / module_rel_dir
 
             benchmark_case = BenchmarkCase(
                 model_name=model.name,

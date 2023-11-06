@@ -19,7 +19,6 @@ import requests
 import shutil
 import subprocess
 import tarfile
-import urllib.parse
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_driver import BenchmarkDriver
@@ -54,18 +53,20 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         capture_filename: Optional[pathlib.Path],
     ) -> None:
         module_dir = benchmark_case.module_dir
-        if isinstance(module_dir, pathlib.Path):
-            case_tmp_dir = module_dir
-            module_path = module_dir / iree_artifacts.MODULE_FILENAME
+        local_module_dir = module_dir.get_local_path()
+        if local_module_dir:
+            case_tmp_dir = local_module_dir
+            module_path = local_module_dir / iree_artifacts.MODULE_FILENAME
         else:
             module_rel_dir = iree_artifacts.get_module_dir_path(
                 benchmark_case.run_config.module_generation_config
             )
             case_tmp_dir = self.config.tmp_dir / module_rel_dir
             case_tmp_dir.mkdir(parents=True, exist_ok=True)
+            module_url = (module_dir / iree_artifacts.MODULE_FILENAME).get_url()
+            assert module_url is not None
             module_path = self.__fetch_file(
-                uri=urllib.parse.urljoin(module_dir, iree_artifacts.MODULE_FILENAME),
-                dest=case_tmp_dir / iree_artifacts.MODULE_FILENAME,
+                uri=module_url, dest=case_tmp_dir / iree_artifacts.MODULE_FILENAME
             )
 
         inputs_dir = None
