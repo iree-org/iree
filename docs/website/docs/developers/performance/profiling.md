@@ -1,5 +1,5 @@
 ---
-icon: octicons/bookmark-16
+icon: material/chart-line
 ---
 
 # Profiling overview

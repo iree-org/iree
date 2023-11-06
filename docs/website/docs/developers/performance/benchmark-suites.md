@@ -1,5 +1,5 @@
 ---
-icon: octicons/stack-16
+icon: simple/speedtest
 ---
 
 # Benchmark suites
