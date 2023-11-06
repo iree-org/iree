@@ -115,9 +115,8 @@ jobs:
           # triggered by our tests. Disable running tests entirely on Pixel 4.
           - device-name: pixel-4
             label-exclude: "vulkan"
-          # TODO(pzread): Re-enable Pixel 6 once the device is fixed.
-          # - device-name: pixel-6-pro
-          #   label-exclude: "^requires-gpu"
+          - device-name: pixel-6-pro
+            label-exclude: "^requires-gpu"
           - device-name: moto-edge-x30
             label-exclude: "^requires-gpu"
     name: test_on_${{ matrix.target.device-name }}
