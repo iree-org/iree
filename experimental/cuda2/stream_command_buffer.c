@@ -491,7 +491,7 @@ static iree_status_t iree_hal_cuda2_stream_command_buffer_push_descriptor_set(
           iree_hal_buffer_allocated_buffer(binding->buffer));
       iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
       device_ptr = device_buffer + offset + binding->offset;
-    };
+    }
     current_bindings[binding->binding] = device_ptr;
   }
 
@@ -571,6 +571,7 @@ static iree_status_t iree_hal_cuda2_stream_command_buffer_dispatch(
   iree_host_size_t set_count =
       iree_hal_cuda2_pipeline_layout_descriptor_set_count(kernel_info.layout);
   for (iree_host_size_t i = 0; i < set_count; ++i) {
+    // TODO: cache this information in the kernel info to avoid recomputation.
     iree_host_size_t binding_count =
         iree_hal_cuda2_descriptor_set_layout_binding_count(
             iree_hal_cuda2_pipeline_layout_descriptor_set_layout(
@@ -584,6 +585,10 @@ static iree_status_t iree_hal_cuda2_stream_command_buffer_dispatch(
   // Append the push constants to the kernel arguments.
   iree_host_size_t base_index =
       iree_hal_cuda2_pipeline_layout_push_constant_index(kernel_info.layout);
+  // As commented in the above, what each kernel parameter points to is a
+  // CUdeviceptr, which as the size of a pointer on the target machine. we are
+  // just storing a 32-bit value for the push constant here instead. So we must
+  // process one element each type, for 64-bit machines.
   for (iree_host_size_t i = 0; i < push_constant_count; i++) {
     *((uint32_t*)params_ptr[base_index + i]) =
         command_buffer->push_constants[i];
