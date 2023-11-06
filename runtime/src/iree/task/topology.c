@@ -99,6 +99,10 @@ void iree_task_topology_initialize_from_group_count(
   for (iree_host_size_t i = 0; i < group_count; ++i) {
     iree_task_topology_group_t* group = &out_topology->groups[i];
     iree_task_topology_group_initialize(i, group);
+    // NOTE: without platform queries we can't figure out cache sizes and just
+    // make a conservative guess.
+    group->caches.l1_data = 32 * 1024;
+    group->caches.l2_data = 128 * 1024;
   }
   out_topology->group_count = group_count;
 

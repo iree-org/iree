@@ -49,6 +49,17 @@ typedef uint64_t iree_task_topology_group_mask_t;
 #define IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT \
   (sizeof(iree_task_topology_group_mask_t) * 8)
 
+// Total cache sizes (that we care about).
+// More information may be available but we shouldn't be specializing on it
+// unless absolutely required. Values should ideally be a power-of-two if
+// that's what the hardware has. Values of 0 indicate the particular cache is
+// not present (or not queried).
+typedef struct iree_task_topology_caches_t {
+  uint32_t l1_data;
+  uint32_t l2_data;
+  uint32_t l3_data;
+} iree_task_topology_caches_t;
+
 // Information about a particular group within the topology.
 // Groups may be of varying levels of granularity even within the same topology
 // based on how the topology is defined.
@@ -62,6 +73,9 @@ typedef struct iree_task_topology_group_t {
 
   // Processor index in the cpuinfo set.
   uint32_t processor_index;
+
+  // Total cache sizes (that we care about).
+  iree_task_topology_caches_t caches;
 
   // Ideal thread affinity for threads within this group.
   // All threads within the group share the same affinity and this is what

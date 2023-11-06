@@ -301,6 +301,7 @@ typedef struct iree_task_executor_options_t {
   // Dispatches performed will be able to request up to this amount of memory
   // for their invocations and no more. May be 0 if no worker local memory is
   // required.
+  // By default the CPU L2 cache size is used if such queries are supported.
   iree_host_size_t worker_local_memory_size;
 } iree_task_executor_options_t;
 
