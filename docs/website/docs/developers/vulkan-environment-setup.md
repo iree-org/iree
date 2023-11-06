@@ -1,3 +1,12 @@
+---
+hide:
+  - tags
+tags:
+  - GPU
+  - Vulkan
+icon: octicons/server-16
+---
+
 # Vulkan environment setup
 
 [Vulkan](https://www.khronos.org/vulkan/) is a new generation graphics and

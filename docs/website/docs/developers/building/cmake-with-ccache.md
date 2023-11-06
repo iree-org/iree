@@ -1,3 +1,7 @@
+---
+icon: simple/cmake
+---
+
 # CMake with `ccache`
 
 [`ccache`](https://ccache.dev/) is a compilation cache. In principle, just

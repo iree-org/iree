@@ -1,3 +1,7 @@
+---
+icon: simple/speedtest
+---
+
 # Benchmarking
 
 IREE uses benchmarks to inspect performance at varying levels of granularity.

@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - Web
+icon: simple/webassembly
+---
+
 # Building with Emscripten
 
 [Emscripten](https://emscripten.org/index.html) is a complete compiler

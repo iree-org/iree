@@ -1,3 +1,7 @@
+---
+icon: octicons/sliders-16
+---
+
 # Building with Bazel
 
 This page walks through building IREE from source using the

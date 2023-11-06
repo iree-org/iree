@@ -1,3 +1,12 @@
+---
+hide:
+  - tags
+tags:
+  - GPU
+  - Vulkan
+icon: material/chart-line
+---
+
 # Profiling GPUs using Vulkan
 
 [Tracy](./profiling-with-tracy.md) offers great insights into CPU/GPU

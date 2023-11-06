@@ -1,3 +1,7 @@
+---
+icon: simple/speedtest
+---
+
 # Benchmark suites
 
 IREE Benchmarks Suites is a collection of benchmarks for IREE developers to

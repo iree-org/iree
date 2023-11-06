@@ -1,3 +1,11 @@
+---
+hide:
+  - tags
+tags:
+  - CPU
+icon: material/chart-line
+---
+
 # Profiling CPUs
 
 CPUs are able to

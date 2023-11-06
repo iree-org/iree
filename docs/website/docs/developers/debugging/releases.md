@@ -1,3 +1,7 @@
+---
+icon: octicons/package-16
+---
+
 # Release debugging playbook
 
 ## Tools and Locations

@@ -1,7 +1,6 @@
-<!-- TODO(scotttodd): add icons to all developers/ pages -->
-<!-- ---
+---
 icon: material/lightbulb-on
---- -->
+---
 
 # Developer tips and tricks
 

@@ -1,3 +1,7 @@
+---
+icon: octicons/bug-16
+---
+
 # Compile time regression debugging
 
 So the IREE compiler used to compile a program quickly, but it is now slower.
