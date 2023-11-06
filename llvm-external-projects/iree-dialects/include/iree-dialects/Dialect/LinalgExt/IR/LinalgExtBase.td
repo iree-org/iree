@@ -96,12 +96,7 @@ def EncodingAttr :
     through operations like pack/unpack.
   }];
 
-  let assemblyFormat = [{
-    `<` `user` `=` `` $user
-    `,` `role` `=` `` $role
-    `,` `element_types` `=` $elementTypes
-    (`,` `original_type` `=` $originalType^)? `>`
-  }];
+  let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
     AttrParameter<"EncodingUserAttr", "kind of operation using this tensor">:$user,
