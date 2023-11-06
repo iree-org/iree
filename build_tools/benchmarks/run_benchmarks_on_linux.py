@@ -58,10 +58,10 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             case_tmp_dir = module_dir
             module_path = module_dir / iree_artifacts.MODULE_FILENAME
         else:
-            local_module_dir = iree_artifacts.get_module_dir_path(
+            module_rel_dir = iree_artifacts.get_module_dir_path(
                 benchmark_case.run_config.module_generation_config
             )
-            case_tmp_dir = self.config.tmp_dir / local_module_dir
+            case_tmp_dir = self.config.tmp_dir / module_rel_dir
             case_tmp_dir.mkdir(parents=True, exist_ok=True)
             module_path = self.__fetch_file(
                 uri=urllib.parse.urljoin(module_dir, iree_artifacts.MODULE_FILENAME),

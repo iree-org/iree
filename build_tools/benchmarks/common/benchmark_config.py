@@ -9,6 +9,7 @@ from argparse import Namespace
 from dataclasses import dataclass
 from typing import Optional, Union
 import pathlib
+import re
 
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
 CAPTURES_REL_PATH = "captures"
@@ -116,7 +117,8 @@ class BenchmarkConfig:
             )
 
         root_benchmark_dir = args.e2e_test_artifacts_dir
-        if not str(root_benchmark_dir).startswith("https://"):
+        # Convert the local path into Path object.
+        if not re.match("^[^:]+://", str(root_benchmark_dir)):
             root_benchmark_dir = pathlib.Path(root_benchmark_dir)
 
         return BenchmarkConfig(

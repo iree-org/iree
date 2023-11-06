@@ -179,6 +179,7 @@ class BenchmarkSuite(object):
 
         Args:
           run_configs: list of benchmark run configs.
+          root_benchmark_dir: path/URL of the root benchmark directory.
         Returns:
           A benchmark suite.
         """
@@ -201,15 +202,15 @@ class BenchmarkSuite(object):
             target_arch = target_device_spec.architecture
             model = module_gen_config.imported_model.model
 
-            module_dir = iree_artifacts.get_module_dir_path(
-                module_generation_config=module_gen_config
-            )
+            module_dir = iree_artifacts.get_module_dir_path(module_gen_config)
             if isinstance(root_benchmark_dir, pathlib.Path):
                 module_dir = root_benchmark_dir / module_dir
             else:
                 # urljoin requires the directory URL ended with "/".
-                url_path = urllib.request.pathname2url(str(module_dir)) + "/"
-                module_dir = urllib.parse.urljoin(root_benchmark_dir + "/", url_path)
+                url_path = urllib.request.pathname2url(str(module_dir))
+                module_dir = (
+                    urllib.parse.urljoin(root_benchmark_dir + "/", url_path) + "/"
+                )
 
             benchmark_case = BenchmarkCase(
                 model_name=model.name,

@@ -72,6 +72,7 @@ from e2e_test_framework.device_specs import device_parameters
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
+ADB_SERVER_ADDR = ("localhost", 5037)
 
 NORMAL_TOOL_REL_DIR = pathlib.PurePosixPath("normal-tools")
 TRACED_TOOL_REL_DIR = pathlib.PurePosixPath("traced-tools")
@@ -224,23 +225,46 @@ def adb_fetch_and_push_file(
     if not req.ok:
         raise RuntimeError(f"Failed to fetch {source}: {req.status_code} - {req.text}")
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(("127.0.0.1", 5037))
+    # Implement the ADB sync protocol to stream file chunk to the device, since
+    # the adb client tool doesn't support it.
+    #
+    # Alternatively we can use thrid-party library such as
+    # https://github.com/JeffLIrion/adb_shell. But the protocol we need is
+    # simple and fairly stable. This part can be replaced with other solutions
+    # if needed.
+    #
+    # To understand the details of the protocol, see
+    # https://cs.android.com/android/_/android/platform/packages/modules/adb/+/93c8e3c26e4de3a2b767a2394200bc0721bb1e24:OVERVIEW.TXT
 
-    sock.sendall(b"0012host:transport-usb")
-    print(sock.recv(4))
-    sock.sendall(b"0005sync:")
-    print(sock.recv(4))
+    def wait_ack_ok(sock: socket.socket):
+        buf = bytearray()
+        while len(buf) < 4:
+            data = sock.recv(4 - len(buf))
+            if not data:
+                break
+            buf += data
 
-    payload = f"{dest},0644".encode("utf-8")
-    sock.sendall(b"SEND" + struct.pack("I", len(payload)) + payload)
+        if buf.decode("utf-8") != "OKAY":
+            raise RuntimeError(f"ADB communication error: {buf}")
 
-    for data in req.iter_content(chunk_size=64 * 1024):
-        sock.sendall(b"DATA" + struct.pack("I", len(data)) + data)
-
-    sock.sendall(b"DONE" + struct.pack("I", int(time.time())))
-    print(sock.recv(4))
-    sock.close()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(ADB_SERVER_ADDR)
+        # Connect to any device (the first 4 hexadecimals is the following text
+        # command length).
+        sock.sendall(b"0012host:transport-any")
+        wait_ack_ok(sock)
+        # Switch to sync mode.
+        sock.sendall(b"0005sync:")
+        wait_ack_ok(sock)
+        # Send the dest file path and file permissions.
+        file_attr = f"{dest},{0o644}".encode("utf-8")
+        sock.sendall(b"SEND" + struct.pack("I", len(file_attr)) + file_attr)
+        # Stream the file chunks. 64k bytes is the max chunk size for adb.
+        for data in req.iter_content(chunk_size=64 * 1024):
+            sock.sendall(b"DATA" + struct.pack("I", len(data)) + data)
+        # End the file stream and set the creation time.
+        sock.sendall(b"DONE" + struct.pack("I", int(time.time())))
+        wait_ack_ok(sock)
 
     return dest
 
@@ -265,21 +289,21 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
         module_dir = benchmark_case.module_dir
         if isinstance(module_dir, pathlib.Path):
-            module_source = module_dir / iree_artifacts.MODULE_FILENAME
+            module_path = module_dir / iree_artifacts.MODULE_FILENAME
         else:
-            module_source = urllib.parse.urljoin(
+            module_path = urllib.parse.urljoin(
                 module_dir, iree_artifacts.MODULE_FILENAME
             )
-        adb_fetch_and_push_file(
-            module_source,
-            android_case_dir / iree_artifacts.MODULE_FILENAME,
+        module_device_path = adb_fetch_and_push_file(
+            source=module_path,
+            dest=android_case_dir / iree_artifacts.MODULE_FILENAME,
             verbose=self.verbose,
         )
 
         run_config = benchmark_case.run_config
         taskset = self.__deduce_taskset_from_run_config(run_config)
         run_args = run_config.materialize_run_flags()
-        run_args.append(f"--module={iree_artifacts.MODULE_FILENAME}")
+        run_args.append(f"--module={module_device_path}")
 
         if benchmark_results_filename is not None:
             self.__run_benchmark(
