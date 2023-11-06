@@ -81,7 +81,7 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://iree.dev/developers/building/cmake-options-and-variables/</loc>
+         <loc>https://iree.dev/developers/building/cmake-options/</loc>
          <lastmod>2023-11-06</lastmod>
          <changefreq>daily</changefreq>
     </url>

@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/guides/deployment-configurations/gpu-rocm/">
+        <link rel="canonical" href="https://iree.dev/developers/building/cmake-options/">
       
       
-        <link rel="prev" href="../gpu-cuda/">
+        <link rel="prev" href="../emscripten/">
       
       
-        <link rel="next" href="../gpu-metal/">
+        <link rel="next" href="../cmake-with-ccache/">
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>GPU - ROCm - IREE</title>
+        <title>CMake options - IREE</title>
       
     
     
@@ -81,7 +81,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gpu-deployment-using-rocm" class="md-skip">
+        <a href="#cmake-options" class="md-skip">
           Skip to content
         </a>
       
@@ -164,7 +164,7 @@
         <div data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              GPU - ROCm
+              CMake options
             
           </span>
         </div>
@@ -343,13 +343,11 @@
         
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../../guides/" class="md-tabs__link">
           
   
     
@@ -385,11 +383,13 @@
         
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../developers/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
           
   
     
@@ -438,8 +438,6 @@
         <div class="md-main__inner md-grid">
           
             
-              
-                
               
               <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
@@ -695,8 +693,6 @@
       
   
   
-    
-  
   
     
     
@@ -711,18 +707,20 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../" class="md-nav__link ">
+            <a href="../../../guides/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -738,7 +736,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Guides
@@ -784,7 +782,7 @@
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../ml-frameworks/" class="md-nav__link ">
+            <a href="../../../guides/ml-frameworks/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -815,7 +813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/tensorflow/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/tensorflow/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1.292 5.856 11.54 0v24l-4.095-2.378V7.603l-6.168 3.564.015-5.31zm21.43 5.311-.014-5.31L12.46 0v24l4.095-2.378V14.87l3.092 1.788-.018-4.618-3.074-1.756V7.603l6.168 3.564z"/></svg>
@@ -837,7 +835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/tflite/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/tflite/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1.292 5.856 11.54 0v24l-4.095-2.378V7.603l-6.168 3.564.015-5.31zm21.43 5.311-.014-5.31L12.46 0v24l4.095-2.378V14.87l3.092 1.788-.018-4.618-3.074-1.756V7.603l6.168 3.564z"/></svg>
@@ -859,7 +857,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/jax/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/jax/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.25.18.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/></svg>
@@ -881,7 +879,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ml-frameworks/pytorch/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/pytorch/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.005 0 4.952 7.053a9.865 9.865 0 0 0 0 14.022 9.866 9.866 0 0 0 14.022 0c3.984-3.9 3.986-10.205.085-14.023l-1.744 1.743c2.904 2.905 2.904 7.634 0 10.538s-7.634 2.904-10.538 0-2.904-7.634 0-10.538l4.647-4.646.582-.665zm3.568 3.899a1.327 1.327 0 0 0-1.327 1.327 1.327 1.327 0 0 0 1.327 1.328A1.327 1.327 0 0 0 16.9 5.226 1.327 1.327 0 0 0 15.573 3.9z"/></svg>
@@ -917,8 +915,6 @@
                 
   
   
-    
-  
   
     
     
@@ -943,18 +939,20 @@
     
       
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../../guides/deployment-configurations/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -970,7 +968,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_3">
             <span class="md-nav__icon md-icon"></span>
             Deployment configurations
@@ -985,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cpu/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/cpu/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
@@ -1007,7 +1005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bare-metal/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/bare-metal/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.5.75V2h3V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75V5h1.25a.75.75 0 0 1 0 1.5H14v3h1.25a.75.75 0 0 1 0 1.5H14v1.25A1.75 1.75 0 0 1 12.25 14H11v1.25a.75.75 0 0 1-1.5 0V14h-3v1.25a.75.75 0 0 1-1.5 0V14H3.75A1.75 1.75 0 0 1 2 12.25V11H.75a.75.75 0 0 1 0-1.5H2v-3H.75a.75.75 0 0 1 0-1.5H2V3.75C2 2.784 2.784 2 3.75 2H5V.75a.75.75 0 0 1 1.5 0Zm5.75 11.75a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25ZM5.75 5h4.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-4.5a.75.75 0 0 1-.75-.75v-4.5A.75.75 0 0 1 5.75 5Zm.75 4.5h3v-3h-3Z"/></svg>
@@ -1029,7 +1027,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gpu-vulkan/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-vulkan/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg>
@@ -1051,7 +1049,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gpu-cuda/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-cuda/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851a3.67 3.67 0 0 1-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964a6.46 6.46 0 0 1-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z"/></svg>
@@ -1071,31 +1069,9 @@
                 
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.324 9.137 1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273.791 1.932H2.008zm17.137.307-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z"/></svg>
-  
-  <span class="md-ellipsis">
-    GPU - ROCm
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../guides/deployment-configurations/gpu-rocm/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.324 9.137 1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273.791 1.932H2.008zm17.137.307-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z"/></svg>
@@ -1106,113 +1082,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-     Prerequisites
-  </a>
-  
-    <nav class="md-nav" aria-label="Prerequisites">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#get-the-iree-compiler" class="md-nav__link">
-    Get the IREE compiler
-  </a>
-  
-    <nav class="md-nav" aria-label="Get the IREE compiler">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#download-the-compiler-from-a-release" class="md-nav__link">
-     Download the compiler from a release
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#build-the-compiler-from-source" class="md-nav__link">
-     Build the compiler from source
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-the-iree-runtime" class="md-nav__link">
-    Get the IREE runtime
-  </a>
-  
-    <nav class="md-nav" aria-label="Get the IREE runtime">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-the-runtime-from-source" class="md-nav__link">
-     Build the runtime from source
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#compile-and-run-a-program-model" class="md-nav__link">
-    Compile and run a program model
-  </a>
-  
-    <nav class="md-nav" aria-label="Compile and run a program model">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#compile-a-program" class="md-nav__link">
-     Compile a program
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#run-a-compiled-program" class="md-nav__link">
-     Run a compiled program
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1224,7 +1093,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../gpu-metal/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-metal/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
@@ -1978,6 +1847,8 @@
       
   
   
+    
+  
   
     
     
@@ -2000,20 +1871,18 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../developers/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -2029,7 +1898,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Developers
@@ -2094,7 +1963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/contributing/" class="md-nav__link">
+      <a href="../../general/contributing/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 13H8.061l-2.574 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25v-8.5C0 1.784.784 1 1.75 1ZM1.5 2.75v8.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm5.28 1.72a.75.75 0 0 1 0 1.06L5.31 7l1.47 1.47a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.75.75 0 0 1 1.06 0Zm2.44 0a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L10.69 7 9.22 5.53a.75.75 0 0 1 0-1.06Z"/></svg>
@@ -2116,7 +1985,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/developer-overview/" class="md-nav__link">
+      <a href="../../general/developer-overview/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>
@@ -2138,7 +2007,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/developer-tips/" class="md-nav__link">
+      <a href="../../general/developer-tips/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1.8c-1.79-1.04-3-2.98-3-5.2a6 6 0 0 1 6-6m2 15v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1h4m6-10h3v2h-3v-2M1 11h3v2H1v-2M13 1v3h-2V1h2M4.92 3.5l2.13 2.14-1.42 1.41L3.5 4.93 4.92 3.5m12.03 2.13 2.12-2.13 1.43 1.43-2.13 2.12-1.42-1.42Z"/></svg>
@@ -2160,7 +2029,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/release-management/" class="md-nav__link">
+      <a href="../../general/release-management/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg>
@@ -2182,7 +2051,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/general/testing-guide/" class="md-nav__link">
+      <a href="../../general/testing-guide/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg>
@@ -2210,6 +2079,8 @@
                 
   
   
+    
+  
   
     
     
@@ -2226,15 +2097,13 @@
     
       
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
         
           <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
             
@@ -2247,7 +2116,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             Building
@@ -2260,7 +2129,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/bazel/" class="md-nav__link">
+      <a href="../bazel/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75Zm-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5H6.5Zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5h6ZM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8Zm-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0v-2Zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75Z"/></svg>
@@ -2282,7 +2151,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/emscripten/" class="md-nav__link">
+      <a href="../emscripten/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.745 0v.129a2.752 2.752 0 1 1-5.504 0V0H0v24h24V0h-9.255zm-3.291 21.431-1.169-5.783h-.02l-1.264 5.783H7.39l-1.824-8.497h1.59l1.088 5.783h.02l1.311-5.783h1.487l1.177 5.854h.02l1.242-5.854h1.561l-2.027 8.497h-1.581zm8.755 0-.542-1.891h-2.861l-.417 1.891h-1.59l2.056-8.497h2.509l2.5 8.497h-1.655zm-2.397-6.403-.694 3.118h2.159l-.796-3.118h-.669z"/></svg>
@@ -2302,9 +2171,31 @@
                 
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../../../developers/building/cmake-options/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
+  
+  <span class="md-ellipsis">
+    CMake options
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
@@ -2315,6 +2206,227 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#frequently-used-cmake-options" class="md-nav__link">
+    Frequently-used CMake options
+  </a>
+  
+    <nav class="md-nav" aria-label="Frequently-used CMake options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cmake_build_type" class="md-nav__link">
+    CMAKE_BUILD_TYPE
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cmake_lang_compiler" class="md-nav__link">
+    CMAKE_&lt;LANG&gt;_COMPILER
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iree-specific-cmake-options" class="md-nav__link">
+    IREE-specific CMake options
+  </a>
+  
+    <nav class="md-nav" aria-label="IREE-specific CMake options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_runtime_tracing" class="md-nav__link">
+    IREE_ENABLE_RUNTIME_TRACING
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_compiler_tracing" class="md-nav__link">
+    IREE_ENABLE_COMPILER_TRACING
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_compiler" class="md-nav__link">
+    IREE_BUILD_COMPILER
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_tests" class="md-nav__link">
+    IREE_BUILD_TESTS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_docs" class="md-nav__link">
+    IREE_BUILD_DOCS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_samples" class="md-nav__link">
+    IREE_BUILD_SAMPLES
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_python_bindings" class="md-nav__link">
+    IREE_BUILD_PYTHON_BINDINGS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_bindings_tflite" class="md-nav__link">
+    IREE_BUILD_BINDINGS_TFLITE
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_bindings_tflite_java" class="md-nav__link">
+    IREE_BUILD_BINDINGS_TFLITE_JAVA
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_experimental_remoting" class="md-nav__link">
+    IREE_BUILD_EXPERIMENTAL_REMOTING
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_hal_driver_defaults" class="md-nav__link">
+    IREE_HAL_DRIVER_DEFAULTS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_hal_driver_" class="md-nav__link">
+    IREE_HAL_DRIVER_*
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_target_backend_defaults" class="md-nav__link">
+    IREE_TARGET_BACKEND_DEFAULTS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_target_backend_" class="md-nav__link">
+    IREE_TARGET_BACKEND_*
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_input_" class="md-nav__link">
+    IREE_INPUT_*
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_output_format_c" class="md-nav__link">
+    IREE_OUTPUT_FORMAT_C
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_dev_mode" class="md-nav__link">
+    IREE_DEV_MODE
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_lld" class="md-nav__link">
+    IREE_ENABLE_LLD
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_asan" class="md-nav__link">
+    IREE_ENABLE_ASAN
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_msan" class="md-nav__link">
+    IREE_ENABLE_MSAN
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_tsan" class="md-nav__link">
+    IREE_ENABLE_TSAN
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_ubsan" class="md-nav__link">
+    IREE_ENABLE_UBSAN
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-compilation" class="md-nav__link">
+    Cross-compilation
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2326,7 +2438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/building/cmake-with-ccache/" class="md-nav__link">
+      <a href="../cmake-with-ccache/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
@@ -2406,7 +2518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/android-with-lldb/" class="md-nav__link">
+      <a href="../../debugging/android-with-lldb/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.523 15.341a1 1 0 0 1 0-1.999 1 1 0 0 1 0 2m-11.046 0a1 1 0 0 1 0-2 1 1 0 0 1 0 2m11.405-6.02 1.997-3.46a.416.416 0 0 0-.152-.567.416.416 0 0 0-.568.152L17.137 8.95c-1.547-.706-3.284-1.1-5.137-1.1s-3.59.394-5.137 1.1L4.841 5.447a.416.416 0 0 0-.568-.152.416.416 0 0 0-.152.567l1.997 3.46C2.688 11.186.343 14.658 0 18.76h24c-.344-4.102-2.69-7.574-6.119-9.44"/></svg>
@@ -2428,7 +2540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/compile-time-regressions/" class="md-nav__link">
+      <a href="../../debugging/compile-time-regressions/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.488 3.488 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327c0 .1-.009.197-.025.292.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5c0 .409-.049.806-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A4.997 4.997 0 0 1 8 16a4.997 4.997 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5.036 5.036 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.677 1.677 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06Zm.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.172.172 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173Z"/></svg>
@@ -2450,7 +2562,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/integration-tests/" class="md-nav__link">
+      <a href="../../debugging/integration-tests/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4.72.22a.75.75 0 0 1 1.06 0l1 .999a3.488 3.488 0 0 1 2.441 0l.999-1a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.775.776c.616.63.995 1.493.995 2.444v.327c0 .1-.009.197-.025.292.408.14.764.392 1.029.722l1.968-.787a.75.75 0 0 1 .556 1.392L13 7.258V9h2.25a.75.75 0 0 1 0 1.5H13v.5c0 .409-.049.806-.141 1.186l2.17.868a.75.75 0 0 1-.557 1.392l-2.184-.873A4.997 4.997 0 0 1 8 16a4.997 4.997 0 0 1-4.288-2.427l-2.183.873a.75.75 0 0 1-.558-1.392l2.17-.868A5.036 5.036 0 0 1 3 11v-.5H.75a.75.75 0 0 1 0-1.5H3V7.258L.971 6.446a.75.75 0 0 1 .558-1.392l1.967.787c.265-.33.62-.583 1.03-.722a1.677 1.677 0 0 1-.026-.292V4.5c0-.951.38-1.814.995-2.444L4.72 1.28a.75.75 0 0 1 0-1.06Zm.53 6.28a.75.75 0 0 0-.75.75V11a3.5 3.5 0 1 0 7 0V7.25a.75.75 0 0 0-.75-.75ZM6.173 5h3.654A.172.172 0 0 0 10 4.827V4.5a2 2 0 1 0-4 0v.327c0 .096.077.173.173.173Z"/></svg>
@@ -2472,7 +2584,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/releases/" class="md-nav__link">
+      <a href="../../debugging/releases/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg>
@@ -2494,7 +2606,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/debugging/sanitizers/" class="md-nav__link">
+      <a href="../../debugging/sanitizers/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m19.36 2.72 1.42 1.42-5.72 5.71c1.07 1.54 1.22 3.39.32 4.59L9.06 8.12c1.2-.9 3.05-.75 4.59.32l5.71-5.72M5.93 17.57c-2.01-2.01-3.24-4.41-3.58-6.65l4.88-2.09 7.44 7.44-2.09 4.88c-2.24-.34-4.64-1.57-6.65-3.58Z"/></svg>
@@ -2576,7 +2688,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/benchmarking/" class="md-nav__link">
+      <a href="../../performance/benchmarking/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
@@ -2598,7 +2710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/benchmark-suites/" class="md-nav__link">
+      <a href="../../performance/benchmark-suites/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
@@ -2620,7 +2732,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling/" class="md-nav__link">
+      <a href="../../performance/profiling/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2642,7 +2754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-cpu-events/" class="md-nav__link">
+      <a href="../../performance/profiling-cpu-events/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2664,7 +2776,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-gpu-vulkan/" class="md-nav__link">
+      <a href="../../performance/profiling-gpu-vulkan/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2686,7 +2798,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/performance/profiling-with-tracy/" class="md-nav__link">
+      <a href="../../performance/profiling-with-tracy/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2764,7 +2876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/cuda-backend/" class="md-nav__link">
+      <a href="../../design-docs/cuda-backend/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2784,7 +2896,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/design-roadmap/" class="md-nav__link">
+      <a href="../../design-docs/design-roadmap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2804,7 +2916,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/function-abi/" class="md-nav__link">
+      <a href="../../design-docs/function-abi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2824,7 +2936,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/design-docs/invocation-execution-model/" class="md-nav__link">
+      <a href="../../design-docs/invocation-execution-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2896,7 +3008,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/usage-best-practices/" class="md-nav__link">
+      <a href="../../usage-best-practices/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 6a6 6 0 0 1 6 6c0 2.22-1.21 4.16-3 5.2V19a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-1.8c-1.79-1.04-3-2.98-3-5.2a6 6 0 0 1 6-6m2 15v1a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-1h4m6-10h3v2h-3v-2M1 11h3v2H1v-2M13 1v3h-2V1h2M4.92 3.5l2.13 2.14-1.42 1.41L3.5 4.93 4.92 3.5m12.03 2.13 2.12-2.13 1.43 1.43-2.13 2.12-1.42-1.42Z"/></svg>
@@ -2918,7 +3030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../developers/vulkan-environment-setup/" class="md-nav__link">
+      <a href="../../vulkan-environment-setup/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M1.75 1h12.5c.966 0 1.75.784 1.75 1.75v4c0 .372-.116.717-.314 1 .198.283.314.628.314 1v4a1.75 1.75 0 0 1-1.75 1.75H1.75A1.75 1.75 0 0 1 0 12.75v-4c0-.358.109-.707.314-1a1.739 1.739 0 0 1-.314-1v-4C0 1.784.784 1 1.75 1ZM1.5 2.75v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm.25 5.75a.25.25 0 0 0-.25.25v4c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-4a.25.25 0 0 0-.25-.25ZM7 4.75A.75.75 0 0 1 7.75 4h4.5a.75.75 0 0 1 0 1.5h-4.5A.75.75 0 0 1 7 4.75ZM7.75 10h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM3 4.75A.75.75 0 0 1 3.75 4h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 4.75ZM3.75 10h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg>
@@ -3290,8 +3402,6 @@
             
             
               
-                
-              
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -3311,57 +3421,24 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-     Prerequisites
+  <a href="#frequently-used-cmake-options" class="md-nav__link">
+    Frequently-used CMake options
   </a>
   
-    <nav class="md-nav" aria-label="Prerequisites">
+    <nav class="md-nav" aria-label="Frequently-used CMake options">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#get-the-iree-compiler" class="md-nav__link">
-    Get the IREE compiler
-  </a>
-  
-    <nav class="md-nav" aria-label="Get the IREE compiler">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#download-the-compiler-from-a-release" class="md-nav__link">
-     Download the compiler from a release
+  <a href="#cmake_build_type" class="md-nav__link">
+    CMAKE_BUILD_TYPE
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#build-the-compiler-from-source" class="md-nav__link">
-     Build the compiler from source
+  <a href="#cmake_lang_compiler" class="md-nav__link">
+    CMAKE_&lt;LANG&gt;_COMPILER
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-the-iree-runtime" class="md-nav__link">
-    Get the IREE runtime
-  </a>
-  
-    <nav class="md-nav" aria-label="Get the IREE runtime">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-the-runtime-from-source" class="md-nav__link">
-     Build the runtime from source
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -3371,29 +3448,176 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compile-and-run-a-program-model" class="md-nav__link">
-    Compile and run a program model
+  <a href="#iree-specific-cmake-options" class="md-nav__link">
+    IREE-specific CMake options
   </a>
   
-    <nav class="md-nav" aria-label="Compile and run a program model">
+    <nav class="md-nav" aria-label="IREE-specific CMake options">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#compile-a-program" class="md-nav__link">
-     Compile a program
+  <a href="#iree_enable_runtime_tracing" class="md-nav__link">
+    IREE_ENABLE_RUNTIME_TRACING
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#run-a-compiled-program" class="md-nav__link">
-     Run a compiled program
+  <a href="#iree_enable_compiler_tracing" class="md-nav__link">
+    IREE_ENABLE_COMPILER_TRACING
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_compiler" class="md-nav__link">
+    IREE_BUILD_COMPILER
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_tests" class="md-nav__link">
+    IREE_BUILD_TESTS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_docs" class="md-nav__link">
+    IREE_BUILD_DOCS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_samples" class="md-nav__link">
+    IREE_BUILD_SAMPLES
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_python_bindings" class="md-nav__link">
+    IREE_BUILD_PYTHON_BINDINGS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_bindings_tflite" class="md-nav__link">
+    IREE_BUILD_BINDINGS_TFLITE
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_bindings_tflite_java" class="md-nav__link">
+    IREE_BUILD_BINDINGS_TFLITE_JAVA
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_build_experimental_remoting" class="md-nav__link">
+    IREE_BUILD_EXPERIMENTAL_REMOTING
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_hal_driver_defaults" class="md-nav__link">
+    IREE_HAL_DRIVER_DEFAULTS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_hal_driver_" class="md-nav__link">
+    IREE_HAL_DRIVER_*
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_target_backend_defaults" class="md-nav__link">
+    IREE_TARGET_BACKEND_DEFAULTS
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_target_backend_" class="md-nav__link">
+    IREE_TARGET_BACKEND_*
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_input_" class="md-nav__link">
+    IREE_INPUT_*
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_output_format_c" class="md-nav__link">
+    IREE_OUTPUT_FORMAT_C
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_dev_mode" class="md-nav__link">
+    IREE_DEV_MODE
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_lld" class="md-nav__link">
+    IREE_ENABLE_LLD
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_asan" class="md-nav__link">
+    IREE_ENABLE_ASAN
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_msan" class="md-nav__link">
+    IREE_ENABLE_MSAN
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_tsan" class="md-nav__link">
+    IREE_ENABLE_TSAN
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_enable_ubsan" class="md-nav__link">
+    IREE_ENABLE_UBSAN
   </a>
   
 </li>
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-compilation" class="md-nav__link">
+    Cross-compilation
+  </a>
   
 </li>
       
@@ -3410,22 +3634,9 @@
               <article class="md-content__inner md-typeset">
                 
                   
-  
-  
-
-<nav class="md-tags" hidden>
-  
-    
-    
-    
-      <a href="../../../community/tags/#gpu" class="md-tag">GPU</a>
-    
-  
-</nav>
-
 
   
-    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/guides/deployment-configurations/gpu-rocm.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/building/cmake-options.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.15 8.15 0 0 1-1.23-2Z"/></svg>
     </a>
@@ -3433,112 +3644,151 @@
   
 
 
-<h1 id="gpu-deployment-using-rocm">GPU deployment using ROCm<a class="headerlink" href="#gpu-deployment-using-rocm" title="Permanent link">link</a></h1>
-<p>IREE can accelerate model execution on AMD GPUs using
-<a href="https://www.amd.com/en/graphics/servers-solutions-rocm">ROCm</a>.</p>
-<h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>In order to use ROCm to drive the GPU, you need to have a functional ROCm
-environment. It can be verified by the following steps:</p>
-<div class="highlight"><pre><span></span><code>rocm-smi<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>rocm
-</code></pre></div>
-<p>If <code>rocm-smi</code> does not exist, you will need to install the latest ROCm Toolkit
-SDK for
-<a href="https://rocm.docs.amd.com/en/latest/deploy/windows/quick_start.html">Windows</a>
-or <a href="https://rocm.docs.amd.com/en/latest/deploy/linux/quick_start.html">Linux</a>.</p>
-<h3 id="get-the-iree-compiler">Get the IREE compiler<a class="headerlink" href="#get-the-iree-compiler" title="Permanent link">link</a></h3>
-<h4 id="download-the-compiler-from-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m8.878.392 5.25 3.045c.54.314.872.89.872 1.514v6.098a1.75 1.75 0 0 1-.872 1.514l-5.25 3.045a1.75 1.75 0 0 1-1.756 0l-5.25-3.045A1.75 1.75 0 0 1 1 11.049V4.951c0-.624.332-1.201.872-1.514L7.122.392a1.75 1.75 0 0 1 1.756 0ZM7.875 1.69l-4.63 2.685L8 7.133l4.755-2.758-4.63-2.685a.248.248 0 0 0-.25 0ZM2.5 5.677v5.372c0 .09.047.171.125.216l4.625 2.683V8.432Zm6.25 8.271 4.625-2.683a.25.25 0 0 0 .125-.216V5.677L8.75 8.432Z"/></svg></span> Download the compiler from a release<a class="headerlink" href="#download-the-compiler-from-a-release" title="Permanent link">link</a></h4>
-<div class="admonition note">
-<p class="admonition-title">Currently ROCm is <strong>NOT supported</strong> for the Python interface.</p>
-</div>
-<h4 id="build-the-compiler-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6-2.11 2.16m3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47Z"/></svg></span> Build the compiler from source<a class="headerlink" href="#build-the-compiler-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed the
-<a href="../../../building-from-source/getting-started/">Getting started</a> page to build
-the IREE compiler, then enable the ROCm compiler target with the
-<code>IREE_TARGET_BACKEND_ROCM</code> option.</p>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p><code>iree-compile</code> will be built under the <code>iree-build/tools/</code> directory. You
-may want to include this path in your system's <code>PATH</code> environment variable.</p>
-</div>
-<h3 id="get-the-iree-runtime">Get the IREE runtime<a class="headerlink" href="#get-the-iree-runtime" title="Permanent link">link</a></h3>
-<p>Next you will need to get an IREE runtime that includes the ROCm HAL driver.</p>
-<h4 id="build-the-runtime-from-source"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m13.78 15.3 6 6 2.11-2.16-6-6-2.11 2.16m3.72-5.2c-.39 0-.81-.05-1.14-.19L4.97 21.25l-2.11-2.11 7.41-7.4L8.5 9.96l-.72.7-1.45-1.41v2.86l-.7.7-3.52-3.56.7-.7h2.81l-1.4-1.41 3.56-3.56a2.976 2.976 0 0 1 4.22 0L9.89 5.74l1.41 1.4-.71.71 1.79 1.78 1.82-1.88c-.14-.33-.2-.75-.2-1.12a3.49 3.49 0 0 1 3.5-3.52c.59 0 1.11.14 1.58.42L16.41 6.2l1.5 1.5 2.67-2.67c.28.47.42.97.42 1.6 0 1.92-1.55 3.47-3.5 3.47Z"/></svg></span> Build the runtime from source<a class="headerlink" href="#build-the-runtime-from-source" title="Permanent link">link</a></h4>
-<p>Please make sure you have followed the
-<a href="../../../building-from-source/getting-started/">Getting started</a> page to build
-IREE from source, then enable the experimental ROCm HAL driver with the
-<code>IREE_EXTERNAL_HAL_DRIVERS=rocm</code> option.</p>
-<h2 id="compile-and-run-a-program-model">Compile and run a program model<a class="headerlink" href="#compile-and-run-a-program-model" title="Permanent link">link</a></h2>
-<p>With the compiler and runtime ready, we can now compile programs and run them
-on GPUs.</p>
-<h3 id="compile-a-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M4 1.75C4 .784 4.784 0 5.75 0h5.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v8.586A1.75 1.75 0 0 1 14.25 15h-9a.75.75 0 0 1 0-1.5h9a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 10 4.25V1.5H5.75a.25.25 0 0 0-.25.25v2.5a.75.75 0 0 1-1.5 0Zm1.72 4.97a.75.75 0 0 1 1.06 0l2 2a.75.75 0 0 1 0 1.06l-2 2a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.47-1.47-1.47-1.47a.75.75 0 0 1 0-1.06ZM3.28 7.78 1.81 9.25l1.47 1.47a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-2-2a.75.75 0 0 1 0-1.06l2-2a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Zm8.22-6.218V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"/></svg></span> Compile a program<a class="headerlink" href="#compile-a-program" title="Permanent link">link</a></h3>
-<p>The IREE compiler transforms a model into its final deployable format in many
-sequential steps. A model authored with Python in an ML framework should use the
-corresponding framework's import tool to convert into a format (i.e.,
-<a href="https://mlir.llvm.org/">MLIR</a>) expected by the IREE compiler first.</p>
-<p>Using MobileNet v2 as an example, you can download the SavedModel with trained
-weights from
-<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a>
-and convert it using IREE's
-<a href="../../ml-frameworks/tensorflow/">TensorFlow importer</a>. Then run one of the
-following commands to compile:</p>
-<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-rocm-target-chip<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-rocm-link-bc<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-rocm-bc-dir<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rocm.vmfb
-</code></pre></div>
-<p>Note ROCm Bitcode Dir (<code>iree-rocm-bc-dir</code>) path is required. If the system
-you are compiling IREE in has ROCm installed, then the default value of
-<code>/opt/rocm/amdgcn/bitcode</code> will usually suffice. If you intend on building
-ROCm compiler in a non-ROCm capable system, please set <code>iree-rocm-bc-dir</code>
-to the absolute path where you might have saved the amdgcn bitcode.</p>
-<p>Note that a ROCm target chip (<code>iree-rocm-target-chip</code>) of the form
-<code>gfx&lt;arch_number&gt;</code> is needed to compile towards each GPU architecture. If
-no architecture is specified then we will default to <code>gfx908</code>.</p>
-<p>Here is a table of commonly used architectures:</p>
-<table>
-<thead>
-<tr>
-<th>AMD GPU</th>
-<th>Target Chip</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>AMD MI25</td>
-<td><code>gfx900</code></td>
-</tr>
-<tr>
-<td>AMD MI50</td>
-<td><code>gfx906</code></td>
-</tr>
-<tr>
-<td>AMD MI60</td>
-<td><code>gfx906</code></td>
-</tr>
-<tr>
-<td>AMD MI100</td>
-<td><code>gfx908</code></td>
-</tr>
-</tbody>
-</table>
-<h3 id="run-a-compiled-program"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25ZM7.25 8a.749.749 0 0 1-.22.53l-2.25 2.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L5.44 8 3.72 6.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.25 2.25c.141.14.22.331.22.53Zm1.5 1.5h3a.75.75 0 0 1 0 1.5h-3a.75.75 0 0 1 0-1.5Z"/></svg></span> Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
-<p>Run the following command:</p>
-<div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">    </span>--device<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>--module<span class="o">=</span>mobilenet_rocm.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
-</code></pre></div>
-<p>The above assumes the exported function in the model is named as <code>predict</code> and
-it expects one 224x224 RGB image. We are feeding in an image with all 0 values
-here for brevity, see <code>iree-run-module --help</code> for the format to specify
-concrete values.</p>
+<h1 id="cmake-options">CMake options<a class="headerlink" href="#cmake-options" title="Permanent link">link</a></h1>
+<h2 id="frequently-used-cmake-options">Frequently-used CMake options<a class="headerlink" href="#frequently-used-cmake-options" title="Permanent link">link</a></h2>
+<h3 id="cmake_build_type"><code>CMAKE_BUILD_TYPE</code><a class="headerlink" href="#cmake_build_type" title="Permanent link">link</a></h3>
+<ul>
+<li>type: STRING</li>
+</ul>
+<p>Sets the build type. Possible values are <code>Release</code>, <code>Debug</code>,
+<code>RelWithDebInfo</code> and <code>MinSizeRel</code>. If unset, build type is set to <code>Release</code>.</p>
+<h3 id="cmake_lang_compiler"><code>CMAKE_&lt;LANG&gt;_COMPILER</code><a class="headerlink" href="#cmake_lang_compiler" title="Permanent link">link</a></h3>
+<ul>
+<li>type: STRING</li>
+</ul>
+<p>This is the command that will be used as the <code>&lt;LANG&gt;</code> compiler, which are <code>C</code>
+and <code>CXX</code> in IREE. These variables are set to compile IREE with <code>clang</code> or
+rather <code>clang++</code>. Once set, these variables can not be changed.</p>
+<h2 id="iree-specific-cmake-options">IREE-specific CMake options<a class="headerlink" href="#iree-specific-cmake-options" title="Permanent link">link</a></h2>
+<p>This gives a brief explanation of IREE specific CMake options and variables.</p>
+<h3 id="iree_enable_runtime_tracing"><code>IREE_ENABLE_RUNTIME_TRACING</code><a class="headerlink" href="#iree_enable_runtime_tracing" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Enables instrumented runtime tracing. Defaults to <code>OFF</code>.</p>
+<h3 id="iree_enable_compiler_tracing"><code>IREE_ENABLE_COMPILER_TRACING</code><a class="headerlink" href="#iree_enable_compiler_tracing" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Enables instrumented compiler tracing. This requires that
+<code>IREE_ENABLE_RUNTIME_TRACING</code> also be set. Defaults to <code>OFF</code>.</p>
+<h3 id="iree_build_compiler"><code>IREE_BUILD_COMPILER</code><a class="headerlink" href="#iree_build_compiler" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Builds the IREE compiler. Defaults to <code>ON</code>.</p>
+<h3 id="iree_build_tests"><code>IREE_BUILD_TESTS</code><a class="headerlink" href="#iree_build_tests" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Builds IREE unit tests. Defaults to <code>ON</code>.</p>
+<h3 id="iree_build_docs"><code>IREE_BUILD_DOCS</code><a class="headerlink" href="#iree_build_docs" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Builds IREE documentation files. Defaults to <code>OFF</code>.</p>
+<h3 id="iree_build_samples"><code>IREE_BUILD_SAMPLES</code><a class="headerlink" href="#iree_build_samples" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Builds IREE sample projects. Defaults to <code>ON</code>.</p>
+<h3 id="iree_build_python_bindings"><code>IREE_BUILD_PYTHON_BINDINGS</code><a class="headerlink" href="#iree_build_python_bindings" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Builds the IREE python bindings. Defaults to <code>OFF</code>.</p>
+<h3 id="iree_build_bindings_tflite"><code>IREE_BUILD_BINDINGS_TFLITE</code><a class="headerlink" href="#iree_build_bindings_tflite" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Builds the IREE TFLite C API compatibility shim. Defaults to <code>ON</code>.</p>
+<h3 id="iree_build_bindings_tflite_java"><code>IREE_BUILD_BINDINGS_TFLITE_JAVA</code><a class="headerlink" href="#iree_build_bindings_tflite_java" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Builds the IREE TFLite Java bindings with the C API compatibility shim.
+Defaults to <code>ON</code>.</p>
+<h3 id="iree_build_experimental_remoting"><code>IREE_BUILD_EXPERIMENTAL_REMOTING</code><a class="headerlink" href="#iree_build_experimental_remoting" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Builds experimental remoting component. Defaults to <code>OFF</code>.</p>
+<h3 id="iree_hal_driver_defaults"><code>IREE_HAL_DRIVER_DEFAULTS</code><a class="headerlink" href="#iree_hal_driver_defaults" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Default setting for each <code>IREE_HAL_DRIVER_*</code> option.</p>
+<h3 id="iree_hal_driver_"><code>IREE_HAL_DRIVER_*</code><a class="headerlink" href="#iree_hal_driver_" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Individual options enabling the build for each runtime HAL driver.</p>
+<h3 id="iree_target_backend_defaults"><code>IREE_TARGET_BACKEND_DEFAULTS</code><a class="headerlink" href="#iree_target_backend_defaults" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Default setting for each <code>IREE_TARGET_BACKEND_*</code> option.</p>
+<h3 id="iree_target_backend_"><code>IREE_TARGET_BACKEND_*</code><a class="headerlink" href="#iree_target_backend_" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Individual options enabling the build for each compiler target backend.</p>
+<h3 id="iree_input_"><code>IREE_INPUT_*</code><a class="headerlink" href="#iree_input_" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Individual options enabling each set of input dialects.</p>
+<h3 id="iree_output_format_c"><code>IREE_OUTPUT_FORMAT_C</code><a class="headerlink" href="#iree_output_format_c" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Enables the vm-c compiler output format, using MLIR EmitC. Defaults to <code>ON</code>.</p>
+<h3 id="iree_dev_mode"><code>IREE_DEV_MODE</code><a class="headerlink" href="#iree_dev_mode" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Configure settings to optimize for IREE development (as opposed to CI or
+release). Defaults to <code>OFF</code>. For example, this will downgrade some compiler
+diagnostics from errors to warnings.</p>
+<h3 id="iree_enable_lld"><code>IREE_ENABLE_LLD</code><a class="headerlink" href="#iree_enable_lld" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Use lld when linking. Defaults to <code>OFF</code>. This option is equivalent to
+<code>-DIREE_USE_LINKER=lld</code>. The option <code>IREE_ENABLE_LLD</code> and <code>IREE_USE_LINKER</code> can
+not be set at the same time.</p>
+<h3 id="iree_enable_asan"><code>IREE_ENABLE_ASAN</code><a class="headerlink" href="#iree_enable_asan" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Enable <a href="https://clang.llvm.org/docs/AddressSanitizer.html">address sanitizer</a> if
+the current build type is Debug and the compiler supports it.</p>
+<h3 id="iree_enable_msan"><code>IREE_ENABLE_MSAN</code><a class="headerlink" href="#iree_enable_msan" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Enable <a href="https://clang.llvm.org/docs/MemorySanitizer.html">memory sanitizer</a> if
+the current build type is Debug and the compiler supports it.</p>
+<h3 id="iree_enable_tsan"><code>IREE_ENABLE_TSAN</code><a class="headerlink" href="#iree_enable_tsan" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Enable <a href="https://clang.llvm.org/docs/ThreadSanitizer.html">thread sanitizer</a> if
+the current build type is Debug and the compiler supports it.</p>
+<h3 id="iree_enable_ubsan"><code>IREE_ENABLE_UBSAN</code><a class="headerlink" href="#iree_enable_ubsan" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Enable <a href="https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html">undefiend behavior sanitizer</a>
+if the current build type is Debug and the compiler supports it.</p>
+<h2 id="cross-compilation">Cross-compilation<a class="headerlink" href="#cross-compilation" title="Permanent link">link</a></h2>
+<p>When cross compiling (using a toolchain file like
+<a href="https://android.googlesource.com/platform/ndk/+/master/build/cmake/android.toolchain.cmake"><code>android.toolchain.cmake</code></a>),
+first build and install IREE's tools for your host configuration, then use the
+<code>IREE_HOST_BIN_DIR</code> CMake option to point the cross compiled build at the
+host tools.</p>
 
 
-
-  
 
 
 
