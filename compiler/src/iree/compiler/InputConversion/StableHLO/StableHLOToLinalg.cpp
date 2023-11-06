@@ -1417,16 +1417,23 @@ struct ConstConverterTensor final
       return rewriter.notifyMatchFailure(constOp, "type conversion failed");
 
     ElementsAttr replacementAttr = constOp.getValue();
-    if (replacementType != constOp.getType()) {
-      if (auto denseAttr = dyn_cast<DenseElementsAttr>(replacementAttr)) {
-        // Signedness conversion.
-        replacementAttr = denseAttr.mapValues(replacementType.getElementType(),
-                                              [](const APInt &i) { return i; });
+    if (replacementType == constOp.getType()) {
+      rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, replacementType,
+                                                     replacementAttr);
+      return success();
+    } else {
+      auto denseAttr = dyn_cast<DenseElementsAttr>(constOp.getValue());
+      if (!denseAttr) {
+        return rewriter.notifyMatchFailure(
+            constOp,
+            "DenseElementsAttr cast failed (only DenseElementsAttr supported)");
       }
+      replacementAttr = denseAttr.mapValues(replacementType.getElementType(),
+                                            [](const APInt &i) { return i; });
+      rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, replacementType,
+                                                     replacementAttr);
+      return success();
     }
-    rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, replacementType,
-                                                   replacementAttr);
-    return success();
   }
 };
 

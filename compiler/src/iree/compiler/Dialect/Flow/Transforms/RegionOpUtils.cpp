@@ -529,14 +529,13 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
     auto constantType = op->getResult(0).getType();
     if (llvm::isa<SplatElementsAttr>(constantValueAttr)) {
       return true;
-    } else if (auto denseAttr =
-                   llvm::dyn_cast<DenseElementsAttr>(constantValueAttr)) {
+    } else if (auto attr = llvm::dyn_cast<ElementsAttr>(constantValueAttr)) {
       auto shapedType = llvm::cast<ShapedType>(constantType);
       uint64_t estimatedByteLength =
           (shapedType.getNumElements() *
            IREE::Util::getTypeBitWidth(shapedType.getElementType())) /
           8;
-      return denseAttr.isSplat() ||
+      return attr.isSplat() ||
              estimatedByteLength <= clInlineConstantByteLength;
     } else if (constantType.isIntOrIndexOrFloat() ||
                isa<ComplexType>(constantType)) {

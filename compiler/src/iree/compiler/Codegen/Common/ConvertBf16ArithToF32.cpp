@@ -214,7 +214,7 @@ public:
       return rewriter.notifyMatchFailure(op, "Not casting from vector-scalar");
     }
 
-    mlir::DenseElementsAttr vectorCst;
+    mlir::ElementsAttr vectorCst;
     if (!matchPattern(operand, m_Constant(&vectorCst))) {
       return failure();
     }
