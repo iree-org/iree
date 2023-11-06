@@ -170,6 +170,7 @@ Flag | Files dumped
     module_abs_dispatch_0_system_elf_x86_64.codegen.bc
     module_abs_dispatch_0_system_elf_x86_64.linked.bc
     module_abs_dispatch_0_system_elf_x86_64.optimized.bc
+    module_abs_dispatch_0_system_elf_x86_64.o
     module_abs_dispatch_0_system_elf_x86_64.s
     module_abs_dispatch_0_system_elf_x86_64.so
     simple_abs_cpu.vmfb
