@@ -150,6 +150,9 @@ createFuseTensorPadWithConsumerPass();
 
 struct GenericVectorizationPassOptions {
   bool enableVectorMasking = false;
+  // Controls whether the op lowering configuration (if present) should be used
+  // to specify the masked vector sizes.
+  bool useConfiguredVectorSizes = true;
   bool vectorizePadding = false;
   bool vectorizeGatherAccesses = false;
   // The flag controls whether it touches the structure generated from tiling,

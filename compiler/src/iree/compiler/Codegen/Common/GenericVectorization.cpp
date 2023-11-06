@@ -86,11 +86,11 @@ inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
 // Return the vector sizes from the local lowering config or try to infer them
 // from the tensor shapes and tiled loops in the IR.
 static FailureOr<SizesAndScalableFlags>
-getVectorSizes(linalg::LinalgOp linalgOp) {
+getVectorSizes(linalg::LinalgOp linalgOp, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
   IREE::Codegen::LoweringConfigAttr loweringConfig =
       getLoweringConfig(linalgOp);
-  if (loweringConfig) {
+  if (useConfiguredVectorSizes && loweringConfig) {
     TilingConfig tilingConfig(loweringConfig);
     auto [vectorSizes, scalableFlags] = tilingConfig.getVectorTileSizes();
     // Replace zeros in canonical vector shape to turn it into a valid shape.
@@ -128,6 +128,7 @@ public:
   using GenericVectorizationBase::GenericVectorizationBase;
   GenericVectorizationPass(const GenericVectorizationPassOptions &options) {
     this->enableVectorMasking.setValue(options.enableVectorMasking);
+    this->useConfiguredVectorSizes.setValue(options.useConfiguredVectorSizes);
     this->vectorizePadding.setValue(options.vectorizePadding);
     this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
     this->enableCleanup.setValue(options.enableCleanup);
@@ -162,7 +163,8 @@ void GenericVectorizationPass::runOnOperation() {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
       if (enableVectorMasking) {
-        auto vectorSizesAndScalableDims = getVectorSizes(linalgOp);
+        auto vectorSizesAndScalableDims =
+            getVectorSizes(linalgOp, useConfiguredVectorSizes);
         if (succeeded(vectorSizesAndScalableDims)) {
           auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
           vectorSizes.append(sizes.begin(), sizes.end());
