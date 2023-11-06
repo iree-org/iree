@@ -101,8 +101,8 @@ jobs:
             | (.value.shards | length) as $count
             | .value.shards[]
             | {$device_name, $host_environment, shard: {index, $count}}
-            ]
-            | select(.device_name != "pixel-6-pro")' "${BENCHMARK_CONFIG}")" >> "${GITHUB_OUTPUT}"
+            | select(.device_name != "pixel-6-pro")
+            ]' "${BENCHMARK_CONFIG}")" >> "${GITHUB_OUTPUT}"
 
   run_benchmarks:
     needs: [generate_matrix]
