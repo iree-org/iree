@@ -1225,7 +1225,7 @@ hal.executable private @matmul_odd {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[11, 32, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[11, 25, 0], [8, 25, 0], [0, 0, 16], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.export public @matmul_odd
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
