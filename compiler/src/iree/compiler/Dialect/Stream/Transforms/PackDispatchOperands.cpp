@@ -87,7 +87,7 @@ static void convertAndDecomposeToI32s(
   if (auto bitcast =
           dyn_cast_or_null<complex::BitcastOp>(operand.getDefiningOp())) {
     auto complexOperand = bitcast.getOperand();
-    auto complexTy = complexOperand.getType().cast<ComplexType>();
+    auto complexTy = cast<ComplexType>(complexOperand.getType());
     auto real = builder.createOrFold<complex::ReOp>(
         loc, complexTy.getElementType(), complexOperand);
     auto imag = builder.createOrFold<complex::ImOp>(
