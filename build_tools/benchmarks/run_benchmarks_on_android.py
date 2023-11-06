@@ -44,7 +44,8 @@ import struct
 import subprocess
 import tarfile
 import time
-from typing import Any, Optional, Sequence, Tuple
+import urllib.parse
+from typing import Any, Optional, Sequence, Tuple, Union
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
@@ -58,7 +59,7 @@ from common.benchmark_definition import (
     wait_for_iree_benchmark_module_start,
     parse_iree_benchmark_metrics,
 )
-from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
+from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.android_device_utils import (
     get_android_device_model,
     get_android_device_info,
@@ -76,31 +77,29 @@ NORMAL_TOOL_REL_DIR = pathlib.PurePosixPath("normal-tools")
 TRACED_TOOL_REL_DIR = pathlib.PurePosixPath("traced-tools")
 
 
-def adb_push_to_tmp_dir(
-    content: pathlib.Path,
-    relative_dir: pathlib.PurePosixPath = pathlib.PurePosixPath(),
+def adb_push_file(
+    source: pathlib.Path,
+    dest: pathlib.PurePosixPath,
     verbose: bool = False,
 ) -> pathlib.PurePosixPath:
     """Pushes content onto the Android device.
 
     Args:
-      content: the full path to the source file.
-      relative_dir: the directory to push to; relative to ANDROID_TMPDIR.
+      source: the path to the source file.
+      dest: the full dest path on the device.
 
     Returns:
       The full path to the content on the Android device.
     """
-    filename = content.name
-    android_path = ANDROID_TMPDIR / relative_dir / filename
     # When the output is a TTY, keep the default progress info output.
     # In other cases, redirect progress info to null to avoid bloating log files.
     stdout_redirect = None if sys.stdout.isatty() else subprocess.DEVNULL
     execute_cmd(
-        ["adb", "push", content.resolve(), android_path],
+        ["adb", "push", source.resolve(), dest],
         verbose=verbose,
         stdout=stdout_redirect,
     )
-    return android_path
+    return dest
 
 
 def adb_execute_and_get_output(
@@ -192,30 +191,36 @@ def adb_path_exists(android_path: pathlib.PurePosixPath, verbose: bool = False):
     return proc.wait() == 0
 
 
-def adb_fetch_file(
-    url: str,
-    device_path: pathlib.PurePosixPath,
+def adb_fetch_and_push_file(
+    source: Union[str, pathlib.Path],
+    dest: pathlib.PurePosixPath,
     verbose: bool = False,
 ):
-    """Fetch file from the URL and stream to the device. This method avoids the
-    temporary file on the host and reduces the overhead when the file is large.
+    """Fetch file from the path/URL and stream to the device.
+
+    In the case of fetching, this method avoids the temporary file on the host
+    and reduces the overhead when the file is large.
 
     Args:
-      url: URL to fetch the file.
-      device_path: the path to store on the device.
+      source: path/URL to fetch the file.
+      dest: the full dest path on the device.
       verbose: output verbose message.
 
     Returns:
       File path on the device.
     """
 
-    if adb_path_exists(device_path, verbose):
-        return device_path
+    if adb_path_exists(dest, verbose):
+        return dest
+
+    # If the source is a local file, push directly.
+    if isinstance(source, pathlib.Path):
+        return adb_push_file(source, dest, verbose=verbose)
 
     if verbose:
-        print(f"Streaming file {url} to {device_path}.")
+        print(f"Streaming file {source} to {dest}.")
 
-    resp = requests.get(url, stream=True, timeout=60)
+    resp = requests.get(source, stream=True, timeout=60)
     if not resp.ok:
         raise RuntimeError(f"Failed to fetch: {resp.status_code} - {resp.text}")
 
@@ -227,7 +232,7 @@ def adb_fetch_file(
     sock.sendall(b"0005sync:")
     print(sock.recv(4))
 
-    payload = f"{device_path},0644".encode("utf-8")
+    payload = f"{dest},0644".encode("utf-8")
     sock.sendall(b"SEND" + struct.pack("I", len(payload)) + payload)
 
     for data in resp.iter_content(chunk_size=64 * 1024):
@@ -237,20 +242,7 @@ def adb_fetch_file(
     print(sock.recv(4))
     sock.close()
 
-    return device_path
-
-
-def get_vmfb_full_path_for_benchmark_case(
-    benchmark_case_dir: pathlib.Path,
-) -> pathlib.Path:
-    flagfile = benchmark_case_dir / MODEL_FLAGFILE_NAME
-    for line in flagfile.read_text().splitlines():
-        flag_name, flag_value = line.strip().split("=")
-        if flag_name == "--module":
-            # Realpath canonicalization matters. The caller may rely on that to track
-            # which files it already pushed.
-            return (benchmark_case_dir / flag_value).resolve()
-    raise ValueError(f"{flagfile} does not contain a --module flag")
+    return dest
 
 
 class AndroidBenchmarkDriver(BenchmarkDriver):
@@ -266,14 +258,24 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         benchmark_results_filename: Optional[pathlib.Path],
         capture_filename: Optional[pathlib.Path],
     ) -> None:
-        benchmark_case_dir = benchmark_case.benchmark_case_dir
-        android_case_dir = pathlib.PurePosixPath(
-            benchmark_case_dir.relative_to(self.config.root_benchmark_dir)
+        module_rel_dir = iree_artifacts.get_module_dir_path(
+            benchmark_case.run_config.module_generation_config
+        )
+        android_case_dir = ANDROID_TMPDIR / module_rel_dir
+
+        module_dir = benchmark_case.module_dir
+        if isinstance(module_dir, pathlib.Path):
+            module_source = module_dir / iree_artifacts.MODULE_FILENAME
+        else:
+            module_source = urllib.parse.urljoin(
+                module_dir, iree_artifacts.MODULE_FILENAME
+            )
+        adb_fetch_and_push_file(
+            module_source,
+            android_case_dir / iree_artifacts.MODULE_FILENAME,
+            verbose=self.verbose,
         )
 
-        self.__check_and_push_file(
-            benchmark_case_dir / iree_artifacts.MODULE_FILENAME, android_case_dir
-        )
         run_config = benchmark_case.run_config
         taskset = self.__deduce_taskset_from_run_config(run_config)
         run_args = run_config.materialize_run_flags()
@@ -409,8 +411,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if android_path is not None:
             return android_path
 
-        android_path = adb_push_to_tmp_dir(
-            host_path, relative_dir=relative_dir, verbose=self.verbose
+        android_path = adb_push_file(
+            host_path,
+            ANDROID_TMPDIR / relative_dir / host_path.name,
+            verbose=self.verbose,
         )
         self.already_pushed_files[host_path] = android_path
         return android_path
@@ -424,7 +428,7 @@ def set_cpu_frequency_scaling_governor(governor: str):
         / "benchmarks"
         / "set_android_scaling_governor.sh"
     )
-    android_path = adb_push_to_tmp_dir(cpu_script)
+    android_path = adb_push_file(cpu_script, ANDROID_TMPDIR / cpu_script.name)
     adb_execute_as_root([android_path, governor])
 
 
@@ -441,7 +445,7 @@ def set_gpu_frequency_scaling_policy(policy: str):
         raise RuntimeError(
             f"Unsupported device '{device_model}' for setting GPU scaling policy"
         )
-    android_path = adb_push_to_tmp_dir(gpu_script)
+    android_path = adb_push_file(gpu_script, ANDROID_TMPDIR / gpu_script.name)
     adb_execute_as_root([android_path, policy])
 
 
