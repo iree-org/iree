@@ -19,6 +19,7 @@ import requests
 import shutil
 import subprocess
 import tarfile
+import urllib.parse
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_driver import BenchmarkDriver
@@ -55,11 +56,16 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         module_dir = benchmark_case.module_dir
         if isinstance(module_dir, pathlib.Path):
             case_tmp_dir = module_dir
+            module_path = module_dir / iree_artifacts.MODULE_FILENAME
         else:
             local_module_dir = iree_artifacts.get_module_dir_path(
                 benchmark_case.run_config.module_generation_config
             )
             case_tmp_dir = self.config.tmp_dir / local_module_dir
+            module_path = self.__fetch_file(
+                uri=urllib.parse.urljoin(module_dir, iree_artifacts.MODULE_FILENAME),
+                dest=case_tmp_dir / iree_artifacts.MODULE_FILENAME,
+            )
 
         inputs_dir = None
         expected_output_dir = None
@@ -71,12 +77,6 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             expected_output_dir = self.__fetch_and_unpack_npy(
                 uri=benchmark_case.expected_output_uri,
                 dest_dir=case_tmp_dir / "expected_outputs_npy",
-            )
-        if isinstance(module_dir, pathlib.Path):
-            module_path = module_dir / iree_artifacts.MODULE_FILENAME
-        else:
-            module_path = self.__fetch_file(
-                uri=module_dir, dest=case_tmp_dir / iree_artifacts.MODULE_FILENAME
             )
 
         if benchmark_results_filename:
