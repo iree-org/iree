@@ -66,7 +66,8 @@ getMaterializedType(RankedTensorType tensorType,
     return dropEncoding(tensorType);
   }
   return tensor::PackOp::inferPackedType(
-             getOriginalTypeWithEncoding(tensorType),
+             getOriginalTypeWithEncoding(tensorType)
+                 .clone(tensorType.getElementType()),
              materializeEncodingInfo->innerTileSizes,
              materializeEncodingInfo->innerDimsPos,
              materializeEncodingInfo->outerDimsPerm)
@@ -361,8 +362,9 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
                     ValueRange convertedOperands,
                     MaterializeEncodingFn materializeEncodingFn,
                     MaterializeEncodingValueFn materializeEncodingValueFn) {
-  auto resultType = getOriginalTypeWithEncoding(
-      emptyOp->getResultTypes()[0].cast<RankedTensorType>());
+  auto emptyType = emptyOp->getResultTypes()[0].cast<RankedTensorType>();
+  auto resultType =
+      getOriginalTypeWithEncoding(emptyType).clone(emptyType.getElementType());
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
       materializeEncodingFn(resultType);
   Location loc = emptyOp.getLoc();
@@ -389,6 +391,36 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
       loc, newShape, resultType.getElementType());
 
   return newEmptyOp;
+}
+
+/// Utility method to convert from `linalg.fill` on `tensor` type with
+/// encoding to fill of the materialized type
+static FailureOr<Operation *>
+lowerOpWithEncoding(RewriterBase &rewriter, linalg::GenericOp genericOp,
+                    ValueRange convertedInputOperands,
+                    ValueRange convertedOutputOperands, MaterializeEncodingFn,
+                    MaterializeEncodingValueFn) {
+  if (!genericOp.hasTensorSemantics() || !isElementwise(genericOp) ||
+      genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "linalg.generic op is not elementwise "
+                                       "with single input and single output");
+  }
+  auto convertedResultType =
+      convertedOutputOperands[0].getType().cast<RankedTensorType>();
+  SmallVector<AffineMap> maps(
+      2, AffineMap::getMultiDimIdentityMap(convertedResultType.getRank(),
+                                           rewriter.getContext()));
+  SmallVector<utils::IteratorType> iteratorTypes(convertedResultType.getRank(),
+                                                 utils::IteratorType::parallel);
+  auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
+      genericOp.getLoc(), convertedResultType, convertedInputOperands,
+      convertedOutputOperands, maps, iteratorTypes,
+      /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
+  rewriter.inlineRegionBefore(genericOp.getRegion(),
+                              materializedGenericOp.getRegion(),
+                              materializedGenericOp.getRegion().begin());
+  return materializedGenericOp.getOperation();
 }
 
 namespace {
@@ -491,7 +523,7 @@ struct UpperBoundTileSizeToConstantOpConversion
   MaterializeEncodingFn materializeEncodingFn;
 };
 
-/// Generic pattern to convert operaiton that is in Destination Passing Style.
+/// Generic pattern to convert operation that is in Destination Passing Style.
 template <typename OpTy>
 struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
   using OpMaterializeEncodingPattern<OpTy>::OpMaterializeEncodingPattern;
@@ -633,6 +665,7 @@ void populateMaterializeEncodingPatterns(
   patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
                   MaterializeDPSOperation<linalg::MatmulOp>,
                   MaterializeDPSOperation<linalg::BatchMatmulOp>,
+                  MaterializeDPSOperation<linalg::GenericOp>,
                   MaterializeOperation<tensor::EmptyOp>,
                   SetEncodingOpToPackOpConversion,
                   UnsetEncodingOpToUnPackOpConversion>(
