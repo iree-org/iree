@@ -15,7 +15,6 @@ For some advanced CPU profiling needs such as querying CPU cache and other
 events, one may need to use some OS-specific profilers. See
 [Profiling CPUs](./profiling-cpu-events.md).
 
-
 ## Vulkan GPU Profiling
 
 [Tracy](./profiling-with-tracy.md) offers great insights into CPU/GPU
