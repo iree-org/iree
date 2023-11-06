@@ -27,13 +27,17 @@ namespace {
 struct AutoInputConversionPipelinePass final
     : AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
   AutoInputConversionPipelinePass(
-      const AutoInputConversionPipelineOptions &inputOptions) {
+      const AutoInputConversionPipelineOptions &inputOptions,
+      PipelineExtensions *pipelineExtensions)
+      : pipelineExtensions(pipelineExtensions) {
     demoteI64ToI32 = inputOptions.demoteI64ToI32;
     demoteF64ToF32 = inputOptions.demoteF64ToF32;
     promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
   }
   void runOnOperation() override;
   void getDependentDialects(DialectRegistry &registry) const override;
+
+  PipelineExtensions *pipelineExtensions = nullptr;
 };
 
 // All the features seen that should be handled during input conversion.
@@ -98,11 +102,40 @@ static void populateFeatures(Operation *op, const Dialect *stablehloDialect,
 
 void AutoInputConversionPipelinePass::runOnOperation() {
   ModuleOp module = getOperation();
-  MLIRContext *ctxt = &getContext();
+  MLIRContext *context = &getContext();
+
+  // Check if any plugin-provided pipeline extensions can convert dialects in
+  // the module first.
+  if (pipelineExtensions) {
+    std::string typeMnemonic =
+        pipelineExtensions->detectCustomInputOperations(module);
+    if (!typeMnemonic.empty()) {
+      OpPassManager passManager(module.getOperationName());
+      bool foundExtension =
+          pipelineExtensions->extendCustomInputConversionPassPipeline(
+              passManager, typeMnemonic);
+      if (!foundExtension) {
+        // We expect that callers properly validate supported extensions and
+        // that if a plugin advertises support, it actually provides it.
+        llvm::errs() << "internal error: custom input conversion for extension "
+                        "not found ("
+                     << typeMnemonic << ")\n";
+        return signalPassFailure();
+      }
+      if (failed(runPipeline(passManager, module))) {
+        return signalPassFailure();
+      }
+      return;
+    }
+  }
+
+  // No plugin-provided pipeline extensions were detected, try the built-in
+  // dialect conversions.
+  // TODO(scotttodd): Migrate these to compiler plugins?
 
   InputFeatures features;
-  const Dialect *stablehloDialect = ctxt->getLoadedDialect("stablehlo");
-  const Dialect *tosaDialect = ctxt->getLoadedDialect("tosa");
+  const Dialect *stablehloDialect = context->getLoadedDialect("stablehlo");
+  const Dialect *tosaDialect = context->getLoadedDialect("tosa");
   if (!stablehloDialect && !tosaDialect) {
     return;
   }
@@ -184,6 +217,10 @@ void AutoInputConversionPipelinePass::getDependentDialects(
   appendPipelineDialects(buildTOSAInputConversionPassPipeline);
 #endif // IREE_HAVE_TOSA_INPUT
 
+  if (pipelineExtensions) {
+    pipelineExtensions->registerDialects(registry);
+  }
+
   (void)appendPipelineDialects;
 }
 } // namespace
@@ -191,12 +228,14 @@ void AutoInputConversionPipelinePass::getDependentDialects(
 std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass() {
   AutoInputConversionPipelineOptions options;
-  return std::make_unique<AutoInputConversionPipelinePass>(options);
+  return std::make_unique<AutoInputConversionPipelinePass>(options, nullptr);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createAutoInputConversionPipelinePass(
-    const AutoInputConversionPipelineOptions &options) {
-  return std::make_unique<AutoInputConversionPipelinePass>(options);
+    const AutoInputConversionPipelineOptions &options,
+    PipelineExtensions *pipelineExtensions) {
+  return std::make_unique<AutoInputConversionPipelinePass>(options,
+                                                           pipelineExtensions);
 }
 
 } // namespace mlir::iree_compiler

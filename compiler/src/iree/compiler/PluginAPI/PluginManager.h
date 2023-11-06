@@ -88,7 +88,7 @@ public:
   LogicalResult initializePlugins();
 
   // Invokes registerDialects() on all initialized plugins.
-  void registerDialects(DialectRegistry &registry);
+  void registerDialects(DialectRegistry &registry) override;
 
   // Activates plugins as configured.
   LogicalResult activatePlugins(MLIRContext *context);
@@ -106,6 +106,18 @@ public:
     for (auto *s : initializedSessions) {
       s->populateCustomInputConversionTypes(typeMnemonics);
     }
+  }
+
+  std::string detectCustomInputOperations(ModuleOp &module) override {
+    for (auto *s : initializedSessions) {
+      // Return the type mnemonic from the first session that detects support.
+      std::string typeMnemonic = s->detectCustomInputOperations(module);
+      if (!typeMnemonic.empty()) {
+        // TODO(scotttodd): error if multiple sessions found ops they support?
+        return typeMnemonic;
+      }
+    }
+    return "";
   }
 
   bool extendCustomInputConversionPassPipeline(
