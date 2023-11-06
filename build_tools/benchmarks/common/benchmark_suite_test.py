@@ -256,6 +256,69 @@ class BenchmarkSuiteTest(unittest.TestCase):
             ],
         )
 
+    def test_load_from_run_configs_with_root_url(self):
+        model_tflite = common_definitions.Model(
+            id="tflite",
+            name="model",
+            tags=[],
+            source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+            source_url="",
+            entry_function="predict",
+            input_types=["1xf32"],
+        )
+        exec_config_a = iree_definitions.ModuleExecutionConfig.build(
+            id="exec_a",
+            tags=["defaults"],
+            loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+            driver=iree_definitions.RuntimeDriver.LOCAL_SYNC,
+        )
+        device_spec_a = common_definitions.DeviceSpec.build(
+            id="dev_a",
+            device_name="a",
+            architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+            host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
+            device_parameters=[],
+            tags=[],
+        )
+        compile_target = iree_definitions.CompileTarget(
+            target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+            target_architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+            target_abi=iree_definitions.TargetABI.LINUX_GNU,
+        )
+        run_config_a = iree_definitions.E2EModelRunConfig.build(
+            module_generation_config=iree_definitions.ModuleGenerationConfig.build(
+                imported_model=iree_definitions.ImportedModel.from_model(model_tflite),
+                compile_config=iree_definitions.CompileConfig.build(
+                    id="1", tags=[], compile_targets=[compile_target]
+                ),
+            ),
+            module_execution_config=exec_config_a,
+            target_device_spec=device_spec_a,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
+            tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+        )
+
+        suite = BenchmarkSuite.load_from_run_configs(
+            run_configs=[run_config_a],
+            root_benchmark_dir="https://example.com/testdata",
+        )
+
+        self.assertEqual(
+            suite.filter_benchmarks(),
+            [
+                BenchmarkCase(
+                    model_name=model_tflite.name,
+                    model_tags=model_tflite.tags,
+                    bench_mode=exec_config_a.tags,
+                    target_arch=common_definitions.DeviceArchitecture.RV64_GENERIC,
+                    driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
+                    benchmark_tool_name="iree-benchmark-module",
+                    module_dir="https://example.com/testdata/iree_module_model_tflite___riscv_64-generic-linux_gnu-llvm_cpu___/",
+                    run_config=run_config_a,
+                )
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

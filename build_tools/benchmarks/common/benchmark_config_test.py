@@ -102,6 +102,23 @@ class BenchmarkConfigTest(unittest.TestCase):
 
         self.assertIsNone(config.trace_capture_config)
 
+    def test_build_from_args_with_test_artifacts_dir_url(self):
+        args = common_arguments.Parser().parse_args(
+            [
+                f"--tmp_dir={self.tmp_dir}",
+                f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
+                f"--e2e_test_artifacts_dir=https://example.com/testdata",
+                f"--execution_benchmark_config={self.execution_config}",
+                "--target_device=test",
+            ]
+        )
+
+        config = benchmark_config.BenchmarkConfig.build_from_args(
+            args=args, git_commit_hash="abcd"
+        )
+
+        self.assertEqual(config.root_benchmark_dir, "https://example.com/testdata")
+
     def test_build_from_args_invalid_capture_args(self):
         args = common_arguments.Parser().parse_args(
             [
