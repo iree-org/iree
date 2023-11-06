@@ -720,9 +720,9 @@ void iree_task_dispatch_shard_execute(
   IREE_TRACE_ZONE_SET_COLOR(
       z0, iree_math_ptr_to_xrgb(dispatch_task->closure.user_context));
 
-  // Map only the requested amount of worker local memory into the tile context.
-  // This ensures that how much memory is used by some executions does not
-  // inadvertently leak over into other executions.
+  // Require at least the requested amount of worker local memory but pass all
+  // of the available memory. This allows dispatches to use more when available
+  // but still get nice validation here when the minimums aren't met.
   if (IREE_UNLIKELY(dispatch_task->local_memory_size >
                     worker_local_memory.data_length)) {
     iree_task_try_set_status(
@@ -736,8 +736,6 @@ void iree_task_dispatch_shard_execute(
     IREE_TRACE_ZONE_END(z0);
     return;
   }
-  iree_byte_span_t local_memory = iree_make_byte_span(
-      worker_local_memory.data, dispatch_task->local_memory_size);
 
   // Prepare context shared for all tiles in the shard.
   iree_task_tile_context_t tile_context;
@@ -748,7 +746,7 @@ void iree_task_dispatch_shard_execute(
   uint32_t workgroup_count_x = tile_context.workgroup_count[0];
   uint32_t workgroup_count_y = tile_context.workgroup_count[1];
   tile_context.worker_id = worker_id;
-  tile_context.local_memory = local_memory;
+  tile_context.local_memory = worker_local_memory;
 
   // We perform all our shard statistics work locally here and only push back to
   // the dispatch at the end; this avoids contention from each shard trying to
