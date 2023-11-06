@@ -220,9 +220,9 @@ def adb_fetch_and_push_file(
     if verbose:
         print(f"Streaming file {source} to {dest}.")
 
-    resp = requests.get(source, stream=True, timeout=60)
-    if not resp.ok:
-        raise RuntimeError(f"Failed to fetch: {resp.status_code} - {resp.text}")
+    req = requests.get(source, stream=True, timeout=60)
+    if not req.ok:
+        raise RuntimeError(f"Failed to fetch {source}: {req.status_code} - {req.text}")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect(("127.0.0.1", 5037))
@@ -235,7 +235,7 @@ def adb_fetch_and_push_file(
     payload = f"{dest},0644".encode("utf-8")
     sock.sendall(b"SEND" + struct.pack("I", len(payload)) + payload)
 
-    for data in resp.iter_content(chunk_size=64 * 1024):
+    for data in req.iter_content(chunk_size=64 * 1024):
         sock.sendall(b"DATA" + struct.pack("I", len(data)) + data)
 
     sock.sendall(b"DONE" + struct.pack("I", int(time.time())))

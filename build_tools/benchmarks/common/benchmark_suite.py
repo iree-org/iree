@@ -207,8 +207,9 @@ class BenchmarkSuite(object):
             if isinstance(root_benchmark_dir, pathlib.Path):
                 module_dir = root_benchmark_dir / module_dir
             else:
-                url_path = urllib.request.pathname2url(str(module_dir))
-                module_dir = urllib.parse.urljoin(root_benchmark_dir, url_path)
+                # urljoin requires the directory URL ended with "/".
+                url_path = urllib.request.pathname2url(str(module_dir)) + "/"
+                module_dir = urllib.parse.urljoin(root_benchmark_dir + "/", url_path)
 
             benchmark_case = BenchmarkCase(
                 model_name=model.name,

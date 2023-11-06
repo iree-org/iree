@@ -62,6 +62,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 benchmark_case.run_config.module_generation_config
             )
             case_tmp_dir = self.config.tmp_dir / local_module_dir
+            case_tmp_dir.mkdir(parents=True, exist_ok=True)
             module_path = self.__fetch_file(
                 uri=urllib.parse.urljoin(module_dir, iree_artifacts.MODULE_FILENAME),
                 dest=case_tmp_dir / iree_artifacts.MODULE_FILENAME,
@@ -144,6 +145,8 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         if dest.exists():
             return dest
         req = requests.get(uri, stream=True, timeout=60)
+        if not req.ok:
+            raise RuntimeError(f"Failed to fetch {uri}: {req.status_code} - {req.text}")
         with dest.open("wb") as dest_file:
             for data in req.iter_content():
                 dest_file.write(data)
