@@ -94,14 +94,12 @@ jobs:
           #     },
           #     ...
           #   ]
-          # TODO(pzread): Re-enable Pixel 6 once the device is fixed.
           echo benchmark-matrix="$(jq -c '[ . | to_entries[]
             | .key as $device_name
             | .value.host_environment as $host_environment
             | (.value.shards | length) as $count
             | .value.shards[]
             | {$device_name, $host_environment, shard: {index, $count}}
-            | select(.device_name != "pixel-6-pro")
             ]' "${BENCHMARK_CONFIG}")" >> "${GITHUB_OUTPUT}"
 
   run_benchmarks:
