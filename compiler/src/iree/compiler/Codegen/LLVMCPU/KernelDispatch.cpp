@@ -1155,9 +1155,13 @@ setRootConfig(func::FuncOp entryPointFn,
       maxTileSizes[0] = 192;
       maxTileSizes[1] = 128;
     }
+    SmallVector<int64_t> vectorSizeHints(numLoops, vectorSize);
+    if (isBM) {
+      vectorSizeHints[0] = 1;
+    }
     distTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, vecTileSizes, maxTileSizes,
-        /*allowIncompleteTile=*/true);
+        /*allowIncompleteTile=*/true, vectorSizeHints);
   } else {
     distTileSizes = getDefaultDistributedLevelTileSizes(linalgOp, vecTileSizes,
                                                         maxTileSizes);
