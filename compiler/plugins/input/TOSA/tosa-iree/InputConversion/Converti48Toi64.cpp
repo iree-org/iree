@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/InputConversion/TOSA/PassDetail.h"
+#include "tosa-iree/InputConversion/PassDetail.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Tosa/Transforms/Passes.h"

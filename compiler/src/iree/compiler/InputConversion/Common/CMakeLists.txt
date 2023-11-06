@@ -9,9 +9,6 @@ set(IREE_INPUT_DEPS "")
 if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
 endif()
-if(IREE_INPUT_TOSA)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
-endif()
 
 iree_add_all_subdirs()
 

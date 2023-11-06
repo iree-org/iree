@@ -23,9 +23,6 @@
 #ifdef IREE_HAVE_STABLEHLO_INPUT
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TOSA_INPUT
-#include "iree/compiler/InputConversion/TOSA/Passes.h"
-#endif // IREE_HAVE_TOSA_INPUT
 
 namespace mlir {
 namespace iree_compiler {
@@ -106,11 +103,6 @@ void buildIREEPrecompileTransformPassPipeline(
                                                               stablehloOptions);
       break;
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TOSA_INPUT
-    case InputDialectOptions::Type::tosa:
-      buildTOSAInputConversionPassPipeline(passManager);
-      break;
-#endif // IREE_HAVE_TOSA_INPUT
     }
     buildCommonInputConversionPassPipeline(passManager);
     IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Input");

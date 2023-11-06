@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_INPUTCONVERSION_TOSA_PASSDETAIL_H_
-#define IREE_COMPILER_INPUTCONVERSION_TOSA_PASSDETAIL_H_
+#ifndef TOSA_IREE_INPUTCONVERSION_PASSDETAIL_H_
+#define TOSA_IREE_INPUTCONVERSION_PASSDETAIL_H_
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -19,9 +19,9 @@ namespace mlir {
 namespace iree_compiler {
 
 #define GEN_PASS_CLASSES
-#include "iree/compiler/InputConversion/TOSA/Passes.h.inc"
+#include "tosa-iree/InputConversion/Passes.h.inc"
 
 } // namespace iree_compiler
 } // namespace mlir
 
-#endif // IREE_COMPILER_INPUTCONVERSION_TOSA_PASSDETAIL_H_
+#endif // TOSA_IREE_INPUTCONVERSION_PASSDETAIL_H_

@@ -34,6 +34,10 @@ iree_compiler_cc_library(
         "Passes.h",
         "Passes.h.inc",
     ],
+    copts = [
+        "-Icompiler/plugins/input/TOSA",
+        "-I$(GENDIR)/compiler/plugins/input/TOSA",
+    ],
     deps = [
         ":PassesIncGen",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
@@ -47,7 +51,7 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
-    name = "TOSA",
+    name = "InputConversion",
     srcs = [
         "Converti48Toi64.cpp",
         "Passes.cpp",
@@ -57,8 +61,9 @@ iree_compiler_cc_library(
     hdrs = [
         "Passes.h",
     ],
-    defines = [
-        "IREE_HAVE_TOSA_INPUT",
+    copts = [
+        "-Icompiler/plugins/input/TOSA",
+        "-I$(GENDIR)/compiler/plugins/input/TOSA",
     ],
     deps = [
         ":PassHeaders",

@@ -8,7 +8,6 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -19,9 +18,6 @@
 #include "iree/compiler/InputConversion/StableHLO/Passes.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TOSA_INPUT
-#include "iree/compiler/InputConversion/TOSA/Passes.h"
-#endif // IREE_HAVE_TOSA_INPUT
 
 namespace mlir::iree_compiler {
 namespace {
@@ -47,8 +43,6 @@ struct InputFeatures {
   bool hasStableHLO = false;
   // - XLA import features.
   bool hasTuples = false;
-  // TOSA features.
-  bool hasTOSA = false;
 };
 
 static void populateHloFeatures(Operation *op, InputFeatures &features) {
@@ -89,16 +83,11 @@ static void populateHloFeatures(Operation *op, InputFeatures &features) {
 
 static void populateFeatures(Operation *op, const Dialect *chloDialect,
                              const Dialect *stablehloDialect,
-                             const Dialect *tosaDialect,
                              InputFeatures &features) {
   Dialect *d = op->getDialect();
   if (d == stablehloDialect || d == chloDialect) {
     features.hasStableHLO = true;
     return populateHloFeatures(op, features);
-  }
-  if (d == tosaDialect) {
-    features.hasTOSA = true;
-    return;
   }
 }
 
@@ -152,23 +141,15 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   InputFeatures features;
   const Dialect *chloDialect = context->getLoadedDialect("chlo");
   const Dialect *stablehloDialect = context->getLoadedDialect("stablehlo");
-  const Dialect *tosaDialect = context->getLoadedDialect("tosa");
-  if (!chloDialect && !stablehloDialect && !tosaDialect) {
+  if (!chloDialect && !stablehloDialect) {
     return;
   }
 
-  auto res = module.walk([&](Operation *op) {
-    populateFeatures(op, chloDialect, stablehloDialect, tosaDialect, features);
-    if (features.hasStableHLO && features.hasTOSA) {
-      module.emitError("not yet implemented mixture of *HLO and TOSA");
-      return WalkResult::interrupt();
-    }
+  module.walk([&](Operation *op) {
+    populateFeatures(op, chloDialect, stablehloDialect, features);
     return WalkResult::advance();
   });
-  if (res.wasInterrupted()) {
-    return signalPassFailure();
-  }
-  if (!features.hasStableHLO && !features.hasTOSA) {
+  if (!features.hasStableHLO) {
     return;
   }
 
@@ -187,11 +168,6 @@ void AutoInputConversionPipelinePass::runOnOperation() {
     }
   }
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TOSA_INPUT
-  if (features.hasTOSA) {
-    buildTOSAInputConversionPassPipeline(pm);
-  }
-#endif // IREE_HAVE_TOSA_INPUT
 
   if (failed(runPipeline(pm, module))) {
     signalPassFailure();
@@ -230,9 +206,9 @@ void AutoInputConversionPipelinePass::getDependentDialects(
       stablehlo::buildStableHLOXLAInputConversionPassPipeline);
 #endif // IREE_HAVE_STABLEHLO_INPUT
 
-#ifdef IREE_HAVE_TOSA_INPUT
-  appendPipelineDialects(buildTOSAInputConversionPassPipeline);
-#endif // IREE_HAVE_TOSA_INPUT
+  if (pipelineExtensions) {
+    pipelineExtensions->registerDialects(registry);
+  }
 
   if (pipelineExtensions) {
     pipelineExtensions->registerDialects(registry);
