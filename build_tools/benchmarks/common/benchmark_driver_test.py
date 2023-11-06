@@ -14,6 +14,7 @@ import unittest
 from common import benchmark_config
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_driver import BenchmarkDriver
+from common import benchmark_definition
 from common.benchmark_definition import (
     IREE_DRIVERS_INFOS,
     DeviceInfo,
@@ -80,7 +81,9 @@ class BenchmarkDriverTest(unittest.TestCase):
 
         self.config = benchmark_config.BenchmarkConfig(
             tmp_dir=self.tmp_dir,
-            root_benchmark_dir=pathlib.Path(self._root_dir_obj.name),
+            root_benchmark_dir=benchmark_definition.ResourceLocation.build_local_path(
+                self._root_dir_obj.name
+            ),
             benchmark_results_dir=self.benchmark_results_dir,
             git_commit_hash="abcd",
             normal_benchmark_tool_dir=self.tmp_dir,
@@ -164,7 +167,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             bench_mode=["sync"],
             target_arch=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
-            module_dir=pathlib.Path("case1"),
+            module_dir=benchmark_definition.ResourceLocation.build_local_path("case1"),
             benchmark_tool_name="tool",
             run_config=run_config_a,
         )
@@ -174,7 +177,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             bench_mode=["task"],
             target_arch=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-            module_dir=pathlib.Path("case2"),
+            module_dir=benchmark_definition.ResourceLocation.build_local_path("case2"),
             benchmark_tool_name="tool",
             run_config=run_config_b,
         )
@@ -211,7 +214,9 @@ class BenchmarkDriverTest(unittest.TestCase):
             bench_mode=["task"],
             target_arch=common_definitions.DeviceArchitecture.RV64_GENERIC,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-            module_dir=pathlib.Path("incompatible_case"),
+            module_dir=benchmark_definition.ResourceLocation.build_local_path(
+                "incompatible_case"
+            ),
             benchmark_tool_name="tool",
             run_config=run_config_incompatible,
         )
