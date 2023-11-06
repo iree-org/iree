@@ -2,21 +2,126 @@
 icon: octicons/code-review-16
 ---
 
-# Contributing
+# Contributing to IREE
 
-This is a more detailed version of the top-level
-[CONTRIBUTING.md](https://github.com/openxla/iree/blob/main/CONTRIBUTING.md)
-file. We keep it separate to avoid everyone getting a pop-up when creating a PR
-after each time it changes.
+We'd love to accept your patches and contributions to this project.
 
-<!-- TODO(scotttodd): Update this document
-    * pull more text into this, update that to point to the website
-    * document access controls (join organization then team)
-    * document revert policy
-    * document where new community members should start
--->
+Please [file issues](https://github.com/openxla/iree/issues/new/choose) or
+reach out on any of our other
+[communication channels](../../index.md#communication-channels) before doing
+substantial work; this will ensure that others don't duplicate the work and
+that there's a chance to discuss any design issues.
 
-## Build systems
+## Developer policies
+
+### :octicons-code-of-conduct-16: Code of conduct
+
+This project follows the
+[OpenXLA Code of Conduct](https://github.com/openxla/community/blob/main/CODE-OF-CONDUCT.md).
+
+### :octicons-law-16: Contributor License Agreement
+
+Contributions to this project must be accompanied by a Contributor License
+Agreement (CLA). Head over to <https://cla.developers.google.com/> to see
+your current agreements on file or to sign a new one.
+
+* You (or your employer) retain the copyright to your contribution; this simply
+  gives us permission to use and redistribute your contributions as part of the
+  project.
+* You generally only need to submit a CLA once, so if you've already submitted
+  one (even if it was for a different project), you probably don't need to do it
+  again.
+
+### :octicons-pencil-16: Coding style guidelines
+
+Most of the code style is derived from the
+[Google Style Guides](http://google.github.io/styleguide/) for the appropriate
+language and is generally not something we accept changes on (as clang-format
+and other linters set that for us). The C++ compiler portion of the project
+follows the
+[MLIR/LLVM style guide](https://mlir.llvm.org/getting_started/DeveloperGuide/#style-guide).
+
+Improvements to code structure and clarity are welcome but please file issues
+to track such work first. Pure style changes are unlikely to be accepted unless
+they are applied consistently across the project.
+
+??? tip - "Tip - code formatters and lint scripts"
+
+    Formatters like
+    [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html) (C/C++) and
+    [_Black_](https://black.readthedocs.io/en/stable/) (Python) can be set to
+    run automatically in your editor of choice.
+
+    The script at
+    [`build_tools/scripts/lint.sh`](https://github.com/openxla/iree/blob/main/build_tools/scripts/lint.sh)
+    can also be used to run the full suite of lint checks.
+
+
+### :octicons-code-review-16: Code reviews
+
+All submissions, including submissions by maintainers, require review. We
+use GitHub pull requests (PRs) for this purpose. Consult
+[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
+information on using pull requests.
+
+* Please keep PRs small (focused on a single issue) to make reviews and later
+  culprit-finding easier.
+
+### :material-check-all: GitHub Actions workflows
+
+We use [GitHub Actions](https://docs.github.com/en/actions) to automatically
+build and test various parts of the project.
+
+* Most presubmit workflows will only run automatically on PRs if you are a
+  project collaborator. Otherwise a maintainer must
+  [approve workflow runs](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
+  If you are sending code changes to the project, please ask to be added as a
+  collaborator, so that these can run automatically.
+* It is generally expected that PRs will only be merged when all checks are
+  passing. In some cases, pre-existing failures may be bypassed by a maintainer.
+
+??? tip - "Tip - adjusting workflow behavior"
+
+    Some workflows only run on commits after they are merged. See the
+    [CI behavior manipulation](#ci-behavior-manipulation) section below to
+    learn how to customize this behavior.
+
+<!-- TODO(scotttodd): link to infrastructure / CI docs when they exist -->
+<!-- TODO(scotttodd): link to "obtaining commit access" -->
+
+### :octicons-git-pull-request-16: Merging approved changes
+
+After review and presubmit checks, PRs should typically be merged using
+"squash and merge".
+
+* The squashed commit summary should match the PR title and the commit
+  description should match the PR body (this is the default behavior).
+  Accordingly, please write these as you would a helpful commit message.
+
+It is assumed that the PR author will merge their change unless they ask
+someone else to merge it for them (e.g. because they don't have write access
+yet).
+
+### :octicons-git-merge-16: Obtaining commit access
+
+!!! note "TODO(jpienaar): write this :)"
+
+### :octicons-people-16: Credits in the AUTHORS file
+
+If you would like additional recognition for your contributions, you may add
+yourself or your organization to the
+[AUTHORS file](https://github.com/openxla/iree/blob/main/AUTHORS) that keeps
+track of those who have made significant contributions to the project.
+
+* Please add the entity who owns the copyright for your contribution.
+* The source control history remains the most accurate source for individual
+  contributions.
+
+<!-- TODO(scotttodd): merge the sections below into "developer overview"? -->
+
+## Information for contributors
+
+### :material-hammer-wrench: Build systems
 
 IREE supports building from source with both Bazel and CMake.
 
@@ -28,13 +133,13 @@ IREE supports building from source with both Bazel and CMake.
   PyTorch, etc.) may be difficult to support with one build system or the
   other, so the project may configure these as optional
 
-## Continuous integration (CI)
+### :octicons-server-16: Continuous integration (CI)
 
 IREE uses [GitHub Actions](https://docs.github.com/en/actions) for CI. The
 primary CI is configured in the
 [ci.yml workflow file](https://github.com/openxla/iree/blob/main/.github/workflows/ci.yml).
 
-### Self-hosted runners
+#### Self-hosted runners
 
 In addition to the default runners GitHub provides, IREE uses
 [self-hosted runners](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners)
@@ -43,13 +148,13 @@ custom configurations such as accelerators. Configuration scripting is checked
 in to this repository (see the
 [README for that directory](https://github.com/openxla/iree/blob/main/build_tools/github_actions/runner/README.md)).
 
-### Custom managed runners
+#### Custom managed runners
 
 In addition to our self-hosted runners, we use GitHub's
 [large managed runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-larger-runners)
-for some platforms that are more trouble to configure ourselves (e.g. Mac).
+for some platforms.
 
-### CI behavior manipulation
+#### CI behavior manipulation
 
 The setup step of the CI determines which CI jobs to run. This is controlled by
 the
@@ -101,7 +206,7 @@ self-hosted runners. We maintain a test environment to allow testing out new
 configurations prior to rolling them out. This trailer is for advanced users who
 are working on the CI infrastructure itself.
 
-#### CI configuration recipes
+##### CI configuration recipes
 
 Copy/paste any of these at the bottom of a PR description to change what the CI
 runs.
@@ -138,7 +243,7 @@ The enabled jobs can be viewed from the Summary page of an action run:
 
 ![ci_enabled_jobs](./contributing-ci-enabled-jobs.png)
 
-## Contributor tips
+### :material-lightbulb-on: Contributor tips
 
 These are opinionated tips documenting workflows that some members of the team
 have found useful. They are focused on meta-tooling, not on IREE code
@@ -154,7 +259,7 @@ specifically (you will find the latter in the
 We assume a basic knowledge
 of `git` and GitHub and suggests some specific ways of using it.
 
-### Useful tools
+#### Useful tools
 
 * GitHub CLI (<https://github.com/cli/cli>). A CLI for interacting with GitHub.
     Most importantly, it allows scripting the creation of pull requests.
@@ -163,10 +268,10 @@ of `git` and GitHub and suggests some specific ways of using it.
     bunch of features to the GitHub UI.
 * VSCode: <https://code.visualstudio.com/>. The most commonly used IDE amongst
     IREE developers.
-* [Ccache](https://ccache.dev/), a fast C/C++ compiler cache. See our
+* [Ccache](https://ccache.dev/), a fast C/C++ compiler cache. See the
   [CMake with `ccache`](../building/cmake-with-ccache.md) page
 
-### Git structure
+#### Git structure
 
 We tend to use the "triangular" or "forking" workflow. Develop primarily on a
 clone of the repository on your development machine. Any local branches named
@@ -179,7 +284,7 @@ different branch on your public fork and create the PR from there.
 <!-- TODO(scotttodd): screenshots / diagrams here
   (https://mermaid.js.org/syntax/gitgraph.html?) -->
 
-#### Setup
+##### Setup
 
 1. Create a fork of the main repository.
 
@@ -222,11 +327,13 @@ different branch on your public fork and create the PR from there.
     little trickier than it should be. You can also turn this into a git command
     by adding it to your path as `git-update`.
 
-#### Git config
+##### Git config
 
 These are some additional options you could put in your top-level `.gitconfig`
 or repository-specific `.git/config` files that are conducive the recommended
 workflow
+
+<!-- TODO(scotttodd): move to auto-collapsed tip -->
 
 ```ini
 [push]
