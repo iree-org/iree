@@ -468,7 +468,7 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     }
   }
 
-  // Final fix up to dividing workload evenly.
+  // Final fixup for dividing workload evenly.
   for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
     if (distributedTileSizes[i] == 0 || ShapedType::isDynamic(workload[i]))
       continue;
