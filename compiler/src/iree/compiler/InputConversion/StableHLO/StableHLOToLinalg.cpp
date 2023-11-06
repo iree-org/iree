@@ -1404,6 +1404,8 @@ struct ConcatenateConverter final
   }
 };
 
+// TODO(#15442): Add generic mapping utility, so we aren't limited to supporting
+// only DenseElementsAttr.
 struct ConstConverterTensor final
     : OpConversionPattern<mlir::stablehlo::ConstantOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -1428,6 +1430,7 @@ struct ConstConverterTensor final
             constOp,
             "DenseElementsAttr cast failed (only DenseElementsAttr supported)");
       }
+      // Signedness conversion.
       replacementAttr = denseAttr.mapValues(replacementType.getElementType(),
                                             [](const APInt &i) { return i; });
       rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, replacementType,
