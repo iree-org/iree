@@ -500,6 +500,6 @@ func.func @unpack_f32f32_transpose_inner_and_outer(%arg0 : tensor<?x?x7x8xf32>, 
 func.func @query_tile_sizes_2d() -> (index, index)  attributes {
   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {ukernels = true}>
 } {
-  %result:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, elementTypes = [f32, f32, f32]>> -> index, index
+  %result:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32]>> -> index, index
   return %result#0, %result#1 : index, index
 }

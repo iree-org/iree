@@ -99,7 +99,7 @@ func.func @pack_fusion(%arg0 : tensor<?x?xf32>,
 // -----
 
 func.func @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
-    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>> {
+    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -129,8 +129,8 @@ func.func @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
       linalg.yield %6 : f32
   } -> tensor<?x?xf32>
   %6 = iree_linalg_ext.set_encoding %5
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>
-  return %6 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  return %6 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 }
 // CHECK-LABEL: func @set_encoding_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
@@ -149,15 +149,15 @@ func.func @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 // -----
 
 func.func @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
-    %arg1 : index, %arg2 : index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>> {
+    %arg1 : index, %arg2 : index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   %cst = arith.constant 0.0 : f32
   %0 = tensor.pad %arg0 low[0, 0] high[%arg1, %arg2] {
     ^bb0(%b0: index, %b1 : index):
       tensor.yield %cst : f32
   } : tensor<?x?xf32> to tensor<?x?xf32>
   %1 = iree_linalg_ext.set_encoding %0
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>
-  return %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  return %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 }
 // CHECK-LABEL: func @set_encoding_pad_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
@@ -170,7 +170,7 @@ func.func @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
 // -----
 
 func.func @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
-    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>> {
+    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -204,8 +204,8 @@ func.func @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %arg1 : 
       tensor.yield %cst : f32
   } : tensor<?x?xf32> to tensor<?x?xf32>
   %7 = iree_linalg_ext.set_encoding %6
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>
-  return %7 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  return %7 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 }
 // CHECK-LABEL: func @set_encoding_pad_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
@@ -225,12 +225,12 @@ func.func @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %arg1 : 
 // -----
 
 func.func @unset_encoding_elementwise_fusion(
-    %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>,
+    %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>,
     %arg1: tensor<?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = iree_linalg_ext.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
   %1 = tensor.dim %0, %c0 : tensor<?x?xf32>
   %2 = tensor.dim %0, %c1 : tensor<?x?xf32>
   %3 = tensor.empty(%1, %2) : tensor<?x?xf32>
@@ -248,7 +248,7 @@ func.func @unset_encoding_elementwise_fusion(
   return %4 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func @unset_encoding_elementwise_fusion(
-//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
 //       CHECK:     %[[UNSET_ENCODING:.+]] = iree_linalg_ext.unset_encoding %[[ARG0]]
@@ -260,12 +260,12 @@ func.func @unset_encoding_elementwise_fusion(
 // -----
 
 func.func @unset_encoding_slice_elementwise_fusion(
-    %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>,
+    %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>,
     %arg1: tensor<?xf32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = iree_linalg_ext.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
   %1 = tensor.extract_slice %0[0, 0] [%arg2, %arg3] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
   %2 = tensor.dim %1, %c0 : tensor<?x?xf32>
   %3 = tensor.dim %1, %c1 : tensor<?x?xf32>
@@ -284,7 +284,7 @@ func.func @unset_encoding_slice_elementwise_fusion(
   return %5 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func @unset_encoding_slice_elementwise_fusion(
-//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, elementTypes = [f32, f32, f32]>>
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
 //       CHECK:   %[[RESULT0:.+]] = flow.dispatch.region
 //       CHECK:     %[[UNSET_ENCODING:.+]] = iree_linalg_ext.unset_encoding %[[ARG0]]

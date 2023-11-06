@@ -751,7 +751,7 @@ func.func @non_perfect_tiling_unpack() {
   %c512 = arith.constant 512 : index
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
-  %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, elementTypes = [i8, i8, i32]>> -> index, index
+  %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32]>> -> index, index
   %1 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#0]
   %2 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#1]
   %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c512) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi32>>{%1, %2, %0#0, %0#1}
