@@ -148,7 +148,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         if not req.ok:
             raise RuntimeError(f"Failed to fetch {uri}: {req.status_code} - {req.text}")
         with dest.open("wb") as dest_file:
-            for data in req.iter_content():
+            for data in req.iter_content(chunk_size=64 * 1024 * 1024):
                 dest_file.write(data)
         return dest
 
