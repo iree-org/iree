@@ -69,6 +69,7 @@ class BenchmarkConfigTest(unittest.TestCase):
             capture_tmp_dir=per_commit_tmp_dir / "captures",
         )
         expected_config = benchmark_config.BenchmarkConfig(
+            tmp_dir=per_commit_tmp_dir,
             root_benchmark_dir=self.e2e_test_artifacts_dir,
             benchmark_results_dir=per_commit_tmp_dir / "benchmark-results",
             git_commit_hash="abcd",

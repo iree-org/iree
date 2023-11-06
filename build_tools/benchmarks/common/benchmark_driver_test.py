@@ -79,6 +79,7 @@ class BenchmarkDriverTest(unittest.TestCase):
         self.captures_dir.mkdir()
 
         self.config = benchmark_config.BenchmarkConfig(
+            tmp_dir=self.tmp_dir,
             root_benchmark_dir=pathlib.Path(self._root_dir_obj.name),
             benchmark_results_dir=self.benchmark_results_dir,
             git_commit_hash="abcd",
@@ -163,7 +164,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             bench_mode=["sync"],
             target_arch=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
-            benchmark_case_dir=pathlib.Path("case1"),
+            module_dir=pathlib.Path("case1"),
             benchmark_tool_name="tool",
             run_config=run_config_a,
         )
@@ -173,7 +174,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             bench_mode=["task"],
             target_arch=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-            benchmark_case_dir=pathlib.Path("case2"),
+            module_dir=pathlib.Path("case2"),
             benchmark_tool_name="tool",
             run_config=run_config_b,
         )
@@ -210,7 +211,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             bench_mode=["task"],
             target_arch=common_definitions.DeviceArchitecture.RV64_GENERIC,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-            benchmark_case_dir=pathlib.Path("incompatible_case"),
+            module_dir=pathlib.Path("incompatible_case"),
             benchmark_tool_name="tool",
             run_config=run_config_incompatible,
         )

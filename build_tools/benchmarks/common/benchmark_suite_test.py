@@ -62,7 +62,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             bench_mode=["1-thread", "full-inference"],
             target_arch=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-            benchmark_case_dir=pathlib.Path("case1"),
+            module_dir=pathlib.Path("case1"),
             benchmark_tool_name="tool",
             run_config=dummy_run_config,
         )
@@ -72,7 +72,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             bench_mode=["full-inference"],
             target_arch=common_definitions.DeviceArchitecture.ARM_VALHALL,
             driver_info=IREE_DRIVERS_INFOS["iree-vulkan"],
-            benchmark_case_dir=pathlib.Path("case2"),
+            module_dir=pathlib.Path("case2"),
             benchmark_tool_name="tool",
             run_config=dummy_run_config,
         )
@@ -82,7 +82,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             bench_mode=["full-inference"],
             target_arch=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
-            benchmark_case_dir=pathlib.Path("case3"),
+            module_dir=pathlib.Path("case3"),
             benchmark_tool_name="tool",
             run_config=dummy_run_config,
         )
@@ -248,7 +248,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                     target_arch=common_definitions.DeviceArchitecture.RV32_GENERIC,
                     driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                     benchmark_tool_name="iree-benchmark-module",
-                    benchmark_case_dir=run_config_c_case_dir,
+                    module_dir=run_config_c_case_dir,
                     input_uri=model_tf.input_url,
                     expected_output_uri=model_tf.expected_output_url,
                     run_config=run_config_c,

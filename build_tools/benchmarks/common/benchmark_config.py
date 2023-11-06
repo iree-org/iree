@@ -7,7 +7,7 @@
 
 from argparse import Namespace
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 import pathlib
 
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
@@ -35,8 +35,9 @@ class TraceCaptureConfig:
 class BenchmarkConfig:
     """Represents the settings to run benchmarks.
 
-    root_benchmark_dir: the root directory containing the built benchmark
-      suites.
+    tmp_dir: per-commit temporary directory.
+    root_benchmark_dir: the root directory path/URL containing the built
+      benchmark suites.
     benchmark_results_dir: the directory to store benchmark results files.
     git_commit_hash: the git commit hash.
     normal_benchmark_tool_dir: the path to the non-traced benchmark tool
@@ -59,7 +60,8 @@ class BenchmarkConfig:
     verify: verify the output if model's expected output is available.
     """
 
-    root_benchmark_dir: pathlib.Path
+    tmp_dir: pathlib.Path
+    root_benchmark_dir: Union[str, pathlib.Path]
     benchmark_results_dir: pathlib.Path
     git_commit_hash: str
 
@@ -113,8 +115,13 @@ class BenchmarkConfig:
                 capture_tmp_dir=per_commit_tmp_dir / CAPTURES_REL_PATH,
             )
 
+        root_benchmark_dir = args.e2e_test_artifacts_dir
+        if not str(root_benchmark_dir).startswith("gs://"):
+            root_benchmark_dir = pathlib.Path(root_benchmark_dir)
+
         return BenchmarkConfig(
-            root_benchmark_dir=args.e2e_test_artifacts_dir,
+            tmp_dir=per_commit_tmp_dir,
+            root_benchmark_dir=root_benchmark_dir,
             benchmark_results_dir=per_commit_tmp_dir / BENCHMARK_RESULTS_REL_PATH,
             git_commit_hash=git_commit_hash,
             normal_benchmark_tool_dir=real_path_or_none(args.normal_benchmark_tool_dir),

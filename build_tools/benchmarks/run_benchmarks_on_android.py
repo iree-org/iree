@@ -37,16 +37,19 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import atexit
 import json
+import requests
 import shutil
+import socket
+import struct
 import subprocess
 import tarfile
+import time
 from typing import Any, Optional, Sequence, Tuple
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_definition import (
-    DriverInfo,
     execute_cmd,
     execute_cmd_and_get_stdout,
     execute_cmd_and_get_output,
@@ -181,6 +184,60 @@ def adb_start_cmd(
     if verbose:
         print(f"cmd: {cmd}")
     return subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+
+
+def adb_path_exists(android_path: pathlib.PurePosixPath, verbose: bool = False):
+    """Run stat to check if the path exists."""
+    proc = adb_start_cmd(["stat", str(android_path)], verbose=verbose)
+    return proc.wait() == 0
+
+
+def adb_fetch_file(
+    url: str,
+    device_path: pathlib.PurePosixPath,
+    verbose: bool = False,
+):
+    """Fetch file from the URL and stream to the device. This method avoids the
+    temporary file on the host and reduces the overhead when the file is large.
+
+    Args:
+      url: URL to fetch the file.
+      device_path: the path to store on the device.
+      verbose: output verbose message.
+
+    Returns:
+      File path on the device.
+    """
+
+    if adb_path_exists(device_path, verbose):
+        return device_path
+
+    if verbose:
+        print(f"Streaming file {url} to {device_path}.")
+
+    resp = requests.get(url, stream=True, timeout=60)
+    if not resp.ok:
+        raise RuntimeError(f"Failed to fetch: {resp.status_code} - {resp.text}")
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(("127.0.0.1", 5037))
+
+    sock.sendall(b"0012host:transport-usb")
+    print(sock.recv(4))
+    sock.sendall(b"0005sync:")
+    print(sock.recv(4))
+
+    payload = f"{device_path},0644".encode("utf-8")
+    sock.sendall(b"SEND" + struct.pack("I", len(payload)) + payload)
+
+    for data in resp.iter_content(chunk_size=64 * 1024):
+        sock.sendall(b"DATA" + struct.pack("I", len(data)) + data)
+
+    sock.sendall(b"DONE" + struct.pack("I", int(time.time())))
+    print(sock.recv(4))
+    sock.close()
+
+    return device_path
 
 
 def get_vmfb_full_path_for_benchmark_case(
