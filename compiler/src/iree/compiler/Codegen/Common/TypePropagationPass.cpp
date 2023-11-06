@@ -105,7 +105,7 @@ struct ConstantOpTypeConversion
   LogicalResult
   matchAndRewrite(arith::ConstantOp constantOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const final {
-    auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
+    auto attr = llvm::cast<ElementsAttr>(constantOp.getValue());
     auto attrType = llvm::dyn_cast<ShapedType>(attr.getType());
     if (!attrType) {
       return rewriter.notifyMatchFailure(

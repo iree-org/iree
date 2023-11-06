@@ -1060,7 +1060,7 @@ static void distributeConstants(arith::ConstantOp constantOp,
   Value constant = constantOp.getResult();
   if (!layoutMap.count(constant))
     return;
-  auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
+  auto attr = llvm::cast<ElementsAttr>(constantOp.getValue());
   // Only handle splat values for now
   if (!attr.isSplat())
     return;
