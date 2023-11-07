@@ -88,6 +88,13 @@ flatbuffer_c_library(
   PUBLIC
 )
 
+add_custom_command(OUTPUT cpu_data_headers_filegroup.stamp
+    COMMAND touch cpu_data_headers_filegroup.stamp
+  DEPENDS
+    "cpu_data.h"
+    "cpu_feature_bits.inl"
+)
+
 iree_cc_library(
   NAME
     cpu_data
