@@ -95,6 +95,10 @@ add_custom_command(OUTPUT cpu_data_headers_filegroup.stamp
     "cpu_feature_bits.inl"
 )
 
+add_custom_target(cpu_data_headers_filegroup
+    DEPENDS cpu_data_headers_filegroup.stamp
+)
+
 iree_cc_library(
   NAME
     cpu_data

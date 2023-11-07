@@ -46,6 +46,10 @@ add_custom_command(OUTPUT internal_headers_filegroup.stamp
     "unpack_internal.h"
 )
 
+add_custom_target(internal_headers_filegroup
+    DEPENDS internal_headers_filegroup.stamp
+)
+
 iree_cc_library(
   NAME
     internal_headers

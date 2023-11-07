@@ -307,13 +307,19 @@ class BuildFileFunctions(object):
         #
         # Instead, we generate a custom command that create a stamp file that
         # acts as an abstraction to the filegroup. The using CMakeLists.txt
-        # then create a file dependency on that stamp file.
+        # then create a file dependency on that stamp file. We also need a
+        # custom target in the same CMakeLists.txt to ensure a rule for the
+        # custom command is actually created as per add_custom_command
+        # documentation.
         depends_block = self._convert_srcs_block(srcs, block_name="DEPENDS")
         stamp_file = self._filegroup_dep_filename(name)
         self._converter.body += (
             f"add_custom_command(OUTPUT {stamp_file}\n"
             f"    COMMAND touch {stamp_file}\n"
             f"{depends_block}"
+            f")\n\n"
+            f"add_custom_target({name}\n"
+            f"    DEPENDS {stamp_file}\n"
             f")\n\n"
         )
 
