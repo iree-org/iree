@@ -502,23 +502,58 @@ struct PackUnPackOpInterface
   }
 };
 
-/// Returns true if the value of a `storeOp` bufferizes to an equivalent
-/// DispatchTensorLoadOp result that bufferizes inplace.
-static bool isValueEquivalentToAnInplaceTensorLoadOp(
-    IREE::Flow::DispatchTensorStoreOp storeOp, Value candidate,
-    function_ref<bool(Value, Value)> equivalenceFn) {
-  auto loadOp = candidate.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-  if (!loadOp)
+struct DispatchTensorLoadOpSubsetInterface
+    : public SubsetOpInterface::ExternalModel<
+          DispatchTensorLoadOpSubsetInterface,
+          IREE::Flow::DispatchTensorLoadOp> {
+  bool operatesOnEquivalentSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // Returns true if the value of a `loadOp` bufferizes to an equivalent
+    // DispatchTensorStoreOp result that bufferizes inplace.
+    auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
+    auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    if (!storeOp)
+      return false;
+    return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
+  }
+
+  bool operatesOnDisjointSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // TODO: This is a new entry point and not clear it is correct.
     return false;
-  if (!equivalenceFn(loadOp.getSource(), storeOp.getTarget()))
-    return false;
-  // TODO: Assert that offsets, sizes and strides are the same.
-  return true;
-}
+  }
+};
 
 struct DispatchTensorStoreOpSubsetInterface
-    : public SubsetInsertionOpInterface::ExternalModel<
+    : public SubsetOpInterface::ExternalModel<
           DispatchTensorStoreOpSubsetInterface,
+          IREE::Flow::DispatchTensorStoreOp> {
+
+  bool operatesOnEquivalentSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // Returns true if the value of a `storeOp` bufferizes to an equivalent
+    // DispatchTensorLoadOp result that bufferizes inplace.
+    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(op);
+    if (!loadOp)
+      return false;
+    return equivalenceFn(loadOp.getSource(), storeOp.getTarget());
+  }
+
+  bool operatesOnDisjointSubset(
+      Operation *op, SubsetOpInterface candidate,
+      function_ref<bool(Value, Value)> equivalenceFn) const {
+    // TODO: This is a new entry point and not clear it is correct.
+    return false;
+  }
+};
+
+struct DispatchTensorStoreOpSubsetInsertionInterface
+    : public SubsetInsertionOpInterface::ExternalModel<
+          DispatchTensorStoreOpSubsetInsertionInterface,
           IREE::Flow::DispatchTensorStoreOp> {
 
   OpOperand &getSourceOperand(Operation *op) const {
@@ -527,14 +562,6 @@ struct DispatchTensorStoreOpSubsetInterface
 
   OpOperand &getDestinationOperand(Operation *op) const {
     return op->getOpOperand(1);
-  }
-
-  bool
-  isEquivalentSubset(Operation *op, Value candidate,
-                     function_ref<bool(Value, Value)> equivalenceFn) const {
-    auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
-    return isValueEquivalentToAnInplaceTensorLoadOp(storeOp, candidate,
-                                                    equivalenceFn);
   }
 
   Value buildSubsetExtraction(Operation *op, OpBuilder &builder,
@@ -580,12 +607,19 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   // Register IREE operations.
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::Flow::FlowDialect *dialect) {
+        // DispatchTensorLoadOp
         IREE::Flow::DispatchTensorLoadOp::attachInterface<
             DispatchTensorLoadOpInterface>(*ctx);
+        IREE::Flow::DispatchTensorLoadOp::attachInterface<
+            DispatchTensorLoadOpSubsetInterface>(*ctx);
+
+        // DispatchTensorStoreOp
         IREE::Flow::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpInterface>(*ctx);
         IREE::Flow::DispatchTensorStoreOp::attachInterface<
             DispatchTensorStoreOpSubsetInterface>(*ctx);
+        IREE::Flow::DispatchTensorStoreOp::attachInterface<
+            DispatchTensorStoreOpSubsetInsertionInterface>(*ctx);
       });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
