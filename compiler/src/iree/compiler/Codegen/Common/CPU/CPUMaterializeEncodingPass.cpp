@@ -32,22 +32,41 @@ using IREE::HAL::ExecutableTargetAttr;
 
 namespace {
 
+/// Returns true if the 'targetAttr' contains '+sve' or '+sve2' in its cpu
+/// features.
+/// TODO(hanchung): Move the method to a proper place. We can not simply use
+/// it from LLVMCPU/Utils.h because of cyclic deps.
+static bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2");
+}
+
 static FailureOr<MatmulTileParams>
-chooseMatmulTileParamsGeneric(ExecutableTargetAttr target) {
-  if (isVMVXBackend(target) && hasMicrokernels(target)) {
+chooseMatmulTileParamsGeneric(EncodingUser user, ExecutableTargetAttr target) {
+  if (isVMVXBackend(target)) {
     // VMVX+ukernel uses dynamic tile shapes.
-    return MatmulTileParams{ShapedType::kDynamic, ShapedType::kDynamic,
-                            ShapedType::kDynamic};
-  } else {
-    // Some vaguely reasonable static tile shape.
-    return MatmulTileParams{8, 4, 8};
+    if (hasMicrokernels(target)) {
+      // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
+      // does not support batch_matmul atm.
+      if (user == EncodingUser::BATCH_MATMUL) {
+        return failure();
+      }
+      return MatmulTileParams{ShapedType::kDynamic, ShapedType::kDynamic,
+                              ShapedType::kDynamic};
+    }
   }
+  // Some vaguely reasonable static tile shape.
+  return MatmulTileParams{8, 4, 8};
 }
 
 static FailureOr<MatmulTileParams>
 chooseMatmulTileParamsAArch64(EncodingUser user, TypeRange elementTypes,
                               ExecutableTargetAttr target) {
   if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
+    return failure();
+  }
+
+  // Data-tiling for SVE is not implemented yet.
+  if (hasAnySVEFeature(target)) {
     return failure();
   }
 
@@ -156,7 +175,11 @@ chooseMatmulTileParams(EncodingUser user, TypeRange elementTypes,
   if (isX86_64(target)) {
     return chooseMatmulTileParamsX86_64(user, elementTypes, target);
   }
-  return chooseMatmulTileParamsGeneric(target);
+  // Data-tiling for RISCV is not implemented yet.
+  if (isRISCV(target)) {
+    return failure();
+  }
+  return chooseMatmulTileParamsGeneric(user, target);
 }
 
 struct CPUMaterializeEncodingPass
