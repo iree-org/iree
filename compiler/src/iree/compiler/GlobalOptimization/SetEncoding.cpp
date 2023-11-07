@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -156,6 +157,12 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasTensorSemantics())
       return failure();
+
+    if (getCompilationInfo(matmulOp)) {
+      return rewriter.notifyMatchFailure(
+          matmulOp, "the op has preset compilation strategy, skip SetEncoding");
+    }
+
     auto inputs = matmulOp.getDpsInputs();
     auto outputs = matmulOp.getDpsInits();
     auto hasEncoding = [](Value operand) -> bool {
@@ -228,6 +235,12 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasTensorSemantics())
       return failure();
+
+    if (getCompilationInfo(matmulOp)) {
+      return rewriter.notifyMatchFailure(
+          matmulOp, "the op has preset compilation strategy, skip SetEncoding");
+    }
+
     auto inputs = matmulOp.getDpsInputs();
     auto outputs = matmulOp.getDpsInits();
     auto hasEncoding = [](Value operand) -> bool {
