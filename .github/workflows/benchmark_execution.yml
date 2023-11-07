@@ -185,6 +185,11 @@ jobs:
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
           export IREE_E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR/gs:\/\//https://storage.googleapis.com/}"
+          # TODO(TODO): Annotate the c2-standard-60 resutls as experimental and
+          # avoid uploading to the dashboard (excluded from the pattern).
+          if [[ "${IREE_TARGET_DEVICE_NAME}" == "c2-standard-60" ]]; then
+            export IREE_BENCHMARK_RESULTS="experimental-${IREE_BENCHMARK_RESULTS}"
+          fi
           ./build_tools/benchmarks/run_benchmarks.sh
       - name: "Uploading benchmark results"
         run: gcloud storage cp -r "${BENCHMARK_RESULTS_DIR}" "${GCS_DIR}/"

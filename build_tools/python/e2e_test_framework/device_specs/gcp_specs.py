@@ -18,6 +18,15 @@ GCP_C2_STANDARD_16 = common_definitions.DeviceSpec.build(
     tags=["cpu"],
 )
 
+GCP_C2_STANDARD_601T = common_definitions.DeviceSpec.build(
+    id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_601T,
+    device_name="c2-standard-60",
+    host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
+    architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
+    device_parameters=[device_parameters.ALL_CORES],
+    tags=["cpu"],
+)
+
 GCP_A2_HIGHGPU_1G = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_GCP_A2_HIGHGPU_1G,
     device_name="a2-highgpu-1g",
