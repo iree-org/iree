@@ -31,17 +31,18 @@
   IREE_VM_ABI_VLA_STRUCT_IMPL(types, vla_count, vla_field,        \
                               IREE_VM_ABI_TYPE_NAME(types), body)
 
-#define IREE_VM_ABI_FIXED_STRUCT_IMPL(struct_type, types, body)        \
-  typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED    \
-      struct_type;                                                     \
-  static inline struct_type* iree_vm_abi_##types##_checked_deref(      \
-      iree_byte_span_t buffer) {                                       \
-    return IREE_LIKELY(buffer.data_length == sizeof(struct_type))      \
-               ? (struct_type*)buffer.data                             \
-               : NULL;                                                 \
-  }                                                                    \
-  static inline void iree_vm_abi_##types##_reset(struct_type* value) { \
-    memset(value, 0, sizeof(struct_type));                             \
+#define IREE_VM_ABI_FIXED_STRUCT_IMPL(struct_type, types, body)         \
+  typedef struct iree_vm_abi_##types##_t body IREE_ATTRIBUTE_PACKED     \
+      struct_type;                                                      \
+  static inline struct_type* iree_vm_abi_##types##_checked_deref(       \
+      iree_byte_span_t buffer) {                                        \
+    return IREE_LIKELY(buffer.data_length == sizeof(struct_type))       \
+               ? (struct_type*)buffer.data                              \
+               : NULL;                                                  \
+  }                                                                     \
+  IREE_ATTRIBUTE_UNUSED static inline void iree_vm_abi_##types##_reset( \
+      struct_type* value) {                                             \
+    memset(value, 0, sizeof(struct_type));                              \
   }
 
 #define IREE_VM_ABI_FIELD_SIZE(type, member) sizeof(((type*)NULL)->member)
@@ -80,7 +81,7 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
       void* IREE_RESTRICT module_state);
 
 #define IREE_VM_ABI_DEFINE_SHIM(arg_types, ret_types)                          \
-  iree_status_t iree_vm_shim_##arg_types##_##ret_types(                        \
+  IREE_ATTRIBUTE_UNUSED iree_status_t iree_vm_shim_##arg_types##_##ret_types(  \
       iree_vm_stack_t* IREE_RESTRICT stack,                                    \
       iree_vm_native_function_flags_t flags, iree_byte_span_t args_storage,    \
       iree_byte_span_t rets_storage,                                           \
@@ -101,7 +102,7 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
   }
 
 #define IREE_VM_ABI_EXPORT(function_name, module_state, arg_types, ret_types) \
-  static iree_status_t function_name(                                         \
+  IREE_ATTRIBUTE_UNUSED static iree_status_t function_name(                   \
       iree_vm_stack_t* IREE_RESTRICT stack, void* IREE_RESTRICT module,       \
       module_state* IREE_RESTRICT state,                                      \
       IREE_VM_ABI_TYPE_NAME(arg_types) * IREE_RESTRICT args,                  \

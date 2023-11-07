@@ -21,10 +21,6 @@ static inline size_t iree_min_host_size(iree_host_size_t a,
 
 // Here to ensure that we don't pull in locale-specific code:
 static bool iree_isupper(char c) { return (unsigned)c - 'A' < 26; }
-static bool iree_islower(char c) { return (unsigned)c - 'a' < 26; }
-static inline char iree_toupper(char c) {
-  return iree_islower(c) ? (c & 0x5F) : c;
-}
 static inline char iree_tolower(char c) {
   return iree_isupper(c) ? (c | 32) : c;
 }

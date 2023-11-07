@@ -262,19 +262,6 @@ makeFunctionSignatureDef(IREE::VM::FuncOp funcOp,
                                     cconv.value(), attrsRef, fbb);
 }
 
-// Returns a serialized function signature.
-static iree_vm_FunctionSignatureDef_ref_t
-makeInternalFunctionSignatureDef(IREE::VM::FuncOp funcOp,
-                                 llvm::DenseMap<Type, int> &typeTable,
-                                 FlatbufferBuilder &fbb) {
-  // Generate the signature calling convention string based on types.
-  auto cconv = makeCallingConventionString(funcOp);
-  if (!cconv.has_value())
-    return {};
-  return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
-                                    cconv.value(), /*attrsRef=*/0, fbb);
-}
-
 // Walks |rootOp| to find all VM features required by it and its children.
 static iree_vm_FeatureBits_enum_t findRequiredFeatures(Operation *rootOp) {
   iree_vm_FeatureBits_enum_t result = 0;

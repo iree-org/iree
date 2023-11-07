@@ -53,7 +53,8 @@
 #define iree_aligned_free(p) free(p)
 #elif _POSIX_C_SOURCE >= 200112L
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
-static inline void* iree_aligned_alloc(size_t alignment, size_t size) {
+IREE_ATTRIBUTE_UNUSED static inline void* iree_aligned_alloc(size_t alignment,
+                                                             size_t size) {
   void* ptr = NULL;
   return posix_memalign(&ptr, alignment, size) == 0 ? ptr : NULL;
 }
@@ -391,7 +392,7 @@ typedef struct iree_status_storage_t {
   ((iree_status_storage_t*)(((uintptr_t)(status) & ~IREE_STATUS_CODE_MASK)))
 
 // Appends a payload to the storage doubly-linked list.
-static iree_status_t iree_status_append_payload(
+IREE_ATTRIBUTE_UNUSED static iree_status_t iree_status_append_payload(
     iree_status_t status, iree_status_storage_t* storage,
     iree_status_payload_t* payload) {
   if (!storage->payload_tail) {
@@ -408,7 +409,7 @@ static iree_status_t iree_status_append_payload(
 // NUL. If |buffer| is omitted then |out_buffer_length| will be set to the
 // total number of characters in |buffer_capacity| required to contain the
 // entire message.
-static void iree_status_payload_message_formatter(
+IREE_ATTRIBUTE_UNUSED static void iree_status_payload_message_formatter(
     const iree_status_payload_t* base_payload, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
   iree_status_payload_message_t* payload =
@@ -758,7 +759,7 @@ static iree_status_t iree_status_attach_stack_trace(
 
 #else
 
-static iree_status_t iree_status_attach_stack_trace(
+IREE_ATTRIBUTE_UNUSED static iree_status_t iree_status_attach_stack_trace(
     iree_status_t status, iree_status_storage_t* storage, int skip_frames) {
   return status;
 }

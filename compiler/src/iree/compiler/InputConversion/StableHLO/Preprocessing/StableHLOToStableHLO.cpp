@@ -46,12 +46,6 @@ DenseIntElementsAttr make1DElementsAttr(OpBuilder &b,
   return DenseIntElementsAttr::get(type, integers);
 }
 
-DenseIntElementsAttr make1DElementsAttr(OpBuilder &b, int64_t start,
-                                        int64_t num) {
-  return make1DElementsAttr(
-      b, llvm::to_vector(llvm::seq<int64_t>(start, start + num)));
-}
-
 Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
                   ArrayRef<float> values) {
   RankedTensorType ty = RankedTensorType::get(shapes, b.getF32Type());

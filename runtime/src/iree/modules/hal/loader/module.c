@@ -93,13 +93,6 @@ static iree_host_size_t iree_hal_cast_host_size(int64_t value) {
   return (iree_host_size_t)value;
 }
 
-// Casts a VM value to a HAL device size.
-static iree_device_size_t iree_hal_cast_device_size(int64_t value) {
-  // TODO(benvanik): make this return status and check for overflow if device
-  // size is 32-bits.
-  return (iree_device_size_t)value;
-}
-
 //===----------------------------------------------------------------------===//
 // Shared argument shims
 //===----------------------------------------------------------------------===//
