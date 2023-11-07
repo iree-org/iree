@@ -54,6 +54,7 @@ iree_cc_library(
     MLIRTensorTransformOps
     MLIRTensorTransforms
     MLIRTransformDialect
+    MLIRTransformLoopExtension
     MLIRVectorDialect
     MLIRVectorTransformOps
     MLIRVectorTransforms
