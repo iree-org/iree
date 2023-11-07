@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -637,6 +638,9 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
           tensor::ExtractSliceOp, complex::CreateOp>(op)) {
     return true;
   }
+  if (isGroupedDequantizationOp(op)) {
+    return true;
+  }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
     if (clInlineConstantByteLength == 0)
       return false;
@@ -695,9 +699,8 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
   return false;
 }
 
-/// Collect all ops that should be cloned into the given dispatch region op.
-static SmallVector<Operation *>
-getCloneableOps(Flow::DispatchRegionOp regionOp) {
+SmallVector<Operation *>
+Flow::getCloneableOps(Flow::DispatchRegionOp regionOp) {
   // Find values that are used inside of the dispatch region but defined outside
   // of the dispatch region.
   llvm::SetVector<Value> valuesDefinedAbove;

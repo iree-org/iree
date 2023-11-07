@@ -99,6 +99,9 @@ bool isClonableIntoDispatchOp(Operation *op);
 /// Returns true if the operation is an generic op that represents dequant.
 bool isGroupedDequantizationOp(Operation *op);
 
+/// Collect all ops that should be cloned into the given dispatch region op.
+SmallVector<Operation *> getCloneableOps(Flow::DispatchRegionOp regionOp);
+
 /// Clone into the region producers of those value used in the region but
 /// defined above, to prepare the dispatch region isolated from above.
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
