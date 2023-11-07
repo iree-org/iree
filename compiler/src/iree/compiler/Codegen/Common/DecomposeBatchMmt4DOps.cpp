@@ -16,6 +16,48 @@ namespace iree_compiler {
 
 namespace {
 
+// Returns true if:
+//    1. `genericOp` is element-wise with all identity indexing maps
+//    2. `genericOp` has only one input and one output with the same shape
+static bool isElementWiseIdentity(linalg::GenericOp genericOp) {
+  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1 ||
+      !linalg::isElementwise(genericOp) ||
+      !llvm::all_of(genericOp.getIndexingMapsArray(),
+                    [](AffineMap map) { return map.isIdentity(); })) {
+    return false;
+  }
+  auto inputType = genericOp->getOperandTypes()[0].dyn_cast<RankedTensorType>();
+  auto resultType = genericOp->getResultTypes()[0].dyn_cast<RankedTensorType>();
+  if (inputType.getShape() != resultType.getShape()) {
+    return false;
+  }
+  return true;
+}
+
+// Drops the outermost unit dimension of the defining op of `input`, as
+// long as it is a linalg::GenericOp that passes `isElementWiseIdentity`.
+// unit dims are dropped using tensor::InsertSliceOp/tensor::ExtractSliceOp
+// in order to fold with other ops introduced by ConvertBatchMmt4DtoMmt4DPattern
+static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
+  auto producer = input.getDefiningOp<linalg::GenericOp>();
+  if (!producer) {
+    return failure();
+  }
+  linalg::ControlDropUnitDims options;
+  options.rankReductionStrategy =
+      linalg::ControlDropUnitDims::RankReductionStrategy::ExtractInsertSlice;
+  options.controlFn = [](Operation *op) {
+    auto genericOp = dyn_cast<linalg::GenericOp>(op);
+    if (!genericOp || !isElementWiseIdentity(genericOp)) {
+      return SmallVector<unsigned>{};
+    }
+    SmallVector<unsigned> dims;
+    dims.push_back(0);
+    return dims;
+  };
+  return linalg::dropUnitDims(rewriter, producer, options);
+}
+
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
 struct ConvertBatchMmt4DtoMmt4DPattern
     : public OpRewritePattern<linalg::BatchMmt4DOp> {
@@ -59,12 +101,14 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         RankedTensorType::Builder(lhsType).dropDim(0);
     auto reducedLhs = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, lhs, reducedLhsType);
+    (void)reduceDefiningOp(rewriter, lhs);
 
     auto rhsType = rhs.getType().cast<RankedTensorType>();
     RankedTensorType reducedRhsType =
         RankedTensorType::Builder(rhsType).dropDim(0);
     auto reducedRhs = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, rhs, reducedRhsType);
+    (void)reduceDefiningOp(rewriter, rhs);
 
     auto mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
@@ -100,6 +144,8 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
   tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::EmptyOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::populateFoldTensorEmptyPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
