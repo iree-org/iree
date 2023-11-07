@@ -666,7 +666,7 @@ void mlir::iree_compiler::gpu::buildPipelineSharedMemoryCopies(
   Value forOpH = b.create<transform::GetParentOp>(
       transform::AnyOpType::get(b.getContext()), computeOpH,
       /*isolated_from_above=*/false, /*allow_empty_results=*/false,
-      /*op_name=*/b.getStringAttr("scf.for"));
+      /*op_name=*/b.getStringAttr("scf.for"), /*deduplicate=*/true);
   // TODO: Better builder instead of setting post-hoc.
   auto pipelineOp = b.create<
       iree_compiler::IREE::transform_dialect::PipelineSharedMemoryCopiesOp>(
