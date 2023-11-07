@@ -82,8 +82,7 @@ static void populateHloFeatures(Operation *op, InputFeatures &features) {
   }
 }
 
-static void populateFeatures(Operation *op,
-                             const Dialect *chloDialect,
+static void populateFeatures(Operation *op, const Dialect *chloDialect,
                              const Dialect *stablehloDialect,
                              const Dialect *tosaDialect,
                              InputFeatures &features) {
