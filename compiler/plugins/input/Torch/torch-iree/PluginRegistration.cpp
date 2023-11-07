@@ -1,4 +1,4 @@
-// Copyright 2023 Nod Labs, Inc
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -28,7 +28,7 @@ struct TorchOptions {
   }
 };
 
-// The shark-turbine plugin provides dialects, passes and opt-in options.
+// The torch plugin provides dialects, passes and opt-in options.
 // Therefore, it is appropriate for default activation.
 struct TorchSession
     : public PluginSession<TorchSession, TorchOptions,
