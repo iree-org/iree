@@ -4,7 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import array
 import logging
+import numpy as np
 import unittest
 
 import iree.compiler
@@ -16,7 +18,7 @@ MM_TEST_ASM = r"""
   #map = affine_map<(d0, d1) -> (d0, d1)>
   #map1 = affine_map<(d0, d1) -> (d1, d0)>
   #map2 = affine_map<(d0, d1) -> (d1)>
-  module @external_global_parameters_map_dict {
+  module @main {
     util.global private @_params.classifier.weight {noinline} = #stream.parameter.named<"params"::"weight"> : tensor<30x20xf32>
     util.global private @_params.classifier.bias {noinline} = #stream.parameter.named<"params"::"bias"> : tensor<30xf32>
   func.func @run(%arg0: tensor<128x20xf32>) -> tensor<128x30xf32> {
@@ -60,10 +62,15 @@ def create_mm_test_module(instance):
     return rt.VmModule.copy_buffer(instance, binary)
 
 
+def _float_constant(val: float) -> array.array:
+    return array.array("f", [val])
+
+
 class ParameterTest(unittest.TestCase):
     def setUp(self):
         self.instance = rt.VmInstance()
         self.device = rt.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
+        self.config = rt.Config(device=self.device)
 
     def testParameterIndex(self):
         index = rt.ParameterIndex()
@@ -72,16 +79,30 @@ class ParameterTest(unittest.TestCase):
         self.assertEqual(len(index), 0)
         provider = index.create_provider()
         rt.create_io_parameters_module(self.instance, provider)
-    def testBasic(self):
-        empty_provider = rt.ParameterIndex().create_provider(scope="params")
-        context = rt.VmContext(
-            self.instance,
-            [
-                rt.create_io_parameters_module(self.instance, empty_provider),
-                rt.create_hal_module(self.instance, self.device),
-                create_mm_test_module(self.instance),
-            ],
+
+    def testSplats(self):
+        splat_index = rt.ParameterIndex()
+        splat_index.add_splat("weight", _float_constant(1.0), 30 * 20 * 4)
+        splat_index.add_splat("bias", _float_constant(5.0), 30 * 4)
+        modules = rt.load_vm_modules(
+            rt.create_io_parameters_module(
+                self.instance, splat_index.create_provider(scope="params")
+            ),
+            rt.create_hal_module(self.instance, self.device),
+            create_mm_test_module(self.instance),
+            config=self.config,
         )
+        main = modules[-1]
+        input = np.zeros([128, 20], dtype=np.float32) + 2.0
+        result = main.run(input)
+        print(result.to_host())
+
+    def testSplatTooBig(self):
+        splat_index = rt.ParameterIndex()
+        with self.assertRaises(ValueError):
+            splat_index.add_splat(
+                "weight", array.array("f", [1.0, 2.0, 3.0, 4.0, 5.0]), 30 * 20 * 4
+            )
 
 
 if __name__ == "__main__":
