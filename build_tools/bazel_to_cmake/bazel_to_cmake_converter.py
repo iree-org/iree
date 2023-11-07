@@ -295,19 +295,19 @@ class BuildFileFunctions(object):
         # abstraction in CMake.
         #
         # One way of doing the transitive dependency is peeking in the build
-        # file that define a give filegroup but goes against the current design
-        # where each build file is processed independently.
+        # file that defines a given filegroup but goes against the current
+        # design where each build file is processed independently.
         #
-        # Alternatively, the build file that define a filegroup could set a
+        # Alternatively, the build file that defines a filegroup could set a
         # variable with the list of all the files in the filegroup which the
         # CMakeLists.txt corresponding to the using build file would use.
         # However that requires the variable to be defined before the
         # add_directory() for the corresponding using CMakeLists.txt which is
         # not a given.
         #
-        # Instead, we generate a custom command that create a stamp file that
+        # Instead, we generate a custom command that creates a stamp file that
         # acts as an abstraction to the filegroup. The using CMakeLists.txt
-        # then create a file dependency on that stamp file. We also need a
+        # then creates a file dependency on that stamp file. We also need a
         # custom target in the same CMakeLists.txt to ensure a rule for the
         # custom command is actually created as per add_custom_command
         # documentation.
