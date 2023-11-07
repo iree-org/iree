@@ -64,6 +64,8 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
   "initialize_module.cc"
   "invoke.h"
   "invoke.cc"
+  "io.h"
+  "io.cc"
   "hal.h"
   "hal.cc"
   "numpy_interop.h"
@@ -83,6 +85,12 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::hal
   iree::hal::drivers
   iree::hal::utils::allocators
+  iree::io::file_handle
+  iree::io::parameter_index
+  iree::io::parameter_index_provider
+  iree::io::parameter_provider
+  iree::io::scope_map
+  iree::modules::io::parameters
   iree::modules::hal
   iree::tooling::device_util
   iree::tooling::modules
