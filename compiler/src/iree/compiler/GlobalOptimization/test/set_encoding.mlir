@@ -639,3 +639,27 @@ func.func @fold_fill_with_tensor_pad(%arg0 : index, %arg1 : index, %arg2 : index
 //      CHECK:   %[[FILL:.+]] = linalg.fill
 // CHECK-SAME:       outs(%[[EMPTY]] :
 //      CHECK:   return %[[FILL]]
+
+// -----
+
+#compilation = #iree_codegen.compilation_info<
+    lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0]]>,
+    translation_info  = <CPUDefault>>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+func.func @preset_compilation_info(
+    %arg0 : tensor<?x?xf32>,
+    %arg1 : tensor<?x?xf32>,
+    %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = linalg.matmul {compilation_info = #compilation} ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%arg2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @preset_compilation_info
+// CHECK-NOT:     set_encoding
+// CHECK-NOT:     unset_encoding
