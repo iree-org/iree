@@ -33,7 +33,6 @@ iree_lit_test_suite(
     "form_dispatch_regions.mlir"
     "form_dispatch_workgroups.mlir"
     "form_scalar_dispatches.mlir"
-    "fuse_dequantization_matmul.mlir"
     "fusion_of_tensor_ops.mlir"
     "generalize_named_ops.mlir"
     "infer_numeric_narrowing.mlir"

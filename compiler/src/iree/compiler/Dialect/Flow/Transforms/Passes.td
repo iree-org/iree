@@ -101,12 +101,6 @@ def FormScalarDispatches :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormScalarDispatchesPass()";
 }
 
-def FuseDequantizationMatmul:
-    Pass<"iree-flow-fuse-dequantization-matmul", ""> {
-  let summary = "Fuse dequantization and matmul linalg.generic ops";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createFuseDequantizationMatmulPass()";
-}
-
 def CollapseDimensions :
     InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
   let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
