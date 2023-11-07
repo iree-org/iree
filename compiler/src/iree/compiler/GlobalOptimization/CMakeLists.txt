@@ -73,6 +73,7 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTensorUtils
     MLIRTransforms
+    iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms

@@ -51,7 +51,7 @@ module attributes {hal.device.targets = [#device_target_vulkan]} {
   }
 }
 
-// vulkan does not implement buildMaterializeEncodingsPassPipeline method.
+// vulkan uses default materialization patterns which unsets the encodings.
 // CHECK-LABEL: func.func @lhs_encoding
-// CHECK:         iree_linalg_ext.upper_bound_tile_size
-// CHECK:         iree_linalg_ext.set_encoding
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         return %[[ARG0]]

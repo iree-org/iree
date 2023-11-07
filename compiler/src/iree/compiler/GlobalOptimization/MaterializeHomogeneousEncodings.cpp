@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
@@ -17,6 +18,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -44,20 +46,26 @@ public:
     if (executableTargets.size() != 1) {
       return;
     }
-    // TODO(hanchung): Move *CPUMateralize* methods to Codegen/Common. They
-    // could be generalized to other backends (by looking into something like
-    // ExecutableTarget things). Only llvm-cpu backends handle encodings for
-    // now.
+    // TODO: vmvx has its own logic about supporting dynamic tile
+    // sizes. It is not fully integrated into the pipeline, so we remain the
+    // materialization to the end.
     auto executableTarget = executableTargets[0];
-    if (executableTarget.getBackend() != "llvm-cpu") {
+    if (executableTarget.getBackend() == "vmvx") {
       return;
     }
 
+    // Only llvm-cpu backends handle encodings for now, others just go with nop.
     OpPassManager passManager(moduleOp.getOperationName());
-    passManager.addNestedPass<func::FuncOp>(
-        createCPUMaterializeUpperBoundTileSizePass(executableTargets));
-    passManager.addNestedPass<func::FuncOp>(
-        createCPUMaterializeEncodingPass(executableTarget));
+    if (executableTarget.getBackend() == "llvm-cpu") {
+      passManager.addNestedPass<func::FuncOp>(
+          createCPUMaterializeUpperBoundTileSizePass(executableTargets));
+      passManager.addNestedPass<func::FuncOp>(
+          createCPUMaterializeEncodingPass(executableTarget));
+    } else {
+      passManager.addNestedPass<func::FuncOp>(
+          createMaterializeEncodingIntoNopPass());
+      passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    }
 
     if (failed(runPipeline(passManager, moduleOp))) {
       return signalPassFailure();
