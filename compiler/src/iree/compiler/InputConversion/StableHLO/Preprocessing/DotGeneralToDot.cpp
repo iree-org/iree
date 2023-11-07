@@ -154,12 +154,12 @@ struct GeneralDotRemoveBatch final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
-    auto lhsTy = op.getLhs().getType().cast<ShapedType>();
-    auto rhsTy = op.getRhs().getType().cast<ShapedType>();
-    auto ty = op.getType().cast<ShapedType>();
+    auto lhsTy = cast<ShapedType>(op.getLhs().getType());
+    auto rhsTy = cast<ShapedType>(op.getRhs().getType());
+    auto ty = cast<ShapedType>(op.getType());
 
     if (!ty.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(op, "Does not have static shape");
+      return rewriter.notifyMatchFailure(op, "does not have static shape");
     }
 
     auto dimNumbers = op.getDotDimensionNumbers();
