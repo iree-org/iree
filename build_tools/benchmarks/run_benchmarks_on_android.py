@@ -489,17 +489,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             dest=device_dir.with_suffix(".tgz"),
         )
         adb_execute(
-            [
-                "mkdir",
-                "-p",
-                str(device_dir),
-                "&&",
-                "tar",
-                "-xvf",
-                str(archive_path),
-                "-C",
-                str(device_dir),
-            ],
+            ["mkdir", "-p", str(device_dir)]
+            + ["&&", "tar", "-xvf", str(archive_path), "-C", str(device_dir)],
             verbose=self.verbose,
         )
         return device_dir
@@ -580,13 +571,7 @@ def main(args):
     # Clear the benchmark directory on the Android device first just in case
     # there are leftovers from manual or failed runs.
     adb_execute(
-        ["rm", "-rf", str(ANDROID_TMPDIR)],
-        cwd=pathlib.PurePosixPath("/"),
-        verbose=args.verbose,
-    )
-
-    adb_execute(
-        ["mkdir", "-p", str(ANDROID_TMPDIR)],
+        ["rm", "-rf", str(ANDROID_TMPDIR), "&&", "mkdir", "-p", str(ANDROID_TMPDIR)],
         cwd=pathlib.PurePosixPath("/"),
         verbose=args.verbose,
     )
