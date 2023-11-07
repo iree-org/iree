@@ -90,6 +90,7 @@ struct TorchSession
         typeMnemonic = "torch";
         return WalkResult::interrupt();
       } else if (d == tmTensorDialect) {
+        // TODO: Retire the tm_tensor input pipeline
         typeMnemonic = "tm_tensor";
         return WalkResult::interrupt();
       }

@@ -64,6 +64,7 @@ public:
 
   // Returns an appropriate typeMnemonic if operations from a dialect this
   // instance supports are present in the module.
+  // Requires that dialects have already been added using |registerDialects|.
   virtual std::string detectCustomInputOperations(ModuleOp &module) {
     return "";
   }
