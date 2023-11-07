@@ -59,7 +59,7 @@ iree_gentbl_cc_library(
         "@llvm-project//mlir:BufferizationOpsTdFiles",
         "@llvm-project//mlir:MemRefOpsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:SubsetInsertionOpInterfaceTdFiles",
+        "@llvm-project//mlir:SubsetOpInterfaceTdFiles",
         "@llvm-project//mlir:TensorOpsTdFiles",
     ],
 )
