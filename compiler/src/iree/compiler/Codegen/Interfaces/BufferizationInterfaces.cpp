@@ -25,7 +25,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
-#include "mlir/Interfaces/SubsetInsertionOpInterface.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
 using mlir::SubsetInsertionOpInterface;
