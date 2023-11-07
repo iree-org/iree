@@ -393,8 +393,8 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
   return newEmptyOp;
 }
 
-/// Utility method to convert from `linalg.fill` on `tensor` type with
-/// encoding to fill of the materialized type
+/// Utility method to convert from `linalg.generic` on `tensor` type with
+/// encoding to `linalg.generic` on the materialized type
 static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, linalg::GenericOp genericOp,
                     ValueRange convertedInputOperands,
@@ -405,6 +405,11 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::GenericOp genericOp,
     return rewriter.notifyMatchFailure(genericOp,
                                        "linalg.generic op is not elementwise "
                                        "with single input and single output");
+  }
+  if (!llvm::all_of(genericOp.getIndexingMapsArray(),
+                    [](AffineMap m) { return m.isIdentity(); })) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "indexing maps are not all identity maps");
   }
   auto convertedResultType =
       convertedOutputOperands[0].getType().cast<RankedTensorType>();
