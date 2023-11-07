@@ -7,6 +7,7 @@
 
 import pathlib
 import unittest
+from common import benchmark_definition
 from common.benchmark_definition import IREE_DRIVERS_INFOS
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -62,7 +63,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             bench_mode=["1-thread", "full-inference"],
             target_arch=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
-            benchmark_case_dir=pathlib.Path("case1"),
+            module_dir=benchmark_definition.ResourceLocation.build_local_path("case1"),
             benchmark_tool_name="tool",
             run_config=dummy_run_config,
         )
@@ -72,7 +73,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             bench_mode=["full-inference"],
             target_arch=common_definitions.DeviceArchitecture.ARM_VALHALL,
             driver_info=IREE_DRIVERS_INFOS["iree-vulkan"],
-            benchmark_case_dir=pathlib.Path("case2"),
+            module_dir=benchmark_definition.ResourceLocation.build_local_path("case2"),
             benchmark_tool_name="tool",
             run_config=dummy_run_config,
         )
@@ -82,7 +83,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             bench_mode=["full-inference"],
             target_arch=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
             driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
-            benchmark_case_dir=pathlib.Path("case3"),
+            module_dir=benchmark_definition.ResourceLocation.build_local_path("case3"),
             benchmark_tool_name="tool",
             run_config=dummy_run_config,
         )
@@ -215,7 +216,10 @@ class BenchmarkSuiteTest(unittest.TestCase):
         root_dir = pathlib.Path("root")
 
         suite = BenchmarkSuite.load_from_run_configs(
-            run_configs=run_configs, root_benchmark_dir=root_dir
+            run_configs=run_configs,
+            root_benchmark_dir=benchmark_definition.ResourceLocation.build_local_path(
+                root_dir
+            ),
         )
 
         loaded_run_configs = [case.run_config for case in suite.filter_benchmarks()]
@@ -248,10 +252,79 @@ class BenchmarkSuiteTest(unittest.TestCase):
                     target_arch=common_definitions.DeviceArchitecture.RV32_GENERIC,
                     driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                     benchmark_tool_name="iree-benchmark-module",
-                    benchmark_case_dir=run_config_c_case_dir,
+                    module_dir=benchmark_definition.ResourceLocation.build_local_path(
+                        run_config_c_case_dir
+                    ),
                     input_uri=model_tf.input_url,
                     expected_output_uri=model_tf.expected_output_url,
                     run_config=run_config_c,
+                )
+            ],
+        )
+
+    def test_load_from_run_configs_with_root_url(self):
+        model_tflite = common_definitions.Model(
+            id="tflite",
+            name="model",
+            tags=[],
+            source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+            source_url="",
+            entry_function="predict",
+            input_types=["1xf32"],
+        )
+        exec_config_a = iree_definitions.ModuleExecutionConfig.build(
+            id="exec_a",
+            tags=["defaults"],
+            loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+            driver=iree_definitions.RuntimeDriver.LOCAL_SYNC,
+        )
+        device_spec_a = common_definitions.DeviceSpec.build(
+            id="dev_a",
+            device_name="a",
+            architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+            host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
+            device_parameters=[],
+            tags=[],
+        )
+        compile_target = iree_definitions.CompileTarget(
+            target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+            target_architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
+            target_abi=iree_definitions.TargetABI.LINUX_GNU,
+        )
+        run_config_a = iree_definitions.E2EModelRunConfig.build(
+            module_generation_config=iree_definitions.ModuleGenerationConfig.build(
+                imported_model=iree_definitions.ImportedModel.from_model(model_tflite),
+                compile_config=iree_definitions.CompileConfig.build(
+                    id="1", tags=[], compile_targets=[compile_target]
+                ),
+            ),
+            module_execution_config=exec_config_a,
+            target_device_spec=device_spec_a,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
+            tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
+        )
+
+        suite = BenchmarkSuite.load_from_run_configs(
+            run_configs=[run_config_a],
+            root_benchmark_dir=benchmark_definition.ResourceLocation.build_url(
+                "https://example.com/testdata"
+            ),
+        )
+
+        self.assertEqual(
+            suite.filter_benchmarks(),
+            [
+                BenchmarkCase(
+                    model_name=model_tflite.name,
+                    model_tags=model_tflite.tags,
+                    bench_mode=exec_config_a.tags,
+                    target_arch=common_definitions.DeviceArchitecture.RV64_GENERIC,
+                    driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
+                    benchmark_tool_name="iree-benchmark-module",
+                    module_dir=benchmark_definition.ResourceLocation.build_url(
+                        "https://example.com/testdata/iree_module_model_tflite___riscv_64-generic-linux_gnu-llvm_cpu___"
+                    ),
+                    run_config=run_config_a,
                 )
             ],
         )

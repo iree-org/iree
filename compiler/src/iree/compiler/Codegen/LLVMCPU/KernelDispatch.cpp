@@ -461,11 +461,32 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
         llvm::divideCeil(workload[index], distributedTileSizes[index]);
     if (nwg < numWorkgroupsPerDim[index]) {
       numWorkgroups /= numWorkgroupsPerDim[index];
+      numWorkgroupsPerDim[index] = nwg;
       numWorkgroups *= nwg;
     } else {
       currDim--;
     }
   }
+
+  // Final fixup for dividing workload evenly.
+  for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
+    if (distributedTileSizes[i] == 0 || ShapedType::isDynamic(workload[i]))
+      continue;
+
+    int64_t nwg = llvm::divideCeil(workload[i], distributedTileSizes[i]);
+    int64_t newSize = llvm::divideCeil(workload[i], nwg);
+
+    // Chech if it's the ideal size with vector size hint. And skip if the new
+    // size will break the ideal size.
+    int64_t vectorSize = vectorSizeHints[i];
+    if (vectorSize > 1 &&
+        (newSize % vectorSize != 0 || workload[i] % newSize != 0)) {
+      continue;
+    }
+
+    distributedTileSizes[i] = newSize;
+  }
+
   return distributedTileSizes;
 }
 
@@ -1134,9 +1155,13 @@ setRootConfig(func::FuncOp entryPointFn,
       maxTileSizes[0] = 192;
       maxTileSizes[1] = 128;
     }
+    SmallVector<int64_t> vectorSizeHints(numLoops, vectorSize);
+    if (isBM) {
+      vectorSizeHints[0] = 1;
+    }
     distTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, vecTileSizes, maxTileSizes,
-        /*allowIncompleteTile=*/true);
+        /*allowIncompleteTile=*/true, vectorSizeHints);
   } else {
     distTileSizes = getDefaultDistributedLevelTileSizes(linalgOp, vecTileSizes,
                                                         maxTileSizes);

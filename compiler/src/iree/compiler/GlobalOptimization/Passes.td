@@ -32,6 +32,16 @@ def ExpandVectors : Pass<"iree-global-opt-expand-vectors", ""> {
   let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandVectorsPass()";
 }
 
+def FuseDequantizationMatmul:
+    InterfacePass<"iree-global-opt-fuse-dequantization-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Fuse dequantization and matmul linalg.generic ops";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseDequantizationMatmulPass()";
+  let options = [
+    Option<"enableQuantizedMatmulReassociation", "enable-quantized-matmul-reassociation", "bool",
+           /*default=*/"false", "Allow reassociation of quantized matmuls (experimental)">,
+  ];
+}
+
 def MaterializeHomogeneousEncodings :
   Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
   let summary = "Materializes logical encodings to physical encodings if there is a single device target.";
