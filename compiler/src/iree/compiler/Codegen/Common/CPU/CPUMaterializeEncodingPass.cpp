@@ -36,8 +36,8 @@ using IREE::HAL::ExecutableTargetAttr;
 // targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTilesGeneric(EncodingUser user, ExecutableTargetAttr target) {
-  if (isVMVXBackend(target) && hasMicrokernels(target)) {
+enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
+  if (hasMicrokernels(target)) {
     // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
     // does not support batch_matmul atm.
     if (user == EncodingUser::BATCH_MATMUL) {
@@ -49,10 +49,7 @@ enumerateMatmulTilesGeneric(EncodingUser user, ExecutableTargetAttr target) {
   }
 
   return {
-      TileMxNxK{8, 8, 4}, // Some vaguely reasonable static tile shape.
-      TileMxNxK{4, 8, 4}, // Truncation of the above.
-      TileMxNxK{2, 8, 4}, // Truncation of the above.
-      TileMxNxK{1, 8, 4}, // Truncation of the above.
+      TileMxNxK{8, 8, 4} // Some vaguely reasonable tile shape
   };
 }
 
@@ -128,7 +125,7 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
   }
 
   // Fallback - no architecture-optimized tile size for this case.
-  return enumerateMatmulTilesGeneric(user, target);
+  return {};
 }
 
 // Enumerate tile sizes to choose from on x86-64.
@@ -234,7 +231,7 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
   }
 
   // Fallback - no architecture-optimized tile size for this case.
-  return enumerateMatmulTilesGeneric(user, target);
+  return {};
 }
 
 static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
@@ -311,17 +308,16 @@ static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
 SmallVector<TileMxNxK> enumerateMatmulTileMxNxK(EncodingUser user,
                                                 TypeRange elementTypes,
                                                 ExecutableTargetAttr target) {
+  if (isVMVXBackend(target)) {
+    return enumerateMatmulTilesVMVX(user, target);
+  }
   if (isAArch64(target)) {
     return enumerateMatmulTileArm64(user, elementTypes, target);
   }
   if (isX86_64(target)) {
     return enumerateMatmulTileX86_64(user, elementTypes, target);
   }
-  // Data-tiling for RISCV is not implemented yet.
-  if (isRISCV(target)) {
-    return {};
-  }
-  return enumerateMatmulTilesGeneric(user, target);
+  return {};
 }
 
 struct CPUMaterializeEncodingPass
