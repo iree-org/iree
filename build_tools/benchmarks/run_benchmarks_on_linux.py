@@ -52,17 +52,33 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         benchmark_results_filename: Optional[pathlib.Path],
         capture_filename: Optional[pathlib.Path],
     ) -> None:
-        case_dir = benchmark_case.benchmark_case_dir
+        module_dir = benchmark_case.module_dir
+        local_module_dir = module_dir.get_local_path()
+        if local_module_dir:
+            case_tmp_dir = local_module_dir
+            module_path = local_module_dir / iree_artifacts.MODULE_FILENAME
+        else:
+            module_rel_dir = iree_artifacts.get_module_dir_path(
+                benchmark_case.run_config.module_generation_config
+            )
+            case_tmp_dir = self.config.tmp_dir / module_rel_dir
+            case_tmp_dir.mkdir(parents=True, exist_ok=True)
+            module_url = (module_dir / iree_artifacts.MODULE_FILENAME).get_url()
+            assert module_url is not None
+            module_path = self.__fetch_file(
+                uri=module_url, dest=case_tmp_dir / iree_artifacts.MODULE_FILENAME
+            )
+
         inputs_dir = None
         expected_output_dir = None
         if benchmark_case.input_uri:
             inputs_dir = self.__fetch_and_unpack_npy(
-                uri=benchmark_case.input_uri, dest_dir=case_dir / "inputs_npy"
+                uri=benchmark_case.input_uri, dest_dir=case_tmp_dir / "inputs_npy"
             )
         if benchmark_case.expected_output_uri:
             expected_output_dir = self.__fetch_and_unpack_npy(
                 uri=benchmark_case.expected_output_uri,
-                dest_dir=case_dir / "expected_outputs_npy",
+                dest_dir=case_tmp_dir / "expected_outputs_npy",
             )
 
         if benchmark_results_filename:
@@ -75,6 +91,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 self.__run_verify(
                     tool_dir=self.config.normal_benchmark_tool_dir,
                     benchmark_case=benchmark_case,
+                    module_path=module_path,
                     inputs_dir=inputs_dir,
                     expected_outputs_dir=expected_output_dir,
                 )
@@ -82,18 +99,22 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             self.__run_benchmark(
                 tool_dir=self.config.normal_benchmark_tool_dir,
                 benchmark_case=benchmark_case,
+                module_path=module_path,
                 results_filename=benchmark_results_filename,
             )
 
         if capture_filename:
             self.__run_capture(
-                benchmark_case=benchmark_case, capture_filename=capture_filename
+                benchmark_case=benchmark_case,
+                module_path=module_path,
+                capture_filename=capture_filename,
             )
 
     def __build_tool_cmds(
         self,
         benchmark_case: BenchmarkCase,
         tool_path: pathlib.Path,
+        module_path: pathlib.Path,
         inputs_dir: Optional[pathlib.Path] = None,
     ) -> List[Any]:
         run_config = benchmark_case.run_config
@@ -102,8 +123,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         )
         cmds.append(tool_path)
 
-        module_dir_path = benchmark_case.benchmark_case_dir
-        cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
+        cmds += [f"--module={module_path}"]
         cmds += run_config.materialize_run_flags(
             gpu_id=self.gpu_id,
             inputs_dir=inputs_dir,
@@ -126,8 +146,10 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         if dest.exists():
             return dest
         req = requests.get(uri, stream=True, timeout=60)
+        if not req.ok:
+            raise RuntimeError(f"Failed to fetch {uri}: {req.status_code} - {req.text}")
         with dest.open("wb") as dest_file:
-            for data in req.iter_content():
+            for data in req.iter_content(chunk_size=64 * 1024 * 1024):
                 dest_file.write(data)
         return dest
 
@@ -143,12 +165,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         self,
         tool_dir: pathlib.Path,
         benchmark_case: BenchmarkCase,
+        module_path: pathlib.Path,
         inputs_dir: pathlib.Path,
         expected_outputs_dir: pathlib.Path,
     ):
         cmd = self.__build_tool_cmds(
             benchmark_case=benchmark_case,
             tool_path=tool_dir / "iree-run-module",
+            module_path=module_path,
             inputs_dir=inputs_dir,
         )
         # Currently only support single output.
@@ -160,11 +184,15 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         self,
         tool_dir: pathlib.Path,
         benchmark_case: BenchmarkCase,
+        module_path: pathlib.Path,
         results_filename: pathlib.Path,
     ):
         tool_name = benchmark_case.benchmark_tool_name
-        tool_path = tool_dir / tool_name
-        cmd = self.__build_tool_cmds(benchmark_case=benchmark_case, tool_path=tool_path)
+        cmd = self.__build_tool_cmds(
+            benchmark_case=benchmark_case,
+            tool_path=tool_dir / tool_name,
+            module_path=module_path,
+        )
 
         if tool_name == "iree-benchmark-module":
             cmd.extend(
@@ -186,18 +214,21 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
 
     def __run_capture(
-        self, benchmark_case: BenchmarkCase, capture_filename: pathlib.Path
+        self,
+        benchmark_case: BenchmarkCase,
+        module_path: pathlib.Path,
+        capture_filename: pathlib.Path,
     ):
         capture_config = self.config.trace_capture_config
         if capture_config is None:
             raise ValueError("capture_config can't be None.")
 
         tool_name = benchmark_case.benchmark_tool_name
-        tool_path = (
-            capture_config.traced_benchmark_tool_dir
-            / benchmark_case.benchmark_tool_name
+        cmd = self.__build_tool_cmds(
+            benchmark_case=benchmark_case,
+            tool_path=capture_config.traced_benchmark_tool_dir / tool_name,
+            module_path=module_path,
         )
-        cmd = self.__build_tool_cmds(benchmark_case=benchmark_case, tool_path=tool_path)
 
         if tool_name == "iree-benchmark-module":
             cmd.extend(
