@@ -148,6 +148,68 @@ Value processDotArg(Value arg, Location loc, ArrayRef<int64_t> contractDimsAttr,
   return transposeReshape(arg, loc, contractDims, outerDims, shape, rewriter);
 }
 
+struct GeneralDotRemoveBatch final
+    : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
+    auto lhsTy = cast<ShapedType>(op.getLhs().getType());
+    auto rhsTy = cast<ShapedType>(op.getRhs().getType());
+    auto ty = cast<ShapedType>(op.getType());
+
+    if (!ty.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "does not have static shape");
+    }
+
+    auto dimNumbers = op.getDotDimensionNumbers();
+    if (dimNumbers.getLhsBatchingDimensions().size() != 1 ||
+        dimNumbers.getLhsBatchingDimensions().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "non-unary batch dimension");
+    }
+
+    if (dimNumbers.getLhsBatchingDimensions().front() != 0 ||
+        dimNumbers.getRhsBatchingDimensions().front() != 0) {
+      return rewriter.notifyMatchFailure(op, "not first dim on lhs/rhs");
+    }
+
+    if (lhsTy.getDimSize(0) != 1 || rhsTy.getDimSize(0) != 1) {
+      return rewriter.notifyMatchFailure(op, "not unary batch size");
+    }
+
+    // We no longer include the batch dimension of 1.
+    llvm::SmallVector<int64_t> newLhsContractingDims;
+    for (auto dim : dimNumbers.getLhsContractingDimensions())
+      newLhsContractingDims.push_back(dim - 1);
+
+    llvm::SmallVector<int64_t> newRhsContractingDims;
+    for (auto dim : dimNumbers.getRhsContractingDimensions())
+      newRhsContractingDims.push_back(dim - 1);
+
+    auto lhs = rewriter.create<mlir::stablehlo::ReshapeOp>(
+        op.getLoc(), lhsTy.clone(lhsTy.getShape().drop_front()), op.getLhs());
+
+    auto rhs = rewriter.create<mlir::stablehlo::ReshapeOp>(
+        op.getLoc(), rhsTy.clone(rhsTy.getShape().drop_front()), op.getRhs());
+
+    auto newDimNumbers = mlir::stablehlo::DotDimensionNumbersAttr::get(
+        rewriter.getContext(),
+        /*lhsBatchingDimensions=*/{},
+        /*rhsBatchingDimensions=*/{},
+        /*lhsContractingDimensions=*/
+        newLhsContractingDims,
+        /*rhsContractingDimensions=*/
+        newRhsContractingDims);
+
+    auto dot = rewriter.create<mlir::stablehlo::DotGeneralOp>(
+        op.getLoc(), ty.clone(ty.getShape().drop_front()), lhs, rhs,
+        newDimNumbers, op.getPrecisionConfigAttr());
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(op, ty,
+                                                            dot.getResult());
+    return success();
+  }
+};
+
 struct GeneralDotConvert final
     : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -374,7 +436,9 @@ struct DotGeneralToDot final : impl::DotGeneralToDotBase<DotGeneralToDot> {
 void populatePreprocessingDotGeneralToDotPatterns(mlir::MLIRContext *context,
                                                   RewritePatternSet *patterns,
                                                   PatternBenefit benefit) {
-  patterns->add<GeneralDotConvert, DotVectorOptimization>(context, benefit);
+  patterns
+      ->add<GeneralDotConvert, GeneralDotRemoveBatch, DotVectorOptimization>(
+          context, benefit);
 }
 
 } // namespace mlir::iree_compiler::stablehlo
