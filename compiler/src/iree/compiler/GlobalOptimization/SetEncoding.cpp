@@ -138,6 +138,11 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
       getAttr(narrow.M), getAttr(narrow.N));
 }
 
+// Creates a linalg::GenericOp that performs an element-wise cast of the same
+// type as performed in `castOp`, and returns the result enceoded with
+// `encodingAttr`. The element type of `encoded` is expected to be the same as
+// the element type of the input to `castOp`, which can be a CastOpInterface op
+// on a tensor or single element.
 static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
                                CastOpInterface castOp,
                                IREE::LinalgExt::EncodingAttr encodingAttr) {
@@ -145,6 +150,10 @@ static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
   auto castResultElemType = getElementTypeOrSelf(castOp->getResultTypes()[0]);
   auto castedType = RankedTensorType::get(encodedType.getShape(),
                                           castResultElemType, encodingAttr);
+  assert(encodedType.getElementType() ==
+             getElementTypeOrSelf(castOp->getOperandTypes()[0]) &&
+         "Expected encoded element type to be the same as the cast input "
+         "element type");
   SmallVector<OpFoldResult> inputMixedSizes =
       tensor::getMixedSizes(builder, loc, encoded);
   Value init = builder.create<tensor::EmptyOp>(
