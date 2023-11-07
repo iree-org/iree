@@ -137,7 +137,7 @@ class BuildFileFunctions(object):
         #      '//path/to/package:generated.c'
         #      -> '${CMAKE_BINARY_DIR}/path/to/package/generated.c'
         pkg_root_relative_label = src.startswith("//")
-        src = src.removeprefix("//").lstrip(":").replace(":", "/")
+        src = src.lstrip("/").lstrip(":").replace(":", "/")
         if not pkg_root_relative_label:
             return src
         elif os.path.exists(os.path.join(self._build_dir, src)):
