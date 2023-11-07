@@ -118,7 +118,16 @@ track of those who have made significant contributions to the project.
 
 <!-- TODO(scotttodd): merge the sections below into "developer overview"? -->
 
-## Information for contributors
+## Tips for contributors
+
+### Tool recommendations
+
+| Program or tool | Description |
+| -- | -- |
+[:material-microsoft-visual-studio-code: Visual Studio Code (VSCode)](<https://code.visualstudio.com/>) | The most commonly used editor amongst IREE developers
+[:simple-cmake: Ccache](<https://ccache.dev/>) | A fast C/C++ compiler cache. See the [CMake with `ccache`](../building/cmake-with-ccache.md) page
+[:simple-github: GitHub CLI](<https://github.com/cli/cli>) | A CLI for interacting with GitHub
+[:simple-github: "Refined GitHub" browser extensions](<https://github.com/sindresorhus/refined-github>) | Extension that add features to the GitHub UI
 
 ### :material-hammer-wrench: Build systems
 
@@ -160,10 +169,14 @@ the
 [configure_ci.py](https://github.com/openxla/iree/blob/main/build_tools/github_actions/configure_ci.py)
 script. It will generally run a pre-determined set of jobs on presubmit with
 some jobs kept as post-submit only. If changes are only to a certain set of
-excluded files that we know don't affect CI (e.g. docs), then it will skip the
-jobs. You can customize which jobs run using
+excluded files that we know don't affect CI (e.g. Markdown files), then it will
+skip the jobs.
+
+You can customize which jobs run using
 [git trailers](https://git-scm.com/docs/git-interpret-trailers) in the PR
-description. The available options are
+description.
+
+The available options are
 
 ``` text
 ci-skip: jobs,to,skip
@@ -175,35 +188,69 @@ benchmark-extra: extra,benchmarks,to,run
 runner-env: [testing|prod]
 ```
 
-The first three follow the same format and instruct the setup script on which
-jobs to include or exclude from its run. They take a comma-separated list of
-jobs which must be from the set of top-level job identifiers in ci.yml file or
-the special keyword "all" to indicate all jobs. `ci-skip` removes jobs that
-would otherwise be included, though it is not an error to list jobs that would
-not be included by default. `ci-extra` adds additional jobs that would not have
-otherwise been run, though it is not an error to list jobs that would have been
-included anyway. It *is* an error to list a job in both of these fields.
-`ci-exactly` provides an exact list of jobs that should run. It is mutually
-exclusive with both `ci-skip` and `ci-extra`. In all these cases, the setup does
-not make any effort to ensure that job dependencies are satisfied. Thus, if you
-request skipping the `build_all` job, all the jobs that depend on it will fail,
-not be skipped. `skip-ci` is an older option that simply skips all jobs. Its
-usage is deprecated and it is mutually exclusive with all of the other `ci-*`
-options. Prefer `ci-skip: all`.
+??? info - "Using `skip-ci`"
 
-Benchmarks don't run by default on PRs, and must be specifically requested. They
-*do* run by default on PRs detected to be an integration of LLVM into IREE, but
-this behavior can be disabled with `skip-llvm-integrate-benchmark`. The
-`benchmark-extra` option allows specifying additional benchmark presets to run
-as part of benchmarking. It accepts a comma-separated list of benchmark presets.
-This combines with labels added to the PR (which are a more limited set of
-options). See the
-[benchmark suites documentation](../performance/benchmark-suites.md).
+    `skip-ci` skips all jobs. It is mutually exclusive with the other `ci-*`
+    options and is synonomous with `ci-skip: all`.
 
-The `runner-env` option controls which runner environment to target for our
-self-hosted runners. We maintain a test environment to allow testing out new
-configurations prior to rolling them out. This trailer is for advanced users who
-are working on the CI infrastructure itself.
+    ``` text
+    skip-ci: free form reason
+    ```
+
+??? info - "Using `ci-skip`, `ci-extra`, `ci-exactly`"
+
+    The `ci-*` options instruct the setup script on which jobs to include or
+    exclude from its run. They take a comma-separated list of jobs which must be
+    from the set of top-level job identifiers in the `ci.yml` file or the
+    special keyword "all" to indicate all jobs.
+
+    ``` text
+    ci-skip: jobs,to,skip
+    ci-extra: extra,jobs,to,run
+    ci-exactly: exact,set,of,jobs,to,run
+    ```
+
+    * `ci-skip` removes jobs that would otherwise be included, though it is not
+    an error to list jobs that would not be included by default.
+    * `ci-extra` adds additional jobs that would not have otherwise been run,
+    though it is not an error to list jobs that would have been included anyway.
+    It *is* an error to list a job in both "skip" and "extra".
+    * `ci-exactly` provides an exact list of jobs that should run. It is
+    mutually exclusive with both "skip" and "extra".
+
+    In all these cases, the setup does not make any effort to ensure that job
+    dependencies are satisfied. Thus, if you request skipping the `build_all`
+    job, all the jobs that depend on it will fail, not be skipped.
+
+??? info - "Using `benchmark-extra`, `skip-llvm-integrate-benchmark`"
+
+    ``` text
+    benchmark-extra: extra,benchmarks,to,run
+    skip-llvm-integrate-benchmark: free form reason
+    ```
+
+    Benchmarks don't run by default on PRs, and must be specifically requested.
+
+    The `benchmark-extra` option allows specifying additional benchmark presets
+    to run as part of benchmarking. It accepts a comma-separated list of
+    benchmark presets. This combines with labels added to the PR (which are a
+    more limited set of options). See the
+    [benchmark suites documentation](../performance/benchmark-suites.md).
+
+    Benchmarks *do* run by default on PRs detected to be an integration of LLVM
+    into IREE, but this behavior can be disabled with
+    `skip-llvm-integrate-benchmark`.
+
+??? info - "Using `runner-env`"
+
+    The `runner-env` option controls which runner environment to target for our
+    self-hosted runners. We maintain a test environment to allow testing out new
+    configurations prior to rolling them out. This trailer is for advanced users
+    who are working on the CI infrastructure itself.
+
+    ``` text
+    runner-env: [testing|prod]
+    ```
 
 ##### CI configuration recipes
 
@@ -212,27 +259,27 @@ runs.
 
 * Also run Windows and macOS builds that are normally post-merge only:
 
-  ``` text
-  ci-extra: build_test_all_windows,build_test_all_macos_arm64,build_test_all_macos_x86_64
-  ```
+    ``` text
+    ci-extra: build_test_all_windows,build_test_all_macos_arm64,build_test_all_macos_x86_64
+    ```
 
 * Also run GPU tests on NVIDIA A100 runners (opt-in due to low availability):
 
-  ``` text
-  ci-extra: test_a100
-  ```
+    ``` text
+    ci-extra: test_a100
+    ```
 
 * Skip all CI builds and tests, e.g. for comment-only changes:
 
-  ``` text
-  skip-ci: Comment-only change.
-  ```
+    ``` text
+    skip-ci: Comment-only change.
+    ```
 
 * Only run Bazel builds, e.g. for changes only affecting Bazel rules:
 
-  ``` text
-  ci-exactly: build_test_all_bazel
-  ```
+    ``` text
+    ci-exactly: build_test_all_bazel
+    ```
 
 For example, this PR opted in to running the `build_test_all_windows` job:
 
@@ -242,35 +289,7 @@ The enabled jobs can be viewed from the Summary page of an action run:
 
 ![ci_enabled_jobs](./contributing-ci-enabled-jobs.png)
 
-### :material-lightbulb-on: Contributor tips
-
-These are opinionated tips documenting workflows that some members of the team
-have found useful. They are focused on meta-tooling, not on IREE code
-specifically (you will find the latter in the
-[Developer Overview](./developer-overview.md)).
-
-!!! note
-
-    It is certainly possible to use workflows other than these. Some common
-    tasks, especially for maintainers, will likely be made easier by using
-    these flows.
-
-We assume a basic knowledge
-of `git` and GitHub and suggests some specific ways of using it.
-
-#### Useful tools
-
-* GitHub CLI (<https://github.com/cli/cli>). A CLI for interacting with GitHub.
-    Most importantly, it allows scripting the creation of pull requests.
-* Refined GitHub Chrome and Firefox Extension:
-    <https://github.com/sindresorhus/refined-github>. Nice extension that adds a
-    bunch of features to the GitHub UI.
-* VSCode: <https://code.visualstudio.com/>. The most commonly used IDE amongst
-    IREE developers.
-* [Ccache](https://ccache.dev/), a fast C/C++ compiler cache. See the
-  [CMake with `ccache`](../building/cmake-with-ccache.md) page
-
-#### Git structure
+### Git workflows
 
 We tend to use the "triangular" or "forking" workflow. Develop primarily on a
 clone of the repository on your development machine. Any local branches named
@@ -283,7 +302,7 @@ different branch on your public fork and create the PR from there.
 <!-- TODO(scotttodd): screenshots / diagrams here
   (https://mermaid.js.org/syntax/gitgraph.html?) -->
 
-##### Setup
+#### Setup
 
 1. Create a fork of the main repository.
 
@@ -294,30 +313,33 @@ different branch on your public fork and create the PR from there.
     a. If you already cloned from the main repository (e.g. by following the
     getting started guide):
 
-    ```shell
-    # From your existing git repo
-    $ git remote rename origin upstream
-    $ git remote add origin https://github.com/<github_username>/iree.git
-    ```
+      ```shell
+      # From your existing git repo
+      $ git remote rename origin upstream
+      $ git remote add origin https://github.com/<github_username>/iree.git
+      ```
 
     b. If you haven't already cloned:
 
-    ```shell
-    # From whatever directory under which you want to nest your repo
-    $ git clone https://github.com/<github_username>/iree.git
-    $ cd iree
-    $ git remote add upstream https://github.com/openxla/iree.git
-    ```
+      ```shell
+      # From whatever directory under which you want to nest your repo
+      $ git clone https://github.com/<github_username>/iree.git
+      $ cd iree
+      $ git remote add upstream https://github.com/openxla/iree.git
+      ```
 
     This is especially important for maintainers who have write access (so can
     push directly to the main repository) and admins who have elevated
-    privileges (so can push directly to protected branches). These names are
-    just suggestions, but you might find some scripts where the defaults are for
-    remotes named like this. For extra safety, you can make it difficult to push
-    directly to upstream by setting the push url to something invalid: `git
-    remote set-url --push upstream DISABLE`, which requires re-enabling the push
-    URL explicitly before pushing. You can wrap this behavior in a custom git
-    command like
+    privileges (so can push directly to protected branches).
+
+    These names are just suggestions, but you might find some scripts where the
+    defaults are for remotes named like this.
+
+    For extra safety, you can make it difficult to push directly to upstream by
+    setting the push url to something invalid:
+    `git remote set-url --push upstream DISABLE`, which requires re-enabling the
+    push URL explicitly before pushing. You can wrap this behavior in a custom
+    git command like
     [git-sudo](https://gist.github.com/GMNGeoffrey/42dd9a9792390094a43bdb69659320c0).
 
 3. Use a script like
@@ -326,7 +348,7 @@ different branch on your public fork and create the PR from there.
     little trickier than it should be. You can also turn this into a git command
     by adding it to your path as `git-update`.
 
-##### Git config
+#### Git config
 
 These are some additional options you could put in your top-level `.gitconfig`
 or repository-specific `.git/config` files that are conducive the recommended
