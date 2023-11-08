@@ -568,7 +568,7 @@ setup(
                 "iree-run-trace*",
                 "iree-benchmark-module*",
                 "iree-benchmark-trace*",
-                # These utilities are invariant wrt tracing and are only build for the default runtime.
+                # These utilities are invariant wrt tracing and are only built for the default runtime.
                 "iree-dump-module*",
                 "iree-dump-parameters*",
                 "iree-cpuinfo*",
