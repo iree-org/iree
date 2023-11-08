@@ -15,5 +15,9 @@ GPU = common_definitions.DeviceSpec.build(
     device_name=DEVICE_NAME,
     architecture=common_definitions.DeviceArchitecture.QUALCOMM_ADRENO,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
+    device_parameters=common_definitions.DeviceParameters(
+        # Pin on the fastest CPU core.
+        cpu_params=common_definitions.CPUParameters(pinned_cores=[7])
+    ),
     tags=["gpu"],
 )

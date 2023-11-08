@@ -34,7 +34,6 @@ from common.benchmark_definition import (
 )
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_artifacts import iree_artifacts
-from e2e_model_tests import run_module_utils
 
 import common.common_arguments
 
@@ -118,17 +117,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         inputs_dir: Optional[pathlib.Path] = None,
     ) -> List[Any]:
         run_config = benchmark_case.run_config
-        cmds: List[Any] = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
-            run_config.target_device_spec
-        )
-        cmds.append(tool_path)
-
-        cmds += [f"--module={module_path}"]
+        cmds = [tool_path, f"--module={module_path}"]
         cmds += run_config.materialize_run_flags(
             gpu_id=self.gpu_id,
             inputs_dir=inputs_dir,
         )
-
+        cpu_params = run_config.target_device_spec.device_parameters.cpu_params
+        if cpu_params:
+            raise ValueError("CPU pinning is not supported yet.")
         return cmds
 
     def __fetch_and_unpack_npy(self, uri: str, dest_dir: pathlib.Path) -> pathlib.Path:

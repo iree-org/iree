@@ -67,8 +67,7 @@ from common.android_device_utils import (
 )
 import common.common_arguments
 from e2e_test_artifacts import iree_artifacts
-from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.device_specs import device_parameters
+from e2e_test_framework.definitions import iree_definitions
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
@@ -440,29 +439,25 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         stdout_redirect = None if self.verbose else subprocess.DEVNULL
         execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
 
-    # TODO(#13187): These logics are inherited from the legacy benchmark suites,
-    # which only work for a few specific phones. We should define the topology
-    # in their device specs.
     def __deduce_taskset_from_run_config(
         self, run_config: iree_definitions.E2EModelRunConfig
     ) -> str:
         """Deduces the CPU mask according to device and execution config."""
 
-        device_spec = run_config.target_device_spec
-        # For GPU benchmarks, use the most performant core.
-        if device_spec.architecture.type == common_definitions.ArchitectureType.GPU:
-            return "80"
+        cpu_params = run_config.target_device_spec.device_parameters.cpu_params
+        if not cpu_params:
+            return "0xff"
 
-        device_params = device_spec.device_parameters
-        single_thread = "1-thread" in run_config.module_execution_config.tags
-        if device_parameters.ARM_BIG_CORES in device_params:
-            return "80" if single_thread else "f0"
-        elif device_parameters.ARM_LITTLE_CORES in device_params:
-            return "08" if single_thread else "0f"
-        elif device_parameters.ALL_CORES in device_params:
-            return "80" if single_thread else "ff"
+        exec_config = run_config.module_execution_config
+        pinned_cores = cpu_params.pinned_cores
+        if (
+            exec_config.driver == iree_definitions.RuntimeDriver.LOCAL_SYNC
+            or "1-thread" in exec_config.tags
+        ):
+            pinned_cores = pinned_cores[-1:]
 
-        raise ValueError(f"Unsupported config to deduce taskset: '{run_config}'.")
+        cpu_mask = sum(1 << core_id for core_id in cpu_params.pinned_cores)
+        return hex(cpu_mask)
 
     def __check_and_push_file(
         self, host_path: pathlib.Path, device_dir: pathlib.PurePosixPath

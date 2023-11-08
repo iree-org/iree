@@ -7,14 +7,12 @@
 
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework.device_specs import device_parameters
 
 GCP_C2_STANDARD_16 = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_16,
     device_name="c2-standard-16",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
     architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
-    device_parameters=[device_parameters.ALL_CORES],
     tags=["cpu"],
 )
 
@@ -23,7 +21,6 @@ GCP_C2_STANDARD_60 = common_definitions.DeviceSpec.build(
     device_name="c2-standard-60",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
     architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
-    device_parameters=[device_parameters.ALL_CORES],
     tags=["cpu"],
 )
 
