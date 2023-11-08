@@ -3,6 +3,9 @@ from typing import Any, Callable, ClassVar, List, Optional, Sequence, Tuple, Uni
 from typing import overload
 
 def create_hal_module(instance: VmInstance, device: HalDevice) -> VmModule: ...
+def create_io_parameters_module(
+    instance: VmInstance, *providers: ParameterProvider
+) -> VmModule: ...
 def disable_leak_checker(): ...
 def get_cached_hal_driver(device_uri: str) -> HalDriver: ...
 def parse_flags(*flag: str): ...
@@ -45,6 +48,12 @@ class BufferUsage(int):
     __name__: str
     def __and__(self, other: BufferUsage) -> int: ...
     def __or__(self, other: BufferUsage) -> int: ...
+
+class FileHandle:
+    @staticmethod
+    def wrap_memory(
+        host_buffer: Any, readable: bool = True, writable: bool = False
+    ) -> FileHandle: ...
 
 class HalAllocator:
     def allocate_buffer(
@@ -274,6 +283,52 @@ class MemoryType(int):
     __name__: Any
     def __and__(self, other: MemoryType) -> int: ...
     def __or__(self, other: MemoryType) -> int: ...
+
+class ParameterIndex:
+    def __init__() -> None: ...
+    def __len__(self) -> int: ...
+    def reserve(self, new_capacity: int) -> None: ...
+    def add_splat(
+        self,
+        key: str,
+        pattern: Any,
+        total_length: int,
+        *,
+        metadata: Optional[Union[bytes, str]] = None
+    ) -> None: ...
+    def add_from_file_handle(
+        self,
+        key: str,
+        file_handle: FileHandle,
+        length: int,
+        *,
+        offset: int = 0,
+        metadata: Optional[Union[bytes, str]] = None
+    ) -> None: ...
+    def add_buffer(
+        self,
+        key: str,
+        buffer: Any,
+        *,
+        readable: bool = True,
+        writable: bool = False,
+        metadata: Optional[Union[bytes, str]] = None
+    ) -> None: ...
+    def load_from_file_handle(self, file_handle: FileHandle, format: str) -> None: ...
+    def load(
+        self,
+        file_path: str,
+        *,
+        format: Optional[str] = None,
+        readable: bool = True,
+        writable: bool = False,
+        mmap: bool = True
+    ) -> None: ...
+    def create_provider(
+        self, *, scope: str = "", max_concurrent_operations: Optional[int] = None
+    ) -> ParameterProvider: ...
+
+class ParameterProvider: ...
 
 class PyModuleInterface:
     def __init__(self, module_name: str, ctor: object) -> None: ...

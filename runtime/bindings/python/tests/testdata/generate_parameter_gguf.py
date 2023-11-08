@@ -5,19 +5,19 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# https://github.com/ggerganov/llama.cpp/blob/master/gguf-py/gguf/gguf.py
+# https://huggingface.co/docs/safetensors/index
 #
 # To regenerate:
-#  $ pip install gguf
-#  $ cd runtime/src/iree/io/formats/gguf/testdata/
-#  $ ./generate_gguf_files.py
+#  $ pip install safetensors
+#  $ ./runtime/bindings/python/tests/testdata/generate_parameter_safetensors.py
 
+from pathlib import Path
 import numpy as np
 from gguf import GGUFWriter
 
 
 def save_file(tensors, path):
-    writer = GGUFWriter(path, "generic")
+    writer = GGUFWriter(str(path), "generic")
 
     writer.add_architecture()
     writer.add_custom_alignment(64)
@@ -36,18 +36,11 @@ def save_file(tensors, path):
     writer.close()
 
 
-# no tensors
-save_file({}, "empty.gguf")
-
-# single tensor
-save_file({"tensor0": np.ones((2, 2), dtype=np.float32)}, "single.gguf")
-
 # multiple tensors
 save_file(
     {
-        "tensor0": np.ones((2, 2), dtype=np.float32),
-        "tensor1": np.ones((1, 2), dtype=np.float32),
-        "tensor2": np.ones((4, 3), dtype=np.float32),
+        "weight": np.zeros([30, 20], dtype=np.float32) + 2.0,
+        "bias": np.zeros([30], dtype=np.float32) + 1.0,
     },
-    "multiple.gguf",
+    Path(__file__).resolve().parent / "parameter_weight_bias_1.gguf",
 )
