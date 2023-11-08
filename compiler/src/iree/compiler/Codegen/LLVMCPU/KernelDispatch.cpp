@@ -1427,6 +1427,9 @@ setUnPackOpRootConfig(func::FuncOp entryPointFn, tensor::UnPackOp op,
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributionTileSizes(cast<TilingInterface>(op.getOperation()));
 
+  SmallVector<int64_t> workload(op.getDestType().getShape());
+  reduceDistributionWorkgroups(workload, distTileSizes);
+
   // Fixup for making distTileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
