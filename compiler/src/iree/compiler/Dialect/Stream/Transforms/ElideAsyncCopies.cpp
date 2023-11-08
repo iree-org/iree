@@ -432,6 +432,17 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   return false;
 }
 
+// Tries to elide |cloneOp| by replacing all uses with its source if safe.
+// Returns true if the op was elided.
+static bool tryElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
+                            LastUseAnalysis &analysis) {
+  if (!isSafeToElideCloneOp(cloneOp, analysis))
+    return false;
+  cloneOp.replaceAllUsesWith(cloneOp.getSource());
+  cloneOp.erase();
+  return true;
+}
+
 // Tries to elide copies nested within |region| when safe.
 // Returns true if any ops were elided.
 static bool tryElideAsyncCopiesInRegion(Region &region,

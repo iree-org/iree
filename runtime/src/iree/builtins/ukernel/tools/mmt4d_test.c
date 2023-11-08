@@ -443,8 +443,7 @@ static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
   iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features);
 }
 
-IREE_ATTRIBUTE_UNUSED static void
-iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+static void iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
     iree_uk_uint32_t flags, int M0, int N0, int K0, const char* cpu_features) {
   iree_uk_test_mmt4d(flags, M0, N0, K0, cpu_features);
   iree_uk_test_mmt4d(flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS, M0,

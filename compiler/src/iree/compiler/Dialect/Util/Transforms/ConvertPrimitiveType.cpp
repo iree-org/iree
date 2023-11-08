@@ -55,8 +55,8 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
   return nullptr;
 };
 
-[[maybe_unused]] Value convertRankedInteger(OpBuilder &builder, Type type,
-                                            ValueRange inputs, Location loc) {
+Value convertRankedInteger(OpBuilder &builder, Type type, ValueRange inputs,
+                           Location loc) {
   Type eTy = getElementTypeOrSelf(type);
   Type inputETy = getElementTypeOrSelf(inputs[0].getType());
   if (!llvm::isa<FloatType>(getElementTypeOrSelf(type)))

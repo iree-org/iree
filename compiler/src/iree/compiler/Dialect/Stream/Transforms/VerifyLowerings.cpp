@@ -236,6 +236,16 @@ static void markStreamAsyncOpsIllegal(Verifier &verifier) {
       });
 }
 
+static void markStreamCmdOpsIllegal(Verifier &verifier) {
+  verifier.addOpVerifier(
+      [](Operation *op) -> std::optional<Verifier::Legality> {
+        if (op->hasTrait<OpTrait::IREE::Stream::CmdPhaseOp>()) {
+          return Verifier::Legality::ILLEGAL;
+        }
+        return std::nullopt;
+      });
+}
+
 //===----------------------------------------------------------------------===//
 // -iree-stream-verify-input
 //===----------------------------------------------------------------------===//

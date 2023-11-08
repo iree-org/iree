@@ -93,7 +93,6 @@ static iree_host_size_t iree_file_path_canonicalize_unix(
   return new_length;
 }
 
-#if defined(IREE_PLATFORM_WINDOWS)
 static iree_host_size_t iree_file_path_canonicalize_win32(
     char* path, iree_host_size_t path_length) {
   char* p = path;
@@ -118,7 +117,6 @@ static iree_host_size_t iree_file_path_canonicalize_win32(
   path[new_length] = 0;  // NUL
   return new_length;
 }
-#endif  // IREE_PLATFORM_WINDOWS
 
 iree_host_size_t iree_file_path_canonicalize(char* path,
                                              iree_host_size_t path_length) {

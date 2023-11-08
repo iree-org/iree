@@ -233,7 +233,6 @@ static iree_status_t iree_vm_bytecode_module_enumerate_dependencies(
   return iree_ok_status();
 }
 
-#if IREE_VM_BACKTRACE_ENABLE
 // Tries to return the original function name for internal function |ordinal|.
 // Empty if the debug database has been stripped from the flatbuffer.
 static flatbuffers_string_t
@@ -251,7 +250,6 @@ iree_vm_bytecode_module_lookup_internal_function_name(
   if (!source_map_def) return NULL;
   return iree_vm_FunctionSourceMapDef_local_name(source_map_def);
 }
-#endif  // IREE_VM_BACKTRACE_ENABLE
 
 static iree_status_t iree_vm_bytecode_module_lookup_function(
     void* self, iree_vm_function_linkage_t linkage, iree_string_view_t name,
@@ -521,8 +519,7 @@ static iree_status_t iree_vm_bytecode_location_format(
   }
 }
 
-IREE_ATTRIBUTE_UNUSED static iree_status_t
-iree_vm_bytecode_module_source_location_format(
+static iree_status_t iree_vm_bytecode_module_source_location_format(
     void* self, uint64_t data[2], iree_vm_source_location_format_flags_t flags,
     iree_string_builder_t* builder) {
   iree_vm_DebugDatabaseDef_table_t debug_database_def =
@@ -554,7 +551,6 @@ iree_vm_bytecode_module_source_location_format(
   return iree_ok_status();
 }
 
-#if IREE_VM_BACKTRACE_ENABLE
 static iree_status_t iree_vm_bytecode_module_resolve_source_location(
     void* self, iree_vm_function_t function, iree_vm_source_offset_t pc,
     iree_vm_source_location_t* out_source_location) {
@@ -596,7 +592,6 @@ static iree_status_t iree_vm_bytecode_module_resolve_source_location(
   out_source_location->format = iree_vm_bytecode_module_source_location_format;
   return iree_ok_status();
 }
-#endif  // IREE_VM_BACKTRACE_ENABLE
 
 // Lays out the nested tables within a |state| structure.
 // Returns the total size of the structure and all tables with padding applied.

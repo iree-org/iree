@@ -195,6 +195,66 @@ static void printTargetConditionRegion(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<ConditionalTargetRegions>($targets, $objects, $target_regions)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseConditionalTargetRegions(
+    OpAsmParser &parser, ArrayAttr &targetsAttr, ArrayAttr &objectsAttr,
+    SmallVectorImpl<std::unique_ptr<Region>> &targetRegions) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> targetAttrs;
+  SmallVector<Attribute> objectsAttrs;
+  do {
+    IREE::HAL::ExecutableTargetAttr targetAttr;
+    if (failed(parser.parseAttribute(targetAttr)))
+      return failure();
+    targetAttrs.push_back(targetAttr);
+    std::unique_ptr<Region> targetRegion = std::make_unique<Region>();
+    if (succeeded(parser.parseOptionalKeyword("if"))) {
+      if (failed(parseTargetConditionRegion(parser, *targetRegion)))
+        return failure();
+    }
+    targetRegions.emplace_back(std::move(targetRegion));
+    if (failed(parser.parseEqual()))
+      return failure();
+    ArrayAttr targetObjectsAttr;
+    if (failed(parser.parseAttribute(targetObjectsAttr)))
+      return failure();
+    objectsAttrs.push_back(targetObjectsAttr);
+  } while (succeeded(parser.parseOptionalComma()));
+  targetsAttr = builder.getArrayAttr(targetAttrs);
+  objectsAttr = builder.getArrayAttr(objectsAttrs);
+  return success();
+}
+
+static void
+printConditionalTargetRegions(OpAsmPrinter &p, Operation *op,
+                              ArrayAttr targetsAttr, ArrayAttr objectsAttr,
+                              MutableArrayRef<Region> targetRegions) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(targetsAttr.getAsRange<IREE::HAL::ExecutableTargetAttr>(),
+                      objectsAttr.getAsRange<ArrayAttr>(), targetRegions),
+      [&](auto it) {
+        auto [targetAttr, targetObjectsAttr, targetRegion] = it;
+        p.printAttribute(targetAttr);
+        if (!targetRegion.empty()) {
+          p << " if";
+          printTargetConditionRegion(p, op, targetRegion);
+        }
+        p << " = ";
+        p.printAttribute(targetObjectsAttr);
+      },
+      [&]() {
+        p << ",";
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
 

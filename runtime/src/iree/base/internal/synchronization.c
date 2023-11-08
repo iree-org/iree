@@ -65,7 +65,7 @@
 
 // MSVC uses architecture-specific intrinsics.
 
-IREE_ATTRIBUTE_UNUSED static inline void iree_processor_yield(void) {
+static inline void iree_processor_yield(void) {
 #if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
   // https://docs.microsoft.com/en-us/cpp/intrinsics/x86-intrinsics-list
   _mm_pause();
@@ -81,7 +81,7 @@ IREE_ATTRIBUTE_UNUSED static inline void iree_processor_yield(void) {
 
 // Clang/GCC and compatibles use architecture-specific inline assembly.
 
-IREE_ATTRIBUTE_UNUSED static inline void iree_processor_yield(void) {
+static inline void iree_processor_yield(void) {
 #if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
   asm volatile("pause");
 #elif defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64)

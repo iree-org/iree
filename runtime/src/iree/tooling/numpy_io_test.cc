@@ -19,6 +19,11 @@ using iree::testing::status::IsOk;
 using iree::testing::status::StatusIs;
 using ::testing::ElementsAreArray;
 
+std::ostream& operator<<(std::ostream& os, const Status& x) {
+  os << x.ToString();
+  return os;
+}
+
 class NumpyIOTest : public ::testing::Test {
  protected:
   virtual void SetUp() {

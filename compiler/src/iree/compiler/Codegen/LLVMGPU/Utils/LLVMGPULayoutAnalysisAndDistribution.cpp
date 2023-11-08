@@ -35,7 +35,7 @@ static constexpr int VecIdX = 7;
 static constexpr int NumDims = 8;
 } // namespace DimType
 
-[[maybe_unused]] static std::string typeToString(int i) {
+static std::string typeToString(int i) {
   switch (i) {
   case DimType::Batch0:
     return "Batch0";
@@ -754,6 +754,15 @@ static int isSingleLaneIdReduced(std::array<int, 4> &order) {
       count++;
   }
   return count == 1;
+}
+
+static int getVecSizes(std::array<int, 4> &order, const Layout &layout) {
+  int size = 1;
+  for (int i = 0; i < 4; i++) {
+    if (isVectorId(i))
+      size *= layout.shape[i];
+  }
+  return size;
 }
 
 using bodyType = std::function<void(std::array<int, DimType::NumDims> &)>;

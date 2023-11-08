@@ -273,8 +273,7 @@ void iree_flag_string_list_print(iree_string_view_t flag_name, void* storage,
   IREE_FLAG_CALLBACK(iree_flag_##type##_list_parse,                         \
                      iree_flag_##type##_list_print, &FLAG_##name##_storage, \
                      name, description);                                    \
-  IREE_ATTRIBUTE_UNUSED static const iree_flag_##type##_list_t              \
-      FLAG_##name##_list(void) {                                            \
+  static const iree_flag_##type##_list_t FLAG_##name##_list(void) {         \
     const iree_flag_##type##_list_t list = {                                \
         /*.count=*/FLAG_##name##_storage.count,                             \
         /*.values=*/FLAG_##name##_storage.count == 1                        \

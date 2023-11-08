@@ -51,6 +51,14 @@ getPartitionableLoopsImpl(linalg::LinalgOp linalgOp,
   return parallelLoops;
 }
 
+static llvm::SmallVector<utils::IteratorType>
+getIteratorTypesFromAttr(ArrayAttr iteratorTypesAttr) {
+  return llvm::map_to_vector(iteratorTypesAttr, [](Attribute attr) {
+    return utils::symbolizeIteratorType(llvm::cast<StringAttr>(attr).getValue())
+        .value();
+  });
+}
+
 /// External model implementation for all LinalgOps.
 template <typename OpTy>
 struct LinalgOpPartitionableLoops

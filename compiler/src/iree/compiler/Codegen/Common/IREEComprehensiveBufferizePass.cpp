@@ -92,6 +92,8 @@ private:
 };
 } // namespace
 
+static bool isaTensor(Type t) { return llvm::isa<TensorType>(t); };
+
 // Default allocation functions.
 static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
                                             MemRefType allocationType,
