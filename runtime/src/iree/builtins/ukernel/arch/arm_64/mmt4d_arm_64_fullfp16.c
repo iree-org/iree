@@ -7,7 +7,7 @@
 #include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
 #include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64_internal.h"
 
-void iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fp16(
+void iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fullfp16(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
@@ -50,8 +50,8 @@ void iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fp16(
 }
 
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
-    iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fp16,
-    iree_uk_mmt4d_tile_f16f16f16_1x8x1_arm_64_fp16,
-    iree_uk_mmt4d_tile_f16f16f16_2x8x1_arm_64_fp16,
-    iree_uk_mmt4d_tile_f16f16f16_4x8x1_arm_64_fp16,
-    iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64_fp16)
+    iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fullfp16,
+    iree_uk_mmt4d_tile_f16f16f16_1x8x1_arm_64_fullfp16,
+    iree_uk_mmt4d_tile_f16f16f16_2x8x1_arm_64_fullfp16,
+    iree_uk_mmt4d_tile_f16f16f16_4x8x1_arm_64_fullfp16,
+    iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64_fullfp16)

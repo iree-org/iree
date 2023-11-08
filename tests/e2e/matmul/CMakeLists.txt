@@ -335,7 +335,7 @@ iree_generated_trace_runner_test(
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
-    "arm_64:fp16:+fp16"
+    "arm_64:fp16:+fullfp16"
 )
 
 iree_generated_trace_runner_test(
@@ -365,7 +365,7 @@ iree_generated_trace_runner_test(
     "default"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
-    "arm_64:fp16:+fp16"
+    "arm_64:fp16:+fullfp16"
 )
 
 iree_generated_trace_runner_test(
