@@ -32,7 +32,7 @@ enum class PipelinePhase {
   // Runs the transform pipeline up to executable sources (pre translation).
   ExecutableSources,
   // Runs the transform pipeline up to executable configurations (before
-  // strategy selection).
+  // translation strategy selection).
   ExecutableConfigurations,
   // Runs the transform pipeline until just after executable translation.
   ExecutableTargets,
@@ -134,7 +134,8 @@ createPreprocessExecutablesWithPipelinePass(std::string pipeline);
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createPreprocessExecutablesWithToolPass(std::string command);
 
-// Configures hal.executable.variant ops via a nested translation pipeline.
+// Configures hal.executable.variant ops in all hal.executable ops via a nested
+// translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createConfigureExecutablesPass(const TargetBackendRegistry &targetRegistry);
 

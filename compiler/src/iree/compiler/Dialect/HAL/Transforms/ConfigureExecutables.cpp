@@ -1,4 +1,4 @@
-// Copyright 2020 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -71,12 +71,14 @@ public:
     // This pipeline is optional, and the default is no passes, in which case
     // nothing is needed.
     if (!passManager.empty()) {
-      if (failed(runPipeline(passManager, variantOp))) {
-        variantOp.emitError() << "failed to run translation of source "
-                                 "executable to target executable for backend "
-                              << variantOp.getTarget();
-        return signalPassFailure();
-      }
+      return;
+    }
+
+    if (failed(runPipeline(passManager, variantOp))) {
+      variantOp.emitError() << "failed to run configuration of source "
+                               "executable to target executable for backend "
+                            << variantOp.getTarget();
+      return signalPassFailure();
     }
   }
 
@@ -84,7 +86,7 @@ private:
   Option<std::string> target{
       *this, "target",
       llvm::cl::desc(
-          "Target backend name whose executables will be translated by "
+          "Target backend name whose executables will be configured by "
           "this pass.")};
 
   const TargetBackendRegistry &targetRegistry;

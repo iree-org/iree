@@ -86,9 +86,9 @@ static llvm::cl::opt<std::string> clSubstituteExecutableSourcesFrom{
 static llvm::cl::list<std::string> clSubstituteExecutableConfiguration{
     "iree-hal-substitute-executable-configuration",
     llvm::cl::desc(
-        "A `executable_name=object_file.xxx` pair specifying a "
-        "hal.executable symbol name that will be substituted with the source "
-        "object file at the given path. Source object paths are relative to "
+        "A `executable_name=object_file.xxx` pair specifying a hal.executable "
+        "symbol name that will be substituted with the configured executable "
+        "file at the given path. Configured execuable paths are relative to "
         "those specified on `--iree-hal-executable-object-search-path=`. If a "
         "`.mlir` or `.mlirbc` file is specified the entire executable will be "
         "replaced with an equivalently named hal.executable in the referenced "
@@ -256,10 +256,11 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
 
   if (compileFrom < PipelinePhase::ExecutableConfigurations) {
-    // Select a strategy for each hal.executable.variant and generate the IR to
-    // condition on support for the variant. In the future, this or neighboring
-    // passes can expand/contract variants based on the selected strategies and
-    // the features each strategy are known to require or not require.
+    // Select a translation strategy for each hal.executable.variant and
+    // generate the IR to condition on support for the variant. In the future,
+    // this or neighboring passes can expand/contract variants based on the
+    // selected translation strategies and the features each translation
+    // strategy are known to require or not require.
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(
         createConfigureExecutablesPass(targetRegistry));
 

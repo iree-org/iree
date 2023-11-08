@@ -158,12 +158,12 @@ public:
   // for translation. The pass manager will be nested on `hal.executable` such
   // that the pipeline will only run on executable contents.
   //
-  // The primary purpose of this pipeline is to do the minimum necessary
-  // preprocessing on variants necessary for translation, as well as set any
-  // strategy specific information needed for translation. This is to inform
-  // later passes on how to expand/contract variants for multiple targets that
-  // might be known to translate to the same thing. As such, this pipeline is
-  // optional.
+  // The primary purpose of this pipeline is to preprocess then annotate all
+  // `hal.executable.variant` ops with the information necessary for
+  // translation. This can include specifying the set of required and/or
+  // irrelevant target features, allowing for an additional deduplication step
+  // when the only difference between two variants is a set of irrelevant
+  // features. As a result, this pipeline is optional.
   //
   // The expected input to this pipeline might look like:
   //   hal.executable @some_executable {
@@ -175,7 +175,26 @@ public:
   //       hal.executable.export @main interface(@main_io) {
   //         ordinal = 0 : index
   //       }
-  //       module { ... }
+  //       module {
+  //         func.func @main ...
+  //       }
+  //     }
+  //   }
+  //
+  // As output, structurally the variant should be very similar:
+  //   hal.executable @some_executable {
+  //     hal.interface @main_io {
+  //       hal.interface.binding @arg0, set=0, binding=0, ...
+  //       hal.interface.binding @arg1, set=0, binding=1, ...
+  //     }
+  //     hal.executable.variant @target, target="target-backend" {
+  //       hal.executable.export @main interface(@main_io)
+  //         {attrs = #target_specific_translation_attr<...>} {
+  //         ordinal = 0 : index
+  //       }
+  //       module {
+  //         func.func @main ...
+  //       }
   //     }
   //   }
   virtual void

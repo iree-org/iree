@@ -71,7 +71,8 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       "iree-hal-dump-executable-configurations-to",
       executableConfigurationsPath,
       llvm::cl::desc("Path to write individual hal.executable input source "
-                     "listings into, after configuration (- for stdout)."),
+                     "listings into, after translation strategy selection and "
+                     "before starting translation (- for stdout)."),
       llvm::cl::cat(halTargetOptionsCategory));
 
   binder.opt<std::string>(

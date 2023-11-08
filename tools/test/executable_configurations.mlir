@@ -6,7 +6,7 @@
 // RUN:     --mlir-print-ir-before=iree-hal-serialize-executables 2>&1 | \
 // RUN: FileCheck %s
 
-// This test relies on us piping stdout and that there's only a single
+// This test relies on piping stdout and that there is only a single
 // executable (otherwise we'd need to look at files and that's harder
 // cross-platform). Real automation of this requires xargs: compile and dump a
 // directory of .mlir sources by specifying a path to the dump flag instead
