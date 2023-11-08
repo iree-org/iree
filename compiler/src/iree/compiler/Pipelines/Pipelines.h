@@ -74,7 +74,7 @@ inline static void enumerateIREEVMPipelinePhases(
   callback(IREEVMPipelinePhase::ExecutableConfigurations,
            "executable-configurations",
            "Compiles up to just before `hal.executable`s are translated, "
-           "including selection of strategies for codegen.");
+           "including selection of translation strategies for codegen.");
   callback(IREEVMPipelinePhase::ExecutableTargets, "executable-targets",
            "Compiles up to translated `hal.executable`s, including codegen.");
   callback(IREEVMPipelinePhase::HAL, "hal",
