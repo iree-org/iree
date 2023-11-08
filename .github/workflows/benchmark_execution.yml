@@ -185,8 +185,8 @@ jobs:
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
           export IREE_E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR/gs:\/\//https://storage.googleapis.com/}"
-          # TODO(TODO): Annotate the c2-standard-60 resutls as experimental and
-          # avoid uploading to the dashboard (excluded from the pattern).
+          # TODO(#14661): Annotate the c2-standard-60 resutls as experimental
+          # and avoid uploading to the dashboard (excluded from the pattern).
           if [[ "${IREE_TARGET_DEVICE_NAME}" == "c2-standard-60" ]]; then
             export IREE_BENCHMARK_RESULTS="${IREE_BENCHMARK_RESULTS/benchmark-results-/experimental-benchmark-results-}"
           fi
