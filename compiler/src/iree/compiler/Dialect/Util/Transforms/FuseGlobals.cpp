@@ -79,8 +79,8 @@ struct GlobalTable {
   }
 };
 
-static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     llvm::BitVector &bits) {
+[[maybe_unused]] static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                                      llvm::BitVector &bits) {
   for (unsigned i = 0; i < bits.size(); ++i) {
     os << (bits.test(i) ? "1" : "0");
   }

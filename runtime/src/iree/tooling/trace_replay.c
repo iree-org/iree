@@ -370,23 +370,10 @@ static uint32_t iree_tree_replay_pseudorandom_uint32(uint32_t* state) {
   return *state;
 }
 
-// Returns a random uint8_t in the range of [0, UCHAR_MAX].
-static uint8_t iree_trace_replay_pseudorandom_uint8(uint32_t* state) {
-  // return the second-least-signicant out of the 4 bytes of state. it avoids
-  // some mild issues with the least-significant and most-significant bytes.
-  return iree_tree_replay_pseudorandom_uint32(state) >> 8;
-}
-
 // Returns a random uint32_t in the range [0, range).
 static inline uint32_t iree_trace_replay_pseudorandom_range(uint32_t* state,
                                                             uint32_t range) {
   return iree_tree_replay_pseudorandom_uint32(state) % range;
-}
-
-// Returns a random double in the range of [0, 1.0).
-static double iree_trace_replay_pseudorandom_double(uint32_t* state) {
-  const double inv_modulus = 1.0 / IREE_PRNG_MODULUS;
-  return iree_tree_replay_pseudorandom_uint32(state) * inv_modulus;
 }
 
 // Get minimum and maximum for integer-valued uniform distribution.

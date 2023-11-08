@@ -527,8 +527,6 @@ static void expandCondBranchOp(mlir::cf::CondBranchOp op,
   op.erase();
 }
 
-static ValueRange asValueRange(ArrayRef<Value> values) { return values; }
-
 static void expandSwitchOp(mlir::cf::SwitchOp op,
                            IRMapping &resourceTimepointMap) {
   if (!usesResources(op))

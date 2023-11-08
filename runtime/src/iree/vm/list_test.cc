@@ -115,11 +115,6 @@ static std::vector<iree_vm_value_t> GetValuesList(iree_vm_list_t* list) {
   return result;
 }
 
-static bool operator==(const iree_vm_ref_t& lhs,
-                       const iree_vm_ref_t& rhs) noexcept {
-  return lhs.type == rhs.type && lhs.ptr == rhs.ptr;
-}
-
 namespace {
 
 using ::iree::Status;

@@ -81,25 +81,6 @@ verifyDispatchWorkload(Operation *op, IREE::Stream::ExecutableExportOp exportOp,
 }
 
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
-// of the dynamic dimensions in |values|.
-static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
-                                         ValueRange dynamicDims) {
-  unsigned requiredCount = 0;
-  for (auto value : values) {
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(value.getType())) {
-      requiredCount += shapedType.getNumDynamicDims();
-    }
-  }
-  if (dynamicDims.size() != requiredCount) {
-    return op->emitOpError()
-           << "value set has " << requiredCount
-           << " dynamic dimensions but only " << dynamicDims.size()
-           << " dimension values are attached";
-  }
-  return success();
-}
-
-// Verifies that |dynamicDims| contains the appropriate number of dims for all
 // the dynamic dimensions in |type|.
 static LogicalResult verifyOpDynamicDims(Operation *op, TypeRange types,
                                          ValueRange dynamicDims) {
