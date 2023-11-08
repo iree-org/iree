@@ -49,7 +49,10 @@ enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
   }
 
   return {
-      TileMxNxK{8, 8, 4} // Some vaguely reasonable tile shape
+      TileMxNxK{8, 8, 4}, // Some vaguely reasonable tile shape.
+      TileMxNxK{4, 8, 4}, // Truncation of the above.
+      TileMxNxK{2, 8, 4}, // Truncation of the above.
+      TileMxNxK{1, 8, 4}, // Truncation of the above.
   };
 }
 
