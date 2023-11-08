@@ -42,12 +42,10 @@ namespace GlobalOptimization {
 // Utility functions
 //===---------------------------------------------------------------------===//
 
-namespace {
-
 /// Pads `value` enough for any actual tile sizes that could result from
 /// materialization of `encodingAttr`.
-Value pad(OpBuilder &builder, Location loc, Value source,
-          IREE::LinalgExt::EncodingAttr encodingAttr) {
+static Value pad(OpBuilder &builder, Location loc, Value source,
+                 IREE::LinalgExt::EncodingAttr encodingAttr) {
   RankedTensorType sourceType = source.getType().cast<RankedTensorType>();
   Type elemType = sourceType.getElementType();
   size_t rank = sourceType.getRank();
@@ -93,7 +91,7 @@ struct MatmulNarrowSizes {
 
 // Returns the minimum of static sizes of the M-dimension in the types of the
 // LHS and/or the Output operand of a matmul, whichever is static.
-MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType) {
+static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType) {
   int64_t M = outType.getDimSize(0);
   int64_t N = outType.getDimSize(1);
   MatmulNarrowSizes narrow;
@@ -104,17 +102,17 @@ MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType) {
   // opportunities to select optimized narrow tiles for narrow matmuls.
   // If it is larger, everything will work fine, but the IR will be a bit more
   // verbose as more narrow_matmul_{M,N} optional parameters will be specified.
-  const int64_t narrowThreshold = 16;
-  if (M != ShapedType::kDynamic && M < narrowThreshold) {
+  const int64_t kNarrowThreshold = 16;
+  if (!ShapedType::isDynamic(M) && M < kNarrowThreshold) {
     narrow.M = M;
   }
-  if (N != ShapedType::kDynamic && N < narrowThreshold) {
+  if (!ShapedType::isDynamic(N) && N < kNarrowThreshold) {
     narrow.N = N;
   }
   return narrow;
 }
 
-IREE::LinalgExt::EncodingAttr
+static IREE::LinalgExt::EncodingAttr
 makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
              IREE::LinalgExt::EncodingRole role, TypeRange operandTypes,
              Type originalType, MatmulNarrowSizes narrow) {
@@ -137,10 +135,11 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
       getAttr(narrow.M), getAttr(narrow.N));
 }
 
-Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                        IREE::LinalgExt::EncodingUser user,
-                        IREE::LinalgExt::EncodingRole role,
-                        TypeRange operandTypes, MatmulNarrowSizes narrow) {
+static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
+                               IREE::LinalgExt::EncodingUser user,
+                               IREE::LinalgExt::EncodingRole role,
+                               TypeRange operandTypes,
+                               MatmulNarrowSizes narrow) {
   // No need to specify original_type in the encoding passed to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
@@ -161,9 +160,9 @@ Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   return setEncoding(builder, loc, padded, encodingForSetEncoding);
 }
 
-Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
-                                   Value source,
-                                   SmallVector<OpFoldResult> sizes) {
+static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
+                                          Value source,
+                                          SmallVector<OpFoldResult> sizes) {
   auto sourceType = source.getType().cast<RankedTensorType>();
   auto unsetEncodingReturnType =
       RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
@@ -177,6 +176,8 @@ Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
   return builder.create<tensor::ExtractSliceOp>(loc, unsetEncoding, offsets,
                                                 sizes, strides);
 }
+
+namespace {
 
 /// Rewrites the matmul op to work on tensors with encoding. Optionally
 /// also pads the operands.

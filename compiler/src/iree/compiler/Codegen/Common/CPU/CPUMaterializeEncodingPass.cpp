@@ -32,12 +32,10 @@ namespace iree_compiler {
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
 
-namespace {
-
 // Enumerate tile sizes to choose from when no specific architecture is
 // targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
 // narrow-N cases are handled by transposition in chooseMatmulTile.
-SmallVector<TileMxNxK>
+static SmallVector<TileMxNxK>
 enumerateMatmulTilesGeneric(EncodingUser user, ExecutableTargetAttr target) {
   if (isVMVXBackend(target) && hasMicrokernels(target)) {
     // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
@@ -61,9 +59,9 @@ enumerateMatmulTilesGeneric(EncodingUser user, ExecutableTargetAttr target) {
 // Enumerate tile sizes to choose from on arm64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
-SmallVector<TileMxNxK> enumerateMatmulTileArm64(EncodingUser user,
-                                                TypeRange elementTypes,
-                                                ExecutableTargetAttr target) {
+static SmallVector<TileMxNxK>
+enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
+                         ExecutableTargetAttr target) {
   if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
     return {};
   }
@@ -136,9 +134,9 @@ SmallVector<TileMxNxK> enumerateMatmulTileArm64(EncodingUser user,
 // Enumerate tile sizes to choose from on x86-64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
-SmallVector<TileMxNxK> enumerateMatmulTileX86_64(EncodingUser user,
-                                                 TypeRange elementTypes,
-                                                 ExecutableTargetAttr target) {
+static SmallVector<TileMxNxK>
+enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
+                          ExecutableTargetAttr target) {
   if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
     return {};
   }
@@ -239,8 +237,9 @@ SmallVector<TileMxNxK> enumerateMatmulTileX86_64(EncodingUser user,
   return enumerateMatmulTilesGeneric(user, target);
 }
 
-TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
-                           int64_t matmulNarrowM, int64_t matmulNarrowN) {
+static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
+                                  int64_t matmulNarrowM,
+                                  int64_t matmulNarrowN) {
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
   if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
@@ -407,7 +406,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   return IREE::LinalgExt::getEncodingInfoForMatmul(user, role, chosenTileMxNxK);
 }
 
-MaterializeEncodingFn
+static MaterializeEncodingFn
 getMaterializeEncodingFn(ExecutableTargetAttr targetAttr) {
   return
       [targetAttr](
@@ -425,7 +424,7 @@ getMaterializeEncodingFn(ExecutableTargetAttr targetAttr) {
 // executable variant. There, the padding amounts only control the size of
 // allocated buffers, so it's OK to over-estimate (only wasting some memory)
 // but not under-estimate (would cause buffer overruns) padding amounts.
-MaterializeEncodingFn
+static MaterializeEncodingFn
 getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
   return
       [targetAttrs](
@@ -464,8 +463,6 @@ getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
         return result;
       };
 }
-
-} // namespace
 
 void CPUMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
