@@ -4613,7 +4613,9 @@ only the non-padded part of the output.</p>
   EncodingUserAttr,   # user
   EncodingRoleAttr,   # role
   ArrayAttr,   # element_types
-  TypeAttr   # original_type
+  TypeAttr,   # original_type
+  IntegerAttr,   # matmul_narrow_M
+  IntegerAttr   # matmul_narrow_N
 &gt;
 </code></pre></div>
 <p>This attribute describes the change in the layout for
@@ -4653,6 +4655,16 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">original_type</td>
 <td style="text-align: center;"><code>TypeAttr</code></td>
 <td>type of the original tensor type before padding</td>
+</tr>
+<tr>
+<td style="text-align: center;">matmul_narrow_M</td>
+<td style="text-align: center;"><code>IntegerAttr</code></td>
+<td>optional M narrow dimension size (only for MATMUL and BATCH_MATMUL users)</td>
+</tr>
+<tr>
+<td style="text-align: center;">matmul_narrow_N</td>
+<td style="text-align: center;"><code>IntegerAttr</code></td>
+<td>optional N narrow dimension size (only for MATMUL and BATCH_MATMUL users)</td>
 </tr>
 </tbody>
 </table>
