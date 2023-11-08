@@ -18,8 +18,8 @@ GCP_C2_STANDARD_16 = common_definitions.DeviceSpec.build(
     tags=["cpu"],
 )
 
-GCP_C2_STANDARD_601T = common_definitions.DeviceSpec.build(
-    id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_601T,
+GCP_C2_STANDARD_60 = common_definitions.DeviceSpec.build(
+    id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_60,
     device_name="c2-standard-60",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
     architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
