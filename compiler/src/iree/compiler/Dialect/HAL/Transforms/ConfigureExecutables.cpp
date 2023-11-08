@@ -70,7 +70,7 @@ public:
 
     // This pipeline is optional, and the default is no passes, in which case
     // nothing is needed.
-    if (!passManager.empty()) {
+    if (passManager.empty()) {
       return;
     }
 
