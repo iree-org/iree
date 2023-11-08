@@ -23,7 +23,7 @@ namespace HAL {
 //
 // For details on the linking process and file formats, see:
 // * https://lld.llvm.org/WebAssembly.html
-// * https://github.com/WebAssembly/tool-conventions/blob/master/Linking.md
+// * https://github.com/WebAssembly/tool-conventions/blob/main/Linking.md
 //
 // For more background on WebAssembly, see:
 // * https://webassembly.org/
