@@ -16,32 +16,26 @@ namespace iree_compiler {
 
 namespace {
 
-// Returns true if:
-//    1. `genericOp` is element-wise with all identity indexing maps
-//    2. `genericOp` has only one input and one output with the same shape
+/// Returns true if:
+///    1. `genericOp` is element-wise with all identity indexing maps
+///    2. `genericOp` has only one input and one output with the same shape
 static bool isElementWiseIdentity(linalg::GenericOp genericOp) {
-  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1 ||
-      !linalg::isElementwise(genericOp) ||
-      !llvm::all_of(genericOp.getIndexingMapsArray(),
-                    [](AffineMap map) { return map.isIdentity(); })) {
-    return false;
-  }
-  auto inputType = genericOp->getOperandTypes()[0].dyn_cast<RankedTensorType>();
-  auto resultType = genericOp->getResultTypes()[0].dyn_cast<RankedTensorType>();
-  if (inputType.getShape() != resultType.getShape()) {
-    return false;
-  }
-  return true;
+  return genericOp.getNumDpsInputs() == 1 && genericOp.getNumDpsInits() == 1 &&
+         linalg::isElementwise(genericOp) &&
+         llvm::all_of(genericOp.getIndexingMapsArray(),
+                      [](AffineMap map) { return map.isIdentity(); });
 }
 
-// Drops the outermost unit dimension of the defining op of `input`, as
-// long as it is a linalg::GenericOp that passes `isElementWiseIdentity`.
-// unit dims are dropped using tensor::InsertSliceOp/tensor::ExtractSliceOp
-// in order to fold with other ops introduced by ConvertBatchMmt4DtoMmt4DPattern
+/// Drops the outermost unit dimension of the defining op of `input`, as
+/// long as it is a linalg::GenericOp that passes `isElementWiseIdentity`.
+/// unit dims are dropped using tensor::InsertSliceOp/tensor::ExtractSliceOp
+/// in order to fold with other ops introduced by
+/// ConvertBatchMmt4DtoMmt4DPattern
 static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
   auto producer = input.getDefiningOp<linalg::GenericOp>();
   if (!producer) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        input.getLoc(), "input has no defining linalg.generic op");
   }
   linalg::ControlDropUnitDims options;
   options.rankReductionStrategy =
@@ -55,7 +49,12 @@ static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
     dims.push_back(0);
     return dims;
   };
-  return linalg::dropUnitDims(rewriter, producer, options);
+  if (failed(linalg::dropUnitDims(rewriter, producer, options))) {
+    return rewriter.notifyMatchFailure(
+        producer, "op is not element-wise with all identity maps, or cannot "
+                  "drop first unit dimension");
+  }
+  return success();
 }
 
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
