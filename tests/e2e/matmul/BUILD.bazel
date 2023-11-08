@@ -123,21 +123,21 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
                                    ] if lhs_rhs_type == "f32" and acc_type == "f32" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                       "arm_64:fp16:+fullfp16",
+                                       "arm_64:fullfp16:+fullfp16",
                                    ] if lhs_rhs_type == "f16" and acc_type == "f16" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                       "arm_64:fp16:+fp16fml",
+                                       "arm_64:fp16fml:+fp16fml",
                                    ] if lhs_rhs_type == "f16" and acc_type == "f32" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
                                        "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
-                                       "arm_64:fp16:+bf16",
+                                       "arm_64:bf16:+bf16",
                                    ] if lhs_rhs_type == "bf16" and acc_type == "bf16" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
                                        "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
-                                       "arm_64:fp16:+bf16",
+                                       "arm_64:bf16:+bf16",
                                    ] if lhs_rhs_type == "bf16" and acc_type == "f32" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for (lhs_rhs_type, acc_type) in [
