@@ -89,7 +89,7 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
-      - name: "Building IREE"
+      - name: "Building and testing with ThreadSanitizer"
         env:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
         run: |
@@ -98,15 +98,7 @@ jobs:
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353" \
             gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
-            ./build_tools/cmake/build_all.sh \
-            "${BUILD_DIR}"
-      - name: "Testing IREE"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env IREE_CUDA_DISABLE=1 \
-            --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
-            ./build_tools/cmake/ctest_all.sh \
+            ./build_tools/cmake/build_and_test_tsan.sh \
             "${BUILD_DIR}"
 
   build_test_all_windows:

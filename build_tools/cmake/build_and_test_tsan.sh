@@ -48,6 +48,10 @@ CMAKE_ARGS=(
   # Don't build samples: they assume embedded-ELF so don't work with
   # IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON.
   "-DIREE_BUILD_SAMPLES=OFF"
+
+  # Building the compiler with TSan hangs on arm64 builders.
+  # Anyway, the issue we're looking to reproduce in #15488 is in the runtime.
+  "-DIREE_BUILD_COMPILER=OFF"
 )
 
 "${CMAKE_BIN}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]?}"
@@ -56,9 +60,10 @@ echo "Building all"
 echo "------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
 
-echo "Building test deps"
-echo "------------------"
-"$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
+# We're disabled the compiler above.
+# echo "Building test deps"
+# echo "------------------"
+# "$CMAKE_BIN" --build "${BUILD_DIR}" --target iree-test-deps -- -k 0
 
 if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats
