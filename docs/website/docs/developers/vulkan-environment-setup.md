@@ -207,12 +207,12 @@ display at the server side, for example:
 export DISPLAY=:0
 ```
 
-[VulkanArchOverview]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#overview
-[VulkanArchPicture]: https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/master/docs/images/high_level_loader.png
-[VulkanICD]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#installable-client-drivers
-[VulkanLayer]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#layers
-[VulkanLoader]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#the-loader
-[VulkanLoaderEnvVars]: https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#table-of-debug-environment-variables
+[VulkanArchOverview]: https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#overview
+[VulkanArchPicture]: https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/main/docs/images/high_level_loader.png
+[VulkanICD]: https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#installable-client-drivers
+[VulkanLayer]: https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#layers
+[VulkanLoader]: https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#the-loader
+[VulkanLoaderEnvVars]: https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#table-of-debug-environment-variables
 [VulkanLoaderSource]: https://github.com/KhronosGroup/Vulkan-Loader
 [VulkanSDK]: https://www.lunarg.com/vulkan-sdk/
 [VulkanValidationLayersSource]: https://github.com/KhronosGroup/Vulkan-ValidationLayers

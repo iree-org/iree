@@ -170,7 +170,7 @@ if the current build type is Debug and the compiler supports it.
 ## Cross-compilation
 
 When cross compiling (using a toolchain file like
-[`android.toolchain.cmake`](https://android.googlesource.com/platform/ndk/+/master/build/cmake/android.toolchain.cmake)),
+[`android.toolchain.cmake`](https://android.googlesource.com/platform/ndk/+/main/build/cmake/android.toolchain.cmake)),
 first build and install IREE's tools for your host configuration, then use the
 `IREE_HOST_BIN_DIR` CMake option to point the cross compiled build at the
 host tools.

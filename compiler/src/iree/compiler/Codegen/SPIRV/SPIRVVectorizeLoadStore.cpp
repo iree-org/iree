@@ -100,6 +100,9 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
     auto transferOp = dyn_cast<VectorTransferOpInterface>(op);
     if (!transferOp)
       return 0;
+    // Masked transfers must be scalarized.
+    if (transferOp.getMask())
+      return 0;
     std::optional<unsigned> transferSize =
         getBitWidth(transferOp.getVectorType());
     if (!transferSize)
@@ -739,6 +742,30 @@ public:
   }
 };
 
+// Helper function to optionally predicate a scalar load/store if there is a
+// mask present.
+static Value predicateMaybeMaskedScalarTransfer(
+    OpBuilder &b, Location loc, Value maybeMaskBit,
+    function_ref<Value(OpBuilder &, Location)> thenConditionBuilder,
+    function_ref<void(OpBuilder &, Location)> elseConditionBuilder = nullptr) {
+  if (maybeMaskBit) {
+    auto thenBuilder = [&](OpBuilder &b, Location loc) {
+      Value thenRes = thenConditionBuilder(b, loc);
+      if (thenRes) {
+        b.create<scf::YieldOp>(loc, thenRes);
+      } else {
+        b.create<scf::YieldOp>(loc);
+      }
+    };
+    auto ifOp = b.create<scf::IfOp>(loc, maybeMaskBit,
+                                    /*thenBuilder=*/thenBuilder,
+                                    /*elseBuilder=*/elseConditionBuilder);
+
+    return !ifOp.getNumResults() ? Value() : ifOp->getResult(0);
+  }
+  return thenConditionBuilder(b, loc);
+}
+
 /// Scalarizes remaining vector transfer that couldn't be converted to
 /// vevtor load operations.
 
@@ -756,9 +783,26 @@ struct ScalarizeVectorTransferRead final
       return failure();
 
     Location loc = readOp.getLoc();
+    Value maybeMask = readOp.getMask();
     if (vectorType.getRank() == 0) {
-      Value scalar = rewriter.create<memref::LoadOp>(loc, readOp.getSource(),
-                                                     readOp.getIndices());
+      Value maybeMaskBit;
+      if (maybeMask) {
+        Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask, zero);
+      }
+
+      auto thenCond = [&](OpBuilder &b, Location loc) {
+        return b
+            .create<memref::LoadOp>(loc, readOp.getSource(),
+                                    readOp.getIndices())
+            .getResult();
+      };
+      auto elseCond = [&](OpBuilder &b, Location loc) {
+        b.create<scf::YieldOp>(loc, readOp.getPadding());
+      };
+
+      Value scalar = predicateMaybeMaskedScalarTransfer(
+          rewriter, loc, maybeMaskBit, thenCond, elseCond);
       rewriter.replaceOpWithNewOp<vector::SplatOp>(readOp, vectorType, scalar);
       return success();
     }
@@ -778,10 +822,29 @@ struct ScalarizeVectorTransferRead final
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      indices[dimPos] = rewriter.create<affine::AffineApplyOp>(
-          loc, addMap, ValueRange{oldIndex, iVal});
-      Value scalar =
-          rewriter.create<memref::LoadOp>(loc, readOp.getSource(), indices);
+
+      // Extract the mask bit for this value if present.
+      Value maybeMaskBit;
+      if (maybeMask) {
+        // The result vector is 1-D and we have a projected permutation, meaning
+        // we can just extract the mask bit using the same index as the loaded
+        // vector.
+        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask, iVal);
+      }
+
+      auto thenCond = [&](OpBuilder &b, Location loc) {
+        indices[dimPos] = b.create<affine::AffineApplyOp>(
+            loc, addMap, ValueRange{oldIndex, iVal});
+        Value scalar =
+            b.create<memref::LoadOp>(loc, readOp.getSource(), indices);
+        return scalar;
+      };
+      auto elseCond = [&](OpBuilder &b, Location loc) {
+        b.create<scf::YieldOp>(loc, readOp.getPadding());
+      };
+
+      Value scalar = predicateMaybeMaskedScalarTransfer(
+          rewriter, loc, maybeMaskBit, thenCond, elseCond);
       newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
     }
     rewriter.replaceOp(readOp, newVector);
@@ -844,11 +907,25 @@ struct ScalarizeVectorTransferWrite final
       return failure();
 
     Location loc = writeOp.getLoc();
+    Value maybeMask = writeOp.getMask();
     if (vectorType.getRank() == 0) {
-      Value scalar =
-          rewriter.create<vector::ExtractElementOp>(loc, writeOp.getVector());
-      rewriter.create<memref::StoreOp>(loc, scalar, writeOp.getSource(),
-                                       writeOp.getIndices());
+
+      Value maybeMaskBit;
+      if (maybeMask) {
+        Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask, zero);
+      }
+
+      auto thenCond = [&](OpBuilder &b, Location loc) {
+        Value scalar =
+            b.create<vector::ExtractElementOp>(loc, writeOp.getVector());
+        b.create<memref::StoreOp>(loc, scalar, writeOp.getSource(),
+                                  writeOp.getIndices());
+        return Value();
+      };
+
+      (void)predicateMaybeMaskedScalarTransfer(rewriter, loc, maybeMaskBit,
+                                               thenCond);
       rewriter.eraseOp(writeOp);
       return success();
     }
@@ -858,19 +935,31 @@ struct ScalarizeVectorTransferWrite final
     bindSymbols(context, sym0, sym1);
     auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
 
-    // The result vector is 1-D and we have a projected permutation.
+    // The written vector is 1-D and we have a projected permutation.
     unsigned dimPos = map.getDimPosition(0);
 
     auto indices = llvm::to_vector(writeOp.getIndices());
     Value oldIndex = indices[dimPos];
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      indices[dimPos] = rewriter.create<affine::AffineApplyOp>(
-          loc, addMap, ValueRange{oldIndex, iVal});
-      Value scalar =
-          rewriter.create<vector::ExtractOp>(loc, writeOp.getVector(), i);
-      rewriter.create<memref::StoreOp>(loc, scalar, writeOp.getSource(),
-                                       indices);
+
+      Value maybeMaskBit;
+      if (maybeMask) {
+        // The result vector is 1-D and we have a projected permutation, meaning
+        // we can just extract the mask bit using the same index as the written
+        // vector.
+        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask, iVal);
+      }
+
+      auto thenCond = [&](OpBuilder &b, Location loc) {
+        indices[dimPos] = b.create<affine::AffineApplyOp>(
+            loc, addMap, ValueRange{oldIndex, iVal});
+        Value scalar = b.create<vector::ExtractOp>(loc, writeOp.getVector(), i);
+        b.create<memref::StoreOp>(loc, scalar, writeOp.getSource(), indices);
+        return Value();
+      };
+      (void)predicateMaybeMaskedScalarTransfer(rewriter, loc, maybeMaskBit,
+                                               thenCond);
     }
     rewriter.eraseOp(writeOp);
     return success();

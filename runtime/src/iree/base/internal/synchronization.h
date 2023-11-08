@@ -339,7 +339,7 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
 // http://www.1024cores.net/home/lock-free-algorithms/eventcounts
 // https://software.intel.com/en-us/forums/intel-threading-building-blocks/topic/299245
 // https://github.com/r10a/Event-Counts
-// https://github.com/facebook/folly/blob/master/folly/experimental/EventCount.h
+// https://github.com/facebook/folly/blob/main/folly/experimental/EventCount.h
 // https://github.com/concurrencykit/ck/blob/master/include/ck_ec.h
 typedef struct iree_notification_t {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE

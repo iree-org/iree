@@ -343,7 +343,7 @@ class BuildFileFunctions(object):
                 # bazel's glob has some specific restrictions about crossing package
                 # boundaries. We have no uses of recursive globs. Rather than try to
                 # emulate them or silently give different behavior, just error out.
-                # See https://docs.bazel.build/versions/master/be/functions.html#glob
+                # See https://bazel.build/reference/be/functions.html#glob
                 raise NotImplementedError("Recursive globs not supported")
             # Bazel `*.mlir` glob -> CMake Variable `_GLOB_X_MLIR`
             var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()

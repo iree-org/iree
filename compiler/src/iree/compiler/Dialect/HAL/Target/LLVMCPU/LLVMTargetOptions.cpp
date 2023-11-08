@@ -14,7 +14,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/TargetParser/AArch64TargetParser.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/TargetParser/Triple.h"
@@ -46,7 +45,7 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
              "be either also `host` or the default value\n";
       return false;
     }
-    outCpu = llvm::sys::getHostCPUName().str();
+    outCpu = triple.isX86() ? llvm::sys::getHostCPUName().str() : "";
     llvm::SubtargetFeatures features;
     llvm::StringMap<bool> hostFeatures;
     if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
@@ -70,7 +69,8 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
 
   // If CPU is non-host and non-generic then we need to populate the
   // corresponding features.
-  if (inCpu == "host" || inCpu == "generic" || inCpu.starts_with("generic-")) {
+  if (outCpu.empty() || inCpu == "host" || inCpu == "generic" ||
+      inCpu.starts_with("generic-")) {
     return true;
   }
   if (triple.isX86()) {
@@ -81,24 +81,6 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
       targetCpuFeatures.AddFeature(feature);
     }
     outCpuFeatures = targetCpuFeatures.getString();
-  } else if (triple.isAArch64()) {
-    std::vector<std::string> UpdatedFeaturesVec;
-    std::optional<llvm::AArch64::CpuInfo> cpuInfo =
-        llvm::AArch64::parseCpu(outCpu);
-    if (!cpuInfo) {
-      llvm::errs() << "error: Failed to resolve AArch64 CPU features for the "
-                      "specified CPU.\n";
-      return false;
-    }
-    auto cpuExts = cpuInfo->getImpliedExtensions();
-    std::vector<StringRef> cpuExtFeatures;
-    llvm::AArch64::getExtensionFeatures(cpuExts, cpuExtFeatures);
-    for (auto feature : cpuExtFeatures) {
-      if (!outCpuFeatures.empty()) {
-        outCpuFeatures.append(",");
-      }
-      outCpuFeatures.append(feature);
-    }
   } else {
     llvm::errs()
         << "error: Resolution of target CPU to target CPU features is not "
@@ -158,7 +140,9 @@ std::optional<LLVMTarget> LLVMTarget::create(std::string_view triple,
   }
   if (!resolveCPUAndCPUFeatures(cpu, cpuFeatures, llvm::Triple(triple),
                                 target.cpu, target.cpuFeatures)) {
-    return {};
+    // Something bad happened, and our target might not be what the user expects
+    // but we need to continue to avoid breaking existing users. Hopefully
+    // resolveCPUAndCPUFeatures logged a helpful error already.
   }
   return target;
 }

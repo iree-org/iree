@@ -185,7 +185,7 @@ adb shell simpleperf list
 
 There is no `simpleperf annotate`. The `simpleperf` documentation lists a couple
 of
-[ways](https://android.googlesource.com/platform/system/extras/+/master/simpleperf/doc/README.md#show-annotated-source-code-and-disassembly)
+[ways](https://android.googlesource.com/platform/system/extras/+/main/simpleperf/doc/README.md#show-annotated-source-code-and-disassembly)
 of achieving the same thing.
 
 However:

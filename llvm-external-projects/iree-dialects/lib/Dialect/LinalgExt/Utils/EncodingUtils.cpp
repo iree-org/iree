@@ -19,9 +19,9 @@ bool isBatchMatmulEncodingUser(EncodingUser user) {
   return user == EncodingUser::BATCH_MATMUL;
 }
 
-MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
-                            MatmulTileParams tileParams) {
+MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingUser user,
+                                                 EncodingRole role,
+                                                 TileMxNxK tileMxNxK) {
   // Start dim of the MxK (LHS), KxN (RHS), or MxN (RESULT) 2D matrix.
   int64_t matmulDimBase = isBatchMatmulEncodingUser(user) ? 1 : 0;
 
@@ -29,11 +29,11 @@ chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
   encodingInfo.innerDimsPos = {matmulDimBase, matmulDimBase + 1};
   switch (role) {
   case (EncodingRole::LHS): {
-    encodingInfo.innerTileSizes = {tileParams.M, tileParams.K};
+    encodingInfo.innerTileSizes = {tileMxNxK.M, tileMxNxK.K};
     break;
   }
   case (EncodingRole::RHS): {
-    encodingInfo.innerTileSizes = {tileParams.N, tileParams.K};
+    encodingInfo.innerTileSizes = {tileMxNxK.N, tileMxNxK.K};
     encodingInfo.innerDimsPos = {matmulDimBase + 1, matmulDimBase};
     encodingInfo.outerDimsPerm =
         llvm::to_vector(llvm::seq<int64_t>(0, matmulDimBase));
@@ -42,7 +42,7 @@ chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
     break;
   }
   case (EncodingRole::RESULT): {
-    encodingInfo.innerTileSizes = {tileParams.M, tileParams.N};
+    encodingInfo.innerTileSizes = {tileMxNxK.M, tileMxNxK.N};
     break;
   }
   default: {

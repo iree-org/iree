@@ -38,16 +38,19 @@ iree_cc_library(
     GlobalOptimization
   HDRS
     "Passes.h"
+    "Utils.h"
   SRCS
     "Convert1X1FilterConv2DToMatmul.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandVectors.cpp"
     "FuseDequantizationMatmul.cpp"
+    "LiftGenericToTransposeBatchMatmul.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "Passes.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
+    "Utils.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
