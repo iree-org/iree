@@ -13,6 +13,7 @@
 #include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -97,10 +98,8 @@ struct ExpandVectors
     std::optional<CastOpInterface> castOp = getDefiningCastOp(vectorIn);
     if (castOp) {
       Value castIn = vectorIn.getDefiningOp()->getOperand(0);
-      Type castSrcElemType = castOp.value()->getOperand(0).getType();
-      if (auto castTensorType = dyn_cast<RankedTensorType>(castSrcElemType)) {
-        castSrcElemType = castTensorType.getElementType();
-      }
+      Type castSrcElemType =
+          getElementTypeOrSelf(castOp.value()->getOperand(0).getType());
       auto newVectorCastInTy =
           RankedTensorType::get(expandedInDims, castSrcElemType);
       expandedIn =
