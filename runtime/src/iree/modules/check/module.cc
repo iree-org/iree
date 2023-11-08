@@ -231,8 +231,7 @@ TransferBuffersToHost(
 static Status TransferToHost(iree_hal_device_t* device,
                              vm::ref<iree_hal_buffer_view_t>& buffer_view) {
   IREE_TRACE_SCOPE();
-  iree::span<const vm::ref<iree_hal_buffer_view_t>>
-      source_views({buffer_view});
+  iree::span<const vm::ref<iree_hal_buffer_view_t>> source_views({buffer_view});
   IREE_ASSIGN_OR_RETURN(auto target_views,
                         TransferBuffersToHost(device, source_views));
   buffer_view = std::move(target_views[0]);
@@ -243,11 +242,10 @@ static Status TransferToHost(iree_hal_device_t* device,
                              vm::ref<iree_hal_buffer_view_t>& buffer_view_a,
                              vm::ref<iree_hal_buffer_view_t>& buffer_view_b) {
   IREE_TRACE_SCOPE();
-  iree::span<const vm::ref<iree_hal_buffer_view_t>>
-      source_views({buffer_view_a, buffer_view_b});
-  IREE_ASSIGN_OR_RETURN(
-      auto target_views,
-      TransferBuffersToHost(device, source_views));
+  iree::span<const vm::ref<iree_hal_buffer_view_t>> source_views(
+      {buffer_view_a, buffer_view_b});
+  IREE_ASSIGN_OR_RETURN(auto target_views,
+                        TransferBuffersToHost(device, source_views));
   buffer_view_a = std::move(target_views[0]);
   buffer_view_b = std::move(target_views[1]);
   return OkStatus();
