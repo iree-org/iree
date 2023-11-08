@@ -45,7 +45,7 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
              "be either also `host` or the default value\n";
       return false;
     }
-    outCpu = llvm::sys::getHostCPUName().str();
+    outCpu = triple.isX86() ? llvm::sys::getHostCPUName().str() : "";
     llvm::SubtargetFeatures features;
     llvm::StringMap<bool> hostFeatures;
     if (llvm::sys::getHostCPUFeatures(hostFeatures)) {
@@ -69,7 +69,8 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
 
   // If CPU is non-host and non-generic then we need to populate the
   // corresponding features.
-  if (inCpu == "host" || inCpu == "generic" || inCpu.starts_with("generic-")) {
+  if (outCpu.empty() || inCpu == "host" || inCpu == "generic" ||
+      inCpu.starts_with("generic-")) {
     return true;
   }
   if (triple.isX86()) {
