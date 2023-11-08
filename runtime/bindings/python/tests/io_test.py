@@ -7,6 +7,7 @@
 import array
 import logging
 import numpy as np
+from pathlib import Path
 import unittest
 
 import iree.compiler
@@ -80,10 +81,19 @@ class ParameterTest(unittest.TestCase):
         provider = index.create_provider()
         rt.create_io_parameters_module(self.instance, provider)
 
+    def testFileHandleWrap(self):
+        fh = rt.FileHandle.wrap_memory(b"foobar")
+        del fh
+
+    def testParameterIndexAddFromFile(self):
+        splat_index = rt.ParameterIndex()
+        fh = rt.FileHandle.wrap_memory(b"foobar")
+        splat_index.add_from_file_handle("data", fh, length=3, offset=3)
+
     def testSplats(self):
         splat_index = rt.ParameterIndex()
-        splat_index.add_splat("weight", _float_constant(1.0), 30 * 20 * 4)
-        splat_index.add_splat("bias", _float_constant(5.0), 30 * 4)
+        splat_index.add_splat("weight", _float_constant(2.0), 30 * 20 * 4)
+        splat_index.add_splat("bias", _float_constant(1.0), 30 * 4)
         modules = rt.load_vm_modules(
             rt.create_io_parameters_module(
                 self.instance, splat_index.create_provider(scope="params")
@@ -96,6 +106,78 @@ class ParameterTest(unittest.TestCase):
         input = np.zeros([128, 20], dtype=np.float32) + 2.0
         result = main.run(input)
         print(result.to_host())
+        # TODO: Fix splat in the parameter code so it is not all zeros.
+        # expected_result = np.zeros([128, 30], dtype=np.float32) + 81.0
+        # np.testing.assert_array_almost_equal(result, expected_result)
+
+    def testBuffers(self):
+        index = rt.ParameterIndex()
+        weight = np.zeros([30, 20], dtype=np.float32) + 2.0
+        bias = np.zeros([30], dtype=np.float32) + 1.0
+        index.add_buffer("weight", weight)
+        index.add_buffer("bias", bias)
+        modules = rt.load_vm_modules(
+            rt.create_io_parameters_module(
+                self.instance, index.create_provider(scope="params")
+            ),
+            rt.create_hal_module(self.instance, self.device),
+            create_mm_test_module(self.instance),
+            config=self.config,
+        )
+        main = modules[-1]
+        input = np.zeros([128, 20], dtype=np.float32) + 2.0
+        result = main.run(input)
+        print(result.to_host())
+        expected_result = np.zeros([128, 30], dtype=np.float32) + 81.0
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+    def testGguf(self):
+        index = rt.ParameterIndex()
+        index.load(
+            str(
+                Path(__file__).resolve().parent
+                / "testdata"
+                / "parameter_weight_bias_1.gguf"
+            )
+        )
+        modules = rt.load_vm_modules(
+            rt.create_io_parameters_module(
+                self.instance, index.create_provider(scope="params")
+            ),
+            rt.create_hal_module(self.instance, self.device),
+            create_mm_test_module(self.instance),
+            config=self.config,
+        )
+        main = modules[-1]
+        input = np.zeros([128, 20], dtype=np.float32) + 2.0
+        result = main.run(input)
+        print(result.to_host())
+        expected_result = np.zeros([128, 30], dtype=np.float32) + 81.0
+        np.testing.assert_array_almost_equal(result, expected_result)
+
+    def testSafetensors(self):
+        index = rt.ParameterIndex()
+        index.load(
+            str(
+                Path(__file__).resolve().parent
+                / "testdata"
+                / "parameter_weight_bias_1.safetensors"
+            )
+        )
+        modules = rt.load_vm_modules(
+            rt.create_io_parameters_module(
+                self.instance, index.create_provider(scope="params")
+            ),
+            rt.create_hal_module(self.instance, self.device),
+            create_mm_test_module(self.instance),
+            config=self.config,
+        )
+        main = modules[-1]
+        input = np.zeros([128, 20], dtype=np.float32) + 2.0
+        result = main.run(input)
+        print(result.to_host())
+        expected_result = np.zeros([128, 30], dtype=np.float32) + 81.0
+        np.testing.assert_array_almost_equal(result, expected_result)
 
     def testSplatTooBig(self):
         splat_index = rt.ParameterIndex()

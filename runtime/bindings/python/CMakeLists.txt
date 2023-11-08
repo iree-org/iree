@@ -85,7 +85,11 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::hal
   iree::hal::drivers
   iree::hal::utils::allocators
+  iree::base::internal::file_io
+  iree::base::internal::path
   iree::io::file_handle
+  iree::io::formats::gguf
+  iree::io::formats::safetensors
   iree::io::parameter_index
   iree::io::parameter_index_provider
   iree::io::parameter_provider
@@ -221,9 +225,9 @@ iree_py_test(
 
 iree_py_test(
   NAME
-    py_module_test
+    io_test
   SRCS
-    "tests/py_module_test.py"
+    "tests/io_test.py"
 )
 
 iree_py_test(
