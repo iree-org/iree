@@ -38,8 +38,6 @@ constexpr int kMaxVectorNumElements = 4;
 namespace mlir {
 namespace iree_compiler {
 
-static void doNothing(OpBuilder &, Location) {}
-
 //===----------------------------------------------------------------------===//
 // Utility Functions
 //===----------------------------------------------------------------------===//
@@ -747,29 +745,22 @@ public:
 // Helper function to optionally predicate a scalar load/store if there is a
 // mask present.
 static Value predicateMaybeMaskedScalarTransfer(
-    OpBuilder &b, Location loc, Value maybeMaskBit, TypeRange resultTypes,
+    OpBuilder &b, Location loc, Value maybeMaskBit,
     function_ref<Value(OpBuilder &, Location)> thenConditionBuilder,
-    function_ref<void(OpBuilder &, Location)> elseConditionBuilder,
-    bool hasElse) {
-  OpBuilder::InsertionGuard guard(b);
+    function_ref<void(OpBuilder &, Location)> elseConditionBuilder = nullptr) {
   if (maybeMaskBit) {
-    OpBuilder::InsertionGuard guard1(b);
-    scf::IfOp ifOp;
-    if (hasElse) {
-      ifOp = b.create<scf::IfOp>(loc, resultTypes, maybeMaskBit, /*else=*/true);
-    } else {
-      ifOp = b.create<scf::IfOp>(loc, maybeMaskBit, /*else=*/false);
-    }
-    b.setInsertionPointToStart(&ifOp.getThenRegion().front());
-    Value thenRes = thenConditionBuilder(b, loc);
-    if (hasElse) {
-      // An if with results must have an else region.
-      b.create<scf::YieldOp>(loc, thenRes);
+    auto thenBuilder = [&](OpBuilder &b, Location loc) {
+      Value thenRes = thenConditionBuilder(b, loc);
+      if (thenRes) {
+        b.create<scf::YieldOp>(loc, thenRes);
+      } else {
+        b.create<scf::YieldOp>(loc);
+      }
+    };
+    auto ifOp = b.create<scf::IfOp>(loc, maybeMaskBit,
+                                    /*thenBuilder=*/thenBuilder,
+                                    /*elseBuilder=*/elseConditionBuilder);
 
-      OpBuilder::InsertionGuard guard2(b);
-      b.setInsertionPointToStart(&ifOp.getElseRegion().front());
-      elseConditionBuilder(b, loc);
-    }
     return !ifOp.getNumResults() ? Value() : ifOp->getResult(0);
   }
   return thenConditionBuilder(b, loc);
@@ -811,8 +802,7 @@ struct ScalarizeVectorTransferRead final
       };
 
       Value scalar = predicateMaybeMaskedScalarTransfer(
-          rewriter, loc, maybeMaskBit, TypeRange{vectorType.getElementType()},
-          thenCond, elseCond, /*hasElse=*/true);
+          rewriter, loc, maybeMaskBit, thenCond, elseCond);
       rewriter.replaceOpWithNewOp<vector::SplatOp>(readOp, vectorType, scalar);
       return success();
     }
@@ -854,8 +844,7 @@ struct ScalarizeVectorTransferRead final
       };
 
       Value scalar = predicateMaybeMaskedScalarTransfer(
-          rewriter, loc, maybeMaskBit, TypeRange{vectorType.getElementType()},
-          thenCond, elseCond, /*hasElse=*/true);
+          rewriter, loc, maybeMaskBit, thenCond, elseCond);
       newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
     }
     rewriter.replaceOp(readOp, newVector);
@@ -935,9 +924,8 @@ struct ScalarizeVectorTransferWrite final
         return Value();
       };
 
-      (void)predicateMaybeMaskedScalarTransfer(
-          rewriter, loc, maybeMaskBit, TypeRange{}, thenCond,
-          /*elseCond=*/doNothing, /*hasElse=*/false);
+      (void)predicateMaybeMaskedScalarTransfer(rewriter, loc, maybeMaskBit,
+                                               thenCond);
       rewriter.eraseOp(writeOp);
       return success();
     }
@@ -970,9 +958,8 @@ struct ScalarizeVectorTransferWrite final
         b.create<memref::StoreOp>(loc, scalar, writeOp.getSource(), indices);
         return Value();
       };
-      (void)predicateMaybeMaskedScalarTransfer(
-          rewriter, loc, maybeMaskBit, TypeRange{}, thenCond,
-          /*elseCond=*/doNothing, /*hasElse=*/false);
+      (void)predicateMaybeMaskedScalarTransfer(rewriter, loc, maybeMaskBit,
+                                               thenCond);
     }
     rewriter.eraseOp(writeOp);
     return success();
