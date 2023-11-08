@@ -201,8 +201,8 @@ padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // the tensor type that the encoding is applied to.
   auto encodingForSetEncoding = encodingForPad;
   if (padded.getType() != padSource.getType()) {
-    encodingForSetEncoding =
-        makeEncoding(builder, user, role, operandTypes, padSource.getType(), narrow);
+    encodingForSetEncoding = makeEncoding(builder, user, role, operandTypes,
+                                          padSource.getType(), narrow);
   }
   Value encoded = setEncoding(builder, loc, padded, encodingForSetEncoding);
   if (castOp) {
@@ -370,15 +370,15 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
         cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
     operandTypes[1] =
         cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
-    Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
-                                         IREE::LinalgExt::EncodingRole::LHS,
-                                         operandTypes, narrowSizes, maybeLhsCastOp);
-    Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
-                                         IREE::LinalgExt::EncodingRole::RHS,
-                                         operandTypes, narrowSizes, maybeRhsCastOp);
-    Value encodedOut =
-        padAndSetEncoding(rewriter, loc, origOut, user,
-                          IREE::LinalgExt::EncodingRole::RESULT, operandTypes, narrowSizes);
+    Value encodedLhs = padAndSetEncoding(
+        rewriter, loc, origLhs, user, IREE::LinalgExt::EncodingRole::LHS,
+        operandTypes, narrowSizes, maybeLhsCastOp);
+    Value encodedRhs = padAndSetEncoding(
+        rewriter, loc, origRhs, user, IREE::LinalgExt::EncodingRole::RHS,
+        operandTypes, narrowSizes, maybeRhsCastOp);
+    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
+                                         IREE::LinalgExt::EncodingRole::RESULT,
+                                         operandTypes, narrowSizes);
 
     Value matmulTiled = rewriter
                             .create<linalg::BatchMatmulOp>(
