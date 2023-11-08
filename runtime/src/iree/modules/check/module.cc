@@ -244,7 +244,7 @@ static Status TransferToHost(iree_hal_device_t* device,
                              vm::ref<iree_hal_buffer_view_t>& buffer_view_b) {
   IREE_TRACE_SCOPE();
   iree::span<const vm::ref<iree_hal_buffer_view_t>>
-    source_views({buffer_view_a, buffer_view_b});
+      source_views({buffer_view_a, buffer_view_b});
   IREE_ASSIGN_OR_RETURN(
       auto target_views,
       TransferBuffersToHost(device, source_views));
