@@ -154,8 +154,8 @@ iree_link_bitcode(
     "ukernel_bitcode_arm_64_base.bc"
     "ukernel_bitcode_arm_64_bf16.bc"
     "ukernel_bitcode_arm_64_dotprod.bc"
-    "ukernel_bitcode_arm_64_fullfp16.bc"
     "ukernel_bitcode_arm_64_fp16fml.bc"
+    "ukernel_bitcode_arm_64_fullfp16.bc"
     "ukernel_bitcode_arm_64_i8mm.bc"
 
 )
