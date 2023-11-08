@@ -39,8 +39,10 @@ iree_cc_library(
     MLIRSCFTransformOps
     MLIRTensorDialect
     MLIRTensorTransformOps
+    MLIRTensorTransforms
     MLIRTransformLoopExtension
     MLIRVectorTransformOps
+    MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
@@ -69,7 +71,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
-    MLIRTransforms
     MLIRVectorTransforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
