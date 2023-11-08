@@ -32,13 +32,13 @@
 
 #define DEBUG_TYPE "iree-spirv-vectorize-load-store"
 
-#define DO_NOTHING [](OpBuilder &b, Location loc) {}
-
 constexpr int kMaxVectorNumBits = 128;
 constexpr int kMaxVectorNumElements = 4;
 
 namespace mlir {
 namespace iree_compiler {
+
+static void doNothing(OpBuilder &, Location) {}
 
 //===----------------------------------------------------------------------===//
 // Utility Functions
@@ -937,7 +937,7 @@ struct ScalarizeVectorTransferWrite final
 
       (void)predicateMaybeMaskedScalarTransfer(
           rewriter, loc, maybeMaskBit, TypeRange{}, thenCond,
-          /*elseCond=*/DO_NOTHING, /*hasElse=*/false);
+          /*elseCond=*/doNothing, /*hasElse=*/false);
       rewriter.eraseOp(writeOp);
       return success();
     }
@@ -972,7 +972,7 @@ struct ScalarizeVectorTransferWrite final
       };
       (void)predicateMaybeMaskedScalarTransfer(
           rewriter, loc, maybeMaskBit, TypeRange{}, thenCond,
-          /*elseCond=*/DO_NOTHING, /*hasElse=*/false);
+          /*elseCond=*/doNothing, /*hasElse=*/false);
     }
     rewriter.eraseOp(writeOp);
     return success();
