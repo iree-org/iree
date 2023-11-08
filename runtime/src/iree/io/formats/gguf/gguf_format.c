@@ -107,6 +107,74 @@ typedef struct {
   int8_t qs[QK8_1];
 } block_q8_1;
 
+// Ugh, this file format is non-hermetic and the size of the k blocks is based
+// on compiler configuration. We pick one here that works for what we use but
+// have no way of knowing it's correct. LLAMA_QKK_64 is what controls this in
+// llama.cpp and it's off by default so we assume that here as well.
+#ifdef GGML_QKK_64
+#define QK_K 64
+#define K_SCALE_SIZE 4
+#else
+#define QK_K 256
+#define K_SCALE_SIZE 12
+#endif  // GGML_QKK_64
+typedef struct {
+  uint8_t scales[QK_K / 16];
+  uint8_t qs[QK_K / 4];
+  uint16_t d;
+  uint16_t dmin;
+} block_q2_K;
+#ifdef GGML_QKK_64
+typedef struct {
+  uint8_t hmask[QK_K / 8];
+  uint8_t qs[QK_K / 4];
+  uint8_t scales[2];
+  uint16_t d;
+} block_q3_K;
+typedef struct {
+  uint16_t d[2];
+  uint8_t scales[2];
+  uint8_t qs[QK_K / 2];
+} block_q4_K;
+typedef struct {
+  uint16_t d;
+  int8_t scales[QK_K / 16];
+  uint8_t qh[QK_K / 8];
+  uint8_t qs[QK_K / 2];
+} block_q5_K;
+#else
+typedef struct {
+  uint8_t hmask[QK_K / 8];
+  uint8_t qs[QK_K / 4];
+  uint8_t scales[12];
+  uint16_t d;
+} block_q3_K;
+typedef struct {
+  uint16_t d;
+  uint16_t dmin;
+  uint8_t scales[K_SCALE_SIZE];
+  uint8_t qs[QK_K / 2];
+} block_q4_K;
+typedef struct {
+  uint16_t d;
+  uint16_t dmin;
+  uint8_t scales[K_SCALE_SIZE];
+  uint8_t qh[QK_K / 8];
+  uint8_t qs[QK_K / 2];
+} block_q5_K;
+#endif
+typedef struct {
+  uint8_t ql[QK_K / 2];
+  uint8_t qh[QK_K / 4];
+  int8_t scales[QK_K / 16];
+  uint16_t d;
+} block_q6_K;
+typedef struct {
+  float d;
+  int8_t qs[QK_K];
+  int16_t bsums[QK_K / 16];
+} block_q8_K;
+
 typedef struct {
   int blck_size;
   size_t type_size;
@@ -166,6 +234,36 @@ static const ggml_type_traits_t ggml_type_traits[GGML_TYPE_COUNT] = {
         {
             .blck_size = QK8_1,
             .type_size = sizeof(block_q8_1),
+        },
+    [GGML_TYPE_Q2_K] =
+        {
+            .blck_size = QK_K,
+            .type_size = sizeof(block_q2_K),
+        },
+    [GGML_TYPE_Q3_K] =
+        {
+            .blck_size = QK_K,
+            .type_size = sizeof(block_q3_K),
+        },
+    [GGML_TYPE_Q4_K] =
+        {
+            .blck_size = QK_K,
+            .type_size = sizeof(block_q4_K),
+        },
+    [GGML_TYPE_Q5_K] =
+        {
+            .blck_size = QK_K,
+            .type_size = sizeof(block_q5_K),
+        },
+    [GGML_TYPE_Q6_K] =
+        {
+            .blck_size = QK_K,
+            .type_size = sizeof(block_q6_K),
+        },
+    [GGML_TYPE_Q8_K] =
+        {
+            .blck_size = QK_K,
+            .type_size = sizeof(block_q8_K),
         },
 };
 
@@ -315,19 +413,22 @@ static inline uint64_t iree_align_uint64(uint64_t value, uint64_t alignment) {
   return (value + (alignment - 1)) & ~(alignment - 1);
 }
 
-static uint64_t iree_io_gguf_calculate_storage_size(
-    const gguf_tensor_info_t* tensor_info) {
+static iree_status_t iree_io_gguf_calculate_storage_size(
+    const gguf_tensor_info_t* tensor_info, uint64_t* out_storage_size) {
+  *out_storage_size = 0;
   uint64_t element_count = 1;
   for (uint32_t i = 0; i < tensor_info->n_dimensions; ++i) {
     element_count *= tensor_info->dimensions[i];
   }
-  const ggml_type_traits_t type_traits = ggml_type_traits[tensor_info->type];
-  if (type_traits.type_size == 0) {
-    // For some reason some entries have a 0 type size and a 0 blck_size.
-    // Detect this to avoid FPE.
-    return 0;
+  if (tensor_info->type < 0 || tensor_info->type >= GGML_TYPE_COUNT) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "GGML tensor type %d not supported",
+                            (int)tensor_info->type);
   }
-  return (element_count * type_traits.type_size) / type_traits.blck_size;
+  const ggml_type_traits_t type_traits = ggml_type_traits[tensor_info->type];
+  *out_storage_size =
+      (element_count * type_traits.type_size) / type_traits.blck_size;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_io_gguf_parse_value(iree_const_byte_span_t* contents,
@@ -522,7 +623,9 @@ static iree_status_t iree_io_gguf_append_tensor_info(
   // have. If they just included the size we wouldn't even have to care about
   // data type or tensor dimensions and not need to handle the ever-growing list
   // of hard-coded format types.
-  uint64_t storage_size = iree_io_gguf_calculate_storage_size(tensor_info);
+  uint64_t storage_size = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_io_gguf_calculate_storage_size(tensor_info, &storage_size));
 
   // Verify the range is within tensor data bounds.
   uint64_t begin = tensor_info->offset;
