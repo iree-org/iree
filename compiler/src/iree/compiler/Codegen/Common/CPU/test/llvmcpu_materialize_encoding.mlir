@@ -1242,3 +1242,127 @@ func.func @extend_batch_vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view)
 //      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[MMT4D]] inner_dims_pos = [1, 2] inner_tiles = [1, 16] into %[[INIT_UNPACK]] : tensor<32x1x688x1x16xi32> -> tensor<32x1x11008xi32>
 //      CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[UNPACK]] "output 0" : tensor<32x1x11008xi32> -> !hal.buffer_view
 //      CHECK: return %[[EXPORT]] : !hal.buffer_view
+
+// -----
+
+func.func @matmul_lowering_i16i16i32_x86_64_avx2() attributes {
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx2"}>
+} {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, i16, i32]>>>{%M, %K}
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, i16, i32]>>>{%K, %N}
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32]>>>{%M, %N}
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, i16, i32]>>>{%M, %K}
+      -> tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, i16, i32]>>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, i16, i32]>>>{%K, %N}
+      -> tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, i16, i32]>>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32]>>
+  %6 = linalg.matmul
+      ins(%3, %4 : tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, i16, i32]>>,
+                   tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, i16, i32]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32]>>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32]>>>{%M, %N}
+  return
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
+//      CHECK: func @matmul_lowering_i16i16i32_x86_64_avx2()
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
+//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
+//  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
+//  CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[MAP0]]()[%[[M]]]
+//  CHECK-DAG:   %[[TILED_K:.+]] = affine.apply #[[MAP1]]()[%[[K]]]
+//      CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
+// CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x8x2xi16>>{%[[TILED_M]], %[[TILED_K]]}
+//      CHECK:   %[[TILED_N:.+]] = affine.apply #[[MAP0]]()[%[[N]]]
+//      CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
+// CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x8x2xi16>>{%[[TILED_N]], %[[TILED_K]]}
+//      CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2)
+// CHECK-SAME:       !flow.dispatch.tensor<readwrite:tensor<?x?x8x8xi32>>{%[[TILED_M]], %[[TILED_N]]}
+//      CHECK:   %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]
+// CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_K]], 8, 2], strides = [1, 1, 1, 1]
+//      CHECK:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]
+// CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_N]], %[[TILED_K]], 8, 2], strides = [1, 1, 1, 1]
+//      CHECK:   %[[OUTS:.+]] = flow.dispatch.tensor.load %[[OUTS_BINDING]]
+// CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+//      CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:       outs(%[[OUTS]] :
+//      CHECK:   flow.dispatch.tensor.store %[[MMT4D]], %[[OUTS_BINDING]]
+// CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[TILED_N]], 8, 8], strides = [1, 1, 1, 1]
+
+// -----
+
+func.func @matmul_lowering_i16ui4i32_x86_64_avx512vnni() attributes {
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
+} {
+  %c0 = arith.constant 0 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
+  %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, ui4, i32]>>>{%M, %K}
+  %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi4, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32]>>>{%K, %N}
+  %out_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32]>>>{%M, %N}
+  %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, ui4, i32]>>>{%M, %K}
+      -> tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, ui4, i32]>>
+  %rhs_i4 = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi4, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32]>>>{%K, %N}
+      -> tensor<?x?xi4, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32]>>
+  %empty = tensor.empty(%K, %N) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32]>>
+  %rhs_i32 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+     ins(%rhs_i4 : tensor<?x?xi4, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32]>>) outs(%empty : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32]>>) {
+  ^bb0(%in: i4, %out: i32):
+    %17 = arith.extui %in : i4 to i32
+    linalg.yield %17 : i32
+  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32]>>
+  %out = flow.dispatch.tensor.load %out_binding, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32]>>
+  %result = linalg.matmul
+      ins(%lhs, %rhs_i32 : tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, ui4, i32]>>,
+                   tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32]>>)
+      outs(%out : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32]>>
+  flow.dispatch.tensor.store %result, %out_binding, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32]>>>{%M, %N}
+  return
+}
+
+// CHECK-DAG: #[[MAP_CEILDIV_8:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+// CHECK-DAG: #[[MAP_CEILDIV_16:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+// CHECK-DAG: #[[MAP_IDENTITY_4D:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK:     func.func @matmul_lowering_i16ui4i32_x86_64_avx512vnni()
+// CHECK-DAG: %[[M:.+]] = hal.interface.constant.load[0] : index
+// CHECK-DAG: %[[N:.+]] = hal.interface.constant.load[1] : index
+// CHECK-DAG: %[[K:.+]] = hal.interface.constant.load[2] : index
+// CHECK-DAG: %[[K_CEILDIV_8:.+]] = affine.apply #[[MAP_CEILDIV_8]]()[%[[K]]]
+// CHECK-DAG: %[[N_CEILDIV_16:.+]] = affine.apply #[[MAP_CEILDIV_16]]()[%[[N]]]
+// CHECK-DAG: %[[LHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) {{.*}} : !flow.dispatch.tensor<readonly:tensor<?x?x1x8xi16>>{%[[M]], %[[K_CEILDIV_8]]}
+// CHECK-DAG: %[[RHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.*}} : !flow.dispatch.tensor<readonly:tensor<?x?x16x8xi4>>{%[[N_CEILDIV_16]], %[[K_CEILDIV_8]]}
+// CHECK-DAG: %[[OUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2) {{.*}} : !flow.dispatch.tensor<readwrite:tensor<?x?x1x16xi32>>{%[[M]], %[[N_CEILDIV_16]]}
+// CHECK-DAG: %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M]], %[[K_CEILDIV_8]], 1, 8], {{.*}} -> tensor<?x?x1x8xi16>
+// CHECK-DAG: %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[N_CEILDIV_16]], %[[K_CEILDIV_8]], 16, 8], {{.*}} -> tensor<?x?x16x8xi4>
+// CHECK-DAG: %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M]], %[[N_CEILDIV_16]], 1, 16], {{.*}} -> tensor<?x?x1x16xi32>
+// CHECK-DAG: %[[EMPTY:.+]] = tensor.empty(%[[N_CEILDIV_16]], %[[K_CEILDIV_8]]) : tensor<?x?x16x8xi32>
+// CHECK-DAG: %[[RHS_I32:.+]] = linalg.generic {indexing_maps = [#[[MAP_IDENTITY_4D]], #[[MAP_IDENTITY_4D]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[RHS]] : tensor<?x?x16x8xi4>) outs(%[[EMPTY]] : tensor<?x?x16x8xi32>) {
+// CHECK-DAG: %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS]], %[[RHS_I32]] : tensor<?x?x1x8xi16>, tensor<?x?x16x8xi32>) outs(%[[OUT]] : tensor<?x?x1x16xi32>) -> tensor<?x?x1x16xi32>
+// CHECK: flow.dispatch.tensor.store %[[MMT4D]], %[[OUT_BINDING]],
