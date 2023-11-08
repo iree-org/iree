@@ -815,7 +815,7 @@ void registerCodegenLLVMCPUPasses() {
 
   static PassPipelineRegistration<> LLVMCPUConfigPipeline(
       "iree-codegen-llvmcpu-configuration-pipeline",
-      "Runs the progressive lowering pipeline from Linalg to LLVM",
+      "Runs the translation strategy configuration pipeline on Linalg for CPU",
       [](OpPassManager &passManager) {
         buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
       });

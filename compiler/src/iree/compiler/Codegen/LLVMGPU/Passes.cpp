@@ -633,8 +633,7 @@ void registerCodegenLLVMGPUPasses() {
 
   static PassPipelineRegistration<> LLVMGPUConfigPipeline(
       "iree-codegen-llvmgpu-configuration-pipeline",
-      "Runs the translation strategy configuration pipeline for lowering "
-      "Linalg",
+      "Runs the translation strategy configuration pipeline on Linalg for GPU",
       [](OpPassManager &passManager) {
         buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
       });
