@@ -95,6 +95,13 @@ moveScalarAndBindingUniformCode(vector::WarpExecuteOnLane0Op warpOp) {
       return true;
     if (isUniformLoad(op))
       return true;
+    // Shared memory is already scoped to the workgroup and can safely be
+    // hoisted out of the the warp op.
+    if (auto allocOp = dyn_cast<memref::AllocOp>(op)) {
+      if (hasSharedMemoryAddressSpace(allocOp.getType())) {
+        return true;
+      }
+    }
 
     return false;
   };
@@ -142,6 +149,26 @@ public:
       return failure();
     rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
         insertOp, insertOp.getDestVectorType(), insertOp.getSource());
+    return success();
+  }
+};
+
+/// Pattern to sink `gpu.barrier` ops out of a `warp_execute_on_lane_0` op.
+class WarpOpBarrier : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
+  using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
+                                PatternRewriter &rewriter) const override {
+    auto yield = cast<vector::YieldOp>(
+        warpOp.getBodyRegion().getBlocks().begin()->getTerminator());
+    Operation *lastNode = yield->getPrevNode();
+    auto barrierOp = dyn_cast_or_null<gpu::BarrierOp>(lastNode);
+    if (!barrierOp)
+      return failure();
+
+    rewriter.setInsertionPointAfter(warpOp);
+    (void)rewriter.create<gpu::BarrierOp>(barrierOp.getLoc());
+    rewriter.eraseOp(barrierOp);
     return success();
   }
 };
@@ -251,6 +278,7 @@ public:
       vector::populateDistributeReduction(patterns, groupReductionFn);
       vector::populateDistributeTransferWriteOpPatterns(patterns,
                                                         distributionFn);
+      patterns.add<WarpOpBarrier>(patterns.getContext(), 3);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
