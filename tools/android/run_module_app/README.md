@@ -57,5 +57,5 @@ When started on Android, the app will read the contents in `assets` to get the
 VM FlatBuffer and invocation information and run it.
 
 [native-activity]: https://developer.android.com/reference/android/app/NativeActivity
-[native-activity-example]: https://github.com/android/ndk-samples/tree/master/native-activity
+[native-activity-example]: https://github.com/android/ndk-samples/tree/main/native-activity
 [native-activity-tutorial]: https://medium.com/androiddevelopers/getting-started-with-c-and-android-native-activities-2213b402ffff

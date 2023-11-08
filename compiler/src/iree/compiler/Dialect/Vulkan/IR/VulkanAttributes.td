@@ -36,7 +36,7 @@ def VK_CooperativeMatrixPropertiesKHRAttr :
 
 // TODO(antiagainst): consider auto-generating this file (or part of it) from
 // vk.xml:
-// https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/master/xml/vk.xml
+// https://raw.githubusercontent.com/KhronosGroup/Vulkan-Docs/main/xml/vk.xml
 
 // Dictionary attribute containing various Vulkan capability bits. This is
 // aggregated from various Vulkan properties, limits, features from the spec.

@@ -19,7 +19,7 @@ TFLite | [tflite_text_classification](tflite_text_classification.ipynb) | Compil
 ## Working with GitHub
 
 Refer to
-[Colab's GitHub demo](https://colab.research.google.com/github/googlecolab/colabtools/blob/master/notebooks/colab-github-demo.ipynb)
+[Colab's GitHub demo](https://colab.research.google.com/github/googlecolab/colabtools/blob/main/notebooks/colab-github-demo.ipynb)
 for general information about using Colab with GitHub.
 
 To make changes to a notebook in this repository, one possible workflow is:

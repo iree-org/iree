@@ -23,7 +23,7 @@ test --test_output=errors
 # Enables unix-style runfiles link trees on Windows. Requires enabling symlink
 # permissions: Enable Developer Mode in the Developer Settings page of the
 # system settings. See
-# https://docs.bazel.build/versions/master/windows.html#enable-symlink-support
+# https://bazel.build/configure/windows#enable-symlink-support
 # and https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
 startup --windows_enable_symlinks
 build --enable_runfiles
