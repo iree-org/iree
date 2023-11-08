@@ -109,6 +109,7 @@ class ModelSourceType(Enum):
     EXPORTED_TFLITE = "exported_tflite"
 
 
+@serialization.serializable
 @dataclass(frozen=True)
 class CPUParameters:
     """Describes CPU related parameters."""
@@ -117,6 +118,7 @@ class CPUParameters:
     pinned_cores: List[int]
 
 
+@serialization.serializable
 @dataclass(frozen=True)
 class DeviceParameters:
     """Describes device parameters."""
