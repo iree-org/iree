@@ -3507,11 +3507,11 @@ development environment. The information here is meant to be generic.</p>
 There are four components involved in this architecture:</p>
 <ul>
 <li>The Vulkan Application</li>
-<li><a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#the-loader">The Vulkan Loader</a></li>
-<li><a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#layers">Vulkan Layers</a></li>
-<li><a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#installable-client-drivers">Installable Client Drivers (ICDs)</a></li>
+<li><a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#the-loader">The Vulkan Loader</a></li>
+<li><a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#layers">Vulkan Layers</a></li>
+<li><a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#installable-client-drivers">Installable Client Drivers (ICDs)</a></li>
 </ul>
-<p><img alt="High Level View of Loader" src="https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/master/docs/images/high_level_loader.png" /></p>
+<p><img alt="High Level View of Loader" src="https://raw.githubusercontent.com/KhronosGroup/Vulkan-Loader/main/docs/images/high_level_loader.png" /></p>
 <p>The Vulkan loader sits between the Vulkan application, which calls Vulkan APIs,
 and the ICDs, which implements these Vulkan APIs. Vulkan layers agument the
 Vulkan system to provide optional features like validation and debugging. The
@@ -3519,7 +3519,7 @@ Vulkan loader composes a chain of requested layers, which processes the Vulkan
 application's API calls one by one, and finally redirects the API calls made by
 the Vulkan application to one or more ICDs.</p>
 <p>It's highly recommned to read the
-<a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#overview">Architecture of the Vulkan Loader Interfaces Overview</a> to
+<a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#overview">Architecture of the Vulkan Loader Interfaces Overview</a> to
 get a general understanding of what these components are and how they interact
 with one another.</p>
 <h2 id="vulkan-development-environment-setup">Vulkan development environment setup<a class="headerlink" href="#vulkan-development-environment-setup" title="Permanent link">link</a></h2>
@@ -3631,7 +3631,7 @@ behavior and print verbose information, notably:</p>
     application.</li>
 <li><code>VK_LAYER_PATH</code>: override the loader's standard layer library search folders.</li>
 </ul>
-<p>Please see the <a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#table-of-debug-environment-variables">Vulkan loader's documentation</a> for detailed
+<p>Please see the <a href="https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderInterfaceArchitecture.md#table-of-debug-environment-variables">Vulkan loader's documentation</a> for detailed
 explanation for these variables.</p>
 <h3 id="setting-environment-variables-for-bazel-test">Setting environment variables for Bazel test<a class="headerlink" href="#setting-environment-variables-for-bazel-test" title="Permanent link">link</a></h3>
 <p>Bazel runs tests in a sandbox and environment variables must be passed through
