@@ -75,6 +75,10 @@ createRemoveZeroExtentTensorsPass();
 // Sets encoding for tensors to allow tiled execution of operations.
 std::unique_ptr<Pass> createSetEncodingPass();
 
+// Convert linalg.generic ops to linalg.batch_matmul, possibly with transposes
+// on operands/result.
+std::unique_ptr<Pass> createLiftGenericToTransposeBatchMatmulPass();
+
 void registerGlobalOptimizationPipeline();
 
 } // namespace GlobalOptimization
