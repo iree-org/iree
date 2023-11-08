@@ -446,10 +446,12 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
 
         cpu_params = run_config.target_device_spec.device_parameters.cpu_params
         if not cpu_params:
-            return "0xff"
+            # Assume the mobile CPUs have <= 16 cores.
+            return "ffff"
 
         exec_config = run_config.module_execution_config
         pinned_cores = cpu_params.pinned_cores
+        # Use the fastest cores in the spec for single-thread benchmarks.
         if (
             exec_config.driver == iree_definitions.RuntimeDriver.LOCAL_SYNC
             or "1-thread" in exec_config.tags
@@ -457,7 +459,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             pinned_cores = pinned_cores[-1:]
 
         cpu_mask = sum(1 << core_id for core_id in cpu_params.pinned_cores)
-        return hex(cpu_mask)
+        return f"{cpu_mask:04x}"
 
     def __check_and_push_file(
         self, host_path: pathlib.Path, device_dir: pathlib.PurePosixPath
