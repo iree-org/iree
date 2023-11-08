@@ -115,7 +115,6 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-llvmcpu-target-triple=riscv32-pc-linux-elf"
-    "--iree-llvmcpu-target-cpu=generic-rv32"
     "--iree-llvmcpu-target-cpu-features=+m,+f"
     "--iree-llvmcpu-target-abi=ilp32"
     "--iree-llvmcpu-debug-symbols=false"
@@ -134,7 +133,6 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-llvmcpu-target-triple=riscv64-pc-linux-elf"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
     "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+c"
     "--iree-llvmcpu-target-abi=lp64d"
     "--iree-llvmcpu-debug-symbols=false"

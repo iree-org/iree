@@ -157,11 +157,10 @@ The SIMD code can be generated following the
 [IREE CPU flow](../guides/deployment-configurations/cpu.md)
 with the additional command-line flags
 
-```shell hl_lines="3 4 5 6 7 8"
+```shell hl_lines="3 4 5 6"
 tools/iree-compile \
   --iree-hal-target-backends=llvm-cpu \
   --iree-llvmcpu-target-triple=riscv64 \
-  --iree-llvmcpu-target-cpu=generic-rv64 \
   --iree-llvmcpu-target-abi=lp64d \
   --iree-llvmcpu-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
   --riscv-v-fixed-length-vector-lmul-max=8 \
