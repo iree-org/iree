@@ -21,7 +21,7 @@ static StringRef getOpName(Operation *op) {
   return symbol ? symbol.getName() : op->getName().getStringRef();
 }
 
-[[maybe_unused]] static StringRef getRegionName(Region &region) {
+static StringRef getRegionName(Region &region) {
   return getOpName(region.getParentOp());
 }
 

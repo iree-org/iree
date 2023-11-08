@@ -386,6 +386,41 @@ struct ReductionSplitResult {
 };
 } // namespace
 
+/// Builds transform IR requesting to bubble up the "expand_shape" operation
+/// produced as parent of reduction splitting if necessary for fusion of the
+/// leading elementwise operation.
+// TODO: consider passing a problem-specific struct to control information.
+static ReductionSplitResult
+createBubbleExpand(ImplicitLocOpBuilder &b, Value variantH,
+                   SplitReductionOp splitReductionTransformOp,
+                   bool hasLeadingEltwise, bool hasTrailingEltwise) {
+  ReductionSplitResult result;
+  if (!hasLeadingEltwise) {
+    result.splitFillH = splitReductionTransformOp.getFillOp();
+    result.splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
+    result.combinerH = splitReductionTransformOp.getCombiningLinalgOp();
+    return result;
+  }
+
+  auto funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
+    b.create<
+        iree_compiler::IREE::transform_dialect::ApplyBubbleExpandPatternsOp>(
+        loc);
+  });
+  std::tie(result.originalFillH, result.splitFillH) =
+      matchAndUnpack<2>(b, variantH, linalg::FillOp::getOperationName());
+  if (hasTrailingEltwise) {
+    std::tie(result.leadingEltwiseH, result.splitLinalgH, result.combinerH,
+             result.trailingEltwiseH) =
+        matchAndUnpack<4>(b, variantH, linalg::GenericOp::getOperationName());
+  } else {
+    std::tie(result.leadingEltwiseH, result.splitLinalgH, result.combinerH) =
+        matchAndUnpack<3>(b, variantH, linalg::GenericOp::getOperationName());
+  }
+  return result;
+}
+
 /// Build transform IR to split the reduction into a parallel and combiner part.
 /// Then tile the parallel part and map it to `tileSize` threads, each reducing
 /// on `vectorSize` elements.

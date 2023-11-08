@@ -138,6 +138,23 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
 // user-friendliness.
 //===----------------------------------------------------------------------===//
 
+/// Placeholder to encode fixed reductions that should take finer-grained
+/// precedence over other heuristics. In the future, this could be lifted to
+/// e.g. `cpuModel` or higher up in some transform dialect database summary of
+/// "known good things".
+static FailureOr<ReductionConfig> applyKnownGoodReductionConfigurations(
+    const transform_ext::MatchedReductionCaptures &captures,
+    const CPUModel &cpuModel) {
+  int64_t reductionSize = captures.reductionOpSizes.back();
+  if (cpuModel.model == CPUModel::kDefaultCPU) {
+    if (captures.reductionOutputElementalTypeBitWidth == 32) {
+      if (reductionSize == 32)
+        return ReductionConfig{/*vectorSize=*/32};
+    }
+  }
+  return failure();
+}
+
 static ReductionConfig
 getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
                    const CPUModel &cpuModel) {

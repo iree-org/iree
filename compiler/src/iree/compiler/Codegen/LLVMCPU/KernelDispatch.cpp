@@ -113,8 +113,8 @@ enum class VectorPreProcStrategy {
 };
 
 // TODO(dcaballe): Move operator<< to DebugUtils.h.
-[[maybe_unused]] static llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os, const VectorPreProcStrategy &strategy) {
+static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const VectorPreProcStrategy &strategy) {
   switch (strategy) {
   case VectorPreProcStrategy::Padding:
     os << "Padding";
@@ -133,8 +133,8 @@ operator<<(llvm::raw_ostream &os, const VectorPreProcStrategy &strategy) {
 }
 
 template <typename T>
-[[maybe_unused]] static llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os, const llvm::SmallVectorImpl<T> &vector) {
+static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const llvm::SmallVectorImpl<T> &vector) {
   for (T element : vector) {
     os << element << " ";
   }
@@ -142,7 +142,7 @@ operator<<(llvm::raw_ostream &os, const llvm::SmallVectorImpl<T> &vector) {
   return os;
 }
 
-[[maybe_unused]] static llvm::raw_ostream &
+static llvm::raw_ostream &
 operator<<(llvm::raw_ostream &os,
            const mlir::iree_compiler::TileSizesListType &tileSizeList) {
   os << "[";

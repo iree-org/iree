@@ -80,6 +80,20 @@ static bool transposeOpFilter(Operation *op) {
   return opInfo.isTranspose();
 }
 
+/// Returns true if the index map represents a transpose that benefits from
+/// shared mem.
+static bool isSharedMemTranspose(AffineMap indexMap) {
+  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
+    // Ensure that the fasted moving dimension (the last one) is permuted,
+    // Otherwise shared memory promotion will not benefit the operation.
+    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+        indexMap.getNumDims() - 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
 namespace {
 /// Swaps bufferization.alloc_tensor with the copied linalg op result when the
 /// linalg op does not use the output initial value during calculation.

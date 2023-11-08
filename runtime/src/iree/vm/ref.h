@@ -271,8 +271,7 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
   }                                                                         \
   IREE_API_EXPORT iree_vm_ref_t name##_retain_ref(T* value);                \
   IREE_API_EXPORT iree_vm_ref_t name##_move_ref(T* value);                  \
-  IREE_ATTRIBUTE_UNUSED static inline T* name##_deref(                      \
-      const iree_vm_ref_t ref) {                                            \
+  static inline T* name##_deref(const iree_vm_ref_t ref) {                  \
     IREE_VM_REF_ASSERT(name##_registration);                                \
     return IREE_LIKELY(name##_isa(ref)) ? (T*)ref.ptr : NULL;               \
   }                                                                         \

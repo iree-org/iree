@@ -36,6 +36,16 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Gets the given `attrOrValue` as a Value by creating constant ops for
+/// attributes.
+static Value getAsValue(OpFoldResult attrOrValue, OpBuilder &builder,
+                        Location loc) {
+  if (Value val = attrOrValue.dyn_cast<Value>())
+    return val;
+  auto attr = llvm::cast<IntegerAttr>(attrOrValue.get<Attribute>());
+  return builder.create<arith::ConstantIndexOp>(loc, attr.getInt());
+}
+
 #ifndef NDEBUG
 inline raw_ostream &operator<<(raw_ostream &os,
                                const LoopTilingAndDistributionInfo &info) {

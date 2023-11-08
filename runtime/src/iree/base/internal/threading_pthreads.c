@@ -227,8 +227,7 @@ uintptr_t iree_thread_id(iree_thread_t* thread) {
 // Maps an IREE iree_thread_priority_class_t value to a pthreads priority param.
 // The min/max ranges of the priority are implementation dependent so we need to
 // do this at runtime.
-IREE_ATTRIBUTE_UNUSED static struct sched_param
-iree_thread_sched_param_for_priority_class(
+static struct sched_param iree_thread_sched_param_for_priority_class(
     int policy, iree_thread_priority_class_t priority_class) {
   struct sched_param param;
   memset(&param, 0, sizeof(param));

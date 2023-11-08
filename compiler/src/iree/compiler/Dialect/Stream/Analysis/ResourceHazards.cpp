@@ -33,8 +33,21 @@ namespace Stream {
 
 // TODO(#6972): move to StreamTypes.h.
 
+static bool doesRead(ResourceAccessBitfield access) {
+  return bitEnumContainsAny(access, ResourceAccessBitfield::Read);
+}
+static bool doesWrite(ResourceAccessBitfield access) {
+  return bitEnumContainsAny(access, ResourceAccessBitfield::Write);
+}
 static bool isReadOnly(ResourceAccessBitfield access) {
   return access == ResourceAccessBitfield::Read;
+}
+static bool isWriteOnly(ResourceAccessBitfield access) {
+  return access == ResourceAccessBitfield::Write;
+}
+static bool isReadWrite(ResourceAccessBitfield access) {
+  return bitEnumContainsAny(access, ResourceAccessBitfield::Read |
+                                        ResourceAccessBitfield::Write);
 }
 
 static bool doesRangeOverlap(AsyncAccessRange &lhs, AsyncAccessRange &rhs) {

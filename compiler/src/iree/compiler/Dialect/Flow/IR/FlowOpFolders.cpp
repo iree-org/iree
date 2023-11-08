@@ -132,6 +132,23 @@ struct ReplaceOpIfTensorOperandEmpty : public OpRewritePattern<Op> {
   }
 };
 
+// Turns a tensor type that may have one or more dynamic dimensions into a
+// static type with dynamic dimensions replaced with 0.
+// Example: tensor<?x0x1xf32> -> tensor<0x0x1xf32>
+static Type makeZeroElementsStaticTensorType(Type type) {
+  auto tensorType = llvm::cast<RankedTensorType>(type);
+  if (tensorType.hasStaticShape())
+    return type;
+  SmallVector<int64_t> dims;
+  dims.resize(tensorType.getRank());
+  for (int64_t i = 0; i < tensorType.getRank(); ++i) {
+    int64_t dim = tensorType.getDimSize(i);
+    dims[i] = dim == ShapedType::kDynamic ? 0 : dim;
+  }
+  return RankedTensorType::get(dims, tensorType.getElementType(),
+                               tensorType.getEncoding());
+}
+
 // Returns a new set of dynamic dimensions for a shape carrying op when a type
 // is being changed. This attempts to reuse the existing dimension values if
 // they are available and will drop/insert new ones as required.

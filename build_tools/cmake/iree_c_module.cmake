@@ -91,11 +91,6 @@ function(iree_c_module)
     DEPENDS ${_COMPILE_TOOL} ${_SRC_PATH}
   )
 
-  iree_select_compiler_opts(_NO_WARN_ON_UNUSED_FUNCTION
-    CLANG_OR_GCC
-      "-Wno-unused-function"
-  )
-
   iree_cc_library(
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
@@ -104,7 +99,6 @@ function(iree_c_module)
     COPTS
       "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
       "${_TESTONLY_ARG}"
-      "${_NO_WARN_ON_UNUSED_FUNCTION}"
     DEPS
       # Include paths and options for the runtime sources.
       iree::defs

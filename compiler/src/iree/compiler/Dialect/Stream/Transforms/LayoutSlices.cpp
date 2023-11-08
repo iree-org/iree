@@ -35,6 +35,35 @@ namespace {
 
 using Slice = IREE::Stream::ResourcePackOp::Slice;
 
+// Packs slices back-to-back with no aliasing. Useful when debugging to remove
+// the aliasing that makes data breakpoints useless.
+//
+// Slice packed offset SSA values will be updated and start at the given
+// |baseOffset|. Returns |baseOffset| + the total size of the allocation
+// aligned to the requirements of |resourceConfig|.
+static Value
+packSlicesWithNoAliasing(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
+                         ArrayRef<Slice> slices,
+                         IREE::Stream::ResourceConfigAttr resourceConfig,
+                         IndexSet &indexSet, OpBuilder &builder) {
+  auto loc = packOp.getLoc();
+  int64_t offsetAlignment = resourceConfig.getMinBufferOffsetAlignment();
+  int64_t rangeAlignment = resourceConfig.getMinBufferRangeAlignment();
+
+  Value offset = baseOffset;
+  for (auto &slice : slices) {
+    auto sliceSize = builder.createOrFold<IREE::Util::AlignOp>(
+        loc, slice.dynamicSize, rangeAlignment);
+    slice.packedOffset.replaceAllUsesWith(offset);
+    auto valueToAlign =
+        builder.createOrFold<arith::AddIOp>(loc, offset, sliceSize);
+    offset = builder.createOrFold<IREE::Util::AlignOp>(loc, valueToAlign,
+                                                       offsetAlignment);
+  }
+
+  return builder.createOrFold<IREE::Util::AlignOp>(loc, offset, rangeAlignment);
+}
+
 // Packs a set of statically-sized slices by greedy strip packing.
 //
 // This is the same algorithm used in tflite here:

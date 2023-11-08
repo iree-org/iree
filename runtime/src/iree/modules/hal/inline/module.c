@@ -203,6 +203,13 @@ static iree_status_t IREE_API_PTR iree_hal_inline_module_notify(
 // Utilities
 //===----------------------------------------------------------------------===//
 
+// Casts a VM value to a C host size.
+static iree_host_size_t iree_hal_cast_host_size(int64_t value) {
+  // TODO(benvanik): make this return status and check for overflow if host
+  // size is 32-bits.
+  return (iree_host_size_t)value;
+}
+
 // Casts a VM value to a HAL device size.
 static iree_device_size_t iree_hal_cast_device_size(int64_t value) {
   // TODO(benvanik): make this return status and check for overflow if device

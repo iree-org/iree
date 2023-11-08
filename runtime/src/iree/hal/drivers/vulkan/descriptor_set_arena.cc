@@ -85,6 +85,22 @@ static void PopulateDescriptorSetWriteInfos(
   *out_infos = write_infos.data();
 }
 
+static VkDescriptorSetAllocateInfo PopulateDescriptorSetsAllocateInfo(
+    const DescriptorPool& descriptor_pool,
+    iree_hal_descriptor_set_layout_t* set_layout) {
+  VkDescriptorSetAllocateInfo allocate_info;
+  allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocate_info.pNext = nullptr;
+  allocate_info.descriptorPool = descriptor_pool.handle;
+
+  VkDescriptorSetLayout set_layout_handle =
+      iree_hal_vulkan_native_descriptor_set_layout_handle(set_layout);
+  allocate_info.descriptorSetCount = 1;
+  allocate_info.pSetLayouts = &set_layout_handle;
+
+  return allocate_info;
+}
+
 }  // namespace
 
 DescriptorSetArena::DescriptorSetArena(

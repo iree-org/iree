@@ -25,6 +25,49 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+/// Returns the op that contains lowering config. Checks whether the provided op
+/// contains the lowering config and returns it. Otherwise, tries to find the
+/// lowering config across the function. If there are multiple ops with the same
+/// lowering configs, returns the first one found. Returns failure if there are
+/// multiple op with different lowering config.
+static FailureOr<Operation *> getRootOp(Operation *op) {
+  // Check for self first.
+  if (iree_compiler::getLoweringConfig(op)) {
+    return op;
+  }
+
+  // Get the function op.
+  auto funcOp = dyn_cast<func::FuncOp>(op);
+  if (!funcOp) {
+    funcOp = op->getParentOfType<func::FuncOp>();
+  }
+
+  assert(funcOp && "Missing funcOp");
+
+  Operation *rootOp = nullptr;
+  mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr rootLoweringConfig;
+  auto result = funcOp.walk([&](Operation *op) -> WalkResult {
+    auto loweringConfig = iree_compiler::getLoweringConfig(op);
+    if (!loweringConfig) {
+      return WalkResult::advance();
+    }
+    if (rootLoweringConfig) {
+      if (rootLoweringConfig != loweringConfig) {
+        return WalkResult::interrupt();
+      }
+    } else {
+      rootOp = op;
+      rootLoweringConfig = loweringConfig;
+    }
+    return WalkResult::advance();
+  });
+
+  if (!rootOp || result.wasInterrupted()) {
+    return failure();
+  }
+  return rootOp;
+}
+
 /// Tries to infer the vector sizes from an IR using ValueBounds analysis.
 /// Returns failure if vector sizes can't be inferred.
 static FailureOr<SmallVector<int64_t>>
