@@ -2356,7 +2356,7 @@ static bool isIdentityParallelProjection(linalg::LinalgOp op, AffineMap map) {
       projectedDims.set(idx);
   }
   auto projectedMap = getProjectedMap(map, projectedDims);
-  llvm::dbgs() << "Projected map: " << projectedMap << "\n";
+  LLVM_DEBUG(KD_DBGS() << "Projected map: " << projectedMap << "\n");
   return isIdentityMapWithZeros(projectedMap);
 }
 
@@ -2372,7 +2372,7 @@ static bool isIdentityParallelProjectionInBetween(Operation *op) {
         return false;
       auto map = linalgProducer.getIndexingMapMatchingResult(
           llvm::cast<OpResult>(opOperand.get()));
-      llvm::dbgs() << "Producer map: " << map << "\n";
+      LLVM_DEBUG(KD_DBGS() << "Producer map: " << map << "\n");
       if (!isIdentityParallelProjection(linalgProducer, map))
         return false;
     }
@@ -2382,7 +2382,7 @@ static bool isIdentityParallelProjectionInBetween(Operation *op) {
       if (!linalgConsumer)
         return false;
       auto map = linalgConsumer.getMatchingIndexingMap(&opOperand);
-      llvm::dbgs() << "Consumer map: " << map << "\n";
+      LLVM_DEBUG(KD_DBGS() << "Consumer map: " << map << "\n");
       if (!isIdentityParallelProjection(linalgConsumer, map))
         return false;
     }
@@ -2443,7 +2443,7 @@ setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   if (llvm::any_of(computeOps, [](Operation *op) {
         return !isIdentityParallelProjectionInBetween(op);
       })) {
-    llvm::dbgs() << "Assumption failed\n";
+    LLVM_DEBUG(KD_DBGS() << "Not identity mapping\n");
     return success();
   }
 
