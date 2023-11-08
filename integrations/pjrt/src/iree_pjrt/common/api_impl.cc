@@ -1449,7 +1449,7 @@ iree_status_t ClientInstance::PopulateDevices() {
   return iree_ok_status();
 }
 
-PJRT_Error* ClientInstance::Compile(PJRT_Program* program,
+PJRT_Error* ClientInstance::Compile(const PJRT_Program* program,
                                     /*xla::CompileOptions options,*/
                                     LoadedExecutableInstance** out_executable) {
   std::unique_ptr<ArtifactDumper::Transaction> artifact_tx;
@@ -2155,7 +2155,7 @@ void BindMonomorphicApi(PJRT_Api* api) {
   api->struct_size = PJRT_Api_STRUCT_SIZE;
   api->extension_start = nullptr;
   api->pjrt_api_version.major_version = PJRT_API_MAJOR;
-  api->pjrt_api_version.minor_version = PJRT_API_MINOR - 1;
+  api->pjrt_api_version.minor_version = PJRT_API_MINOR;
 
   // This is a bare implementation throwing UNDEFINED errors. This way new
   // functions will not segmentation fault on invocation.

@@ -93,4 +93,4 @@
   _STUB(PJRT_Buffer_CopyToMemory);
   _STUB(PJRT_Client_CreateViewOfDeviceBuffer);
   _STUB(PJRT_Executable_Fingerprint);
-
+  _STUB(PJRT_Client_TopologyDescription);
