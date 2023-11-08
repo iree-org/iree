@@ -38,6 +38,7 @@ iree_cc_library(
     GlobalOptimization
   HDRS
     "Passes.h"
+    "Utils.h"
   SRCS
     "Convert1X1FilterConv2DToMatmul.cpp"
     "DetachElementwiseFromNamedOps.cpp"
@@ -48,6 +49,7 @@ iree_cc_library(
     "Passes.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
+    "Utils.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
