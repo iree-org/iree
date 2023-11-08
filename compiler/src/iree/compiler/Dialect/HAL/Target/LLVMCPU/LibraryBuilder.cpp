@@ -44,7 +44,7 @@ static llvm::StructType *makeImportTableType(llvm::LLVMContext &context) {
     return existingType;
   }
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
+  auto *i8PtrType = llvm::PointerType::getUnqual(context);
   auto *type = llvm::StructType::create(context,
                                         {
                                             i32Type,
@@ -144,7 +144,7 @@ static llvm::StructType *makeSrcLocType(llvm::LLVMContext &context) {
     return existingType;
   }
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
+  auto *i8PtrType = llvm::PointerType::getUnqual(context);
   auto *type = llvm::StructType::create(context,
                                         {
                                             i32Type,
@@ -172,7 +172,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
   auto *dispatchFunctionType = makeDispatchFunctionType(context);
   auto *dispatchAttrsType = makeDispatchAttrsType(context);
-  auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
+  auto *i8PtrType = llvm::PointerType::getUnqual(context);
   auto *srcLocType = makeSrcLocType(context);
   auto *type = llvm::StructType::create(
       context,
@@ -220,7 +220,7 @@ static llvm::StructType *makeLibraryHeaderType(llvm::LLVMContext &context) {
     return existingType;
   }
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
+  auto *i8PtrType = llvm::PointerType::getUnqual(context);
   auto *type = llvm::StructType::create(context,
                                         {
                                             i32Type,
