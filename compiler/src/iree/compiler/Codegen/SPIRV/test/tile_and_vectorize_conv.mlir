@@ -439,7 +439,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 // CHECK-LABEL: func.func @nchw_conv_static_shape_f32()
 
 // No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
-// CHECK-NOT: vector.transfer_write_write
+// CHECK-NOT: vector.transfer_write
 
 // Check tiling loop along input channel and filter height/width
 // TODO: enable vector hoisting
