@@ -2322,6 +2322,74 @@ adjustTileSizesForGenericOp(func::FuncOp entryPointFn,
   return success();
 }
 
+static bool isIdentityMapWithZeros(AffineMap map) {
+  if (map.getNumSymbols() != 0)
+    return false;
+  if (map.isEmpty())
+    return false;
+  unsigned dimsSeen = 0;
+  for (auto result : map.getResults()) {
+    bool isValidExpr = TypeSwitch<AffineExpr, bool>(result)
+                           .Case<AffineDimExpr>([&dimsSeen](auto dimExpr) {
+                             if (dimExpr.getPosition() != dimsSeen)
+                               return false;
+                             dimsSeen++;
+                             return true;
+                           })
+                           .Case<AffineConstantExpr>([](auto constExpr) {
+                             return constExpr.getValue() == 0;
+                           })
+                           .Default([](AffineExpr) { return false; });
+    if (!isValidExpr)
+      return false;
+  }
+  return true;
+}
+
+static bool isIdentityParallelProjection(linalg::LinalgOp op, AffineMap map) {
+  if (!map.isProjectedPermutation())
+    return false;
+
+  llvm::SmallBitVector projectedDims(op.getNumLoops());
+  for (auto [idx, type] : llvm::enumerate(op.getIteratorTypesArray())) {
+    if (type == utils::IteratorType::reduction)
+      projectedDims.set(idx);
+  }
+  auto projectedMap = getProjectedMap(map, projectedDims);
+  llvm::dbgs() << "Projected map: " << projectedMap << "\n";
+  return isIdentityMapWithZeros(projectedMap);
+}
+
+static bool isIdentityParallelProjectionInBetween(Operation *op) {
+  for (auto &opOperand : op->getOpOperands()) {
+    auto producer = opOperand.get().getDefiningOp();
+    if (!isa<TilingInterface>(producer))
+      continue;
+
+    if (!isa<tensor::UnPackOp>(producer)) {
+      auto linalgProducer = opOperand.get().getDefiningOp<linalg::LinalgOp>();
+      if (!linalgProducer)
+        return false;
+      auto map = linalgProducer.getIndexingMapMatchingResult(
+          llvm::cast<OpResult>(opOperand.get()));
+      llvm::dbgs() << "Producer map: " << map << "\n";
+      if (!isIdentityParallelProjection(linalgProducer, map))
+        return false;
+    }
+
+    if (!isa<tensor::PackOp>(op)) {
+      auto linalgConsumer = dyn_cast<linalg::LinalgOp>(op);
+      if (!linalgConsumer)
+        return false;
+      auto map = linalgConsumer.getMatchingIndexingMap(&opOperand);
+      llvm::dbgs() << "Consumer map: " << map << "\n";
+      if (!isIdentityParallelProjection(linalgConsumer, map))
+        return false;
+    }
+  }
+  return true;
+}
+
 /// Set the lowering configs for all the compute ops. The lowering config is
 /// already set on `rootOperation`. We will duplicate the tile sizes of
 /// distribution and common parallel dims to other compute ops (so they have
@@ -2369,6 +2437,13 @@ setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
   if (isa<linalg::ConvolutionOpInterface>(rootOperation)) {
     // TODO(dcaballe): We don't know yet how to properly propagate the lowering
     // config of a convolution.
+    return success();
+  }
+
+  if (llvm::any_of(computeOps, [](Operation *op) {
+        return !isIdentityParallelProjectionInBetween(op);
+      })) {
+    llvm::dbgs() << "Assumption failed\n";
     return success();
   }
 
