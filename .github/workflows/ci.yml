@@ -578,6 +578,10 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
+      - name: "Setting up Python"
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+        with:
+          python-version: "3.9"
       - name: Wait for docker pull
         run: |
           wait
@@ -590,7 +594,12 @@ jobs:
           # minimum.
           override_python_versions: cp39-cp39
         run: |
-          ./build_tools/python_deploy/build_linux_packages.sh
+          output_dir="$PWD" ./build_tools/python_deploy/build_linux_packages.sh
+      - name: Validate runtime wheel (Linux)
+        shell: bash
+        run: |
+          pip install -f $PWD -v iree-runtime
+          python -m iree.runtime._package_test
       # Note that it is just a trade-off decision to have this serialized
       # as a separate step vs parallelized as a separate job. The runtime
       # build is fast, pays the clone/docker overhead and provides early

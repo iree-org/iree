@@ -604,6 +604,13 @@ int main(int argc, char** argv) {
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-benchmark-module");
 
   // Pass through flags to benchmark (allowing --help to fall through).
+  iree_flags_set_usage(
+      "iree-benchmark-module",
+      "Benchmarks a function within a compiled IREE module and handles I/O\n"
+      "parsing. Modules can be provided by file path (`--module=file.vmfb`)\n"
+      "or read from stdin (`--module=-`) and the function to execute\n"
+      "matches the original name provided to the compiler\n"
+      "(`--function=foo` for `func.func @foo`).\n");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);

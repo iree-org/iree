@@ -568,7 +568,9 @@ setup(
                 "iree-run-trace*",
                 "iree-benchmark-module*",
                 "iree-benchmark-trace*",
+                # These utilities are invariant wrt tracing and are only build for the default runtime.
                 "iree-dump-module*",
+                "iree-dump-parameters*",
                 "iree-cpuinfo*",
             ],
         },
@@ -592,6 +594,7 @@ setup(
             "iree-benchmark-module = iree._runtime.scripts.iree_benchmark_module.__main__:main",
             "iree-benchmark-trace = iree._runtime.scripts.iree_benchmark_trace.__main__:main",
             "iree-dump-module = iree._runtime.scripts.iree_dump_module.__main__:main",
+            "iree-dump-parameters = iree._runtime.scripts.iree_dump_parameters.__main__:main",
             "iree-cpuinfo = iree._runtime.scripts.iree_cpuinfo.__main__:main",
         ]
         + (
