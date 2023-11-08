@@ -133,6 +133,8 @@ def _deserialize(
         subtypes = typing.get_args(obj_type)
         if len(subtypes) != 2 or NONE_TYPE not in subtypes:
             raise ValueError(f"Unsupported union type: {obj_type}.")
+        if data is None:
+            return None
         subtype = subtypes[0] if subtypes[1] == NONE_TYPE else subtypes[1]
         return _deserialize(data, subtype, keyed_obj_map, obj_cache)
 

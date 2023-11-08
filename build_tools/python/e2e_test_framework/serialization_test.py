@@ -41,6 +41,7 @@ class TestA(object):
     c_obj: TestC
     str_val: Optional[str]
     enum_val: EnumX
+    optional_val: Optional[TestB]
 
 
 @serialization.serializable
@@ -66,12 +67,14 @@ class SerializationTest(unittest.TestCase):
                 c_obj=TestC(float_val=0.1),
                 str_val="test1",
                 enum_val=EnumX.OPTION_B,
+                optional_val=None,
             ),
             TestA(
                 b_list=[b_obj_a],
                 c_obj=TestC(float_val=0.2),
                 str_val=None,
                 enum_val=EnumX.OPTION_C,
+                optional_val=b_obj_b,
             ),
         ]
 
@@ -91,12 +94,14 @@ class SerializationTest(unittest.TestCase):
                         c_obj=dict(float_val=0.1),
                         str_val="test1",
                         enum_val="OPTION_B",
+                        optional_val=None,
                     ),
                     dict(
                         b_list=["id_a"],
                         c_obj=dict(float_val=0.2),
                         str_val=None,
                         enum_val="OPTION_C",
+                        optional_val="id_b",
                     ),
                 ],
                 "obj_map": {
@@ -135,18 +140,21 @@ class SerializationTest(unittest.TestCase):
                 c_obj=TestC(float_val=0.1),
                 str_val="test1",
                 enum_val=EnumX.OPTION_B,
+                optional_val=None,
             ),
             TestA(
                 b_list=[b_obj_a],
                 c_obj=TestC(float_val=0.2),
                 str_val=None,
                 enum_val=EnumX.OPTION_C,
+                optional_val=None,
             ),
             TestA(
                 b_list=[b_obj_b],
                 c_obj=TestC(float_val=0.3),
                 str_val="test3",
                 enum_val=EnumX.OPTION_A,
+                optional_val=b_obj_a,
             ),
         ]
 
