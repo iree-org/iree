@@ -35,7 +35,7 @@ static constexpr int VecIdX = 7;
 static constexpr int NumDims = 8;
 } // namespace DimType
 
-static std::string typeToString(int i) {
+[[maybe_unused]] static std::string typeToString(int i) {
   switch (i) {
   case DimType::Batch0:
     return "Batch0";
@@ -756,15 +756,6 @@ static int isSingleLaneIdReduced(std::array<int, 4> &order) {
   return count == 1;
 }
 
-static int getVecSizes(std::array<int, 4> &order, const Layout &layout) {
-  int size = 1;
-  for (int i = 0; i < 4; i++) {
-    if (isVectorId(i))
-      size *= layout.shape[i];
-  }
-  return size;
-}
-
 using bodyType = std::function<void(std::array<int, DimType::NumDims> &)>;
 
 /// This function iterates over the dimensions of a given column/row order
@@ -1060,7 +1051,7 @@ static void distributeConstants(arith::ConstantOp constantOp,
   Value constant = constantOp.getResult();
   if (!layoutMap.count(constant))
     return;
-  auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
+  auto attr = llvm::cast<ElementsAttr>(constantOp.getValue());
   // Only handle splat values for now
   if (!attr.isSplat())
     return;

@@ -45,9 +45,9 @@ class Parser(argparse.ArgumentParser):
         self.add_argument(
             "--e2e_test_artifacts_dir",
             metavar="<e2e-test-artifacts-dir>",
-            type=_check_dir_path,
+            type=str,
             required=True,
-            help="Path to the IREE e2e test artifacts directory.",
+            help="Path/URL to the IREE e2e test artifacts directory.",
         )
 
         self.add_argument(

@@ -224,6 +224,7 @@ void iree_task_nop_retire(iree_task_nop_t* task,
 // IREE_TASK_TYPE_CALL
 //==============================================================================
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 // Returns an XXBBGGRR color (red in the lowest bits).
 // Must not be 0 (tracy will ignore).
 static uint32_t iree_math_ptr_to_xrgb(const void* ptr) {
@@ -233,6 +234,7 @@ static uint32_t iree_math_ptr_to_xrgb(const void* ptr) {
   uint64_t ptr64 = (uintptr_t)ptr;
   return (uint32_t)ptr64 ^ (uint32_t)(ptr64 >> 32);
 }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 void iree_task_call_initialize(iree_task_scope_t* scope,
                                iree_task_call_closure_t closure,
@@ -444,13 +446,9 @@ void iree_task_wait_retire(iree_task_wait_t* task,
 // IREE_TASK_TYPE_DISPATCH_* utilities
 //==============================================================================
 
-// Returns an XXBBGGRR color (red in the lowest bits).
-// Must not be 0 (tracy will ignore).
-static uint32_t iree_task_tile_to_color(
-    const iree_task_tile_context_t* tile_context);
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #if defined(IREE_TASK_TRACING_PER_TILE_COLORS)
-
 // TODO(#4017): optimize this to compute entire slices at once and fold in the
 // work grid location code.
 static uint32_t iree_math_hsv_to_xrgb(const uint8_t h, const uint8_t s,
@@ -480,6 +478,8 @@ static uint32_t iree_math_hsv_to_xrgb(const uint8_t h, const uint8_t s,
   return xrgb;
 }
 
+// Returns an XXBBGGRR color (red in the lowest bits).
+// Must not be 0 (tracy will ignore).
 static uint32_t iree_task_tile_to_color(
     const iree_task_tile_context_t* tile_context) {
   // TODO(#4017): optimize such that it's always on when tracing is
@@ -503,14 +503,16 @@ static uint32_t iree_task_tile_to_color(
   return iree_math_hsv_to_xrgb(h, s, v);
 }
 
-#else
+#else  // defined(IREE_TASK_TRACING_PER_TILE_COLORS)
 
 static uint32_t iree_task_tile_to_color(
     const iree_task_tile_context_t* tile_context) {
   return 0;  // use default tracy colors
 }
 
-#endif  // IREE_TASK_TRACING_PER_TILE_COLORS
+#endif  // defined(IREE_TASK_TRACING_PER_TILE_COLORS)
+
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 void iree_task_dispatch_statistics_merge(
     const iree_task_dispatch_statistics_t* source,
@@ -720,9 +722,9 @@ void iree_task_dispatch_shard_execute(
   IREE_TRACE_ZONE_SET_COLOR(
       z0, iree_math_ptr_to_xrgb(dispatch_task->closure.user_context));
 
-  // Map only the requested amount of worker local memory into the tile context.
-  // This ensures that how much memory is used by some executions does not
-  // inadvertently leak over into other executions.
+  // Require at least the requested amount of worker local memory but pass all
+  // of the available memory. This allows dispatches to use more when available
+  // but still get nice validation here when the minimums aren't met.
   if (IREE_UNLIKELY(dispatch_task->local_memory_size >
                     worker_local_memory.data_length)) {
     iree_task_try_set_status(
@@ -736,8 +738,6 @@ void iree_task_dispatch_shard_execute(
     IREE_TRACE_ZONE_END(z0);
     return;
   }
-  iree_byte_span_t local_memory = iree_make_byte_span(
-      worker_local_memory.data, dispatch_task->local_memory_size);
 
   // Prepare context shared for all tiles in the shard.
   iree_task_tile_context_t tile_context;
@@ -748,7 +748,7 @@ void iree_task_dispatch_shard_execute(
   uint32_t workgroup_count_x = tile_context.workgroup_count[0];
   uint32_t workgroup_count_y = tile_context.workgroup_count[1];
   tile_context.worker_id = worker_id;
-  tile_context.local_memory = local_memory;
+  tile_context.local_memory = worker_local_memory;
 
   // We perform all our shard statistics work locally here and only push back to
   // the dispatch at the end; this avoids contention from each shard trying to

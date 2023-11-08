@@ -14,6 +14,7 @@
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "third_party/nccl/nccl.h"
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 // Returns the same value as NCCL's init.cc hashUniqueId.
 // These magic constants were chosen by their implementation and unlikely to
 // be stable as it's not part of their public API. Only to be used for
@@ -28,6 +29,7 @@ static uint64_t iree_hal_cuda_nccl_hash_id(const iree_hal_cuda_nccl_id_t* id) {
   }
   return hash;
 }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 iree_status_t iree_hal_cuda_nccl_get_unique_id_from_context(
     iree_hal_cuda_context_wrapper_t* context_wrapper,

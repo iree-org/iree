@@ -170,7 +170,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-unknown-warning-option"
     "-Wno-unused-command-line-argument"
     "-Wno-unused-const-variable"
-    "-Wno-unused-function"
     "-Wno-unused-local-typedef"
     "-Wno-unused-private-field"
     "-Wno-user-defined-warnings"

@@ -14,7 +14,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/TargetParser/AArch64TargetParser.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/TargetParser/Triple.h"
@@ -81,24 +80,6 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
       targetCpuFeatures.AddFeature(feature);
     }
     outCpuFeatures = targetCpuFeatures.getString();
-  } else if (triple.isAArch64()) {
-    std::vector<std::string> UpdatedFeaturesVec;
-    std::optional<llvm::AArch64::CpuInfo> cpuInfo =
-        llvm::AArch64::parseCpu(outCpu);
-    if (!cpuInfo) {
-      llvm::errs() << "error: Failed to resolve AArch64 CPU features for the "
-                      "specified CPU.\n";
-      return false;
-    }
-    auto cpuExts = cpuInfo->getImpliedExtensions();
-    std::vector<StringRef> cpuExtFeatures;
-    llvm::AArch64::getExtensionFeatures(cpuExts, cpuExtFeatures);
-    for (auto feature : cpuExtFeatures) {
-      if (!outCpuFeatures.empty()) {
-        outCpuFeatures.append(",");
-      }
-      outCpuFeatures.append(feature);
-    }
   } else {
     llvm::errs()
         << "error: Resolution of target CPU to target CPU features is not "
@@ -158,7 +139,9 @@ std::optional<LLVMTarget> LLVMTarget::create(std::string_view triple,
   }
   if (!resolveCPUAndCPUFeatures(cpu, cpuFeatures, llvm::Triple(triple),
                                 target.cpu, target.cpuFeatures)) {
-    return {};
+    // Something bad happened, and our target might not be what the user expects
+    // but we need to continue to avoid breaking existing users. Hopefully
+    // resolveCPUAndCPUFeatures logged a helpful error already.
   }
   return target;
 }

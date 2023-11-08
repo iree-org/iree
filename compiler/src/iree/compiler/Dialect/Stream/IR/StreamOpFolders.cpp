@@ -362,7 +362,8 @@ struct PropagateClonableOps : public OpRewritePattern<Op> {
 
 // Materialize copy-on-write (🐄) ops where required for |rootValue|.
 // Only valid in tensor/async ops - don't use with stream.cmd.*.
-static bool materializeCOW(Location loc, Value rootValue, OpBuilder &builder) {
+[[maybe_unused]] static bool materializeCOW(Location loc, Value rootValue,
+                                            OpBuilder &builder) {
   auto valueType =
       llvm::dyn_cast<IREE::Stream::ResourceType>(rootValue.getType());
   if (!valueType)

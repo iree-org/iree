@@ -64,7 +64,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRSCFTransforms
-    MLIRSubsetInsertionOpInterface
+    MLIRSubsetOpInterface
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms

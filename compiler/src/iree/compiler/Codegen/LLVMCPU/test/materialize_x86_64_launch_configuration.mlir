@@ -977,7 +977,7 @@ hal.executable private @matmul_static  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[192, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.export public @matmul_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1575,6 +1575,43 @@ hal.executable private @pack  {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @pack_many_elements  {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
+    cpu_features = "+avx512f",
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 64 : index,
+    target_triple = "x86_64-none-elf"
+  }>) {
+  hal.executable.export public @pack_many_elements layout(#pipeline_layout)
+    builtin.module {
+      func.func @pack_many_elements() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1200x500000xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<31250x1200x16x1xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1200, 500000], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1200x500000xf32>> -> tensor<1200x500000xf32>
+        %3 = tensor.empty() : tensor<31250x1200x16x1xf32>
+        %pack = tensor.pack %2 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %3 : tensor<1200x500000xf32> -> tensor<31250x1200x16x1xf32>
+        flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [31250, 1200, 16, 1], strides = [1, 1, 1, 1] : tensor<31250x1200x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<31250x1200x16x1xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 31250], [1, 1]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//      CHECK: hal.executable.export public @pack_many_elements
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   tensor.pack
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   <0, bindings = [
     <0, storage_buffer, ReadOnly>,
     <1, storage_buffer, ReadOnly>,
@@ -1863,7 +1900,7 @@ hal.executable private @quant_model {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[256, 72, 0], [8, 32, 0], [0, 0, 12], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[192, 144, 0], [8, 32, 0], [0, 0, 12], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.export public @quant_model
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

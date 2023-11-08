@@ -269,53 +269,6 @@ struct MaterializeFlowDispatchTensorStoreOp
 
 } // namespace
 
-void adjustTileSizesToNarrowStaticShape(MaterializeEncodingInfo &encodingInfo,
-                                        ArrayRef<int64_t> shape) {
-  for (size_t i = 0; i < encodingInfo.innerDimsPos.size(); i++) {
-    int64_t size = shape[encodingInfo.innerDimsPos[i]];
-    // Dynamic sizes are assumed to be large enough, not to be candidates for
-    // narrow kernels.
-    if (ShapedType::isDynamic(size))
-      continue;
-    int64_t &tileSize = encodingInfo.innerTileSizes[i];
-    // Let's not try to handle any dynamic tile sizes here. We could handle the
-    // case where size==1 (as whatever is the runtime value of tileSize, it
-    // can't be less than that, so it should be OK to replace it with 1) but
-    // in general, adjusting dynamic tile sizes has to be done by the
-    // materializeEncodingValueFn which we obtain those tileSizes from.
-    if (ShapedType::isDynamic(tileSize))
-      continue;
-    // Adjust tile sizes for narrow cases: ensure that narrow sizes (those that
-    // are less than the normal tileSize) don't get padded to more than the
-    // next power of two, or tileSize, whichever is smaller.
-    //
-    // For example, if size==1, always adjust tileSize to be 1, so that
-    // matrix-times-vector problems remain that, instead of becoming more
-    // general matrix-times-matrix.
-    //
-    // Another example, if tileSize==6, then:
-    //
-    //   Original tensor size | adjusted tileSize
-    //   -------------------- | -----------------
-    //                      1 |                 1
-    //                      2 |                 2
-    //                      3 |                 4
-    //                      4 |                 4
-    //                      5 |                 6
-    //                   >= 6 |                 6
-    //
-    // Note: this implies that microkernels that implement a code path for
-    // a given `tileSize` value should also implement alternative code paths
-    // for all powers of two smaller than `tileSize`, as those could end up
-    // being selected here, and would fall back on slow generic code if no
-    // optimized code path is provided.
-    for (int po2 = 1; po2 < tileSize; po2 *= 2) {
-      if (size <= po2 && tileSize >= po2)
-        tileSize = po2;
-    }
-  }
-}
-
 static FailureOr<MaterializeEncodingValueInfo>
 chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
                                           OpBuilder &builder, Location loc) {

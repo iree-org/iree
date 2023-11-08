@@ -112,26 +112,6 @@ static inline iree_e2e_test_value_t iree_e2e_test_value_make_i32(
   return result;
 }
 
-// TODO(#5542): check the value type before accessing the union.
-static inline int32_t iree_e2e_test_value_get_i32(
-    iree_e2e_test_value_t* value) {
-  return value->i32;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_i64(
-    int64_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_I64;
-  result.i64 = value;
-  return result;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline int64_t iree_e2e_test_value_get_i64(
-    iree_e2e_test_value_t* value) {
-  return value->i64;
-}
-
 static inline iree_e2e_test_value_t iree_e2e_test_value_make_f16(
     uint16_t value) {
   iree_e2e_test_value_t result;
@@ -153,35 +133,6 @@ static inline iree_e2e_test_value_t iree_e2e_test_value_make_f32(float value) {
   result.type = IREE_E2E_TEST_VALUE_TYPE_F32;
   result.f32 = value;
   return result;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline float iree_e2e_test_value_get_f32(iree_e2e_test_value_t* value) {
-  return value->f32;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline uint16_t iree_e2e_test_value_get_f16(
-    iree_e2e_test_value_t* value) {
-  return value->f16_u16;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline uint16_t iree_e2e_test_value_get_bf16(
-    iree_e2e_test_value_t* value) {
-  return value->bf16_u16;
-}
-
-static inline iree_e2e_test_value_t iree_e2e_test_value_make_f64(double value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_F64;
-  result.f64 = value;
-  return result;
-}
-
-// TODO(#5542): check the value type before accessing the union.
-static inline double iree_e2e_test_value_get_f64(iree_e2e_test_value_t* value) {
-  return value->f64;
 }
 
 /*****************************************************************************
@@ -289,22 +240,6 @@ static iree_status_t copy_device_buffer_view_to_host(
   return status;
 }
 
-// Performs a deep copy of host-local |src| into a device-local |dst|.
-// Allocates |dst|.
-static iree_status_t copy_host_buffer_view_to_device(
-    iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
-    iree_hal_buffer_view_t* src, iree_hal_buffer_view_t** dst) {
-  iree_hal_buffer_mapping_t src_mapping;
-  IREE_RETURN_IF_ERROR(map_host_local_row_major_data(
-      src, IREE_HAL_MEMORY_ACCESS_READ, &src_mapping));
-  iree_const_byte_span_t const_src_bytes = iree_make_const_byte_span(
-      src_mapping.contents.data, src_mapping.contents.data_length);
-  IREE_RETURN_IF_ERROR(allocate_device_buffer_view_like(
-      device, hal_allocator, src, const_src_bytes, dst));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&src_mapping));
-  return iree_ok_status();
-}
-
 // Performs a deep copy of device-local |src| into a device-local |dst|.
 // Allocates |dst|.
 static iree_status_t copy_device_buffer_view_to_device(
@@ -349,32 +284,6 @@ static iree_status_t copy_device_buffer_views_to_host(
   return iree_ok_status();
 }
 
-// Helper to write an int value to a single buffer element.
-static void write_int_element(iree_hal_element_type_t element_type, int value,
-                              void* dst) {
-#define WRITE_INT_ELEMENT_CASE(ETYPE, CTYPE) \
-  case IREE_HAL_ELEMENT_TYPE_##ETYPE:        \
-    *(CTYPE*)dst = (CTYPE)value;             \
-    break;
-
-  switch (element_type) {
-    WRITE_INT_ELEMENT_CASE(INT_8, int8_t)
-    WRITE_INT_ELEMENT_CASE(INT_32, int32_t)
-    WRITE_INT_ELEMENT_CASE(FLOAT_32, float)
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-      *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
-      break;
-    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
-      *(uint16_t*)dst = iree_math_f32_to_bf16((float)value);
-      break;
-    default:
-      IREE_ASSERT(false, "unhandled element type");
-      break;
-  }
-
-#undef WRITE_INT_ELEMENT_CASE
-}
-
 /*****************************************************************************
  *
  * Part 2:
@@ -388,30 +297,6 @@ static void write_int_element(iree_hal_element_type_t element_type, int value,
  * particular test program is entrenched here.
  *
  *****************************************************************************/
-// Write an int32_t element to a mapped row-major matrix buffer.
-static void write_int_to_matrix_element(int32_t value, iree_hal_dim_t m_size,
-                                        iree_hal_dim_t n_size,
-                                        iree_hal_element_type_t result_type,
-                                        void* data, iree_hal_dim_t m,
-                                        iree_hal_dim_t n) {
-  iree_host_size_t index = n + m * n_size;
-  (void)m_size;
-  if (iree_hal_element_type_is_integer(result_type, 32)) {
-    ((int32_t*)data)[index] = value;
-    return;
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
-    ((uint16_t*)data)[index] = iree_math_f32_to_f16((float)value);
-    return;
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {
-    ((uint16_t*)data)[index] = iree_math_f32_to_bf16((float)value);
-    return;
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
-    ((float*)data)[index] = value;
-    return;
-  }
-  IREE_CHECK_OK(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                 "unhandled matmul result type"));
-}
 
 // Reads an element from a mapped row-major matrix buffer.
 static iree_e2e_test_value_t read_matrix_element(

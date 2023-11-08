@@ -19,6 +19,12 @@ namespace GlobalOptimization {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
+static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
+    "iree-global-opt-enable-quantized-matmul-reassociation",
+    llvm::cl::desc(
+        "Enables reassociation of quantized matmul ops (experimental)."),
+    llvm::cl::init(false));
+
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
   // ML frontends have very uneven support for user-controlled types _and_ users
@@ -67,7 +73,12 @@ void buildGlobalOptimizationPassPipeline(
       // this pass both before unit dim folding + consteval, as well as after.
       .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
-      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
+      .addPass([&]() {
+        return createFuseDequantizationMatmulPass(
+            clEnableQuantizedMatmulReassociation);
+      })
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
       // Expand all vectors in vecmat/matvec ops into matrices for tiling.
       .addPredicatedPass(transformOptions.options.dataTiling,
                          createExpandVectorsPass)
