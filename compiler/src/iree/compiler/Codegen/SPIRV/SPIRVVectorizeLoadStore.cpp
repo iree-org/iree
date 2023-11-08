@@ -32,7 +32,7 @@
 
 #define DEBUG_TYPE "iree-spirv-vectorize-load-store"
 
-#define DO_NOTHING [](OpBuilder &b, Location loc) { return ValueRange{}; }
+#define DO_NOTHING [](OpBuilder &b, Location loc) {}
 
 constexpr int kMaxVectorNumBits = 128;
 constexpr int kMaxVectorNumElements = 4;
