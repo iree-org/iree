@@ -598,8 +598,12 @@ jobs:
       - name: Validate runtime wheel (Linux)
         shell: bash
         run: |
-          pip install -f $PWD -v iree-runtime
+          pip install --upgrade pip
+          pip install --no-index -f $PWD -v iree-runtime
+          echo "Testing default runtime:"
           python -m iree.runtime._package_test
+          echo "Testing tracy runtime:"
+          IREE_PY_RUNTIME=tracy python -m iree.runtime._package_test
       # Note that it is just a trade-off decision to have this serialized
       # as a separate step vs parallelized as a separate job. The runtime
       # build is fast, pays the clone/docker overhead and provides early
