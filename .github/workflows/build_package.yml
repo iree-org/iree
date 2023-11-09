@@ -164,9 +164,7 @@ jobs:
       # console scripts (like cmake, ninja) will not be on the path.
       ##########################################################################
       - name: Main distribution (Linux for x86_64)
-        if: >
-          "matrix.build-package == 'main-dist-linux' &&
-          matrix.build-family == 'linux-x86_64'"
+        if: "matrix.build-package == 'main-dist-linux' && matrix.build-family == 'linux-x86_64'"
         shell: bash
         run: |
           docker run --rm -w=/work \
@@ -175,9 +173,7 @@ jobs:
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
 
       - name: Main distribution (Linux for Arm64)
-        if: >
-          "matrix.build-package == 'main-dist-linux' &&
-          matrix.build-family == 'linux-aarch64'"
+        if: "matrix.build-package == 'main-dist-linux' && matrix.build-family == 'linux-aarch64'"
         shell: bash
         run: |
           docker run --rm -w=/work \
@@ -192,10 +188,7 @@ jobs:
       ##########################################################################
 
       - name: Build runtime wheels (Linux, x86_64 and Arm64)
-        if: >
-          "matrix.build-package == 'py-runtime-pkg' &&
-          (matrix.build-family == 'linux-x86_64' ||
-          matrix.build-family == 'linux-aarch64')"
+        if: "matrix.build-package == 'py-runtime-pkg' && contains(matrix.build-family, 'linux')"
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
@@ -206,9 +199,7 @@ jobs:
           ./c/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build runtime wheels (MacOS)
-        if: >
-          "matrix.build-package == 'py-runtime-pkg' &&
-          matrix.build-family == 'macos'"
+        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'macos'"
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
@@ -220,9 +211,7 @@ jobs:
           ./c/build_tools/python_deploy/build_macos_packages.sh
 
       - name: Build runtime wheels (Windows)
-        if: >
-          "matrix.build-package == 'py-runtime-pkg' &&
-          matrix.build-family == 'windows'"
+        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'windows'"
         shell: powershell
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
@@ -241,10 +230,7 @@ jobs:
       # One step per OS.
       ##########################################################################
       - name: Build compiler wheels (Linux, x86_64 and Arm64)
-        if: >
-          "matrix.build-package == 'py-runtime-pkg' &&
-          (matrix.build-family == 'linux-x86_64' ||
-          matrix.build-family == 'linux-aarch64')"
+        if: "matrix.build-package == 'py-compiler-pkg' && contains(matrix.build-family, 'linux')"
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
@@ -255,9 +241,7 @@ jobs:
           ./c/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build compiler wheels (MacOS)
-        if: >
-          "matrix.build-package == 'py-compiler-pkg' &&
-          matrix.build-family == 'macos'"
+        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'macos'"
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
@@ -269,9 +253,7 @@ jobs:
           ./c/build_tools/python_deploy/build_macos_packages.sh
 
       - name: Build compiler wheels (Windows)
-        if: >
-          "matrix.build-package == 'py-compiler-pkg' &&
-          matrix.build-family == 'windows'"
+        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'windows'"
         shell: powershell
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
