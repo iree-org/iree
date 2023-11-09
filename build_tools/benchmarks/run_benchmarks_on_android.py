@@ -307,6 +307,8 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
             )
 
         run_config = benchmark_case.run_config
+        # TODO(#15452): Change to `--task_topology_cpu_ids` once we figure out
+        # the right mapping.
         taskset = self.__deduce_taskset_from_run_config(run_config)
         run_args = run_config.materialize_run_flags(inputs_dir=inputs_dir)
         run_args.append(f"--module={module_device_path}")
