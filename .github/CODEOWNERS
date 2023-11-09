@@ -17,7 +17,8 @@
 # Except for routinely-updated submodules
 /third_party/llvm-project @ghost
 /third_party/llvm-project.branch-pin @ghost
-/third_party/mlir-hlo @ghost
+/third_party/stablehlo @ghost
+/third_party/torch-mlir @ghost
 
 # Bindings
 /runtime/bindings/python/ @stellaraccident
