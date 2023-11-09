@@ -13,11 +13,11 @@
 # set.
 # IREE_VULKAN_DISABLE: Do not run tests that require Vulkan. Default: 0
 # BUILD_TAG_FILTERS: Passed to bazel to filter targets to build.
-#   See https://docs.bazel.build/versions/master/command-line-reference.html#flag--build_tag_filters)
+#   See https://bazel.build/reference/command-line-reference.html#flag--build_tag_filters)
 #   Default: "-nokokoro"
 # TEST_TAG_FILTERS: Passed to bazel to filter targets to test. Note that test
 #   targets excluded this way will also not be built.
-#   See https://docs.bazel.build/versions/master/command-line-reference.html#flag--test_tag_filters)
+#   See https://bazel.build/reference/command-line-reference.html#flag--test_tag_filters)
 #   Default: If IREE_VULKAN_DISABLE=1, "-nokokoro,-driver=vulkan". Else "-nokokoro".
 
 set -xeuo pipefail

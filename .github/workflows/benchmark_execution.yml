@@ -94,14 +94,12 @@ jobs:
           #     },
           #     ...
           #   ]
-          # TODO(pzread): Re-enable Pixel 6 once the device is fixed.
           echo benchmark-matrix="$(jq -c '[ . | to_entries[]
             | .key as $device_name
             | .value.host_environment as $host_environment
             | (.value.shards | length) as $count
             | .value.shards[]
             | {$device_name, $host_environment, shard: {index, $count}}
-            | select(.device_name != "pixel-6-pro")
             ]' "${BENCHMARK_CONFIG}")" >> "${GITHUB_OUTPUT}"
 
   run_benchmarks:
@@ -127,7 +125,6 @@ jobs:
       SHARD_COUNT: ${{ matrix.benchmark.shard.count }}
       PLATFORM_ARCH: ${{ matrix.benchmark.host_environment.platform }}-${{ matrix.benchmark.host_environment.architecture }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ inputs.e2e-test-artifacts-gcs-artifact-dir }}
-      E2E_TEST_ARTIFACTS_DIR: ${{ inputs.e2e-test-artifacts-dir }}
       BENCHMARK_RESULTS_DIR: benchmark-results
     outputs:
       benchmark-results-dir: ${{ env.BENCHMARK_RESULTS_DIR }}
@@ -153,14 +150,6 @@ jobs:
         id: download-assets
         run: |
           gcloud storage cp "${BENCHMARK_CONFIG_GCS_ARTIFACT}" "${BENCHMARK_CONFIG}"
-          mkdir -p "${E2E_TEST_ARTIFACTS_DIR}"
-          jq -r \
-            --arg DEVICE_NAME "${DEVICE_NAME}" \
-            --arg SHARD_INDEX "${SHARD_INDEX}" \
-            --arg GCS_ARTIFACT_DIR "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}" \
-            '.[$DEVICE_NAME].shards[($SHARD_INDEX | tonumber)] | .module_dir_paths[] | "\($GCS_ARTIFACT_DIR)/\(.)"' \
-            "${BENCHMARK_CONFIG}" | \
-            gcloud storage cp -r --read-paths-from-stdin "${E2E_TEST_ARTIFACTS_DIR}"
           echo "benchmark-config=${BENCHMARK_CONFIG}" >> "${GITHUB_OUTPUT}"
       - name: "Unpacking benchmark tools"
         id: unpack-tools
@@ -191,11 +180,16 @@ jobs:
           IREE_TRACY_CAPTURE_TOOL: ${{ steps.unpack-tools.outputs.tracy-capture-tool }}
           IREE_TARGET_DEVICE_NAME: ${{ env.DEVICE_NAME }}
           IREE_SHARD_INDEX: ${{ matrix.benchmark.shard.index }}
-          IREE_E2E_TEST_ARTIFACTS_DIR: ${{ env.E2E_TEST_ARTIFACTS_DIR }}
           IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}${{ steps.sharding.outputs.suffix }}.json
           IREE_BENCHMARK_TRACES: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-traces-${{ matrix.benchmark.device_name }}${{ steps.sharding.outputs.suffix }}.tar.gz
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
+          export IREE_E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR/gs:\/\//https://storage.googleapis.com/}"
+          # TODO(#14661): Annotate the c2-standard-60 resutls as experimental
+          # and avoid uploading to the dashboard (excluded from the pattern).
+          if [[ "${IREE_TARGET_DEVICE_NAME}" == "c2-standard-60" ]]; then
+            export IREE_BENCHMARK_RESULTS="${IREE_BENCHMARK_RESULTS/benchmark-results-/experimental-benchmark-results-}"
+          fi
           ./build_tools/benchmarks/run_benchmarks.sh
       - name: "Uploading benchmark results"
         run: gcloud storage cp -r "${BENCHMARK_RESULTS_DIR}" "${GCS_DIR}/"

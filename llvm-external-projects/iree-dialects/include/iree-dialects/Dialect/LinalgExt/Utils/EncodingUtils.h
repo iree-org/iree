@@ -21,15 +21,15 @@ bool isMatmulEncodingUser(EncodingUser user);
 // Check if encoding user is one of batch matmul encodings.
 bool isBatchMatmulEncodingUser(EncodingUser user);
 
-struct MatmulTileParams {
+struct TileMxNxK {
   int64_t M = 1;
-  int64_t K = 1;
   int64_t N = 1;
+  int64_t K = 1;
 };
 
-MaterializeEncodingInfo
-chooseEncodingInfoForMatmul(EncodingUser user, EncodingRole role,
-                            MatmulTileParams tileParams);
+MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingUser user,
+                                                 EncodingRole role,
+                                                 TileMxNxK tileMxNxK);
 
 } // namespace LinalgExt
 } // namespace IREE

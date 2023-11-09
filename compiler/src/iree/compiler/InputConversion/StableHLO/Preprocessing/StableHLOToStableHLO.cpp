@@ -46,12 +46,6 @@ DenseIntElementsAttr make1DElementsAttr(OpBuilder &b,
   return DenseIntElementsAttr::get(type, integers);
 }
 
-DenseIntElementsAttr make1DElementsAttr(OpBuilder &b, int64_t start,
-                                        int64_t num) {
-  return make1DElementsAttr(
-      b, llvm::to_vector(llvm::seq<int64_t>(start, start + num)));
-}
-
 Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
                   ArrayRef<float> values) {
   RankedTensorType ty = RankedTensorType::get(shapes, b.getF32Type());
@@ -418,19 +412,17 @@ struct TransposeReshapeGenericDotGeneral final
     auto lhsNewType = cast<RankedTensorType>(lhs.getType());
     auto rhsNewType = cast<RankedTensorType>(rhs.getType());
 
-    // if lhs's shape or rhs's shape has collapsed, we need reshape the result
-    bool needReshapeResult = lhsNewType.getRank() < lhsShapeType.getRank() ||
-                             rhsNewType.getRank() < rhsShapeType.getRank();
     // batching、lhs parallel、rhs parallel this order is a conversion
-    SmallVector<int64_t> newShape = {lhsNewType.getShape()[0],
-                                     lhsNewType.getShape()[1]};
+    SmallVector<int64_t, 3> newShape = {lhsNewType.getShape()[0]};
+
+    if (lhsNewType.getRank() > 2)
+      newShape.push_back(lhsNewType.getDimSize(1));
+
     if (rhsNewType.getRank() > 2)
       newShape.push_back(rhsNewType.getDimSize(2));
 
     TensorType newResultType =
-        needReshapeResult
-            ? RankedTensorType::get(newShape, resultType.getElementType())
-            : op.getType();
+        RankedTensorType::get(newShape, resultType.getElementType());
 
     auto newOp = rewriter.create<mlir::stablehlo::DotGeneralOp>(
         op.getLoc(), newResultType, lhs, rhs, dimensionNumbers,
@@ -446,10 +438,11 @@ struct TransposeReshapeGenericDotGeneral final
     }
 
     Value result = newOp.getResult();
-    if (needReshapeResult) {
-      result = rewriter.create<mlir::stablehlo::ReshapeOp>(op.getLoc(),
-                                                           resultType, result);
+    if (op.getType() != newResultType) {
+      result = rewriter.create<mlir::stablehlo::ReshapeOp>(
+          op.getLoc(), op.getType(), newOp.getResult());
     }
+
     rewriter.replaceOp(op, result);
     return success();
   }

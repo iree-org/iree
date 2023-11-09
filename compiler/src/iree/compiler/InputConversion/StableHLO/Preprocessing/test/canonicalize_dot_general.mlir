@@ -17,6 +17,8 @@ func.func public @dot_general_2d(%arg0: tensor<4x3xf32> {stablehlo.sharding = ""
   return %0 : tensor<3xf32>
 }
 
+// -----
+
 // CHECK-LABEL: @dot_general_4d
 func.func public @dot_general_4d(%arg0: tensor<1x2x3xf32> {stablehlo.sharding = ""}, %arg1: tensor<1x4x2x3xf32> {stablehlo.sharding = ""}) -> tensor<1x2x4xf32> {
   %0 = stablehlo.dot_general %arg0, %arg1,
@@ -34,4 +36,19 @@ func.func public @dot_general_4d(%arg0: tensor<1x2x3xf32> {stablehlo.sharding = 
   // CHECK-NEXT: %[[RES:.+]]   = stablehlo.reshape %[[DOT]] : (tensor<2x1x4xf32>) -> tensor<1x2x4xf32>
   // CHECK-NEXT: return %[[RES]]
   return %0 : tensor<1x2x4xf32>
+}
+
+
+// -----
+
+// CHECK-LABEL: @unary_out_channel_dot
+func.func public @unary_out_channel_dot(%arg0: tensor<1x3x4xui16>, %arg1: tensor<1x4x3xui16>) -> tensor<1xui16> {
+
+  // CHECK: %[[TRANS:.+]] = stablehlo.transpose %arg0, dims = [0, 2, 1]
+  // CHECK: %[[LHS:.+]] = stablehlo.reshape %[[TRANS]] : (tensor<1x4x3xui16>) -> tensor<12xui16>
+  // CHECK: %[[RHS:.+]] = stablehlo.reshape %arg1 : (tensor<1x4x3xui16>) -> tensor<12xui16>
+  // CHECK: %[[DOT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+  // CHECK: %[[OUT:.+]] = stablehlo.reshape %[[DOT]] : (tensor<ui16>) -> tensor<1xui16>
+  %0 = stablehlo.dot_general %arg0, %arg1, batching_dims = [0] x [0], contracting_dims = [2, 1] x [1, 2], precision = [HIGH, HIGH] : (tensor<1x3x4xui16>, tensor<1x4x3xui16>) -> tensor<1xui16>
+  return %0 : tensor<1xui16>
 }

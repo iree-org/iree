@@ -371,6 +371,83 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
   return referenceTypeLengthInBytes;
 }
 
+// Reduces the number of workgroups in cases where we are dividing the work too
+// much. Over-provision the number of workgroups to twice the number of
+// threads.
+static void reduceDistributionWorkgroups(
+    ArrayRef<int64_t> workload, SmallVectorImpl<int64_t> &distributedTileSizes,
+    std::optional<ArrayRef<int64_t>> maxTileSizes = std::nullopt,
+    std::optional<ArrayRef<int64_t>> vectorSizeHints = std::nullopt) {
+  assert(workload.size() == distributedTileSizes.size());
+  SmallVector<int64_t> numWorkgroupsPerDim(workload.size(), 1);
+  for (auto [idx, value] : llvm::enumerate(workload)) {
+    if (distributedTileSizes[idx] == 0 || ShapedType::isDynamic(value)) {
+      continue;
+    }
+    numWorkgroupsPerDim[idx] =
+        llvm::divideCeil(value, distributedTileSizes[idx]);
+  }
+
+  int64_t numWorkgroupsLimit = 2 * clNumberOfRuntimeThreads;
+  int64_t numWorkgroups =
+      std::accumulate(numWorkgroupsPerDim.begin(), numWorkgroupsPerDim.end(),
+                      1LL, std::multiplies<int64_t>{});
+  unsigned currDim = workload.size();
+  while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
+    unsigned index = currDim - 1;
+    int64_t currSize = distributedTileSizes[index];
+    if (workload[index] == ShapedType::kDynamic ||
+        (maxTileSizes && currSize >= maxTileSizes.value()[index]) ||
+        currSize >= workload[index]) {
+      currDim--;
+      continue;
+    }
+
+    int64_t newSize = std::min<int64_t>(currSize * 2, workload[index]);
+    int64_t vectorSize = vectorSizeHints ? vectorSizeHints.value()[index] : 0;
+
+    // Chech if it's the ideal size with vector size hint. And skip if the new
+    // size will break the ideal size.
+    if (vectorSize > 1 &&
+        (currSize % vectorSize == 0 && workload[index] % currSize == 0) &&
+        (newSize % vectorSize != 0 || workload[index] % newSize != 0)) {
+      currDim--;
+      continue;
+    }
+
+    distributedTileSizes[index] = newSize;
+    int64_t nwg =
+        llvm::divideCeil(workload[index], distributedTileSizes[index]);
+    if (nwg < numWorkgroupsPerDim[index]) {
+      numWorkgroups /= numWorkgroupsPerDim[index];
+      numWorkgroupsPerDim[index] = nwg;
+      numWorkgroups *= nwg;
+    } else {
+      currDim--;
+    }
+  }
+
+  // Final fixup for dividing workload evenly.
+  for (auto i : llvm::seq<unsigned>(0, distributedTileSizes.size())) {
+    if (distributedTileSizes[i] == 0 || ShapedType::isDynamic(workload[i])) {
+      continue;
+    }
+
+    int64_t nwg = llvm::divideCeil(workload[i], distributedTileSizes[i]);
+    int64_t newSize = llvm::divideCeil(workload[i], nwg);
+
+    // Chech if it's the ideal size with vector size hint. And skip if the new
+    // size will break the ideal size.
+    int64_t vectorSize = vectorSizeHints ? vectorSizeHints.value()[i] : 0;
+    if (vectorSize > 1 &&
+        (newSize % vectorSize != 0 || workload[i] % newSize != 0)) {
+      continue;
+    }
+
+    distributedTileSizes[i] = newSize;
+  }
+}
+
 /// Returns the default tile sizes to use for the loops that are distributed.
 static SmallVector<int64_t>
 getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
@@ -389,7 +466,6 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
   }
 
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
-  SmallVector<int64_t> numWorkgroupsPerDim(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
   for (auto i : llvm::seq<size_t>(0, numDims)) {
     if (maxTileSizes[i] == 0 || ShapedType::isDynamic(lbs[i]) ||
@@ -423,49 +499,11 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     // work per invocation reasonable.
     distributedTileSizes[i] =
         std::min<int64_t>(candidateTileSize, maxTileSizes[i]);
-    numWorkgroupsPerDim[i] =
-        llvm::divideCeil(workload[i], distributedTileSizes[i]);
   }
 
-  // Reduce the number of workgroups in cases where we are dividing the work too
-  // much. Over-provision the number of workgroups to twice the number of
-  // threads.
-  int64_t numWorkgroupsLimit = 2 * clNumberOfRuntimeThreads;
-  int64_t numWorkgroups =
-      std::accumulate(numWorkgroupsPerDim.begin(), numWorkgroupsPerDim.end(),
-                      1LL, std::multiplies<int64_t>{});
-  unsigned currDim = numDims;
-  while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
-    unsigned index = currDim - 1;
-    int64_t currSize = distributedTileSizes[index];
-    if (workload[index] == ShapedType::kDynamic ||
-        currSize >= maxTileSizes[index] || currSize >= workload[index]) {
-      currDim--;
-      continue;
-    }
+  reduceDistributionWorkgroups(workload, distributedTileSizes, maxTileSizes,
+                               vectorSizeHints);
 
-    int64_t newSize = std::min<int64_t>(currSize * 2, workload[index]);
-    int64_t vectorSize = vectorSizeHints[index];
-
-    // Chech if it's the ideal size with vector size hint. And skip if the new
-    // size will break the ideal size.
-    if (vectorSize > 1 &&
-        (currSize % vectorSize == 0 && workload[index] % currSize == 0) &&
-        (newSize % vectorSize != 0 || workload[index] % newSize != 0)) {
-      currDim--;
-      continue;
-    }
-
-    distributedTileSizes[index] = newSize;
-    int64_t nwg =
-        llvm::divideCeil(workload[index], distributedTileSizes[index]);
-    if (nwg < numWorkgroupsPerDim[index]) {
-      numWorkgroups /= numWorkgroupsPerDim[index];
-      numWorkgroups *= nwg;
-    } else {
-      currDim--;
-    }
-  }
   return distributedTileSizes;
 }
 
@@ -1134,9 +1172,13 @@ setRootConfig(func::FuncOp entryPointFn,
       maxTileSizes[0] = 192;
       maxTileSizes[1] = 128;
     }
+    SmallVector<int64_t> vectorSizeHints(numLoops, vectorSize);
+    if (isBM) {
+      vectorSizeHints[0] = 1;
+    }
     distTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, vecTileSizes, maxTileSizes,
-        /*allowIncompleteTile=*/true);
+        /*allowIncompleteTile=*/true, vectorSizeHints);
   } else {
     distTileSizes = getDefaultDistributedLevelTileSizes(linalgOp, vecTileSizes,
                                                         maxTileSizes);
@@ -1333,7 +1375,9 @@ static SmallVector<int64_t> getPackVectorTileSizes(func::FuncOp entryPointFn,
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
-  if (hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
+  // TODO(#15421): Improve tile sizes selection for non f32 cases.
+  if (op.getSourceType().getElementType().isF32() &&
+      hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
     tileSizes.back() = vectorSize;
   }
   return tileSizes;
@@ -1344,6 +1388,16 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributionTileSizes(cast<TilingInterface>(op.getOperation()));
+
+  int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
+  SmallVector<int64_t> vectorSizeHints(op.getSourceRank(), 1);
+  for (auto dim : op.getInnerDimsPos()) {
+    vectorSizeHints[dim] = vectorSize;
+  }
+
+  SmallVector<int64_t> workload(op.getSourceType().getShape());
+  reduceDistributionWorkgroups(workload, distTileSizes,
+                               /*maxTileSizes=*/std::nullopt, vectorSizeHints);
 
   // The default function aims to returns the number of workload per workgroup,
   // but it does not know that it is working on packed domain. We need to take
@@ -1372,6 +1426,9 @@ setUnPackOpRootConfig(func::FuncOp entryPointFn, tensor::UnPackOp op,
                           DispatchLoweringPassPipeline::CPUDataTiling) {
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributionTileSizes(cast<TilingInterface>(op.getOperation()));
+
+  SmallVector<int64_t> workload(op.getDestType().getShape());
+  reduceDistributionWorkgroups(workload, distTileSizes);
 
   // Fixup for making distTileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();

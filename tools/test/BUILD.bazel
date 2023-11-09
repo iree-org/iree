@@ -23,6 +23,7 @@ iree_lit_test_suite(
             "compile_to_continuation.mlir",
             "compile_to_phase.mlir",
             "executable_benchmarks.mlir",
+            "executable_configurations.mlir",
             "executable_sources.mlir",
             "iree-benchmark-module.mlir",
             "iree-dump-parameters.txt",

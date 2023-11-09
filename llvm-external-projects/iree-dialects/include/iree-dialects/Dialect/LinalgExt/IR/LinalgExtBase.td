@@ -102,7 +102,10 @@ def EncodingAttr :
     AttrParameter<"EncodingUserAttr", "kind of operation using this tensor">:$user,
     AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
-    OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$original_type
+    OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$original_type,
+    // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
+    OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for MATMUL and BATCH_MATMUL users)">:$matmul_narrow_M,
+    OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for MATMUL and BATCH_MATMUL users)">:$matmul_narrow_N
   );
 
   let genVerifyDecl = 0;

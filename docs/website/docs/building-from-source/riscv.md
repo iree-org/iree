@@ -143,13 +143,13 @@ ${QEMU_BIN} \
  toolchain and the emulator, build the tools from the following sources:
 
 * RISC-V toolchain is built from
-<https://github.com/llvm/llvm-project> (main branch).
+<https://github.com/llvm/llvm-project>.
     * Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
       GNU linker, and C libraries. You need to build GNU toolchain first.
     * Clone GNU toolchain from:
-      <https://github.com/riscv/riscv-gnu-toolchain>
-      (master branch). Switch the "riscv-binutils" submodule to
-      `git://sourceware.org/git/binutils-gdb.git` (master branch) manually.
+      <https://github.com/riscv/riscv-gnu-toolchain>.
+      Switch the "riscv-binutils" submodule to
+      `git://sourceware.org/git/binutils-gdb.git` manually.
 * RISC-V QEMU is built from
 <https://gitlab.com/qemu-project/qemu/tree/v8.1.2>.
 
@@ -157,11 +157,10 @@ The SIMD code can be generated following the
 [IREE CPU flow](../guides/deployment-configurations/cpu.md)
 with the additional command-line flags
 
-```shell hl_lines="3 4 5 6 7 8"
+```shell hl_lines="3-6"
 tools/iree-compile \
   --iree-hal-target-backends=llvm-cpu \
   --iree-llvmcpu-target-triple=riscv64 \
-  --iree-llvmcpu-target-cpu=generic-rv64 \
   --iree-llvmcpu-target-abi=lp64d \
   --iree-llvmcpu-target-cpu-features="+m,+a,+f,+d,+zvl512b,+v" \
   --riscv-v-fixed-length-vector-lmul-max=8 \

@@ -14,9 +14,11 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/TransformOps/SCFTransformOps.h"
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
+#include "mlir/Dialect/Transform/LoopExtension/LoopExtensionOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
@@ -34,7 +36,7 @@ using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
     IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::FuseIntoContainingOp;
-using transform::HoistRedundantTensorSubsetsOp;
+using transform::HoistLoopInvariantSubsetsOp;
 using transform::MatchOp;
 using transform::MemRefEraseDeadAllocAndStoresOp;
 using transform::MergeHandlesOp;
@@ -343,7 +345,9 @@ Value mlir::iree_compiler::buildLowerVectorMasksAndCleanup(
 
 /// Hoist redundant subet ops.
 void mlir::iree_compiler::buildHoisting(ImplicitLocOpBuilder &b, Value funcH) {
-  b.create<HoistRedundantTensorSubsetsOp>(funcH);
+  Value loops =
+      b.create<transform::MatchOp>(funcH, scf::ForOp::getOperationName());
+  b.create<HoistLoopInvariantSubsetsOp>(loops);
 }
 
 /// Bufferize and drop HAL descriptor from memref ops.
@@ -385,41 +389,6 @@ struct ReductionSplitResult {
   Value trailingEltwiseH;
 };
 } // namespace
-
-/// Builds transform IR requesting to bubble up the "expand_shape" operation
-/// produced as parent of reduction splitting if necessary for fusion of the
-/// leading elementwise operation.
-// TODO: consider passing a problem-specific struct to control information.
-static ReductionSplitResult
-createBubbleExpand(ImplicitLocOpBuilder &b, Value variantH,
-                   SplitReductionOp splitReductionTransformOp,
-                   bool hasLeadingEltwise, bool hasTrailingEltwise) {
-  ReductionSplitResult result;
-  if (!hasLeadingEltwise) {
-    result.splitFillH = splitReductionTransformOp.getFillOp();
-    result.splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
-    result.combinerH = splitReductionTransformOp.getCombiningLinalgOp();
-    return result;
-  }
-
-  auto funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
-    b.create<
-        iree_compiler::IREE::transform_dialect::ApplyBubbleExpandPatternsOp>(
-        loc);
-  });
-  std::tie(result.originalFillH, result.splitFillH) =
-      matchAndUnpack<2>(b, variantH, linalg::FillOp::getOperationName());
-  if (hasTrailingEltwise) {
-    std::tie(result.leadingEltwiseH, result.splitLinalgH, result.combinerH,
-             result.trailingEltwiseH) =
-        matchAndUnpack<4>(b, variantH, linalg::GenericOp::getOperationName());
-  } else {
-    std::tie(result.leadingEltwiseH, result.splitLinalgH, result.combinerH) =
-        matchAndUnpack<3>(b, variantH, linalg::GenericOp::getOperationName());
-  }
-  return result;
-}
 
 /// Build transform IR to split the reduction into a parallel and combiner part.
 /// Then tile the parallel part and map it to `tileSize` threads, each reducing

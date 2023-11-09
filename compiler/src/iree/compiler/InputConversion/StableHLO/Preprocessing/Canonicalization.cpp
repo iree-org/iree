@@ -414,7 +414,7 @@ struct SelectOpCanon final : OpRewritePattern<mlir::stablehlo::SelectOp> {
 
     // Simplify when the condition is a constant.
     Value pred = op.getPred();
-    DenseElementsAttr cond;
+    ElementsAttr cond;
     if (!matchPattern(pred, m_Constant(&cond))) {
       return failure();
     }
@@ -430,11 +430,11 @@ struct SelectOpCanon final : OpRewritePattern<mlir::stablehlo::SelectOp> {
     if (cond.getNumElements() > kFoldOpEltLimit)
       return failure();
 
-    DenseElementsAttr trueAttr;
+    ElementsAttr trueAttr;
     if (!matchPattern(trueVal, m_Constant(&trueAttr)))
       return failure();
 
-    DenseElementsAttr falseAttr;
+    ElementsAttr falseAttr;
     if (!matchPattern(falseVal, m_Constant(&falseAttr)))
       return failure();
 

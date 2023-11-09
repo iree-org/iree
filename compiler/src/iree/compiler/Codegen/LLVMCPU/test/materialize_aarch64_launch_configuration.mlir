@@ -368,7 +368,7 @@ hal.executable private @restrict_num_workgroups {
     }
   }
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 7, 64, 0, 0], [1, 1, 1, 4, 0, 0], [0, 0, 0, 0, 1, 1], [0, 0, 0, 0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 7, 7, 64, 0, 0], [1, 1, 1, 4, 0, 0], [0, 0, 0, 0, 1, 1], [0, 0, 0, 0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
 //       CHECK: hal.executable.export public @restrict_num_workgroups
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -498,7 +498,7 @@ hal.executable private @pack  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[8, 64], [1, 1]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 40], [1, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
 //      CHECK: hal.executable.export public @pack
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

@@ -30,7 +30,11 @@ namespace iree_compiler {
 namespace IREE {
 namespace VMVX {
 
-static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
+// ---------------------------------------------------------------------------
+// Variant configuration
+// ---------------------------------------------------------------------------
+
+void buildVMVXConfigurationPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
   // Tensor-level optimization, kernel dispatch and lower to buffers.
   // ---------------------------------------------------------------------------
@@ -41,6 +45,16 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // memory space through the stack.
   passManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
   passManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
+}
+
+// ---------------------------------------------------------------------------
+// Variant Translation
+// ---------------------------------------------------------------------------
+
+static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
+  // ---------------------------------------------------------------------------
+  // Tensor-level optimization, kernel dispatch and lower to buffers.
+  // ---------------------------------------------------------------------------
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -138,6 +152,13 @@ namespace {
 void registerVMVXPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> configurationPassPipeline(
+      "iree-vmvx-configuration-pipeline",
+      "Runs the full IREE VMVX dialect configuration pipeline",
+      [](OpPassManager &passManager) {
+        buildVMVXConfigurationPassPipeline(passManager);
+      });
 
   static PassPipelineRegistration<> transformPassPipeline(
       "iree-vmvx-transformation-pipeline",

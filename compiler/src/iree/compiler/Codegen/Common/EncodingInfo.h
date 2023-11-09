@@ -14,10 +14,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-void adjustTileSizesToNarrowStaticShape(
-    IREE::LinalgExt::MaterializeEncodingInfo &encodingInfo,
-    ArrayRef<int64_t> shape);
-
 IREE::LinalgExt::MaterializeEncodingValueFn
 getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr);
 

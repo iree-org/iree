@@ -751,8 +751,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<LLVM::LLVMFuncOp>(createAddFastMathFlagsPass());
 }
 
-void buildLLVMCPUCodegenStrategyInitializationPassPipeline(
-    OpPassManager &passManager) {
+void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager) {
   {
     addCommonTargetExecutablePreprocessingPasses(passManager);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
@@ -773,7 +772,6 @@ void buildLLVMCPUCodegenStrategyInitializationPassPipeline(
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
-  buildLLVMCPUCodegenStrategyInitializationPassPipeline(passManager);
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);
@@ -814,6 +812,13 @@ namespace {
 void registerCodegenLLVMCPUPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> LLVMCPUConfigPipeline(
+      "iree-codegen-llvmcpu-configuration-pipeline",
+      "Runs the translation strategy configuration pipeline on Linalg for CPU",
+      [](OpPassManager &passManager) {
+        buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
+      });
 
   static PassPipelineRegistration<> LinalgLLVMPipeline(
       "iree-codegen-linalg-to-llvm-pipeline",

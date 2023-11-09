@@ -32,6 +32,16 @@ def ExpandVectors : Pass<"iree-global-opt-expand-vectors", ""> {
   let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandVectorsPass()";
 }
 
+def FuseDequantizationMatmul:
+    InterfacePass<"iree-global-opt-fuse-dequantization-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Fuse dequantization and matmul linalg.generic ops";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseDequantizationMatmulPass()";
+  let options = [
+    Option<"enableQuantizedMatmulReassociation", "enable-quantized-matmul-reassociation", "bool",
+           /*default=*/"false", "Allow reassociation of quantized matmuls (experimental)">,
+  ];
+}
+
 def MaterializeHomogeneousEncodings :
   Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
   let summary = "Materializes logical encodings to physical encodings if there is a single device target.";
@@ -48,6 +58,12 @@ def RemoveZeroExtentTensors :
 def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
   let summary = "Introduce tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
+}
+
+def LiftGenericToTransposeBatchMatmul:
+    Pass<"iree-global-opt-lift-generic-to-tranpose-batch-matmul", ""> {
+  let summary = "Convert linalg.generic ops to linalg.batch_matmul, possibly with transposes on operands/result.";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createLiftGenericToTransposeBatchMatmulPass()";
 }
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

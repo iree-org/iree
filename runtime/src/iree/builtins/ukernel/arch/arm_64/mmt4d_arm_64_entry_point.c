@@ -74,17 +74,17 @@ iree_uk_mmt4d_select_tile_func_arm_64_f16f16f32(
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_arm_64_f16f16f16_M0x8x1(
     const iree_uk_mmt4d_params_t* params) {
-#ifdef IREE_UK_BUILD_ARM_64_FP16
+#ifdef IREE_UK_BUILD_ARM_64_FULLFP16
   if (iree_uk_cpu_supports_fp16(params->cpu_data)) {
     switch (params->M0) {
       case 1:
-        return iree_uk_mmt4d_tile_f16f16f16_1x8x1_arm_64_fp16;
+        return iree_uk_mmt4d_tile_f16f16f16_1x8x1_arm_64_fullfp16;
       case 2:
-        return iree_uk_mmt4d_tile_f16f16f16_2x8x1_arm_64_fp16;
+        return iree_uk_mmt4d_tile_f16f16f16_2x8x1_arm_64_fullfp16;
       case 4:
-        return iree_uk_mmt4d_tile_f16f16f16_4x8x1_arm_64_fp16;
+        return iree_uk_mmt4d_tile_f16f16f16_4x8x1_arm_64_fullfp16;
       case 8:
-        return iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64_fp16;
+        return iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64_fullfp16;
     }
   }
 #endif

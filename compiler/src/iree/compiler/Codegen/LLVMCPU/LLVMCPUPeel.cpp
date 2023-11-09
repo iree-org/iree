@@ -23,8 +23,8 @@ namespace iree_compiler {
 namespace {
 // Gathers tiled loops that aren't distribution loops from previous tiling
 // stages.
-void collectLoopsToPeel(RewriterBase &rewriter, Operation *op,
-                        SmallVectorImpl<scf::ForOp> &loopsToPeel) {
+void collectLoopsToPeel(Operation *op,
+                        llvm::SmallSetVector<scf::ForOp, 8> &loopsToPeel) {
   if (!iree_compiler::getLoweringConfig(op))
     return;
 
@@ -41,10 +41,10 @@ void collectLoopsToPeel(RewriterBase &rewriter, Operation *op,
     auto loop = llvm::cast_or_null<scf::ForOp>(op);
     if (!loop || iree_compiler::isTiledAndDistributedLoop(loop))
       break;
-    loopsToPeel.push_back(loop);
-  }
 
-  std::reverse(loopsToPeel.begin(), loopsToPeel.end());
+    LLVM_DEBUG(llvm::dbgs() << "Loop to peel:\n" << *op << "\n");
+    loopsToPeel.insert(loop);
+  }
 }
 
 class LLVMCPUPeelPass : public LLVMCPUPeelBase<LLVMCPUPeelPass> {
@@ -59,24 +59,25 @@ public:
 void LLVMCPUPeelPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-  SmallVector<Operation *> candidates;
+
+  llvm::SmallSetVector<scf::ForOp, 8> uniqueLoopsToPeel;
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::LinalgOp, tensor::PackOp>(op)) {
-      candidates.push_back(op);
+      LLVM_DEBUG(llvm::dbgs() << "Gather loops to peel from candidate op:\n"
+                              << *op << "\n");
+      collectLoopsToPeel(op, uniqueLoopsToPeel);
     }
   });
-  for (auto op : candidates) {
-    LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
 
-    IRRewriter rewriter(context);
-    IRRewriter::InsertionGuard g(rewriter);
-    rewriter.setInsertionPointAfter(op);
+  LLVM_DEBUG(llvm::dbgs() << "Peeling loops\n");
+  // Visiting the loops in outer-to-inner order will prevent loops nested in
+  // partial iterations to be peeled again.
+  SmallVector<scf::ForOp, 8> outerToInnerLoopsToPeel(uniqueLoopsToPeel.rbegin(),
+                                                     uniqueLoopsToPeel.rend());
+  IRRewriter rewriter(context);
+  linalg::peelLoops(rewriter, outerToInnerLoopsToPeel);
 
-    SmallVector<scf::ForOp> loopsToPeel;
-    collectLoopsToPeel(rewriter, op, loopsToPeel);
-    linalg::peelLoops(rewriter, loopsToPeel);
-  }
-
+  LLVM_DEBUG(llvm::dbgs() << "Canonicalizing loops\n");
   RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);

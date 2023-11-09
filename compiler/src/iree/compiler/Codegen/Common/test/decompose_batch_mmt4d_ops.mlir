@@ -37,3 +37,54 @@ func.func @batch_mmt4d_with_no_fill(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tenso
 // CHECK:        %[[MMT4D:.+]] = linalg.mmt4d ins(%[[EXT_LHS]], %[[EXT_RHS]] : tensor<10x32x8x1xf32>, tensor<80x32x4x1xf32>) outs(%[[EXT_OUT]] : tensor<10x80x8x4xf32>) -> tensor<10x80x8x4xf32>
 // CHECK:        %[[INS:.+]] = tensor.insert_slice %[[MMT4D]] into %[[OUT]][0, 0, 0, 0, 0] [1, 10, 80, 8, 4] [1, 1, 1, 1, 1] : tensor<10x80x8x4xf32> into tensor<1x10x80x8x4xf32>
 // CHECK:        return %[[INS]] : tensor<1x10x80x8x4xf32>
+
+// -----
+
+func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1: tensor<1x80x32x4x1xi8>, %arg2: tensor<1x10x80x8x4xi32>) -> tensor<1x10x80x8x4xi32> {
+  %c0_i32 = arith.constant 0 : i32
+  %0 = tensor.empty() : tensor<1x10x32x8x1xi32>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>, 
+                                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], 
+                       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} 
+                       ins(%arg0 : tensor<1x10x32x8x1xi8>) outs(%0 : tensor<1x10x32x8x1xi32>) {
+  ^bb0(%in: i8, %out: i32):
+    %6 = arith.extsi %in : i8 to i32
+    linalg.yield %6 : i32
+  } -> tensor<1x10x32x8x1xi32>
+  %2 = tensor.empty() : tensor<1x80x32x4x1xi32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>,
+                                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], 
+                       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+                       ins(%arg1 : tensor<1x80x32x4x1xi8>) outs(%2 : tensor<1x80x32x4x1xi32>) {
+  ^bb0(%in: i8, %out: i32):
+    %6 = arith.extsi %in : i8 to i32
+    linalg.yield %6 : i32
+  } -> tensor<1x80x32x4x1xi32>
+  %4 = linalg.fill ins(%c0_i32 : i32) outs(%arg2 : tensor<1x10x80x8x4xi32>) -> tensor<1x10x80x8x4xi32>
+  %5 = linalg.batch_mmt4d ins(%1, %3 : tensor<1x10x32x8x1xi32>, tensor<1x80x32x4x1xi32>) outs(%4 : tensor<1x10x80x8x4xi32>) -> tensor<1x10x80x8x4xi32>
+  return %5 : tensor<1x10x80x8x4xi32>
+}
+
+// CHECK:      #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK:      func.func @batch_mmt4d_with_extened_inputs
+// CHECK-SAME:   %[[LHS:.+]]: tensor<1x10x32x8x1xi8>,
+// CHECK-SAME:   %[[RHS:.+]]: tensor<1x80x32x4x1xi8>,
+// CHECK-SAME:   %[[OUT:.+]]: tensor<1x10x80x8x4xi32>
+// CHECK-DAG:    %[[CST:.+]] = arith.constant 0 : i32
+// CHECK-DAG:    %[[EXT_OUT:.+]] = tensor.extract_slice %[[OUT]][0, 0, 0, 0, 0] [1, 10, 80, 8, 4] [1, 1, 1, 1, 1] : tensor<1x10x80x8x4xi32> to tensor<10x80x8x4xi32>
+// CHECK:        %[[FILL:.+]] = linalg.fill ins(%[[CST]] : i32) outs(%[[EXT_OUT]] : tensor<10x80x8x4xi32>) -> tensor<10x80x8x4xi32>
+// CHECK-DAG:    %[[EXT_LHS:.+]] = tensor.extract_slice %[[LHS]][0, 0, 0, 0, 0] [1, 10, 32, 8, 1] [1, 1, 1, 1, 1] : tensor<1x10x32x8x1xi8> to tensor<10x32x8x1xi8>
+// CHECK-DAG:    %[[INIT_GEN_LHS:.+]] = tensor.empty() : tensor<10x32x8x1xi32>
+// CHECK-DAG:    %[[GEN_LHS:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[EXT_LHS]] : tensor<10x32x8x1xi8>) outs(%[[INIT_GEN_LHS]] : tensor<10x32x8x1xi32>) {
+// CHECK-NEXT:       ^bb0(%[[ARGIN_GEN_LHS:.+]]: i8, %[[ARGOUT_GEN_LHS:.+]]: i32):
+// CHECK-NEXT:         %[[EXT_GEN_LHS:.+]] = arith.extsi %[[ARGIN_GEN_LHS]] : i8 to i32
+// CHECK-NEXT:         linalg.yield %[[EXT_GEN_LHS]] : i32
+// CHECK-DAG:    %[[EXT_RHS:.+]] = tensor.extract_slice %[[RHS]][0, 0, 0, 0, 0] [1, 80, 32, 4, 1] [1, 1, 1, 1, 1] : tensor<1x80x32x4x1xi8> to tensor<80x32x4x1xi8>
+// CHECK-DAG:    %[[INIT_GEN_RHS:.+]] = tensor.empty() : tensor<80x32x4x1xi32>
+// CHECK-DAG:    %[[GEN_RHS:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[EXT_RHS]] : tensor<80x32x4x1xi8>) outs(%[[INIT_GEN_RHS]] : tensor<80x32x4x1xi32>) {
+// CHECK-NEXT:       ^bb0(%[[ARGIN_GEN_RHS:.+]]: i8, %[[ARGOUT_GEN_RHS:.+]]: i32):
+// CHECK-NEXT:         %[[EXT_GEN_RHS:.+]] = arith.extsi %[[ARGIN_GEN_RHS]] : i8 to i32
+// CHECK-NEXT:         linalg.yield %[[EXT_GEN_RHS]] : i32
+// CHECK:        %[[MMT4D:.+]] = linalg.mmt4d ins(%[[GEN_LHS]], %[[GEN_RHS]] : tensor<10x32x8x1xi32>, tensor<80x32x4x1xi32>) outs(%[[FILL]] : tensor<10x80x8x4xi32>) -> tensor<10x80x8x4xi32>
+// CHECK:        %[[INS:.+]] = tensor.insert_slice %[[MMT4D]] into %[[OUT]][0, 0, 0, 0, 0] [1, 10, 80, 8, 4] [1, 1, 1, 1, 1] : tensor<10x80x8x4xi32> into tensor<1x10x80x8x4xi32>
+// CHECK:        return %[[INS]] : tensor<1x10x80x8x4xi32>

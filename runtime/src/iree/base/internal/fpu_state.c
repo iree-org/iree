@@ -20,7 +20,7 @@
 // iree_fpu_state_t
 //==============================================================================
 // https://github.com/petewarden/tensorflow_makefile/blob/master/tensorflow/core/platform/denormal.cc
-// https://chromium.googlesource.com/chromium/blink/+/master/Source/platform/audio/DenormalDisabler.h
+// https://chromium.googlesource.com/chromium/blink/+/main/Source/platform/audio/DenormalDisabler.h
 
 static uint64_t iree_fpu_state_set_dtz(uint64_t state, bool denormals_to_zero);
 

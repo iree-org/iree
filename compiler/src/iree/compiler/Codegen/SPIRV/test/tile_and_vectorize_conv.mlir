@@ -57,7 +57,7 @@ hal.executable private @nhwc_conv_static_shape_f32 {
 // CHECK-LABEL: func.func @nhwc_conv_static_shape_f32()
 
 // No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
-// CHECK-NOT: vector.transfer
+// CHECK-NOT: vector.transfer_write
 
 // Check tiling loop along filter height/width and input channel
 //      CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
@@ -439,14 +439,14 @@ hal.executable private @nchw_conv_static_shape_f32 {
 // CHECK-LABEL: func.func @nchw_conv_static_shape_f32()
 
 // No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
-// CHECK-NOT: vector.transfer
+// CHECK-NOT: vector.transfer_write
 
 // Check tiling loop along input channel and filter height/width
 // TODO: enable vector hoisting
 //      CHECK: scf.for %{{.*}} = %c0 to %c1280 step %c4
-// CHECK-SAME:     -> (tensor<2x8x1x4xf32>)
+// CHECK-SAME:     -> (vector<4xf32>{{(, vector<4xf32>)+}})
 //      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:       -> (tensor<2x8x1x4xf32>)
+// CHECK-SAME:       -> (vector<4xf32>{{(, vector<4xf32>)+}})
 //      CHECK:     scf.for %{{.*}} = %c0 to %c3 step %c1
 // CHECK-SAME:         -> (vector<4xf32>{{(, vector<4xf32>)+}})
 

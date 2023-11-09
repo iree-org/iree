@@ -213,3 +213,47 @@ hal.executable private @reduce_storage_buffer_offset  {
 //         CHECK:     vector.reduction
 // CHECK-COUNT-5:     gpu.shuffle
 //         CHECK:     scf.yield
+
+// -----
+
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @shared_memory_copy  {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
+    hal.executable.export @shared_memory_copy layout(#pipeline_layout) attributes {
+      workgroup_size = [32 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+    func.func @shared_memory_copy() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
+      %cst_0 = arith.constant 0.000000e+00 : f32
+      %c32 = arith.constant 32 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<128x32xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<128x32xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %alloc = memref.alloc() {alignment = 64 : i64} : memref<32xf32, #gpu.address_space<workgroup>>
+      %2 = vector.transfer_read %0[%workgroup_id_x, %c0], %cst_0 {in_bounds = [true]} : memref<128x32xf32>, vector<32xf32>
+      vector.transfer_write %2, %alloc[%c0] {in_bounds = [true]} : vector<32xf32>, memref<32xf32, #gpu.address_space<workgroup>>
+      gpu.barrier
+      %3 = vector.transfer_read %alloc[%c0], %cst_0 {in_bounds = [true]} : memref<32xf32, #gpu.address_space<workgroup>>, vector<32xf32>
+      vector.transfer_write %3, %1[%workgroup_id_x, %c0] {in_bounds = [true]} : vector<32xf32>, memref<128x32xf32>
+      return
+    }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @shared_memory_copy() {
+//       CHECK:   %[[ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   vector.transfer_read {{.*}} : memref<128x32xf32>, vector<1xf32>
+//       CHECK:   vector.transfer_write {{.*}} %[[ALLOC]]{{.*}} : vector<1xf32>, memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   gpu.barrier
+//       CHECK:   vector.transfer_read %[[ALLOC]]{{.*}} : memref<32xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+//       CHECK:   vector.transfer_write {{.*}} : vector<1xf32>, memref<128x32xf32>
+//       CHECK:   return

@@ -516,7 +516,7 @@ struct RemoveCstOutsDependency
     bool modifiedOutput = false;
     Location loc = op.getLoc();
     for (OpOperand &opOperand : op.getDpsInitsMutable()) {
-      DenseElementsAttr attr;
+      ElementsAttr attr;
       if (!matchPattern(opOperand.get(), m_Constant(&attr)))
         continue;
       if (!attr.isSplat())

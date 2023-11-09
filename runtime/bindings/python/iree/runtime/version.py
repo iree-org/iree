@@ -9,4 +9,4 @@ The generated version.py comes from the selected _runtime_libs
 package.
 """
 
-from ._runtime_libs.version import *
+from .._runtime_libs.version import *

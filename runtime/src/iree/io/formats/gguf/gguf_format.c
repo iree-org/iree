@@ -322,6 +322,11 @@ static uint64_t iree_io_gguf_calculate_storage_size(
     element_count *= tensor_info->dimensions[i];
   }
   const ggml_type_traits_t type_traits = ggml_type_traits[tensor_info->type];
+  if (type_traits.type_size == 0) {
+    // For some reason some entries have a 0 type size and a 0 blck_size.
+    // Detect this to avoid FPE.
+    return 0;
+  }
   return (element_count * type_traits.type_size) / type_traits.blck_size;
 }
 

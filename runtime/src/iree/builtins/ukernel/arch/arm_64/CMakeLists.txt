@@ -18,6 +18,14 @@ iree_bitcode_library(
     ukernel_bitcode_arm_64_entry_points
   ARCH
     wasm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_arm_64.h"
+    "common_arm_64_entry_point.h"
+    "mmt4d_arm_64_internal.h"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_entry_point.c"
     "pack_arm_64_entry_point.c"
@@ -30,6 +38,14 @@ iree_bitcode_library(
     ukernel_bitcode_arm_64_base
   ARCH
     arm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_arm_64.h"
+    "common_arm_64_entry_point.h"
+    "mmt4d_arm_64_internal.h"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64.c"
     "pack_arm_64.c"
@@ -38,11 +54,19 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arm_64_fp16
+    ukernel_bitcode_arm_64_fullfp16
   ARCH
     arm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_arm_64.h"
+    "common_arm_64_entry_point.h"
+    "mmt4d_arm_64_internal.h"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
-    "mmt4d_arm_64_fp16.c"
+    "mmt4d_arm_64_fullfp16.c"
   COPTS
     "-march=armv8.2-a+fp16"
 )
@@ -52,6 +76,14 @@ iree_bitcode_library(
     ukernel_bitcode_arm_64_fp16fml
   ARCH
     arm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_arm_64.h"
+    "common_arm_64_entry_point.h"
+    "mmt4d_arm_64_internal.h"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_fp16fml.c"
   COPTS
@@ -63,6 +95,14 @@ iree_bitcode_library(
     ukernel_bitcode_arm_64_bf16
   ARCH
     arm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_arm_64.h"
+    "common_arm_64_entry_point.h"
+    "mmt4d_arm_64_internal.h"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_bf16.c"
   COPTS
@@ -74,6 +114,14 @@ iree_bitcode_library(
     ukernel_bitcode_arm_64_dotprod
   ARCH
     arm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_arm_64.h"
+    "common_arm_64_entry_point.h"
+    "mmt4d_arm_64_internal.h"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_dotprod.c"
   COPTS
@@ -85,6 +133,14 @@ iree_bitcode_library(
     ukernel_bitcode_arm_64_i8mm
   ARCH
     arm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_arm_64.h"
+    "common_arm_64_entry_point.h"
+    "mmt4d_arm_64_internal.h"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_i8mm.c"
   COPTS
@@ -98,8 +154,8 @@ iree_link_bitcode(
     "ukernel_bitcode_arm_64_base.bc"
     "ukernel_bitcode_arm_64_bf16.bc"
     "ukernel_bitcode_arm_64_dotprod.bc"
-    "ukernel_bitcode_arm_64_fp16.bc"
     "ukernel_bitcode_arm_64_fp16fml.bc"
+    "ukernel_bitcode_arm_64_fullfp16.bc"
     "ukernel_bitcode_arm_64_i8mm.bc"
 
 )
@@ -115,7 +171,7 @@ if (NOT (IREE_ARCH STREQUAL "arm_64"))
   return()
 endif()
 
-iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_FP16
+iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_FULLFP16
   CLANG_OR_GCC
     "-march=armv8.2-a+fp16"
 )
@@ -140,7 +196,7 @@ iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_I8MM
     "-march=armv8.2-a+i8mm"
 )
 
-check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_FP16}" IREE_UK_BUILD_ARM_64_FP16)
+check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_FULLFP16}" IREE_UK_BUILD_ARM_64_FULLFP16)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_FP16FML}" IREE_UK_BUILD_ARM_64_FP16FML)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_BF16}" IREE_UK_BUILD_ARM_64_BF16)
 check_cxx_compiler_flag("${IREE_UK_COPTS_ARM_64_DOTPROD}" IREE_UK_BUILD_ARM_64_DOTPROD)
@@ -159,19 +215,19 @@ iree_cc_library(
 
 set(IREE_UK_ARM_64_DEPS "")
 
-if(IREE_UK_BUILD_ARM_64_FP16)
+if(IREE_UK_BUILD_ARM_64_FULLFP16)
 iree_cc_library(
   NAME
-    arm_64_fp16
+    arm_64_fullfp16
   SRCS
-    "mmt4d_arm_64_fp16.c"
+    "mmt4d_arm_64_fullfp16.c"
   COPTS
-    "${IREE_UK_COPTS_ARM_64_FP16}"
+    "${IREE_UK_COPTS_ARM_64_FULLFP16}"
   DEPS
     iree::builtins::ukernel::internal_headers
 )
-list(APPEND IREE_UK_ARM_64_DEPS "::arm_64_fp16")
-endif()  # IREE_UK_BUILD_ARM_64_FP16
+list(APPEND IREE_UK_ARM_64_DEPS "::arm_64_fullfp16")
+endif()  # IREE_UK_BUILD_ARM_64_FULLFP16
 
 if(IREE_UK_BUILD_ARM_64_FP16FML)
 iree_cc_library(

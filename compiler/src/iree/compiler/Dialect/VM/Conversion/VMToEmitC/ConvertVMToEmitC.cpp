@@ -213,30 +213,6 @@ removeBlockArguments(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-FailureOr<int64_t> calculateNumSpans(IREE::VM::CallVariadicOp &callOp) {
-  auto isVariadic = [](APInt segmentSize) {
-    return segmentSize.getSExtValue() != -1;
-  };
-
-  DenseIntElementsAttr segmentSizes = callOp.getSegmentSizes();
-  size_t numSegments = segmentSizes.size();
-  size_t numVariadicSegments = llvm::count_if(segmentSizes, isVariadic);
-
-  if (numVariadicSegments != 1) {
-    callOp.emitError() << "only exactly one variadic segment supported";
-    return failure();
-  }
-
-  auto lastSegmentSize = *(segmentSizes.begin() + (numSegments - 1));
-
-  if (!isVariadic(lastSegmentSize)) {
-    callOp.emitError() << "expected the last segment to be variadic";
-    return failure();
-  }
-
-  return lastSegmentSize.getSExtValue();
-}
-
 std::optional<std::string> buildFunctionName(IREE::VM::ModuleOp &moduleOp,
                                              IREE::VM::ImportOp &importOp) {
   auto callingConvention = makeImportCallingConventionString(importOp);

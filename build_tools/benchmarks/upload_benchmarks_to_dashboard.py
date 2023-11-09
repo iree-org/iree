@@ -41,8 +41,8 @@ COMMON_DESCRIPTION = """
 For the graph, the x axis is the Git commit index, and the y axis is the
 measured metrics. The unit for the numbers is shown in the "Unit" dropdown.
 <br>
-See <a href="https://github.com/openxla/iree/tree/main/benchmarks/dashboard.md">
-https://github.com/openxla/iree/tree/main/benchmarks/dashboard.md
+See <a href="https://iree.dev/developers/performance/benchmark-suites/">
+https://iree.dev/developers/performance/benchmark-suites/
 </a> for benchmark philosophy, specification, and definitions.
 """
 

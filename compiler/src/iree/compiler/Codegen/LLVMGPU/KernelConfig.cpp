@@ -681,25 +681,6 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
                                                passPipeline, workgroupSize);
 }
 
-/// Return the size of the given dimension in the linalg op.
-// TODO: this should be part of LinalgOp interface, the equivalent member
-// function currently only support the case where all the dimensions are static
-// while we want to support dynamic shapes.
-static std::optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
-  for (auto [mapIdx, map] : llvm::enumerate(op.getIndexingMapsArray())) {
-    for (auto [dimIdx, dim] : llvm::enumerate(map.getResults())) {
-      auto expr = dim.dyn_cast<AffineDimExpr>();
-      if (expr && expr.getPosition() == d) {
-        auto type = llvm::cast<ShapedType>(op->getOperand(mapIdx).getType());
-        if (type.isDynamicDim(dimIdx))
-          return std::nullopt;
-        return type.getDimSize(dimIdx);
-      }
-    }
-  }
-  return std::nullopt;
-}
-
 /// Set configuration for transform dialect based strategies.
 static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
                                                Operation *op,

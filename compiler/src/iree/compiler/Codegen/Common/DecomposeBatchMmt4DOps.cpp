@@ -16,6 +16,35 @@ namespace iree_compiler {
 
 namespace {
 
+/// Returns true if:
+///    1. `genericOp` is element-wise with all identity indexing maps
+///    2. `genericOp` has only one input and one output with the same shape
+static bool isElementWiseIdentity(linalg::GenericOp genericOp) {
+  return genericOp.getNumDpsInputs() == 1 && genericOp.getNumDpsInits() == 1 &&
+         linalg::isElementwise(genericOp) &&
+         llvm::all_of(genericOp.getIndexingMapsArray(),
+                      [](AffineMap map) { return map.isIdentity(); });
+}
+
+/// Drops the outermost unit dimension of the defining op of `input`, as
+/// long as it is a linalg::GenericOp that passes `isElementWiseIdentity`.
+/// unit dims are dropped using tensor::InsertSliceOp/tensor::ExtractSliceOp
+/// in order to fold with other ops introduced by
+/// ConvertBatchMmt4DtoMmt4DPattern
+static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
+  auto producer = input.getDefiningOp<linalg::GenericOp>();
+  if (!producer || !isElementWiseIdentity(producer)) {
+    return success();
+  }
+  linalg::ControlDropUnitDims options;
+  options.rankReductionStrategy =
+      linalg::ControlDropUnitDims::RankReductionStrategy::ExtractInsertSlice;
+  options.controlFn = [](Operation *op) -> SmallVector<unsigned> {
+    return {0};
+  };
+  return linalg::dropUnitDims(rewriter, producer, options);
+}
+
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
 struct ConvertBatchMmt4DtoMmt4DPattern
     : public OpRewritePattern<linalg::BatchMmt4DOp> {
@@ -59,12 +88,20 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         RankedTensorType::Builder(lhsType).dropDim(0);
     auto reducedLhs = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, lhs, reducedLhsType);
+    if (failed(reduceDefiningOp(rewriter, lhs))) {
+      return rewriter.notifyMatchFailure(
+          lhs.getLoc(), "lhs producer should be reduced, but reduction failed");
+    }
 
     auto rhsType = rhs.getType().cast<RankedTensorType>();
     RankedTensorType reducedRhsType =
         RankedTensorType::Builder(rhsType).dropDim(0);
     auto reducedRhs = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, rhs, reducedRhsType);
+    if (failed(reduceDefiningOp(rewriter, rhs))) {
+      return rewriter.notifyMatchFailure(
+          rhs.getLoc(), "rhs producer should be reduced, but reduction failed");
+    }
 
     auto mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
@@ -100,6 +137,8 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
   tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::EmptyOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::populateFoldTensorEmptyPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

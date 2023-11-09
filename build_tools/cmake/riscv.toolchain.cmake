@@ -76,7 +76,6 @@ if(RISCV_CPU STREQUAL "linux-riscv_64")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lstdc++ -lpthread -lm -ldl")
   set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
     "--iree-llvmcpu-target-triple=riscv64"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
     "--iree-llvmcpu-target-abi=lp64d"
     "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+c,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
@@ -102,7 +101,6 @@ elseif(RISCV_CPU STREQUAL "linux-riscv_32")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lstdc++ -lpthread -lm -ldl -latomic")
   set(RISCV32_TEST_DEFAULT_LLVM_FLAGS
     "--iree-llvmcpu-target-triple=riscv32"
-    "--iree-llvmcpu-target-cpu=generic-rv32"
     "--iree-llvmcpu-target-abi=ilp32d"
     "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+zve32f"
     "--riscv-v-fixed-length-vector-lmul-max=8"
