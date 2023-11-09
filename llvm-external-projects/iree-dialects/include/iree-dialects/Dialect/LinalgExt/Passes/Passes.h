@@ -172,9 +172,17 @@ std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 std::unique_ptr<Pass> createDecomposeSoftmaxPass();
 
 // Transform dialect version of tile and decompose attention wrapper.
-SmallVector<Operation *>
-tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
-                          RewriterBase &rewriter, bool onlyTile = false);
+void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
+                               SmallVectorImpl<Operation *> &ops,
+                               RewriterBase &rewriter, bool onlyTile = false);
+
+IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
+                                           SmallVectorImpl<Operation *> &ops,
+                                           RewriterBase &rewriter);
+
+void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
+                             SmallVectorImpl<Operation *> &ops,
+                             RewriterBase &rewriter);
 
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
