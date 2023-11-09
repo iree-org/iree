@@ -52,6 +52,9 @@ CMAKE_ARGS=(
   # Building the compiler with TSan hangs on arm64 builders.
   # Anyway, the issue we're looking to reproduce in #15488 is in the runtime.
   "-DIREE_BUILD_COMPILER=OFF"
+
+  # Stay as close as possible to build_all.sh
+  "-DIREE_ENABLE_ASSERTIONS=ON"
 )
 
 "${CMAKE_BIN}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]?}"
@@ -80,11 +83,7 @@ export IREE_CUDA_DISABLE=1
 # Honor the "notsan" label on tests.
 export IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE=notsan
 
-# Run all tests, once
-build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-
-# Re-run many times certain tests that are cheap and prone to nondeterministic
-# failure (typically, IREE runtime tests exercising multi-threading features).
-export IREE_CTEST_TESTS_REGEX="(^iree/base/|^iree/task/)"
-export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT=32
+# Re-run many times the test that fails in #15488.
+export IREE_CTEST_TESTS_REGEX="(^iree/task/)"
+export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT=256
 build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
