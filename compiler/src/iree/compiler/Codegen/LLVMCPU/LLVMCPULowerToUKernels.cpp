@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -102,20 +103,47 @@ getFnNameAndDefAttrs(const char *ukernelName, RewriterBase &rewriter,
   return result;
 }
 
+// If the defining op of `input` is an element-wise cast, return the input to
+// the casting `linalg.generic` op. Otherwise, return `input`.
+static Value getInputForUKernel(Value input) {
+  auto genericOp = input.getDefiningOp<linalg::GenericOp>();
+  std::optional<CastOpInterface> castOp = getCastOpOfElementWiseCast(genericOp);
+  if (!castOp) {
+    return input;
+  }
+  return genericOp->getOperand(0);
+}
+
+// If the defining op of `input` is an element-wise cast, return the element
+// type of the cast source with explicit signedness. Otherwise, return the
+// element type of `input`.
+static Type getElementTypeForUKernel(Value input) {
+  auto genericOp = input.getDefiningOp<linalg::GenericOp>();
+  std::optional<CastOpInterface> castOp = getCastOpOfElementWiseCast(genericOp);
+  if (!castOp) {
+    return llvm::cast<ShapedType>(input.getType()).getElementType();
+  }
+  Type castOpSrcType = castOp.value()->getOperand(0).getType();
+  if (isa<arith::ExtUIOp>(*castOp)) {
+    return IntegerType::get(castOp->getContext(),
+                            castOpSrcType.getIntOrFloatBitWidth(),
+                            IntegerType::SignednessSemantics::Unsigned);
+  }
+  return castOpSrcType;
+}
+
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
 static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
                    bool skipIntermediateRoundings) {
-  Value lhs = op.getDpsInputOperand(0)->get();
-  Value rhs = op.getDpsInputOperand(1)->get();
+  Value lhs = getInputForUKernel(op.getDpsInputOperand(0)->get());
+  Value rhs = getInputForUKernel(op.getDpsInputOperand(1)->get());
   Value out = op.getDpsInitOperand(0)->get();
-  auto lhsType = llvm::cast<ShapedType>(lhs.getType());
-  auto rhsType = llvm::cast<ShapedType>(rhs.getType());
   auto outType = llvm::cast<ShapedType>(out.getType());
-  Type lhsElemType = lhsType.getElementType();
-  Type rhsElemType = rhsType.getElementType();
+  Type lhsElemType = getElementTypeForUKernel(op.getDpsInputOperand(0)->get());
+  Type rhsElemType = getElementTypeForUKernel(op.getDpsInputOperand(1)->get());
   Type outElemType = outType.getElementType();
   uint32_t flags = 0;
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
