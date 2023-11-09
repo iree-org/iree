@@ -584,13 +584,14 @@ void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
     }
   }
 
-  // TODO: Accept params for src_offset and target_offset.
+  // TODO: Accept params for src_offset and target_offset. Just check that
+  // the source will fit in the target buffer for now.
   iree_device_size_t source_length =
       iree_hal_buffer_byte_length(source_buffer.raw_ptr());
-  if (source_length != iree_hal_buffer_byte_length(target_buffer.raw_ptr())) {
+  if (source_length > iree_hal_buffer_byte_length(target_buffer.raw_ptr())) {
     throw std::invalid_argument(
-        "Source and target buffer length must match and it does not. Please "
-        "check allocations");
+        "Source and buffer length must be less than the target buffer length "
+        "and it does not. Please check allocations");
   }
   CheckApiStatus(iree_hal_device_queue_copy(
                      raw_ptr(), IREE_HAL_QUEUE_AFFINITY_ANY, wait_list,

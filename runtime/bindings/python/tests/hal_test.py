@@ -303,13 +303,14 @@ class DeviceHalTest(unittest.TestCase):
             allocation_size=13,
         )
         sem = self.device.create_semaphore(0)
-        with self.assertRaisesRegex(ValueError, "length must match"):
-            self.device.queue_copy(
-                source_buffer,
-                target_buffer,
-                wait_semaphores=iree.runtime.HalFence.create_at(sem, 0),
-                signal_semaphores=iree.runtime.HalFence.create_at(sem, 1),
-            )
+        self.device.queue_copy(
+            source_buffer,
+            target_buffer,
+            wait_semaphores=iree.runtime.HalFence.create_at(sem, 0),
+            signal_semaphores=iree.runtime.HalFence.create_at(sem, 1),
+        )
+        iree.runtime.HalFence.create_at(sem, 1).wait()
+        # Just check that it runs?
 
     def testCommandBufferStartsByDefault(self):
         cb = iree.runtime.HalCommandBuffer(self.device)
