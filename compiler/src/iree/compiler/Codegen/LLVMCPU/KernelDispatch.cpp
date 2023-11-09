@@ -1233,6 +1233,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     SmallVector<int64_t> minTileSizes(numLoops, 0);
     SmallVector<int64_t> maxTileSizes(numLoops, 0);
     minTileSizes[0] = minTileSizes[1] = 1;
+    // Scale default distribution tile size down because it is already in packed
+    // domain. With outer M dim size=X means that there will be `X * M0`
+    // elements to process. Same for N dimension.
     maxTileSizes[0] = llvm::divideCeil(defaultDistTileSize, M0);
     maxTileSizes[1] = llvm::divideCeil(defaultDistTileSize, N0);
     SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
@@ -1291,9 +1294,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     unsigned numLoops = batchMmt4dOp.getNumLoops();
     SmallVector<int64_t> minTileSizes(numLoops, 0);
     SmallVector<int64_t> maxTileSizes(numLoops, 0);
-    // Force batch dim being 1.
-    minTileSizes[0] = maxTileSizes[0] = 1;
+    minTileSizes[0] = maxTileSizes[0] = 1; // Force batch dim being 1.
     minTileSizes[1] = minTileSizes[2] = 1;
+    // Scale default distribution tile size down because it is already in packed
+    // domain. With outer M dim size=X means that there will be `X * M0`
+    // elements to process. Same for N dimension.
     maxTileSizes[1] = llvm::divideCeil(defaultDistTileSize, M0);
     maxTileSizes[2] = llvm::divideCeil(defaultDistTileSize, N0);
     SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
