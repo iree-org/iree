@@ -6,6 +6,7 @@
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -27,13 +28,17 @@ namespace {
 struct AutoInputConversionPipelinePass final
     : AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
   AutoInputConversionPipelinePass(
-      const AutoInputConversionPipelineOptions &inputOptions) {
+      const AutoInputConversionPipelineOptions &inputOptions,
+      PipelineExtensions *pipelineExtensions)
+      : pipelineExtensions(pipelineExtensions) {
     demoteI64ToI32 = inputOptions.demoteI64ToI32;
     demoteF64ToF32 = inputOptions.demoteF64ToF32;
     promoteBF16ToF32 = inputOptions.promoteBF16ToF32;
   }
   void runOnOperation() override;
   void getDependentDialects(DialectRegistry &registry) const override;
+
+  PipelineExtensions *pipelineExtensions = nullptr;
 };
 
 // All the features seen that should be handled during input conversion.
@@ -99,12 +104,55 @@ static void populateFeatures(Operation *op, const Dialect *chloDialect,
 
 void AutoInputConversionPipelinePass::runOnOperation() {
   ModuleOp module = getOperation();
-  MLIRContext *ctxt = &getContext();
+  MLIRContext *context = &getContext();
+
+  // Check if any plugin-provided pipeline extensions can convert dialects in
+  // the module first.
+  if (pipelineExtensions) {
+    llvm::StringSet<> detectedTypeMnemonics;
+    pipelineExtensions->populateDetectedCustomInputConversionTypes(
+        module, detectedTypeMnemonics);
+
+    if (detectedTypeMnemonics.getNumItems() > 1) {
+      // TODO(scotttodd): handle multiple typeMnemonics (use all?)
+      auto diag = module.emitError(
+          "mixture of input types not yet implemented, set "
+          "'--iree-input-type=[type]' explicitly instead of using 'auto' or "
+          "audit the input program to understand why dialects are mixed");
+      diag << " (detected:";
+      for (auto &s : detectedTypeMnemonics) {
+        diag << " '" << s.first() << "'";
+      }
+      diag << ")";
+      return signalPassFailure();
+    } else if (detectedTypeMnemonics.getNumItems() == 1) {
+      auto typeMnemonic = detectedTypeMnemonics.begin()->getKey();
+      OpPassManager passManager(module.getOperationName());
+      bool foundExtension =
+          pipelineExtensions->extendCustomInputConversionPassPipeline(
+              passManager, typeMnemonic);
+      if (!foundExtension) {
+        // We expect that callers properly validate supported extensions and
+        // that if a plugin advertises support, it actually provides it.
+        module.emitError() << "custom input conversion for extension '"
+                           << typeMnemonic << "' not found";
+        return signalPassFailure();
+      }
+      if (failed(runPipeline(passManager, module))) {
+        return signalPassFailure();
+      }
+      return;
+    }
+  }
+
+  // No plugin-provided pipeline extensions were detected, try the built-in
+  // dialect conversions.
+  // TODO(scotttodd): Migrate these to compiler plugins?
 
   InputFeatures features;
-  const Dialect *chloDialect = ctxt->getLoadedDialect("chlo");
-  const Dialect *stablehloDialect = ctxt->getLoadedDialect("stablehlo");
-  const Dialect *tosaDialect = ctxt->getLoadedDialect("tosa");
+  const Dialect *chloDialect = context->getLoadedDialect("chlo");
+  const Dialect *stablehloDialect = context->getLoadedDialect("stablehlo");
+  const Dialect *tosaDialect = context->getLoadedDialect("tosa");
   if (!chloDialect && !stablehloDialect && !tosaDialect) {
     return;
   }
@@ -186,6 +234,10 @@ void AutoInputConversionPipelinePass::getDependentDialects(
   appendPipelineDialects(buildTOSAInputConversionPassPipeline);
 #endif // IREE_HAVE_TOSA_INPUT
 
+  if (pipelineExtensions) {
+    pipelineExtensions->registerDialects(registry);
+  }
+
   (void)appendPipelineDialects;
 }
 } // namespace
@@ -193,12 +245,14 @@ void AutoInputConversionPipelinePass::getDependentDialects(
 std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass() {
   AutoInputConversionPipelineOptions options;
-  return std::make_unique<AutoInputConversionPipelinePass>(options);
+  return std::make_unique<AutoInputConversionPipelinePass>(options, nullptr);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createAutoInputConversionPipelinePass(
-    const AutoInputConversionPipelineOptions &options) {
-  return std::make_unique<AutoInputConversionPipelinePass>(options);
+    const AutoInputConversionPipelineOptions &options,
+    PipelineExtensions *pipelineExtensions) {
+  return std::make_unique<AutoInputConversionPipelinePass>(options,
+                                                           pipelineExtensions);
 }
 
 } // namespace mlir::iree_compiler

@@ -88,7 +88,7 @@ public:
   LogicalResult initializePlugins();
 
   // Invokes registerDialects() on all initialized plugins.
-  void registerDialects(DialectRegistry &registry);
+  void registerDialects(DialectRegistry &registry) override;
 
   // Activates plugins as configured.
   LogicalResult activatePlugins(MLIRContext *context);
@@ -105,6 +105,13 @@ public:
   void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
     for (auto *s : initializedSessions) {
       s->populateCustomInputConversionTypes(typeMnemonics);
+    }
+  }
+
+  void populateDetectedCustomInputConversionTypes(
+      ModuleOp &module, StringSet<> &typeMnemonics) override {
+    for (auto *s : initializedSessions) {
+      s->populateDetectedCustomInputConversionTypes(module, typeMnemonics);
     }
   }
 

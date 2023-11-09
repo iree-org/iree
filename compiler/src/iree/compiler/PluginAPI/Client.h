@@ -19,6 +19,7 @@
 namespace mlir {
 class DialectRegistry;
 class MLIRContext;
+class ModuleOp;
 class OpPassManager;
 } // namespace mlir
 
@@ -48,8 +49,11 @@ class PipelineExtensions {
 public:
   virtual ~PipelineExtensions();
 
-  // Add passes to the input preprocessing pipeline, which allows to process the
-  // raw input to IREE. This applies to builtin Type enum input pipelines.
+  // Registers dialects used by the instance.
+  virtual void registerDialects(DialectRegistry &registry) {}
+
+  // Adds passes to the input preprocessing pipeline, which allows to process
+  // the raw input to IREE. This applies to builtin Type enum input pipelines.
   virtual void extendInputConversionPreprocessingPassPipeline(
       OpPassManager &passManager, InputDialectOptions::Type inputType) {}
 
@@ -57,6 +61,13 @@ public:
   // must advertise support for a custom input type in order for it to be
   // considered valid.
   virtual void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) {}
+
+  // Adds input type mnemonics that this instance supports, if those types are
+  // detected in |module|.
+  // Requires that |registerDialects| has been called first.
+  virtual void
+  populateDetectedCustomInputConversionTypes(ModuleOp &module,
+                                             StringSet<> &typeMnemonics) {}
 
   // Adds passes to the input preprocessing pipeline for the given
   // InputDialectOptions::Type::plugin type with the given mnemonic.

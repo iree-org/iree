@@ -13,6 +13,7 @@ iree_cc_library(
     "PluginRegistration.cpp"
   DEPS
     MLIRIR
+    MLIRMLProgramDialect
     MLIRPass
     iree::compiler::PluginAPI
     torch-iree::InputConversion

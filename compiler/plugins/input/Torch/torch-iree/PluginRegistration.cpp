@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/PluginAPI/Client.h"
+#include "mlir/Dialect/MLProgram/IR/MLProgram.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "torch-iree/InputConversion/Passes.h"
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
@@ -44,6 +46,7 @@ struct TorchSession
     registry.insert<torch::Torch::TorchDialect>();
     registry.insert<torch::TorchConversion::TorchConversionDialect>();
     registry.insert<mlir::torch::TMTensor::TMTensorDialect>();
+    registry.insert<mlir::ml_program::MLProgramDialect>();
   }
 
   bool extendCustomInputConversionPassPipeline(
@@ -71,6 +74,25 @@ struct TorchSession
   void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
     typeMnemonics.insert("tm_tensor");
     typeMnemonics.insert("torch");
+  }
+
+  void populateDetectedCustomInputConversionTypes(
+      ModuleOp &module, StringSet<> &typeMnemonics) override {
+    auto *ctx = module.getContext();
+    const Dialect *torchDialect = ctx->getLoadedDialect("torch");
+    const Dialect *torchConversionDialect = ctx->getLoadedDialect("torch_c");
+    const Dialect *tmTensorDialect = ctx->getLoadedDialect("tm_tensor");
+
+    module.walk([&](Operation *op) {
+      Dialect *d = op->getDialect();
+      if (d == torchDialect || d == torchConversionDialect) {
+        typeMnemonics.insert("torch");
+      } else if (d == tmTensorDialect) {
+        // TODO: Retire the tm_tensor input pipeline
+        typeMnemonics.insert("tm_tensor");
+      }
+      return WalkResult::advance();
+    });
   }
 };
 

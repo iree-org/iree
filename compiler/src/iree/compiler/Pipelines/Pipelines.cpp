@@ -75,7 +75,8 @@ void buildIREEPrecompileTransformPassPipeline(
     case InputDialectOptions::Type::none:
       break;
     case InputDialectOptions::Type::auto_detect:
-      passManager.addPass(createAutoInputConversionPipelinePass(autoOptions));
+      passManager.addPass(createAutoInputConversionPipelinePass(
+          autoOptions, hooks.pipelineExtensions));
       break;
     case InputDialectOptions::Type::plugin: {
       bool foundExtension = false;
