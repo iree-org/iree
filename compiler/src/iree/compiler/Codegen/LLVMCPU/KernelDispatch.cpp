@@ -191,11 +191,10 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
   bool isLinalgGeneric = isa<linalg::GenericOp>(linalgOp.getOperation());
-  bool isByteAligned = hasByteAlignedElementTypes(linalgOp);
 
   // Default X86 specific strategy.
   if (isX86(targetAttr)) {
-    if (isLinalgGeneric && isByteAligned) {
+    if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -212,7 +211,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default RISC-V specific strategies.
   if (isRISCV(targetAttr)) {
-    if (isLinalgGeneric && isByteAligned) {
+    if (isLinalgGeneric) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -223,7 +222,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
-    if (hasAnySVEFeature(targetAttr) && isByteAligned) {
+    if (hasAnySVEFeature(targetAttr)) {
       return VectorPreProcStrategy::Masking;
     }
     if ((linalg::isElementwise(linalgOp) || isFullyDynamicOp(linalgOp)) &&

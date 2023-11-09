@@ -100,14 +100,6 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   return rootOperation;
 }
 
-bool hasByteAlignedElementTypes(linalg::LinalgOp linalgOp) {
-  return llvm::all_of(linalgOp->getOperands(), [](Value operand) {
-    auto bitwidth =
-        IREE::Util::getTypeBitWidth(getElementTypeOrSelf(operand.getType()));
-    return bitwidth % 8 == 0;
-  });
-}
-
 void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
                      SmallVector<int64_t> tileSizes,
                      SmallVector<bool> tileScalableFlags) {
