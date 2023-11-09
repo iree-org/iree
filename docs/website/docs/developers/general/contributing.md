@@ -107,7 +107,29 @@ yet).
 
 ### :octicons-git-merge-16: Obtaining commit access
 
-!!! note "TODO(jpienaar): write this :)"
+Access to affiliated repositories is divided into three tiers:
+
+| Tier | Description | Team link |
+| ---- | ----------- | --------- |
+Triage | :material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | [iree-triage](https://github.com/orgs/openxla/teams/iree-triage)
+Write | **Most developers should request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches | [iree-write](https://github.com/orgs/openxla/teams/iree-write)
+Maintain | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | [iree-maintain](https://github.com/orgs/openxla/teams/iree-maintain)
+
+All access tiers first require joining the
+[OpenXLA GitHub organization](https://github.com/openxla/).
+
+<!-- markdownlint-disable-next-line -->
+[Fill out this form to request access :fontawesome-solid-paper-plane:](https://docs.google.com/forms/d/e/1FAIpQLSfEwANtMvLJWq-ED4lub_xsMch0MgNY02VxgtXE61FqNvNVUg/viewform){ .md-button .md-button--primary }
+
+Once you are a member of the OpenXLA GitHub organization, you can request to
+join any of the teams on <https://github.com/orgs/openxla/teams>.
+
+!!! note - "Note: other GitHub organizations"
+
+    Work on IREE sometimes spans other GitHub organizations like
+    [iree-org](https://github.com/iree-org) and
+    [shark-infra](https://github.com/shark-infra/). Reach out to a project
+    member if you would also like access to repositories in those organizations.
 
 ### :octicons-people-16: Credits in the AUTHORS file
 
