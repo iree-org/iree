@@ -33,28 +33,16 @@ static bool isElementWiseIdentity(linalg::GenericOp genericOp) {
 /// ConvertBatchMmt4DtoMmt4DPattern
 static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
   auto producer = input.getDefiningOp<linalg::GenericOp>();
-  if (!producer) {
-    return rewriter.notifyMatchFailure(
-        input.getLoc(), "input has no defining linalg.generic op");
+  if (!producer || !isElementWiseIdentity(producer)) {
+    return success();
   }
   linalg::ControlDropUnitDims options;
   options.rankReductionStrategy =
       linalg::ControlDropUnitDims::RankReductionStrategy::ExtractInsertSlice;
-  options.controlFn = [](Operation *op) {
-    auto genericOp = dyn_cast<linalg::GenericOp>(op);
-    if (!genericOp || !isElementWiseIdentity(genericOp)) {
-      return SmallVector<unsigned>{};
-    }
-    SmallVector<unsigned> dims;
-    dims.push_back(0);
-    return dims;
+  options.controlFn = [](Operation *op) -> SmallVector<unsigned> {
+    return {0};
   };
-  if (failed(linalg::dropUnitDims(rewriter, producer, options))) {
-    return rewriter.notifyMatchFailure(
-        producer, "op is not element-wise with all identity maps, or cannot "
-                  "drop first unit dimension");
-  }
-  return success();
+  return linalg::dropUnitDims(rewriter, producer, options);
 }
 
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
@@ -100,14 +88,20 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         RankedTensorType::Builder(lhsType).dropDim(0);
     auto reducedLhs = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, lhs, reducedLhsType);
-    (void)reduceDefiningOp(rewriter, lhs);
+    if (failed(reduceDefiningOp(rewriter, lhs))) {
+      return rewriter.notifyMatchFailure(
+          lhs.getLoc(), "lhs producer should be reduced, but reduction failed");
+    }
 
     auto rhsType = rhs.getType().cast<RankedTensorType>();
     RankedTensorType reducedRhsType =
         RankedTensorType::Builder(rhsType).dropDim(0);
     auto reducedRhs = tensor::createCanonicalRankReducingExtractSliceOp(
         rewriter, loc, rhs, reducedRhsType);
-    (void)reduceDefiningOp(rewriter, rhs);
+    if (failed(reduceDefiningOp(rewriter, rhs))) {
+      return rewriter.notifyMatchFailure(
+          rhs.getLoc(), "rhs producer should be reduced, but reduction failed");
+    }
 
     auto mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
