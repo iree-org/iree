@@ -62,12 +62,12 @@ public:
   // considered valid.
   virtual void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) {}
 
-  // Returns an appropriate typeMnemonic if operations from a dialect this
-  // instance supports are present in the module.
-  // Requires that dialects have already been added using |registerDialects|.
-  virtual std::string detectCustomInputOperations(ModuleOp &module) {
-    return "";
-  }
+  // Adds input type mnemonics that this instance supports, if those types are
+  // detected in |module|.
+  // Requires that |registerDialects| has been called first.
+  virtual void
+  populateDetectedCustomInputConversionTypes(ModuleOp &module,
+                                             StringSet<> &typeMnemonics) {}
 
   // Adds passes to the input preprocessing pipeline for the given
   // InputDialectOptions::Type::plugin type with the given mnemonic.

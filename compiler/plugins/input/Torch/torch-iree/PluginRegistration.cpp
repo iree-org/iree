@@ -76,27 +76,23 @@ struct TorchSession
     typeMnemonics.insert("torch");
   }
 
-  std::string detectCustomInputOperations(ModuleOp &module) override {
+  void populateDetectedCustomInputConversionTypes(
+      ModuleOp &module, StringSet<> &typeMnemonics) override {
     auto *ctx = module.getContext();
-
     const Dialect *torchDialect = ctx->getLoadedDialect("torch");
     const Dialect *torchConversionDialect = ctx->getLoadedDialect("torch_c");
     const Dialect *tmTensorDialect = ctx->getLoadedDialect("tm_tensor");
 
-    std::string typeMnemonic = "";
     module.walk([&](Operation *op) {
       Dialect *d = op->getDialect();
       if (d == torchDialect || d == torchConversionDialect) {
-        typeMnemonic = "torch";
-        return WalkResult::interrupt();
+        typeMnemonics.insert("torch");
       } else if (d == tmTensorDialect) {
         // TODO: Retire the tm_tensor input pipeline
-        typeMnemonic = "tm_tensor";
-        return WalkResult::interrupt();
+        typeMnemonics.insert("tm_tensor");
       }
       return WalkResult::advance();
     });
-    return typeMnemonic;
   }
 };
 

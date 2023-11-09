@@ -109,9 +109,18 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   // Check if any plugin-provided pipeline extensions can convert dialects in
   // the module first.
   if (pipelineExtensions) {
-    std::string typeMnemonic =
-        pipelineExtensions->detectCustomInputOperations(module);
-    if (!typeMnemonic.empty()) {
+    llvm::StringSet<> detectedTypeMnemonics;
+    pipelineExtensions->populateDetectedCustomInputConversionTypes(
+        module, detectedTypeMnemonics);
+
+    if (detectedTypeMnemonics.getNumItems() >= 2) {
+      // TODO(scotttodd): handle multiple typeMnemonics (use all?)
+      module.emitError("not yet implemented mixture of input types");
+      return signalPassFailure();
+    }
+
+    if (!detectedTypeMnemonics.empty()) {
+      auto typeMnemonic = detectedTypeMnemonics.begin()->getKey();
       OpPassManager passManager(module.getOperationName());
       bool foundExtension =
           pipelineExtensions->extendCustomInputConversionPassPipeline(

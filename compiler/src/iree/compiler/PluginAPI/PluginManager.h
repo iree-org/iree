@@ -108,16 +108,11 @@ public:
     }
   }
 
-  std::string detectCustomInputOperations(ModuleOp &module) override {
+  void populateDetectedCustomInputConversionTypes(
+      ModuleOp &module, StringSet<> &typeMnemonics) override {
     for (auto *s : initializedSessions) {
-      // Return the type mnemonic from the first session that detects support.
-      std::string typeMnemonic = s->detectCustomInputOperations(module);
-      if (!typeMnemonic.empty()) {
-        // TODO(scotttodd): error if multiple sessions found ops they support?
-        return typeMnemonic;
-      }
+      s->populateDetectedCustomInputConversionTypes(module, typeMnemonics);
     }
-    return "";
   }
 
   bool extendCustomInputConversionPassPipeline(
