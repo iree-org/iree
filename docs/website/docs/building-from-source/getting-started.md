@@ -360,24 +360,33 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
 
     ``` shell
     source ../iree-build/.env && export PYTHONPATH
-    python -c "import iree.compiler"
-    python -c "import iree.runtime"
+    # The 'PYTHONPATH' environment variable should now contain
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+
+    python -c "import iree.compiler; help(iree.compiler)"
+    python -c "import iree.runtime; help(iree.runtime)"
     ```
 
 === ":fontawesome-brands-apple: macOS"
 
     ``` shell
     source ../iree-build/.env && export PYTHONPATH
-    python -c "import iree.compiler"
-    python -c "import iree.runtime"
+    # The 'PYTHONPATH' environment variable should now contain
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+
+    python -c "import iree.compiler; help(iree.compiler)"
+    python -c "import iree.runtime; help(iree.runtime)"
     ```
 
 === ":fontawesome-brands-windows: Windows"
 
     ``` powershell
-    ../iree-build/.env.bat
-    python -c "import iree.compiler"
-    python -c "import iree.runtime"
+    ..\iree-build\.env.ps1  # or ..\iree-build\.env.bat
+    # The 'PYTHONPATH' environment variable should now contain
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+
+    python -c "import iree.compiler; help(iree.compiler)"
+    python -c "import iree.runtime; help(iree.runtime)"
     ```
 
 Using IREE's ML framework importers requires a few extra steps:

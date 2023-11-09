@@ -979,9 +979,11 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env" CONTENT "${_PYTHONPATH_ENV}")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env" CONTENT "${_PYTHONPATH_ENV}")
-  # Similarly, write out .env.bat for Windows.
+  # Similarly, write out .env.bat and .env.ps1 for Windows.
   set(_PYTHONPATH_ENV_BAT "set PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env.bat" CONTENT "${_PYTHONPATH_ENV_BAT}")
+  set(_PYTHONPATH_ENV_PS1 "$env:PYTHONPATH = '$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>'\n")
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env.ps1" CONTENT "${_PYTHONPATH_ENV_PS1}")
 endif()
 
 if(IREE_BUILD_BINDINGS_TFLITE)
