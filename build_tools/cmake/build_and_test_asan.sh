@@ -30,9 +30,8 @@ source build_tools/cmake/setup_ccache.sh
 #    path is used.
 #  - When asan_in_bytecode_modules_ON_OFF=ON, ASAN is also enabled in bytecode
 #    modules. The system-ELF path is used (required for ASAN-in-modules).
-for asan_in_bytecode_modules_ON_OFF in OFF ON; do
-    # It's enough to do that in either of the two loop iterations.
-    build_microbenchmarks_ON_OFF=${asan_in_bytecode_modules_ON_OFF}
+for asan_in_bytecode_modules_ON_OFF in OFF; do
+  build_microbenchmarks_ON_OFF=OFF
 
   CMAKE_ARGS=(
     "-G" "Ninja"
@@ -51,6 +50,11 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
     # Also check if microbenchmarks are buildable. It's enough to do that in one
     # of the two loop iterations.
     "-DIREE_BUILD_MICROBENCHMARKS=${build_microbenchmarks_ON_OFF}"
+
+    # Building the compiler with ASan risks hanging on arm64 builders in the
+    # way TSan did.
+    # Anyway, the issue we're looking to reproduce in #15488 is in the runtime.
+    "-DIREE_BUILD_COMPILER=OFF"
   )
 
   echo "*** Configuring CMake (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
@@ -61,9 +65,10 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
   echo "------------------"
   "${CMAKE_BIN?}" --build "${BUILD_DIR?}" -- -k 0
 
-  echo "*** Building test deps (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
-  echo "------------------"
-  "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
+  # We've disabled the compiler above.
+  # echo "*** Building test deps (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
+  # echo "------------------"
+  # "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
 
   if [[ "${build_microbenchmarks_ON_OFF}" == "ON" ]]; then
     echo "*** Building microbenchmark suites (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
