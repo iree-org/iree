@@ -65,6 +65,10 @@ information on using pull requests.
 
 * Please keep PRs small (focused on a single issue) to make reviews and later
   culprit-finding easier.
+* You may see trusted core contributors bending this rule for project
+  maintenance and major subsystem renovation. If you feel like the rules aren't
+  working for a certain situation, please ask as we bias towards pragmatism for
+  cases that require it.
 
 ### :material-check-all: GitHub Actions workflows
 
