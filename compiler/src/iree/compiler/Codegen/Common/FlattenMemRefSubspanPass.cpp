@@ -705,23 +705,6 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
   };
 };
 
-/// Returns the number of bytes of the given `type`. Returns std::nullopt if
-/// cannot deduce.
-///
-/// Note that this should be kept consistent with how the byte offset was
-/// calculated in the subspan ops!
-std::optional<int64_t> getNumBytes(Type type) {
-  if (type.isIntOrFloat())
-    return IREE::Util::getRoundedElementByteWidth(type);
-  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
-    auto elementBytes = getNumBytes(vectorType.getElementType());
-    if (!elementBytes)
-      return std::nullopt;
-    return elementBytes.value() * vectorType.getNumElements();
-  }
-  return std::nullopt;
-}
-
 /// Erase alignment hints.
 struct RemoveAssumeAlignOp
     : public OpRewritePattern<memref::AssumeAlignmentOp> {

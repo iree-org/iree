@@ -120,26 +120,6 @@ getTileAndDistributeConfig(ArrayRef<Operation *> computeOps,
   return success();
 }
 
-/// Get the materialization information from a `tensor.pack` operation.
-static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
-getMaterializationInfo(tensor::PackOp packOp) {
-  IREE::LinalgExt::MaterializeEncodingInfo encodingInfo;
-  SmallVector<OpFoldResult> mixedTileSizes = packOp.getMixedTiles();
-  encodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
-  for (auto tileSize : mixedTileSizes) {
-    if (tileSize.is<Value>()) {
-      encodingInfo.innerTileSizes.push_back(ShapedType::kDynamic);
-    } else {
-      encodingInfo.innerTileSizes.push_back(
-          llvm::cast<IntegerAttr>(tileSize.get<Attribute>()).getInt());
-    }
-  }
-  encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
-  encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
-  encodingInfo.srcRank = packOp.getSourceRank();
-  return encodingInfo;
-}
-
 //===---------------------------------------------------------------------===//
 // Patterns to lower operations that are used to compute the number of
 // workgroups.
