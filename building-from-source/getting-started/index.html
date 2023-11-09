@@ -3769,20 +3769,29 @@ cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>../iree-build/.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">export</span><span class="w"> </span>PYTHONPATH
-python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler&quot;</span>
-python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.runtime&quot;</span>
+<span class="c1"># The &#39;PYTHONPATH&#39; environment variable should now contain</span>
+<span class="c1">#   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python</span>
+
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler; help(iree.compiler)&quot;</span>
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.runtime; help(iree.runtime)&quot;</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><span class="nb">source</span><span class="w"> </span>../iree-build/.env<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">export</span><span class="w"> </span>PYTHONPATH
-python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler&quot;</span>
-python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.runtime&quot;</span>
+<span class="c1"># The &#39;PYTHONPATH&#39; environment variable should now contain</span>
+<span class="c1">#   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python</span>
+
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler; help(iree.compiler)&quot;</span>
+python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.runtime; help(iree.runtime)&quot;</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="p">../</span><span class="n">iree-build</span><span class="p">/.</span><span class="n">env</span><span class="p">.</span><span class="n">bat</span>
-<span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import iree.compiler&quot;</span>
-<span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import iree.runtime&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="p">..\</span><span class="n">iree-build</span><span class="p">\.</span><span class="n">env</span><span class="p">.</span><span class="n">ps1</span>  <span class="c"># or ..\iree-build\.env.bat</span>
+<span class="c"># The &#39;PYTHONPATH&#39; environment variable should now contain</span>
+<span class="c">#   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python</span>
+
+<span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import iree.compiler; help(iree.compiler)&quot;</span>
+<span class="n">python</span> <span class="n">-c</span> <span class="s2">&quot;import iree.runtime; help(iree.runtime)&quot;</span>
 </code></pre></div>
 </div>
 </div>
