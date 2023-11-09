@@ -756,15 +756,6 @@ static int isSingleLaneIdReduced(std::array<int, 4> &order) {
   return count == 1;
 }
 
-static int getVecSizes(std::array<int, 4> &order, const Layout &layout) {
-  int size = 1;
-  for (int i = 0; i < 4; i++) {
-    if (isVectorId(i))
-      size *= layout.shape[i];
-  }
-  return size;
-}
-
 using bodyType = std::function<void(std::array<int, DimType::NumDims> &)>;
 
 /// This function iterates over the dimensions of a given column/row order

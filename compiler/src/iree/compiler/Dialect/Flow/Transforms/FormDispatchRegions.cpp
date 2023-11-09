@@ -158,15 +158,6 @@ static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
   fusionGroups.append(newGroups.begin(), newGroups.end());
   op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
 }
-/// Returns true if the given `op` is in the `targetGroup` fusion group.
-static bool isInFusionGroup(Operation *op, unsigned targetGroup) {
-  if (ArrayAttr opGroupAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    return llvm::any_of(opGroupAttr, [&targetGroup](Attribute attr) {
-      return llvm::cast<IntegerAttr>(attr).getInt() == targetGroup;
-    });
-  }
-  return false;
-}
 /// Removes the fusion groups attribute.
 static void removeFusionGroupsAttribute(Operation *op) {
   op->removeAttr(kFusionGroupsAttr);

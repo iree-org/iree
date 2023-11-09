@@ -323,12 +323,6 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
 typedef bool (*iree_task_topology_core_filter_t)(
     const struct cpuinfo_core* core, uintptr_t user_data);
 
-// Matches all cores.
-static bool iree_task_topology_core_filter_all(const struct cpuinfo_core* core,
-                                               uintptr_t user_data) {
-  return true;
-}
-
 // Matches all cores that have the provided cluster ID.
 static bool iree_task_topology_core_filter_by_cluster_id(
     const struct cpuinfo_core* core, uintptr_t user_data) {
