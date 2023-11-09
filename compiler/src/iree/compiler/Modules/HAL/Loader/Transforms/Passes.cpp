@@ -69,6 +69,8 @@ void buildHALInlineDynamicTransformPassPipeline(
   // After this point the executables are opaque blobs and we cannot change
   // their interfaces.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
+      IREE::HAL::createConfigureExecutablesPass(targetRegistry));
+  passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       IREE::HAL::createTranslateExecutablesPass(targetRegistry));
 
   //----------------------------------------------------------------------------

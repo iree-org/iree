@@ -656,7 +656,7 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-void buildSPIRVCodegenStrategyInitializationPassPipeline(OpPassManager &pm) {
+void buildSPIRVCodegenConfigurationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -665,7 +665,6 @@ void buildSPIRVCodegenStrategyInitializationPassPipeline(OpPassManager &pm) {
 }
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
-  buildSPIRVCodegenStrategyInitializationPassPipeline(pm);
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
@@ -690,6 +689,13 @@ namespace {
 void registerCodegenSPIRVPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> SPIRVConfigPipeline(
+      "iree-codegen-spirv-configuration-pipeline",
+      "Runs the pipeline for configuring the lowering from linalg to SPIR-V",
+      [](OpPassManager &passManager) {
+        buildSPIRVCodegenConfigurationPassPipeline(passManager);
+      });
 
   static PassPipelineRegistration<> LinalgSPIRVPipeline(
       "iree-codegen-linalg-to-spirv-pipeline",

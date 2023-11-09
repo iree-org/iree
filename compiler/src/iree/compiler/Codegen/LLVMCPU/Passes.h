@@ -191,7 +191,7 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 
 /// Populates passes needed for preprocessing before codegen lowerings, as well
 /// as high level lowering strategy selection.
-void buildLLVMCPUCodegenRoutingPassPipeline(OpPassManager &passManager);
+void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager);
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the

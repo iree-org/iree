@@ -214,6 +214,11 @@ public:
     return getDeviceTargetFromTarget(context, *maybeTarget, defaultAddlConfig_);
   }
 
+  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                      OpPassManager &passManager) override {
+    buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
+  }
+
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
     buildLLVMCPUCodegenPassPipeline(passManager);

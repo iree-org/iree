@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "AssignTargetDevices.cpp"
     "BenchmarkBatchDispatches.cpp"
+    "ConfigureExecutables.cpp"
     "ConvertToHAL.cpp"
     "DumpExecutableBenchmarks.cpp"
     "DumpExecutableSources.cpp"

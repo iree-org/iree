@@ -256,6 +256,9 @@ void buildIREEVMTransformPassPipeline(
   case IREEVMPipelinePhase::ExecutableSources:
     halCompileFrom = IREE::HAL::PipelinePhase::ExecutableSources;
     break;
+  case IREEVMPipelinePhase::ExecutableConfigurations:
+    halCompileFrom = IREE::HAL::PipelinePhase::ExecutableConfigurations;
+    break;
   case IREEVMPipelinePhase::ExecutableTargets:
     halCompileFrom = IREE::HAL::PipelinePhase::ExecutableTargets;
     break;
@@ -268,6 +271,9 @@ void buildIREEVMTransformPassPipeline(
     break;
   case IREEVMPipelinePhase::ExecutableSources:
     halCompileTo = IREE::HAL::PipelinePhase::ExecutableSources;
+    break;
+  case IREEVMPipelinePhase::ExecutableConfigurations:
+    halCompileTo = IREE::HAL::PipelinePhase::ExecutableConfigurations;
     break;
   case IREEVMPipelinePhase::ExecutableTargets:
     halCompileTo = IREE::HAL::PipelinePhase::ExecutableTargets;

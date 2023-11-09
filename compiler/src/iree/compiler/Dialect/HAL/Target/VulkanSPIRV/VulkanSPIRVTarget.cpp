@@ -149,6 +149,17 @@ public:
         context, b.getStringAttr(deviceID()), configAttr);
   }
 
+  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                      OpPassManager &passManager) override {
+    // For now we disable translation if the variant has external object files.
+    // We could instead perform linking with those objects (if they're .spv
+    // files we could use spirv-link or import them into MLIR and merge here).
+    if (variantOp.isExternal())
+      return;
+
+    buildSPIRVCodegenConfigurationPassPipeline(passManager);
+  }
+
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
     // For now we disable translation if the variant has external object files.
