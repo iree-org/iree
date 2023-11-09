@@ -152,6 +152,40 @@ func.func @mmt4d_i8i8i32(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tensor<?x?x?x?xi8>,
 
 // -----
 
+func.func @mmt4d_i16i16i32(%arg0 : tensor<?x?x?x?xi16>, %arg1 : tensor<?x?x?x?xi16>,
+    %arg2 : tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all"}>
+} {
+  %0 = linalg.mmt4d ins(%arg0, %arg1 : tensor<?x?x?x?xi16>, tensor<?x?x?x?xi16>)
+      outs(%arg2 : tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32>
+  return %0 : tensor<?x?x?x?xi32>
+}
+//      CHECK: func @mmt4d_i16i16i32(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi16>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi16>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
+//  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1287 : i32
+//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[M0_index:.+]] = tensor.dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[M0:.+]] = arith.index_cast %[[M0_index]] : index to i32
+//  CHECK-DAG:   %[[N0_index:.+]] = tensor.dim %[[ARG1]], %[[C2]]
+//  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
+//  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
+//  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
+//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
+// CHECK-SAME:       outs(%[[ARG2]] :
+// CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
+//      CHECK:   return %[[MICRO_KERNEL]]
+
+// -----
+
 func.func @mmt4d_f16f16f32(%arg0 : tensor<?x?x?x?xf16>, %arg1 : tensor<?x?x?x?xf16>,
     %arg2 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all"}>
@@ -619,6 +653,68 @@ func.func @mmt4d_i8i8i32_extend_producers(%arg0: tensor<?x?x?x?xi8>, %arg1: tens
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
 //  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1282 : i32
+//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[M0_index:.+]] = tensor.dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[M0:.+]] = arith.index_cast %[[M0_index]] : index to i32
+//  CHECK-DAG:   %[[N0_index:.+]] = tensor.dim %[[ARG1]], %[[C2]]
+//  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
+//  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
+//  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
+//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
+// CHECK-SAME:       outs(%[[ARG2]] :
+// CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
+//      CHECK:   return %[[MICRO_KERNEL]]
+
+// ----
+
+func.func @mmt4d_i16u4i32_extend_producers(%arg0: tensor<?x?x?x?xi16>, %arg1: tensor<?x?x?x?xi4>, %arg2: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all"}>
+} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x?x?x?xi16>
+  %dim_0 = tensor.dim %arg0, %c1 : tensor<?x?x?x?xi16>
+  %dim_1 = tensor.dim %arg0, %c2 : tensor<?x?x?x?xi16>
+  %dim_2 = tensor.dim %arg0, %c3 : tensor<?x?x?x?xi16>
+  %0 = tensor.empty(%dim, %dim_0, %dim_1, %dim_2) : tensor<?x?x?x?xi32>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], 
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+                        ins(%arg0 : tensor<?x?x?x?xi16>) outs(%0 : tensor<?x?x?x?xi32>) {
+  ^bb0(%in: i16, %out: i32):
+    %5 = arith.extsi %in : i16 to i32
+    linalg.yield %5 : i32
+  } -> tensor<?x?x?x?xi32>
+  %dim_3 = tensor.dim %arg1, %c0 : tensor<?x?x?x?xi4>
+  %dim_4 = tensor.dim %arg1, %c1 : tensor<?x?x?x?xi4>
+  %dim_5 = tensor.dim %arg1, %c2 : tensor<?x?x?x?xi4>
+  %dim_6 = tensor.dim %arg1, %c3 : tensor<?x?x?x?xi4>
+  %2 = tensor.empty(%dim_3, %dim_4, %dim_5, %dim_6) : tensor<?x?x?x?xi32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], 
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+                        ins(%arg1 : tensor<?x?x?x?xi4>) outs(%2 : tensor<?x?x?x?xi32>) {
+  ^bb0(%in: i4, %out: i32):
+    %5 = arith.extui %in : i4 to i32
+    linalg.yield %5 : i32
+  } -> tensor<?x?x?x?xi32>
+  %4 = linalg.mmt4d ins(%1, %3 : tensor<?x?x?x?xi32>, tensor<?x?x?x?xi32>) outs(%arg2 : tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32>
+  return %4 : tensor<?x?x?x?xi32>
+}
+//      CHECK: func @mmt4d_i16u4i32_extend_producers(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi16>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi4>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
+//  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1288 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
