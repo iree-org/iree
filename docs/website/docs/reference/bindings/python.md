@@ -149,9 +149,42 @@ results = f(arg0, arg1).to_host()
 print("Results:", results)
 ```
 
+### Console scripts
+
+The Python packages include console scripts for most of IREE's native tools
+like `iree-compile` and `iree-run-module`.  After installing a package from
+pip, these should be added to your path automatically:
+
+```console
+$ python -m pip install iree-runtime
+$ which iree-run-module
+
+/projects/.venv/Scripts/iree-run-module
+```
+
 ### Samples
 
 Check out the samples in IREE's
 [samples/colab/ directory](https://github.com/openxla/iree/tree/main/samples/colab)
 and the [iree-samples repository](https://github.com/iree-org/iree-samples) for
 examples using the Python APIs.
+
+## Profiling
+
+The tools in the `iree-runtime` package support variants:
+
+| Variant name | Description |
+| ------------ | ----------- |
+default | Standard runtime tools
+tracy | Runtime tools instrumented using the [Tracy](https://github.com/wolfpld/tracy) profiler
+
+Switch between variants of the installed tools using the `IREE_PY_RUNTIME`
+environment variable:
+
+```bash
+IREE_PY_RUNTIME=tracy iree-run-module ...
+```
+
+See the developer documentation page on
+[Profiling with Tracy](../../developers/performance/profiling-with-tracy.md)
+for information on using Tracy.

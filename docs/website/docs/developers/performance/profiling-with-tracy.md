@@ -187,6 +187,19 @@ cmake -DIREE_ENABLE_RUNTIME_TRACING=ON .
 cmake --build .
 ```
 
+!!! tip - "Tip - python bindings"
+
+    The `iree-runtime` Python package includes instrumented tools too. Set the
+    `IREE_PY_RUNTIME=tracy` environment variable to use them:
+
+    ```console
+    $ python -m pip install iree-runtime
+    $ IREE_PY_RUNTIME=tracy iree-run-module ...
+    ```
+
+    See [this section](../../../reference/bindings/python#profiling) in the
+    Python bindings documentation for more details.
+
 ### Additional steps for Sampling
 
 In order for Sampling features to work, make sure that binaries contain debug
