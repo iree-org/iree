@@ -1216,6 +1216,13 @@ setRootConfig(func::FuncOp entryPointFn,
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::Mmt4DOp mmt4dOp) {
   assert(!getLoweringConfig(mmt4dOp) && "expected lowering_config is not set");
+
+  auto lhsShape = cast<ShapedType>(mmt4dOp.getInputs()[0].getType()).getShape();
+  auto rhsShape = cast<ShapedType>(mmt4dOp.getInputs()[1].getType()).getShape();
+  int M0 = lhsShape[2];
+  int N0 = rhsShape[2];
+  int K0 = lhsShape[3];
+
   auto getDistTileSizes = [&]() -> SmallVector<int64_t> {
     if (!clMmt4dDistributionTileSizes.empty()) {
       return SmallVector<int64_t>(clMmt4dDistributionTileSizes.begin(),
@@ -1224,10 +1231,12 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     unsigned numLoops = mmt4dOp.getNumLoops();
     SmallVector<int64_t> minTileSizes(numLoops, 0);
     SmallVector<int64_t> maxTileSizes(numLoops, 0);
-    minTileSizes[0] = 4;
-    minTileSizes[1] = 4;
-    maxTileSizes[0] = 48;
-    maxTileSizes[1] = 32;
+    minTileSizes[0] = minTileSizes[1] = 1;
+    // Scale default distribution tile size down because it is already in packed
+    // domain. With outer M dim size=X means that there will be `X * M0`
+    // elements to process. Same for N dimension.
+    maxTileSizes[0] = llvm::divideCeil(defaultDistTileSize, M0);
+    maxTileSizes[1] = llvm::divideCeil(defaultDistTileSize, N0);
     SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
         mmt4dOp, minTileSizes, maxTileSizes);
     return distTileSizes;
@@ -1238,14 +1247,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
                                   mmt4dL1TileSizes.end());
     }
-    auto lhsShape =
-        llvm::cast<ShapedType>(mmt4dOp.getInputs()[0].getType()).getShape();
-    auto rhsShape =
-        llvm::cast<ShapedType>(mmt4dOp.getInputs()[1].getType()).getShape();
-    int M0 = lhsShape[2];
-    int N0 = rhsShape[2];
-    int K0 = lhsShape[3];
-
     return {1, 1, 1, M0, N0, K0};
   };
 
@@ -1272,6 +1273,13 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::BatchMmt4DOp batchMmt4dOp) {
   assert(!getLoweringConfig(batchMmt4dOp) &&
          "expected lowering_config is not set");
+  auto lhsShape =
+      cast<ShapedType>(batchMmt4dOp.getInputs()[0].getType()).getShape();
+  auto rhsShape =
+      cast<ShapedType>(batchMmt4dOp.getInputs()[1].getType()).getShape();
+  int M0 = lhsShape[3];
+  int N0 = rhsShape[3];
+  int K0 = lhsShape[4];
   auto getDistTileSizes = [&]() -> SmallVector<int64_t> {
     if (!clMmt4dDistributionTileSizes.empty()) {
       SmallVector<int64_t> tileSizes;
@@ -1285,12 +1293,13 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     unsigned numLoops = batchMmt4dOp.getNumLoops();
     SmallVector<int64_t> minTileSizes(numLoops, 0);
     SmallVector<int64_t> maxTileSizes(numLoops, 0);
-    minTileSizes[0] = 1;
-    minTileSizes[1] = 4;
-    minTileSizes[2] = 4;
-    maxTileSizes[0] = 1;
-    maxTileSizes[1] = 48;
-    maxTileSizes[2] = 32;
+    minTileSizes[0] = maxTileSizes[0] = 1; // Force batch dim being 1.
+    minTileSizes[1] = minTileSizes[2] = 1;
+    // Scale default distribution tile size down because it is already in packed
+    // domain. With outer M dim size=X means that there will be `X * M0`
+    // elements to process. Same for N dimension.
+    maxTileSizes[1] = llvm::divideCeil(defaultDistTileSize, M0);
+    maxTileSizes[2] = llvm::divideCeil(defaultDistTileSize, N0);
     SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
         batchMmt4dOp, minTileSizes, maxTileSizes);
     return distTileSizes;
@@ -1307,15 +1316,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       return tileSizes;
     }
 
-    auto lhsShape =
-        llvm::cast<ShapedType>(batchMmt4dOp.getInputs()[0].getType())
-            .getShape();
-    auto rhsShape =
-        llvm::cast<ShapedType>(batchMmt4dOp.getInputs()[1].getType())
-            .getShape();
-    int M0 = lhsShape[3];
-    int N0 = rhsShape[3];
-    int K0 = lhsShape[4];
     tileSizes.append({1, 1, 1, M0, N0, K0});
     return tileSizes;
   };
