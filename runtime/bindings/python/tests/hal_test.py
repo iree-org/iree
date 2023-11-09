@@ -291,26 +291,25 @@ class DeviceHalTest(unittest.TestCase):
         copy_ary = target_buffer.map().asarray(original_ary.shape, original_ary.dtype)
         np.testing.assert_array_equal(original_ary, copy_ary)
 
-    def testDifferentSizeQueueCopy(self):
+    def testIncompatibleSizeQueueCopy(self):
         source_buffer = self.allocator.allocate_buffer(
-            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
-            allocation_size=12,
-        )
-        target_buffer = self.allocator.allocate_buffer(
             memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
             allowed_usage=iree.runtime.BufferUsage.DEFAULT,
             allocation_size=13,
         )
-        sem = self.device.create_semaphore(0)
-        self.device.queue_copy(
-            source_buffer,
-            target_buffer,
-            wait_semaphores=iree.runtime.HalFence.create_at(sem, 0),
-            signal_semaphores=iree.runtime.HalFence.create_at(sem, 1),
+        target_buffer = self.allocator.allocate_buffer(
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            allocation_size=12,
         )
-        iree.runtime.HalFence.create_at(sem, 1).wait()
-        # Just check that it runs?
+        sem = self.device.create_semaphore(0)
+        with self.assertRaisesRegex(ValueError, "length must be less than"):
+            self.device.queue_copy(
+                source_buffer,
+                target_buffer,
+                wait_semaphores=iree.runtime.HalFence.create_at(sem, 0),
+                signal_semaphores=iree.runtime.HalFence.create_at(sem, 1),
+            )
 
     def testCommandBufferStartsByDefault(self):
         cb = iree.runtime.HalCommandBuffer(self.device)
