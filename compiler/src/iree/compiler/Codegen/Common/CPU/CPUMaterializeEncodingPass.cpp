@@ -193,8 +193,9 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
     };
   }
 
-  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
-      out.isSignlessInteger(32)) {
+  if (out.isSignlessInteger(32) &&
+      ((lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8)) ||
+       (lhs.isSignlessInteger(16) && rhs.isSignlessInteger(16)))) {
     if (hasFeature(target, "+avx512vnni")) {
       // This is the same tile size as with VPMADDWD as the only difference
       // is that VPDPWSSD accumulates. VPDPBUSD would call for {16, 16, 4} but
@@ -231,6 +232,16 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
         TileMxNxK{2, 4, 2}, // Truncation of the above.
         TileMxNxK{1, 4, 2}, // Truncation of the above.
     };
+  }
+
+  if (out.isSignlessInteger(32) && lhs.isSignlessInteger(16) &&
+      rhs.isUnsignedInteger(4)) {
+    // Experimental s16u4s32 case. Focusing only on the vecmat case for now.
+    if (hasFeature(target, "+avx512vnni")) {
+      return {
+          TileMxNxK{1, 16, 8}, // Aim to use VPDPBUSD (zmm).
+      };
+    }
   }
 
   // Fallback - no architecture-optimized tile size for this case.
