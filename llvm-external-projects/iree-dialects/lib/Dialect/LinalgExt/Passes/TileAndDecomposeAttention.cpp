@@ -425,7 +425,7 @@ tileAttention(IREE::LinalgExt::AttentionOp attnOp, RewriterBase &rewriter) {
       insertOutputSlice(loopNest.results[0], output, sequenceTileLength,
                         headDimension, loc, rewriter);
 
-  attnOp.getResults()[0].replaceAllUsesWith(loopNest.results[0]);
+  rewriter.replaceOp(attnOp, loopNest.results[0]);
   ops.push_back(tiledAttentionOp);
   return ops;
 }
@@ -458,12 +458,7 @@ static void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
       keySlice, valueSlice, querySlice, tiledResult, max, sum,
       sequenceTileLength, headDimension, elementType, ops, loc, rewriter);
 
-  tiledAttnOp.getResults()[0].replaceAllUsesWith(result);
-  tiledAttnOp.getResults()[1].replaceAllUsesWith(newMax);
-  tiledAttnOp.getResults()[2].replaceAllUsesWith(newSum);
-
-  OpBuilder::InsertionGuard afterScfLoop(rewriter);
-  rewriter.setInsertionPointAfter(tiledAttnOp->getParentOp());
+  rewriter.replaceOp(tiledAttnOp, ValueRange{result, newMax, newSum});
 }
 
 /// Utility function which tiles and then decomposes attention op via
