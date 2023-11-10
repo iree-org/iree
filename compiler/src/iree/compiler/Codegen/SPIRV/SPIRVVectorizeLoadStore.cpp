@@ -995,15 +995,14 @@ struct ReifyExtractOfCreateMask final
     }
 
     Location loc = maskOp.getLoc();
-    Value maskBit = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getIntegerAttr(rewriter.getI1Type(), 1));
+    Value maskBit =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
     for (auto [idx, size] :
          llvm::zip_equal(extractOp.getMixedPosition(), maskOp.getOperands())) {
       Value idxVal;
       if (idx.is<Attribute>()) {
-        idxVal = rewriter.create<arith::ConstantOp>(
-            loc, rewriter.getI1Type(),
-            idx.get<Attribute>().cast<IntegerAttr>());
+        idxVal = rewriter.create<arith::ConstantIndexOp>(
+            loc, idx.get<Attribute>().cast<IntegerAttr>().getInt());
       } else {
         idxVal = idx.get<Value>();
       }
