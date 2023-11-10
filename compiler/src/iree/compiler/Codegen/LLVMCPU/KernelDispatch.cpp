@@ -2596,7 +2596,11 @@ setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
     }
 
     // Set vector level tile sizes for other operations individually.
-    if (failed(setLoweringConfigForComputeOps(entryPointFn, computeOps,
+    // TODO(hanchung): Move VMVX logics to Codegen/VMVX. VMVX only has
+    // distribution tile sizes. It is already set on root op; we don't have to
+    // model other level of tiling.
+    if (!isVMVXBackend(targetAttr) &&
+        failed(setLoweringConfigForComputeOps(entryPointFn, computeOps,
                                               rootOperation))) {
       return failure();
     }
