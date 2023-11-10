@@ -284,8 +284,6 @@ static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
 static bool isIdentityMapWithZeros(AffineMap map) {
   if (map.getNumSymbols() != 0)
     return false;
-  if (map.isEmpty())
-    return false;
   unsigned dimsSeen = 0;
   for (auto result : map.getResults()) {
     bool isValidExpr = TypeSwitch<AffineExpr, bool>(result)
@@ -302,7 +300,7 @@ static bool isIdentityMapWithZeros(AffineMap map) {
     if (!isValidExpr)
       return false;
   }
-  return dimsSeen == map.getNumDims();
+  return true;
 }
 
 static bool
