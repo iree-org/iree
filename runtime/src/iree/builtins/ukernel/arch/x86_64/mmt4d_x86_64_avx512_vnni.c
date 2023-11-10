@@ -290,7 +290,7 @@ iree_uk_mmt4d_tile_s16u4s32_1x16x8_to_1x32x8_x86_64_avx512_vnni(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int N0) {
-  IREE_UK_ASSERT(N0 >= 1 && N0 <= 16 && iree_uk_is_po2_u32(N0));
+  IREE_UK_ASSERT(N0 >= 16 && N0 <= 32 && iree_uk_is_po2_u32(N0));
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
   const iree_uk_int16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_uint8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
