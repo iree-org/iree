@@ -138,38 +138,45 @@ option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possib
 set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 
 #-------------------------------------------------------------------------------
-# Compiler plugins
-# IREE compiler plugins can be statically built into the compiler by adding
-# directories to IREE_COMPILER_PLUGIN_PATHS. If directories are relative, they
-# are interpreted against the IREE source directory.
+# IREE out of tree plugins
 #
-# In addition, certain in-tree plugin directories are included regardless of
-# this variable (possibly based on other flags).
+# IREE has multiple facilities for building with out of tree plugin sources.
+# The entry-point is via the -DIREE_CMAKE_PLUGIN_PATHS=<dir1;dir2> setting.
+# Each directory in this list can have any of the following files in it, which
+# will be included at the appropriate point in the CMake build:
 #
-# Super-projects can populate the list IREE_COMPILER_BUILTIN_PLUGIN_PATHS to
+#   iree_compiler_plugin.cmake : Included in the context of the compiler/
+#     directory before sources and bindings. Will execute with source and
+#     binary dir ${IREE_BUILD_DIR}/compiler/plugins (shared with all other 
+#     dirs).
+#   iree_runtime_plugin.cmake : Included in the context of the runtime/
+#     directory before sources. Will execute with source and binary dir 
+#     ${IREE_BUILD_DIR}/runtime/plugins (shared with all other dirs).
+#
+# Typically, these plugins will perform additional project setup, and
+# eventually call registration functions to advertise additional capabilities
+# to the build system.
+#
+# Super-projects can populate the list IREE_CMAKE_BUILTIN_PLUGIN_PATHS to
 # statically configure more plugin directories to be used.
 #
-# A plugin directory must contain an iree_compiler_plugin_group.cmake file that
-# is loaded and must specify:
-#   - any needed add_subdirectory() calls to populate targets.
-#   - iree_compiler_register_plugin() targets (either directly or transitively)
-#     which associates a plugin id with a registration target.
+# Compiler Plugins
+# ----------------
+# Compiler plugins are advertised to the build system via the function
+# iree_compiler_register_plugin(), which associated a plugin id to a build target
+# and registration function. See samples/compiler_plugins for examples.
 #
-# All iree_compiler_plugin_group.cmake files are included from the binary
-# directory ${IREE_BINARY_DIR}/compiler/plugins and must create a sub binary
-# directory that is globally unique. It is recommended to prefix with org
-# name or project. The following names are reserved:
-#   - builtin
-#   - samples
-#
-# Example:
-#   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/example samples/example)
+# External HAL Driver Plugins
+# ---------------------------
+# HAL driver implementations are advertised to the build system via
+# iree_register_external_hal_driver(), which specifies the name, target, 
+# registration function and optional source/binary directory.
 #-------------------------------------------------------------------------------
 
-set(IREE_COMPILER_PLUGIN_PATHS "" CACHE STRING "Paths to external compiler plugins")
-list(APPEND IREE_COMPILER_BUILTIN_PLUGIN_PATHS "compiler/plugins")
+set(IREE_CMAKE_PLUGIN_PATHS "" CACHE STRING "Paths to be scanned for IREE CMake plugin includes")
+list(APPEND IREE_CMAKE_BUILTIN_PLUGIN_PATHS "compiler/plugins")
 if(IREE_BUILD_SAMPLES)
-  list(APPEND IREE_COMPILER_BUILTIN_PLUGIN_PATHS "samples/compiler_plugins")
+  list(APPEND IREE_CMAKE_BUILTIN_PLUGIN_PATHS "samples/compiler_plugins")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -340,36 +347,6 @@ endif()
 if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
   message(STATUS "  - system-library")
 endif()
-
-#-------------------------------------------------------------------------------
-# Experimental next-generation CUDA HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=cuda2
-#-------------------------------------------------------------------------------
-
-set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2")
-set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/cuda2")
-set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_TARGET "iree::experimental::cuda2::registration")
-set(IREE_EXTERNAL_CUDA2_HAL_DRIVER_REGISTER "iree_hal_cuda2_driver_module_register")
-
-#-------------------------------------------------------------------------------
-# Experimental ROCM HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=rocm
-#-------------------------------------------------------------------------------
-
-set(IREE_EXTERNAL_ROCM_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm")
-set(IREE_EXTERNAL_ROCM_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/rocm")
-set(IREE_EXTERNAL_ROCM_HAL_DRIVER_TARGET "iree::experimental::rocm::registration")
-set(IREE_EXTERNAL_ROCM_HAL_DRIVER_REGISTER "iree_hal_rocm_driver_module_register")
-
-#-------------------------------------------------------------------------------
-# Experimental WebGPU HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=webgpu
-#-------------------------------------------------------------------------------
-
-set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu")
-set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu")
-set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_TARGET "iree::experimental::webgpu::registration")
-set(IREE_EXTERNAL_WEBGPU_HAL_DRIVER_REGISTER "iree_hal_webgpu_driver_module_register")
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
@@ -564,7 +541,6 @@ include(iree_copts)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
-include(iree_compiler_plugin)
 include(iree_import_binary)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
@@ -587,6 +563,7 @@ include(iree_hal_cts_test_suite)
 include(iree_static_linker_test)
 include(iree_fetch_artifact)
 include(iree_run_module_test)
+include(iree_plugin_register)
 
 # Default any sub-tree which doesn't provide its own package namespacing
 # to derive it relative to this directory and prefixed with iree/.
@@ -594,6 +571,54 @@ set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "iree")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+
+#-------------------------------------------------------------------------------
+# Experimental next-generation CUDA HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=cuda2
+#-------------------------------------------------------------------------------
+
+iree_register_external_hal_driver(
+  NAME
+    cuda2
+  SOURCE_DIR 
+    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2"
+  DRIVER_TARGET
+    iree::experimental::cuda2::registration
+  REGISTER_FN
+    iree_hal_cuda2_driver_module_register
+)
+
+#-------------------------------------------------------------------------------
+# Experimental ROCM HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=rocm
+#-------------------------------------------------------------------------------
+
+iree_register_external_hal_driver(
+  NAME
+    rocm
+  SOURCE_DIR 
+    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm"
+  DRIVER_TARGET
+    iree::experimental::rocm::registration
+  REGISTER_FN
+    iree_hal_rocm_driver_module_register
+)
+
+#-------------------------------------------------------------------------------
+# Experimental WebGPU HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=webgpu
+#-------------------------------------------------------------------------------
+
+iree_register_external_hal_driver(
+  NAME
+    rocm
+  SOURCE_DIR 
+    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
+  DRIVER_TARGET
+    iree::experimental::webgpu::registration
+  REGISTER_FN
+    iree_hal_webgpu_driver_module_register
+)
 
 #-------------------------------------------------------------------------------
 # IREE compilation flags
