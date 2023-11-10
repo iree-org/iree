@@ -1384,27 +1384,13 @@
         
           <li class="md-nav__item">
   <a href="#samples" class="md-nav__link">
-     Samples
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#console-scripts" class="md-nav__link">
-     Console scripts
+    Samples
   </a>
   
 </li>
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#profiling" class="md-nav__link">
-     Profiling
-  </a>
   
 </li>
       
@@ -3377,27 +3363,13 @@
         
           <li class="md-nav__item">
   <a href="#samples" class="md-nav__link">
-     Samples
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#console-scripts" class="md-nav__link">
-     Console scripts
+    Samples
   </a>
   
 </li>
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#profiling" class="md-nav__link">
-     Profiling
-  </a>
   
 </li>
       
@@ -3578,47 +3550,11 @@ page for instructions for building from source.</p>
 <span class="n">results</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">arg0</span><span class="p">,</span> <span class="n">arg1</span><span class="p">)</span><span class="o">.</span><span class="n">to_host</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Results:&quot;</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
 </code></pre></div>
-<h3 id="samples"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h3>
+<h3 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h3>
 <p>Check out the samples in IREE's
 <a href="https://github.com/openxla/iree/tree/main/samples/colab">samples/colab/ directory</a>
 and the <a href="https://github.com/iree-org/iree-samples">iree-samples repository</a> for
 examples using the Python APIs.</p>
-<h3 id="console-scripts"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 19V7H4v12h16m0-16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h16m-7 14v-2h5v2h-5m-3.42-4L5.57 9H8.4l3.3 3.3c.39.39.39 1.03 0 1.42L8.42 17H5.59l3.99-4Z"/></svg></span> Console scripts<a class="headerlink" href="#console-scripts" title="Permanent link">link</a></h3>
-<p>The Python packages include console scripts for most of IREE's native tools
-like <code>iree-compile</code> and <code>iree-run-module</code>.  After installing a package from
-pip, these should be added to your path automatically:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-runtime
-<span class="gp">$ </span>which<span class="w"> </span>iree-run-module
-
-<span class="go">/projects/.venv/Scripts/iree-run-module</span>
-</code></pre></div>
-<h2 id="profiling"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg></span> Profiling<a class="headerlink" href="#profiling" title="Permanent link">link</a></h2>
-<p>The tools in the <code>iree-runtime</code> package support variants:</p>
-<table>
-<thead>
-<tr>
-<th>Variant name</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>default</td>
-<td>Standard runtime tools</td>
-</tr>
-<tr>
-<td>tracy</td>
-<td>Runtime tools instrumented using the <a href="https://github.com/wolfpld/tracy">Tracy</a> profiler</td>
-</tr>
-</tbody>
-</table>
-<p>Switch between variants of the installed tools using the <code>IREE_PY_RUNTIME</code>
-environment variable:</p>
-<div class="highlight"><pre><span></span><code><span class="nv">IREE_PY_RUNTIME</span><span class="o">=</span>tracy<span class="w"> </span>iree-run-module<span class="w"> </span>...
-</code></pre></div>
-<p>See the developer documentation page on
-<a href="../../../developers/performance/profiling-with-tracy/">Profiling with Tracy</a>
-for information on using Tracy.</p>
 
 
 
