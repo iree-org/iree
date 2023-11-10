@@ -21,6 +21,8 @@ genrule(
     cmd = (
         "echo '" +
         "HANDLE_PLUGIN_ID(hal_target_cuda)\n" +
+        "HANDLE_PLUGIN_ID(input_tosa)\n" +
+        # Samples
         "HANDLE_PLUGIN_ID(example)\n" +
         "HANDLE_PLUGIN_ID(simple_io_sample)\n" +
         "' > $@"
@@ -39,6 +41,7 @@ iree_compiler_cc_library(
         # generates its deps from the environment.
         # For now, we just hard include all in-tree plugins.
         "//compiler/plugins/target/CUDA",
+        "//compiler/plugins/input/TOSA/tosa-iree:registration",
         "//samples/compiler_plugins/example:registration",
         "//samples/compiler_plugins/simple_io_sample:registration",
     ],

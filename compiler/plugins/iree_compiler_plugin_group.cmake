@@ -8,6 +8,10 @@ if(IREE_INPUT_TORCH)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/input/Torch input/Torch)
 endif()
 
+if(IREE_INPUT_TOSA)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/input/TOSA input/TOSA)
+endif()
+
 if(IREE_TARGET_BACKEND_CUDA)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/CUDA target/CUDA)
 endif()

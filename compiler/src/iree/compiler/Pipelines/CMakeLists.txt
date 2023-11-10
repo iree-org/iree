@@ -10,9 +10,6 @@ set(IREE_INPUT_DEFINES "")
 if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
 endif()
-if(IREE_INPUT_TOSA)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
-endif()
 
 iree_cc_library(
   NAME
