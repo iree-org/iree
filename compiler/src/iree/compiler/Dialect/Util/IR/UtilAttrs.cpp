@@ -448,6 +448,10 @@ static LogicalResult serializeGenericResourceElementData(
   if (llvm::isa<IntegerType>(resourceElementsAttr.getType().getElementType())) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
+    // At the time of writing, DenseResourceElementsAttr byte aligned physical
+    // element types only with the exception of i1, which is stored as a full
+    // byte. This is in contrast to DenseElementsAttr which has an exception for
+    // i1 where it is bit-packed.
     unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
     switch (bitWidth) {
     case 1:
