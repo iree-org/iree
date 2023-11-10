@@ -51,10 +51,9 @@ static llvm::cl::opt<bool> clEnableCPUMicrokernels(
         "Enables microkernel lowering for llvmcpu backend (experimental)"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clLinkCPUMicrokernelsBitcode(
-    "iree-llvmcpu-link-microkernels-bitcode",
-    llvm::cl::desc(
-        "Enables linking microkernel bitcode in the llvmcpu backend"),
+static llvm::cl::opt<bool> clLinkCPUUKernelBitcode(
+    "iree-llvmcpu-link-ukernel-bitcode",
+    llvm::cl::desc("Link ukernel bitcode libraries into generated executables"),
     llvm::cl::init(true));
 
 static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
@@ -499,7 +498,7 @@ public:
       }
     }
 
-    if (clLinkCPUMicrokernelsBitcode) {
+    if (clLinkCPUUKernelBitcode) {
       // Tracks ukernel functions, in order to set their linkage to internal
       // after ukernel bitcode modules are linked but before runLLVMIRPasses, so
       // that unused ukernel code paths get DCE'd. Notes:
