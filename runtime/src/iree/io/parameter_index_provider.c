@@ -236,11 +236,11 @@ static iree_status_t iree_io_parameter_index_provider_load(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_io_parameter_index_provider_resolve(
               provider, device, queue_affinity, source_scope, source_key,
-              target_params.access, &source_entry, &source_file));
+              IREE_HAL_MEMORY_ACCESS_READ, &source_entry, &source_file));
 
   // Validate the parameter range is in-bounds.
   iree_status_t status = iree_io_validate_parameter_range(
-      target_params.access, source_entry, source_offset, length);
+      IREE_HAL_MEMORY_ACCESS_READ, source_entry, source_offset, length);
 
   // Try first to reuse the file backing store directly as a buffer. This only
   // works with specific file types and with specific target usage. The most
