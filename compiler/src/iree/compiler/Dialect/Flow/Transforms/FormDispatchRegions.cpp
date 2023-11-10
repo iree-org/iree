@@ -341,6 +341,10 @@ static bool hasCompatibleOuterParallelLoops(
   llvm::SmallBitVector consumerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(consumer.getOperation()));
 
+  /// There is no benefit to fuse producer with no outer parallel loop.
+  if (producerParallelLoops.count() == 0)
+    return false;
+
   if (!matchIteratorTypes(rootOuterParallelLoops, producerParallelLoops) ||
       !matchIteratorTypes(rootOuterParallelLoops, consumerParallelLoops)) {
     return false;
