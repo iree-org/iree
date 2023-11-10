@@ -812,7 +812,7 @@ struct SerializableDenseResourceElementsAttrModel
       os.write_zeros(getStorageSize(baseAttr));
       return success();
     } else {
-      os.reserveExtraSpace(getStorageSize(baseAttr));
+      os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
       return serializeGenericResourceElementData(loc, attr, endian, os);
     }
 
