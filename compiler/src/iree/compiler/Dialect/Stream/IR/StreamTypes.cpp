@@ -68,8 +68,8 @@ static llvm::cl::opt<bool> clResourceAliasMutableBindings(
     llvm::cl::desc(
         "Fuses bindings that are mutable instead of leaving them split."),
     llvm::cl::init(false));
-// TODO: Change this to discrete once task system scalability limits are
-// corrected. https://github.com/openxla/iree/issues/15522
+// TODO(#15522): Change this to discrete once task system scalability limits
+// are corrected.
 static llvm::cl::opt<IREE::Stream::MemoryModel> clResourceMemoryModel(
     "iree-stream-resource-memory-model",
     llvm::cl::desc("Memory model used for host-device resource memory access."),
