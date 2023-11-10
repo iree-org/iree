@@ -239,7 +239,7 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
     // Experimental s16u4s32 case. Focusing only on the vecmat case for now.
     if (hasFeature(target, "+avx512vnni")) {
       return {
-          TileMxNxK{1, 16, 8}, // Aim to use VPDPBUSD (zmm).
+          TileMxNxK{1, 32, 8}, // Aim to use VPDPBUSD (zmm).
       };
     }
   }

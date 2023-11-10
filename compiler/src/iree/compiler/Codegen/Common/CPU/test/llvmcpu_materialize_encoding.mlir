@@ -1348,21 +1348,21 @@ func.func @matmul_lowering_i16ui4i32_x86_64_avx512vnni() attributes {
 }
 
 // CHECK-DAG: #[[MAP_CEILDIV_8:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-// CHECK-DAG: #[[MAP_CEILDIV_16:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+// CHECK-DAG: #[[MAP_CEILDIV_32:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 // CHECK-DAG: #[[MAP_IDENTITY_4D:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK:     func.func @matmul_lowering_i16ui4i32_x86_64_avx512vnni()
 // CHECK-DAG: %[[M:.+]] = hal.interface.constant.load[0] : index
 // CHECK-DAG: %[[N:.+]] = hal.interface.constant.load[1] : index
 // CHECK-DAG: %[[K:.+]] = hal.interface.constant.load[2] : index
 // CHECK-DAG: %[[K_CEILDIV_8:.+]] = affine.apply #[[MAP_CEILDIV_8]]()[%[[K]]]
-// CHECK-DAG: %[[N_CEILDIV_16:.+]] = affine.apply #[[MAP_CEILDIV_16]]()[%[[N]]]
+// CHECK-DAG: %[[N_CEILDIV_32:.+]] = affine.apply #[[MAP_CEILDIV_32]]()[%[[N]]]
 // CHECK-DAG: %[[LHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) {{.*}} : !flow.dispatch.tensor<readonly:tensor<?x?x1x8xi16>>{%[[M]], %[[K_CEILDIV_8]]}
-// CHECK-DAG: %[[RHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.*}} : !flow.dispatch.tensor<readonly:tensor<?x?x16x8xi4>>{%[[N_CEILDIV_16]], %[[K_CEILDIV_8]]}
-// CHECK-DAG: %[[OUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2) {{.*}} : !flow.dispatch.tensor<readwrite:tensor<?x?x1x16xi32>>{%[[M]], %[[N_CEILDIV_16]]}
+// CHECK-DAG: %[[RHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.*}} : !flow.dispatch.tensor<readonly:tensor<?x?x32x8xi4>>{%[[N_CEILDIV_32]], %[[K_CEILDIV_8]]}
+// CHECK-DAG: %[[OUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2) {{.*}} : !flow.dispatch.tensor<readwrite:tensor<?x?x1x32xi32>>{%[[M]], %[[N_CEILDIV_32]]}
 // CHECK-DAG: %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M]], %[[K_CEILDIV_8]], 1, 8], {{.*}} -> tensor<?x?x1x8xi16>
-// CHECK-DAG: %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[N_CEILDIV_16]], %[[K_CEILDIV_8]], 16, 8], {{.*}} -> tensor<?x?x16x8xi4>
-// CHECK-DAG: %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M]], %[[N_CEILDIV_16]], 1, 16], {{.*}} -> tensor<?x?x1x16xi32>
-// CHECK-DAG: %[[EMPTY:.+]] = tensor.empty(%[[N_CEILDIV_16]], %[[K_CEILDIV_8]]) : tensor<?x?x16x8xi32>
-// CHECK-DAG: %[[RHS_I32:.+]] = linalg.generic {indexing_maps = [#[[MAP_IDENTITY_4D]], #[[MAP_IDENTITY_4D]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[RHS]] : tensor<?x?x16x8xi4>) outs(%[[EMPTY]] : tensor<?x?x16x8xi32>) {
-// CHECK-DAG: %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS]], %[[RHS_I32]] : tensor<?x?x1x8xi16>, tensor<?x?x16x8xi32>) outs(%[[OUT]] : tensor<?x?x1x16xi32>) -> tensor<?x?x1x16xi32>
+// CHECK-DAG: %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[N_CEILDIV_32]], %[[K_CEILDIV_8]], 32, 8], {{.*}} -> tensor<?x?x32x8xi4>
+// CHECK-DAG: %[[OUT:.+]] = flow.dispatch.tensor.load %[[OUT_BINDING]], offsets = [0, 0, 0, 0], sizes = [%[[M]], %[[N_CEILDIV_32]], 1, 32], {{.*}} -> tensor<?x?x1x32xi32>
+// CHECK-DAG: %[[EMPTY:.+]] = tensor.empty(%[[N_CEILDIV_32]], %[[K_CEILDIV_8]]) : tensor<?x?x32x8xi32>
+// CHECK-DAG: %[[RHS_I32:.+]] = linalg.generic {indexing_maps = [#[[MAP_IDENTITY_4D]], #[[MAP_IDENTITY_4D]]], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%[[RHS]] : tensor<?x?x32x8xi4>) outs(%[[EMPTY]] : tensor<?x?x32x8xi32>) {
+// CHECK-DAG: %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS]], %[[RHS_I32]] : tensor<?x?x1x8xi16>, tensor<?x?x32x8xi32>) outs(%[[OUT]] : tensor<?x?x1x32xi32>) -> tensor<?x?x1x32xi32>
 // CHECK: flow.dispatch.tensor.store %[[MMT4D]], %[[OUT_BINDING]],
