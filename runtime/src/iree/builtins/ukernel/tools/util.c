@@ -90,11 +90,6 @@ int iree_uk_random_engine_get_0_1(iree_uk_random_engine_t* e) {
   return v & 1;
 }
 
-int iree_uk_random_engine_get_minus16_plus15(iree_uk_random_engine_t* e) {
-  int v = iree_uk_random_engine_get_0_65535(e);
-  return (v % 32) - 16;
-}
-
 void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
                                  iree_uk_type_t type,
                                  iree_uk_random_engine_t* engine) {
@@ -125,34 +120,36 @@ void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
     // Small integers, should work for now for all the types we currently have
     // and enable exact float arithmetic, allowing to keep tests simpler for
     // now. Watch out for when we'll do float16!
-    int random_val = iree_uk_random_engine_get_minus16_plus15(engine);
+    int random_val = iree_uk_random_engine_get_0_65535(engine);
     switch (type) {
       case IREE_UK_TYPE_FLOAT_32:
-        ((float*)buffer)[i] = random_val;
+        ((float*)buffer)[i] = (random_val % 4) - 2;
         break;
       case IREE_UK_TYPE_FLOAT_16:
-        ((uint16_t*)buffer)[i] = iree_math_f32_to_f16((float)random_val);
+        ((uint16_t*)buffer)[i] =
+            iree_math_f32_to_f16((float)((random_val % 16) - 8));
         break;
       case IREE_UK_TYPE_BFLOAT_16:
-        ((uint16_t*)buffer)[i] = iree_math_f32_to_bf16((float)random_val);
+        ((uint16_t*)buffer)[i] =
+            iree_math_f32_to_bf16((float)((random_val % 4) - 2));
         break;
       case IREE_UK_TYPE_SINT_32:
-        ((int32_t*)buffer)[i] = random_val;
+        ((int32_t*)buffer)[i] = (random_val % 2048) - 512;
         break;
       case IREE_UK_TYPE_UINT_32:
-        ((uint32_t*)buffer)[i] = random_val;
+        ((uint32_t*)buffer)[i] = random_val % 2048;
         break;
       case IREE_UK_TYPE_SINT_16:
-        ((int16_t*)buffer)[i] = random_val;
+        ((int16_t*)buffer)[i] = (random_val % 2048) - 512;
         break;
       case IREE_UK_TYPE_UINT_16:
-        ((uint16_t*)buffer)[i] = random_val;
+        ((uint16_t*)buffer)[i] = random_val % 2048;
         break;
       case IREE_UK_TYPE_SINT_8:
-        ((int8_t*)buffer)[i] = random_val;
+        ((int8_t*)buffer)[i] = (random_val % 256) - 128;
         break;
       case IREE_UK_TYPE_UINT_8:
-        ((uint8_t*)buffer)[i] = random_val;
+        ((uint8_t*)buffer)[i] = random_val % 256;
         break;
       default:
         IREE_UK_ASSERT(false && "unknown type");

@@ -106,7 +106,7 @@ static void iree_mmt4d_reference_innerloop_bf16bf16f32(
   *out_ptr = acc;
 }
 
-static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
+static void iree_mmt4d_reference_innerloop_bf16bf16bf16_noskipround(
     uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
   uint16_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
@@ -121,6 +121,36 @@ static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
     }
   }
   *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_bf16bf16bf16_skipround(
+    uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  float acc_f32 = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE
+                      ? iree_math_bf16_to_f32(*out_ptr)
+                      : 0.f;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      float lhs_f32 =
+          iree_math_bf16_to_f32(lhs_ptr[k * params->M0 * params->K0 + k0]);
+      float rhs_f32 =
+          iree_math_bf16_to_f32(rhs_ptr[k * params->N0 * params->K0 + k0]);
+      acc_f32 += lhs_f32 * rhs_f32;
+    }
+  }
+  *out_ptr = iree_math_f32_to_bf16(acc_f32);
+}
+
+static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
+    uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  if (params->flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) {
+    iree_mmt4d_reference_innerloop_bf16bf16bf16_skipround(out_ptr, lhs_ptr,
+                                                          rhs_ptr, params);
+  } else {
+    iree_mmt4d_reference_innerloop_bf16bf16bf16_noskipround(out_ptr, lhs_ptr,
+                                                            rhs_ptr, params);
+  }
 }
 
 static void iree_mmt4d_reference_innerloop_s8s8s32(
@@ -346,22 +376,10 @@ static void iree_uk_test_mmt4d_for_shape_params(
   // code accumulates in a different order compared to the actual code. This
   // relies on picking input test matrix elements so that all intermediate
   // values are exactly representable - i.e. small integer numerators.
+  // This also relies on honoring IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS
+  // consistently between actual tile functions (including generic fallback
+  // ones) and the reference code in this test.
   bool fail = memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size);
-  if (fail) {
-    // The one thing that causes legitimate bit differences at the moment is
-    // when we enable skipping intermediate roundings but the actual kernel does
-    // not skip intermediate roundings, such as when falling back on a generic
-    // code path. In that case, we retry with reference code not skipping
-    // intermediate roundings. This currently only happens when the output type
-    // is f16.
-    if (out_type == IREE_UK_TYPE_FLOAT_16 &&
-        (params.flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS)) {
-      reference_params.flags &= ~IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
-      memcpy(reference_out_buffer, init_out_buffer, out_buffer_size);
-      iree_mmt4d_reference(&reference_params);
-      fail = memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size);
-    }
-  }
 
   if (fail) {
     IREE_UK_TEST_FAIL(test);
@@ -379,6 +397,11 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
   typedef struct shape_mnk_t {
     int m, n, k;
   } shape_mnk_t;
+  const iree_uk_mmt4d_type_t mmt4d_type =
+      iree_uk_mmt4d_type(((const iree_uk_mmt4d_params_t*)src_params)->flags);
+  const iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
+  const int max_reduction_size =
+      (out_type == IREE_UK_TYPE_BFLOAT_16) ? 100 : 1000;
   const shape_mnk_t shapes[] = {
       // Degenerate case M==0. Vacuous.
       {0, 1, 1},
@@ -394,7 +417,7 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
       {1, 1, 1},
       {1, 1, 2},
       {1, 1, 10},
-      {1, 1, 1000},
+      {1, 1, max_reduction_size},
       {2, 1, 1},
       {1, 2, 1},
       {2, 2, 2},
