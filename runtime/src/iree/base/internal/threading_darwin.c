@@ -227,7 +227,7 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   // https://fergofrog.com/code/cbowser/xnu/osfmk/mach/thread_policy.h.html
   // http://www.hybridkernel.com/2015/01/18/binding_threads_to_cores_osx.html
   thread_affinity_policy_data_t policy_data = {affinity.id};
-  thread_policy_set(mach_task_self(), THREAD_AFFINITY_POLICY,
+  thread_policy_set(thread->mach_port, THREAD_AFFINITY_POLICY,
                     (thread_policy_t)(&policy_data),
                     THREAD_AFFINITY_POLICY_COUNT);
 
