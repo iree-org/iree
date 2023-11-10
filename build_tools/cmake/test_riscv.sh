@@ -99,6 +99,8 @@ test_exclude_args+=(
   "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_llvm-cpu_local-task"
   "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_no_padding_llvm-cpu_local-task"
   "iree/tests/e2e/regression/check_regression_llvm-cpu_strided_slice.mlir"
+  # TODO(#15540): Enable the tests.
+  "iree/tests/e2e/linalg/check_llvm-cpu_local-task_f32_to_i4.mlir"
 )
 
 tests_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
