@@ -323,9 +323,9 @@ static Value insertOutputSlice(Value src, Value dst,
 
 /// Tile iree_linalg_ext.attention.
 /// TODO: Adopt getTiledImplementation with this.
-static SmallVector<Operation *>
-tileAttention(IREE::LinalgExt::AttentionOp attnOp, RewriterBase &rewriter) {
-  SmallVector<Operation *> ops;
+IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
+                                           SmallVectorImpl<Operation *> &ops,
+                                           RewriterBase &rewriter) {
   Location loc = attnOp.getLoc();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(attnOp);
@@ -427,14 +427,15 @@ tileAttention(IREE::LinalgExt::AttentionOp attnOp, RewriterBase &rewriter) {
 
   rewriter.replaceOp(attnOp, loopNest.results[0]);
   ops.push_back(tiledAttentionOp);
-  return ops;
+
+  return tiledAttentionOp;
 }
 
 /// Decompose tiled iree_linalg_ext.attention op.
 /// TODO: Adopt decomposeOperation with this.
-static void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
-                                    SmallVector<Operation *> &ops,
-                                    RewriterBase &rewriter) {
+void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
+                             SmallVectorImpl<Operation *> &ops,
+                             RewriterBase &rewriter) {
   Location loc = tiledAttnOp.getLoc();
   Value keySlice = tiledAttnOp.getKey();
   Value valueSlice = tiledAttnOp.getValue();
@@ -463,24 +464,14 @@ static void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
 
 /// Utility function which tiles and then decomposes attention op via
 /// FlashAttention algorithm.
-SmallVector<Operation *>
-tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
-                          RewriterBase &rewriter, bool onlyTile) {
-  SmallVector<Operation *> ops = tileAttention(attnOp, rewriter);
+void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
+                               SmallVectorImpl<Operation *> &ops,
+                               RewriterBase &rewriter, bool onlyTile) {
+  IREE::LinalgExt::AttentionOp tiledAttentionOp =
+      tileAttention(attnOp, ops, rewriter);
   if (onlyTile)
-    return ops;
-  auto tiledAttnOp = cast<IREE::LinalgExt::AttentionOp>(ops[ops.size() - 1]);
-  ops.pop_back();
-  Operation *truncateToF16 = NULL;
-  Type elementType = tiledAttnOp.getQueryType().getElementType();
-  if (elementType.isF16()) {
-    truncateToF16 = ops[ops.size() - 1];
-    ops.pop_back();
-  }
-  decomposeTiledAttention(tiledAttnOp, ops, rewriter);
-  if (truncateToF16)
-    ops.push_back(truncateToF16);
-  return ops;
+    return;
+  decomposeTiledAttention(tiledAttentionOp, ops, rewriter);
 }
 
 namespace {
@@ -515,7 +506,8 @@ namespace {
 LogicalResult reifyAttentionTransform(func::FuncOp funcOp, bool onlyTile) {
   IRRewriter rewriter(funcOp.getContext());
   funcOp.walk([&](IREE::LinalgExt::AttentionOp attnOp) {
-    tileAndDecomposeAttention(attnOp, rewriter, onlyTile);
+    SmallVector<Operation *> ops;
+    tileAndDecomposeAttention(attnOp, ops, rewriter, onlyTile);
     return WalkResult::advance();
   });
   return success();
