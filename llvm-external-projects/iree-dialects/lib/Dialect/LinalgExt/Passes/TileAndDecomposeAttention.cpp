@@ -472,7 +472,7 @@ tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
   auto tiledAttnOp = cast<IREE::LinalgExt::AttentionOp>(ops[ops.size() - 1]);
   ops.pop_back();
   Operation *truncateToF16 = NULL;
-  Type elementType = attnOp.getQueryType().getElementType();
+  Type elementType = tiledAttnOp.getQueryType().getElementType();
   if (elementType.isF16()) {
     truncateToF16 = ops[ops.size() - 1];
     ops.pop_back();
