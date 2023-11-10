@@ -109,5 +109,9 @@ IREE_UK_MMT4D_TILE_FUNC_DECL(
     iree_uk_mmt4d_tile_s16s16s32_8x16x2_x86_64_avx512_vnni)
 IREE_UK_MMT4D_TILE_FUNC_DECL(
     iree_uk_mmt4d_tile_s16s16s32_16x16x2_x86_64_avx512_vnni)
+IREE_UK_MMT4D_TILE_FUNC_DECL(
+    iree_uk_mmt4d_tile_s16u4s32_1x16x8_x86_64_avx512_vnni)
+IREE_UK_MMT4D_TILE_FUNC_DECL(
+    iree_uk_mmt4d_tile_s16u4s32_1x32x8_x86_64_avx512_vnni)
 
 #endif  // foIREE_BUILTINS_UKERNEL_ARCH_X86_64_MMT4D_X86_64_INTERNAL_H_
