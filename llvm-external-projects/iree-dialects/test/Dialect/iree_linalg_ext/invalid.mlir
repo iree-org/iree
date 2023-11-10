@@ -590,9 +590,9 @@ func.func @illegal_set_encoding_op_with_no_result_encoding(%arg0 : tensor<?x?xf3
 
 // -----
 
-func.func @illegal_set_encoding_op_with_source_encoding(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>) -> tensor<?x?xf32> {
+func.func @illegal_set_encoding_op_with_source_encoding(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>) -> tensor<?x?xf32> {
   // expected-error @+1 {{source of set_encoding op cannot have a tensor encoding}}
-  %0 = iree_linalg_ext.set_encoding %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<?x?xf32>
+  %0 = iree_linalg_ext.set_encoding %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
 
@@ -606,18 +606,18 @@ func.func @illegal_set_encoding_op_with_unknown_encoding(%arg0 : tensor<?x?xf32>
 
 // -----
 
-func.func @illegal_set_encoding_op_with_rank_change(%arg0 : tensor<?x?xf32>) -> tensor<?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> {
+func.func @illegal_set_encoding_op_with_rank_change(%arg0 : tensor<?x?xf32>) -> tensor<?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   // expected-error @+1 {{cannot change the rank of the tensor}}
-  %0 = iree_linalg_ext.set_encoding %arg0: tensor<?x?xf32> -> tensor<?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-  return %0 : tensor<?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+  %0 = iree_linalg_ext.set_encoding %arg0: tensor<?x?xf32> -> tensor<?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  return %0 : tensor<?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 }
 
 // -----
 
-func.func @illegal_set_encoding_op_with_shape_change(%arg0 : tensor<10x20xf32>) -> tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> {
+func.func @illegal_set_encoding_op_with_shape_change(%arg0 : tensor<10x20xf32>) -> tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   // expected-error @+1 {{expected to preserve the logical shape of the tensor}}
-  %0 = iree_linalg_ext.set_encoding %arg0: tensor<10x20xf32> -> tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-  return %0 : tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+  %0 = iree_linalg_ext.set_encoding %arg0: tensor<10x20xf32> -> tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  return %0 : tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 }
 
 // -----
@@ -630,10 +630,10 @@ func.func @illegal_unset_encoding_op_with_no_source_encoding(%arg0 : tensor<?x?x
 
 // -----
 
-func.func @illegal_unset_encoding_op_with_result_encoding(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> {
+func.func @illegal_unset_encoding_op_with_result_encoding(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   // expected-error @+1 {{result of unset_encoding op cannot have a tensor encoding}}
-  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
-  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>
+  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
 }
 
 // -----
@@ -646,17 +646,17 @@ func.func @illegal_unset_encoding_op_with_unknown_encoding(%arg0 : tensor<?x?xf3
 
 // -----
 
-func.func @illegal_unset_encoding_op_with_rank_change(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>) -> tensor<?xf32> {
+func.func @illegal_unset_encoding_op_with_rank_change(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>) -> tensor<?xf32> {
   // expected-error @+1 {{cannot change the rank of the tensor}}
-  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<?xf32>
+  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<?xf32>
   return %0 : tensor<?xf32>
 }
 
 // -----
 
-func.func @illegal_unset_encoding_op_with_shape_change(%arg0 : tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>>) -> tensor<10x20xf32> {
+func.func @illegal_unset_encoding_op_with_shape_change(%arg0 : tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>) -> tensor<10x20xf32> {
   // expected-error @+1 {{expected to preserve the logical shape of the tensor}}
-  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL_F32F32F32, role = LHS>> -> tensor<10x20xf32>
+  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<20x30xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<10x20xf32>
   return %0 : tensor<10x20xf32>
 }
 
@@ -726,7 +726,7 @@ func.func @illegal_winograd_output_image_dimensions(%arg0: tensor<8x8x1x2x2x32xf
 func.func @illegal_softmax_output_shape(%arg0: tensor<2x16x32xf32>) -> tensor<2x16xf32> {
   %0 = tensor.empty() : tensor<2x16xf32>
   // expected-error @+1 {{incompatible output shape}}
-  %1 = iree_linalg_ext.softmax dimension(2) ins(%arg0 : tensor<2x16x32xf32>) outs(%0: tensor<2x16xf32>) -> tensor<2x16xf32>
+  %1 = linalg.softmax dimension(2) ins(%arg0 : tensor<2x16x32xf32>) outs(%0: tensor<2x16xf32>) -> tensor<2x16xf32>
   return %1 : tensor<2x16xf32>
 }
 
@@ -734,9 +734,20 @@ func.func @illegal_softmax_output_shape(%arg0: tensor<2x16x32xf32>) -> tensor<2x
 
 func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<6x12x20x8xf32>, %value: tensor<6x12x20x8xf32>) {
   %0 = tensor.empty() : tensor<6x12x20x8xf32>
-  // expected-error @+1 {{failed to verify that query has shaped type of rank 3}}
+  // expected-error @+1 {{'iree_linalg_ext.attention' op expected query to have rank 3 but found 4}}
   %1 = iree_linalg_ext.attention ins(%query, %key, %value : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>) outs(%0 : tensor<6x12x20x8xf32>) -> tensor<6x12x20x8xf32>
   return %1 : tensor<6x12x20x8xf32>
+}
+
+// -----
+
+func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<20x8xf32>, %value: tensor<20x8xf32>) -> (tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) {
+  %result = tensor.empty() : tensor<20x8xf32>
+  %max = tensor.empty() : tensor<8xf32>
+  %sum = tensor.empty() : tensor<8xf32>
+  // expected-error @+1 {{'iree_linalg_ext.attention' op expected query to have rank 2 but found 1}}
+  %1:3 = iree_linalg_ext.attention ins(%query, %key, %value : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
+  return %1#0, %1#1, %1#2 : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
 }
 
 // -----

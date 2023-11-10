@@ -267,149 +267,149 @@ func.func @nvidia_tenscore_schedule_f16() {
     scf.yield %278, %280, %282, %284, %286, %288, %290, %292, %293, %294, %295, %296, %297, %298, %299, %300, %301, %302, %303, %304, %305, %306, %307, %308, %309, %310, %311, %312, %313, %314, %315, %316 : vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>, vector<2x2xf16>
   }
   %7 = gpu.lane_id
-  %8 = vector.extract %6#31[0] : vector<2x2xf16>
+  %8 = vector.extract %6#31[0] : vector<2xf16> from vector<2x2xf16>
   %9 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 48)>()[%1, %7]
   %10 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 56)>()[%0, %7]
   vector.store %8, %alloc[%9, %10] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %11 = vector.extract %6#31[1] : vector<2x2xf16>
+  %11 = vector.extract %6#31[1] : vector<2xf16> from vector<2x2xf16>
   %12 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 56)>()[%1, %7]
   vector.store %11, %alloc[%12, %10] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %13 = vector.extract %6#30[0] : vector<2x2xf16>
+  %13 = vector.extract %6#30[0] : vector<2xf16> from vector<2x2xf16>
   %14 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 48)>()[%0, %7]
   vector.store %13, %alloc[%9, %14] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %15 = vector.extract %6#30[1] : vector<2x2xf16>
+  %15 = vector.extract %6#30[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %15, %alloc[%12, %14] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %16 = vector.extract %6#29[0] : vector<2x2xf16>
+  %16 = vector.extract %6#29[0] : vector<2xf16> from vector<2x2xf16>
   %17 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 40)>()[%0, %7]
   vector.store %16, %alloc[%9, %17] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %18 = vector.extract %6#29[1] : vector<2x2xf16>
+  %18 = vector.extract %6#29[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %18, %alloc[%12, %17] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %19 = vector.extract %6#28[0] : vector<2x2xf16>
+  %19 = vector.extract %6#28[0] : vector<2xf16> from vector<2x2xf16>
   %20 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 32)>()[%0, %7]
   vector.store %19, %alloc[%9, %20] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %21 = vector.extract %6#28[1] : vector<2x2xf16>
+  %21 = vector.extract %6#28[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %21, %alloc[%12, %20] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %22 = vector.extract %6#27[0] : vector<2x2xf16>
+  %22 = vector.extract %6#27[0] : vector<2xf16> from vector<2x2xf16>
   %23 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 24)>()[%0, %7]
   vector.store %22, %alloc[%9, %23] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %24 = vector.extract %6#27[1] : vector<2x2xf16>
+  %24 = vector.extract %6#27[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %24, %alloc[%12, %23] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %25 = vector.extract %6#26[0] : vector<2x2xf16>
+  %25 = vector.extract %6#26[0] : vector<2xf16> from vector<2x2xf16>
   %26 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 16)>()[%0, %7]
   vector.store %25, %alloc[%9, %26] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %27 = vector.extract %6#26[1] : vector<2x2xf16>
+  %27 = vector.extract %6#26[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %27, %alloc[%12, %26] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %28 = vector.extract %6#25[0] : vector<2x2xf16>
+  %28 = vector.extract %6#25[0] : vector<2xf16> from vector<2x2xf16>
   %29 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 8)>()[%0, %7]
   vector.store %28, %alloc[%9, %29] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %30 = vector.extract %6#25[1] : vector<2x2xf16>
+  %30 = vector.extract %6#25[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %30, %alloc[%12, %29] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %31 = vector.extract %6#24[0] : vector<2x2xf16>
+  %31 = vector.extract %6#24[0] : vector<2xf16> from vector<2x2xf16>
   %32 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64)>()[%0, %7]
   vector.store %31, %alloc[%9, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %33 = vector.extract %6#24[1] : vector<2x2xf16>
+  %33 = vector.extract %6#24[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %33, %alloc[%12, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %34 = vector.extract %6#23[0] : vector<2x2xf16>
+  %34 = vector.extract %6#23[0] : vector<2xf16> from vector<2x2xf16>
   %35 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 32)>()[%1, %7]
   vector.store %34, %alloc[%35, %10] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %36 = vector.extract %6#23[1] : vector<2x2xf16>
+  %36 = vector.extract %6#23[1] : vector<2xf16> from vector<2x2xf16>
   %37 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 40)>()[%1, %7]
   vector.store %36, %alloc[%37, %10] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %38 = vector.extract %6#22[0] : vector<2x2xf16>
+  %38 = vector.extract %6#22[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %38, %alloc[%35, %14] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %39 = vector.extract %6#22[1] : vector<2x2xf16>
+  %39 = vector.extract %6#22[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %39, %alloc[%37, %14] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %40 = vector.extract %6#21[0] : vector<2x2xf16>
+  %40 = vector.extract %6#21[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %40, %alloc[%35, %17] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %41 = vector.extract %6#21[1] : vector<2x2xf16>
+  %41 = vector.extract %6#21[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %41, %alloc[%37, %17] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %42 = vector.extract %6#20[0] : vector<2x2xf16>
+  %42 = vector.extract %6#20[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %42, %alloc[%35, %20] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %43 = vector.extract %6#20[1] : vector<2x2xf16>
+  %43 = vector.extract %6#20[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %43, %alloc[%37, %20] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %44 = vector.extract %6#19[0] : vector<2x2xf16>
+  %44 = vector.extract %6#19[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %44, %alloc[%35, %23] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %45 = vector.extract %6#19[1] : vector<2x2xf16>
+  %45 = vector.extract %6#19[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %45, %alloc[%37, %23] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %46 = vector.extract %6#18[0] : vector<2x2xf16>
+  %46 = vector.extract %6#18[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %46, %alloc[%35, %26] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %47 = vector.extract %6#18[1] : vector<2x2xf16>
+  %47 = vector.extract %6#18[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %47, %alloc[%37, %26] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %48 = vector.extract %6#17[0] : vector<2x2xf16>
+  %48 = vector.extract %6#17[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %48, %alloc[%35, %29] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %49 = vector.extract %6#17[1] : vector<2x2xf16>
+  %49 = vector.extract %6#17[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %49, %alloc[%37, %29] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %50 = vector.extract %6#16[0] : vector<2x2xf16>
+  %50 = vector.extract %6#16[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %50, %alloc[%35, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %51 = vector.extract %6#16[1] : vector<2x2xf16>
+  %51 = vector.extract %6#16[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %51, %alloc[%37, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %52 = vector.extract %6#15[0] : vector<2x2xf16>
+  %52 = vector.extract %6#15[0] : vector<2xf16> from vector<2x2xf16>
   %53 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 16)>()[%1, %7]
   vector.store %52, %alloc[%53, %10] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %54 = vector.extract %6#15[1] : vector<2x2xf16>
+  %54 = vector.extract %6#15[1] : vector<2xf16> from vector<2x2xf16>
   %55 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 24)>()[%1, %7]
   vector.store %54, %alloc[%55, %10] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %56 = vector.extract %6#14[0] : vector<2x2xf16>
+  %56 = vector.extract %6#14[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %56, %alloc[%53, %14] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %57 = vector.extract %6#14[1] : vector<2x2xf16>
+  %57 = vector.extract %6#14[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %57, %alloc[%55, %14] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %58 = vector.extract %6#13[0] : vector<2x2xf16>
+  %58 = vector.extract %6#13[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %58, %alloc[%53, %17] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %59 = vector.extract %6#13[1] : vector<2x2xf16>
+  %59 = vector.extract %6#13[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %59, %alloc[%55, %17] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %60 = vector.extract %6#12[0] : vector<2x2xf16>
+  %60 = vector.extract %6#12[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %60, %alloc[%53, %20] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %61 = vector.extract %6#12[1] : vector<2x2xf16>
+  %61 = vector.extract %6#12[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %61, %alloc[%55, %20] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %62 = vector.extract %6#11[0] : vector<2x2xf16>
+  %62 = vector.extract %6#11[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %62, %alloc[%53, %23] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %63 = vector.extract %6#11[1] : vector<2x2xf16>
+  %63 = vector.extract %6#11[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %63, %alloc[%55, %23] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %64 = vector.extract %6#10[0] : vector<2x2xf16>
+  %64 = vector.extract %6#10[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %64, %alloc[%53, %26] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %65 = vector.extract %6#10[1] : vector<2x2xf16>
+  %65 = vector.extract %6#10[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %65, %alloc[%55, %26] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %66 = vector.extract %6#9[0] : vector<2x2xf16>
+  %66 = vector.extract %6#9[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %66, %alloc[%53, %29] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %67 = vector.extract %6#9[1] : vector<2x2xf16>
+  %67 = vector.extract %6#9[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %67, %alloc[%55, %29] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %68 = vector.extract %6#8[0] : vector<2x2xf16>
+  %68 = vector.extract %6#8[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %68, %alloc[%53, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %69 = vector.extract %6#8[1] : vector<2x2xf16>
+  %69 = vector.extract %6#8[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %69, %alloc[%55, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %70 = vector.extract %6#7[0] : vector<2x2xf16>
+  %70 = vector.extract %6#7[0] : vector<2xf16> from vector<2x2xf16>
   %71 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4)>()[%1, %7]
   vector.store %70, %alloc[%71, %10] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %72 = vector.extract %6#7[1] : vector<2x2xf16>
+  %72 = vector.extract %6#7[1] : vector<2xf16> from vector<2x2xf16>
   %73 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 8)>()[%1, %7]
   vector.store %72, %alloc[%73, %10] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %74 = vector.extract %6#6[0] : vector<2x2xf16>
+  %74 = vector.extract %6#6[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %74, %alloc[%71, %14] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %75 = vector.extract %6#6[1] : vector<2x2xf16>
+  %75 = vector.extract %6#6[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %75, %alloc[%73, %14] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %76 = vector.extract %6#5[0] : vector<2x2xf16>
+  %76 = vector.extract %6#5[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %76, %alloc[%71, %17] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %77 = vector.extract %6#5[1] : vector<2x2xf16>
+  %77 = vector.extract %6#5[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %77, %alloc[%73, %17] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %78 = vector.extract %6#4[0] : vector<2x2xf16>
+  %78 = vector.extract %6#4[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %78, %alloc[%71, %20] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %79 = vector.extract %6#4[1] : vector<2x2xf16>
+  %79 = vector.extract %6#4[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %79, %alloc[%73, %20] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %80 = vector.extract %6#3[0] : vector<2x2xf16>
+  %80 = vector.extract %6#3[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %80, %alloc[%71, %23] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %81 = vector.extract %6#3[1] : vector<2x2xf16>
+  %81 = vector.extract %6#3[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %81, %alloc[%73, %23] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %82 = vector.extract %6#2[0] : vector<2x2xf16>
+  %82 = vector.extract %6#2[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %82, %alloc[%71, %26] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %83 = vector.extract %6#2[1] : vector<2x2xf16>
+  %83 = vector.extract %6#2[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %83, %alloc[%73, %26] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %84 = vector.extract %6#1[0] : vector<2x2xf16>
+  %84 = vector.extract %6#1[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %84, %alloc[%71, %29] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %85 = vector.extract %6#1[1] : vector<2x2xf16>
+  %85 = vector.extract %6#1[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %85, %alloc[%73, %29] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %86 = vector.extract %6#0[0] : vector<2x2xf16>
+  %86 = vector.extract %6#0[0] : vector<2xf16> from vector<2x2xf16>
   vector.store %86, %alloc[%71, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
-  %87 = vector.extract %6#0[1] : vector<2x2xf16>
+  %87 = vector.extract %6#0[1] : vector<2xf16> from vector<2x2xf16>
   vector.store %87, %alloc[%73, %32] : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<2xf16>
   gpu.barrier
   %88 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 4 + s2 * 8 + s0 floordiv 32)>()[%0, %1, %2]
@@ -1037,149 +1037,149 @@ func.func @nvidia_tenscore_schedule_f32() {
     scf.yield %657, %658, %659, %660, %661, %662, %663, %664, %665, %666, %667, %668, %669, %670, %671, %672, %673, %674, %675, %676, %677, %678, %679, %680, %681, %682, %683, %684, %685, %686, %687, %688 : vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>, vector<2x2xf32>
   }
   %211 = gpu.lane_id
-  %212 = vector.extract %210#31[0] : vector<2x2xf32>
+  %212 = vector.extract %210#31[0] : vector<2xf32> from vector<2x2xf32>
   %213 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 48)>()[%1, %211]
   %214 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 56)>()[%0, %211]
   vector.store %212, %alloc[%213, %214] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %215 = vector.extract %210#31[1] : vector<2x2xf32>
+  %215 = vector.extract %210#31[1] : vector<2xf32> from vector<2x2xf32>
   %216 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 56)>()[%1, %211]
   vector.store %215, %alloc[%216, %214] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %217 = vector.extract %210#30[0] : vector<2x2xf32>
+  %217 = vector.extract %210#30[0] : vector<2xf32> from vector<2x2xf32>
   %218 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 48)>()[%0, %211]
   vector.store %217, %alloc[%213, %218] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %219 = vector.extract %210#30[1] : vector<2x2xf32>
+  %219 = vector.extract %210#30[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %219, %alloc[%216, %218] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %220 = vector.extract %210#29[0] : vector<2x2xf32>
+  %220 = vector.extract %210#29[0] : vector<2xf32> from vector<2x2xf32>
   %221 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 40)>()[%0, %211]
   vector.store %220, %alloc[%213, %221] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %222 = vector.extract %210#29[1] : vector<2x2xf32>
+  %222 = vector.extract %210#29[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %222, %alloc[%216, %221] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %223 = vector.extract %210#28[0] : vector<2x2xf32>
+  %223 = vector.extract %210#28[0] : vector<2xf32> from vector<2x2xf32>
   %224 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 32)>()[%0, %211]
   vector.store %223, %alloc[%213, %224] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %225 = vector.extract %210#28[1] : vector<2x2xf32>
+  %225 = vector.extract %210#28[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %225, %alloc[%216, %224] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %226 = vector.extract %210#27[0] : vector<2x2xf32>
+  %226 = vector.extract %210#27[0] : vector<2xf32> from vector<2x2xf32>
   %227 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 24)>()[%0, %211]
   vector.store %226, %alloc[%213, %227] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %228 = vector.extract %210#27[1] : vector<2x2xf32>
+  %228 = vector.extract %210#27[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %228, %alloc[%216, %227] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %229 = vector.extract %210#26[0] : vector<2x2xf32>
+  %229 = vector.extract %210#26[0] : vector<2xf32> from vector<2x2xf32>
   %230 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 16)>()[%0, %211]
   vector.store %229, %alloc[%213, %230] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %231 = vector.extract %210#26[1] : vector<2x2xf32>
+  %231 = vector.extract %210#26[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %231, %alloc[%216, %230] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %232 = vector.extract %210#25[0] : vector<2x2xf32>
+  %232 = vector.extract %210#25[0] : vector<2xf32> from vector<2x2xf32>
   %233 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64 + 8)>()[%0, %211]
   vector.store %232, %alloc[%213, %233] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %234 = vector.extract %210#25[1] : vector<2x2xf32>
+  %234 = vector.extract %210#25[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %234, %alloc[%216, %233] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %235 = vector.extract %210#24[0] : vector<2x2xf32>
+  %235 = vector.extract %210#24[0] : vector<2xf32> from vector<2x2xf32>
   %236 = affine.apply affine_map<()[s0, s1] -> (s1 * 2 - (s1 floordiv 4) * 8 + (s0 floordiv 32) * 64)>()[%0, %211]
   vector.store %235, %alloc[%213, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %237 = vector.extract %210#24[1] : vector<2x2xf32>
+  %237 = vector.extract %210#24[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %237, %alloc[%216, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %238 = vector.extract %210#23[0] : vector<2x2xf32>
+  %238 = vector.extract %210#23[0] : vector<2xf32> from vector<2x2xf32>
   %239 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 32)>()[%1, %211]
   vector.store %238, %alloc[%239, %214] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %240 = vector.extract %210#23[1] : vector<2x2xf32>
+  %240 = vector.extract %210#23[1] : vector<2xf32> from vector<2x2xf32>
   %241 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 40)>()[%1, %211]
   vector.store %240, %alloc[%241, %214] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %242 = vector.extract %210#22[0] : vector<2x2xf32>
+  %242 = vector.extract %210#22[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %242, %alloc[%239, %218] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %243 = vector.extract %210#22[1] : vector<2x2xf32>
+  %243 = vector.extract %210#22[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %243, %alloc[%241, %218] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %244 = vector.extract %210#21[0] : vector<2x2xf32>
+  %244 = vector.extract %210#21[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %244, %alloc[%239, %221] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %245 = vector.extract %210#21[1] : vector<2x2xf32>
+  %245 = vector.extract %210#21[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %245, %alloc[%241, %221] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %246 = vector.extract %210#20[0] : vector<2x2xf32>
+  %246 = vector.extract %210#20[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %246, %alloc[%239, %224] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %247 = vector.extract %210#20[1] : vector<2x2xf32>
+  %247 = vector.extract %210#20[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %247, %alloc[%241, %224] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %248 = vector.extract %210#19[0] : vector<2x2xf32>
+  %248 = vector.extract %210#19[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %248, %alloc[%239, %227] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %249 = vector.extract %210#19[1] : vector<2x2xf32>
+  %249 = vector.extract %210#19[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %249, %alloc[%241, %227] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %250 = vector.extract %210#18[0] : vector<2x2xf32>
+  %250 = vector.extract %210#18[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %250, %alloc[%239, %230] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %251 = vector.extract %210#18[1] : vector<2x2xf32>
+  %251 = vector.extract %210#18[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %251, %alloc[%241, %230] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %252 = vector.extract %210#17[0] : vector<2x2xf32>
+  %252 = vector.extract %210#17[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %252, %alloc[%239, %233] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %253 = vector.extract %210#17[1] : vector<2x2xf32>
+  %253 = vector.extract %210#17[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %253, %alloc[%241, %233] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %254 = vector.extract %210#16[0] : vector<2x2xf32>
+  %254 = vector.extract %210#16[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %254, %alloc[%239, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %255 = vector.extract %210#16[1] : vector<2x2xf32>
+  %255 = vector.extract %210#16[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %255, %alloc[%241, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %256 = vector.extract %210#15[0] : vector<2x2xf32>
+  %256 = vector.extract %210#15[0] : vector<2xf32> from vector<2x2xf32>
   %257 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 16)>()[%1, %211]
   vector.store %256, %alloc[%257, %214] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %258 = vector.extract %210#15[1] : vector<2x2xf32>
+  %258 = vector.extract %210#15[1] : vector<2xf32> from vector<2x2xf32>
   %259 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 24)>()[%1, %211]
   vector.store %258, %alloc[%259, %214] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %260 = vector.extract %210#14[0] : vector<2x2xf32>
+  %260 = vector.extract %210#14[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %260, %alloc[%257, %218] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %261 = vector.extract %210#14[1] : vector<2x2xf32>
+  %261 = vector.extract %210#14[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %261, %alloc[%259, %218] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %262 = vector.extract %210#13[0] : vector<2x2xf32>
+  %262 = vector.extract %210#13[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %262, %alloc[%257, %221] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %263 = vector.extract %210#13[1] : vector<2x2xf32>
+  %263 = vector.extract %210#13[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %263, %alloc[%259, %221] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %264 = vector.extract %210#12[0] : vector<2x2xf32>
+  %264 = vector.extract %210#12[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %264, %alloc[%257, %224] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %265 = vector.extract %210#12[1] : vector<2x2xf32>
+  %265 = vector.extract %210#12[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %265, %alloc[%259, %224] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %266 = vector.extract %210#11[0] : vector<2x2xf32>
+  %266 = vector.extract %210#11[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %266, %alloc[%257, %227] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %267 = vector.extract %210#11[1] : vector<2x2xf32>
+  %267 = vector.extract %210#11[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %267, %alloc[%259, %227] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %268 = vector.extract %210#10[0] : vector<2x2xf32>
+  %268 = vector.extract %210#10[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %268, %alloc[%257, %230] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %269 = vector.extract %210#10[1] : vector<2x2xf32>
+  %269 = vector.extract %210#10[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %269, %alloc[%259, %230] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %270 = vector.extract %210#9[0] : vector<2x2xf32>
+  %270 = vector.extract %210#9[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %270, %alloc[%257, %233] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %271 = vector.extract %210#9[1] : vector<2x2xf32>
+  %271 = vector.extract %210#9[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %271, %alloc[%259, %233] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %272 = vector.extract %210#8[0] : vector<2x2xf32>
+  %272 = vector.extract %210#8[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %272, %alloc[%257, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %273 = vector.extract %210#8[1] : vector<2x2xf32>
+  %273 = vector.extract %210#8[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %273, %alloc[%259, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %274 = vector.extract %210#7[0] : vector<2x2xf32>
+  %274 = vector.extract %210#7[0] : vector<2xf32> from vector<2x2xf32>
   %275 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4)>()[%1, %211]
   vector.store %274, %alloc[%275, %214] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %276 = vector.extract %210#7[1] : vector<2x2xf32>
+  %276 = vector.extract %210#7[1] : vector<2xf32> from vector<2x2xf32>
   %277 = affine.apply affine_map<()[s0, s1] -> (s0 * 64 + s1 floordiv 4 + 8)>()[%1, %211]
   vector.store %276, %alloc[%277, %214] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %278 = vector.extract %210#6[0] : vector<2x2xf32>
+  %278 = vector.extract %210#6[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %278, %alloc[%275, %218] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %279 = vector.extract %210#6[1] : vector<2x2xf32>
+  %279 = vector.extract %210#6[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %279, %alloc[%277, %218] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %280 = vector.extract %210#5[0] : vector<2x2xf32>
+  %280 = vector.extract %210#5[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %280, %alloc[%275, %221] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %281 = vector.extract %210#5[1] : vector<2x2xf32>
+  %281 = vector.extract %210#5[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %281, %alloc[%277, %221] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %282 = vector.extract %210#4[0] : vector<2x2xf32>
+  %282 = vector.extract %210#4[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %282, %alloc[%275, %224] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %283 = vector.extract %210#4[1] : vector<2x2xf32>
+  %283 = vector.extract %210#4[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %283, %alloc[%277, %224] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %284 = vector.extract %210#3[0] : vector<2x2xf32>
+  %284 = vector.extract %210#3[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %284, %alloc[%275, %227] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %285 = vector.extract %210#3[1] : vector<2x2xf32>
+  %285 = vector.extract %210#3[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %285, %alloc[%277, %227] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %286 = vector.extract %210#2[0] : vector<2x2xf32>
+  %286 = vector.extract %210#2[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %286, %alloc[%275, %230] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %287 = vector.extract %210#2[1] : vector<2x2xf32>
+  %287 = vector.extract %210#2[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %287, %alloc[%277, %230] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %288 = vector.extract %210#1[0] : vector<2x2xf32>
+  %288 = vector.extract %210#1[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %288, %alloc[%275, %233] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %289 = vector.extract %210#1[1] : vector<2x2xf32>
+  %289 = vector.extract %210#1[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %289, %alloc[%277, %233] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %290 = vector.extract %210#0[0] : vector<2x2xf32>
+  %290 = vector.extract %210#0[0] : vector<2xf32> from vector<2x2xf32>
   vector.store %290, %alloc[%275, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
-  %291 = vector.extract %210#0[1] : vector<2x2xf32>
+  %291 = vector.extract %210#0[1] : vector<2xf32> from vector<2x2xf32>
   vector.store %291, %alloc[%277, %236] : memref<128x128xf32, #gpu.address_space<workgroup>>, vector<2xf32>
   gpu.barrier
   %292 = affine.apply affine_map<()[s0, s1, s2] -> (s1 * 2 + s2 * 4 + s0 floordiv 32)>()[%0, %1, %2]

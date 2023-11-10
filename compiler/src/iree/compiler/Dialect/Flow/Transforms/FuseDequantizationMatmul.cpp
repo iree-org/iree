@@ -31,8 +31,8 @@ namespace {
 // passed ops inside as long as the dequant op is a
 // producer for the matmul op
 static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
-                                          Operation *dequant,
-                                          Operation *matmul) {
+                                          Operation *dequant, Operation *matmul,
+                                          std::optional<Operation *> fill) {
 
   Flow::DispatchRegionOp regionOp = matmul->getParentOfType<DispatchRegionOp>();
   if (!regionOp) {
@@ -43,18 +43,17 @@ static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
     regionOp = maybeRegionOp.value();
   }
 
-  FailureOr<DispatchRegionOp> maybeFusedRegionOp;
-  if (dequant->hasOneUse()) {
-    maybeFusedRegionOp =
-        movePrecedingOpsIntoDispatchRegion(rewriter, dequant, regionOp);
-  } else {
-    // Clone the dequant operation if there are multiple uses of dequant.
-    maybeFusedRegionOp =
-        clonePrecedingOpIntoDispatchRegion(rewriter, dequant, regionOp);
-  }
-
+  FailureOr<DispatchRegionOp> maybeFusedRegionOp =
+      clonePrecedingOpIntoDispatchRegion(rewriter, dequant, regionOp);
   if (failed(maybeFusedRegionOp))
     return failure();
+
+  if (fill && *fill) {
+    FailureOr<DispatchRegionOp> maybeFusedFillRegionOp =
+        clonePrecedingOpIntoDispatchRegion(rewriter, fill.value(), regionOp);
+    if (failed(maybeFusedFillRegionOp))
+      return failure();
+  }
 
   return success();
 }
@@ -197,15 +196,22 @@ public:
     auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>();
     auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>();
 
+    std::optional<Operation *> maybeFill = std::nullopt;
+    if (auto fill = genericOp.getDpsInitOperand(0)
+                        ->get()
+                        .getDefiningOp<linalg::FillOp>()) {
+      maybeFill = fill;
+    }
+
     if (lhsOp)
       if (!failed(isGroupedDequantizationOp(
               llvm::dyn_cast<linalg::GenericOp>(*lhsOp)))) {
-        return fuseDequantAndMatmul(rewriter, lhsOp, matmulOp);
+        return fuseDequantAndMatmul(rewriter, lhsOp, matmulOp, maybeFill);
       }
     if (rhsOp)
       if (!failed(isGroupedDequantizationOp(
               llvm::dyn_cast<linalg::GenericOp>(*rhsOp)))) {
-        return fuseDequantAndMatmul(rewriter, rhsOp, matmulOp);
+        return fuseDequantAndMatmul(rewriter, rhsOp, matmulOp, maybeFill);
       }
 
     return failure();

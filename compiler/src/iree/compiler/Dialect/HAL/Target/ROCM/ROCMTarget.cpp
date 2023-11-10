@@ -12,11 +12,14 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -37,10 +40,9 @@ static llvm::cl::opt<bool>
                  llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
                  llvm::cl::init(false));
 
-static llvm::cl::opt<std::string>
-    clROCMBitcodeDir("iree-rocm-bc-dir",
-                     llvm::cl::desc("Directory of ROCM Bitcode"),
-                     llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
+static llvm::cl::opt<std::string> clROCMBitcodeDir(
+    "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
+    llvm::cl::init(mlir::iree_compiler::findPlatformLibDirectory("rocm")));
 
 namespace mlir {
 namespace iree_compiler {
@@ -110,7 +112,7 @@ public:
     if (variantOp.isExternal())
       return;
 
-    buildLLVMGPUTransformPassPipeline(passManager, true);
+    buildLLVMGPUCodegenPassPipeline(passManager, true);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
@@ -145,10 +147,11 @@ public:
 
     // Collect all the entry point names.
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
-    for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    for (auto op : variantOp.getExportOps()) {
       exportOps[op.getSymName()] = op;
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
+    SmallVector<uint32_t> workgroupLocalMemories;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       int32_t flatWgSize = 1;
       auto *llvmFunc = llvmModule->getFunction(func.getName());
@@ -166,6 +169,11 @@ public:
         workgroupSize = {1, 1, 1};
       }
       workgroupSizes.push_back(workgroupSize);
+      uint32_t workgroupLocalMemory = 0;
+      if (auto workgroupLocalMemoryAttr = exportOp.getWorkgroupLocalMemory()) {
+        workgroupLocalMemory = workgroupLocalMemoryAttr->getSExtValue();
+      }
+      workgroupLocalMemories.push_back(workgroupLocalMemory);
       // For GPU kernels,
       // 1. Insert AMDGPU_KERNEL calling convention.
       // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
@@ -199,15 +207,26 @@ public:
     iree_hal_rocm_ExecutableDef_start_as_root(builder);
 
     // Link module to Device Library
+    std::string rocmBitcodeDir = clROCMBitcodeDir;
     if (clROCMLinkBC) {
-      linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip,
-                           clROCMBitcodeDir);
+      if (clROCMBitcodeDir.empty()) {
+        return variantOp.emitError()
+               << "cannot find ROCM bitcode files. Check your installation "
+                  "consistency and in the worst case, set --iree-rocm-bc-dir= "
+                  "to an explicit location on your system.";
+      }
+      linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip, rocmBitcodeDir);
     }
 
     // Serialize hsaco kernel into the binary that we will embed in the
     // final FlatBuffer.
     std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
-    std::string targetHSACO = createHsaco(targetObj, libraryName);
+    std::string targetHSACO =
+        createHsaco(variantOp.getLoc(), targetObj, libraryName);
+    if (targetHSACO.empty()) {
+      return failure();
+    }
+
     if (!options.dumpBinariesPath.empty()) {
       dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
                      variantOp.getName(), ".hsaco", targetHSACO);
@@ -230,10 +249,14 @@ public:
           builder, (*blockSizes)[0], (*blockSizes)[1], (*blockSizes)[2]);
       ++blockSizes;
     }
+    auto workgroupLocalMemoriesRef =
+        builder.createInt32Vec(workgroupLocalMemories);
     auto blockSizesRef = iree_hal_rocm_BlockSizeDef_vec_end(builder);
 
     iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
+    iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(
+        builder, workgroupLocalMemoriesRef);
     iree_hal_rocm_ExecutableDef_hsaco_image_add(builder, hsacoRef);
     iree_hal_rocm_ExecutableDef_end_as_root(builder);
 

@@ -22,7 +22,6 @@
 #define IREE_HAVE_DYNAMIC_LIBRARY_PDB_SUPPORT 1
 #pragma warning(disable : 4091)
 #include <dbghelp.h>
-
 void IREEDbgHelpLock(void);
 void IREEDbgHelpUnlock(void);
 #endif  // TRACY_ENABLE
@@ -64,13 +63,13 @@ static void iree_dynamic_library_init_temp_paths(void) {
   // See:
   // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-gettemppatha
   char temp_path[MAX_PATH];
-  DWORD temp_path_length = GetTempPathA(IREE_ARRAYSIZE(temp_path), temp_path);
+  GetTempPathA(IREE_ARRAYSIZE(temp_path), temp_path);
 
   // Append the process ID to the path; this is like what _mktemp does but
   // without all the hoops.
   snprintf(iree_dynamic_library_temp_path_base_,
            sizeof(iree_dynamic_library_temp_path_base_), "%s\\iree_dylib_%08X",
-           temp_path, GetCurrentProcessId());
+           temp_path, (uint32_t)GetCurrentProcessId());
 
   // Canonicalize away any double path separators.
   iree_file_path_canonicalize(iree_dynamic_library_temp_path_base_,

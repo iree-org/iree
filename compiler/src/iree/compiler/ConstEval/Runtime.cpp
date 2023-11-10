@@ -191,7 +191,7 @@ FunctionCall::importSerializableAttr(
 
   // Copy.
   LogicalResult copyResult = serializableAttr.serializeToBuffer(
-      loc, llvm::support::endian::system_endianness(),
+      loc, llvm::endianness::native,
       ArrayRef<char>(reinterpret_cast<char *>(mapping.contents.data),
                      storageSize));
 

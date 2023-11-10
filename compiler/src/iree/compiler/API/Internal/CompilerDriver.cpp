@@ -35,10 +35,9 @@
 #include <unistd.h>
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
-
 #include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 
 #include "iree/compiler/API/Internal/Diagnostics.h"
@@ -89,6 +88,86 @@
 
 namespace mlir::iree_compiler::embed {
 namespace {
+
+// If not using memfd_create, then we need to align output buffers
+// similarly, which is unfortunately, quite platform specific.
+// While memfd_create aligns to a page, we align these to 64 bytes,
+// which matches runtime requirements.
+const size_t kOutputBufferAlignment = 64;
+
+template <typename T>
+struct rt_aligned_allocator {
+  using value_type = T;
+  rt_aligned_allocator() noexcept {}
+  template <class U>
+  rt_aligned_allocator(const rt_aligned_allocator<U> &) noexcept {}
+
+  T *allocate(std::size_t n) {
+    std::size_t size = n * sizeof(T);
+#ifdef _WIN32
+    T *alloc = static_cast<T *>(_aligned_malloc(size, kOutputBufferAlignment));
+#else
+    // std::aligned_alloc requires `size` to be a multiple of `alignment`.
+    // Rounding `size` to the next multiple of `alignment` can theoretically
+    // overflow. This being allocator code, we try to be righteous.
+    // It helps that the size type here is unsigned, so overflow is well-defined
+    // as wrap-around.
+    std::size_t rounded_up_size =
+        (size + kOutputBufferAlignment - 1) & ~(kOutputBufferAlignment - 1);
+    if (rounded_up_size < size) {
+      // overflow!
+      return nullptr;
+    }
+    T *alloc = static_cast<T *>(
+        std::aligned_alloc(kOutputBufferAlignment, rounded_up_size));
+
+#endif
+    assert((reinterpret_cast<uintptr_t>(alloc) &
+            (kOutputBufferAlignment - 1)) == 0 &&
+           "unaligned allocation");
+    return alloc;
+  }
+  void deallocate(T *p, std::size_t n) {
+#ifdef _WIN32
+    _aligned_free(p);
+#else
+    std::free(p);
+#endif
+  }
+};
+
+template <class T, class U>
+bool operator==(const rt_aligned_allocator<T> &,
+                const rt_aligned_allocator<U> &) {
+  return true;
+}
+template <class T, class U>
+bool operator!=(const rt_aligned_allocator<T> &,
+                const rt_aligned_allocator<U> &) {
+  return false;
+}
+
+using rt_aligned_string =
+    std::basic_string<char, std::char_traits<char>, rt_aligned_allocator<char>>;
+
+// Adaptation of llvm::raw_string_ostream which operates on one of our
+// aligned strings.
+class rt_aligned_string_ostream : public llvm::raw_ostream {
+public:
+  explicit rt_aligned_string_ostream(rt_aligned_string &O) : OS(O) {
+    SetUnbuffered();
+  }
+
+  uint64_t current_pos() const override { return OS.size(); }
+
+private:
+  rt_aligned_string &OS;
+
+  /// See raw_ostream::write_impl.
+  void write_impl(const char *Ptr, size_t Size) override {
+    OS.append(Ptr, Size);
+  }
+};
 
 struct Error {
   Error(std::string message) : message(std::move(message)) {}
@@ -410,6 +489,9 @@ struct Output {
       stringOutputStream->flush();
       *data = static_cast<void *>(&outputString[0]);
       *size = outputString.size();
+      assert((reinterpret_cast<uintptr_t>(*data) &
+              (kOutputBufferAlignment - 1)) == 0 &&
+             "output buffer has unaligned storage");
       return nullptr;
     } else if (type == Type::File) {
 #if !IREE_COMPILER_USE_MMAP
@@ -469,8 +551,8 @@ private:
   std::optional<int> backingFileDescriptor;
 
   // Fields for Type::Memory.
-  std::string outputString;
-  std::optional<llvm::raw_string_ostream> stringOutputStream;
+  rt_aligned_string outputString;
+  std::optional<rt_aligned_string_ostream> stringOutputStream;
 };
 
 Output::~Output() {
@@ -516,6 +598,8 @@ Error *Output::openMembuffer() {
   // Fallback to an std::string based accumulator if no platform support
   // for memfiles.
   type = Type::Membuffer;
+  // Avoid some initial memcpys with a size appropriate for program output.
+  outputString.reserve(16384);
   stringOutputStream.emplace(outputString);
   outputStream = &(*stringOutputStream);
   return nullptr;
@@ -824,6 +908,8 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   if (failed(passManager->run(parsedModule))) {
     return false;
   }
+  // Done with the pipeline, mark the start of a new 'frame'.
+  IREE_TRACE_FRAME_MARK();
   return true;
 }
 
@@ -930,7 +1016,7 @@ GlobalInit *globalInit = nullptr;
 bool isShutdown = false;
 
 void llvmVersionPrinter(llvm::raw_ostream &os) {
-  os << "IREE (https://openxla.github.io/iree):\n  ";
+  os << "IREE (https://iree.dev):\n  ";
   std::string version = mlir::iree_compiler::getIreeRevision();
   if (version.empty()) {
     version = "(unknown)";

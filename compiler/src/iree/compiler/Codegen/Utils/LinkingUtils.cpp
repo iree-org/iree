@@ -236,14 +236,14 @@ LogicalResult linkExecutablesInto(
       // Move any constant blocks that need to be preserved for future host
       // translation. There may be duplicates provided but they'll be cleaned
       // up in future passes.
-      for (auto constantBlockOp : llvm::make_early_inc_range(
-               variantOp.getOps<IREE::HAL::ExecutableConstantBlockOp>())) {
+      for (auto constantBlockOp :
+           llvm::make_early_inc_range(variantOp.getConstantBlockOps())) {
         constantBlockOp->moveBefore(&*linkedTargetBuilder.getInsertionPoint());
       }
 
       // Clone export ops and queue remapping ordinals and updating
       // symbol refs.
-      for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+      for (auto exportOp : variantOp.getExportOps()) {
         auto newExportOp =
             linkedTargetBuilder.create<IREE::HAL::ExecutableExportOp>(
                 exportOp.getLoc(), exportOp.getSymNameAttr(),
@@ -290,7 +290,7 @@ LogicalResult linkExecutablesInto(
   replaceEntryPointUses(moduleOp, symbolReplacements);
 
   // Remove if we didn't add anything.
-  if (linkedTargetOp.getOps<IREE::HAL::ExecutableExportOp>().empty()) {
+  if (linkedTargetOp.getExportOps().empty()) {
     linkedTargetOp.erase();
     linkedExecutableOp.erase();
   }

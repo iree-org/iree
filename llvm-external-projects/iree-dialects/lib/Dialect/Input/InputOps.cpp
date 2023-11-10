@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -313,13 +314,57 @@ static void printShapedTiedResult(OpAsmPrinter &p, TiedOpInterface op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<ShapedOperandList>($values, type($values), $value_dims)
+//===----------------------------------------------------------------------===//
+// %value : type{%dynamic_dims}, ...
+
+ParseResult parseShapedOperandList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values,
+    SmallVectorImpl<Type> &valueTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &valueDims) {
+  do {
+    values.emplace_back();
+    valueTypes.emplace_back();
+    if (failed(parser.parseOperand(values.back())) ||
+        failed(parser.parseColon()) ||
+        failed(parser.parseType(valueTypes.back())))
+      return failure();
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(valueTypes.back()).getNumDynamicDims()) {
+      if (failed(parser.parseOperandList(valueDims, dynamicDimCount,
+                                         AsmParser::Delimiter::Braces)))
+        return failure();
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+void printShapedOperandList(OpAsmPrinter &p, Operation *op, ValueRange values,
+                            TypeRange valueTypes, ValueRange valueDims) {
+  llvm::interleaveComma(llvm::zip_equal(values, valueTypes), p, [&](auto it) {
+    auto [value, valueType] = it;
+    p << value;
+    p << " : ";
+    p << valueType;
+    if (int64_t dynamicDimCount =
+            cast<ShapedType>(valueType).getNumDynamicDims()) {
+      p << "{";
+      llvm::interleaveComma(valueDims.take_front(dynamicDimCount), p);
+      valueDims = valueDims.drop_front(dynamicDimCount);
+      p << "}";
+    }
+  });
+}
+
+//===----------------------------------------------------------------------===//
 // custom<ShapedFunctionType>
 //===----------------------------------------------------------------------===//
 // (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
 
 static ParseResult
-parseShapedOperandList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
-                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
+parseShapedTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
+                    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
   do {
     Type type;
     if (failed(parser.parseType(type)))
@@ -462,7 +507,7 @@ static ParseResult parseShapedFunctionType(
   if (failed(parser.parseLParen()))
     return failure();
   if (failed(parser.parseOptionalRParen())) {
-    if (failed(parseShapedOperandList(parser, operandTypes, operandDims)) ||
+    if (failed(parseShapedTypeList(parser, operandTypes, operandDims)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
@@ -689,6 +734,25 @@ TensorUpdateOp::getTiedResultOperandIndex(unsigned resultIndex) {
 
 SmallVector<int64_t> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0}; // $target
+}
+
+//===----------------------------------------------------------------------===//
+// iree_input.tensor.trace
+//===----------------------------------------------------------------------===//
+
+void TensorTraceOp::build(OpBuilder &builder, OperationState &state,
+                          StringRef key, ValueRange values) {
+  SmallVector<Value> dynamicDims;
+  for (auto value : values) {
+    auto valueType = cast<ShapedType>(value.getType());
+    for (unsigned i = 0; i < valueType.getRank(); ++i) {
+      if (valueType.isDynamicDim(i)) {
+        dynamicDims.push_back(
+            builder.createOrFold<tensor::DimOp>(state.location, value, i));
+      }
+    }
+  }
+  build(builder, state, key, values, dynamicDims);
 }
 
 //===----------------------------------------------------------------------===//

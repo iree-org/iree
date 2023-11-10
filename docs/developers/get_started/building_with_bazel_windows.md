@@ -88,7 +88,7 @@ level.
 You can put a user.bazelrc at the root of the repository and it will be ignored
 by git. The recommended contents for Windows are:
 
-```
+```starlark
 build --disk_cache=c:/bazelcache
 build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=never
 ```

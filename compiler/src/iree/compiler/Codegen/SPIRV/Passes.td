@@ -79,6 +79,15 @@ def SPIRVMapMemRefStorageClass :
   let constructor = "mlir::iree_compiler::createSPIRVMapMemRefStorageClassPass()";
 }
 
+def SPIRVSelectLoweringStrategy :
+    Pass<"iree-spirv-select-lowering-strategy-pass",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Select the IREE::HAL::DispatchLoweringPassPipeline for lowering"
+                "to SPIR-V";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVSelectLoweringStrategyPass()";
+}
+
 def SPIRVTile : Pass<"iree-spirv-tile", "func::FuncOp"> {
   let summary = "Tile Linalg ops with tensor semantics to invocations";
   let constructor = "mlir::iree_compiler::createSPIRVTilePass()";
@@ -112,9 +121,16 @@ def SPIRVTileToCooperativeOps : Pass<
     "mlir::iree_compiler::createSPIRVTileToCooperativeOpsPass()";
 }
 
-def SPIRVVectorLowering : Pass<"iree-spirv-vector-lowering", "func::FuncOp"> {
-  let summary = "Vectorize Linalg ops with buffer semantics";
-  let constructor = "mlir::iree_compiler::createSPIRVVectorLoweringPass()";
+def SPIRVInitialVectorLowering : Pass<
+    "iree-spirv-initial-vector-lowering", "func::FuncOp"> {
+  let summary = "Perform initial lowering of vectors ops to fit SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVInitialVectorLoweringPass()";
+}
+
+def SPIRVFinalVectorLowering : Pass<
+    "iree-spirv-final-vector-lowering", "func::FuncOp"> {
+  let summary = "Perform final lowering of vectors ops to fit SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVFinalVectorLoweringPass()";
 }
 
 def SPIRVVectorizeLoadStore :

@@ -10,6 +10,8 @@
 #include <vector>
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/GraphTraits.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Operation.h"
@@ -127,6 +129,28 @@ public:
     }
   };
 
+  // Define an iterator over the second value of constInfoMap.
+  using ConstValueMapT = llvm::DenseMap<Value, ConstValueInfo *>;
+  class ConstValueIterator final
+      : public llvm::mapped_iterator<
+            ConstValueMapT::const_iterator,
+            ConstValueInfo *(*)(const ConstValueMapT::value_type &)> {
+
+    static ConstValueInfo *unwrap(const ConstValueMapT::value_type &value) {
+      return value.second;
+    }
+
+  public:
+    ConstValueIterator(ConstValueMapT::const_iterator it)
+        : llvm::mapped_iterator<
+              ConstValueMapT::const_iterator,
+              ConstValueInfo *(*)(const ConstValueMapT::value_type &)>(
+              it, &unwrap) {}
+  };
+
+  ConstValueIterator begin() const { return constInfoMap.begin(); }
+  ConstValueIterator end() const { return constInfoMap.end(); }
+
 private:
   // Expands the frontier to include all results of a given op in an UNKNOWN
   // state. This also checks that all of its operands are known, adding
@@ -145,6 +169,8 @@ private:
 
   // Map of analyzed value to corresponding info struct.
   llvm::DenseMap<Value, ConstValueInfo *> constInfoMap;
+
+  // Define an iterator over std::unique_ptr<T> as a pointer range on T*.
 
   // Allocated ConstValueInfo structs (to preserve pointer stability).
   llvm::SmallVector<std::unique_ptr<ConstValueInfo>> allocedConstInfos;
@@ -188,10 +214,19 @@ public:
     Outcome outcome = UNDECIDED;
   };
 
-  ConstExprHoistingPolicy(const ConstExprAnalysis &analysis);
+  void printDotGraph(raw_ostream &os) const;
+  void dumpDotGraph() const;
+
+  const ConstExprAnalysis &getAnalysis() const { return analysis; }
+
+  ConstExprHoistingPolicy(const ConstExprAnalysis &analysis, int64_t threshold);
   void initialize();
   Decision *getDecision(const ConstExprAnalysis::ConstValueInfo *info) {
     return &decisions[info];
+  }
+
+  Outcome getOutcome(const ConstExprAnalysis::ConstValueInfo *info) const {
+    return decisions.lookup(info).getOutcome();
   }
 
 private:
@@ -201,13 +236,15 @@ private:
   void makeInvariantDecision(const ConstExprAnalysis::ConstValueInfo *info,
                              Decision *decision);
   // Makes a decision that depends on producers and consumers of a value. This
-  // may be called repeatedly until convergence. The implementation should call
-  // decision.disableHoist() or decision.enableHoist() if it can reach a
+  // may be called repeatedly until convergence. The implementation should
+  // call decision.disableHoist() or decision.enableHoist() if it can reach a
   // decision.
   void makeDecision(const ConstExprAnalysis::ConstValueInfo *info,
                     Decision *decision);
 
   const ConstExprAnalysis &analysis;
+
+  int64_t constExprMaxSizeIncreaseThreshold;
 
   // Map of ConstValueInfo * to decision structs. All are allocated at
   // initialization and then the structure is not changed.
@@ -224,5 +261,51 @@ inline raw_ostream &operator<<(raw_ostream &os,
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
+
+namespace llvm {
+template <>
+struct GraphTraits<
+    mlir::iree_compiler::IREE::Util::ConstExprAnalysis::ConstValueInfo *> {
+  using NodeRef =
+      mlir::iree_compiler::IREE::Util::ConstExprAnalysis::ConstValueInfo *;
+  using ChildIteratorType = SmallPtrSetImpl<NodeRef>::iterator;
+
+  static NodeRef getEntryNode(NodeRef info) { return info; }
+
+  static ChildIteratorType child_begin(NodeRef info) {
+    return info->consumers.begin();
+  }
+
+  static ChildIteratorType child_end(NodeRef info) {
+    return info->consumers.end();
+  }
+};
+
+template <>
+struct GraphTraits<
+    const mlir::iree_compiler::IREE::Util::ConstExprHoistingPolicy *>
+    : public GraphTraits<mlir::iree_compiler::IREE::Util::ConstExprAnalysis::
+                             ConstValueInfo *> {
+
+  using nodes_iterator =
+      mlir::iree_compiler::IREE::Util::ConstExprAnalysis::ConstValueIterator;
+
+  static NodeRef getEntryNode(
+      const mlir::iree_compiler::IREE::Util::ConstExprHoistingPolicy *graph) {
+    return *graph->getAnalysis().begin();
+  }
+
+  static nodes_iterator nodes_begin(
+      const mlir::iree_compiler::IREE::Util::ConstExprHoistingPolicy *graph) {
+    return graph->getAnalysis().begin();
+  }
+
+  static nodes_iterator nodes_end(
+      const mlir::iree_compiler::IREE::Util::ConstExprHoistingPolicy *graph) {
+    return graph->getAnalysis().end();
+  }
+};
+
+} // namespace llvm
 
 #endif // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_CONST_EXPR_H_

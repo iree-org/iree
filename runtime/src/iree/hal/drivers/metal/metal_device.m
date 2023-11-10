@@ -277,16 +277,18 @@ static iree_status_t iree_hal_metal_device_create_executable_cache(
                                                     device->host_allocator, out_executable_cache);
 }
 
-static iree_status_t iree_hal_metal_device_import_file(
-    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_memory_access_t access, iree_hal_external_file_t* IREE_RESTRICT external_file,
-    iree_hal_file_release_callback_t release_callback, iree_hal_file_t** out_file) {
-  if (external_file->type != IREE_HAL_EXTERNAL_FILE_TYPE_HOST_ALLOCATION) {
+static iree_status_t iree_hal_metal_device_import_file(iree_hal_device_t* base_device,
+                                                       iree_hal_queue_affinity_t queue_affinity,
+                                                       iree_hal_memory_access_t access,
+                                                       iree_io_file_handle_t* handle,
+                                                       iree_hal_external_file_flags_t flags,
+                                                       iree_hal_file_t** out_file) {
+  if (iree_io_file_handle_type(handle) != IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "implementation does not support the external file type");
   }
-  return iree_hal_memory_file_wrap(queue_affinity, access, external_file->handle.host_allocation,
-                                   release_callback, iree_hal_device_allocator(base_device),
+  return iree_hal_memory_file_wrap(queue_affinity, access, handle,
+                                   iree_hal_device_allocator(base_device),
                                    iree_hal_device_host_allocator(base_device), out_file);
 }
 
@@ -444,9 +446,16 @@ static iree_status_t iree_hal_metal_device_queue_execute(
                                            value:signal_semaphore_list.payload_values[i]];
       }
 
+      // We use a resource set to keep track of resources in the above. So here we need to retain
+      // the device to make sure the block pool behind outlives the resource set.
+      iree_hal_device_retain(base_device);
       [signal_command_buffer addCompletedHandler:^(id<MTLCommandBuffer> cb) {
         // Now we can release all retained resources.
         iree_hal_resource_set_free(resource_set);
+        // And then release the device handle. Note that this must happen separately--if we put the
+        // device itself in the resource set, we can destroy the block pool data structure inside
+        // the device prematurely, before the resource set free procedure done scanning it.
+        iree_hal_device_release(base_device);
       }];
       [signal_command_buffer commit];
     }

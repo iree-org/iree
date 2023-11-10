@@ -256,7 +256,16 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
     out_buffer_ptr = (element_type*)buffer->data.data + (element_offset);   \
   }
 
-// Returns the a string view referencing the given |value| buffer.
+// Returns a byte span referencing the given |value| buffer.
+// The returned span will only be valid for as long as the buffer is live.
+static inline iree_const_byte_span_t iree_vm_buffer_as_const_byte_span(
+    const iree_vm_buffer_t* value) {
+  return value ? iree_make_const_byte_span(value->data.data,
+                                           value->data.data_length)
+               : iree_const_byte_span_empty();
+}
+
+// Returns a string view referencing the given |value| buffer.
 // The returned view will only be valid for as long as the buffer is live.
 static inline iree_string_view_t iree_vm_buffer_as_string(
     const iree_vm_buffer_t* value) {

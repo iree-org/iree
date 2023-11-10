@@ -22,6 +22,7 @@ typedef struct iree_hal_rocm_kernel_params_t {
   iree_hal_pipeline_layout_t* layout;
   hipFunction_t function;
   uint32_t block_size[3];
+  uint32_t shared_memory_size;
   IREE_TRACE(iree_string_view_t function_name;)
   IREE_TRACE(iree_string_view_t source_filename;)
   IREE_TRACE(uint32_t source_line;)

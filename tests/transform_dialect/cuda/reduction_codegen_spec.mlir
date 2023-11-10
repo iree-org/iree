@@ -14,8 +14,8 @@ transform.sequence failures(propagate) {
 
   // Step 2. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
-  %forall_grid, %grid_combiner_op =
-    transform.structured.tile_to_forall_op %combiner_op tile_sizes [1]
+  %grid_combiner_op, %forall_grid =
+    transform.structured.tile_using_forall %combiner_op tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
        : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
@@ -26,8 +26,8 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op 
     : (!transform.any_op) -> !transform.any_op
-  %forall_block_combiner_op, %block_combiner_op =
-    transform.structured.tile_to_forall_op %grid_combiner_op tile_sizes [1] 
+  %block_combiner_op, %forall_block_combiner_op =
+    transform.structured.tile_using_forall %grid_combiner_op tile_sizes [1] 
     ( mapping = [#gpu.thread<z>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.structured.fuse_into_containing_op %fill_1d into %forall_block_combiner_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -48,8 +48,8 @@ transform.sequence failures(propagate) {
   %grid_more_parallel_op = transform.structured.match ops{["linalg.generic"]}
     attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op 
       : (!transform.any_op) -> !transform.any_op
-  %forall_block_more_parallel_op, %block_more_parallel_op =
-    transform.structured.tile_to_forall_op %grid_more_parallel_op tile_sizes [1, 1] 
+  %block_more_parallel_op, %forall_block_more_parallel_op =
+    transform.structured.tile_using_forall %grid_more_parallel_op tile_sizes [1, 1] 
     ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.structured.fuse_into_containing_op %fill_2d into %forall_block_more_parallel_op : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)

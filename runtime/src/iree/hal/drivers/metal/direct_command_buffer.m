@@ -398,7 +398,7 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
     iree_hal_metal_staging_buffer_increase_command_buffer_refcount(staging_buffer);
     // Retain the device given that we refer to builtin executables and staging buffers whose
     // lifetime is associated with the device.
-    iree_hal_resource_retain(device);
+    iree_hal_device_retain(device);
   } else {
     iree_hal_metal_command_buffer_destroy_internal(&command_buffer->base);
   }
@@ -437,7 +437,7 @@ static void iree_hal_metal_command_buffer_destroy(iree_hal_command_buffer_t* bas
 
   iree_hal_metal_command_buffer_destroy_internal(base_command_buffer);
 
-  iree_hal_resource_release(device);
+  iree_hal_device_release(device);
 
   IREE_TRACE_ZONE_END(z0);
 }

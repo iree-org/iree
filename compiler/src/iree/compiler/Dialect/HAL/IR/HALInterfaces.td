@@ -25,7 +25,7 @@ def HAL_MatchAttrInterface :
         attribute is true for the given value.
       }],
       "Value", "buildConditionExpression",
-      (ins "Location":$loc, "Value":$value, "OpBuilder":$builder)
+      (ins "Location":$loc, "Value":$device, "OpBuilder":$builder)
     >,
   ];
 }

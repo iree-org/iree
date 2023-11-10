@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
@@ -43,12 +42,6 @@ constexpr int kMaxVectorNumBits = 128;
 
 namespace mlir {
 namespace iree_compiler {
-
-llvm::cl::opt<std::string> clSPIRVTransformDialectFileName(
-    "iree-spirv-use-transform-dialect",
-    llvm::cl::desc(
-        "MLIR file containing a transform dialect specification to apply"),
-    llvm::cl::init(""));
 
 llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
     "iree-spirv-enable-transform-dialect-jit",
@@ -1175,39 +1168,35 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
 
-  auto funcOp = op->getParentOfType<FunctionOpInterface>();
-  auto walkResult = funcOp.walk([](linalg::LinalgOp op) {
-    using utils::IteratorType;
-    SmallVector<IteratorType, 4> kinds = op.getIteratorTypesArray();
-    SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-    for (auto [kind, bound] : llvm::zip_equal(kinds, bounds)) {
-      if (kind == IteratorType::reduction && ShapedType::isDynamic(bound))
-        return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  if (walkResult.wasInterrupted()) {
-    LLVM_DEBUG(llvm::dbgs() << "failed: dynamic shapes in reduction dims\n");
-    return failure();
-  }
-
   // This pipeline eventually generates non-uniform group shuffle ops, which
   // requires special capability.
   if (!targetEnv.allows(spirv::Capability::GroupNonUniformShuffle))
     return failure();
 
+  SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+
+  // We should have reduction dimensions.
   if (reductionDims.empty())
     return failure();
 
-  // Make sure reduction dimensions are the innermost ones.
-  for (int i = 0; i < reductionDims.size(); ++i) {
-    if (reductionDims[reductionDims.size() - 1 - i] !=
-        op.getNumLoops() - 1 - i) {
+  // Make sure reduction dimensions are static and innermost ones.
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      LLVM_DEBUG(llvm::dbgs() << "failed: dynamic shapes in reduction dims\n");
+      return failure();
+    }
+    if (dim < numParallelDims) {
+      LLVM_DEBUG(llvm::dbgs() << "failed: non-innermost reduction dims\n");
       return failure();
     }
   }
+
   if (op.getRegionOutputArgs().size() != 1)
     return failure();
 
@@ -1238,11 +1227,10 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-  int64_t dimSize = 1;
+  int64_t reductionSize = 1;
   for (int64_t dim : reductionDims)
-    dimSize *= bounds[dim];
-  if (dimSize % subgroupSize != 0)
+    reductionSize *= bounds[dim];
+  if (reductionSize % subgroupSize != 0)
     return failure();
 
   const Type elementType =
@@ -1256,28 +1244,56 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   // Let each thread handle `vectorSize` elements.
   unsigned vectorSize = kMaxVectorNumBits / bitWidth;
-  while ((dimSize / vectorSize) % subgroupSize != 0)
+  while ((reductionSize / vectorSize) % subgroupSize != 0)
     vectorSize /= 2;
 
-  // TODO: Add reduction tiling to handle larger reductions.
+  // Deduce the workgroup size we should use for reduction. Currently a
+  // workgroup processes all elements in reduction dimensions. Need to make sure
+  // the workgroup size we use can divide the total reduction size, and it's
+  // also within hardware limitations.
   const int64_t maxWorkgroupSize =
       targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
-  int64_t groupSize = dimSize / vectorSize;
+  int64_t groupSize = reductionSize / vectorSize;
   if (groupSize > maxWorkgroupSize) {
     groupSize = GreatestCommonDivisor(APInt(64, uint64_t(groupSize)),
                                       APInt(64, uint64_t(maxWorkgroupSize)))
                     .getZExtValue();
   }
+
+  // Then we need to strike a balance--
+  // 1) parallel dimensions are distributed to workgroups. If there are many
+  //    workgroups dispatched, we'd want to have each GPU core hosting multiple
+  //    of them for occupancy.
+  // 2) we want each thread to read quite a few 128-bit vectors for better
+  //    memory cache behavior.
+  // Both means we cannot use a too large workgroup size.
+
+  int64_t parallelSize = 1;
+  for (int64_t dim : parallelDims) {
+    if (!ShapedType::isDynamic(bounds[dim]))
+      parallelSize *= bounds[dim];
+  }
+  // Total parallel size that can fill the GPU with enough workgorups.
+  // TODO: query from the target device; roughly 2x hardware compute unit.
+  int parallelThreshold = 256;
+  // How many 128-bit vectors each thread should at least read.
+  const int targetVectorCount = 8;
+  while (parallelSize > parallelThreshold &&
+         (groupSize / 2) % subgroupSize == 0 &&
+         reductionSize / (groupSize * vectorSize) < targetVectorCount) {
+    // Use less subgroups per workgroup..
+    groupSize /= 2;
+    // in order to host more workgroups per hardware compute unit.
+    parallelSize /= 2;
+  }
+
   // Current warp reduction pattern is a two step butterfly warp reduce.
   // First, do warp reductions along multiple subgroups.
   // Second, reduce results from multiple subgroups using single warp reduce.
-  // The final warp reduce requires numSubgroupUsed > subgroupSize to work.
-  // TODO(raikonenfnu): Add flexible num of warp reduce to handle more configs.
-  // TT::CPU and TT::ARM_Valhall is not going through warp reduce.
-  const int64_t numSubgroupsUsed = groupSize / subgroupSize;
-  if (numSubgroupsUsed > subgroupSize) {
+  // The final warp reduce requires subgroup count <= subgroup size to work.
+  if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
-  }
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
@@ -1314,7 +1330,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   // Set lowering configuration to drive tiling for other Linalg ops too---the
   // pipeline expects it.
-  funcOp.walk([&](linalg::LinalgOp op) {
+  op->getParentOfType<FunctionOpInterface>().walk([&](linalg::LinalgOp op) {
     setLoweringConfig(
         op, IREE::Codegen::LoweringConfigAttr::get(op.getContext(), tileSizes));
   });
@@ -1594,20 +1610,13 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult
 setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
                           const spirv::TargetEnv &targetEnv) {
-  if (!clSPIRVEnableTransformDialectJit &&
-      clSPIRVTransformDialectFileName.empty()) {
+  if (!clSPIRVEnableTransformDialectJit) {
     return failure();
   }
 
   MLIRContext *context = entryPoint.getContext();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       context, CodeGenPipeline::TransformDialectCodegen);
-
-  // Prefer a transform script file if provided.
-  if (!clSPIRVTransformDialectFileName.empty()) {
-    LLVM_DEBUG(llvm::dbgs() << "using user specified transform dialect...\n");
-    return setTranslationInfo(entryPoint, translationInfo);
-  }
 
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
@@ -1650,13 +1659,6 @@ setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
 static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
                                       func::FuncOp entryPointFn,
                                       Operation *rootOp) {
-  if (IREE::Codegen::CompilationInfoAttr compilationInfo =
-          getCompilationInfo(rootOp)) {
-    // If the op already has a lowering configuration specified from the
-    // original source by the user, then use it directly.
-    return setUserConfig(entryPointFn, rootOp, compilationInfo);
-  }
-
   // First try to see if there is a matching transform dialect configuration.
   if (succeeded(setTransformDialectConfig(entryPointFn, rootOp, targetEnv))) {
     return success();
@@ -1825,6 +1827,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   for (auto funcOp : module.getOps<func::FuncOp>()) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp)
+      continue;
+    if (getTranslationInfo(exportOp))
       continue;
 
     if (failed(setConfigForKernel(targetEnv, exportOp, funcOp))) {

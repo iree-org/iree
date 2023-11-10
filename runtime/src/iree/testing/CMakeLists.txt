@@ -70,6 +70,7 @@ iree_cc_library(
     ::gtest
     gmock
     gtest
+    iree::base
     iree::base::internal::flags
   TESTONLY
   PUBLIC

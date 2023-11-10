@@ -1777,7 +1777,7 @@ struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
     if (!funcOp)
       return rewriter.notifyMatchFailure(op, "computation function not found.");
 
-    int64_t k = cast<ShapedType>(op.getType(0)).getDimSize(1);
+    int64_t k = cast<ShapedType>(op.getType(0)).getShape().back();
     auto input = op.getOperand(0);
     auto iota = op.getOperand(1);
 
@@ -1785,7 +1785,7 @@ struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
             dyn_cast_or_null<mlir::stablehlo::IotaOp>(iota.getDefiningOp())) {
       int64_t iotaDim = iotaOp.getIotaDimension();
       auto iotaLastDim = cast<ShapedType>(iotaOp.getType()).getRank() - 1;
-      if (iotaDim != iotaLastDim || iotaLastDim != 1) {
+      if (iotaDim != iotaLastDim) {
         return rewriter.notifyMatchFailure(op, "Iota of last dim not found.");
       }
     }

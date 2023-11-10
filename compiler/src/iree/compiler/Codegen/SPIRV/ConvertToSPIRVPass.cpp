@@ -179,8 +179,7 @@ struct HALInterfaceLoadConstantConverter final
     // TODO(#1519): this conversion should look up the entry point information
     // to get the total push constant count.
     auto variantOp = loadOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-    auto exportOps =
-        llvm::to_vector<1>(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
+    auto exportOps = llvm::to_vector<1>(variantOp.getExportOps());
     assert(exportOps.size() == 1);
     auto layoutAttr = exportOps.front().getLayout();
 
@@ -367,6 +366,9 @@ void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
 
+  if (moduleOp.getBody()->empty())
+    return;
+
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
@@ -412,7 +414,10 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// rely on this rewrite for the cases seen today.
   /// TODO: Support general emulation of compute on sub-byte types. This is
   /// not mutually exclusive with this pattern, but does mean it is no longer
-  /// load bearing.
+  /// load bearing.  Also these patterns are already run during
+  /// `EmulateNarrotType` pass but dont trigger there due to missing support for
+  /// emulation of `vector.transfer_read` in the emulation path. Remove the
+  /// patterns from here after that is done.
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     RewritePatternSet narrowingPatterns(context);
     vector::populateVectorNarrowTypeRewritePatterns(narrowingPatterns);
@@ -447,9 +452,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
-  typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
-    return convertMMAToSPIRVCoopMatrixType(type);
-  });
+  populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter);
   RewritePatternSet patterns(&getContext());
   ScfToSPIRVContext scfToSPIRVContext;
 

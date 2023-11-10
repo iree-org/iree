@@ -15,7 +15,7 @@ transform.sequence failures(propagate) {
   // Step 1. Map to a single block by tiling with size 1 and fusing.
   %fusion_root_1, %fusion_group_1 = transform.iree.take_first %maybe_trailing_0, %combiner_op
     : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-  %grid_loop, %outer_tiled = transform.structured.tile_to_forall_op %fusion_root_1 tile_sizes [1]
+  %outer_tiled, %grid_loop = transform.structured.tile_using_forall %fusion_root_1 tile_sizes [1]
     ( mapping = [#gpu.block<x>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   
@@ -45,8 +45,8 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   %fusion_group_22_full = transform.merge_handles %fused_2, %original_fill_2
     : !transform.any_op
-  %block_loop_22, %fusion_root_22_tiled =
-    transform.structured.tile_to_forall_op %outer_tiled
+  %fusion_root_22_tiled, %block_loop_22 =
+    transform.structured.tile_using_forall %outer_tiled
     tile_sizes [1] ( mapping = [#gpu.thread<z>] )
      : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.structured.fuse_into_containing_op %fusion_group_22_full into %block_loop_22 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
@@ -54,8 +54,8 @@ transform.sequence failures(propagate) {
 
   %fusion_group_21 = transform.merge_handles %maybe_leading_2, %more_parallel_fill_2
     : !transform.any_op
-  %block_loop_21, %fusion_root_21_tiled =
-    transform.structured.tile_to_forall_op %parallel_reduction_2
+  %fusion_root_21_tiled, %block_loop_21 =
+    transform.structured.tile_using_forall %parallel_reduction_2
     tile_sizes [1, 1] ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.structured.fuse_into_containing_op %fusion_group_21 into %block_loop_21 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)

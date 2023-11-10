@@ -192,6 +192,13 @@ def EraseHALDescriptorTypeFromMemRef
       "mlir::iree_compiler::createEraseHALDescriptorTypeFromMemRefPass()";
 }
 
+def ConvertHALDescriptorTypeToGPUAddressSpace
+    : Pass<"iree-codegen-convert-hal-descriptor-type-to-gpu-address-space"> {
+  let summary = "Convert #hal.descriptor_type to #gpu.address_space<global>";
+  let constructor =
+      "mlir::iree_compiler::createConvertHALDescriptorTypeToGPUAddressSpacePass()";
+}
+
 def ExtractAddressComputation: Pass<"extract-address-computation"> {
   let summary = "Extract address computations from memory accesses";
   let description = [{
@@ -262,6 +269,8 @@ def GenericVectorization :
       "generated from tiling so it affects later steps like bufferization and vector hoisting.">,
     Option<"generateContract", "generate-contract", "bool",/*default=*/"true",
       "Enable conversion for reduction ops to contraction ops.">,
+    Option<"foldCastIntoContract", "fold-cast-into-contract", "bool",/*default=*/"false",
+      "Enable folding casting ops into vector.contract.">,
     Option<"maxVectorSize", "max-vector-size", "int64_t",
             /*default=*/"2147483647",
            "Max vector size allowed to avoid creating large vectors.">
@@ -274,6 +283,12 @@ def HoistRedundantVectorTransfers :
     Pass<"iree-codegen-hoist-redundant-vector-transfers", "func::FuncOp"> {
   let summary = "Hoist redundant vector transfers";
   let constructor = "mlir::iree_compiler::createHoistRedundantVectorTransfersPass()";
+}
+
+def HoistUnrolledVectorExtractInsertSlice :
+    Pass<"iree-codegen-hoist-vector-extract-insert-slice", "func::FuncOp"> {
+  let summary = "Hoist unrolled vector (extract, insert) pairs out of scf.for op";
+  let constructor =  "mlir::iree_compiler::createHoistUnrolledVectorExtractInsertSlicePass()";
 }
 
 def HoistStaticallyBoundAllocations :
@@ -316,6 +331,15 @@ def LowerUKernelOpsToCalls :
     Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
   let summary = "Lower micro-kernel wrapper ops into function calls";
   let constructor = "mlir::iree_compiler::createLowerUKernelOpsToCallsPass()";
+}
+
+def MaterializeUserConfigs :
+    Pass<"iree-codegen-materialize-user-configs", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Sets the lowering configs and translation info from user configs";
+  let constructor = "mlir::iree_compiler::createMaterializeUserConfigsPass()";
+  let dependentDialects = [
+      "transform::TransformDialect"
+  ];
 }
 
 def MemrefCopyToLinalgPass :
@@ -429,11 +453,10 @@ def TransformDialectInterpreter :
             "Optional filename containing a transform dialect specification to "
             "apply. If left empty, the IR is assumed to contain one top-level "
             "transform dialect operation somewhere in the module.">,
-    Option<"transformLibraryFileName",
-           "transform-library-file-name",
+    ListOption<"transformLibraryPaths",
+           "transform-library-paths",
            "std::string",
-           /*default=*/"\"\"",
-           "If non-empty, the name of the file containing definitions of "
+           "If non-empty, the paths to files containing definitions of "
            "external symbols referenced in the transform script. "
            "These definitions will be used to replace declarations.">,
     Option<"debugPayloadRootTag", "debug-payload-root-tag", "std::string",

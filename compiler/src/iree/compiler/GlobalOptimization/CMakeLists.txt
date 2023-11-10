@@ -39,17 +39,36 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "Convert1X1FilterConv2DToMatmul.cpp"
+    "DetachElementwiseFromNamedOps.cpp"
+    "EraseUnusedLinalgOperands.cpp"
+    "ExpandVectors.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "Passes.cpp"
+    "RemoveZeroExtentTensors.cpp"
+    "SetEncoding.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    IREELinalgExtDialect
+    IREELinalgExtTransforms
+    IREELinalgExtUtils
     LLVMSupport
+    MLIRAffineDialect
+    MLIRArithDialect
+    MLIRArithUtils
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
+    MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
+    MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRTensorDialect
+    MLIRTensorTransforms
+    MLIRTensorUtils
     MLIRTransforms
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Dialect::Flow::Transforms

@@ -58,7 +58,7 @@ customize which jobs run using
 [git trailers](https://git-scm.com/docs/git-interpret-trailers) in the PR
 description. The available options are
 
-```
+``` text
 ci-skip: jobs,to,skip
 ci-extra: extra,jobs,to,run
 ci-exactly: exact,set,of,jobs,to,run
@@ -96,3 +96,40 @@ The `runner-env` option controls which runner environment to target for our
 self-hosted runners. We maintain a test environment to allow testing out new
 configurations prior to rolling them out. This trailer is for advanced users who
 are working on the CI infrastructure itself.
+
+#### CI configuration recipes
+
+Copy/paste any of these at the bottom of a PR description to change what the CI
+runs.
+
+* Also run Windows and macOS builds that are normally post-merge only:
+
+  ``` text
+  ci-extra: build_test_all_windows,build_test_all_macos_arm64,build_test_all_macos_x86_64
+  ```
+
+* Also run GPU tests on NVIDIA A100 runners (opt-in due to low availability):
+
+  ``` text
+  ci-extra: test_a100
+  ```
+
+* Skip all CI builds and tests, e.g. for comment-only changes:
+
+  ``` text
+  skip-ci: Comment-only change.
+  ```
+
+* Only run Bazel builds, e.g. for changes only affecting Bazel rules:
+
+  ``` text
+  ci-exactly: build_test_all_bazel
+  ```
+
+For example, this PR opted in to running the `build_test_all_windows` job:
+
+![ci-extra](/docs/developers/assets/ci-extra.png)
+
+The enabled jobs can be viewed from the Summary page of an action run:
+
+![ci_enabled_jobs](/docs/developers/assets/ci_enabled_jobs.png)

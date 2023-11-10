@@ -21,7 +21,7 @@ following the
 We recommend Clang. GCC is not fully supported.
 
 ```shell
-$ sudo apt install clang
+sudo apt install clang
 ```
 
 Set environment variables for Bazel:
@@ -34,7 +34,7 @@ export CXX=clang++
 ### Install python3 numpy
 
 ```shell
-$ python3 -m pip install numpy
+python3 -m pip install numpy
 ```
 
 ## Clone and Build
@@ -44,10 +44,10 @@ $ python3 -m pip install numpy
 Clone the repository, initialize its submodules and configure:
 
 ```shell
-$ git clone https://github.com/openxla/iree.git
-$ cd iree
-$ git submodule update --init
-$ python3 configure_bazel.py
+git clone https://github.com/openxla/iree.git
+cd iree
+git submodule update --init
+python3 configure_bazel.py
 ```
 
 > Tip:<br>
@@ -59,7 +59,7 @@ $ python3 configure_bazel.py
 Run all core tests:
 
 ```shell
-$ bazel test -k //...
+bazel test -k //...
 ```
 
 > Tip:<br>
@@ -94,14 +94,14 @@ build:asserts --compilation_mode=opt '--copt=-UNDEBUG'
 Build all of IREE's 'tools' directory:
 
 ```shell
-$ bazel build tools/...
+bazel build tools/...
 ```
 
 Check out what was built:
 
 ```shell
-$ ls bazel-bin/tools/
-$ ./bazel-bin/tools/iree-compile --help
+ls bazel-bin/tools/
+./bazel-bin/tools/iree-compile --help
 ```
 
 Translate a

@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "iree/compiler/Codegen/LLVMCPU/TileSizeSelection.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -196,7 +196,13 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
       continue;
     }
     TilingConfig tilingConfig(maybeLoweringConfig.value());
-    auto reductionSizes = tilingConfig.getVectorReductionSizes();
+    auto [reductionSizes, scalableDims] =
+        tilingConfig.getVectorReductionSizes();
+    if (scalableDims.back()) {
+      LLVM_DEBUG(llvm::dbgs() << "scalable reduction dimensions not yet "
+                                 "supported, skip SplitReduction");
+      continue;
+    }
     if (reductionSizes.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "the list of reduction tiling sizes is empty, "
                                  "skip SplitReduction");

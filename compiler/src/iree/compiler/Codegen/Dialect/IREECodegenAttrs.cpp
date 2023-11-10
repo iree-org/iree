@@ -10,6 +10,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
 #define GET_ATTRDEF_CLASSES
@@ -59,11 +60,12 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
+    SymbolRefAttr codegenSpec) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
   return get(context, pipelineAttr, softwarePipelineDepth,
-             softwarePipelineStoreStage);
+             softwarePipelineStoreStage, codegenSpec);
 }
 
 DispatchLoweringPassPipeline
@@ -74,7 +76,8 @@ TranslationInfoAttr::getDispatchLoweringPassPipeline() {
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage) {
+    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
+    SymbolRefAttr codegenSpec) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
@@ -82,6 +85,13 @@ LogicalResult TranslationInfoAttr::verify(
   if (passPipelineValue > IREE::Codegen::DispatchLoweringPassPipeline::None) {
     return emitError() << "invalid pass pipeline value : "
                        << stringifyEnum(passPipeline.getValue());
+  }
+  auto tdPassPipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen;
+  if (codegenSpec && passPipelineValue != tdPassPipeline) {
+    return emitError()
+           << "transform dialect codegen spec requires pass pipeline : "
+           << stringifyEnum(tdPassPipeline);
   }
   return success();
 }
@@ -92,14 +102,30 @@ LogicalResult TranslationInfoAttr::verify(
 
 void LoweringConfigTilingLevelAttr::print(mlir::AsmPrinter &printer) const {
   auto tileInterchange = getInterchange();
-  if (tileInterchange.empty()) {
+  auto printTileSizes = [&] {
     printer << '[';
-    printer.printStrippedAttrOrType(getSizes());
+    if (getScalableFlags().empty()) {
+      printer.printStrippedAttrOrType(getSizes());
+    } else {
+      llvm::interleaveComma(llvm::zip(getSizes(), getScalableFlags()), printer,
+                            [&](auto pair) {
+                              auto [tileSize, isScalable] = pair;
+                              // Wrap scalable sizes in square brackets.
+                              if (isScalable)
+                                printer << '[';
+                              printer << tileSize;
+                              if (isScalable)
+                                printer << ']';
+                            });
+    }
     printer << ']';
+  };
+  if (tileInterchange.empty()) {
+    printTileSizes();
   } else {
-    printer << "{sizes = [";
-    printer.printStrippedAttrOrType(getSizes());
-    printer << "], interchange = [";
+    printer << "{sizes = ";
+    printTileSizes();
+    printer << ", interchange = [";
     printer.printStrippedAttrOrType(tileInterchange);
     printer << "]}";
   }
@@ -108,68 +134,100 @@ void LoweringConfigTilingLevelAttr::print(mlir::AsmPrinter &printer) const {
 Attribute LoweringConfigTilingLevelAttr::parse(mlir::AsmParser &parser,
                                                mlir::Type) {
   auto loc = parser.getCurrentLocation();
-  auto parseListOfI64 = [&](bool prefixChecked =
-                                false) -> FailureOr<SmallVector<int64_t>> {
+  auto parseListOfSizes = [&](SmallVector<bool> *scalableFlags = nullptr,
+                              bool prefixChecked =
+                                  false) -> FailureOr<SmallVector<int64_t>> {
     if (!prefixChecked && parser.parseLSquare())
       return failure();
     if (parser.parseOptionalRSquare().succeeded()) {
       // Empty list.
       return SmallVector<int64_t>();
     }
-    auto list = FieldParser<SmallVector<int64_t>>::parse(parser);
-    if (failed(list)) {
-      parser.emitError(parser.getCurrentLocation(),
-                       "failed to parse list of i64s");
+    SmallVector<int64_t> sizes;
+    bool expectScalableSizes = scalableFlags != nullptr;
+    auto listParse =
+        parser.parseCommaSeparatedList(AsmParser::Delimiter::None, [&] {
+          bool isScalable =
+              expectScalableSizes && parser.parseOptionalLSquare().succeeded();
+          int64_t size = 0;
+          if (parser.parseInteger(size) ||
+              (isScalable && parser.parseRSquare()))
+            return failure();
+          sizes.push_back(size);
+          if (scalableFlags)
+            scalableFlags->push_back(isScalable);
+          return success();
+        });
+    if (failed(listParse) || parser.parseRSquare())
       return failure();
-    }
-    if (parser.parseRSquare())
-      return failure();
-    return list;
+    return sizes;
   };
+  SmallVector<bool> scalableFlags;
   if (parser.parseOptionalLSquare().succeeded()) {
     // Case 1: Simple list of tile sizes, e.g.:
-    // [0, 32, 16]
-    auto tileSizes = parseListOfI64(/*prefixChecked=*/true);
+    // [0, [32], 16]
+    auto tileSizes = parseListOfSizes(&scalableFlags, /*prefixChecked=*/true);
     if (failed(tileSizes))
       return {};
     return parser.getChecked<LoweringConfigTilingLevelAttr>(
-        loc, parser.getContext(), *tileSizes, ArrayRef<int64_t>{});
+        loc, parser.getContext(), *tileSizes, ArrayRef<int64_t>{},
+        scalableFlags);
   }
   // Case 2: sizes and interchange, e.g.:
-  // {sizes = [0, 32, 16], interchange = [0, 1, 2]}
+  // {sizes = [0, [32], 16], interchange = [0, 1, 2]}
   if (parser.parseLBrace() || parser.parseKeyword("sizes") ||
       parser.parseEqual())
     return {};
-  auto tileSizes = parseListOfI64();
+  auto tileSizes = parseListOfSizes(&scalableFlags);
   if (failed(tileSizes) || parser.parseComma() ||
       parser.parseKeyword("interchange") || parser.parseEqual())
     return {};
-  auto tileInterchange = parseListOfI64();
+  auto tileInterchange = parseListOfSizes();
   if (failed(tileInterchange) || parser.parseRBrace())
     return {};
   return parser.getChecked<LoweringConfigTilingLevelAttr>(
-      loc, parser.getContext(), *tileSizes, *tileInterchange);
+      loc, parser.getContext(), *tileSizes, *tileInterchange, scalableFlags);
+}
+
+LogicalResult LoweringConfigTilingLevelAttr::verify(
+    function_ref<InFlightDiagnostic()> emitError, ArrayRef<int64_t> tileSizes,
+    ArrayRef<int64_t> tileInterchange, ArrayRef<bool> scalableFlags) {
+  if (!scalableFlags.empty() && scalableFlags.size() != tileSizes.size())
+    return emitError() << "scalable flags length does not match tile sizes";
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
 // iree_codegen.lowering_config
 //===----------------------------------------------------------------------===//
 
-LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
-                                           TileSizesListTypeRef tileSizes,
-                                           TileSizesListTypeRef tileInterchange,
-                                           ArrayRef<int64_t> nativeVectorSize) {
+LoweringConfigAttr
+LoweringConfigAttr::get(MLIRContext *context, TileSizesListTypeRef tileSizes,
+                        ScalableTileFlagsListTypeRef scalableTileFlags,
+                        TileSizesListTypeRef tileInterchange,
+                        ArrayRef<int64_t> nativeVectorSize) {
   SmallVector<LoweringConfigTilingLevelAttr> tilinglevels;
   for (auto [level, sizes] : llvm::enumerate(tileSizes)) {
     ArrayRef<int64_t> interchange = level < tileInterchange.size()
                                         ? tileInterchange[level]
                                         : ArrayRef<int64_t>{};
-    tilinglevels.push_back(
-        LoweringConfigTilingLevelAttr::get(context, sizes, interchange));
+    ArrayRef<bool> scalableFlags = level < scalableTileFlags.size()
+                                       ? scalableTileFlags[level]
+                                       : ArrayRef<bool>{};
+    tilinglevels.push_back(LoweringConfigTilingLevelAttr::get(
+        context, sizes, interchange, scalableFlags));
   }
   return get(context,
              LoweringConfigTilingLevelsAttr::get(context, tilinglevels),
              nativeVectorSize);
+}
+
+LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
+                                           TileSizesListTypeRef tileSizes,
+                                           TileSizesListTypeRef tileInterchange,
+                                           ArrayRef<int64_t> nativeVectorSize) {
+
+  return get(context, tileSizes, {}, tileInterchange, nativeVectorSize);
 }
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() {
@@ -184,6 +242,23 @@ SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) {
   if (level >= levels.size())
     return {};
   return SmallVector<int64_t>(levels[level].getSizes());
+}
+
+ScalableTileFlagsListType LoweringConfigAttr::getScalableTileFlagVals() {
+  ScalableTileFlagsListType scalableFlags;
+  for (auto &level : getTilingLevels())
+    scalableFlags.push_back(SmallVector<bool>(level.getScalableFlags()));
+  return scalableFlags;
+}
+
+SmallVector<bool> LoweringConfigAttr::getScalableTileFlagVals(unsigned level) {
+  auto levels = getTilingLevels();
+  if (level >= levels.size())
+    return {};
+  SmallVector<bool> scalableFlags(levels[level].getScalableFlags());
+  // Extend the scalable flags with `false` to match the length of the sizes.
+  scalableFlags.resize(levels[level].getSizes().size());
+  return scalableFlags;
 }
 
 SmallVector<int64_t>
@@ -226,7 +301,8 @@ LogicalResult CompilationInfoAttr::verify(
   if (failed(TranslationInfoAttr::verify(
           emitError, translationInfo.getPassPipeline(),
           translationInfo.getSoftwarePipelineDepth(),
-          translationInfo.getSoftwarePipelineStoreStage()))) {
+          translationInfo.getSoftwarePipelineStoreStage(),
+          translationInfo.getCodegenSpec()))) {
     return failure();
   }
   return success();

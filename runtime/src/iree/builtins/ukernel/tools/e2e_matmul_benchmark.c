@@ -43,7 +43,7 @@ typedef struct iree_uk_benchmark_e2e_matmul_params_t {
 static iree_uk_uint32_t iree_uk_qts_op_flag(iree_uk_mmt4d_type_t type) {
   if (type == iree_uk_mmt4d_type_f32f32f32)
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
-  if (type == iree_uk_mmt4d_type_i8i8i32)
+  if (type == iree_uk_mmt4d_type_s8s8s32)
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_I8I8I32;
   iree_abort();
   return 0;
@@ -132,7 +132,7 @@ static void iree_uk_reference_rowmajor_matmul(
       iree_uk_reference_rowmajor_matmul_f32f32f32(
           params, (const float*)lhs, (const float*)rhs, (float*)out);
       break;
-    case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
+    case IREE_UK_FLAG_MMT4D_TYPE_S8S8S32:
       iree_uk_reference_rowmajor_matmul_i8i8i32(
           params, (const iree_uk_int8_t*)lhs, (const iree_uk_int8_t*)rhs,
           (iree_uk_int32_t*)out);
@@ -376,7 +376,7 @@ iree_uk_uint32_t iree_uk_mmt4d_parse_type_into_flag(const char* type) {
     return IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
   }
   if (!strcmp(type, "i8i8i32")) {
-    return IREE_UK_FLAG_MMT4D_TYPE_I8I8I32;
+    return IREE_UK_FLAG_MMT4D_TYPE_S8S8S32;
   }
   fprintf(stderr, "Unhandled type: %s\n", type);
   iree_abort();

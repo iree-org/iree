@@ -55,19 +55,20 @@ getOrdinalFromDebugTarget(std::string marker) {
 }
 
 // Inserts flow.tensor.trace ops around the specified dispatch op.
-static void traceOpWithName(DispatchOp dispatchOp, std::string name) {
+static void traceOpWithName(IREE::Flow::DispatchOp dispatchOp,
+                            std::string name) {
   OpBuilder builder(dispatchOp);
   // Input tensors:
-  builder.create<TensorTraceOp>(
+  builder.create<IREE::Flow::TensorTraceOp>(
       dispatchOp.getLoc(), builder.getStringAttr(name + " inputs"),
       filterNonTensorValues(dispatchOp.getArguments()));
 
   // Output tensors:
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPointAfter(dispatchOp);
-  builder.create<TensorTraceOp>(dispatchOp.getLoc(),
-                                builder.getStringAttr(name + " outputs"),
-                                filterNonTensorValues(dispatchOp.getResults()));
+  builder.create<IREE::Flow::TensorTraceOp>(
+      dispatchOp.getLoc(), builder.getStringAttr(name + " outputs"),
+      filterNonTensorValues(dispatchOp.getResults()));
 }
 
 // Breaks the given function on the specified op by simply returning immediately
@@ -162,18 +163,14 @@ struct InsertDebugTargetAtOrdinalPass
         localTraceOrdinal = traceOrdinal;
 
       auto &bodyRegion = op.getFunctionBody();
-      auto dispatchOps = llvm::to_vector<8>(bodyRegion.getOps<DispatchOp>());
+      auto dispatchOps =
+          llvm::to_vector<8>(bodyRegion.getOps<IREE::Flow::DispatchOp>());
 
       // Trace on a valid ordinal.
       if (localTraceOrdinal >= 0 && localTraceOrdinal < dispatchOps.size()) {
         auto traceTarget = dispatchOps[localTraceOrdinal];
-        std::string entryPointName =
-            traceTarget.getEntryPoint().getRootReference().getValue().str();
-        for (FlatSymbolRefAttr nestedRef :
-             traceTarget.getEntryPoint().getNestedReferences()) {
-          entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
-        }
         // Append the ordinal to the trace name.
+        std::string entryPointName = traceTarget.getEntryPointName();
         traceOpWithName(traceTarget, entryPointName + std::string("::") +
                                          std::to_string(localTraceOrdinal));
       }
@@ -222,17 +219,11 @@ struct InsertDebugTargetAtSymbolPass
 
       // Find the target dispatch to break on and trace on all matching
       // dispatches.
-      DispatchOp breakTarget = DispatchOp();
-      funcOp.walk([&](DispatchOp dispatchOp) {
-        std::string entryPointName =
-            dispatchOp.getEntryPoint().getRootReference().getValue().str();
-        for (FlatSymbolRefAttr nestedRef :
-             dispatchOp.getEntryPoint().getNestedReferences()) {
-          entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
-        }
+      IREE::Flow::DispatchOp breakTarget;
+      funcOp.walk([&](IREE::Flow::DispatchOp dispatchOp) {
+        std::string entryPointName = dispatchOp.getEntryPointName();
         if (traceMatcher.match(entryPointName))
           traceOpWithName(dispatchOp, entryPointName);
-
         if (!breakTarget && breakMatcher.match(entryPointName))
           breakTarget = dispatchOp;
       });

@@ -61,7 +61,7 @@ cmake --build ../iree-build/ --target install
 
 Build the runtime using the Android NDK toolchain:
 
-=== "Linux"
+=== ":fontawesome-brands-linux: Linux"
 
     ``` shell
     cmake -GNinja -B ../iree-build-android/ \
@@ -74,7 +74,7 @@ Build the runtime using the Android NDK toolchain:
     cmake --build ../iree-build-android/
     ```
 
-=== "macOS"
+=== ":fontawesome-brands-apple: macOS"
 
     ``` shell
     cmake -GNinja -B ../iree-build-android/ \
@@ -87,7 +87,7 @@ Build the runtime using the Android NDK toolchain:
     cmake --build ../iree-build-android/
     ```
 
-=== "Windows"
+=== ":fontawesome-brands-windows: Windows"
 
     ``` shell
     cmake -GNinja -B ../iree-build-android/ \

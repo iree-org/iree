@@ -121,7 +121,11 @@ module attributes {hal.device.targets = [#hal.device.target<"llvm-cpu">]} {
 // TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
 //   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
-  hal.executable.variant @vmvx, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
+    hal.executable.condition(%device: !hal.device) -> i1 {
+      %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
+      hal.return %selected : i1
+    }
     hal.executable.export @entry0 ordinal(0) layout(#pipeline_layout_0) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
@@ -155,9 +159,18 @@ hal.executable @exe {
 
 // CHECK: util.global private @_executable_exe : !hal.executable
 // CHECK-NEXT: util.initializer {
+
+// Switch on the supported formats:
 // CHECK:   %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
-// CHECK:   %[[RET:.+]] = hal.device.switch<%[[DEVICE]] : !hal.device> -> !hal.executable
-// CHECK:   #hal.device.match.executable.format<"vmvx-bytecode-fb"> {
+// CHECK:   %{{.+}}, %[[FORMAT_VMVX:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.executable.format" :: "vmvx-bytecode-fb")
+// CHECK:   %[[VMVX_CONDITION:.+]] = scf.execute_region -> i1 {
+// CHECK:     %{{.+}}, %[[FEATURE:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("some" :: "feature")
+// CHECK:     scf.yield %[[FEATURE]]
+// CHECK:   }
+// CHECK:   %[[VMVX_VARIANT_SELECTED:.+]] = arith.andi %[[FORMAT_VMVX]], %[[VMVX_CONDITION]]
+// CHECK:   %[[VARIANT_INDEX:.+]] = arith.select %[[VMVX_VARIANT_SELECTED]], %c0, %c-1
+// CHECK:   %[[RET:.+]] = scf.index_switch %[[VARIANT_INDEX]] -> !hal.executable
+// CHECK:   case 0 {
 
 // Dependent layouts:
 // CHECK:     %[[LAYOUT0:.+]] = util.global.load @_pipeline_layout_0 : !hal.pipeline_layout
@@ -176,11 +189,11 @@ hal.executable @exe {
 // CHECK-SAME:  constants([%[[CONST_01]]#0, %[[CONST_01]]#1, %[[CONST_2]]])
 // CHECK-SAME:  : !hal.executable
 
-// CHECK:     hal.return %[[EXE]] : !hal.executable
-// CHECK:   },
-// CHECK:   #hal.match.always {
+// CHECK:     scf.yield %[[EXE]] : !hal.executable
+// CHECK:   }
+// CHECK:   default {
 // CHECK:     %[[NULL:.+]] = util.null : !hal.executable
-// CHECK:     hal.return %[[NULL]] : !hal.executable
+// CHECK:     scf.yield %[[NULL]] : !hal.executable
 // CHECK:   }
 // CHECK:   util.global.store %[[RET]], @_executable_exe : !hal.executable
 
@@ -247,22 +260,26 @@ util.initializer {
 util.global private @_executable_exe : !hal.executable
 util.initializer {
   %device = hal.ex.shared_device : !hal.device
-  %0 = hal.device.switch<%device : !hal.device> -> !hal.executable
-  #hal.device.match.executable.format<"vmvx-bytecode-fb"> {
+  %format_ok, %format_supported = hal.device.query<%device : !hal.device> key("hal.executable.format" :: "some-format") : i1, i1
+  %c0 = arith.constant 0 : index
+  %c-1 = arith.constant -1 : index
+  %variant = arith.select %format_supported, %c0, %c-1 : index
+  %selected = scf.index_switch %variant -> !hal.executable
+  case 0 {
     %_pipeline_layout_0 = util.global.load @_pipeline_layout_0 : !hal.pipeline_layout
     %exe = hal.executable.create device(%device : !hal.device) target(@exe0::@vmvx) layouts([%_pipeline_layout_0]) : !hal.executable
-    hal.return %exe : !hal.executable
-  },
-  #hal.match.always {
-    %1 = util.null : !hal.executable
-    hal.return %1 : !hal.executable
+    scf.yield %exe : !hal.executable
   }
-  util.global.store %0, @_executable_exe : !hal.executable
+  default {
+    %null = util.null : !hal.executable
+    scf.yield %null : !hal.executable
+  }
+  util.global.store %selected, @_executable_exe : !hal.executable
   util.initializer.return
 }
 
 hal.executable @exe {
-  hal.executable.variant @vmvx, target = <"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
     hal.executable.export @entry ordinal(0) layout(#pipeline_layout_0) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }

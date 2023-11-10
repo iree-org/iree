@@ -1,12 +1,12 @@
 // RUN: iree-opt --split-input-file %s --verify-diagnostics | FileCheck %s
 
 flow.executable @ex0 {
+  flow.executable.export @dispatch_fn
   builtin.module {
     func.func @dispatch_fn(%cst : index, %arg0 : tensor<4xf32>) -> tensor<4xf32> {
       return %arg0 : tensor<4xf32>
     }
   }
-  flow.executable.export @dispatch_fn
 }
 
 // CHECK-LABEL: @dispatch
@@ -21,18 +21,28 @@ func.func @dispatch(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 flow.executable private @ex0 {
+  flow.executable.export public @dispatch_a
+  flow.executable.export public @dispatch_b
+}
+
+// CHECK-LABEL: @dispatchWithMultipleRefs
+func.func @dispatchWithMultipleRefs(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK: = flow.dispatch {@ex0::@dispatch_a, @ex0::@dispatch_b}(%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch {@ex0::@dispatch_a, @ex0::@dispatch_b}(%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+
+// -----
+
+flow.executable private @ex0 {
   flow.executable.export public @dispatch workgroups(%arg0: index, %arg1: index) -> (index, index, index) {
     flow.return %arg0, %arg1, %arg0 : index, index, index
   }
-  builtin.module {
-    func.func @dispatch() {
-      return
-    }
-  }
 }
 
-// CHECK-LABEL: @asyncDispatchWithWorkgroupCount
-func.func @asyncDispatchWithWorkgroupCount(%arg0: tensor<4xf32>, %arg1: index) -> tensor<4xf32> {
+// CHECK-LABEL: @dispatchWithWorkgroupCount
+func.func @dispatchWithWorkgroupCount(%arg0: tensor<4xf32>, %arg1: index) -> tensor<4xf32> {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   // CHECK: = flow.dispatch @ex0::@dispatch[%c1, %c2](%arg0, %arg1) : (tensor<4xf32>, index) -> tensor<4xf32>
@@ -46,14 +56,9 @@ flow.executable private @ex0 {
   flow.executable.export public @dispatch workgroups(%arg0: index) -> (index, index, index) {
     flow.return %arg0, %arg0, %arg0 : index, index, index
   }
-  builtin.module {
-    func.func @dispatch() {
-      return
-    }
-  }
 }
 
-func.func @asyncDispatchWithInvalidWorkload(%arg0: tensor<4xf32>, %arg1: index) -> tensor<4xf32> {
+func.func @dispatchWithInvalidWorkload(%arg0: tensor<4xf32>, %arg1: index) -> tensor<4xf32> {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   // expected-error @+1 {{op workload mismatch; entry point expects 1 arguments but dispatch provides 2}}

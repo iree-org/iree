@@ -47,6 +47,7 @@ iree_cc_library(
     MLIRIR
     MLIRMemRefDialect
     MLIRParser
+    MLIRSCFDialect
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils
@@ -73,6 +74,7 @@ iree_cc_library(
     MLIRIR
     MLIRMemRefDialect
     MLIRParser
+    MLIRSCFDialect
     MLIRTransformUtils
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::hal_imports

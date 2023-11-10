@@ -25,7 +25,6 @@ def IREELinalgExt_Dialect : Dialect {
     A dialect designed for experimenting with non-structured operations that
     cannot be represented efficiently/directly by the Linalg dialect.
   }];
-  let hasCanonicalizer = 1;
   let useDefaultAttributePrinterParser = 1;
 }
 
@@ -56,33 +55,13 @@ class IREELinalgExt_I32EnumAttr<string name, string summary, list<I32EnumAttrCas
 class IREELinalgExt_EnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREELinalgExt_Dialect, enumInfo, name>;
 
-def MATMUL_F32F32F32 : I32EnumAttrCase<"MATMUL_F32F32F32", 0>;
-def MATMUL_I8I8I32 : I32EnumAttrCase<"MATMUL_I8I8I32", 1>;
-def MATMUL_F16F16F32 : I32EnumAttrCase<"MATMUL_F16F16F32", 2>;
-def MATMUL_F16F16F16 : I32EnumAttrCase<"MATMUL_F16F16F16", 3>;
-def MATMUL_BF16BF16F32 : I32EnumAttrCase<"MATMUL_BF16BF16F32", 4>;
-def MATMUL_BF16BF16BF16 : I32EnumAttrCase<"MATMUL_BF16BF16BF16", 5>;
-def BATCH_MATMUL_F32F32F32 : I32EnumAttrCase<"BATCH_MATMUL_F32F32F32", 6>;
-def BATCH_MATMUL_I8I8I32 : I32EnumAttrCase<"BATCH_MATMUL_I8I8I32", 7>;
-def BATCH_MATMUL_F16F16F32 : I32EnumAttrCase<"BATCH_MATMUL_F16F16F32", 8>;
-def BATCH_MATMUL_F16F16F16 : I32EnumAttrCase<"BATCH_MATMUL_F16F16F16", 9>;
-def BATCH_MATMUL_BF16BF16F32 : I32EnumAttrCase<"BATCH_MATMUL_BF16BF16F32", 10>;
-def BATCH_MATMUL_BF16BF16BF16 : I32EnumAttrCase<"BATCH_MATMUL_BF16BF16BF16", 11>;
+def MATMUL : I32EnumAttrCase<"MATMUL", 0>;
+def BATCH_MATMUL : I32EnumAttrCase<"BATCH_MATMUL", 1>;
 
 def EncodingUser : IREELinalgExt_I32EnumAttr<"EncodingUser",
     "Describes the operation that a tensor is an operand or a result of.", [
-      MATMUL_F32F32F32,
-      MATMUL_I8I8I32,
-      MATMUL_F16F16F32,
-      MATMUL_F16F16F16,
-      MATMUL_BF16BF16F32,
-      MATMUL_BF16BF16BF16,
-      BATCH_MATMUL_F32F32F32,
-      BATCH_MATMUL_I8I8I32,
-      BATCH_MATMUL_F16F16F32,
-      BATCH_MATMUL_F16F16F16,
-      BATCH_MATMUL_BF16BF16F32,
-      BATCH_MATMUL_BF16BF16BF16,
+      MATMUL,
+      BATCH_MATMUL,
     ]>;
 
 def EncodingUserAttr :
@@ -120,12 +99,14 @@ def EncodingAttr :
   let assemblyFormat = [{
     `<` `user` `=` `` $user
     `,` `role` `=` `` $role
+    `,` `element_types` `=` $elementTypes
     (`,` `original_type` `=` $originalType^)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"EncodingUserAttr", "kind of operation using this tensor">:$user,
     AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role,
+    AttrParameter<"ArrayAttr", "element types of the user's operands">:$elementTypes,
     OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$originalType
   );
 

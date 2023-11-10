@@ -1,10 +1,10 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))" --split-input-file %s | FileCheck %s
 
 hal.executable private @pad_only {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>) {
     hal.executable.export public @pad_only_dispatch ordinal(0)
         layout(#hal.pipeline.layout<push_constants = 0,
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
@@ -60,10 +60,10 @@ hal.executable private @pad_only {
 // -----
 
 hal.executable private @pad_with_producer {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>) {
     hal.executable.export public @pad_with_producer_dispatch ordinal(0)
         layout(#hal.pipeline.layout<push_constants = 0,
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
@@ -131,36 +131,37 @@ hal.executable private @pad_with_producer {
 //       CHECK:         scf.for
 //       CHECK:           scf.for
 //   CHECK-DAG:             %[[INPUT_SLICE:.+]] = memref.subview %[[INPUT_SUBVIEW]]
-//   CHECK-DAG:             %[[ALLOC:.+]] = memref.alloca
-//       CHECK:             %[[CONV_OUTPUT:.+]] = memref.subview %[[ALLOC]]
-//       CHECK:               scf.for
-//       CHECK:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
-//       CHECK:               %[[FILTER_SLICE:.+]] = memref.subview %[[FILTER_SUBVIEW]]
+//       CHECK:             %[[ALLOC1:.+]] = memref.alloca
+//       CHECK:             scf.for
+//   CHECK-DAG:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
+//   CHECK-DAG:               %[[FILTER_SLICE:.+]] = memref.subview %[[FILTER_SUBVIEW]]
+//       CHECK:               %[[ALLOC2:.+]] = memref.alloca
 //       CHECK:               linalg.fill
-//  CHECK-SAME:                   outs(%[[ALLOC]]
+//  CHECK-SAME:                   outs(%[[ALLOC2]]
+//       CHECK:               %[[CONV_OUTPUT:.+]] = memref.subview %[[ALLOC2]]
 //       CHECK:               scf.for
-//       CHECK:                 %[[CONV_INPUT:.+]] = memref.subview %[[INPUT_SLICE]]
-//       CHECK:                 %[[CONV_FILTER:.+]] = memref.subview %[[FILTER_SLICE]]
+//   CHECK-DAG:                 %[[CONV_INPUT:.+]] = memref.subview %[[INPUT_SLICE]]
+//   CHECK-DAG:                 %[[CONV_FILTER:.+]] = memref.subview %[[FILTER_SLICE]]
 //       CHECK:                 linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:                     ins(%[[CONV_INPUT]], %[[CONV_FILTER]] :
 //  CHECK-SAME:                     outs(%[[CONV_OUTPUT]] :
 //       CHECK:               %[[BIAS_INPUT:.+]] = memref.subview %[[BIAS_SUBVIEW]]
 //       CHECK:               linalg.generic
-//  CHECK-SAME:                   ins(%[[ALLOC]], %[[BIAS_INPUT]] :
-//  CHECK-SAME:                   outs(%[[ALLOC]]
+//  CHECK-SAME:                   ins(%[[CONV_OUTPUT]], %[[BIAS_INPUT]] :
+//  CHECK-SAME:                   outs(%[[ALLOC1]]
 //       CHECK:               linalg.fill ins(%{{.+}} :   f32) outs(%[[OUTPUT_SLICE]]
 //       CHECK:               %[[INTERIOR_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
 //       CHECK:               linalg.generic
-//  CHECK-SAME:                   ins(%[[ALLOC]] :
+//  CHECK-SAME:                   ins(%[[ALLOC1]] :
 //  CHECK-SAME:                   outs(%[[INTERIOR_SLICE]] :
 
 // -----
 
 hal.executable private @pad_consumer_fusion {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}> {
+      native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>) {
     hal.executable.export public @pad_consumer_fusion_dispatch ordinal(0)
         layout(#hal.pipeline.layout<push_constants = 0,
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {

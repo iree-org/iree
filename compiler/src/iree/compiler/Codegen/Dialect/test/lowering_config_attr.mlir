@@ -69,3 +69,25 @@ module {
   }
 }
 // CHECK: #iree_codegen.export_config<workgroup_size = [4, 1]
+
+// -----
+
+module {
+  /// Lowering config where the middle size of the second level is scalable.
+  func.func @scalable_tile_sizes() attributes {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[128, 128, 0], [1, [32], 0], [0, 0, 1], [0, 0, 0]]>} {
+    return
+  }
+  // CHECK: #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 128, 0], [1, [32], 0], [0, 0, 1], [0, 0, 0]{{\]}}>
+}
+
+// -----
+
+module {
+  /// Lowering config where the middle size of the second level is scalable has a tile interchange.
+  func.func @scalable_tile_sizes() attributes {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[128, 128, 0], {sizes=[1, [32], 0], interchange=[2, 1, 0]}, [0, 0, 1], [0, 0, 0]]>} {
+    return
+  }
+  // CHECK: #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 128, 0], {sizes = [1, [32], 0], interchange = [2, 1, 0]}, [0, 0, 1], [0, 0, 0]{{\]}}>
+}

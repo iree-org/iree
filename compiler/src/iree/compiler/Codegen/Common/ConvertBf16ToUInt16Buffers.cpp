@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -53,6 +54,18 @@ public:
 
     addConversion([this](ShapedType ty) -> std::optional<Type> {
       return ty.clone(convertType(ty.getElementType()));
+    });
+
+    addConversion([this](FunctionType ty) -> std::optional<Type> {
+      SmallVector<Type> inputs;
+      if (failed(convertTypes(ty.getInputs(), inputs)))
+        return std::nullopt;
+
+      SmallVector<Type> results;
+      if (failed(convertTypes(ty.getResults(), results)))
+        return std::nullopt;
+
+      return FunctionType::get(ty.getContext(), inputs, results);
     });
   }
 };
@@ -217,6 +230,10 @@ std::optional<Value> materializeArithBitcast(OpBuilder &builder, Type resultTy,
 
 static void populateIreeBf16EmulationPatterns(RewritePatternSet &patterns,
                                               TypeConverter &typeConverter) {
+  populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(patterns,
+                                                                 typeConverter);
+  populateCallOpTypeConversionPattern(patterns, typeConverter);
+  populateReturnOpTypeConversionPattern(patterns, typeConverter);
   patterns.add<GenericTypeConversionPattern, ConvertHalInterfaceBindingSubspan,
                ConvertMemRefAlloc, ConvertMemRefLoad, ConvertMemRefStore>(
       typeConverter, patterns.getContext());
@@ -244,7 +261,6 @@ struct ConvertBf16ToUInt16BuffersPass final
     // Run the main emulation pass.
     {
       ConversionTarget target(*ctx);
-      target.addLegalOp<func::ReturnOp>();
       target.addDynamicallyLegalOp<func::FuncOp>([&typeConverter](
                                                      Operation *op) {
         return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());

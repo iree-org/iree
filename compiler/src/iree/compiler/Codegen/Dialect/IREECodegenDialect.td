@@ -35,6 +35,22 @@ def IREECodegen_Dialect : Dialect {
   }];
   let extraClassDeclaration = [{
     void initializeCodegenAttrs();
+
+    FailureOr<::mlir::ModuleOp>
+    getOrLoadTransformLibraryModule(std::string libraryPath);
+
+    private:
+
+    /// Map containing modules containing symbols, e.g. named sequences, that
+    /// will be executed by the interpreter when used. This is a reflection of the
+    /// library module storage upstream on the transform dialect, but instead we
+    /// manage it here to ensure all required dialects are registered, and so that
+    /// we can handle the loading/caching ourselves.
+    ::llvm::StringMap<::mlir::OwningOpRef<::mlir::ModuleOp>> libraryModules;
+
+    /// Lock to control the updating of the library modules such that we only load
+    /// the module once and can reuse it across all invocations.
+    std::mutex libraryMutex;
   }];
   let useDefaultAttributePrinterParser = 1;
 }

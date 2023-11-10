@@ -61,7 +61,7 @@ elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV32_NEWLIB_TOOLCHAIN_ROOT}"
-    -DRISCV_TOOLCHAIN_PREFIX="riscv32-unknown-elf-"
+    -DRISCV_TOOLCHAIN_PREFIX="riscv32-unknown-elf"
   )
 else
   echo "riscv config for ${RISCV_PLATFORM_ARCH} not supported yet"

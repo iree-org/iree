@@ -215,6 +215,7 @@ iree_cc_binary(
     iree::modules::hal
     iree::tooling::device_util
     iree::tooling::trace_replay
+    iree::tooling::vm_util
     iree::tooling::yaml_util
     iree::vm
     yaml
@@ -272,6 +273,20 @@ if(IREE_BUILD_COMPILER)
       iree-compile
     SRCS
       "iree-compile-main.cc"
+    DEPS
+      iree::compiler::bindings::c::headers
+      iree::compiler::API::Impl
+    DATA
+      ${IREE_LLD_TARGET}
+    HOSTONLY
+    SETUP_INSTALL_RPATH
+  )
+
+  iree_cc_binary(
+    NAME
+      iree-reduce
+    SRCS
+      "iree-reduce.cc"
     DEPS
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl

@@ -298,8 +298,10 @@ public:
     // Convert all public function signatures and manipulate the arguments.
     for (auto executableOp :
          getOperation().getOps<IREE::Stream::ExecutableOp>()) {
-      for (auto funcOp :
-           executableOp.getInnerModule().getOps<mlir::func::FuncOp>()) {
+      auto innerModuleOp = executableOp.getInnerModule();
+      if (!innerModuleOp)
+        continue;
+      for (auto funcOp : innerModuleOp.getOps<mlir::func::FuncOp>()) {
         if (funcOp.isPublic()) {
           updateExportFuncOp(funcOp);
         }

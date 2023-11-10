@@ -16,7 +16,7 @@ contact:
     email: laurenzo@google.com
     affiliation: Google
 license: "Apache-2.0 WITH LLVM-exception"
-url: "https://openxla.github.io/iree/"
+url: "https://iree.dev/"
 repository-code: "https://github.com/openxla/iree"
 keywords:
   - compiler

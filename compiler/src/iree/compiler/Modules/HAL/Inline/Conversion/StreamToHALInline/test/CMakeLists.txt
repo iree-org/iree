@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "cmd_ops.mlir"
+    "debug_ops.mlir"
     "file_ops.mlir"
     "resource_ops.mlir"
     "timepoint_ops.mlir"

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))' %s | FileCheck %s
 
 // Convolution with consumer pointwise ops
 
@@ -19,13 +19,13 @@
   ]>
 ]>
 hal.executable private @nhwc_conv_pointwise_112x112x32 {
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 16384,
         max_compute_workgroup_invocations = 128,
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @nhwc_conv_pointwise_112x112x32 layout(#pipeline_layout)
     builtin.module {
       func.func @nhwc_conv_pointwise_112x112x32() {
@@ -82,13 +82,13 @@ hal.executable private @nhwc_conv_pointwise_112x112x32 {
 ]>
 
 hal.executable private @nchw_conv_2x1280x8x8 {
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 16384,
         max_compute_workgroup_invocations = 128,
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @nchw_conv_2x1280x8x8 layout(#pipeline_layout)
     builtin.module {
       func.func @nchw_conv_2x1280x8x8() {

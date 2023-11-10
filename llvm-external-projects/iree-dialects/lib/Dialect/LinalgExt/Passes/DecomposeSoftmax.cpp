@@ -119,44 +119,35 @@ static Value computeSoftmax(Value numerator, Value denominator, Value output,
 LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<Operation *> toDelete;
-  funcOp.walk([&](IREE::LinalgExt::SoftmaxOp softmaxOp) {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(softmaxOp);
-    Location loc = softmaxOp.getLoc();
-    Value input = softmaxOp.input();
-    ShapedType inputType = input.getType().cast<ShapedType>();
-    Type elementType = inputType.getElementType();
-    int64_t reductionDim = softmaxOp.getDimension();
-    SmallVector<OpFoldResult> dims =
-        tensor::getMixedSizes(rewriter, loc, input);
-    Value outputNd = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
-    dims.erase(dims.begin() + reductionDim);
-    // Compute max along dim
-    Value output = rewriter.create<tensor::EmptyOp>(loc, dims, elementType);
-    Value largeNegative = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getFloatAttr(elementType, -1.0e30));
-    Value negativeInit =
-        rewriter.create<linalg::FillOp>(loc, Value{largeNegative}, output)
-            .result();
-    Value max = reduce<arith::MaximumFOp>(input, negativeInit, reductionDim,
-                                          loc, rewriter);
-    // Subtract max from input and exponentiate
-    linalg::GenericOp numeratorOp =
-        subtractAndExp(input, max, outputNd, reductionDim, loc, rewriter);
-    Value numerator = numeratorOp->getResult(0);
-    // Compute sum along dim
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elementType));
-    Value zeroInit =
-        rewriter.create<linalg::FillOp>(loc, Value{zero}, output).result();
-    Value denominator =
-        reduce<arith::AddFOp>(numerator, zeroInit, reductionDim, loc, rewriter);
-    // Compute softmax
-    Value result = computeSoftmax(numerator, denominator, outputNd,
-                                  reductionDim, loc, rewriter);
-    softmaxOp.getResult()[0].replaceAllUsesWith(result);
-    // Delete the op after the walk.
-    toDelete.push_back(softmaxOp.getOperation());
+  SmallVector<Operation *> softmaxOpsToDecompose;
+  funcOp.walk([&](linalg::SoftmaxOp softmaxOp) {
+    softmaxOpsToDecompose.push_back(softmaxOp);
+  });
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  for (Operation *softmaxOp : softmaxOpsToDecompose) {
+    // Cast linalg::softmax to AggregatedOpInterface since this where
+    // `decomposeOperation` is implemented.
+    auto decomposableSoftmaxOp = cast<linalg::AggregatedOpInterface>(softmaxOp);
+
+    // Decompose linalg::softmax.
+    FailureOr<SmallVector<Value>> result =
+        decomposableSoftmaxOp.decomposeOperation(rewriter);
+    if (failed(result)) {
+      failed(rewriter.notifyMatchFailure(
+          softmaxOp, "linalg::SoftmaxOp could not be decomposed"));
+      return failure();
+    }
+
+    // Replace the result of linalg::softmax with the `result` generated via
+    // the decomposition above.
+    rewriter.replaceOp(decomposableSoftmaxOp, *result);
+
+    // Fusion later depends on couple of Ops/Values - we try to obtain the same
+    // by backtracking through the generated value's def-chain.
+    Operation *resultOp = (*result)[0].getDefiningOp();
+    Value numerator = resultOp->getOperand(0);
+    Operation *numeratorOp = numerator.getDefiningOp();
 
     // Rematerialize operands that are marked for this.
     SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
@@ -176,9 +167,7 @@ LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
       }
     }
     toDelete.push_back(numeratorOp);
-
-    return WalkResult::advance();
-  });
+  }
   for (Operation *op : toDelete) {
     rewriter.eraseOp(op);
   }

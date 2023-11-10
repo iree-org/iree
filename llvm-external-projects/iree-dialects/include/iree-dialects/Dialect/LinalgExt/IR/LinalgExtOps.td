@@ -37,19 +37,6 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
 }
 
 //===----------------------------------------------------------------------===//
-// Helpers.
-//===----------------------------------------------------------------------===//
-
-class CheckNumOperands<int i> : CPred<"$_op.getNumOperands() == " # i>;
-
-// This class checks that the operand has a shaped type and has rank 3
-class CheckShapedOperandOfRank3<int i> : And<[
-         CPred<"$_op.getNumOperands() > " # i>,
-         SubstLeaves<"$_self", "$_op.getOperand(" # i # ").getType()",
-           IsShapedTypePred>,
-         CPred<"$_op.getOperand(" # i # ").getType().cast<::mlir::ShapedType>().getRank() == 3">]>;
-
-//===----------------------------------------------------------------------===//
 // Utility ops
 //===----------------------------------------------------------------------===//
 
@@ -539,86 +526,11 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 }
 
 //===----------------------------------------------------------------------===//
-// Softmax
-//===----------------------------------------------------------------------===//
-
-def IREELinalgExt_SoftmaxOp : IREELinalgExt_Op<"softmax",
-    [PredOpTrait<"only one input and one output",  CheckNumOperands<2>>,
-     PredOpTrait<"input and output have same element type", TCopVTEtIsSameAs<0, 1>>,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-     DeclareOpInterfaceMethods<TilingInterface,
-      ["getIterationDomain",
-       "getLoopIteratorTypes",
-       "getResultTilePosition",
-       "getTiledImplementation"]>]> {
-  let summary = "Softmax operator";
-  let description = [{
-    This op computes a numerically stable version of softmax for a given tensor.
-    For a given input tensor x and specified dimension d,
-    we first compute the max along that dimension (m). We then compute
-    f(x) = exp(x - m). Then, we sum f(x) along dimension d to get l(x). Finally,
-    we compute the softmax as f(x) / l(x).
-  }];
-
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
-                       I64Attr:$dimension
-  );
-
-  let builders = [
-    OpBuilder<(ins "Value":$inputs, "Value":$outputs,
-      CArg<"int64_t", "0">:$dimension)>
-  ];
-
-  let results = (outs Variadic<AnyRankedTensor>:$result);
-  let hasFolder = 1;
-  let assemblyFormat = [{
-    attr-dict
-    `dimension` `(` $dimension `)`
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
-    (`->` type($result)^)?
-  }];
-
-  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value input() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value output() {
-      return getDpsInitOperand(0)->get();
-    }
-    ShapedType getInputOperandType() {
-      return input().getType().cast<ShapedType>();
-    }
-    ShapedType getOutputOperandType() {
-      return output().getType().cast<ShapedType>();
-    }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
-    }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
-    }
-    // Method to implement for specifying output range for
-    // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
-  }];
-}
-
-//===----------------------------------------------------------------------===//
 // Attention
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
-    [PredOpTrait<"only 3 inputs and 1 output",  CheckNumOperands<4>>,
-     PredOpTrait<"all operands have same element type", TCopVTEtAreSameAt<[0, 1, 2, 3]>>,
-     PredOpTrait<"query has shaped type of rank 3", CheckShapedOperandOfRank3<0>>,
-     PredOpTrait<"key has shaped type of rank 3", CheckShapedOperandOfRank3<1>>,
-     PredOpTrait<"value has shaped type of rank 3", CheckShapedOperandOfRank3<2>>,
-     PredOpTrait<"output has shaped type of rank 3", CheckShapedOperandOfRank3<3>>,
-     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -635,6 +547,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     that out of the current implementation. For cross-attention, the query and output
     have the same shape (BxNxd), while the key and value differ in sequence length
     (they have shape BxLxd, where L != N).
+    This operator after tiling results in a tiled result as per flash attention and results
+    in the current `max` and `sum` statistics while processing the current tile.
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
@@ -645,13 +559,13 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs)>
   ];
 
-  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
   let hasFolder = 1;
   let assemblyFormat = [{
     attr-dict
     `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
-    (`->` type($result)^)?
+    (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
@@ -667,6 +581,16 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     Value getOutput() {
       return getDpsInitOperand(0)->get();
     }
+    std::optional<Value> getMax() {
+      if (getNumResults() == 1)
+        return std::nullopt;
+      return getDpsInitOperand(1)->get();
+    }
+    std::optional<Value> getSum() {
+      if (getNumResults() == 1)
+        return std::nullopt;
+      return getDpsInitOperand(2)->get();
+    }
     ShapedType getQueryType() {
       return getQuery().getType().cast<ShapedType>();
     }
@@ -679,6 +603,16 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     ShapedType getOutputType() {
       return getOutput().getType().cast<ShapedType>();
     }
+    std::optional<ShapedType> getMaxType() {
+      if (!getMax().has_value())
+        return std::nullopt;
+      return (*getMax()).getType().cast<ShapedType>();
+    }
+    std::optional<ShapedType> getSumType() {
+      if (!getSum().has_value())
+        return std::nullopt;
+      return (*getSum()).getType().cast<ShapedType>();      
+    }
     int64_t getQueryRank() {
       return getQueryType().getRank();
     }
@@ -690,6 +624,16 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     }
     int64_t getOutputRank() {
       return getOutputType().getRank();
+    }
+    std::optional<int64_t> getMaxRank() {
+      if (!getMax())
+        return std::nullopt;
+      return (*getMaxType()).getRank();
+    }
+    std::optional<int64_t> getSumRank() {
+      if (!getSum().has_value())
+        return std::nullopt;
+      return (*getSumType()).getRank();
     }
     int64_t getIterationDomainRank() {
       return 2;

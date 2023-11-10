@@ -132,7 +132,8 @@ def IREECodegen_TranslationInfoAttr :
   let assemblyFormat = [{
     `<` `` $passPipeline
     (`pipeline_depth` `=` $softwarePipelineDepth^)?
-    (`store_stage` `=` $softwarePipelineStoreStage^)? `>`
+    (`store_stage` `=` $softwarePipelineStoreStage^)?
+    (`codegen_spec` `=` $codegenSpec^)? `>`
   }];
 
   let parameters = (ins
@@ -141,12 +142,15 @@ def IREECodegen_TranslationInfoAttr :
     OptionalParameter<"unsigned",
         "The software pipeline depth to be used">:$softwarePipelineDepth,
     DefaultValuedParameter<"unsigned", "1",
-        "The software pipeline stage to place stores">:$softwarePipelineStoreStage
+        "The software pipeline stage to place stores">:$softwarePipelineStoreStage,
+    OptionalParameter<"SymbolRefAttr",
+        "The symbol pointing to the transform dialect codegen spec to be used">:$codegenSpec
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
         CArg<"unsigned", "0">:$softwarePipelineDepth,
-        CArg<"unsigned", "1">:$softwarePipelineStoreStage)>
+        CArg<"unsigned", "1">:$softwarePipelineStoreStage,
+        CArg<"SymbolRefAttr", "{}">:$codegenSpec)>
   ];
   let extraClassDeclaration = [{
     // Returns the lowering pass pipeline set.
@@ -163,8 +167,11 @@ def IREECodegen_LoweringConfigTilingLevelAttr :
     ArrayRefParameter<"int64_t",
         "The tile sizes to use for this level of tiling">:$sizes,
     OptionalArrayRefParameter<"int64_t",
-        "The tile interchange to use for this level of tiling">:$interchange);
+        "The tile interchange to use for this level of tiling">:$interchange,
+    OptionalArrayRefParameter<"bool",
+        "The scalable tile flags for this level of tiling">:$scalableFlags);
   let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
 }
 
 def IREECodegen_LoweringConfigTilingLevelsAttr :
@@ -205,6 +212,10 @@ def IREECodegen_LoweringConfigAttr :
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
         CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
+        CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>,
+    AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
+        "ScalableTileFlagsListTypeRef":$scalableTileFlags,
+        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
         CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>
   ];
   let extraClassDeclaration = [{
@@ -213,6 +224,12 @@ def IREECodegen_LoweringConfigAttr :
 
     // Returns the tile sizes for a level set for the op.
     SmallVector<int64_t> getTileSizeVals(unsigned level);
+
+    // Returns the scalable tile flags for all levels set for the op.
+    ScalableTileFlagsListType getScalableTileFlagVals();
+
+    // Returns the scalable tile flags for a level set for the op.
+    SmallVector<bool> getScalableTileFlagVals(unsigned level);
 
     // Returns the tile interchange for a level set for the op.
     SmallVector<int64_t> getTileInterchangeVals(unsigned level);

@@ -1120,7 +1120,7 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*methodName=*/"serializeToVector",
       /*args=*/(ins
         "Location":$loc,
-        "llvm::support::endianness":$endian,
+        "llvm::endianness":$endian,
         "SmallVectorImpl<char> &":$buffer
       ),
       /*methodBody=*/[{}],
@@ -1138,7 +1138,7 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*methodName=*/"serializeToBuffer",
       /*args=*/(ins
         "Location":$loc,
-        "llvm::support::endianness":$endian,
+        "llvm::endianness":$endian,
         "ArrayRef<char>":$buffer
       )
     >,
@@ -1151,7 +1151,7 @@ def Util_SerializableAttrInterface : AttrInterface<"SerializableAttrInterface"> 
       /*methodName=*/"serializeToStream",
       /*args=*/(ins
         "Location":$loc,
-        "llvm::support::endianness":$endian,
+        "llvm::endianness":$endian,
         "llvm::raw_ostream &":$os
       ),
       /*methodBody=*/[{}],

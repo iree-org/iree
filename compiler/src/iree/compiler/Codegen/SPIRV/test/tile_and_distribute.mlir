@@ -18,7 +18,7 @@
   ]>
 ]>
 hal.executable private @matmul {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @matmul layout(#pipeline_layout) attributes {
       workgroup_size = [16: index, 8: index, 1: index],
       translation_info = #translation
@@ -88,7 +88,7 @@ hal.executable private @matmul {
   ]>
 ]>
 hal.executable private @conv_1d {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @conv_1d layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation_info = #translation
@@ -168,7 +168,7 @@ hal.executable private @conv_1d {
   ]>
 ]>
 hal.executable private @conv_2d {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @conv_2d layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation_info = #translation
@@ -283,7 +283,7 @@ hal.executable private @conv_2d {
   ]>
 ]>
 hal.executable private @conv_3d {
-  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export @conv_3d layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation_info = #translation
@@ -354,7 +354,7 @@ hal.executable private @conv_3d {
 ]>
 module  {
   hal.executable private @pooling_nhwc_max {
-    hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+    hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
       hal.executable.export @pooling_nhwc_max layout(#pipeline_layout) attributes {
         workgroup_size = [32: index, 4: index, 1: index],
         translation_info = #translation
@@ -421,7 +421,7 @@ module  {
 ]>
 
 hal.executable @matvec {
-  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
     hal.executable.export public @matvec ordinal(0) layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index],
       translation_info = #translation

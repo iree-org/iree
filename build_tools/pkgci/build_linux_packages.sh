@@ -188,10 +188,12 @@ function build_wheel() {
 function build_iree_runtime() {
   # We install the needed build deps below for the tools.
   IREE_RUNTIME_BUILD_TRACY=ON IREE_RUNTIME_BUILD_TRACY_TOOLS=ON \
+  IREE_EXTERNAL_HAL_DRIVERS="rocm" \
   build_wheel runtime/
 }
 
 function build_iree_compiler() {
+  IREE_TARGET_BACKEND_ROCM=ON IREE_ENABLE_LLD=ON \
   build_wheel compiler/
 }
 

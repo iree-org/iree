@@ -18,19 +18,16 @@ IREE_HAL_API_RETAIN_RELEASE(file);
 
 IREE_API_EXPORT iree_status_t iree_hal_file_import(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_memory_access_t access,
-    iree_hal_external_file_t* IREE_RESTRICT external_file,
-    iree_hal_file_release_callback_t release_callback,
-    iree_hal_file_t** out_file) {
+    iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
+    iree_hal_external_file_flags_t flags, iree_hal_file_t** out_file) {
   IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(external_file);
+  IREE_ASSERT_ARGUMENT(handle);
   IREE_ASSERT_ARGUMENT(out_file);
   *out_file = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, import_file)(
-          device, queue_affinity, access, external_file, release_callback,
-          out_file);
+          device, queue_affinity, access, handle, flags, out_file);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

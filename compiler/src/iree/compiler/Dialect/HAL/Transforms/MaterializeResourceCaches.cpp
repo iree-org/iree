@@ -10,12 +10,10 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -44,7 +42,7 @@ public:
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::cf::ControlFlowDialect>();
+    registry.insert<mlir::scf::SCFDialect>();
     registry.insert<IREE::HAL::HALDialect>();
   }
 
@@ -91,8 +89,7 @@ public:
     for (auto executableOp : executableOps) {
       for (auto variantOp :
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-        for (auto exportOp :
-             variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+        for (auto exportOp : variantOp.getExportOps()) {
           definePipelineLayoutOp(exportOp.getLoc(), exportOp.getLayout());
         }
       }
@@ -226,21 +223,33 @@ private:
     // Each case should then cache only executables which contain a matching
     // ExecutableVariantOp.
     // Afterwards, canonicalization will take care of de-duping/etc.
-    DeviceSwitchBuilder switchBuilder(loc,
-                                      /*resultTypes=*/TypeRange{executableType},
-                                      deviceValue, blockBuilder);
-    for (auto executableVariantOp :
+    SmallVector<int64_t> caseIndices;
+    SmallVector<IREE::HAL::ExecutableVariantOp> caseVariantOps;
+    for (auto variantOp :
          executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-      auto *region = switchBuilder.addConditionRegion(
-          executableVariantOp.getTarget().getMatchExpression());
-      auto &entryBlock = region->front();
-      auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
+      caseIndices.push_back(caseIndices.size());
+      caseVariantOps.push_back(variantOp);
+    }
+
+    // Select the variant index.
+    Value selectedIndex = buildIfElseTree(
+        loc, caseVariantOps.size(),
+        [&](Location loc, size_t i, OpBuilder &builder) {
+          return caseVariantOps[i].buildCondition(deviceValue, builder);
+        },
+        blockBuilder);
+
+    // Allow each variant to define how it is loaded and what pipeline it has.
+    auto switchOp = blockBuilder.create<scf::IndexSwitchOp>(
+        loc, executableType, selectedIndex, caseIndices, caseIndices.size());
+    for (auto [i, variantOp] : llvm::enumerate(caseVariantOps)) {
+      auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
+      auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
 
       // Gather each of the pipeline layouts needed for each entry point in
       // the executable.
       SmallVector<Value, 8> pipelineLayoutValues;
-      for (auto exportOp :
-           executableVariantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+      for (auto exportOp : variantOp.getExportOps()) {
         auto pipelineLayoutGlobalOp =
             definePipelineLayoutOp(executableOp.getLoc(), exportOp.getLayout());
         pipelineLayoutValues.push_back(
@@ -253,32 +262,29 @@ private:
       // We want these to all happen inside of this device switch case; they'll
       // get deduplicated/hoisted if possible in future canonicalization passes.
       SmallVector<Value> constantValues;
-      for (auto blockOp : llvm::make_early_inc_range(
-               executableVariantOp
-                   .getOps<IREE::HAL::ExecutableConstantBlockOp>())) {
+      for (auto blockOp :
+           llvm::make_early_inc_range(variantOp.getConstantBlockOps())) {
         constantValues.append(inlineConstantBlockOp(blockOp, moduleBuilder,
                                                     caseBuilder, deviceValue));
         blockOp.erase();
       }
 
       auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
-          loc, ExecutableType::get(loc.getContext()), deviceValue,
-          SymbolRefAttr::get(
-              executableOp.getSymNameAttr(),
-              {SymbolRefAttr::get(executableVariantOp.getSymNameAttr())}),
+          loc, executableType, deviceValue,
+          SymbolRefAttr::get(executableOp.getSymNameAttr(),
+                             {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
           pipelineLayoutValues, constantValues);
 
-      caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);
+      caseBuilder.create<scf::YieldOp>(loc, executableValue);
     }
 
-    auto *defaultRegion = switchBuilder.addConditionRegion(
-        IREE::HAL::MatchAlwaysAttr::get(loc.getContext()));
-    auto defaultBuilder = OpBuilder::atBlockBegin(&defaultRegion->front());
+    // Fallback for no available variant.
+    auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
+    auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
     auto nullValue =
         defaultBuilder.createOrFold<IREE::Util::NullOp>(loc, executableType);
-    defaultBuilder.create<IREE::HAL::ReturnOp>(loc, nullValue);
+    defaultBuilder.create<scf::YieldOp>(loc, nullValue);
 
-    auto switchOp = switchBuilder.build();
     auto executableValue = switchOp.getResult(0);
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableValue,
                                                    globalOp.getName());

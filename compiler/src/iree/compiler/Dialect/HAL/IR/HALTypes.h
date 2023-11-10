@@ -11,6 +11,7 @@
 #include <optional>
 
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -40,7 +41,7 @@ namespace HAL {
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.h.inc" // IWYU pragma: export
 
 //===----------------------------------------------------------------------===//
-// Enum utilities
+// Utilities
 //===----------------------------------------------------------------------===//
 
 // Returns a stable identifier for the MLIR element type or nullopt if the
@@ -109,7 +110,9 @@ struct DescriptorSetLayoutType
   using Base::Base;
 };
 
-struct DeviceType : public Type::TypeBase<DeviceType, Type, TypeStorage> {
+struct DeviceType
+    : public Type::TypeBase<DeviceType, Type, TypeStorage,
+                            mlir::OpTrait::IREE::Util::ImplicitlyCaptured> {
   using Base::Base;
 };
 

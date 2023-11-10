@@ -20,7 +20,7 @@ func.func @fn(%arg0: !hal.buffer_view) {
 // -----
 
 hal.executable @ex_with_constants {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // expected-error @+1 {{must have one key for every result}}
     hal.executable.constant.block(%device: !hal.device) -> (i32, i32) as ("foo") {
       %c0 = arith.constant 0 : i32
@@ -33,7 +33,7 @@ hal.executable @ex_with_constants {
 // -----
 
 hal.executable @ex_with_constants {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     hal.executable.constant.block(%device: !hal.device) -> (i32, i32) as ("foo", "bar") {
       %c0 = arith.constant 0 : i32
       // expected-error @+1 {{return must have the same number of operands}}
@@ -45,7 +45,7 @@ hal.executable @ex_with_constants {
 // -----
 
 hal.executable @ex_with_constants {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     hal.executable.constant.block(%device: !hal.device) -> i32 as "foo" {
       %c0 = arith.constant 0.0 : f32
       // expected-error @+1 {{parent expected result 0 to be 'i32' but returning 'f32'}}
@@ -57,7 +57,7 @@ hal.executable @ex_with_constants {
 // -----
 
 hal.executable @ex_with_constants {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // expected-error @+1 {{initializer must take a !hal.device or nothing}}
     hal.executable.constant.block(%device: !hal.device, %invalid: i32) -> i32 as "foo" {
       %c0 = arith.constant 0 : i32
@@ -69,7 +69,7 @@ hal.executable @ex_with_constants {
 // -----
 
 hal.executable @ex_with_constants {
-  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+  hal.executable.variant @backend target(#hal.executable.target<"backend", "format">) {
     // expected-error @+1 {{initializer must return only i32 values}}
     hal.executable.constant.block() -> f32 as "foo" {
       %c0 = arith.constant 0.0 : f32

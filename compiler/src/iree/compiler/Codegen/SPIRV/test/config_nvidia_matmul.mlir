@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -8,13 +8,13 @@
   ]>
 ]>
 hal.executable @matmul_4x4096x9216 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export @matmul_4x4096x9216 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_4x4096x9216() {
@@ -59,13 +59,13 @@ hal.executable @matmul_4x4096x9216 {
   ]>
 ]>
 hal.executable @matmul_1x4096x9216 {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export @matmul_1x4096x9216 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_1x4096x9216() {
@@ -110,13 +110,13 @@ hal.executable @matmul_1x4096x9216 {
   ]>
 ]>
 hal.executable private @multi_reduction_transposed_b_matmul {
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 32>>
-    }> {
+    }>) {
     hal.executable.export public @multi_reduction_transposed_b_matmul layout(#pipeline_layout)
     builtin.module {
       func.func @multi_reduction_transposed_b_matmul() {

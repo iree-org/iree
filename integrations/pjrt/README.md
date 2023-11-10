@@ -29,7 +29,7 @@ python -c "import jax; a = jax.numpy.asarray([1, 2, 3, 4, 5, 6, 7, 8, 9]); print
 
 ## Install the plugin of your choice (in this example 'cpu')
 
-pip install -e -v --no-deps python_packages/iree_cpu_plugin
+pip install -v --no-deps -e python_packages/iree_cpu_plugin
 
 ## Verify basic functionality
 

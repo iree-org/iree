@@ -52,7 +52,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             ),
             module_execution_config=exec_config,
             target_device_spec=device_spec,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
 
@@ -139,6 +139,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
             source_url="",
             entry_function="predict",
             input_types=["1xf32"],
+            input_url="https://abc/inputs_npy.tgz",
+            expected_output_url="https://abc/outputs_npy.tgz",
         )
         exec_config_a = iree_definitions.ModuleExecutionConfig.build(
             id="exec_a",
@@ -182,7 +184,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             ),
             module_execution_config=exec_config_a,
             target_device_spec=device_spec_a,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         run_config_b = iree_definitions.E2EModelRunConfig.build(
@@ -194,7 +196,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             ),
             module_execution_config=exec_config_b,
             target_device_spec=device_spec_b,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         run_config_c = iree_definitions.E2EModelRunConfig.build(
@@ -206,7 +208,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
             ),
             module_execution_config=exec_config_a,
             target_device_spec=device_spec_a,
-            input_data=common_definitions.ZEROS_MODEL_INPUT_DATA,
+            input_data=common_definitions.DEFAULT_INPUT_DATA,
             tool=iree_definitions.E2EModelRunTool.IREE_BENCHMARK_MODULE,
         )
         run_configs = [run_config_a, run_config_b, run_config_c]
@@ -247,6 +249,8 @@ class BenchmarkSuiteTest(unittest.TestCase):
                     driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                     benchmark_tool_name="iree-benchmark-module",
                     benchmark_case_dir=run_config_c_case_dir,
+                    input_uri=model_tf.input_url,
+                    expected_output_uri=model_tf.expected_output_url,
                     run_config=run_config_c,
                 )
             ],

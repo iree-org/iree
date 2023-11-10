@@ -7,7 +7,7 @@
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 
 // Generic implementation of matmul tile, i8*i8->i32 case.
-static void iree_uk_mmt4d_tile_i8i8i32_generic(
+static void iree_uk_mmt4d_tile_s8s8s32_generic(
     void* out_tile_untyped, const void* lhs_panel_untyped,
     const void* rhs_panel_untyped, const iree_uk_mmt4d_params_t* params) {
   iree_uk_int32_t* out_tile = out_tile_untyped;
@@ -225,8 +225,8 @@ static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
   switch (iree_uk_mmt4d_type(params->flags)) {
     case iree_uk_mmt4d_type_f32f32f32:
       return iree_uk_mmt4d_tile_f32f32f32_generic;
-    case iree_uk_mmt4d_type_i8i8i32:
-      return iree_uk_mmt4d_tile_i8i8i32_generic;
+    case iree_uk_mmt4d_type_s8s8s32:
+      return iree_uk_mmt4d_tile_s8s8s32_generic;
     case iree_uk_mmt4d_type_f16f16f32:
       return iree_uk_mmt4d_tile_f16f16f32_generic;
     case iree_uk_mmt4d_type_f16f16f16:

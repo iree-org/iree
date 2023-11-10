@@ -7,8 +7,8 @@ transform.sequence failures(propagate) {
 
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
-  %forall_grid, %grid_reduction =
-    transform.structured.tile_to_forall_op %reduction tile_sizes [1]
+  %grid_reduction, %forall_grid =
+    transform.structured.tile_using_forall %reduction tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
@@ -16,11 +16,11 @@ transform.sequence failures(propagate) {
 
   // Step 2. Split the reduction to get meatier parallelism.
   // ===========================================================================
-  %forall, %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2 = 
-    transform.structured.tile_reduction_using_scf %grid_reduction by tile_sizes = [0, 128]
+  %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2, %forall = 
+    transform.structured.tile_reduction_using_for %grid_reduction by tile_sizes = [0, 128]
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
   %_1:2 =
-    transform.structured.tile_to_forall_op %block_more_parallel_op_2 num_threads [0, 32]
+    transform.structured.tile_using_forall %block_more_parallel_op_2 num_threads [0, 32]
     ( mapping = [#gpu.thread<x>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
@@ -28,13 +28,13 @@ transform.sequence failures(propagate) {
   // ===========================================================================
   // 1st op is [parallel, parallel], map it to threadIdx.x by 4.
   %_2:2 =
-    transform.structured.tile_to_forall_op %block_more_parallel_fill_op_2 tile_sizes [0, 4]
+    transform.structured.tile_using_forall %block_more_parallel_fill_op_2 tile_sizes [0, 4]
     ( mapping = [#gpu.thread<x>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
   // 2nd op is [parallel, reduction] of 1x128, map the 1-dim to threadIdx.y to
   // trigger mapping of the reduction to threadIdx.x via predication via `if (x==0)`.
   %_3:2 =
-    transform.structured.tile_to_forall_op %block_combiner_op_2 tile_sizes [1] 
+    transform.structured.tile_using_forall %block_combiner_op_2 tile_sizes [1] 
     ( mapping = [#gpu.thread<y>] )
     : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 

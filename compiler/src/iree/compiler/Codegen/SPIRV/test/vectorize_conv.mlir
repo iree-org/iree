@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization,iree-spirv-vector-lowering))' \
+// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-generic-vectorization,iree-spirv-initial-vector-lowering,iree-codegen-hoist-redundant-vector-transfers,iree-spirv-final-vector-lowering))' \
 // RUN:   %s | FileCheck %s
 
 func.func @ncw_conv_1d(%input: tensor<2x4x4xf32>, %filter: tensor<4x4x1xf32>, %init: tensor<2x4x4xf32>) -> tensor<2x4x4xf32> {
@@ -15,7 +15,7 @@ func.func @ncw_conv_1d(%input: tensor<2x4x4xf32>, %filter: tensor<4x4x1xf32>, %i
 //  CHECK-COUNT-8:   vector.transfer_read %[[INPUT]]{{.+}} : tensor<2x4x4xf32>, vector<4xf32>
 // CHECK-COUNT-16:   vector.transfer_read %[[FILTER]]{{.+}} : tensor<4x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:   vector.transfer_read %[[INIT]]{{.+}} : tensor<2x4x4xf32>, vector<4xf32>
-// CHECK-COUNT-16:   vector.extract %{{.+}}[0] : vector<1xf32>
+// CHECK-COUNT-16:   vector.extract %{{.+}}[0] : f32 from vector<1xf32>
 //      CHECK-NOT:   vector.insert
 // CHECK-COUNT-32:   vector.fma {{.+}} : vector<4xf32>
 //      CHECK-NOT:   vector.insert

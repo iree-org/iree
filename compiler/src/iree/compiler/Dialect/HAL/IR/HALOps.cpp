@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -111,6 +112,204 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
                           p << "]";
                         });
   p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<TargetConditionRegion>($body)
+//===----------------------------------------------------------------------===//
+
+static FunctionType getTargetConditionRegionType(MLIRContext *context) {
+  return FunctionType::get(context,
+                           {
+                               IREE::HAL::DeviceType::get(context),
+                           },
+                           {
+                               IntegerType::get(context, 1),
+                           });
+}
+
+static LogicalResult verifyTargetConditionRegion(Operation *op,
+                                                 Region &region) {
+  // Ignore if empty.
+  if (region.empty())
+    return success();
+
+  // Verify region takes a !hal.device.
+  if (region.getNumArguments() != 1 ||
+      !isa<IREE::HAL::DeviceType>(region.getArgumentTypes().front())) {
+    return op->emitOpError()
+           << "target condition region must take a !hal.device";
+  }
+
+  // Verify i1 return.
+  for (auto returnOp : region.getOps<IREE::HAL::ReturnOp>()) {
+    if (returnOp.getNumOperands() != 1) {
+      return returnOp.emitOpError()
+             << "target condition region must return a single i1 result";
+    }
+    for (auto returnType : returnOp.getOperandTypes()) {
+      if (!returnType.isInteger(1)) {
+        return returnOp.emitOpError()
+               << "target condition region must return a single i1 result";
+      }
+    }
+  }
+
+  return success();
+}
+
+static ParseResult parseTargetConditionRegion(OpAsmParser &parser,
+                                              Region &body) {
+  SmallVector<OpAsmParser::Argument> args;
+  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
+                                      /*allowType=*/true,
+                                      /*allowAttrs=*/true))) {
+    return failure();
+  }
+
+  SmallVector<Type> returnTypes;
+  if (failed(parser.parseArrowTypeList(returnTypes))) {
+    return failure();
+  }
+  if (returnTypes.size() != 1 ||
+      !llvm::all_of(returnTypes, [](Type type) { return type.isInteger(1); })) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "target condition region must return one i1";
+  }
+
+  return parser.parseRegion(body, args, /*enableNameShadowing=*/false);
+}
+
+static void printTargetConditionRegion(OpAsmPrinter &p, Operation *op,
+                                       Region &body) {
+  if (body.empty())
+    return;
+  p << "(";
+  llvm::interleaveComma(body.getArguments(), p,
+                        [&](BlockArgument arg) { p.printRegionArgument(arg); });
+  p << ")";
+  p.printArrowTypeList(TypeRange{IntegerType::get(body.getContext(), 1)});
+  p << " ";
+  p.printRegion(body, /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
+}
+
+//===----------------------------------------------------------------------===//
+// custom<ConditionalTargetRegions>($targets, $objects, $target_regions)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseConditionalTargetRegions(
+    OpAsmParser &parser, ArrayAttr &targetsAttr, ArrayAttr &objectsAttr,
+    SmallVectorImpl<std::unique_ptr<Region>> &targetRegions) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> targetAttrs;
+  SmallVector<Attribute> objectsAttrs;
+  do {
+    IREE::HAL::ExecutableTargetAttr targetAttr;
+    if (failed(parser.parseAttribute(targetAttr)))
+      return failure();
+    targetAttrs.push_back(targetAttr);
+    std::unique_ptr<Region> targetRegion = std::make_unique<Region>();
+    if (succeeded(parser.parseOptionalKeyword("if"))) {
+      if (failed(parseTargetConditionRegion(parser, *targetRegion)))
+        return failure();
+    }
+    targetRegions.emplace_back(std::move(targetRegion));
+    if (failed(parser.parseEqual()))
+      return failure();
+    ArrayAttr targetObjectsAttr;
+    if (failed(parser.parseAttribute(targetObjectsAttr)))
+      return failure();
+    objectsAttrs.push_back(targetObjectsAttr);
+  } while (succeeded(parser.parseOptionalComma()));
+  targetsAttr = builder.getArrayAttr(targetAttrs);
+  objectsAttr = builder.getArrayAttr(objectsAttrs);
+  return success();
+}
+
+static void
+printConditionalTargetRegions(OpAsmPrinter &p, Operation *op,
+                              ArrayAttr targetsAttr, ArrayAttr objectsAttr,
+                              MutableArrayRef<Region> targetRegions) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(targetsAttr.getAsRange<IREE::HAL::ExecutableTargetAttr>(),
+                      objectsAttr.getAsRange<ArrayAttr>(), targetRegions),
+      [&](auto it) {
+        auto [targetAttr, targetObjectsAttr, targetRegion] = it;
+        p.printAttribute(targetAttr);
+        if (!targetRegion.empty()) {
+          p << " if";
+          printTargetConditionRegion(p, op, targetRegion);
+        }
+        p << " = ";
+        p.printAttribute(targetObjectsAttr);
+      },
+      [&]() {
+        p << ",";
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<WorkgroupCountRegion>($body)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseWorkgroupCountRegion(OpAsmParser &parser,
+                                             Region &body) {
+  SmallVector<OpAsmParser::Argument> args;
+  if (failed(parser.parseArgumentList(args, AsmParser::Delimiter::Paren,
+                                      /*allowType=*/true,
+                                      /*allowAttrs=*/true))) {
+    return failure();
+  }
+
+  // Return types must be 3 dimensions (workgroup count XYZ).
+  SmallVector<Type> returnTypes;
+  if (failed(parser.parseArrowTypeList(returnTypes))) {
+    return failure();
+  }
+  if (returnTypes.size() != 3 ||
+      !llvm::all_of(returnTypes, [](Type type) { return type.isIndex(); })) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "workgroup count region must return the XYZ dimension counts";
+  }
+
+  // Parse region contents.
+  if (failed(parser.parseRegion(body, args, /*enableNameShadowing=*/false))) {
+    return failure();
+  }
+
+  // Verify the return types match.
+  for (auto returnOp : body.getOps<IREE::HAL::ReturnOp>()) {
+    for (auto [resultType, returnType] :
+         llvm::zip_equal(returnTypes, returnOp.getOperandTypes())) {
+      if (resultType != returnType) {
+        return returnOp.emitOpError()
+               << "operands do not match expected region return types";
+      }
+    }
+  }
+
+  return success();
+}
+
+static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
+                                      Region &body) {
+  if (body.empty())
+    return;
+  p << "(";
+  llvm::interleaveComma(body.getArguments(), p,
+                        [&](BlockArgument arg) { p.printRegionArgument(arg); });
+  p << ")";
+  Type indexType = IndexType::get(body.getContext());
+  p.printArrowTypeList(TypeRange{indexType, indexType, indexType});
+  p << " ";
+  p.printRegion(body, /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
 }
 
 //===----------------------------------------------------------------------===//
@@ -320,6 +519,125 @@ SmallVector<int64_t> TensorBarrierOp::getTiedResultOperandIndices() {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.dispatch.extern
+//===----------------------------------------------------------------------===//
+
+void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
+                             ValueRange workload, TypeRange resultTypes,
+                             ValueRange resultDims, ValueRange arguments,
+                             ValueRange argumentDims,
+                             ArrayRef<int64_t> tiedOperands,
+                             ArrayRef<NamedAttribute> attributes) {
+  state.addTypes(resultTypes);
+  state.addOperands(workload);
+  state.addOperands(arguments);
+  state.addOperands(argumentDims);
+  state.addOperands(resultDims);
+  state.addAttributes(attributes);
+  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                     builder.getIndexArrayAttr(tiedOperands));
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
+                         static_cast<int32_t>(workload.size()),
+                         static_cast<int32_t>(arguments.size()),
+                         static_cast<int32_t>(argumentDims.size()),
+                         static_cast<int32_t>(resultDims.size()),
+                     }));
+
+  // NOTE: workgroup count region is empty; callers are expected to populate it.
+  state.addRegion();
+}
+
+// Verifies that |dynamicDims| contains the appropriate number of dims for all
+// of the dynamic dimensions in |values|.
+static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
+                                         ValueRange dynamicDims) {
+  unsigned requiredCount = 0;
+  for (auto value : values) {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(value.getType())) {
+      requiredCount += shapedType.getNumDynamicDims();
+    }
+  }
+  if (dynamicDims.size() != requiredCount) {
+    return op->emitOpError()
+           << "value set has " << requiredCount
+           << " dynamic dimensions but only " << dynamicDims.size()
+           << " dimension values are attached";
+  }
+  return success();
+}
+
+static LogicalResult
+verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
+  // Verify the workload operands match the expected capture args.
+  auto regionArguments =
+      llvm::make_filter_range(region.getArgumentTypes(), [](Type type) {
+        return !type.isa<IREE::HAL::DeviceType>();
+      });
+  if (workload.size() != llvm::range_size(regionArguments)) {
+    return op->emitOpError()
+           << "workload operands and workgroup count args mismatch ("
+           << workload.size() << " vs " << llvm::range_size(regionArguments)
+           << ")";
+  }
+  for (auto [index, values] :
+       llvm::enumerate(llvm::zip_equal(workload, regionArguments))) {
+    auto [workloadValue, capturedType] = values;
+    if (workloadValue.getType() != capturedType) {
+      return op->emitOpError()
+             << "workload value " << index << " type mismatch; operand is "
+             << workloadValue.getType() << " but region captures "
+             << capturedType;
+    }
+  }
+  return success();
+}
+
+LogicalResult DispatchExternOp::verify() {
+  Operation *op = getOperation();
+
+  if (failed(verifyOpDynamicDims(getOperation(), getArguments(),
+                                 getArgumentDims())) ||
+      failed(
+          verifyOpDynamicDims(getOperation(), getResults(), getResultDims()))) {
+    return failure();
+  }
+
+  auto verifyIOType = [&](Type type) -> LogicalResult {
+    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+      if (shapedType.getElementType().isIndex()) {
+        return op->emitOpError() << "I/O type " << type
+                                 << " is invalid: index types must not cross "
+                                    "the dispatch boundary";
+      }
+    }
+    return success();
+  };
+  for (auto type : getOperandTypes()) {
+    if (failed(verifyIOType(type)))
+      return failure();
+  }
+  for (auto type : getResultTypes()) {
+    if (failed(verifyIOType(type)))
+      return failure();
+  }
+
+  if (failed(
+          verifyWorkgroupCountRegion(op, getWorkload(), getWorkgroupCount()))) {
+    return failure();
+  }
+
+  return success();
+}
+
+std::pair<unsigned, unsigned>
+DispatchExternOp::getTiedOperandsIndexAndLength() {
+  return getODSOperandIndexAndLength(1);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.allocator.allocate
 //===----------------------------------------------------------------------===//
 
@@ -524,113 +842,6 @@ LogicalResult DeviceQueryOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.device.switch
-//===----------------------------------------------------------------------===//
-
-void DeviceSwitchOp::build(OpBuilder &builder, OperationState &state,
-                           TypeRange resultTypes, Value device,
-                           ArrayRef<Attribute> conditions,
-                           ArrayRef<NamedAttribute> attributes) {
-  state.addOperands({device});
-  state.addAttribute("conditions", builder.getArrayAttr(conditions));
-  for (size_t i = 0; i < conditions.size(); ++i) {
-    state.addRegion();
-  }
-  state.addTypes(resultTypes);
-  state.addAttributes(attributes);
-}
-
-ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::UnresolvedOperand device;
-  Type deviceType;
-  if (failed(parser.parseLess()) || failed(parser.parseOperand(device)) ||
-      failed(parser.parseColonType(deviceType)) ||
-      failed(parser.resolveOperand(device, deviceType, result.operands)) ||
-      failed(parser.parseGreater()) ||
-      failed(parser.parseOptionalArrowTypeList(result.types))) {
-    return failure();
-  }
-
-  // Parses each switch condition attribute and region, like:
-  // #hal.device.match.id<"vulkan-v1.?-*"> {
-  //   hal.return %c1 : i32
-  // }, ...
-  SmallVector<Attribute> conditionAttrs;
-  do {
-    Attribute conditionAttr;
-    NamedAttrList dummyAttrs;
-    if (failed(parser.parseAttribute(conditionAttr, "condition", dummyAttrs))) {
-      return failure();
-    }
-    conditionAttrs.push_back(conditionAttr);
-    SmallVector<OpAsmParser::Argument> regionArgs;
-    auto *regionBody = result.addRegion();
-    if (failed(parser.parseRegion(*regionBody, regionArgs))) {
-      return failure();
-    }
-  } while (succeeded(parser.parseOptionalComma()));
-  result.addAttribute("conditions",
-                      ArrayAttr::get(result.getContext(), conditionAttrs));
-
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-void DeviceSwitchOp::print(OpAsmPrinter &p) {
-  Operation *op = getOperation();
-  p << "<";
-  p.printOperand(getDevice());
-  p << " : ";
-  p.printType(getDevice().getType());
-  p << ">";
-  p.printOptionalArrowTypeList(getResultTypes());
-  p << "\n";
-  p.getStream().indent(4);
-  interleave(
-      llvm::zip_equal(getConditions(), getConditionRegions()),
-      [&](std::tuple<Attribute, Region &> it) {
-        auto &conditionAttr = std::get<0>(it);
-        auto &conditionRegion = std::get<1>(it);
-        p.printAttribute(conditionAttr);
-        p << " ";
-        p.printRegion(conditionRegion,
-                      /*printEntryBlockArgs=*/false,
-                      /*printBlockTerminators=*/true);
-      },
-      [&]() {
-        p << ",\n";
-        p.getStream().indent(4);
-      });
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
-                                     /*elidedAttrs=*/{"conditions"});
-}
-
-LogicalResult DeviceSwitchOp::verify() {
-  DeviceSwitchOp op = *this;
-  if (op.getConditions().size() != op.getConditionRegions().size()) {
-    return op.emitOpError() << "requires conditions and regions be matched 1:1";
-  } else if (op.getConditionRegions().empty()) {
-    return op.emitOpError() << "requires at least one condition";
-  }
-  for (auto &region : op.getConditionRegions()) {
-    for (auto &block : region) {
-      if (auto returnOp =
-              dyn_cast_or_null<IREE::HAL::ReturnOp>(block.getTerminator())) {
-        if (!std::equal(returnOp.getOperandTypes().begin(),
-                        returnOp.getOperandTypes().end(),
-                        op.getResultTypes().begin())) {
-          return op.emitOpError()
-                 << "requires all regions return the same types";
-        }
-      }
-    }
-  }
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // hal.device.queue.*
 //===----------------------------------------------------------------------===//
 
@@ -674,6 +885,21 @@ LogicalResult DeviceQueueWriteOp::verify() {
 
 LogicalResult DeviceQueueExecuteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable.source
+//===----------------------------------------------------------------------===//
+
+LogicalResult ExecutableSourceOp::verify() {
+  ExecutableSourceOp op = *this;
+
+  auto conditionOps = getOps<IREE::HAL::ExecutableConditionOp>();
+  if (llvm::range_size(conditionOps) > 1)
+    return op.emitOpError()
+           << "only one condition op is allowed in an executable";
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -921,15 +1147,108 @@ void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
   state.addAttribute("target", target);
 }
 
+LogicalResult ExecutableVariantOp::verify() {
+  ExecutableVariantOp op = *this;
+
+  auto conditionOps = getOps<IREE::HAL::ExecutableConditionOp>();
+  if (llvm::range_size(conditionOps) > 1)
+    return op.emitOpError() << "only one condition op is allowed in a variant";
+
+  return success();
+}
+
 DenseMap<Attribute, int> ExecutableVariantOp::gatherConstantOrdinals() {
   DenseMap<Attribute, int> map;
-  for (auto blockOp : getOps<IREE::HAL::ExecutableConstantBlockOp>()) {
+  for (auto blockOp : getConstantBlockOps()) {
     int baseCount = map.size();
     for (auto [i, keyAttr] : llvm::enumerate(blockOp.getKeys())) {
       map.try_emplace(keyAttr, baseCount + i);
     }
   }
   return map;
+}
+
+Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
+  // Base case dependent on target information.
+  auto matchAttr =
+      cast<IREE::HAL::MatchAttrInterface>(getTarget().getMatchExpression());
+  auto selected = matchAttr.buildConditionExpression(getLoc(), device, builder);
+
+  // Factor in variant condition region, if any.
+  auto conditionOp = getConditionOp();
+  if (conditionOp) {
+    auto regionOp = builder.create<scf::ExecuteRegionOp>(conditionOp.getLoc(),
+                                                         builder.getI1Type());
+
+    IRMapping mapper;
+    mapper.map(conditionOp.getRegion().getArgument(0), device);
+    conditionOp.getRegion().cloneInto(&regionOp.getRegion(), mapper);
+
+    for (auto returnOp :
+         llvm::make_early_inc_range(regionOp.getOps<IREE::HAL::ReturnOp>())) {
+      OpBuilder(returnOp).create<scf::YieldOp>(returnOp.getLoc(),
+                                               returnOp.getOperands());
+      returnOp.erase();
+    }
+
+    selected = builder.create<arith::AndIOp>(getLoc(), selected,
+                                             regionOp.getResult(0));
+  }
+
+  return selected;
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable.condition
+//===----------------------------------------------------------------------===//
+
+LogicalResult ExecutableConditionOp::verify() {
+  ExecutableConditionOp op = *this;
+  return verifyTargetConditionRegion(op, op.getBody());
+}
+
+void ExecutableConditionOp::build(OpBuilder &builder, OperationState &result,
+                                  ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute(
+      "function_type",
+      TypeAttr::get(getTargetConditionRegionType(builder.getContext())));
+  result.addRegion();
+  result.attributes.append(attrs.begin(), attrs.end());
+}
+
+ParseResult ExecutableConditionOp::parse(OpAsmParser &parser,
+                                         OperationState &result) {
+  if (parseTargetConditionRegion(parser, *result.addRegion()))
+    return failure();
+  result.addAttribute(
+      "function_type",
+      TypeAttr::get(getTargetConditionRegionType(parser.getContext())));
+  if (parser.parseOptionalAttrDictWithKeyword(result.attributes))
+    return failure();
+  return success();
+}
+
+void ExecutableConditionOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
+  printTargetConditionRegion(p, op, getBody());
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
+                                     /*elidedAttrs=*/{"function_type"});
+}
+
+Block *ExecutableConditionOp::addEntryBlock() {
+  assert(empty() && "function already has an entry block");
+  auto *entry = new Block();
+  auto argTypes = getArgumentTypes();
+  SmallVector<Location> argLocs(argTypes.size(), getLoc());
+  entry->addArguments(argTypes, argLocs);
+  push_back(entry);
+  return entry;
+}
+
+Block *ExecutableConditionOp::addBlock() {
+  assert(!empty() && "function should at least have an entry block");
+  push_back(new Block());
+  return &back();
 }
 
 //===----------------------------------------------------------------------===//

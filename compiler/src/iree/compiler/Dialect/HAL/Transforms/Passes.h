@@ -90,9 +90,6 @@ createAssignTargetDevicesPass(const TargetBackendRegistry &targetRegistry,
 // removed.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFixupLegacySyncPass();
 
-// Outlines hal.device.switch conditions into functions and inlines conditions.
-std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass();
-
 // Finds hal.device.query ops and creates variables initialized on startup.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createMemoizeDeviceQueriesPass();
 
@@ -208,7 +205,6 @@ inline void registerHALPasses() {
   createConvertToHALPass();
   createDumpExecutableSourcesPass("");
   createElideRedundantCommandsPass();
-  createInlineDeviceSwitchesPass();
   createFixupLegacySyncPass();
   createLinkExecutablesPass(TargetBackendRegistry::getGlobal());
   createLinkTargetExecutablesPass(TargetBackendRegistry::getGlobal(), "");

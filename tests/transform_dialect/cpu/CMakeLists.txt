@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "eltwise_reduction_eltwise.mlir"
     "fold_tensor_slice_into_transfer.mlir"
     "matmul.mlir"
+    "matmul_library_call.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
@@ -29,8 +30,8 @@ iree_lit_test_suite(
     iree-run-module
   DATA
     attention_codegen_spec.mlir
-    matmul_codegen_custom_dispatch_formation_spec.mlir
     matmul_codegen_default_spec.mlir
+    transform_library.mlir
   LABELS
     "noasan"
     "nomsan"

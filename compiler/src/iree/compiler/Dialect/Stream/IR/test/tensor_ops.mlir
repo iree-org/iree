@@ -135,3 +135,19 @@ func.func @tensorStoreRank0(%arg0: !stream.resource<staging>, %arg1: index, %arg
   %0 = stream.tensor.store %arg2, %arg0 : f32 -> tensor<f32> in %arg0 as !stream.resource<staging>{%arg1}
   return %0 : !stream.resource<staging>
 }
+
+// -----
+
+// CHECK-LABEL: @tensorTrace
+//  CHECK-SAME: (%[[TENSOR0:.+]]: !stream.resource<staging>, %[[TENSOR0_SIZE:.+]]: index, %[[TENSOR1:.+]]: !stream.resource<staging>, %[[TENSOR1_SIZE:.+]]: index, %[[TENSOR1_DIM0:.+]]: index, %[[TENSOR1_DIM2:.+]]: index)
+func.func @tensorTrace(%tensor0: !stream.resource<staging>, %tensor0_size: index, %tensor1: !stream.resource<staging>, %tensor1_size: index, %tensor1_dim0: index, %tensor1_dim2: index) {
+  //      CHECK: stream.tensor.trace "FOOBAR" = [
+  // CHECK-NEXT:   %[[TENSOR0]] : tensor<5xf32> in !stream.resource<staging>{%[[TENSOR0_SIZE]]},
+  // CHECK-NEXT:   %[[TENSOR1]] : tensor<?x3x?xi32>{%[[TENSOR1_DIM0]], %[[TENSOR1_DIM2]]} in !stream.resource<staging>{%[[TENSOR1_SIZE]]}
+  // CHECK-NEXT: ]
+  stream.tensor.trace "FOOBAR" = [
+    %tensor0 : tensor<5xf32> in !stream.resource<staging>{%tensor0_size},
+    %tensor1 : tensor<?x3x?xi32>{%tensor1_dim0, %tensor1_dim2} in !stream.resource<staging>{%tensor1_size}
+  ]
+  return
+}

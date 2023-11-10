@@ -1628,6 +1628,37 @@ static iree_status_t iree_vm_bytecode_dispatch(
       }
     });
 
+    DISPATCH_OP(CORE, BranchTable, {
+      int32_t index = VM_DecOperandRegI32("index");
+      int32_t default_block_pc = VM_DecBranchTarget("default_dest");
+      const iree_vm_register_remap_list_t* default_remap_list =
+          VM_DecBranchOperands("default_operands");
+      uint16_t table_size = VM_DecConstI16("table_size");
+      if (index < 0 || index >= table_size) {
+        // Out-of-bounds index; jump to default block.
+        pc = default_block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
+        if (IREE_UNLIKELY(default_remap_list->size > 0)) {
+          iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                           default_remap_list);
+        }
+      } else {
+        // In-bounds index; decode until we hit the case and branch as the
+        // cases are all variable length and we can't directly index.
+        for (uint16_t i = 0; i < index; ++i) {
+          VM_DecBranchTarget("case_dest");
+          VM_DecBranchOperands("case_operands");
+        }
+        int32_t case_block_pc = VM_DecBranchTarget("case_dest");
+        const iree_vm_register_remap_list_t* case_remap_list =
+            VM_DecBranchOperands("case_operands");
+        pc = case_block_pc + IREE_VM_BLOCK_MARKER_SIZE;  // skip block marker
+        if (IREE_UNLIKELY(case_remap_list->size > 0)) {
+          iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
+                                                           case_remap_list);
+        }
+      }
+    });
+
     DISPATCH_OP(CORE, Call, {
       int32_t function_ordinal = VM_DecFuncAttr("callee");
       const iree_vm_register_list_t* src_reg_list =

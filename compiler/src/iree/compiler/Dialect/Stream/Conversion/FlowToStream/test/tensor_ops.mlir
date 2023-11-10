@@ -46,6 +46,20 @@ func.func @tensorReshapeWithMultipleUses(%input: tensor<5x24x48xf32>)
 
 // -----
 
+// CHECK-LABEL: @tensorBitCastWithSingleUse
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
+func.func @tensorBitCastWithSingleUse(%input: tensor<5x24x48xi8>) -> tensor<30x2x192xi4> {
+  // CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<30x2x192xi4> : index
+  // CHECK: %[[BITCAST:.+]] = stream.tensor.clone %[[INPUT]] : tensor<5x24x48xi8> in !stream.resource<*>{%[[INPUT_SIZE]]} -> tensor<30x2x192xi4> in !stream.resource<*>{%[[RESULT_SIZE]]}
+  %0 = flow.tensor.bitcast %input : tensor<5x24x48xi8> -> tensor<30x2x192xi4>
+  // CHECK: %[[RESULT:.+]] = stream.tensor.clone %[[BITCAST]] : tensor<30x2x192xi4> in !stream.resource<*>{%[[RESULT_SIZE]]} -> tensor<30x2x192xi4> in !stream.resource<*>{%[[RESULT_SIZE]]}
+  %1 = flow.tensor.clone %0 : tensor<30x2x192xi4>
+  // CHECK: return %[[RESULT]], %[[RESULT_SIZE]] : !stream.resource<*>, index
+  return %1 : tensor<30x2x192xi4>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorAlloca
 //  CHECK-SAME: (%[[DIM0:.+]]: index)
 func.func @tensorAlloca(%dim0: index) -> tensor<?x0xf32> {
@@ -146,4 +160,22 @@ func.func @tensorStore(%target : tensor<2x3xi32>) -> tensor<2x3xi32> {
   }
   // CHECK: return %[[T2]]
   return %0 : tensor<2x3xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorTrace
+//  CHECK-SAME: (%[[TENSOR0:.+]]: !stream.resource<*>, %[[TENSOR0_SIZE:.+]]: index, %[[TENSOR1:.+]]: !stream.resource<*>, %[[TENSOR1_SIZE:.+]]: index, %[[TENSOR1_DIM0:.+]]: index, %[[TENSOR1_DIM2:.+]]: index)
+func.func @tensorTrace(%tensor0: tensor<5xf32>, %tensor1: tensor<?x3x?xi32>, %tensor1_dim0: index, %tensor1_dim2: index) {
+  // CHECK-DAG: %[[TENSOR0_STAGED:.+]] = stream.async.transfer %[[TENSOR0]] : !stream.resource<*>{%[[TENSOR0_SIZE]]} -> !stream.resource<staging>{%[[TENSOR0_SIZE]]}
+  // CHECK-DAG: %[[TENSOR1_STAGED:.+]] = stream.async.transfer %[[TENSOR1]] : !stream.resource<*>{%[[TENSOR1_SIZE]]} -> !stream.resource<staging>{%[[TENSOR1_SIZE]]}
+  //      CHECK: stream.tensor.trace "FOOBAR" = [
+  // CHECK-NEXT:   %[[TENSOR0_STAGED]] : tensor<5xf32> in !stream.resource<staging>{%[[TENSOR0_SIZE]]},
+  // CHECK-NEXT:   %[[TENSOR1_STAGED]] : tensor<?x3x?xi32>{%[[TENSOR1_DIM0]], %[[TENSOR1_DIM2]]} in !stream.resource<staging>{%[[TENSOR1_SIZE]]}
+  // CHECK-NEXT: ]
+  flow.tensor.trace "FOOBAR" = [
+    %tensor0 : tensor<5xf32>,
+    %tensor1 : tensor<?x3x?xi32>{%tensor1_dim0, %tensor1_dim2}
+  ]
+  return
 }

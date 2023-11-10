@@ -54,8 +54,7 @@ iree_status_t iree_hal_metal_staging_buffer_reserve(iree_hal_metal_staging_buffe
                                                     iree_host_size_t alignment,
                                                     iree_byte_span_t* out_reservation,
                                                     uint32_t* out_offset) {
-  iree_host_size_t aligned_length = iree_host_align(length, alignment);
-  if (aligned_length > staging_buffer->capacity) {
+  if (length > staging_buffer->capacity) {
     // This will never fit in the staging buffer.
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "reservation (%" PRIhsz " bytes) exceeds the maximum capacity of "
@@ -64,17 +63,17 @@ iree_status_t iree_hal_metal_staging_buffer_reserve(iree_hal_metal_staging_buffe
   }
 
   iree_slim_mutex_lock(&staging_buffer->offset_mutex);
-  uint32_t offset = staging_buffer->offset;
-  if (offset + aligned_length > staging_buffer->capacity) {
+  uint32_t aligned_offset = iree_host_align(staging_buffer->offset, alignment);
+  if (aligned_offset + length > staging_buffer->capacity) {
     iree_slim_mutex_unlock(&staging_buffer->offset_mutex);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "failed to reserve %" PRIhsz " bytes in staging buffer", length);
   }
-  staging_buffer->offset += aligned_length;
+  staging_buffer->offset = aligned_offset + length;
   iree_slim_mutex_unlock(&staging_buffer->offset_mutex);
 
-  *out_reservation = iree_make_byte_span(staging_buffer->host_buffer + offset, aligned_length);
-  *out_offset = offset;
+  *out_reservation = iree_make_byte_span(staging_buffer->host_buffer + aligned_offset, length);
+  *out_offset = aligned_offset;
 
   return iree_ok_status();
 }

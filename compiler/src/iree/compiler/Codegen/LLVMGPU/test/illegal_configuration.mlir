@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration=true})))" --verify-diagnostics --split-input-file %s
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" --verify-diagnostics --split-input-file %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
@@ -10,7 +10,7 @@
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [32 : index, 8 : index, 8 : index]
@@ -42,7 +42,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [32 : index, 8 : index, 2 : index]
@@ -74,7 +74,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 10 : index]
@@ -106,7 +106,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [48 : index, 2 : index, 1 : index]
@@ -138,7 +138,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 2 : index]
@@ -170,7 +170,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
@@ -202,7 +202,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [128 : index, 1 : index, 1 : index]
@@ -234,7 +234,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
@@ -266,7 +266,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
@@ -299,7 +299,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @batch_matmul_func  {
-  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
@@ -357,7 +357,7 @@ builtin.module {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [128 : index, 1 : index, 1 : index]
@@ -390,7 +390,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [128 : index, 1 : index, 1 : index]
@@ -422,7 +422,7 @@ hal.executable private @matmul_tensors {
   ]>
 ]>
 hal.executable private @matmul_tensors {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export @illegal layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [128 : index, 1 : index, 1 : index]

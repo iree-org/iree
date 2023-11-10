@@ -14,15 +14,15 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "annotate_dispatches.mlir"
     "capture_dispatch_dynamic_dims.mlir"
     "cleanup_numeric_narrowing.mlir"
     "cleanup_tensor_shapes.mlir"
     "clone_producers_into_dispatch_regions.mlir"
     "collapse_linalg_generic_on_tensors.mlir"
-    "conv1x1_to_matmul.mlir"
+    "collapse_reduction.mlir"
     "convert_region_to_workgroups.mlir"
     "deduplicate_executables.mlir"
-    "detach_elementwise_from_named_ops.mlir"
     "dispatch_linalg_on_tensors.mlir"
     "dispatch_linalg_on_tensors_default.mlir"
     "dispatch_linalg_on_tensors_fusion_with_transpose.mlir"
@@ -48,8 +48,6 @@ iree_lit_test_suite(
     "pad_fusion_with_producer.mlir"
     "pipeline_tests.mlir"
     "raise_special_ops.mlir"
-    "remove_zero_extent_tensors.mlir"
-    "set_encoding.mlir"
     "strip_signedness.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"
     "top_level_scf_to_cfg.mlir"

@@ -31,6 +31,9 @@
 #define VM_ParseConstI8(name) \
   OP_I8(0);                   \
   ++pc;
+#define VM_ParseConstI16(name) \
+  OP_I16(0);                   \
+  pc += 2;
 #define VM_ParseConstI32(name) \
   OP_I32(0);                   \
   pc += 4;
@@ -1585,6 +1588,31 @@ iree_status_t iree_vm_bytecode_disassemble_op(
           iree_string_builder_append_format(b, "), ^%08X(", false_block_pc));
       EMIT_REMAP_LIST(false_remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
+      break;
+    }
+
+    DISASM_OP(CORE, BranchTable) {
+      uint16_t index_reg = VM_ParseOperandRegI32("index");
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, "vm.br_table "));
+      EMIT_I32_REG_NAME(index_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      int32_t default_block_pc = VM_ParseBranchTarget("default_dest");
+      const iree_vm_register_remap_list_t* default_remap_list =
+          VM_ParseBranchOperands("default_operands");
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          b, " { default: ^%08X(", default_block_pc));
+      EMIT_REMAP_LIST(default_remap_list);
+      uint16_t table_size = VM_ParseConstI16(table_size);
+      for (uint16_t i = 0; i < table_size; ++i) {
+        int32_t case_block_pc = VM_ParseBranchTarget("case_dest");
+        const iree_vm_register_remap_list_t* case_remap_list =
+            VM_ParseBranchOperands("case_operands");
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            b, "), %u: ^%08X(", i, case_block_pc));
+        EMIT_REMAP_LIST(case_remap_list);
+      }
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ") }"));
       break;
     }
 

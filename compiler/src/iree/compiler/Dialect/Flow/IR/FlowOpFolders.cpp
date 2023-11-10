@@ -703,6 +703,34 @@ void DispatchTensorStoreOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct DeduplicateDispatchEntryRefs final
+    : public OpRewritePattern<DispatchOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DispatchOp dispatchOp,
+                                PatternRewriter &rewriter) const override {
+    auto originalAttr = dispatchOp.getEntryPointsAttr();
+    auto newAttr = deduplicateArrayElements(originalAttr);
+    if (newAttr == originalAttr)
+      return failure();
+    rewriter.updateRootInPlace(
+        dispatchOp, [&]() { dispatchOp.setEntryPointsAttr(newAttr); });
+    return success();
+  }
+};
+
+} // namespace
+
+void DispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                             MLIRContext *context) {
+  results.insert<DeduplicateDispatchEntryRefs>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // Tensor ops
 //===----------------------------------------------------------------------===//
 
@@ -835,27 +863,70 @@ OpFoldResult TensorReshapeOp::fold(FoldAdaptor operands) {
   return {};
 }
 
+//===----------------------------------------------------------------------===//
+// flow.tensor.bitcast
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorBitCastOp::fold(FoldAdaptor operands) {
+  auto sourceType = llvm::cast<ShapedType>(getSource().getType());
+  auto resultType = llvm::cast<ShapedType>(getResult().getType());
+  if (sourceType.getElementType() != resultType.getElementType()) {
+    // Element type mismatch, this is a bitcast.
+    return {};
+  }
+  if (compareShapesEqual(sourceType, getSourceDims(), resultType,
+                         getResultDims())) {
+    // Shapes match and this is a no-op so just fold to the source.
+    return getSource();
+  }
+  return {};
+}
+
 namespace {
 
-// Flatten a chain of reshapes (reshape feeding into reshape) such that a
-// reshape only ever pulls from a non-reshape source. This prevents big useless
-// chains and makes it easier to track the original storage for the tensor.
-struct FlattenTensorReshapeChain : public OpRewritePattern<TensorReshapeOp> {
-  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
+// Flatten a chain of reshapes or bitcasts (reshape/bitcast feeding into
+// reshape or bitcast) such that a reshape only ever pulls from a non-reshape
+// source. This prevents big useless chains and makes it easier to track the
+// original storage for the tensor.
+template <typename CastOpTy>
+struct FlattenTensorCastLikeChain : public OpRewritePattern<CastOpTy> {
+  using OpRewritePattern<CastOpTy>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
+  LogicalResult matchAndRewrite(CastOpTy reshapeOp,
                                 PatternRewriter &rewriter) const override {
-    auto sourceOp = dyn_cast_or_null<TensorReshapeOp>(
-        reshapeOp.getSource().getDefiningOp());
-    if (!sourceOp)
-      return failure();
-
     // We want the same result value/shape but to source from the ancestor. We
     // need to pull any dynamic dims from that as we don't care about the
     // intermediate reshapes.
-    rewriter.replaceOpWithNewOp<TensorReshapeOp>(
-        reshapeOp, reshapeOp.getResult().getType(), sourceOp.getSource(),
-        sourceOp.getSourceDims(), reshapeOp.getResultDims());
+    Value source;
+    ValueRange sourceDims;
+    if (auto sourceOp = dyn_cast_or_null<TensorReshapeOp>(
+            reshapeOp.getSource().getDefiningOp())) {
+      source = sourceOp.getSource();
+      sourceDims = sourceOp.getSourceDims();
+    } else if (auto sourceOp = dyn_cast_or_null<TensorBitCastOp>(
+                   reshapeOp.getSource().getDefiningOp())) {
+      source = sourceOp.getSource();
+      sourceDims = sourceOp.getSourceDims();
+    }
+
+    if (!source) {
+      return failure();
+    }
+
+    auto sourceType = llvm::cast<ShapedType>(source.getType());
+    auto resultType = llvm::cast<ShapedType>(reshapeOp.getResult().getType());
+
+    // If the element types don't match, this is a bitcast, else we can use
+    // reshape.
+    if (sourceType.getElementType() != resultType.getElementType()) {
+      rewriter.replaceOpWithNewOp<TensorBitCastOp>(
+          reshapeOp, reshapeOp.getResult().getType(), source, sourceDims,
+          reshapeOp.getResultDims());
+    } else {
+      rewriter.replaceOpWithNewOp<TensorReshapeOp>(
+          reshapeOp, reshapeOp.getResult().getType(), source, sourceDims,
+          reshapeOp.getResultDims());
+    }
     return success();
   }
 };
@@ -953,7 +1024,19 @@ void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ReplaceOpIfTensorResultZeroElements<TensorReshapeOp, 0>>(
       context);
   results.insert<ReplaceOpIfTensorOperandEmpty<TensorReshapeOp, 0, 0>>(context);
-  results.insert<FlattenTensorReshapeChain>(context);
+  results.insert<FlattenTensorCastLikeChain<TensorReshapeOp>>(context);
+  results.insert<ResolveShapedRank>(context);
+  results.insert<ResolveShapedDim>(context);
+}
+
+void TensorBitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<ReplaceOpIfTensorOperandZeroElements<TensorBitCastOp, 0>>(
+      context);
+  results.insert<ReplaceOpIfTensorResultZeroElements<TensorBitCastOp, 0>>(
+      context);
+  results.insert<ReplaceOpIfTensorOperandEmpty<TensorBitCastOp, 0, 0>>(context);
+  results.insert<FlattenTensorCastLikeChain<TensorBitCastOp>>(context);
   results.insert<ResolveShapedRank>(context);
   results.insert<ResolveShapedDim>(context);
 }
