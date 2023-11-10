@@ -31,7 +31,7 @@ LLVM_SRCS = enforce_glob(
 )
 
 LLVM_I4_SRCS = [
-  "f32_to_i4.mlir",
+    "f32_to_i4.mlir",
 ]
 
 iree_check_single_backend_test_suite(
