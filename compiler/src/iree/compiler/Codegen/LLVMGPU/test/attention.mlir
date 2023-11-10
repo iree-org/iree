@@ -40,7 +40,7 @@ hal.executable @_attention_dispatch_0 {
 // CHECK-DAG:    %[[CST_0:.+]] = arith.constant dense<-1.000000e+30> : vector<32xf32>
 // CHECK-DAG:    %[[CST_1:.+]] = arith.constant dense<0.000000e+00> : vector<32xf32>
 // CHECK-DAG:    %[[CST_2:.+]] = arith.constant dense<0.000000e+00> : vector<32x128xf32>
-// CHECK-DAG:    %[[CST_3:.+]] = arith.constant dense<1.000000e+00> : vector<32xf32>
+// CHECK-DAG:    %[[CST_3:.+]] = arith.constant dense<1.000000e+00> : vector<64x32xf32>
 // CHECK-DAG:    %[[CST_4:.+]] = arith.constant 0.000000e+00 : f16
 // CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:    %[[C128:.+]] = arith.constant 128 : index
@@ -139,13 +139,8 @@ hal.executable @_attention_dispatch_0 {
 // CHECK:          %[[D23:.+]] = arith.mulf %[[D22]], %[[ARG2]] : vector<32xf32>
 // CHECK:          %[[D24:.+]] = vector.multi_reduction <add>, %[[D20]], %[[D23]] [1] : vector<32x128xf32> to
 // CHECK-SAME:       vector<32xf32>
-// CHECK:          %[[D25:.+]] = arith.divf %[[CST_3]], %[[D24]] : vector<32xf32>
-// CHECK:          %[[D26:.+]] = vector.broadcast %[[D25]] : vector<32xf32> to vector<128x32xf32>
-// CHECK:          %[[D27:.+]] = vector.transpose %[[D26]], [1, 0] : vector<128x32xf32> to vector<32x128xf32>
-// CHECK:          %[[D28:.+]] = arith.mulf %[[D20]], %[[D27]] : vector<32x128xf32>
-// CHECK:          %[[D29:.+]] = arith.truncf %[[D28]] : vector<32x128xf32> to vector<32x128xf16>
-// CHECK:          %[[D30:.+]] = arith.mulf %[[D23]], %[[D25]] : vector<32xf32>
-// CHECK:          %[[D31:.+]] = vector.broadcast %[[D30]] : vector<32xf32> to vector<64x32xf32>
+// CHECK:          %[[D29:.+]] = arith.truncf %[[D20]] : vector<32x128xf32> to vector<32x128xf16>
+// CHECK:          %[[D31:.+]] = vector.broadcast %[[D22]] : vector<32xf32> to vector<64x32xf32>
 // CHECK:          %[[D33:.+]] = vector.transpose %[[D31]], [1, 0] : vector<64x32xf32> to vector<32x64xf32>
 // CHECK:          %[[D34:.+]] = arith.mulf %[[D33]], %[[ARG3]] : vector<32x64xf32>
 // CHECK:          %[[D35:.+]] = vector.transfer_read %[[ALLOC_11]][%[[C0]], %[[C0]]], %[[CST_4]] {in_bounds = [true,
@@ -159,7 +154,11 @@ hal.executable @_attention_dispatch_0 {
 // CHECK:          gpu.barrier
 // CHECK:          scf.yield %[[D16]], %[[D24]], %[[D39]] : vector<32xf32>, vector<32xf32>, vector<32x64xf32>
 // CHECK:        }
-// CHECK:        %[[D12:.+]] = arith.truncf %[[D11]]#[[D2:.+]] : vector<32x64xf32> to vector<32x64xf16>
+// CHECK:        %[[DSCALE1:.+]] = vector.broadcast %[[D11]]#1 : vector<32xf32> to vector<64x32xf32>
+// CHECK:        %[[DSCALE2:.+]] = arith.divf %[[CST_3]], %[[DSCALE1]] : vector<64x32xf32>
+// CHECK:        %[[DSCALE3:.+]] = vector.transpose %[[DSCALE2]], [1, 0] : vector<64x32xf32> to vector<32x64xf32>
+// CHECK:        %[[DSCALE4:.+]] = arith.mulf %[[DSCALE3]], %[[D11]]#2 : vector<32x64xf32>
+// CHECK:        %[[D12:.+]] = arith.truncf %[[DSCALE4]] : vector<32x64xf32> to vector<32x64xf16>
 // CHECK:        vector.transfer_write %[[D12]], %[[ALLOC_7]][%[[C0]], %[[D8]], %[[C0]]] {in_bounds = [true, true]} :
 // CHECK-SAME:     vector<32x64xf16>, memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:        gpu.barrier
