@@ -222,12 +222,17 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   if (!affinity.specified) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Use mach_task_self when the caller requesting the affinity change is the
+  // thread being changed.
+  mach_port_t thread_port =
+      thread->handle == pthread_self() ? mach_task_self() : thread->mach_port;
+
   // See:
   // https://gist.github.com/Coneko/4234842
   // https://fergofrog.com/code/cbowser/xnu/osfmk/mach/thread_policy.h.html
   // http://www.hybridkernel.com/2015/01/18/binding_threads_to_cores_osx.html
   thread_affinity_policy_data_t policy_data = {affinity.id};
-  thread_policy_set(mach_task_self(), THREAD_AFFINITY_POLICY,
+  thread_policy_set(thread_port, THREAD_AFFINITY_POLICY,
                     (thread_policy_t)(&policy_data),
                     THREAD_AFFINITY_POLICY_COUNT);
 
