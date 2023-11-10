@@ -225,3 +225,49 @@ hal.executable private @unpack_outer_dynamic  {
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   tensor.unpack
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+hal.executable private @elem_pack_ukernels  {
+  hal.executable.variant public @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb", {ukernels = true}>) {
+    hal.executable.export public @elem_pack_ukernels ordinal(0) layout(#hal.pipeline.layout<push_constants = 8, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @elem_pack_ukernels() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x2048xf32>>
+        %1:2 = iree_codegen.query_tile_sizes tensor<1024x2048xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
+        %2 = affine.apply affine_map<()[s0] -> (1024 ceildiv s0)>()[%1#0]
+        %3 = affine.apply affine_map<()[s0] -> (2048 ceildiv s0)>()[%1#1]
+        %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%2, %3, %1#0, %1#1}
+        %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x2048xf32>> -> tensor<1024x2048xf32>
+        %6 = tensor.empty() : tensor<1024x2048xf32>
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<1024x2048xf32>) outs(%6 : tensor<1024x2048xf32>) {
+        ^bb0(%in: f32, %out: f32):
+          %15 = arith.addf %in, %in : f32
+          linalg.yield %15 : f32
+        } -> tensor<1024x2048xf32>
+        %8:2 = iree_codegen.query_tile_sizes tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
+        %9 = affine.apply affine_map<()[s0] -> (1024 ceildiv s0)>()[%8#0]
+        %10 = affine.apply affine_map<()[s0] -> (2048 ceildiv s0)>()[%8#1]
+        %11 = tensor.empty(%9, %10, %8#0, %8#1) : tensor<?x?x?x?xf32>
+        %pack = tensor.pack %7 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [%8#0, %8#1] into %11 : tensor<1024x2048xf32> -> tensor<?x?x?x?xf32>
+        %12:2 = iree_codegen.query_tile_sizes tensor<1024x2048xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1024x2048xf32>>> -> index, index
+        %13 = affine.apply affine_map<()[s0] -> (1024 ceildiv s0)>()[%12#0]
+        %14 = affine.apply affine_map<()[s0] -> (2048 ceildiv s0)>()[%12#1]
+        flow.dispatch.tensor.store %pack, %4, offsets = [0, 0, 0, 0], sizes = [%13, %14, %12#0, %12#1], strides = [1, 1, 1, 1] : tensor<?x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?x?xf32>>{%13, %14, %12#0, %12#1}
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
+//      CHECK: hal.executable.export public @elem_pack_ukernels
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]

@@ -2596,8 +2596,16 @@ setTranslationInfoAndRootConfig(func::FuncOp entryPointFn,
     }
 
     // Set vector level tile sizes for other operations individually.
+    // We allow vmvx with micorkernels having failures because it is okay to not
+    // scale tile sizes. The configuration has dynamic inner tile sizes. It
+    // fails only if the compute op is tensor.pack and inner tile sizes are
+    // dynamic.
+    bool isVMVXWithUkernels =
+        isVMVXBackend(targetAttr) && hasMicrokernels(targetAttr);
+
     if (failed(setLoweringConfigForComputeOps(entryPointFn, computeOps,
-                                              rootOperation))) {
+                                              rootOperation)) &&
+        !isVMVXWithUkernels) {
       return failure();
     }
   }
