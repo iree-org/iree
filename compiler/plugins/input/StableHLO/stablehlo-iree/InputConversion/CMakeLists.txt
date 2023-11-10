@@ -1,0 +1,139 @@
+# TODO(scotttodd): generate this file
+#     Need a mapping for stablehlo-iree::InputConversion::Preprocessing
+
+# Add this tablegen include to support CHLO rewrites with DRR.
+list(APPEND IREE_COMPILER_TABLEGEN_INCLUDE_DIRS "${IREE_SOURCE_DIR}/third_party/stablehlo")
+
+iree_add_all_subdirs()
+
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
+iree_cc_library(
+  NAME
+    PassHeaders
+  COPTS
+    "-Icompiler/plugins/input/StableHLO"
+    "-I$(GENDIR)/compiler/plugins/input/StableHLO"
+  HDRS
+    "PassDetail.h"
+    "Passes.h"
+    "Passes.h.inc"
+    "Rewriters.h"
+  DEPS
+    ::PassesIncGen
+    MLIRPass
+    MLIRTransforms
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    CHLODecompositionPatterns
+  TD_FILE
+    "CHLODecompositionPatterns.td"
+  OUTS
+    --gen-rewriters CHLODecompositionPatterns.h.inc
+)
+
+iree_cc_library(
+  NAME
+    StableHLOLegalization
+  COPTS
+    "-Icompiler/plugins/input/StableHLO"
+    "-I$(GENDIR)/compiler/plugins/input/StableHLO"
+  SRCS
+    "ConvertCollectives.cpp"
+    "LegalizeCHLO.cpp"
+    "LegalizeControlFlow.cpp"
+    "LegalizeShapeComputations.cpp"
+    "LegalizeToLinalgUtils.cpp"
+    "LegalizeToLinalgUtils.h"
+    "MapStableHLOToScalarOp.h"
+    "StableHLOToArith.cpp"
+    "StableHLOToIREEInputDialects.cpp"
+    "StableHLOToLinalg.cpp"
+    "StableHLOToLinalgConvolution.cpp"
+    "StableHLOToLinalgDotProd.cpp"
+    "StableHLOToLinalgExt.cpp"
+    "StableHLOToLinalgPointwise.cpp"
+    "StableHLOToLinalgRandom.cpp"
+    "StableHLOToLinalgReduce.cpp"
+    "TypeConversion.cpp"
+    "TypeConversion.h"
+    "VerifyCompilerInputLegality.cpp"
+  DEPS
+    ::CHLODecompositionPatterns
+    ::PassHeaders
+    ChloOps
+    IREELinalgExtDialect
+    LLVMSupport
+    MLIRAffineDialect
+    MLIRAffineUtils
+    MLIRArithDialect
+    MLIRBufferizationDialect
+    MLIRComplexDialect
+    MLIRControlFlowDialect
+    MLIRFuncDialect
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRLinalgTransforms
+    MLIRLinalgUtils
+    MLIRMLProgramDialect
+    MLIRMathDialect
+    MLIRMemRefDialect
+    MLIRSCFDialect
+    MLIRShapeDialect
+    MLIRShapeOpsTransforms
+    MLIRSparseTensorDialect
+    MLIRSupport
+    MLIRTensorDialect
+    MLIRTensorUtils
+    MLIRTransforms
+    MLIRVectorDialect
+    StablehloBroadcastUtils
+    StablehloOps
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Utils
+    stablehlo-iree::InputConversion::Preprocessing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    InputConversion
+  COPTS
+    "-Icompiler/plugins/input/StableHLO"
+    "-I$(GENDIR)/compiler/plugins/input/StableHLO"
+  HDRS
+    "Passes.h"
+  SRCS
+    "Passes.cpp"
+  DEPS
+    ::PassHeaders
+    ::StableHLOLegalization
+    LLVMSupport
+    MLIRLinalgTransforms
+    MLIRMLProgramDialect
+    MLIRPass
+    MLIRReconcileUnrealizedCasts
+    MLIRSCFToControlFlow
+    MLIRSCFTransforms
+    MLIRShapeOpsTransforms
+    MLIRShapeToStandard
+    MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::InputConversion::Common
+    stablehlo-iree::InputConversion::Preprocessing
+  PUBLIC
+)

@@ -26,26 +26,6 @@ config_setting(
 )
 
 iree_compiler_cc_library(
-    name = "init_input_passes_and_dialects",
-    srcs = [
-        "init_input_dialects.cc",
-        "init_input_passes.cc",
-    ],
-    hdrs = [
-        "init_input_dialects.h",
-        "init_input_passes.h",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/InputConversion/Common",
-        "//compiler/src/iree/compiler/InputConversion/StableHLO",
-        "@llvm-project//mlir:ConversionPasses",
-        "@llvm-project//mlir:IR",
-        "@stablehlo//:chlo_ops",
-        "@stablehlo//:stablehlo_ops",
-    ],
-)
-
-iree_compiler_cc_library(
     name = "init_iree_passes_and_dialects",
     hdrs = [
         "init_iree_dialects.h",
@@ -73,6 +53,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
         "//compiler/src/iree/compiler/Dialect/VMVX/Transforms",
         "//compiler/src/iree/compiler/Dialect/Vulkan/IR",
+        "//compiler/src/iree/compiler/InputConversion/Common",
         "//compiler/src/iree/compiler/Modules/HAL/Inline/IR:HALInlineDialect",
         "//compiler/src/iree/compiler/Modules/HAL/Inline/Transforms",
         "//compiler/src/iree/compiler/Modules/HAL/Loader/IR:HALLoaderDialect",
@@ -140,7 +121,6 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":init_compiler_modules",
-        ":init_input_passes_and_dialects",
         ":init_iree_passes_and_dialects",
         ":init_mlir_passes_and_dialects",
         "//compiler/src/iree/compiler/Codegen",

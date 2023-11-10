@@ -3,6 +3,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "assume_strict_symbols.mlir"
+    "auto_input_conversion.mlir"
     "attention.mlir"
     "bitcast_quant_tensor.mlir"
     "scan.mlir"
@@ -11,5 +12,6 @@ iree_lit_test_suite(
     "torch_to_iree.mlir"
   TOOLS
     FileCheck
+    iree-compile
     iree-opt
 )
