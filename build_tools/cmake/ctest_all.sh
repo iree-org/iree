@@ -168,7 +168,10 @@ if (( ${#excluded_tests[@]} )); then
   ctest_args+=("--exclude-regex ${excluded_tests_regex}")
 fi
 
-echo "*************** Running CTest ***************"
-
 set -x
+
+echo "*************** Running CTest ***************"
 ctest ${ctest_args[@]}
+
+echo "**************** llvm-external-projects tests ***************"
+cmake --build . --target check-iree-dialects -- -k 0
