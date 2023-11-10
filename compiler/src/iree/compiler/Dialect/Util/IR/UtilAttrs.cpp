@@ -230,9 +230,10 @@ static LogicalResult serializeRawData(Location loc,
 // Serializes the raw data of the given |resourceElementsAttr| to |os|.
 // Assumes that the caller knows what they are doing; the raw data must be in
 // the expected endianness and be densely packed.
-static LogicalResult serializeResourceRawData(Location loc,
-                                      DenseResourceElementsAttr resourceElementsAttr,
-                                      llvm::raw_ostream &os) {
+static LogicalResult
+serializeResourceRawData(Location loc,
+                         DenseResourceElementsAttr resourceElementsAttr,
+                         llvm::raw_ostream &os) {
   auto rawData = resourceElementsAttr.getRawHandle().getBlob()->getData();
   os.write(rawData.data(), rawData.size());
   return success();
@@ -356,7 +357,6 @@ serializeGenericFloatElements(DenseFPElementsAttr attr,
   return success();
 }
 
-
 // Expands 8-values per byte raw data from DenseIntElementsAttr to 0/1 byte
 // values in the output.
 static LogicalResult serializeBitIntegerValuesAsBytes(DenseIntElementsAttr attr,
@@ -469,8 +469,8 @@ static LogicalResult serializeGenericResourceElementData(
              << "unhandled integer element bit width " << bitWidth
              << " for type " << resourceElementsAttr.getType();
     }
-  }
-  else if (llvm::isa<FloatType>(resourceElementsAttr.getType().getElementType())) {
+  } else if (llvm::isa<FloatType>(
+                 resourceElementsAttr.getType().getElementType())) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
     // TODO(saienduri): implement float64 support (not neccesary now)
@@ -485,7 +485,8 @@ static LogicalResult serializeGenericResourceElementData(
                             << " for type " << resourceElementsAttr.getType();
     }
   }
-  return emitError(loc) << "unhandled constant type " << resourceElementsAttr.getType();
+  return emitError(loc) << "unhandled constant type "
+                        << resourceElementsAttr.getType();
 }
 
 //===----------------------------------------------------------------------===//
