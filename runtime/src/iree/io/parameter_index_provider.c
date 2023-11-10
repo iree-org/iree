@@ -265,7 +265,8 @@ static iree_status_t iree_io_parameter_index_provider_load(
             {
                 .host_allocation =
                     {
-                        .ptr = host_allocation.data,
+                        .ptr = host_allocation.data +
+                               source_entry->storage.file.offset,
                     },
             },
     };
