@@ -611,7 +611,7 @@ iree_register_external_hal_driver(
 
 iree_register_external_hal_driver(
   NAME
-    rocm
+    webgpu
   SOURCE_DIR 
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
   DRIVER_TARGET

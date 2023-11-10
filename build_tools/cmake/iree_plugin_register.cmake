@@ -78,6 +78,11 @@ function(iree_register_external_hal_driver)
   string(TOUPPER "${_RULE_NAME}" _NAME_SPEC)
   string(REGEX REPLACE "-" "_" _NAME_SPEC ${_NAME_SPEC})
 
+  get_property(_prev_available GLOBAL PROPERTY IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE)
+  if(_RULE_NAME IN_LIST _prev_available)
+    message(SEND_ERROR "iree_register_external_hal_driver(NAME ${_RULE_NAME}) called more than once")
+  endif()
+
   set_property(GLOBAL APPEND PROPERTY IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE "${_RULE_NAME}")
   if(_RULE_OPTIONAL)
     set_proeprty(GLOBAL_PROPERTY "IREE_EXTERNAL_${_NAME_SPEC}_HAL_DRIVER_OPTIONAL" TRUE)
