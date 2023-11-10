@@ -21,6 +21,8 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
+  LABELS
+    "noriscv"
 )
 
 iree_check_single_backend_test_suite(
