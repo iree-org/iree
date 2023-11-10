@@ -22,6 +22,7 @@ LLVM_SRCS = enforce_glob(
     [
         "conv2d.mlir",
         "i4_to_f32.mlir",
+        "f32_to_i4.mlir",
     ],
     include = ["*.mlir"],
     exclude = ["large_linalg_matmul.mlir"],
@@ -52,6 +53,7 @@ VMVX_SRCS = enforce_glob(
     exclude = [
         "large_linalg_matmul.mlir",
         "i4_to_f32.mlir",
+        "f32_to_i4.mlir",
     ],
 )
 
@@ -68,7 +70,10 @@ VULKAN_SRCS = enforce_glob(
         "i4_to_f32.mlir",
     ],
     include = ["*.mlir"],
-    exclude = ["large_linalg_matmul.mlir"],
+    exclude = [
+        "large_linalg_matmul.mlir",
+        "f32_to_i4.mlir",
+    ],
 )
 
 iree_check_single_backend_test_suite(
