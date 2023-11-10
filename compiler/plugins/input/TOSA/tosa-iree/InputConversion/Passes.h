@@ -24,22 +24,26 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager);
 void registerTOSAConversionPassPipeline();
 
 //------------------------------------------------------------------------------
-// Conversions into Linalg
+// Conversions from TOSA into Linalg and other core IREE dialects
 //------------------------------------------------------------------------------
-
-// Verifies a module being input to the core compiler pipeline only contains
-// IR structures that are supported at that level.
-std::unique_ptr<OperationPass<ModuleOp>>
-createVerifyCompilerTOSAInputLegality();
 
 // Set of patterns for materializing TOSA operations to linalg_ext.
 void populateTosaToLinalgExtPatterns(RewritePatternSet *patterns);
 
-// Creates a pass that converts TOSA operations to linalg_ext.
+// Converts i48 to i64.
+std::unique_ptr<OperationPass<func::FuncOp>> createConverti48Toi64();
+
+// Strips the signed/unsigned portion off of tensors.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createStripSignednessPass();
+
+// Converts TOSA operations to linalg_ext.
 std::unique_ptr<OperationPass<func::FuncOp>> createTosaToLinalgExt();
 
-// Creates a pass that converts i48 to i64.
-std::unique_ptr<OperationPass<func::FuncOp>> createConverti48Toi64();
+// Verifies that a module only contains IR structures that are supported by the
+// core compiler.
+std::unique_ptr<OperationPass<ModuleOp>>
+createVerifyCompilerTOSAInputLegality();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
