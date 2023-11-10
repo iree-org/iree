@@ -32,6 +32,11 @@ iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
     driver = "local-task",
+    tags = [
+        # TODO(#15540): RISC-V needs sub-byte emulation for vector.maskedstore
+        # ops. Enable the test after it is supported.
+        "noriscv",
+    ],
     target_backend = "llvm-cpu",
 )
 
