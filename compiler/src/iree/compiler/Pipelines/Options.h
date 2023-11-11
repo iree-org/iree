@@ -47,10 +47,6 @@ struct InputDialectOptions {
     // preprocessing, e.g., flattening of tuples.
     stablehlo_xla,
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TOSA_INPUT
-    // Legalizes input defined over TOSA ops.
-    tosa,
-#endif // IREE_HAVE_TOSA_INPUT
   };
   // The flag value is captured into spec by the CL system and it must be
   // interpreted by parseInputTypeSpec.

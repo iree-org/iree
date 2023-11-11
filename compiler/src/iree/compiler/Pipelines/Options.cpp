@@ -45,12 +45,12 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
           "  =stablehlo     - Legalize from StableHLO ops.\n"
           "  =stablehlo_xla - Legalize from StableHLO ops (with XLA cleanup preprocessing).\n"
 #endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TOSA_INPUT
-          "  =tosa          - Legalize from TOSA ops.\n"
-#endif  // IREE_HAVE_TOSA_INPUT
 // NOTE: The plugin system does not have a good way to populate CL help
-// messages, so we err on the side of being helpful and populating Torch
+// messages, so we err on the side of being helpful and populating plugin
 // options here, even though it is a layering violation.
+#ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TOSA
+          "  =tosa          - Legalize from TOSA ops.\n"
+#endif  // IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TOSA
 #ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_TORCH_IREE
           "  =tm_tensor     - Legalize a subset of Torch input ops.\n"
           "  =torch         - Legalize from the 'torch' dialect.\n"
@@ -88,10 +88,6 @@ InputDialectOptions::Type InputDialectOptions::parseInputTypeMnemonic() {
     return Type::stablehlo;
   } else if (inputTypeMnemonic == "stablehlo_xla") {
     return Type::stablehlo_xla;
-#endif
-#ifdef IREE_HAVE_TOSA_INPUT
-  } else if (inputTypeMnemonic == "tosa") {
-    return Type::tosa;
 #endif
   } else {
     return Type::plugin;

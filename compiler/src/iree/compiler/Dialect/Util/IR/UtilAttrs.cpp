@@ -225,6 +225,18 @@ static LogicalResult serializeRawData(Location loc,
   return success();
 }
 
+// Serializes the raw data of the given |resourceElementsAttr| to |os|.
+// Assumes that the caller knows what they are doing; the raw data must be in
+// the expected endianness and be densely packed.
+static LogicalResult
+serializeResourceRawData(Location loc,
+                         DenseResourceElementsAttr resourceElementsAttr,
+                         llvm::raw_ostream &os) {
+  auto rawData = resourceElementsAttr.getRawHandle().getBlob()->getData();
+  os.write(rawData.data(), rawData.size());
+  return success();
+}
+
 // Stream writer that supports bit packing.
 // In the initial state the writer starts at a byte-aligned offset 0 and as new
 // values of |logicalBitWidth| are written they will be appended in
@@ -421,6 +433,60 @@ static LogicalResult serializeGenericElementData(Location loc,
     }
   }
   return emitError(loc) << "unhandled constant type " << elementsAttr.getType();
+}
+
+// Performs serialization of all of the elements in |resourceElementsAttr|.
+// Throws error if not supported.
+static LogicalResult serializeGenericResourceElementData(
+    Location loc, DenseResourceElementsAttr resourceElementsAttr,
+    llvm::endianness endian, llvm::raw_ostream &os) {
+
+  if (endian != llvm::endianness::native) {
+    return emitError(loc) << "the endian of the "
+                             "DenseResourceElementsAttr is not supported";
+  }
+  if (llvm::isa<IntegerType>(resourceElementsAttr.getType().getElementType())) {
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    // At the time of writing, DenseResourceElementsAttr byte aligned physical
+    // element types only with the exception of i1, which is stored as a full
+    // byte. This is in contrast to DenseElementsAttr which has an exception for
+    // i1 where it is bit-packed.
+    unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+    case 1:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 8:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 16:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 32:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 64:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    default:
+      return emitError(loc)
+             << "unhandled integer element bit width " << bitWidth
+             << " for type " << resourceElementsAttr.getType();
+    }
+  } else if (llvm::isa<FloatType>(
+                 resourceElementsAttr.getType().getElementType())) {
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    // TODO(saienduri): implement float64 support (not neccesary now)
+    unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+    case 16:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 32:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    default:
+      return emitError(loc) << "unhandled float element bit width " << bitWidth
+                            << " for type " << resourceElementsAttr.getType();
+    }
+  }
+  return emitError(loc) << "unhandled constant type "
+                        << resourceElementsAttr.getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -770,6 +836,9 @@ struct SerializableDenseResourceElementsAttrModel
       }
       os.write_zeros(cast<SizedStorageAttr>(baseAttr).getStorageSize());
       return success();
+    } else {
+      os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
+      return serializeGenericResourceElementData(loc, attr, endian, os);
     }
 
     return mlir::emitError(loc)

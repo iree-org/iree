@@ -603,7 +603,11 @@ jobs:
           echo "Testing default runtime:"
           python -m iree.runtime._package_test
           echo "Testing tracy runtime:"
-          IREE_PY_RUNTIME=tracy python -m iree.runtime._package_test
+          # GH runners don't expose the TSC but we want to make sure the basic packaging
+          # works, so override the check with TRACY_NO_INVARIANT_CHECK=1 (per instructions
+          # if this is left off).
+          TRACY_NO_INVARIANT_CHECK=1 IREE_PY_RUNTIME=tracy \
+            python -m iree.runtime._package_test
       # Note that it is just a trade-off decision to have this serialized
       # as a separate step vs parallelized as a separate job. The runtime
       # build is fast, pays the clone/docker overhead and provides early

@@ -20,27 +20,34 @@
 # Each driver provides a static library target name and a function that is
 # called at runtime to register the driver.
 #
-# Required variables:
+# Required properties (typically set via iree_register_external_hal_driver()):
 #   IREE_EXTERNAL_{name}_HAL_DRIVER_TARGET: static library target name.
 #   IREE_EXTERNAL_{name}_HAL_DRIVER_REGISTER: registration function:
 #      iree_status_t {name}_register(iree_hal_driver_registry_t* registry)
-# Optional variables:
+# Optional properties:
 #   IREE_EXTERNAL_{name}_HAL_DRIVER_OPTIONAL: true if the driver not being found
 #      is not an error.
 #   IREE_EXTERNAL_{name}_HAL_DRIVER_SOURCE_DIR: source directory with a
 #      CMakeLists.txt included when the driver is enabled.
 #   IREE_EXTERNAL_{name}_HAL_DRIVER_BINARY_DIR: binary directory for cmake outs.
+# Optional cache vars:
 #   IREE_EXTERNAL_{name}_HAL_DRIVER_FOUND: bool to indicate whether the driver
 #      was found and valid for use.
 set(IREE_EXTERNAL_HAL_DRIVERS_USED)
+get_property(IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE GLOBAL PROPERTY IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE)
 foreach(_DRIVER_NAME ${IREE_EXTERNAL_HAL_DRIVERS})
+  if(NOT _DRIVER_NAME IN_LIST IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE)
+    message(SEND_ERROR 
+      "Driver passed to -DIREE_EXTERNAL_HAL_DRIVERS=${_DRIVER_NAME} is not found. Available: "
+      "${IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE}")
+  endif()
   string(TOUPPER "IREE_EXTERNAL_${_DRIVER_NAME}_HAL_DRIVER" _DRIVER_VAR)
   string(REGEX REPLACE "-" "_" _DRIVER_VAR ${_DRIVER_VAR})
   message(STATUS "Adding IREE external HAL driver: ${_DRIVER_NAME}")
 
-  set(_DRIVER_OPTIONAL ${${_DRIVER_VAR}_OPTIONAL})
-  set(_DRIVER_SOURCE_DIR ${${_DRIVER_VAR}_SOURCE_DIR})
-  set(_DRIVER_BINARY_DIR ${${_DRIVER_VAR}_BINARY_DIR})
+  get_property(_DRIVER_OPTIONAL GLOBAL PROPERTY ${_DRIVER_VAR}_OPTIONAL)
+  get_property(_DRIVER_SOURCE_DIR GLOBAL PROPERTY ${_DRIVER_VAR}_SOURCE_DIR)
+  get_property(_DRIVER_BINARY_DIR GLOBAL PROPERTY ${_DRIVER_VAR}_BINARY_DIR)
 
   # Default to found unless the user overrides it in the driver source.
   # This allows the driver to decide to disable itself even if the user
@@ -89,10 +96,17 @@ if(IREE_EXTERNAL_HAL_DRIVERS_USED)
   foreach(_DRIVER_NAME ${IREE_EXTERNAL_HAL_DRIVERS_USED})
     string(TOUPPER "IREE_EXTERNAL_${_DRIVER_NAME}_HAL_DRIVER" _DRIVER_VAR)
     string(REGEX REPLACE "-" "_" _DRIVER_VAR ${_DRIVER_VAR})
-    set(_DRIVER_TARGET ${${_DRIVER_VAR}_TARGET})
-    set(_DRIVER_REGISTER ${${_DRIVER_VAR}_REGISTER})
+    get_property(_DRIVER_TARGET GLOBAL PROPERTY ${_DRIVER_VAR}_TARGET)
+    get_property(_DRIVER_REGISTER GLOBAL PROPERTY ${_DRIVER_VAR}_REGISTER)
     list(APPEND _INIT_EXTERNAL_DEPS ${_DRIVER_TARGET})
 
+    if(NOT _DRIVER_TARGET OR NOT _DRIVER_REGISTER)
+      message(SEND_ERROR 
+        "Bad configuration for external HAL driver ${_DRIVER_VAR}: "
+        "Missing ${_DRIVER_VAR}_TARGET or ${_DRIVER_VAR}_REGISTER vars. "
+        "This usually indicates that the project was not included in the "
+        "CMake build correctly: (got '${_DRIVER_TARGET}' '${_DRIVER_REGISTER}')")
+    endif()
     list(APPEND _INIT_EXTERNAL_REGISTER_DECLS
         "extern iree_status_t ${_DRIVER_REGISTER}(iree_hal_driver_registry_t* registry);\n")
     list(APPEND _INIT_EXTERNAL_REGISTER_CALLS

@@ -48,7 +48,11 @@ jobs:
           echo "Testing default runtime:"
           python -m iree.runtime._package_test
           echo "Testing tracy runtime:"
-          IREE_PY_RUNTIME=tracy python -m iree.runtime._package_test
+          # GH runners don't expose the TSC but we want to make sure the basic packaging
+          # works, so override the check with TRACY_NO_INVARIANT_CHECK=1 (per instructions
+          # if this is left off).
+          TRACY_NO_INVARIANT_CHECK=1 IREE_PY_RUNTIME=tracy \
+            python -m iree.runtime._package_test
       # Binaries from the tarball
       - name: Run iree-benchmark-module
         id: run_iree_benchmark_module

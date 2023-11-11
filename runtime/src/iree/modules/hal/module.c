@@ -1212,7 +1212,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_join,  //
                    CrD, r) {
   iree_host_size_t fence_count = 0;
   iree_hal_fence_t** fences = NULL;
-  IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(args, a0_count, a0, iree_hal_fence, 32,
+  // TODO(#15520): Rework this to avoid the need for a fixed allocation.
+  IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(args, a0_count, a0, iree_hal_fence, 349,
                                       &fence_count, &fences);
 
   iree_hal_fence_t* fence = NULL;

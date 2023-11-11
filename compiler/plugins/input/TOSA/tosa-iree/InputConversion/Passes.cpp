@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/InputConversion/TOSA/Passes.h"
+#include "tosa-iree/InputConversion/Passes.h"
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
@@ -60,6 +60,8 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToArith());
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToTensor());
 
+  // TODO(scotttodd): move IREE::Flow::createStripSignednessPass into plugin
+  //     (should in-tree plugins even depend on other in-tree code?)
   passManager.addNestedPass<func::FuncOp>(
       IREE::Flow::createStripSignednessPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
@@ -78,7 +80,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/InputConversion/TOSA/Passes.h.inc" // IWYU pragma: export
+#include "tosa-iree/InputConversion/Passes.h.inc" // IWYU pragma: export
 } // namespace
 
 void registerTOSAConversionPasses() {

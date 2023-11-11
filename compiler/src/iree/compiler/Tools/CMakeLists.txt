@@ -47,11 +47,6 @@ if(IREE_INPUT_STABLEHLO)
   list(APPEND IREE_INPUT_DEPS ChloOps)
   list(APPEND IREE_INPUT_DEPS StablehloOps)
 endif()
-if(IREE_INPUT_TOSA)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
-  list(APPEND IREE_INPUT_DEPS MLIRTosaDialect)
-  list(APPEND IREE_INPUT_DEPS MLIRTosaTransforms)
-endif()
 
 iree_cc_library(
   NAME
@@ -226,4 +221,3 @@ iree_cc_library(
   COPTS
     ${IREE_VERSION_TARGET_COPTS}
 )
-

@@ -31,8 +31,6 @@ iree_bitcode_library(
     libdevice_wasm32_generic
   ARCH
     wasm_32
-  INTERNAL_HDRS
-    "device.h"
   SRCS
     "device_generic.c"
 )
@@ -42,8 +40,6 @@ iree_bitcode_library(
     libdevice_wasm64_generic
   ARCH
     wasm_64
-  INTERNAL_HDRS
-    "device.h"
   SRCS
     "device_generic.c"
 )

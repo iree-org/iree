@@ -966,6 +966,55 @@ struct ScalarizeVectorTransferWrite final
   }
 };
 
+/// Converts IR like the following into a single mask bit
+///
+/// %mask = vector.create_mask %msize : vector<4xi1>
+/// %mbit = vector.extract %mask[1] : i1
+///
+/// into
+///
+/// %c1 = arith.constant 1 : index
+/// %mbit = arith.cmpi slt %c1, %msize
+///
+/// We run this at the same time as scalarizing masked transfers to try to fold
+/// away any remaining mask creation ops as SPIR-V lacks support for masked
+/// operations.
+struct ReifyExtractOfCreateMask final
+    : public OpRewritePattern<vector::ExtractOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::ExtractOp extractOp,
+                                PatternRewriter &rewriter) const override {
+    // Restrict to the degenerate case where we are extracting a single element.
+    if (extractOp.getResult().getType().isa<VectorType>()) {
+      return failure();
+    }
+    auto maskOp = extractOp.getVector().getDefiningOp<vector::CreateMaskOp>();
+    if (!maskOp) {
+      return failure();
+    }
+
+    Location loc = maskOp.getLoc();
+    Value maskBit =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
+    for (auto [idx, size] :
+         llvm::zip_equal(extractOp.getMixedPosition(), maskOp.getOperands())) {
+      Value idxVal;
+      if (idx.is<Attribute>()) {
+        idxVal = rewriter.create<arith::ConstantIndexOp>(
+            loc, idx.get<Attribute>().cast<IntegerAttr>().getInt());
+      } else {
+        idxVal = idx.get<Value>();
+      }
+      Value cmpIdx = rewriter.create<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, idxVal, size);
+      maskBit = rewriter.create<arith::AndIOp>(loc, cmpIdx, maskBit);
+    }
+    rewriter.replaceOp(extractOp, maskBit);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -1050,6 +1099,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
     RewritePatternSet rewritingPatterns(context);
     rewritingPatterns.add<ScalarizeVectorTransferRead, ScalarizeVectorLoad,
                           ScalarizeVectorTransferWrite>(context);
+    rewritingPatterns.add<ReifyExtractOfCreateMask>(context);
 
     if (failed(
             applyPatternsAndFoldGreedily(func, std::move(rewritingPatterns)))) {
