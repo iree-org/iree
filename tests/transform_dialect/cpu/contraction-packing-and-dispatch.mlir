@@ -25,7 +25,6 @@
 //       CHECK:   tensor.pack
 
 // CHECK-LABEL: func.func @matmul_dispatch_1
-//       CHECK:   arith.constant dense<1.000000e-01> : tensor<567x890xf32>
 //       CHECK:   tensor.empty() : tensor<18x56x16x32xf32>
 //       CHECK:   tensor.pack
 
@@ -35,7 +34,8 @@
 
 // CHECK-LABEL: func.func @matmul_dispatch_3
 func.func @matmul(%arg0: !a_tensor_t, %arg2: !c_tensor_t) -> !c_tensor_t {
-  %c0 = arith.constant dense<0.1> : !b_tensor_t
+  %rhs = arith.constant dense<0.1> : !b_tensor_t
+  %c0 = util.optimization_barrier %rhs : !b_tensor_t
   //  CHECK-NOT: pack
   //      CHECK: linalg.generic {indexing_maps = [#[[$map_lhs]], #[[$map_rhs]], #[[$map_res]]],
   // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]}
