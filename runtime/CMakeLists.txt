@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Must runtime plugins before processing the runtime sources so that
+# Must include runtime plugins before processing the runtime sources so that
 # the static link list can be set.
 iree_include_cmake_plugin_dirs(
   LOG_LABEL

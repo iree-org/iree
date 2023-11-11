@@ -33,7 +33,6 @@ function(iree_compiler_register_plugin)
   # Replace target passed by ::name with iree::package::name
   list(TRANSFORM _RULE_TARGET REPLACE "^::" "${_PACKAGE_NS}::")
 
-  # TODO: Can have more control on what gets linked.
   message(STATUS "Registering static linked compiler plugin '${_RULE_PLUGIN_ID}' (${_RULE_TARGET})")
   set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_LINKED_PLUGIN_IDS "${_RULE_PLUGIN_ID}")
   set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_LINKED_PLUGIN_LIBS "${_RULE_TARGET}")
