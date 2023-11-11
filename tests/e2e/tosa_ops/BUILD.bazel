@@ -181,6 +181,9 @@ iree_check_single_backend_test_suite(
     name = "check_vmvx_local-sync_microkernels",
     srcs = VMVX_MICROKERNELS_SRCS,
     compiler_flags = [
+        # TODO(15314): Remove the flag once vmvx supports batch_matmul on
+        # ukernel path.
+        "--iree-opt-data-tiling=false",
         "--iree-vmvx-enable-microkernels",
     ],
     # Sync has more strict runtime error checking for mis-compiled programs.

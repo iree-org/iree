@@ -165,6 +165,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-sync"
   COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
     "--iree-vmvx-enable-microkernels"
   INPUT_TYPE
     "tosa"
