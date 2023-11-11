@@ -290,7 +290,6 @@ def convert_directory(directory_path, write_files, allow_partial_conversion, ver
         converted_build_file = bazel_to_cmake_converter.convert_build_file(
             build_file_code,
             repo_cfg=repo_cfg,
-            build_dir=directory_path,
             allow_partial_conversion=allow_partial_conversion,
         )
     except (NameError, NotImplementedError) as e:

@@ -15,7 +15,6 @@ See bazel_to_cmake.py for usage.
 
 import itertools
 import re
-import os
 
 import bazel_to_cmake_targets
 
@@ -24,15 +23,10 @@ class BuildFileFunctions(object):
     """Object passed to `exec` that has handlers for BUILD file functions."""
 
     def __init__(
-        self,
-        *,
-        converter: "Converter",
-        targets: bazel_to_cmake_targets.TargetConverter,
-        build_dir: str,
+        self, *, converter: "Converter", targets: bazel_to_cmake_targets.TargetConverter
     ):
         self._converter = converter
         self._targets = targets
-        self._build_dir = build_dir
         self._custom_initialize()
 
     def _custom_initialize(self):
@@ -118,45 +112,18 @@ class BuildFileFunctions(object):
         target = target.replace("::", "_")
         return self._convert_string_arg_block(name, target, quote=False)
 
-    def _filegroup_dep_filename(self, src):
-        return f"{src}.stamp"
-
-    def _normalize_label(self, src):
-        """
-        Convert label to file path suitable for CMake to use as a dependency.
-        """
-
+    def _convert_srcs_block(self, srcs):
+        if not srcs:
+            return ""
         # Bazel allows srcs to reference targets in the current package (leading
         # ':') or in other packages (leading '//'). We map that to paths by:
         # - dropping any leading ':' as in:
         #      ':generated.c' -> 'generated.c'
-        # - replacing any leading '//' by '${CMAKE_SOURCE_DIR}/' or
-        #   '${CMAKE_BINARY_DIR}/' and any internal ':' by '/', as in:
-        #      '//path/to/package:source.c'
-        #      -> '${CMAKE_SOURCE_DIR}/path/to/package/source.c'
-        #      '//path/to/package:generated.c'
-        #      -> '${CMAKE_BINARY_DIR}/path/to/package/generated.c'
-        pkg_root_relative_label = src.startswith("//")
-        src = src.lstrip("/").lstrip(":").replace(":", "/")
-        if not pkg_root_relative_label:
-            return src
-        elif os.path.exists(os.path.join(self._build_dir, src)):
-            return f"${{CMAKE_SOURCE_DIR}}/{src}"
-        else:
-            return f"${{CMAKE_BINARY_DIR}}/{src}"
+        # - dropping any leading '//', and internal ':' by '/', as in:
+        #      '//path/to/package:generated.c' ->  'path/to/package/generated.c'
+        srcs = [s.lstrip("//").lstrip(":").replace(":", "/") for s in srcs]
 
-    def _convert_srcs_block(self, srcs, is_generated=False, block_name="SRCS"):
-        if not srcs:
-            return ""
-
-        srcs = [
-            self._normalize_label(s)
-            if s.startswith("$") or os.path.splitext(s)[1]
-            else self._filegroup_dep_filename(self._normalize_label(s))
-            for s in srcs
-        ]
-
-        return self._convert_string_list_block(block_name, srcs, sort=True)
+        return self._convert_string_list_block("SRCS", srcs, sort=True)
 
     def _convert_td_file_block(self, td_file):
         if td_file.startswith("//iree"):
@@ -286,42 +253,14 @@ class BuildFileFunctions(object):
     def py_binary(self, *args, **kwargs):
         pass
 
-    def filegroup(self, name, srcs, **kwargs):
-        if not srcs:
-            return
-
-        # Converting a dependency on a filegroup requires either using the
-        # transitive dependency to the actual file or creating a similar
-        # abstraction in CMake.
-        #
-        # One way of doing the transitive dependency is peeking in the build
-        # file that defines a given filegroup but goes against the current
-        # design where each build file is processed independently.
-        #
-        # Alternatively, the build file that defines a filegroup could set a
-        # variable with the list of all the files in the filegroup which the
-        # CMakeLists.txt corresponding to the using build file would use.
-        # However that requires the variable to be defined before the
-        # add_directory() for the corresponding using CMakeLists.txt which is
-        # not a given.
-        #
-        # Instead, we generate a custom command that creates a stamp file that
-        # acts as an abstraction to the filegroup. The using CMakeLists.txt
-        # then creates a file dependency on that stamp file. We also need a
-        # custom target in the same CMakeLists.txt to ensure a rule for the
-        # custom command is actually created as per add_custom_command
-        # documentation.
-        depends_block = self._convert_srcs_block(srcs, block_name="DEPENDS")
-        stamp_file = self._filegroup_dep_filename(name)
-        self._converter.body += (
-            f"add_custom_command(OUTPUT {stamp_file}\n"
-            f"    COMMAND touch {stamp_file}\n"
-            f"{depends_block}"
-            f")\n\n"
-            f"add_custom_target({name}\n"
-            f"    DEPENDS {stamp_file}\n"
-            f")\n\n"
-        )
+    def filegroup(self, name, **kwargs):
+        # Not implemented, but allowed for Bazel-only uses, such as declaring internal
+        # headers and other kinds of files that Bazel enforces but CMake doesn't care
+        # about. If we ever need to implement this, this might be a no-op, or may
+        # want to evaluate the srcs attribute and pass them along to any targets
+        # that depend on the filegroup.
+        # Cross-package dependencies and complicated globs could be hard to handle.
+        pass
 
     def sh_binary(self, name, **kwargs):
         if self._should_skip_target(**kwargs):
@@ -568,7 +507,6 @@ class BuildFileFunctions(object):
     def iree_bitcode_library(self, name, arch, srcs, internal_hdrs=None, copts=None):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
-        hdrs_block = self._convert_srcs_block(internal_hdrs, block_name="INTERNAL_HDRS")
         srcs_block = self._convert_srcs_block(srcs)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
 
@@ -576,7 +514,6 @@ class BuildFileFunctions(object):
             f"iree_bitcode_library(\n"
             f"{name_block}"
             f"{arch_block}"
-            f"{hdrs_block}"
             f"{srcs_block}"
             f"{copts_block}"
             f")\n\n"
@@ -1007,9 +944,7 @@ def GetDict(obj):
     return ret
 
 
-def convert_build_file(
-    build_file_code, repo_cfg, build_dir, allow_partial_conversion=False
-):
+def convert_build_file(build_file_code, repo_cfg, allow_partial_conversion=False):
     converter = Converter()
     # Allow overrides of TargetConverter and BuildFileFunctions from repo cfg.
     repo_map = getattr(repo_cfg, "REPO_MAP", {})
@@ -1018,7 +953,7 @@ def convert_build_file(
     )(repo_map=repo_map)
     build_file_functions = getattr(
         repo_cfg, "CustomBuildFileFunctions", BuildFileFunctions
-    )(converter=converter, targets=target_converter, build_dir=build_dir)
+    )(converter=converter, targets=target_converter)
 
     exec(build_file_code, GetDict(build_file_functions))
     converted_text = converter.convert()
