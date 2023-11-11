@@ -49,7 +49,7 @@ static llvm::cl::opt<bool> clEnableCPUMicrokernels(
     "iree-llvmcpu-enable-microkernels",
     llvm::cl::desc(
         "Enables microkernel lowering for llvmcpu backend (experimental)"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clLinkCPUUKernelBitcode(
     "iree-llvmcpu-link-ukernel-bitcode",
