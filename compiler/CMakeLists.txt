@@ -27,10 +27,26 @@ add_subdirectory(bindings/c)
 
 # The compiler implementation is gated on the global setting.
 if(IREE_BUILD_COMPILER)
+  # Force enable BUILD_SHARED_LIBS for the compiler if instructed.
+  set(_IREE_ORIG_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+  if(IREE_COMPILER_BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+  endif()
+
   # Must configure plugins before processing the compiler sources so that
   # the static link list can be set.
-  iree_compiler_configure_plugins()
+  iree_include_cmake_plugin_dirs(
+    LOG_LABEL
+      compiler
+    BINARY_DIR
+      "${IREE_BINARY_DIR}/compiler/plugins"
+    PLUGIN_CMAKE_FILE
+      "iree_compiler_plugin.cmake"
+  )
   add_subdirectory(src)
+
+  # Reset BUILD_SHARED_LIBS.
+  set(BUILD_SHARED_LIBS ${_IREE_ORIG_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
 
   # Copy Python packaging files to the build dir so that we can install from
   # there.
