@@ -163,7 +163,6 @@ hal.executable @_attention_dispatch_0 {
 // CHECK:        vector.transfer_write %[[D12]], %[[ALLOC_7]][%[[C0]], %[[D8]], %[[C0]]] {in_bounds = [true, true]} :
 // CHECK-SAME:     vector<32x64xf16>, memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>
 // CHECK:        gpu.barrier
-// CHECK:        gpu.barrier
 // CHECK:        linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP1]]], iterator_types = ["parallel", "parallel",
 // CHECK-SAME:     "parallel"]} ins(%[[ALLOC_7]] : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>)
 // CHECK-SAME:     outs(%[[SUBVIEW_6]] : memref<1x128x64xf16, strided<[65536, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>) {
