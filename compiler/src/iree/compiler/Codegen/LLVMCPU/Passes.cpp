@@ -388,6 +388,20 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
 
   addBufferizePasses(nestedModulePM);
 
+  // The copy operation is disappearing after vectorization. In this case,
+  // bufferization creates a linalg.generic op that copies data from source to
+  // destination. We call the vectorizer again to vectorize copy ops. (Example
+  // in test case in bug#15249). This is a good stop-gap fix till we find a more
+  // appropriate fix.
+  {
+    GenericVectorizationPassOptions options;
+    options.enableVectorMasking = enableVectorMasking;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+  }
+
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
@@ -497,6 +511,20 @@ void addMultiTilingExpertPassPipeline(
 
   addBufferizePasses(nestedModulePM);
 
+  // The copy operation is disappearing after vectorization. In this case,
+  // bufferization creates a linalg.generic op that copies data from source to
+  // destination. We call the vectorizer again to vectorize copy ops. (Example
+  // in test case in bug#15249). This is a good stop-gap fix till we find a more
+  // appropriate fix.
+  {
+    GenericVectorizationPassOptions options;
+    options.enableVectorMasking = enableVectorMasking;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+  }
+
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
@@ -565,6 +593,20 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
       createOptimizeVectorTransferPass(/*flatten=*/true));
 
   addBufferizePasses(nestedModulePM);
+
+  // The copy operation is disappearing after vectorization. In this case,
+  // bufferization creates a linalg.generic op that copies data from source to
+  // destination. We call the vectorizer again to vectorize copy ops. (Example
+  // in test case in bug#15249). This is a good stop-gap fix till we find a more
+  // appropriate fix.
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    options.enableVectorMasking = enableVectorMasking;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+  }
 
   // Perform memref-based transfer_read/write optimizations.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -644,6 +686,19 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   }
 
   addBufferizePasses(nestedModulePM);
+
+  // The copy operation is disappearing after vectorization. In this case,
+  // bufferization creates a linalg.generic op that copies data from source to
+  // destination. We call the vectorizer again to vectorize copy ops. (Example
+  // in test case in bug#15249). This is a good stop-gap fix till we find a more
+  // appropriate fix.
+  {
+    GenericVectorizationPassOptions options;
+    options.vectorizePadding = true;
+    options.enableVectorMasking = enableVectorMasking;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+  }
 
   {
     LLVMCPUVectorLoweringPassOptions options;
