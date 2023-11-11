@@ -451,8 +451,9 @@ class ClientInstance {
 
   // Compiles.
   // See TODOs in PJRT_Client_Compile.
-  PJRT_Error* Compile(PJRT_Program* program, /*xla::CompileOptions options, */
-                      LoadedExecutableInstance** executable);
+  PJRT_Error* Compile(
+      const PJRT_Program* program, /*xla::CompileOptions options, */
+      LoadedExecutableInstance** executable);
 
   // ---------------------------------------------------------------------------
   // Subclass hooks.
@@ -530,7 +531,7 @@ static void BindApi(PJRT_Api* api) {
 
     // Populate config_vars() from the client create_options.
     for (size_t i = 0; i < args->num_options; ++i) {
-      PJRT_NamedValue* nv = args->create_options + i;
+      const PJRT_NamedValue* nv = args->create_options + i;
       // For now, we only support string types.
       if (nv->type != PJRT_NamedValue_kString) continue;
       std::string name(nv->name, nv->name_size);
