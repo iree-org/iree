@@ -368,6 +368,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
   const SupportedFeatures getSupportedFeatures(MLIRContext *context) {
     SupportedFeatures s;
     Builder b(context);
+    s.addScalarType(b.getIntegerType(4));
     s.addScalarType(b.getIntegerType(8));
     s.addScalarType(b.getIntegerType(16));
     s.addScalarType(b.getIntegerType(32));
@@ -375,6 +376,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     s.addScalarType(b.getF32Type());
 
     s.addElementType(b.getIntegerType(1));
+    s.addElementType(b.getIntegerType(4));
     s.addElementType(b.getIntegerType(8));
     s.addElementType(b.getIntegerType(16));
     s.addElementType(b.getIntegerType(32));
