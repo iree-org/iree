@@ -1,7 +1,6 @@
 // RUN: iree-run-mlir \
 // RUN:   --Xcompiler,iree-hal-target-backends=vmvx \
 // RUN:   --Xcompiler,iree-flow-trace-dispatch-tensors \
-// RUN:   --Xcompiler,iree-opt-data-tiling=false \
 // RUN:   %s 2>&1 | FileCheck %s
 
 func.func @two_dispatch() -> (tensor<15xf32>) {
