@@ -53,12 +53,13 @@ jobs:
       - os-family=Linux
     env:
       BUILD_DIR: full-build-dir
+      TOOLS_DIR: iree-tools-dir
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
-      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+      build-dir-archive: ${{ steps.archive-build.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ steps.upload-build.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
@@ -91,18 +92,35 @@ jobs:
       # *in parallel* and upload to GCS. This can be further optimized.
       # Especially decompression is still pretty slow. See #9881.
       - name: "Creating build dir archive"
-        id: archive
+        id: archive-build
         env:
           BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
         run: |
           tar -I 'zstd -T0' \
             -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
           echo "build-dir-archive=${BUILD_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
-      - name: "Uploading build dir archive"
-        id: upload
+      - name: "Creating tools dir archive"
+        id: archive-tools
         env:
-          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_ARCHIVE: ${{ steps.archive-build.outputs.build-dir-archive }}
+          TOOLS_DIR_ARCHIVE: ${{ env.TOOLS_DIR }}.tar.zst
+        run: |
+          tar -I 'zstd -T0' \
+            -cf ${TOOLS_DIR_ARCHIVE} ${BUILD_DIR}/tools
+          echo "tools-dir-archive=${TOOLS_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading build dir archive"
+        id: upload-build
+        env:
+          BUILD_DIR_ARCHIVE: ${{ steps.archive-build.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive-build.outputs.build-dir-archive }}
         run: |
           gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading tools dir archive"
+        id: upload-tools
+        env:
+          TOOLS_DIR_ARCHIVE: ${{ steps.archive-tools.outputs.tools-dir-archive }}
+          TOOLS_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive-tools.outputs.tools-dir-archive }}
+        run: |
+          gcloud storage cp "${TOOLS_DIR_ARCHIVE}" "${TOOLS_DIR_GCS_ARTIFACT}"
+          echo "tools-dir-gcs-artifact=${TOOLS_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
