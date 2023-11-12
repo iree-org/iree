@@ -91,20 +91,6 @@ module @hoist_sub_byte_aligned_scalar_transitive {
 }
 
 // -----
-// CHECK-LABEL: @do_not_hoist_sub_byte_tensor_transitive
-// CHECK-NOT: util.global
-// We do not yet support constexpr of sub-byte types that are 
-// Can hoist a const-expr tree that transitively includes sub-byte aligned
-// values.
-module @do_not_hoist_sub_byte_tensor_transitive {
-  func.func @main() -> (i32) {
-    %0 = arith.constant dense<3> : tensor<i4>
-    %2 = "iree_unregistered.const_expr"(%0) : (tensor<i4>) -> i32
-    return %2 : i32
-  }
-}
-
-// -----
 // CHECK-LABEL: @hoist_i1_tensor_transitive
 // CHECK: util.global private {{.*}} : i32
 // We presently expand i1 -> i8 for legacy reasons. As such, we support

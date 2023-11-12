@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -60,9 +61,8 @@ bool isLegalConstExprType(Type t) {
     // TODO: We shouldn't need to be this conservative about the bit widths we
     // support, but for now the consteval JIT has interop limitations. Lift
     // this restriction when the JIT interops for all types.
-    auto bitWidth = t.getIntOrFloatBitWidth();
-    return bitWidth == 1 || bitWidth == 8 || bitWidth == 16 || bitWidth == 32 ||
-           bitWidth == 64;
+    int64_t bitWidth = t.getIntOrFloatBitWidth();
+    return llvm::isPowerOf2_64(bitWidth) && bitWidth <= 64;
   }
 
   if (llvm::isa<IndexType>(t)) {
@@ -165,11 +165,11 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     }
   }
 
-  // Never hoist sub-byte aligned values: in legal programs, these will be
+  // Never hoist boolean values: in legal programs, these will be
   // cast or packed in some successor.
   if (auto integerType = llvm::dyn_cast<IntegerType>(
           getElementTypeOrSelf(info->constValue.getType()))) {
-    if (integerType.getWidth() % 8 != 0) {
+    if (integerType.getWidth() % 8 == 1) {
       return false;
     }
   }

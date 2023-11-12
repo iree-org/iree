@@ -7,11 +7,16 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 
+#include <optional>
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {
+class OpBuilder;
+class Type;
+class Value;
+
 namespace iree_compiler {
 namespace IREE {
 namespace Util {
@@ -23,8 +28,6 @@ std::unique_ptr<OperationPass<void>>
 createFixedPointIteratorPass(OpPassManager pipeline);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createHoistIntoGlobalsPass(int64_t maxSizeIncreaseThreshold = 2147483647);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass();
@@ -32,6 +35,34 @@ std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantsPass();
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
+
+// Expression hoisting.
+
+struct ExprHoistingOptions {
+  using SelectGlobalStorageTypeFn = std::function<Type(Type)>;
+  using CastTypeFn = std::function<Value(OpBuilder &, Type, Value)>;
+  using RegisterDialectsFn = std::function<void(DialectRegistry &)>;
+
+  // Optional helper functions for setting preferred storage formats for
+  // hoisted globals. `setGlobalStorageFn` may return any type it wants to,
+  // however `unsetGlobalStorageFn` must return a value with the provided
+  // original type.
+  std::optional<SelectGlobalStorageTypeFn> selectGlobalStorageTypeFn =
+      std::nullopt;
+  std::optional<CastTypeFn> setGlobalStorageFn = std::nullopt;
+  std::optional<CastTypeFn> unsetGlobalStorageFn = std::nullopt;
+
+  // Hook to register extra dependent dialects needed for setting storage
+  // formats.
+  std::optional<RegisterDialectsFn> registerDependentDialectsFn = std::nullopt;
+
+  // Threshold for controlling the maximum allowed increase in the stored size
+  // of a single global as a result of hoisting.
+  int64_t maxSizeIncreaseThreshold = 2147483647;
+};
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createHoistIntoGlobalsPass(const ExprHoistingOptions &options);
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
 
 // Resource Management.
 std::unique_ptr<OperationPass<void>> createImportResourcesPass();
