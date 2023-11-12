@@ -33,4 +33,11 @@ PYBIND11_MODULE(_site_initialize_0, m) {
   m.def("register_dialects", [](MlirDialectRegistry registry) {
     ireeCompilerRegisterDialects(registry);
   });
+
+  m.def("context_init_hook",
+        [](MlirContext context) { ireeCompilerInitializeContext(context); });
+
+  // Multi-threading is configured as part of the context_init_hook and
+  // not left to default MLIR heuristics.
+  m.attr("disable_multithreading") = true;
 }
