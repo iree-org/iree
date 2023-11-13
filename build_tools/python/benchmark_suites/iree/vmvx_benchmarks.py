@@ -42,14 +42,14 @@ class Android_VMVX_Benchmarks(object):
         ]
         default_execution_configs = [
             module_execution_configs.get_vmvx_system_scheduling_local_task_config(
-                thread_num=4
+                thread_num=2
             )
         ]
         big_cores_devices = (
             device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
                 architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
                 host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-                device_parameters={"big-cores"},
+                tags=["big-cores"],
             )
         )
         run_configs = utils.generate_e2e_model_run_configs(

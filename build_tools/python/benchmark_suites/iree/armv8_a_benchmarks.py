@@ -69,7 +69,7 @@ class Android_ARMv8_A_Benchmarks(object):
             module_execution_configs.get_elf_system_scheduling_local_task_config(
                 thread_num
             )
-            for thread_num in [1, 4]
+            for thread_num in [1, 2]
         ]
 
         default_gen_confings = [
@@ -97,7 +97,7 @@ class Android_ARMv8_A_Benchmarks(object):
             device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
                 architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
                 host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-                device_parameters={"big-cores"},
+                tags=["big-cores"],
             )
         )
         run_configs = utils.generate_e2e_model_run_configs(
