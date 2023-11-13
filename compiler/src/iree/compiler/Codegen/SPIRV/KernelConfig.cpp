@@ -1186,10 +1186,10 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   // Make sure reduction dimensions are static and innermost ones.
-  int64_t numDynamicReduc = 0;
+  int64_t numDynamicReductionDims = 0;
   for (unsigned dim : reductionDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
-      numDynamicReduc++;
+      numDynamicReductionDims++;
     }
     if (dim < numParallelDims) {
       LLVM_DEBUG(llvm::dbgs() << "failed: non-innermost reduction dims\n");
@@ -1198,7 +1198,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   }
 
   // Distribution of multi-dim masked writes currently aren't fully supported.
-  if (numDynamicReduc > 1) {
+  if (numDynamicReductionDims > 1) {
     return failure();
   }
 
@@ -1244,12 +1244,12 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   // Without any bounds on dynamic reduction dims, we need specialization to
   // get peak performance. For now, just use the subgroup size.
-  if (numDynamicReduc) {
+  if (numDynamicReductionDims) {
     SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
     reductionTileSizes[reductionDims[0]] = subgroupSize;
     TileSizesListType tileSizes;
     tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-    tileSizes.emplace_back(std::move(reductionTileSizes)); // reduction level
+    tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
     std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
     if (failed(setOpConfigAndEntryPointFnTranslation(
             op->getParentOfType<func::FuncOp>(), op, tileSizes,
