@@ -12,21 +12,11 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    static_assert
-  HDRS
-    "static_assert.h"
-  DEPS
-
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     exported_bits
   HDRS
     "exported_bits.h"
   DEPS
-    ::static_assert
+
   PUBLIC
 )
 
@@ -41,7 +31,6 @@ add_custom_command(OUTPUT internal_headers_filegroup.stamp
     "pack_internal.h"
     "query_tile_sizes.h"
     "query_tile_sizes_internal.h"
-    "static_assert.h"
     "unpack.h"
     "unpack_internal.h"
 )
@@ -62,7 +51,6 @@ iree_cc_library(
     "pack_internal.h"
     "query_tile_sizes.h"
     "query_tile_sizes_internal.h"
-    "static_assert.h"
     "unpack.h"
     "unpack_internal.h"
   DEPS
@@ -89,14 +77,12 @@ iree_cc_library(
     "query_tile_sizes.c"
     "query_tile_sizes.h"
     "query_tile_sizes_internal.h"
-    "static_assert.h"
     "unpack.c"
     "unpack.h"
     "unpack_internal.h"
     "unpack_tile.c"
   DEPS
     ::exported_bits
-    ::static_assert
     iree::base::core_headers
     iree::builtins::ukernel::arch::ukernel_arch
   PUBLIC
