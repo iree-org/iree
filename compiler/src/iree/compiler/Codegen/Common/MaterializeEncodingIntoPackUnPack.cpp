@@ -23,7 +23,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "runtime/src/iree/builtins/ukernel/exported_bits.h"
 
 namespace mlir {
 namespace iree_compiler {

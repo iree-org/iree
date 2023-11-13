@@ -66,7 +66,6 @@ iree_cc_library(
     MLIRPass
     MLIRTensorTransforms
     MLIRTransforms
-    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Utils
