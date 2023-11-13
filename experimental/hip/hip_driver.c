@@ -18,7 +18,7 @@
 // Maximum device name length supported by the HIP HAL driver.
 #define IREE_HAL_HIP_MAX_DEVICE_NAME_LENGTH 128
 
-// Utility macros to convert between HIPDevice and iree_hal_device_id_t.
+// Utility macros to convert between HIPDevice/hipDevice_t and iree_hal_device_id_t.
 #define IREE_HIPDEVICE_TO_DEVICE_ID(device) (iree_hal_device_id_t)((device) + 1)
 #define IREE_DEVICE_ID_TO_HIPDEVICE(device_id) (hipDevice_t)((device_id)-1)
 
@@ -32,7 +32,7 @@ typedef struct iree_hal_hip_driver_t {
   // Identifier used for registering the driver in the IREE driver registry.
   iree_string_view_t identifier;
   // HIP driver API dynamic symbols to interact with the HIP system.
-  iree_hal_hip_dynamic_symbols_t HIP_symbols;
+  iree_hal_hip_dynamic_symbols_t hip_symbols;
 
   // The index of the default HIP device to use if multiple ones are available.
   int default_device_index;
@@ -71,7 +71,7 @@ static iree_status_t iree_hal_hip_driver_create_internal(
   driver->default_device_index = options->default_device_index;
 
   iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
-      host_allocator, &driver->HIP_symbols);
+      host_allocator, &driver->hip_symbols);
 
   if (iree_status_is_ok(status)) {
     *out_driver = (iree_hal_driver_t*)driver;
@@ -103,7 +103,7 @@ static void iree_hal_hip_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_hip_dynamic_symbols_deinitialize(&driver->HIP_symbols);
+  iree_hal_hip_dynamic_symbols_deinitialize(&driver->hip_symbols);
   iree_allocator_free(host_allocator, driver);
 
   IREE_TRACE_ZONE_END(z0);
@@ -113,7 +113,7 @@ static void iree_hal_hip_driver_destroy(iree_hal_driver_t* base_driver) {
 static iree_status_t iree_hal_hip_init(iree_hal_hip_driver_t* driver) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
-      IREE_HIP_RESULT_TO_STATUS(&driver->HIP_symbols, hipInit(0), "hipInit");
+      IREE_HIP_RESULT_TO_STATUS(&driver->hip_symbols, hipInit(0), "hipInit");
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -168,12 +168,6 @@ static iree_status_t iree_hal_hip_populate_device_info(
   return iree_ok_status();
 }
 
-// Returns true if the device meets all the required capabilities.
-static bool iree_hal_hip_is_valid_device(iree_hal_hip_driver_t* driver,
-                                           hipDevice_t device) {
-  return true;
-}
-
 static iree_status_t iree_hal_hip_driver_query_available_devices(
     iree_hal_driver_t* base_driver, iree_allocator_t host_allocator,
     iree_host_size_t* out_device_info_count,
@@ -189,7 +183,7 @@ static iree_status_t iree_hal_hip_driver_query_available_devices(
 
   // Query the number of available HIP devices.
   int device_count = 0;
-  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(z0, &driver->HIP_symbols,
+  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(z0, &driver->hip_symbols,
                                          hipGetDeviceCount(&device_count),
                                          "hipGetDeviceCount");
 
@@ -207,12 +201,11 @@ static iree_status_t iree_hal_hip_driver_query_available_devices(
         (uint8_t*)device_infos + device_count * sizeof(iree_hal_device_info_t);
     for (iree_host_size_t i = 0; i < device_count; ++i) {
       hipDevice_t device = 0;
-      status = IREE_HIP_RESULT_TO_STATUS(&driver->HIP_symbols,
+      status = IREE_HIP_RESULT_TO_STATUS(&driver->hip_symbols,
                                        hipDeviceGet(&device, i), "hipDeviceGet");
       if (!iree_status_is_ok(status)) break;
-      if (!iree_hal_hip_is_valid_device(driver, device)) continue;
       status = iree_hal_hip_populate_device_info(
-          device, &driver->HIP_symbols, buffer_ptr, &buffer_ptr,
+          device, &driver->hip_symbols, buffer_ptr, &buffer_ptr,
           &device_infos[valid_device_count]);
       if (!iree_status_is_ok(status)) break;
       valid_device_count++;
@@ -232,12 +225,64 @@ static iree_status_t iree_hal_hip_driver_query_available_devices(
 static iree_status_t iree_hal_hip_driver_dump_device_info(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_string_builder_t* builder) {
+
   iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
-  hipDevice_t device = (hipDevice_t)device_id;
-  if (!device) return iree_ok_status();
-  // TODO: dump detailed device info.
-  (void)driver;
-  (void)device;
+  hipDevice_t device = IREE_DEVICE_ID_TO_HIPDEVICE(device_id);
+
+  hipDeviceProp_t prop;
+  IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols, hipGetDeviceProperties(&prop, device),
+                       "hipGetDeviceProperties");
+
+  // GPU capabilities and architecture.
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-compute-capability: %d.%d", prop.major, prop.minor));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-arch-name: %s", prop.gcnArchName));
+
+  // Launch configuration limits.
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- launch-max-block-dims: (%d, %d, %d)", prop.maxThreadsDim[0],
+      prop.maxThreadsDim[1], prop.maxThreadsDim[2]));
+
+  int shared_memory_kb = prop.sharedMemPerBlock / 1024;
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-thread-count: %d", prop.maxThreadsPerBlock));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-32-bit-register-count: %d", prop.regsPerBlock));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- block-max-shared-memory: %d KB", shared_memory_kb));
+
+  // Memory hierarchy related information.
+  int const_memory_mb = prop.totalConstMem / 1024 / 1024;
+  int global_memory_mb = prop.totalGlobalMem / 1024 / 1024;
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-is-integrated-memory: %d", prop.integrated));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-supports-managed-memory: %d", prop.managedMemory));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-total-const-memory-size: %d MB", const_memory_mb));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-total-global-memory-size: %d MB", global_memory_mb));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- memory-l2-cache-size: %d bytes", prop.l2CacheSize));
+
+  // GPU related information.
+  int compute_clock_mhz = prop.clockRate / 1000;
+  int memory_clock_mhz = prop.memoryClockRate / 1000;
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-compute-unit-count: %d", prop.multiProcessorCount));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-compute-max-clock-rate: %d mHz", compute_clock_mhz));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-memory-max-clock-rate: %d mHz", memory_clock_mhz));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, "\n- gpu-warp-size: %d", prop.warpSize));
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
   return iree_ok_status();
 }
 
@@ -256,7 +301,7 @@ static iree_status_t iree_hal_hip_driver_select_default_device(
                               "no compatible HIP devices were found");
   } else if (default_device_index >= device_count) {
     status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                              "default device %d not found (of %ld enumerated)",
+                              "default device %d not found (of %" PRIhsz " enumerated)",
                               default_device_index, device_count);
   } else {
     *out_device = IREE_DEVICE_ID_TO_HIPDEVICE(
@@ -287,7 +332,7 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
   if (device_id == IREE_HAL_DEVICE_ID_DEFAULT) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_hip_driver_select_default_device(
-                base_driver, &driver->HIP_symbols,
+                base_driver, &driver->hip_symbols,
                 driver->default_device_index, host_allocator, &device));
   } else {
     device = IREE_DEVICE_ID_TO_HIPDEVICE(device_id);
@@ -311,16 +356,16 @@ static iree_status_t iree_hal_hip_driver_create_device_by_uuid(
   // HIP doesn't have an API to do this so we need to scan all devices to
   // find the one with the matching UUID.
   int device_count = 0;
-  IREE_HIP_RETURN_IF_ERROR(&driver->HIP_symbols,
+  IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
                             hipGetDeviceCount(&device_count),
                             "hipGetDeviceCount");
   hipDevice_t device = 0;
   bool found_device = false;
   for (int i = 0; i < device_count; i++) {
-    IREE_HIP_RETURN_IF_ERROR(&driver->HIP_symbols, hipDeviceGet(&device, i),
+    IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols, hipDeviceGet(&device, i),
                               "hipDeviceGet");
     hipUUID query_uuid;
-    IREE_HIP_RETURN_IF_ERROR(&driver->HIP_symbols,
+    IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
                               hipDeviceGetUuid(&query_uuid, device),
                               "hipDeviceGetUuid");
     if (memcmp(&device_uuid->bytes[0], &query_uuid.bytes[0],
@@ -368,7 +413,7 @@ static iree_status_t iree_hal_hip_driver_create_device_by_index(
 
   // Query the number of available HIP devices.
   int device_count = 0;
-  IREE_HIP_RETURN_IF_ERROR(&driver->HIP_symbols,
+  IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
                             hipGetDeviceCount(&device_count),
                             "hipGetDeviceCount");
   if (device_index >= device_count) {
@@ -378,7 +423,7 @@ static iree_status_t iree_hal_hip_driver_create_device_by_index(
   }
 
   hipDevice_t device = 0;
-  IREE_HIP_RETURN_IF_ERROR(&driver->HIP_symbols,
+  IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
                             hipDeviceGet(&device, device_index), "hipDeviceGet");
 
   iree_status_t status = iree_hal_hip_driver_create_device_by_id(
@@ -404,7 +449,7 @@ static iree_status_t iree_hal_hip_driver_create_device_by_path(
   }
 
   if (iree_string_view_consume_prefix(&device_path, IREE_SV("GPU-"))) {
-    // UUID as returned by cuDeviceGetUuid.
+    // UUID as returned by hipDeviceGetUuid.
     hipUUID device_uuid;
     if (!iree_string_view_parse_hex_bytes(device_path,
                                           IREE_ARRAYSIZE(device_uuid.bytes),

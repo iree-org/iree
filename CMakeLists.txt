@@ -605,6 +605,22 @@ iree_register_external_hal_driver(
 )
 
 #-------------------------------------------------------------------------------
+# Experimental HIP HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=hip
+#-------------------------------------------------------------------------------
+
+iree_register_external_hal_driver(
+  NAME
+    hip
+  SOURCE_DIR 
+    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/hip"
+  DRIVER_TARGET
+    iree::experimental::hip::registration
+  REGISTER_FN
+    iree_hal_hip_driver_module_register
+)
+
+#-------------------------------------------------------------------------------
 # Experimental WebGPU HAL driver
 # Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=webgpu
 #-------------------------------------------------------------------------------

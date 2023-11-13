@@ -10,12 +10,12 @@ set(IREE_PACKAGE_ROOT_PREFIX "iree/experimental/hip")
 
 iree_add_all_subdirs()
 
-if(NOT DEFINED ROCM_HEADERS_API_ROOT)
-  set(ROCM_HEADERS_API_ROOT "${IREE_SOURCE_DIR}/third_party/hip-build-deps/include")
+if(NOT DEFINED HIP_HEADERS_API_ROOT)
+  set(HIP_HEADERS_API_ROOT "${IREE_SOURCE_DIR}/third_party/hip-build-deps/include")
 endif()
 
-if(NOT EXISTS "${ROCM_HEADERS_API_ROOT}/hip/hip_version.h")
-  message(SEND_ERROR "Could not find HIP headers at: ${ROCM_HEADERS_API_ROOT}")
+if(NOT EXISTS "${HIP_HEADERS_API_ROOT}/hip/hip_version.h")
+  message(SEND_ERROR "Could not find HIP headers at: ${HIP_HEADERS_API_ROOT}")
 endif()
 
 iree_cc_library(
@@ -27,7 +27,7 @@ iree_cc_library(
     "api.h"
     "hip_driver.c"
   INCLUDES
-    "${ROCM_HEADERS_API_ROOT}"
+    "${HIP_HEADERS_API_ROOT}"
   DEPS
     ::dynamic_symbols
     iree::base
@@ -51,7 +51,7 @@ iree_cc_library(
     "dynamic_symbols.c"
     "status_util.c"
   INCLUDES
-    "${ROCM_HEADERS_API_ROOT}"
+    "${HIP_HEADERS_API_ROOT}"
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   DEPS

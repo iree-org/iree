@@ -18,34 +18,6 @@
 IREE_FLAG(int32_t, hip_default_index, 0,
           "Specifies the index of the default HIP device to use");
 
-IREE_FLAG(bool, hip_default_index_from_mpi, true,
-          "Infers the default HIP device index from the PMI_RANK or\n"
-          "OMPI_COMM_WORLD_LOCAL_RANK environment variables when set");
-
-static bool iree_try_parse_env_i32(const char* var_name, int32_t* out_value) {
-  const char* var_value = getenv(var_name);
-  if (!var_value || strlen(var_value) == 0) return false;
-  return iree_string_view_atoi_int32(iree_make_cstring_view(var_value),
-                                     out_value);
-}
-
-// Tries to infer the device index using the local MPI rank from environment
-// variables; otherwise returns |default_index|.
-//
-// This makes it easy to use N devices on a single system when running via
-// `mpiexec`.
-static int32_t iree_hal_hip_infer_device_index_from_env(
-    int32_t default_index) {
-  // TODO: try more env vars from other implementations. This covers Intel/MS
-  // and OpenMPI today.
-  int32_t result = 0;
-  if (iree_try_parse_env_i32("PMI_RANK", &result) ||
-      iree_try_parse_env_i32("OMPI_COMM_WORLD_LOCAL_RANK", &result)) {
-    return result;
-  }
-  return default_index;
-}
-
 static iree_status_t iree_hal_hip_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
     const iree_hal_driver_info_t** out_driver_infos) {
@@ -81,11 +53,6 @@ static iree_status_t iree_hal_hip_driver_factory_try_create(
   iree_hal_hip_driver_options_initialize(&driver_options);
 
   driver_options.default_device_index = FLAG_hip_default_index;
-  if (FLAG_hip_default_index_from_mpi) {
-    driver_options.default_device_index =
-        iree_hal_hip_infer_device_index_from_env(
-            driver_options.default_device_index);
-  }
 
   iree_status_t status = iree_hal_hip_driver_create(
       driver_name, &driver_options, host_allocator, out_driver);

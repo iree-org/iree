@@ -16,9 +16,9 @@ extern "C" {
 #endif  // __cplusplus
 
 // iree_dynamic_library_t allows dynamically loading a subset of HIP driver API.
-// We load all the symbols in `dynamic_symbol_tables.h` and
-// fail if any of the symbol is not available. The functions signatures are
-// matching the declarations in `hipruntime.h`.
+// We load all the symbols in `dynamic_symbol_tables.h` and fail if any of the
+// symbol is not available. The functions signatures are matching the declarations
+// in `hip_runtime_api.h`.
 
 //===----------------------------------------------------------------------===//
 // HIP dynamic symbols

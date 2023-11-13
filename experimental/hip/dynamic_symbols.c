@@ -42,8 +42,6 @@ static iree_status_t iree_hal_hip_dynamic_symbols_resolve_all(
   return iree_ok_status();
 }
 
-// #undef IREE_CONCAT
-
 iree_status_t iree_hal_hip_dynamic_symbols_initialize(
     iree_allocator_t host_allocator,
     iree_hal_hip_dynamic_symbols_t* out_syms) {
@@ -58,8 +56,8 @@ iree_status_t iree_hal_hip_dynamic_symbols_initialize(
     iree_status_ignore(status);
     status = iree_make_status(
         IREE_STATUS_UNAVAILABLE,
-        "HIP runtime library 'amdhip64.dll'/'libamdhip64.so' not available; please"
-        "ensure installed and in dynamic library search path");
+        "HIP runtime library 'amdhip64.dll'/'libamdhip64.so' not available;"
+        "please ensure installed and in dynamic library search path");
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_dynamic_symbols_resolve_all(out_syms);

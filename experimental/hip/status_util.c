@@ -29,12 +29,12 @@ iree_status_t iree_hal_hip_result_to_status(
 
   const char *error_name = syms->hipGetErrorName(result);
   if (result == hipErrorUnknown) {
-    error_name = "UNKNOWN";
+    error_name = "HIP_ERROR_UNKNOWN";
   }
 
   const char *error_string = syms->hipGetErrorString(result);
   if (result == hipErrorUnknown) {
-    error_string = "Unknown error.";
+    error_string = "unknown error";
   }
 
   return iree_make_status_with_location(
