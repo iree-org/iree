@@ -39,21 +39,10 @@ std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
 // Expression hoisting.
 
 struct ExprHoistingOptions {
-  using SelectGlobalStorageTypeFn = std::function<Type(Type)>;
-  using CastTypeFn = std::function<Value(OpBuilder &, Type, Value)>;
   using RegisterDialectsFn = std::function<void(DialectRegistry &)>;
 
-  // Optional helper functions for setting preferred storage formats for
-  // hoisted globals. `setGlobalStorageFn` may return any type it wants to,
-  // however `unsetGlobalStorageFn` must return a value with the provided
-  // original type.
-  std::optional<SelectGlobalStorageTypeFn> selectGlobalStorageTypeFn =
-      std::nullopt;
-  std::optional<CastTypeFn> setGlobalStorageFn = std::nullopt;
-  std::optional<CastTypeFn> unsetGlobalStorageFn = std::nullopt;
-
-  // Hook to register extra dependent dialects needed for setting storage
-  // formats.
+  // Hook to register extra dependent dialects needed for types implementing
+  // the `HoistableTypeInterace`.
   std::optional<RegisterDialectsFn> registerDependentDialectsFn = std::nullopt;
 
   // Threshold for controlling the maximum allowed increase in the stored size

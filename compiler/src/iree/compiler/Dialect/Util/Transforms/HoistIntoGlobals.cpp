@@ -51,10 +51,7 @@ public:
   }
 
   HoistIntoGlobalsPass(const ExprHoistingOptions &options)
-      : selectGlobalStorageTypeFn(options.selectGlobalStorageTypeFn),
-        setGlobalStorageFn(options.setGlobalStorageFn),
-        unsetGlobalStorageFn(options.unsetGlobalStorageFn),
-        registerDependentDialectsFn(options.registerDependentDialectsFn) {
+      : registerDependentDialectsFn(options.registerDependentDialectsFn) {
     this->maxSizeIncreaseThreshold.setValue(options.maxSizeIncreaseThreshold);
   }
 
@@ -127,8 +124,10 @@ public:
       builder.setInsertionPointAfterValue(originalValue);
       Value load = builder.create<GlobalLoadOp>(globalOp->getLoc(), globalOp);
       // Call user hook to cast back to the original type.
-      if (this->unsetGlobalStorageFn) {
-        load = (*unsetGlobalStorageFn)(builder, originalValue.getType(), load);
+      if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
+              originalValue.getType())) {
+        load = hoistableType.unsetPreferredStorageType(
+            builder, load.getLoc(), originalValue.getType(), load);
       }
       if (load.getType() != originalValue.getType()) {
         getOperation().emitError()
@@ -230,9 +229,13 @@ public:
     for (Value origResult : rootOp->getResults()) {
       Value clonedResult = cloneMapping.lookup(origResult);
       Type globalType = origResult.getType();
-      // Call user hook to cast to get the preferred global storage type.
-      if (this->selectGlobalStorageTypeFn) {
-        globalType = (*selectGlobalStorageTypeFn)(globalType);
+      // If the original type is registered as hoistable, invoke the interface
+      // functions for setting the preferred storage type.
+      auto hoistableType =
+          dyn_cast<IREE::Util::HoistableTypeInterface>(globalType);
+      // Get the preferred global storage type.
+      if (hoistableType) {
+        globalType = hoistableType.getPreferredStorageType();
       }
       GlobalOp globalOp =
           globalBuilder.create<GlobalOp>(loc, "hoisted", false, globalType);
@@ -246,9 +249,10 @@ public:
       // And store into it.
       LLVM_DEBUG(dbgs() << "    CREATE GLOBAL " << globalSymbol << " = "
                         << clonedResult << "\n");
-      // Call user hook to cast to the preferred global storage type.
-      if (this->setGlobalStorageFn) {
-        clonedResult = (*setGlobalStorageFn)(builder, globalType, clonedResult);
+      // Cast to the preferred global storage type.
+      if (hoistableType) {
+        clonedResult = hoistableType.setPreferredStorageType(
+            builder, clonedResult.getLoc(), globalType, clonedResult);
       }
       if (clonedResult.getType() != globalType) {
         globalOp.emitError()
@@ -302,10 +306,6 @@ public:
   }
 
 private:
-  const std::optional<ExprHoistingOptions::SelectGlobalStorageTypeFn>
-      selectGlobalStorageTypeFn;
-  const std::optional<ExprHoistingOptions::CastTypeFn> setGlobalStorageFn;
-  const std::optional<ExprHoistingOptions::CastTypeFn> unsetGlobalStorageFn;
   const std::optional<ExprHoistingOptions::RegisterDialectsFn>
       registerDependentDialectsFn;
 };

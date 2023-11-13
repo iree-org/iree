@@ -27,6 +27,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
+#include "iree/compiler/GlobalOptimization/Interfaces/Interfaces.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
 #include "iree/compiler/Modules/IO/Parameters/IR/IOParametersDialect.h"
@@ -57,6 +58,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // External models.
   IREE::Util::registerUtilExternalModels(registry);
   registerCodegenInterfaces(registry);
+  registerGlobalOptimizationInterfaces(registry);
   registerUKernelBufferizationInterface(registry);
 }
 

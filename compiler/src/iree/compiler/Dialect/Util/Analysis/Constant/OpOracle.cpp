@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -57,12 +56,18 @@ ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
 // it is best to be conservative here, and we limit to known value
 // types.
 bool isLegalConstExprType(Type t) {
+  // If implementing the hoistable interface, just return what the interface
+  // says.
+  if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(t)) {
+    return hoistableType.isHoistableType();
+  }
   if (llvm::isa<IntegerType, FloatType>(t)) {
     // TODO: We shouldn't need to be this conservative about the bit widths we
     // support, but for now the consteval JIT has interop limitations. Lift
     // this restriction when the JIT interops for all types.
-    int64_t bitWidth = t.getIntOrFloatBitWidth();
-    return llvm::isPowerOf2_64(bitWidth) && bitWidth <= 64;
+    auto bitWidth = t.getIntOrFloatBitWidth();
+    return bitWidth == 1 || bitWidth == 8 || bitWidth == 16 || bitWidth == 32 ||
+           bitWidth == 64;
   }
 
   if (llvm::isa<IndexType>(t)) {
@@ -165,14 +170,8 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     }
   }
 
-  // Never hoist boolean values: in legal programs, these will be
-  // cast or packed in some successor.
-  if (auto integerType = llvm::dyn_cast<IntegerType>(
-          getElementTypeOrSelf(info->constValue.getType()))) {
-    if (integerType.getWidth() % 8 == 1) {
-      return false;
-    }
-  }
+  // First check whether we should hoist this kind of operation. Type local
+  // decisions should always come last.
 
   // Generally, we prefer to not hoist broadcasts.
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
@@ -195,6 +194,22 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
   if (isa<tensor::EmptyOp, tensor::ExpandShapeOp, tensor::CollapseShapeOp>(
           op)) {
     return false;
+  }
+
+  // If implementing the HoistableTypeInterface, just return what the interface
+  // says.
+  if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
+          info->constValue.getType())) {
+    return hoistableType.isHoistableLeafType();
+  }
+
+  // Never hoist sub-byte aligned values: in legal programs, these will be
+  // cast or packed in some successor.
+  if (auto integerType = llvm::dyn_cast<IntegerType>(
+          getElementTypeOrSelf(info->constValue.getType()))) {
+    if (integerType.getWidth() % 8 != 0) {
+      return false;
+    }
   }
 
   return true;

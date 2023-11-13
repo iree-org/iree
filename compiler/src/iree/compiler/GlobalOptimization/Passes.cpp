@@ -8,11 +8,9 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
-#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
@@ -20,43 +18,6 @@ namespace iree_compiler {
 namespace GlobalOptimization {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
-
-static Type getPreferredGlobalStorageType(Type originalType) {
-  auto tensorType = dyn_cast<RankedTensorType>(originalType);
-  // Constant data should be statically shaped.
-  if (!tensorType || !tensorType.hasStaticShape()) {
-    return originalType;
-  }
-  unsigned elementBitWidth =
-      IREE::Util::getTypeBitWidth(tensorType.getElementType());
-  // Bit cast sub-byte and non-byte aligned tensor types as MLIR cannot store
-  // them packed at the moment. Also bools continue getting special treatment.
-  if (elementBitWidth == 1 ||
-      (llvm::isPowerOf2_32(elementBitWidth) && elementBitWidth >= 8)) {
-    return originalType;
-  }
-  int64_t numElements = ShapedType::getNumElements(tensorType.getShape());
-  // Bail out if the data can't be aligned on bytes.
-  if (numElements * elementBitWidth % 8 != 0) {
-    return originalType;
-  }
-  return RankedTensorType::get(
-      {numElements * elementBitWidth / 8},
-      Builder(originalType.getContext()).getIntegerType(8));
-}
-
-static Value bitcastToType(OpBuilder &b, Type targetType, Value global) {
-  if (global.getType() == targetType) {
-    return global;
-  }
-  if (!isa<RankedTensorType>(global.getType()) ||
-      !isa<RankedTensorType>(targetType)) {
-    return global;
-  }
-  // No dynamic dims because we are always bitcasting constants.
-  return b.create<IREE::Flow::TensorBitCastOp>(
-      global.getLoc(), targetType, global, ValueRange(), ValueRange());
-}
 
 static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     "iree-global-opt-enable-quantized-matmul-reassociation",
@@ -69,9 +30,6 @@ void buildGlobalOptExprHoistingPassPipeline(
   IREE::Util::ExprHoistingOptions options;
   options.maxSizeIncreaseThreshold =
       transformOptions.options.constExprMaxSizeIncreaseThreshold;
-  options.selectGlobalStorageTypeFn = getPreferredGlobalStorageType;
-  options.setGlobalStorageFn = bitcastToType;
-  options.unsetGlobalStorageFn = bitcastToType;
   options.registerDependentDialectsFn = [](DialectRegistry &registry) {
     registry.insert<IREE::Flow::FlowDialect>();
   };
