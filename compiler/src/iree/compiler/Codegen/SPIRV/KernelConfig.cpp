@@ -1186,15 +1186,20 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   // Make sure reduction dimensions are static and innermost ones.
+  int64_t numDynamicReductionDims = 0;
   for (unsigned dim : reductionDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
-      LLVM_DEBUG(llvm::dbgs() << "failed: dynamic shapes in reduction dims\n");
-      return failure();
+      numDynamicReductionDims++;
     }
     if (dim < numParallelDims) {
       LLVM_DEBUG(llvm::dbgs() << "failed: non-innermost reduction dims\n");
       return failure();
     }
+  }
+
+  // Distribution of multi-dim masked writes currently aren't fully supported.
+  if (numDynamicReductionDims > 1) {
+    return failure();
   }
 
   if (op.getRegionOutputArgs().size() != 1)
@@ -1227,6 +1232,40 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+
+  // Tile all the parallel dimension to 1.
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
+  partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+
+  // Without any bounds on dynamic reduction dims, we need specialization to
+  // get peak performance. For now, just use the subgroup size.
+  if (numDynamicReductionDims) {
+    SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+    reductionTileSizes[reductionDims[0]] = subgroupSize;
+    TileSizesListType tileSizes;
+    tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
+    tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+    std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
+    if (failed(setOpConfigAndEntryPointFnTranslation(
+            op->getParentOfType<func::FuncOp>(), op, tileSizes,
+            CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
+      return failure();
+    }
+
+    // Set lowering configuration to drive tiling for other Linalg ops too---the
+    // pipeline expects it.
+    op->getParentOfType<FunctionOpInterface>().walk([&](linalg::LinalgOp op) {
+      setLoweringConfig(op, IREE::Codegen::LoweringConfigAttr::get(
+                                op.getContext(), tileSizes));
+    });
+    return success();
+  }
+
   int64_t reductionSize = 1;
   for (int64_t dim : reductionDims)
     reductionSize *= bounds[dim];
@@ -1295,14 +1334,6 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
-  // Tile all the parallel dimension to 1.
-  SmallVector<unsigned> partitionedLoops =
-      cast<PartitionableLoopsInterface>(op.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
-  llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
-  partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
-  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
 
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t remaingGroupSize = groupSize;

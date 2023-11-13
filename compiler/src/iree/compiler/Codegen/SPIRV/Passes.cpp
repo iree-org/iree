@@ -545,6 +545,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   // unrolling or lowering, which is done later.
   {
     GenericVectorizationPassOptions options;
+    options.enableVectorMasking = true;
+    options.useConfiguredVectorSizes = false;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
