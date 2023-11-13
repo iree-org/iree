@@ -9,6 +9,18 @@
 
 include "mlir/Pass/PassBase.td"
 
+def Converti48Toi64 :
+    Pass<"iree-tosa-convert-i48-to-i64", "mlir::func::FuncOp"> {
+  let summary = "Converts all i48s to i64s";
+  let constructor = "mlir::iree_compiler::createConverti48Toi64()";
+}
+
+def StripSignedness :
+    InterfacePass<"iree-tosa-strip-signedness", "mlir::FunctionOpInterface"> {
+  let summary = "Legalizes ui tensors constants to uis";
+  let constructor = "mlir::iree_compiler::createStripSignednessPass()";
+}
+
 def TosaToLinalgExt :
     Pass<"iree-tosa-to-linalg-ext", "mlir::func::FuncOp"> {
   let summary = "Convert TOSA operations to their equivalent linalg-ext operations.";
@@ -25,12 +37,6 @@ def VerifyCompilerTOSAInputLegality :
     Pass<"iree-tosa-verify-compiler-input-legality", "ModuleOp"> {
   let summary = "Verifies that only supported IR constructs are passed to the compiler.";
   let constructor = "mlir::iree_compiler::createVerifyCompilerTOSAInputLegality()";
-}
-
-def Converti48Toi64 :
-    Pass<"iree-convert-i48-to-i64", "mlir::func::FuncOp"> {
-  let summary = "Converts all i48s to i64s";
-  let constructor = "mlir::iree_compiler::createConverti48Toi64()";
 }
 
 #endif // TOSA_IREE_INPUTCONVERSION_PASSES

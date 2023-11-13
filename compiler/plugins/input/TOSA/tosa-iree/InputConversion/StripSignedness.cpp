@@ -4,15 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "tosa-iree/InputConversion/PassDetail.h"
+#include "tosa-iree/InputConversion/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
 
 namespace {
 
@@ -132,7 +131,5 @@ createStripSignednessPass() {
   return std::make_unique<StripSignednessPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir

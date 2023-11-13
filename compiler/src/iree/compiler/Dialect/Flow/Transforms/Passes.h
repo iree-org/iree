@@ -107,10 +107,6 @@ std::unique_ptr<Pass> createConvertToFlowPass();
 // iree-flow-infer-numeric-narrowing.
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
-// Strips the signed/unsigned portion off of tensors.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createStripSignednessPass();
-
 // Decomposes top-level SCF operations to CFG.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTopLevelSCFToCFGPass();

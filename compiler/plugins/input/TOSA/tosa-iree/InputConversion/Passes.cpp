@@ -6,7 +6,6 @@
 
 #include "tosa-iree/InputConversion/Passes.h"
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Conversion/TosaToLinalg/TosaToLinalg.h"
@@ -14,6 +13,7 @@
 #include "mlir/Conversion/TosaToTensor/TosaToTensor.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tosa/Transforms/Passes.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -60,10 +60,8 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToArith());
   passManager.addNestedPass<func::FuncOp>(tosa::createTosaToTensor());
 
-  // TODO(scotttodd): move IREE::Flow::createStripSignednessPass into plugin
-  //     (should in-tree plugins even depend on other in-tree code?)
   passManager.addNestedPass<func::FuncOp>(
-      IREE::Flow::createStripSignednessPass());
+      iree_compiler::createStripSignednessPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   passManager.addNestedPass<func::FuncOp>(
