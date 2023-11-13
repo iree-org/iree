@@ -102,7 +102,6 @@ iree_cc_test(
   DEPS
     IREEInputDialect
     MLIRIR
-    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::testing::gtest
     iree::testing::gtest_main
