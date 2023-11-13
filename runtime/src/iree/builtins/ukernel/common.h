@@ -219,16 +219,6 @@
 #define IREE_UK_STATIC_ASSERT(COND) _Static_assert(COND, #COND)
 
 //===----------------------------------------------------------------------===//
-// IREE_UK_STATIC_ASSERT, a static assert macro usable in C and C++.
-//===----------------------------------------------------------------------===//
-
-#if defined(__cplusplus)
-#define IREE_UK_STATIC_ASSERT(COND) static_assert(COND, #COND)
-#else
-#define IREE_UK_STATIC_ASSERT(COND) _Static_assert(COND, #COND)
-#endif
-
-//===----------------------------------------------------------------------===//
 // Local replacements for stdint.h types and constants
 // Refer to the comment at the top of this file for why we can't include
 // stdint.h.
