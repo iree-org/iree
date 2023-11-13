@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_cc_test", "iree_gentbl_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -101,17 +101,5 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
-    ],
-)
-
-iree_compiler_cc_test(
-    name = "IREEImportPublicTest",
-    srcs = ["IREEImportPublicTest.cpp"],
-    deps = [
-        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
-        "//llvm-external-projects/iree-dialects:IREEInputDialect",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-        "@llvm-project//mlir:IR",
     ],
 )

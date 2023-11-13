@@ -94,17 +94,4 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
-  NAME
-    IREEImportPublicTest
-  SRCS
-    "IREEImportPublicTest.cpp"
-  DEPS
-    IREEInputDialect
-    MLIRIR
-    iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
