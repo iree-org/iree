@@ -51,7 +51,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformDialect
     MLIRTransformDialectTransforms
-    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
