@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <iree/compiler/Codegen/Utils/Utils.h>
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
@@ -138,6 +139,11 @@ static Type getElementTypeForUKernel(Value input) {
 static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
                    bool skipIntermediateRoundings) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  const char ukernelName[] = "mmt4d";
+  if (!hasUkernel(targetAttr, ukernelName)) {
+    return failure();
+  }
   Value lhs = getInputForUKernel(op.getDpsInputOperand(0)->get());
   Value rhs = getInputForUKernel(op.getDpsInputOperand(1)->get());
   Value out = op.getDpsInitOperand(0)->get();
@@ -201,8 +207,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   Value k0 = getDimAsI32(rewriter, loc, rhs, 3);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  auto fn = getFnNameAndDefAttrs("mmt4d", rewriter, targetAttr);
+  auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, outType, fn.name, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
@@ -215,6 +220,11 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
 static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
                    bool /*skipIntermediateRoundings*/) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  const char ukernelName[] = "pack";
+  if (!hasUkernel(targetAttr, ukernelName)) {
+    return failure();
+  }
   Value in = op.getSource();
   Value out = op.getDest();
   auto inType = llvm::cast<ShapedType>(in.getType());
@@ -317,8 +327,7 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
   Value out_size3 = rewriter.create<tensor::DimOp>(loc, out, 3);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  auto fn = getFnNameAndDefAttrs("pack", rewriter, targetAttr);
+  auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, outType, fn.name, in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
@@ -332,6 +341,11 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
 static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
                    bool /*skipIntermediateRoundings*/) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  const char ukernelName[] = "unpack";
+  if (!hasUkernel(targetAttr, ukernelName)) {
+    return failure();
+  }
   Value in = op.getSource();
   Value out = op.getDest();
   auto inType = llvm::cast<ShapedType>(in.getType());
@@ -399,8 +413,7 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
   Value out_size1 = rewriter.create<tensor::DimOp>(loc, out, 1);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  auto fn = getFnNameAndDefAttrs("unpack", rewriter, targetAttr);
+  auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, outType, fn.name, in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
@@ -457,6 +470,11 @@ static uint32_t getFlagForRole(IREE::LinalgExt::EncodingRole role) {
 static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
                    bool /*skipIntermediateRoundings*/) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  const char ukernelName[] = "query_tile_sizes.2d";
+  if (!hasUkernel(targetAttr, ukernelName)) {
+    return failure();
+  }
   auto tensorType = op.getTensorType().dyn_cast<RankedTensorType>();
   if (!tensorType) {
     return rewriter.notifyMatchFailure(op,
@@ -484,8 +502,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   }
   inputValues.push_back(rewriter.create<arith::ConstantIntOp>(
       loc, flagForUserAndOperandTypes | flagForRole, 32));
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  auto fn = getFnNameAndDefAttrs("query_tile_sizes.2d", rewriter, targetAttr);
+  auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, resultTypes, fn.name, inputValues, /*outs=*/ValueRange{},
       /*other_operands=*/ValueRange{},
