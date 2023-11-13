@@ -88,56 +88,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTilingInterfaceTilingPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
 
-/// TypeConverter to use for materializing the encoding.
-struct MaterializeEncodingTypeConverter : public TypeConverter {
-  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn);
-  const MaterializeEncodingFn &getMaterializeEncodingFn() const {
-    return materializeEncodingFn;
-  }
-
-private:
-  const MaterializeEncodingFn materializeEncodingFn;
-};
-
-/// Conversion target to use for for materializing the encoding.
-struct MaterializeEncodingConversionTarget : public ConversionTarget {
-  MaterializeEncodingConversionTarget(MLIRContext &context);
-};
-
-/// Base class for patterns that materialize encoding.
-template <typename OpTy>
-class OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
-public:
-  OpMaterializeEncodingPattern(
-      MLIRContext *context,
-      const MaterializeEncodingTypeConverter &typeConverter,
-      MaterializeEncodingValueFn materializeEncodingValueFn = {},
-      PatternBenefit benefit = 1)
-      : OpConversionPattern<OpTy>(typeConverter, context, benefit),
-        materializeEncodingValueFn(materializeEncodingValueFn) {}
-
-protected:
-  const MaterializeEncodingValueFn materializeEncodingValueFn;
-};
-
-/// Method to populate the patterns to convert operations that have operands
-/// with tensor encodings into ops that materialize the layout specified by the
-/// encoding, as well as ops that perform the computation on the materialized
-/// layout. For now these hard-code a fixed way the lowering is encoded, but the
-/// encoding can be made backend specific. Also initializes the
-/// `conversionTarget` and `typeConverter`.
-void populateMaterializeEncodingPatterns(
-    RewritePatternSet &patterns,
-    MaterializeEncodingConversionTarget &conversionTarget,
-    MaterializeEncodingTypeConverter &typeConverter,
-    MaterializeEncodingValueFn materializeEncodingValueFn = {});
-
-void populateMaterializeUpperBoundTileSizePatterns(
-    RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
-
-/// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
-std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();
-
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 
 /// Function signature to control reduction splitting. This returns the split

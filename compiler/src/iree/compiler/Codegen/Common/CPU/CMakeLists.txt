@@ -48,7 +48,6 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
-    IREELinalgExtEncodingUtils
     IREELinalgExtTransforms
     IREELinalgExtUtils
     LLVMSupport
@@ -71,6 +70,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF
