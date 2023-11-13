@@ -9,10 +9,6 @@
 
 #include "iree/builtins/ukernel/common.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 // `mmt4d` microkernel. Used on LLVMCPU (as well as VMVX), due to difficulty of
 // code generation of matrix multiplications kernels.
 
@@ -37,9 +33,5 @@ typedef struct iree_uk_mmt4d_params_t {
 } iree_uk_mmt4d_params_t;
 
 IREE_UK_EXPORT int iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_BUILTINS_UKERNEL_MMT4D_H_

@@ -9,10 +9,6 @@
 
 #include "iree/builtins/ukernel/common.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 // `unpack` microkernel. Currently only used in the VMVX backend, not used in
 // the LLVMCPU backend, because codegen is thought to be good enough and because
 // pack ops tend to get fused with many other ops, with substantial performance
@@ -36,9 +32,5 @@ typedef struct iree_uk_unpack_params_t {
 } iree_uk_unpack_params_t;
 
 IREE_UK_EXPORT int iree_uk_unpack(const iree_uk_unpack_params_t* params);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_BUILTINS_UKERNEL_UNPACK_H_
