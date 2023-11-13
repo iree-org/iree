@@ -29,9 +29,6 @@
 // Include common flag values, shared with the compiler.
 #include "iree/builtins/ukernel/exported_bits.h"
 
-// Include IREE_UK_STATIC_ASSERT.
-#include "iree/builtins/ukernel/static_assert.h"
-
 // Clang on Windows has __builtin_clzll; otherwise we need to use the
 // windows intrinsic functions.
 #if defined(_MSC_VER)
@@ -215,6 +212,16 @@ extern "C" {
 #define bool _Bool
 #define true 1
 #define false 0
+#endif
+
+//===----------------------------------------------------------------------===//
+// IREE_UK_STATIC_ASSERT, a static assert macro usable in C and C++.
+//===----------------------------------------------------------------------===//
+
+#if defined(__cplusplus)
+#define IREE_UK_STATIC_ASSERT(COND) static_assert(COND, #COND)
+#else
+#define IREE_UK_STATIC_ASSERT(COND) _Static_assert(COND, #COND)
 #endif
 
 //===----------------------------------------------------------------------===//
