@@ -171,36 +171,20 @@ private:
 };
 
 llvm::ThreadPoolStrategy getGlobalThreadPoolStrategy() {
-  // We allow two environment variables to control the compiler thread pool.
-  //   IREE_COMPILER_THREAD_COUNT: If present (and not empty or 0), will
-  //     create a thread pool with the requested number of threads, even
-  //     if this is unwise or beyond the limit limit of hardware concurrency.
+  // We allow environment variables to control the compiler thread pool.
   //   IREE_COMPILER_TASK_COUNT: Specifies a target maximum number of
   //     concurrent tasks to support at any given time. The actual number
   //     of threads will be limited to the hardware concurrency if in
   //     excess. If zero, then the hardware concurrency is used.
-  // In the absence of any environment variables, the behavior is as if
-  // IREE_COMPILER_TASK_COUNT was specified with a hard-coded value that
-  // has been chosen by project developers. If a number greater than
-  // zero IREE_COMPILER_THREAD_COUNT will take precedence.
-  const char *envThreadCount = getenv("IREE_COMPILER_THREAD_COUNT");
   const char *envTaskCount = getenv("IREE_COMPILER_TASK_COUNT");
 
   // As of 2023-11-11, the compiler was capable of exploiting ~12x parallelism
   // on large workloads, and this does not cause much increased latency or
   // memory usage on untuned build system jobs which are dispatching large
   // numbers of compilation commands or single-kernel, complicated compilation.
-  unsigned threadCount = 0;
+  // This test was done on a 32-core/64-thread ThreadRipper with 128GB of RAM.
   unsigned taskCount = 12;
 
-  if (envThreadCount) {
-    StringRef srThreadCount(envThreadCount);
-    if (!srThreadCount.empty() && srThreadCount.getAsInteger(10, threadCount)) {
-      llvm::errs() << "IREE COMPILER: Ignoring malformed value for "
-                      "IREE_COMPILER_THREAD_COUNT ('"
-                   << envThreadCount << "')\n";
-    }
-  }
   if (envTaskCount) {
     StringRef srTaskCount(envTaskCount);
     if (!srTaskCount.empty() && srTaskCount.getAsInteger(10, taskCount)) {
@@ -211,13 +195,8 @@ llvm::ThreadPoolStrategy getGlobalThreadPoolStrategy() {
   }
 
   llvm::ThreadPoolStrategy strategy;
-  if (threadCount != 0) {
-    strategy.ThreadsRequested = threadCount;
-  } else {
-    strategy.ThreadsRequested = taskCount;
-    strategy.Limit = true;
-  }
-
+  strategy.ThreadsRequested = taskCount;
+  strategy.Limit = true;
   return strategy;
 }
 
