@@ -109,6 +109,7 @@ iree_compiler_cc_test(
     srcs = ["IREEImportPublicTest.cpp"],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
