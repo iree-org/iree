@@ -73,3 +73,28 @@ hal.executable @abs_ex_dispatch_0 {
 }
 // CHECK-LABEL: llvm.func @reduction_maximum
 // CHECK:  llvm.intr.vector.reduce.fmax({{.*}})  : (vector<2xf32>) -> f32
+
+// -----
+// Test that gpu barriers be lowered to `s_waitcnt lgkmcnt(0)\0As_barrier` on rocm
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>,
+  #hal.descriptor_set.layout<1, bindings = [
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @matmul_dispatch_0 {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export @matmul_dispatch_0 layout(#pipeline_layout)
+    builtin.module {
+      func.func @matmul_dispatch_0() {
+        gpu.barrier
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: llvm.func @matmul_dispatch_0
+// CHECK: llvm.inline_asm has_side_effects asm_dialect = att "s_waitcnt lgkmcnt(0)\0As_barrier", ""  : () -> ()

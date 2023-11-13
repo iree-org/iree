@@ -72,6 +72,10 @@ iree_cc_library(
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     LLVMSupport
+    MLIRAMDGPUDialect
+    MLIRAMDGPUToROCDL
+    MLIRAMDGPUTransforms
+    MLIRAMDGPUUtils
     MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAnalysis
@@ -109,6 +113,8 @@ iree_cc_library(
     MLIRPDLInterpDialect
     MLIRPass
     MLIRROCDLDialect
+    MLIRROCDLTarget
+    MLIRROCDLToLLVMIRTranslation
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
