@@ -17,6 +17,6 @@ iree_cc_library(
     MLIRPass
     MLIRTransforms
     iree::compiler::PluginAPI
-    stablehlo-iree::InputConversion::InputConversion
+    stablehlo-iree::Conversion::Conversion
   PUBLIC
 )

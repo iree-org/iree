@@ -11,7 +11,7 @@
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
-#include "stablehlo-iree/InputConversion/Passes.h"
+#include "stablehlo-iree/Conversion/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {

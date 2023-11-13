@@ -27,7 +27,7 @@ iree_compiler_cc_library(
         "-I$(GENDIR)/compiler/plugins/input/StableHLO",
     ],
     deps = [
-        "//compiler/plugins/input/StableHLO/stablehlo-iree/InputConversion",
+        "//compiler/plugins/input/StableHLO/stablehlo-iree/Conversion",
         "//compiler/src/iree/compiler/PluginAPI",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:IR",
