@@ -1,4 +1,3 @@
-
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.consumed}) {
     // Get attention op
@@ -31,11 +30,11 @@ module attributes { transform.with_named_sequence } {
     // Tile and decompose attention
     // ==========================================
     %attention4 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %acc_fill, %max_fill, %sum_fill, %inner_loop, %last_truncate, %blocked_attention = transform.tile_attention %attention4 :
-      (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
-    %fill_op, %first_matmul, %reduce_max, %partial_softmax, %update, %reduce_sum, %reciprocal_sum, %softmax, %truncate, %scale_acc, %second_matmul
+    %acc_fill, %max_fill, %sum_fill, %inner_loop, %final_scaling, %last_truncate, %blocked_attention = transform.tile_attention %attention4 :
+      (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %fill_op, %first_matmul, %reduce_max, %partial_softmax, %scale_factor, %update, %reduce_sum, %truncate, %scale_acc, %second_matmul
         = transform.decompose_tiled_attention %blocked_attention :
-      (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+      (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
 
     // Promote key and value operands
     // ==========================================
@@ -47,31 +46,53 @@ module attributes { transform.with_named_sequence } {
     // Tile and fuse attention ops
     // ==========================================
     %tiled_matmul, %forall = transform.structured.tile_using_forall %promoted_second_matmul tile_sizes [32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %tiled_reduce_sum, %forall_reduce = transform.structured.tile_using_forall %reduce_sum tile_sizes [32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+
 
     %f0, %loop0 = transform.structured.fuse_into_containing_op %scale_acc into %forall : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
     %f1, %loop1 = transform.structured.fuse_into_containing_op %truncate into %loop0 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    %f2, %loop2 = transform.structured.fuse_into_containing_op %softmax into %loop1 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.apply_cse %func : !transform.any_op
 
-    %f3, %loop3 = transform.structured.fuse_into_containing_op %reciprocal_sum into %loop2 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    %f4, %loop4 = transform.structured.fuse_into_containing_op %reduce_sum into %loop3 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %loop4 = transform.loop.fuse_sibling %forall_reduce into %loop1 : (!transform.any_op, !transform.any_op) -> !transform.any_op
     transform.iree.apply_cse %func : !transform.any_op
 
-    %f5, %loop5 = transform.structured.fuse_into_containing_op %update into %loop4 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %f5_1, %loop5_1 = transform.structured.fuse_into_containing_op %update into %loop4 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.iree.apply_cse %func : !transform.any_op
+
+    %f5, %loop5 = transform.structured.fuse_into_containing_op %scale_factor into %loop5_1 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
     %f6, %loop6 = transform.structured.fuse_into_containing_op %partial_softmax into %loop5 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.iree.apply_cse %func : !transform.any_op
 
     %f7, %loop7 = transform.structured.fuse_into_containing_op %reduce_max into %loop6 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
     %f8, %loop8 = transform.structured.fuse_into_containing_op %promoted_first_matmul into %loop7 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    %f9, %loop9 = transform.structured.fuse_into_containing_op %fill_op into %loop8 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.apply_patterns to %func {
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
     transform.iree.apply_cse %func : !transform.any_op
 
-    // Distribute fills and last truncate
+    %f9, %loop9 = transform.structured.fuse_into_containing_op %fill_op into %loop8 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+
+    transform.apply_patterns to %func {
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
+    transform.iree.apply_cse %func : !transform.any_op
+
+    // Distribute fills
     // ==========================================
-    %fills = transform.merge_handles %acc_fill, %max_fill, %sum_fill, %last_truncate : !transform.any_op
+    %fills = transform.merge_handles %acc_fill, %max_fill, %sum_fill : !transform.any_op
     %tiled_fill, %fill_grid = transform.structured.tile_using_forall %fills tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+
+    // Distribute last_truncate and fuse final_scaling into it
+    // ==========================================
+    %tiled_truncate, %loop_truncate = transform.structured.tile_using_forall %last_truncate tile_sizes[32] (mapping = [#gpu.warp<linear_dim_0>]) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.structured.fuse_into_containing_op %final_scaling into %loop_truncate : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+
+    transform.apply_patterns to %func {
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
+    transform.iree.apply_cse %func : !transform.any_op
 
     // Vectorize function
     // ==========================================
@@ -126,4 +147,4 @@ module attributes { transform.with_named_sequence } {
     transform.memref.erase_dead_alloc_and_stores %func_8 : (!transform.any_op) -> ()
     transform.yield 
   }
-} // module
+} ////  module
