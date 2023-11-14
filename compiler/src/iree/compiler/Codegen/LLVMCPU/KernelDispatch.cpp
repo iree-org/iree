@@ -290,7 +290,7 @@ getMinTilingSizesForEachDim(func::FuncOp entryPointFn, linalg::LinalgOp op,
     if (map.getNumResults() == 0)
       continue;
     auto fastestVaryingDimExpr =
-        map.getResults().back().dyn_cast<AffineDimExpr>();
+        dyn_cast<AffineDimExpr>(map.getResults().back());
     if (!fastestVaryingDimExpr)
       continue;
     unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
@@ -2241,7 +2241,7 @@ static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
     for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
       if (ShapedType::isDynamic(size))
         continue;
-      auto dimExpr = idxMap.getResult(pos).dyn_cast<AffineDimExpr>();
+      auto dimExpr = dyn_cast<AffineDimExpr>(idxMap.getResult(pos));
       if (!dimExpr)
         return failure();
       int mappedPos = dimExpr.getPosition();
