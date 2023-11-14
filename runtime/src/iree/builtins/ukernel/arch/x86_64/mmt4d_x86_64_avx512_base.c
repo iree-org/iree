@@ -68,6 +68,8 @@ iree_uk_mmt4d_tile_f16f16fXX_1x16x1_to_16x16x1_x86_64_avx512_base(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, iree_uk_type_t acc_type, int M0) {
+  IREE_UK_ASSERT(acc_type == IREE_UK_TYPE_FLOAT_32 ||
+                 acc_type == IREE_UK_TYPE_FLOAT_16);
   IREE_UK_ASSERT(M0 >= 1 && M0 <= 16 && iree_uk_is_po2_u32(M0));
   const iree_uk_uint16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_uint16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
