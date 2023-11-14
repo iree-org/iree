@@ -74,6 +74,8 @@ static Value computePartialSoftmax(Value qkTranspose, Value currentMax,
   return genericOp.getResult(0);
 }
 
+/// Return the scale factor for the new softmax maximum and add the generic to
+/// the provided list of operations.
 static Value computeScaleFactor(Value oldMax, Value newMax, Location loc,
                                 OpBuilder &builder,
                                 SmallVectorImpl<Operation *> &ops) {
@@ -81,13 +83,12 @@ static Value computeScaleFactor(Value oldMax, Value newMax, Location loc,
                                                  utils::IteratorType::parallel);
   auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
   SmallVector<AffineMap> indexingMaps(2, identityMap);
-  SmallVector<Type> resultTypes{oldMax.getType()};
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, resultTypes, ValueRange{newMax}, ValueRange{oldMax}, indexingMaps,
-      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+      loc, oldMax.getType(), newMax, oldMax, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
         Value diff = b.create<arith::SubFOp>(loc, args[1], args[0]);
         Value weight = b.create<math::Exp2Op>(loc, diff);
-        b.create<linalg::YieldOp>(loc, ValueRange{weight});
+        b.create<linalg::YieldOp>(loc, weight);
       });
   ops.push_back(genericOp);
   return genericOp.getResult(0);
@@ -100,13 +101,11 @@ static Value updateAndScale(Value scaleFactor, Value oldSum, Location loc,
                                                  utils::IteratorType::parallel);
   auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
   SmallVector<AffineMap> indexingMaps(2, identityMap);
-  SmallVector<Type> resultTypes{oldSum.getType()};
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, resultTypes, ValueRange{scaleFactor}, ValueRange{oldSum},
-      indexingMaps, iteratorTypes,
+      loc, oldSum.getType(), scaleFactor, oldSum, indexingMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value scaledOldSum = b.create<arith::MulFOp>(loc, args[0], args[1]);
-        b.create<linalg::YieldOp>(loc, ValueRange{scaledOldSum});
+        b.create<linalg::YieldOp>(loc, scaledOldSum);
       });
   ops.push_back(genericOp);
   return genericOp.getResult(0);
@@ -147,8 +146,8 @@ static Value applyFinalScaling(Value result, Value newSum, Location loc,
   SmallVector<utils::IteratorType> iteratorTypes(2,
                                                  utils::IteratorType::parallel);
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, result.getType(), ValueRange{newSum}, result, indexingMaps,
-      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+      loc, result.getType(), newSum, result, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
         Value one = b.create<arith::ConstantOp>(
             loc, b.getFloatAttr(args[0].getType(), 1.0));
         Value reciprocal = b.create<arith::DivFOp>(loc, one, args[0]);
@@ -172,9 +171,8 @@ static Value scaleAccumulator(Value accumulator, Value scaleFactor,
   SmallVector<utils::IteratorType> iteratorTypes(2,
                                                  utils::IteratorType::parallel);
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, accumulator.getType(), ValueRange{scaleFactor}, accumulator,
-      indexingMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
+      loc, accumulator.getType(), scaleFactor, accumulator, indexingMaps,
+      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
         Value result = b.create<arith::MulFOp>(loc, args[0], args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
