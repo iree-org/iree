@@ -243,7 +243,7 @@ endif()
 
 if (MSVC_VERSION AND ("${MSVC_VERSION}" VERSION_LESS 1937))
   # Missing _mm512_cvtpbh_ps intrinsic at _MSC_VER=1930.
-  unset(IREE_UK_BUILD_X86_64_AVX512_BF16)
+  unset(IREE_UK_BUILD_X86_64_AVX512_BF16 CACHE)
 endif()
 
 configure_file("config_x86_64.h.in" "config_x86_64.h")
