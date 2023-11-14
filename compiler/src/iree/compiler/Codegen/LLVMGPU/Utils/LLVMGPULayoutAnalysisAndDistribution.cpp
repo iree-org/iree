@@ -478,8 +478,8 @@ static bool isTransposedLdMatrix(AffineMap map) {
   if (map.getNumResults() != 2) {
     return false;
   }
-  auto exprX = dyn_cast<AffineDimExpr>(map);
-  auto exprY = dyn_cast<AffineDimExpr>(map);
+  auto exprX = dyn_cast<AffineDimExpr>(map.getResult(0));
+  auto exprY = dyn_cast<AffineDimExpr>(map.getResult(1));
   if (!exprX || !exprY)
     return false;
   return exprX.getPosition() > exprY.getPosition();

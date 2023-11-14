@@ -366,7 +366,7 @@ public:
     SmallVector<Value> vals;
     std::optional<unsigned> dimension;
     // workgroupSizeOp may have been folded into a constant expression.
-    if (auto wgSize = dyn_cast<AffineConstantExpr>(expr)) {
+    if (auto wgSize = dyn_cast<AffineConstantExpr>(expr.getRHS())) {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS()});
       if (vals.size() != 1 || !vals[0]) {
         return failure();
@@ -438,7 +438,7 @@ public:
     } else {
       // Check if the workgroup tile size is folded into the affine map itself.
       if (loopInfo.tileSize) {
-        if (auto stepCst = dyn_cast<AffineConstantExpr>(expr)) {
+        if (auto stepCst = dyn_cast<AffineConstantExpr>(expr.getRHS())) {
           loopInfo.untiledStep =
               IntegerAttr::get(IndexType::get(applyOp.getContext()),
                                stepCst.getValue() / *loopInfo.tileSize);

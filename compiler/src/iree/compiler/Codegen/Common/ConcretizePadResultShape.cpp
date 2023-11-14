@@ -109,7 +109,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
                           /*numResultSyms=*/numDims + numSyms);
 
         affine::canonicalizeMapAndOperands(&map, &valueSizes);
-        cstExpr = dyn_cast_or_null<AffineConstantExpr>(map.getResult(0));
+        cstExpr = dyn_cast<AffineConstantExpr>(map.getResult(0));
       }
       if (!cstExpr)
         return failure();
