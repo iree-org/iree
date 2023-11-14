@@ -98,7 +98,6 @@ module {
 //       REASSOCIATE-CHECK:   %[[INITMATMUL:.+]] = tensor.empty() : tensor<11008x32xi32>
 //       REASSOCIATE-CHECK:   %[[FILLMATMUL:.+]] = linalg.fill ins(%[[C0I32]]
 //  REASSOCIATE-CHECK-SAME:       outs(%[[INITMATMUL]] :
-//       REASSOCIATE-CHECK:   %[[DISP:.+]] = flow.dispatch.region -> (tensor<11008xf32>)
 //       REASSOCIATE-CHECK:   %[[GENMATMUL:.+]] = linalg.generic
 //  REASSOCIATE-CHECK-SAME:       indexing_maps = [#[[MAP3]], #[[MAP4]], #[[MAP5]]]
 //  REASSOCIATE-CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"]
@@ -124,8 +123,7 @@ module {
 //       REASSOCIATE-CHECK:   %[[RESUBF:.+]] = arith.subf %[[REMULF1]], %[[REMULF3]] : f32
 //       REASSOCIATE-CHECK:   %[[READDF:.+]] = arith.addf %[[RESUBF]], %[[REOUT0]] : f32
 //       REASSOCIATE-CHECK:   linalg.yield %[[READDF]] : f32
-//       REASSOCIATE-CHECK:   flow.return %[[GENREASSOCIATE]] :
-//       REASSOCIATE-CHECK:   return %[[DISP]]
+//       REASSOCIATE-CHECK:   return %[[GENREASSOCIATE]]
 
 // -----
 
