@@ -498,13 +498,16 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   }
 
   if (isPackLikeOp(consumer)) {
-    return isa<linalg::LinalgOp, tensor::PadOp>(producer);
-    /*
-    return TypeSwitch<Operation *, bool>(op)
-        .Case<tensor::PadOp>([](auto padOp) { return true; })
-        .Case<linalg::LinalgOp>([](auto linalgOp) { return true; })
+    return TypeSwitch<Operation *, bool>(producer)
+        .Case<tensor::PadOp>([&](auto padOp) { return true; })
+        .Case<linalg::LinalgOp>([&](auto linalgOp) {
+          auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
+              llvm::cast<OpResult>(fusedOperand.get()));
+          return hasCompatibleOuterParallelLoops(
+              cast<TilingInterface>(linalgOp.getOperation()),
+              producerIndexingMap, rootOuterParallelLoops);
+        })
         .Default([](Operation *) { return false; });
-    */
   }
 
   // By default, padding should be fused with producers. It is hard to square
@@ -626,19 +629,23 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   if (isPackLikeOp(consumer)) {
-    if (auto linalgProducerOp = dyn_cast<linalg::LinalgOp>(producer)) {
-      if (auto packOp = dyn_cast<tensor::PackOp>(consumer)) {
-        // TODO(#12746): fusion of pack with dynamic inner tile size
-        // causes an error in backend. Disable for now.
-        if (!packOp.getInnerTiles().empty()) {
-          return false;
-        }
-      }
-      return linalg::isElementwise(linalgProducerOp) &&
-             linalgProducerOp.getNumLoops() ==
-                 getSourceTypeOfPackLikeOp(consumer).getRank();
-    }
-    return isa<tensor::PadOp>(producer);
+    return TypeSwitch<Operation *, bool>(producer)
+        .Case<tensor::PadOp>([&](auto padOp) { return true; })
+        .Case<linalg::LinalgOp>([&](auto linalgOp) {
+          if (auto packOp = dyn_cast<tensor::PackOp>(consumer)) {
+            // TODO(#12746): fusion of pack with dynamic inner tile size
+            // causes an error in backend. Disable for now.
+            if (!packOp.getInnerTiles().empty()) {
+              return false;
+            }
+          }
+          auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
+              llvm::cast<OpResult>(operand.get()));
+          return hasCompatibleOuterParallelLoops(
+              cast<TilingInterface>(linalgOp.getOperation()),
+              producerIndexingMap, rootOuterParallelLoops);
+        })
+        .Default([](Operation *) { return false; });
   }
 
   if (!isa<linalg::LinalgOp>(consumer) || !isa<linalg::LinalgOp>(producer)) {
