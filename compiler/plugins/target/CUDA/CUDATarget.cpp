@@ -62,6 +62,7 @@ struct CUDAOptions {
   bool clUsePtxas = false;
   std::string clUsePtxasFrom;
   std::string clUsePtxasParams;
+  bool enableLegacySync = true;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("CUDA HAL Target");
@@ -104,6 +105,12 @@ struct CUDAOptions {
         "iree-hal-cuda-use-ptxas-params", clUsePtxasParams,
         llvm::cl::cat(category),
         llvm::cl::desc("Passes the given additional parameters to ptxas."));
+
+    binder.opt<bool>(
+        "iree-hal-cuda-enable-legacy-sync", enableLegacySync,
+        llvm::cl::cat(category),
+        llvm::cl::desc(
+            "Enable legacy sync mode that handles semaphores synchronously."));
   }
 };
 } // namespace
@@ -390,7 +397,9 @@ public:
 
     // Indicates that the runtime HAL driver operates only in the legacy
     // synchronous mode.
-    configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
+    if (options.enableLegacySync) {
+      configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
+    }
 
     configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
