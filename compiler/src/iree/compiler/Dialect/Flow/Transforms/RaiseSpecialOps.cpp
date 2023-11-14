@@ -277,9 +277,9 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
   unsigned currOutDim = 0;
   for (auto [idx, expr] : llvm::enumerate(inputIndexingMap.getResults())) {
     // Assume that the constant access is a rank reducing access.
-    if (expr.isa<AffineConstantExpr>()) {
-      IntegerAttr constIdx = rewriter.getI64IntegerAttr(
-          expr.cast<AffineConstantExpr>().getValue());
+    if (isa<AffineConstantExpr>(expr)) {
+      IntegerAttr constIdx =
+          rewriter.getI64IntegerAttr(cast<AffineConstantExpr>(expr).getValue());
       offsets.push_back(constIdx);
       sizes.push_back(one);
       continue;
