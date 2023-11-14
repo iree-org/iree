@@ -25,6 +25,15 @@ def VMVXLinkExecutables :
   let constructor = "mlir::iree_compiler::createVMVXLinkExecutablesPass()";
 }
 
+def VMVXLowerExecutableTarget :
+    Pass<"iree-vmvx-lower-executable-target",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
+  let constructor =
+      "mlir::iree_compiler::createVMVXLowerExecutableTargetPass()";
+}
+
 def VMVXLowerLinalgMicrokernels :
     Pass<"iree-vmvx-lower-linalg-microkernels", ""> {
   let summary =

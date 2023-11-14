@@ -2548,8 +2548,12 @@ static LogicalResult lowerUsingDefaultPipeline(func::FuncOp entryPointFn) {
     return success();
   }
   // Otherwise lower using default pipeline.
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  auto pipeline = isVMVXBackend(targetAttr)
+                      ? DispatchLoweringPassPipeline::VMVXDefault
+                      : DispatchLoweringPassPipeline::CPUDefault;
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
+      entryPointFn->getContext(), pipeline);
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 

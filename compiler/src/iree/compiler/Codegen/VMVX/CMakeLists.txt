@@ -48,13 +48,13 @@ iree_cc_library(
     "Passes.cpp"
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
+    "VMVXLowerExecutableTargetPass.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
-    MLIRAffineDialect
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRFuncDialect
@@ -64,10 +64,14 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTransforms
+    MLIRVectorDialect
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

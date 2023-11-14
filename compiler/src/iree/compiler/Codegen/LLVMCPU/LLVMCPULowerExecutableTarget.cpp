@@ -254,10 +254,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                                  enableVectorMasking);
         break;
       }
-      case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-        addVMVXDefaultPassPipeline(executableLoweringPipeline,
-                                   enableMicrokernels);
-        break;
       // Transform-dialect pipelines.
       case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
         addTransformDialectPasses(executableLoweringPipeline);

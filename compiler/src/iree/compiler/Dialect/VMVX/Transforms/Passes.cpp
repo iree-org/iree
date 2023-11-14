@@ -55,7 +55,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
   // Tensor-level optimization, kernel dispatch and lower to buffers.
   // ---------------------------------------------------------------------------
-  passManager.addPass(createLLVMCPULowerExecutableTargetPass());
+  passManager.addPass(createVMVXLowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
