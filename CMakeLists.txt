@@ -147,10 +147,10 @@ set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 #
 #   iree_compiler_plugin.cmake : Included in the context of the compiler/
 #     directory before sources and bindings. Will execute with source and
-#     binary dir ${IREE_BUILD_DIR}/compiler/plugins (shared with all other 
+#     binary dir ${IREE_BUILD_DIR}/compiler/plugins (shared with all other
 #     dirs).
 #   iree_runtime_plugin.cmake : Included in the context of the runtime/
-#     directory before sources. Will execute with source and binary dir 
+#     directory before sources. Will execute with source and binary dir
 #     ${IREE_BUILD_DIR}/runtime/plugins (shared with all other dirs).
 #
 # Typically, these plugins will perform additional project setup, and
@@ -169,7 +169,7 @@ set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 # External HAL Driver Plugins
 # ---------------------------
 # HAL driver implementations are advertised to the build system via
-# iree_register_external_hal_driver(), which specifies the name, target, 
+# iree_register_external_hal_driver(), which specifies the name, target,
 # registration function and optional source/binary directory.
 #-------------------------------------------------------------------------------
 
@@ -580,7 +580,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 iree_register_external_hal_driver(
   NAME
     cuda2
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2"
   DRIVER_TARGET
     iree::experimental::cuda2::registration
@@ -596,7 +596,7 @@ iree_register_external_hal_driver(
 iree_register_external_hal_driver(
   NAME
     rocm
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm"
   DRIVER_TARGET
     iree::experimental::rocm::registration
@@ -612,7 +612,7 @@ iree_register_external_hal_driver(
 iree_register_external_hal_driver(
   NAME
     webgpu
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
   DRIVER_TARGET
     iree::experimental::webgpu::registration
@@ -847,10 +847,18 @@ else()
   iree_llvm_add_usage_requirements(LLVMSupport IREELLVMIncludeSetup)
   iree_llvm_add_usage_requirements(MLIRSupport IREELLVMIncludeSetup)
 
-  # Add default external projects.
+  # Add external projects.
+
+  message(STATUS "Configuring llvm-external-projects/mlir-iree-dialects")
+  list(APPEND CMAKE_MESSAGE_INDENT "  ")
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  list(POP_BACK CMAKE_MESSAGE_INDENT)
+
   if(IREE_INPUT_STABLEHLO)
+    message(STATUS "Configuring third_party/stablehlo")
+    list(APPEND CMAKE_MESSAGE_INDENT "  ")
     iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
+    list(POP_BACK CMAKE_MESSAGE_INDENT)
   endif()
 
   # Ensure that LLVM-based dependencies needed for testing are included.
