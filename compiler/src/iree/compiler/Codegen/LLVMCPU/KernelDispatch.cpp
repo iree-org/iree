@@ -1382,10 +1382,8 @@ static SmallVector<int64_t> getPackVectorTileSizes(func::FuncOp entryPointFn,
   return tileSizes;
 }
 
-static LogicalResult
-setRootConfig(func::FuncOp entryPointFn, tensor::PackOp op,
-              DispatchLoweringPassPipeline pipeline =
-                  DispatchLoweringPassPipeline::CPUDataTiling) {
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributionTileSizes(cast<TilingInterface>(op.getOperation()));
