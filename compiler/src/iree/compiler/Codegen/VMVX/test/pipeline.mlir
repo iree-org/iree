@@ -1,4 +1,4 @@
-// RUN: iree-opt  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy, iree-vmvx-lower-executable-target)))" --split-input-file %s | FileCheck %s
 
 hal.executable private @mmt4d_ukernel {
   hal.executable.variant public @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>) {
