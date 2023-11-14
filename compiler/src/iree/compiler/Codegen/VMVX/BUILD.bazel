@@ -47,13 +47,16 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "VMVX",
     srcs = [
+        "KernelDispatch.cpp",
         "LowerLinalgMicrokernels.cpp",
         "Passes.cpp",
         "VMVXAssignConstantOrdinals.cpp",
         "VMVXLinkExecutables.cpp",
         "VMVXLowerExecutableTargetPass.cpp",
+        "VMVXSelectLoweringStrategy.cpp",
     ],
     hdrs = [
+        "KernelDispatch.h",
         "Passes.h",
     ],
     deps = [

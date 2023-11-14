@@ -11,7 +11,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -44,7 +43,7 @@ void buildVMVXConfigurationPassPipeline(OpPassManager &passManager) {
   // TODO: Remove the following pass the plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
-  passManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
+  passManager.addPass(createVMVXSelectLoweringStrategyPass());
 }
 
 // ---------------------------------------------------------------------------
