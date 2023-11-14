@@ -241,6 +241,11 @@ check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_VNNI}" IREE_UK_BUILD_X86_
 check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BF16}" IREE_UK_BUILD_X86_64_AVX512_BF16)
 endif()
 
+if (MSVC_VERSION AND ("${MSVC_VERSION}" VERSION_LESS 1937))
+  # Missing _mm512_cvtpbh_ps intrinsic at _MSC_VER=1930.
+  unset(IREE_UK_BUILD_X86_64_AVX512_BF16)
+endif()
+
 configure_file("config_x86_64.h.in" "config_x86_64.h")
 
 iree_cc_library(
