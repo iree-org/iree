@@ -334,21 +334,6 @@ cc_library(
 )
 
 cc_library(
-    name = "IREELinalgExtEncodingUtils",
-    srcs = [
-        "lib/Dialect/LinalgExt/Utils/EncodingUtils.cpp",
-    ],
-    hdrs = [
-        "include/iree-dialects/Dialect/LinalgExt/Utils/EncodingUtils.h",
-    ],
-    includes = ["include"],
-    deps = [
-        ":IREELinalgExtDialect",
-        ":IREELinalgExtUtils",
-    ],
-)
-
-cc_library(
     name = "IREELinalgExtDialect",
     srcs = glob([
         "lib/Dialect/LinalgExt/IR/*.cpp",
@@ -454,7 +439,6 @@ cc_library(
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
-        ":IREELinalgExtEncodingUtils",
         ":IREELinalgExtPassIncGen",
         ":IREELinalgExtUtils",
         "@llvm-project//llvm:Support",

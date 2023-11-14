@@ -52,7 +52,7 @@ iree_cc_library(
     Common
   HDRS
     "BufferizationAnalysis.h"
-    "EncodingInfo.h"
+    "EncodingUtils.h"
     "ExtractAddressComputation.h"
     "Passes.h"
     "TileSizeSelection.h"
@@ -74,6 +74,7 @@ iree_cc_library(
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
     "EmulateNarrowType.cpp"
+    "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "ExtractAddressComputation.cpp"
