@@ -1382,8 +1382,10 @@ static SmallVector<int64_t> getPackVectorTileSizes(func::FuncOp entryPointFn,
   return tileSizes;
 }
 
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   tensor::PackOp op) {
+static LogicalResult
+setRootConfig(func::FuncOp entryPointFn, tensor::PackOp op,
+              DispatchLoweringPassPipeline pipeline =
+                  DispatchLoweringPassPipeline::CPUDataTiling) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributionTileSizes(cast<TilingInterface>(op.getOperation()));
@@ -2548,8 +2550,12 @@ static LogicalResult lowerUsingDefaultPipeline(func::FuncOp entryPointFn) {
     return success();
   }
   // Otherwise lower using default pipeline.
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  auto pipeline = isVMVXBackend(targetAttr)
+                      ? DispatchLoweringPassPipeline::VMVXDefault
+                      : DispatchLoweringPassPipeline::CPUDefault;
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
+      entryPointFn->getContext(), pipeline);
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 
