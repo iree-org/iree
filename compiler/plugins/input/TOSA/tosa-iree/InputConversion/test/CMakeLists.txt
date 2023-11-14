@@ -14,12 +14,14 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "auto_input_conversion.mlir"
     "convert_i48_to_i64.mlir"
     "strip_signedness.mlir"
     "tosa_to_linalg_ext.mlir"
     "verify_compiler_tosa_input_legality.mlir"
   TOOLS
     FileCheck
+    iree-compile
     iree-opt
 )
 

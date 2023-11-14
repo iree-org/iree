@@ -13,7 +13,6 @@
 #define IREE_COMPILER_TOOLS_INIT_DIALECTS_H_
 
 #include "iree/compiler/Tools/init_compiler_modules.h"
-#include "iree/compiler/Tools/init_input_dialects.h"
 #include "iree/compiler/Tools/init_iree_dialects.h"
 #include "iree/compiler/Tools/init_mlir_dialects.h"
 
@@ -22,7 +21,6 @@ namespace iree_compiler {
 
 inline void registerAllDialects(DialectRegistry &registry) {
   registerMlirDialects(registry);
-  registerInputDialects(registry);
   registerIreeDialects(registry);
 
   mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);

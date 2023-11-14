@@ -94,7 +94,6 @@ iree_compiler_cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        "//compiler/src/iree/compiler/InputConversion/StableHLO",
         "//compiler/src/iree/compiler/PluginAPI",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
@@ -102,6 +101,5 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
-        "@stablehlo//:stablehlo_ops",
     ],
 )

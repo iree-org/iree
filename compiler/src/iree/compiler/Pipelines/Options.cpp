@@ -41,13 +41,13 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
           "Specifies the input program representation:\n"
           "  =none          - No input dialect transformation.\n"
           "  =auto          - Analyze the input program to choose conversion.\n"
-#ifdef IREE_HAVE_STABLEHLO_INPUT
-          "  =stablehlo     - Legalize from StableHLO ops.\n"
-          "  =stablehlo_xla - Legalize from StableHLO ops (with XLA cleanup preprocessing).\n"
-#endif // IREE_HAVE_STABLEHLO_INPUT
 // NOTE: The plugin system does not have a good way to populate CL help
 // messages, so we err on the side of being helpful and populating plugin
 // options here, even though it is a layering violation.
+#ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_STABLEHLO
+          "  =stablehlo     - Legalize from StableHLO ops.\n"
+          "  =stablehlo_xla - Legalize from StableHLO ops (with XLA cleanup preprocessing).\n"
+#endif // IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_STABLEHLO
 #ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TOSA
           "  =tosa          - Legalize from TOSA ops.\n"
 #endif  // IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TOSA
@@ -59,23 +59,6 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
           // clang-format on
           ),
       llvm::cl::cat(category));
-
-#ifdef IREE_HAVE_STABLEHLO_INPUT
-  binder.opt<bool>(
-      "iree-input-demote-i64-to-i32", demoteI64ToI32,
-      llvm::cl::desc("Converts all i64 ops and values into i32 counterparts."),
-      llvm::cl::cat(category));
-
-  binder.opt<bool>(
-      "iree-input-demote-f64-to-f32", demoteF64ToF32,
-      llvm::cl::desc("Converts all f64 ops and values into f32 counterparts."),
-      llvm::cl::cat(category));
-
-  binder.opt<bool>(
-      "iree-input-promote-bf16-to-f32", promoteBF16ToF32,
-      llvm::cl::desc("Converts all bf16 ops and values into f32 counterparts."),
-      llvm::cl::cat(category));
-#endif // IREE_HAVE_STABLEHLO_INPUT
 }
 
 InputDialectOptions::Type InputDialectOptions::parseInputTypeMnemonic() {
@@ -83,12 +66,6 @@ InputDialectOptions::Type InputDialectOptions::parseInputTypeMnemonic() {
     return Type::none;
   } else if (inputTypeMnemonic == "auto") {
     return Type::auto_detect;
-#ifdef IREE_HAVE_STABLEHLO_INPUT
-  } else if (inputTypeMnemonic == "stablehlo") {
-    return Type::stablehlo;
-  } else if (inputTypeMnemonic == "stablehlo_xla") {
-    return Type::stablehlo_xla;
-#endif
   } else {
     return Type::plugin;
   }

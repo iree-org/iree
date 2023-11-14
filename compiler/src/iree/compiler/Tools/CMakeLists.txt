@@ -40,29 +40,6 @@ if(IREE_EMBEDDED_RELEASE_INFO)
   list(APPEND IREE_VERSION_TARGET_COPTS "-DIREE_RELEASE_VERSION=\"${IREE_RELEASE_VERSION}\"")
 endif()
 
-# Enable input dialects based on options.
-set(IREE_INPUT_DEPS "")
-if(IREE_INPUT_STABLEHLO)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
-  list(APPEND IREE_INPUT_DEPS ChloOps)
-  list(APPEND IREE_INPUT_DEPS StablehloOps)
-endif()
-
-iree_cc_library(
-  NAME
-    init_input_passes_and_dialects
-  HDRS
-    "init_input_dialects.h"
-    "init_input_passes.h"
-  SRCS
-    "init_input_dialects.cc"
-    "init_input_passes.cc"
-  DEPS
-    ${IREE_INPUT_DEPS}
-    iree::compiler::InputConversion::Common
-  PUBLIC
-)
-
 iree_cc_library(
   NAME
     init_iree_passes_and_dialects
@@ -98,6 +75,7 @@ iree_cc_library(
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::VMVX::Transforms
     iree::compiler::Dialect::Vulkan::IR
+    iree::compiler::InputConversion::Common
     iree::compiler::Modules::HAL::Inline::IR::HALInlineDialect
     iree::compiler::Modules::HAL::Inline::Transforms
     iree::compiler::Modules::HAL::Loader::IR::HALLoaderDialect
@@ -154,7 +132,6 @@ iree_cc_library(
     "init_passes.h"
   DEPS
     ::init_compiler_modules
-    ::init_input_passes_and_dialects
     ::init_iree_passes_and_dialects
     ::init_mlir_passes_and_dialects
     iree::compiler::Codegen::Codegen
