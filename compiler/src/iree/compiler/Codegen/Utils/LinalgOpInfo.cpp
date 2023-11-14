@@ -40,10 +40,10 @@ static bool isTransposeMap(AffineMap map) {
   // that are actually transposed by comparing its input position.
   unsigned prevDim = 0;
   for (AffineExpr expr : map.getResults()) {
-    if (auto constExpr = expr.dyn_cast<AffineConstantExpr>()) {
+    if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
       // Constant zero expression, guaranteed by 'allowZeroInResults' above.
       continue;
-    } else if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+    } else if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
       if (prevDim > dimExpr.getPosition()) {
         return true;
       }

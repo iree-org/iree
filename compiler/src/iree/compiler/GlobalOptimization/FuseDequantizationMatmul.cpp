@@ -369,9 +369,8 @@ LogicalResult QuantizedMatmulRewriter::precondition() {
     return failure();
   }
   auto affineExprs = indexingMap.getResults();
-  auto innerDim0 = affineExprs.back().dyn_cast<AffineDimExpr>();
-  auto innerDim1 =
-      affineExprs[affineExprs.size() - 2].dyn_cast<AffineDimExpr>();
+  auto innerDim0 = dyn_cast<AffineDimExpr>(affineExprs.back());
+  auto innerDim1 = dyn_cast<AffineDimExpr>(affineExprs[affineExprs.size() - 2]);
   if (!innerDim0 || !innerDim1 ||
       innerDim0.getPosition() != indexingMap.getNumDims() - 1 ||
       innerDim1.getPosition() != indexingMap.getNumDims() - 2) {
@@ -433,9 +432,8 @@ QuantizedMatmulRewriter::getGroupReductionMapsAndIterators(
               utils::IteratorType::reduction) &&
          "inner 2 dimensions of matmul expected to be reduction");
   auto affineExprs = indexingMap.getResults();
-  auto innerDim0 = affineExprs.back().dyn_cast<AffineDimExpr>();
-  auto innerDim1 =
-      affineExprs[affineExprs.size() - 2].dyn_cast<AffineDimExpr>();
+  auto innerDim0 = dyn_cast<AffineDimExpr>(affineExprs.back());
+  auto innerDim1 = dyn_cast<AffineDimExpr>(affineExprs[affineExprs.size() - 2]);
   assert(innerDim0 && innerDim1 &&
          innerDim0.getPosition() == indexingMap.getNumDims() - 1 &&
          innerDim1.getPosition() == indexingMap.getNumDims() - 2 &&

@@ -24,10 +24,10 @@ static Value skipAffineMaxZero(Value dim) {
   if (!affineMax)
     return dim;
   for (AffineExpr expr : affineMax.getMap().getResults()) {
-    if (auto cst = expr.dyn_cast<AffineConstantExpr>()) {
+    if (auto cst = dyn_cast<AffineConstantExpr>(expr)) {
       if (cst.getValue() == 0)
         continue;
-    } else if (auto symExpr = expr.dyn_cast<AffineSymbolExpr>()) {
+    } else if (auto symExpr = dyn_cast<AffineSymbolExpr>(expr)) {
       if (symExpr.getPosition() == 0)
         continue;
     }

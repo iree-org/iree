@@ -103,8 +103,8 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
     return true;
   };
   auto hasSameIteratorType = [&](AffineExpr preExpr, AffineExpr nextExpr) {
-    unsigned prePos = preExpr.cast<AffineDimExpr>().getPosition();
-    unsigned nextPos = nextExpr.cast<AffineDimExpr>().getPosition();
+    unsigned prePos = cast<AffineDimExpr>(preExpr).getPosition();
+    unsigned nextPos = cast<AffineDimExpr>(nextExpr).getPosition();
     return (pDimsSet.count(prePos) && pDimsSet.count(nextPos)) ||
            (rDimsSet.count(prePos) && rDimsSet.count(nextPos));
   };
@@ -132,7 +132,7 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
         range.clear();
       }
     }
-    range.push_back(nextExpr.cast<AffineDimExpr>().getPosition());
+    range.push_back(cast<AffineDimExpr>(nextExpr).getPosition());
     preExpr = nextExpr;
   }
   if (range.size() > 1)

@@ -64,7 +64,7 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
     // Make the input indexing maps identity by interchanging.
     auto interchange =
         llvm::map_to_vector(mapForInterchange->getResults(), [](AffineExpr e) {
-          return e.cast<AffineDimExpr>().getPosition();
+          return cast<AffineDimExpr>(e).getPosition();
         });
 
     return interchangeGenericOp(rewriter, genericOp, interchange);
