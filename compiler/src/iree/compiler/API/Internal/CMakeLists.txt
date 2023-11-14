@@ -116,11 +116,12 @@ if(IREE_BUILD_BUNDLED_LLVM)
   # a compiler definition if not available.
   macro(_add_dependent_lld_target target not_definition)
     list(APPEND _lld_deps
-      $<TARGET_NAME_IF_EXISTS:${target}>)
+      $<TARGET_NAME_IF_EXISTS:${target}>
+      $<IF:$<TARGET_EXISTS:${target}>,lldCommon,>
+    )
     list(APPEND _lld_copts
       $<IF:$<TARGET_EXISTS:${target}>,,-D${not_definition}>)
   endmacro()
-  list(APPEND _lld_deps lldCommon)
   _add_dependent_lld_target(lldCOFF IREE_COMPILER_LLD_COFF_DISABLED)
   _add_dependent_lld_target(lldELF IREE_COMPILER_LLD_ELF_DISABLED)
   _add_dependent_lld_target(lldMachO IREE_COMPILER_LLD_MACHO_DISABLED)
