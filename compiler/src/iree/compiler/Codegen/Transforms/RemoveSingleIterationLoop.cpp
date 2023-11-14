@@ -129,7 +129,7 @@ static bool alwaysRunsFirstIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   auto map = AffineMap::get(dims.size(), 0, iterZero);
   AffineMap simplifiedMap = substituteMin(map, dims, symbols, getMinMax);
   assert(simplifiedMap.getNumResults() == 1);
-  if (auto cst = simplifiedMap.getResult(0).dyn_cast<AffineConstantExpr>()) {
+  if (auto cst = dyn_cast<AffineConstantExpr>(simplifiedMap)) {
     if (cst.getValue() > 0)
       return true;
   }
@@ -155,7 +155,7 @@ static bool neverRunsSecondIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
 
   AffineMap simplifiedMap = substituteMin(map, dims, symbols, getMinMax);
   assert(simplifiedMap.getNumResults() == 1);
-  if (auto cst = simplifiedMap.getResult(0).dyn_cast<AffineConstantExpr>()) {
+  if (auto cst = dyn_cast<AffineConstantExpr>(simplifiedMap)) {
     if (cst.getValue() >= 0)
       return true;
   }

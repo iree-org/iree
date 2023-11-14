@@ -80,7 +80,7 @@ SmallVector<int64_t> getNativeVectorShapeImpl(VectorTransferOpInterface op) {
   SmallVector<int64_t> nativeSize(vecType.getRank(), 1);
   for (const auto &[index, dim] :
        llvm::enumerate(op.getPermutationMap().getResults())) {
-    if (auto dimExpr = dim.dyn_cast<AffineDimExpr>()) {
+    if (auto dimExpr = dyn_cast<AffineDimExpr>(dim)) {
       if (dimExpr.getPosition() == op.getPermutationMap().getNumDims() - 1) {
         nativeSize[index] = getMemoryVectorSize(
             op.source(), vecType.getElementType(), vecType.getShape()[index]);

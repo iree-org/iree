@@ -91,7 +91,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
       affine::fullyComposeAffineMapAndOperands(&map, &valueSizes);
       affine::canonicalizeMapAndOperands(&map, &valueSizes);
 
-      auto cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
+      auto cstExpr = dyn_cast<AffineConstantExpr>(map.getResult(0));
       // Specially handle the case where we have both dimensions and symbols and
       // they map to the same value, e.g.:
       //   affine_map<(d0, s0) -> (d0 - s0 + 4)>(%v, %v).
@@ -109,7 +109,7 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
                           /*numResultSyms=*/numDims + numSyms);
 
         affine::canonicalizeMapAndOperands(&map, &valueSizes);
-        cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
+        cstExpr = dyn_cast_or_null<AffineConstantExpr>(map.getResult(0));
       }
       if (!cstExpr)
         return failure();
