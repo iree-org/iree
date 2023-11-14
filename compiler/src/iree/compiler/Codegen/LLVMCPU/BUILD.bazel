@@ -102,6 +102,8 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtUtils",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectPasses",
+        "//runtime/src/iree/schemas:cpu_data",
+        "//runtime/src/iree/schemas/instruments",
         "@llvm-project//llvm:BinaryFormat",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TargetParser",
