@@ -55,13 +55,16 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
+    MLIRArithDialect
     MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTransforms
     MLIRVectorDialect
