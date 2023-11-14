@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "llvmcpu_materialize_encoding.mlir"
+    "lower_to_ukernel_ops.mlir"
     "vmvx_materialize_encoding.mlir"
   TOOLS
     FileCheck

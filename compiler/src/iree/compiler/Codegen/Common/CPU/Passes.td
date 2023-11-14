@@ -25,4 +25,17 @@ def CPUMaterializeUpperBoundTileSize :
   let constructor = "mlir::iree_compiler::createCPUMaterializeUpperBoundTileSizePass()";
 }
 
+def CPULowerToUKernels :
+    Pass<"iree-codegen-cpu-lower-to-ukernels", ""> {
+  let summary =
+      "Separate out parts of the IR that lower to a micro-kernel";
+  let constructor =
+      "mlir::iree_compiler::createCPULowerToUKernelsPass()";
+  let options = [
+    Option<"optionSkipIntermediateRoundings", "skip-intermediate-roundings",
+      "bool", /*default=*/"true",
+      "Allow skipping intermediate roundings, e.g. in f16 ukernels internally doing f32 arithmetic.">,
+  ];
+}
+
 #endif  // IREE_CODEGEN_COMMON_CPU_PASSES

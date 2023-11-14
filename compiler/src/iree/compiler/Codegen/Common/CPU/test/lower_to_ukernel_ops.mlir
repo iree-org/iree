@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-lower-to-ukernels{skip-intermediate-roundings=true},cse,canonicalize))" %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-lower-to-ukernels{skip-intermediate-roundings=false},cse,canonicalize))" %s | FileCheck %s --check-prefix=NOSKIPROUND
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-lower-to-ukernels{skip-intermediate-roundings=true},cse,canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-lower-to-ukernels{skip-intermediate-roundings=false},cse,canonicalize))" %s | FileCheck %s --check-prefix=NOSKIPROUND
 
 func.func @mmt4d_f32f32f32(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf32>,
     %arg2 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> attributes {
