@@ -55,20 +55,19 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     LLVMSupport
-    MLIRAffineDialect
-    MLIRArithDialect
     MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect
-    MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
     MLIRTensorTransforms
     MLIRTransforms
+    MLIRVectorDialect
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Utils

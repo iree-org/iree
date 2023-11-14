@@ -60,7 +60,7 @@ iree_compiler_cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common",
-        "//compiler/src/iree/compiler/Codegen/Common/CPU",
+        "//compiler/src/iree/compiler/Codegen/Common/CPU:CommonCPUPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/LLVMCPU",
         "//compiler/src/iree/compiler/Codegen/Utils",
