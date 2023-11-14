@@ -147,10 +147,10 @@ set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 #
 #   iree_compiler_plugin.cmake : Included in the context of the compiler/
 #     directory before sources and bindings. Will execute with source and
-#     binary dir ${IREE_BUILD_DIR}/compiler/plugins (shared with all other 
+#     binary dir ${IREE_BUILD_DIR}/compiler/plugins (shared with all other
 #     dirs).
 #   iree_runtime_plugin.cmake : Included in the context of the runtime/
-#     directory before sources. Will execute with source and binary dir 
+#     directory before sources. Will execute with source and binary dir
 #     ${IREE_BUILD_DIR}/runtime/plugins (shared with all other dirs).
 #
 # Typically, these plugins will perform additional project setup, and
@@ -169,7 +169,7 @@ set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 # External HAL Driver Plugins
 # ---------------------------
 # HAL driver implementations are advertised to the build system via
-# iree_register_external_hal_driver(), which specifies the name, target, 
+# iree_register_external_hal_driver(), which specifies the name, target,
 # registration function and optional source/binary directory.
 #-------------------------------------------------------------------------------
 
@@ -446,12 +446,14 @@ if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
       "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
 endif()
 
-if(IREE_BYTECODE_MODULE_ENABLE_ASAN OR IREE_BYTECODE_MODULE_ENABLE_TSAN)
-  if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
-    message(SEND_ERROR
-        "When IREE_BYTECODE_MODULE_ENABLE_ASAN or IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
-        "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
-        "ASAN/TSAN instrumentation is not currently supported in embedded modules.")
+if(IREE_BUILD_COMPILER)
+  if(IREE_BYTECODE_MODULE_ENABLE_ASAN OR IREE_BYTECODE_MODULE_ENABLE_TSAN)
+    if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
+      message(SEND_ERROR
+          "When IREE_BYTECODE_MODULE_ENABLE_ASAN or IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
+          "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
+          "ASAN/TSAN instrumentation is not currently supported in embedded modules.")
+    endif()
   endif()
 endif()
 
@@ -580,7 +582,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 iree_register_external_hal_driver(
   NAME
     cuda2
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2"
   DRIVER_TARGET
     iree::experimental::cuda2::registration
@@ -596,7 +598,7 @@ iree_register_external_hal_driver(
 iree_register_external_hal_driver(
   NAME
     rocm
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm"
   DRIVER_TARGET
     iree::experimental::rocm::registration
@@ -612,7 +614,7 @@ iree_register_external_hal_driver(
 iree_register_external_hal_driver(
   NAME
     webgpu
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
   DRIVER_TARGET
     iree::experimental::webgpu::registration
