@@ -8,6 +8,7 @@
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -50,6 +51,39 @@ std::optional<Type> getCastElemType(Value input) {
                             IntegerType::SignednessSemantics::Unsigned);
   }
   return castSrcElemType;
+}
+
+FailureOr<Value>
+createGenericElementwiseCastOp(OpBuilder &builder, Location loc, Value input,
+                               CastOpInterface castOp,
+                               ArrayRef<NamedAttribute> attrs) {
+  auto inputType = dyn_cast<RankedTensorType>(input.getType());
+  if (!inputType) {
+    return failure();
+  }
+  SmallVector<AffineMap> maps(
+      2, AffineMap::getMultiDimIdentityMap(inputType.getRank(),
+                                           builder.getContext()));
+  SmallVector<utils::IteratorType> iteratorTypes(inputType.getRank(),
+                                                 utils::IteratorType::parallel);
+  auto elementType = getElementTypeOrSelf(castOp->getResultTypes()[0]);
+  auto castedType = inputType.clone(elementType);
+  SmallVector<OpFoldResult> inputMixedSizes =
+      tensor::getMixedSizes(builder, loc, input);
+  Value init =
+      builder.create<tensor::EmptyOp>(loc, inputMixedSizes, elementType);
+  return builder
+      .create<linalg::GenericOp>(
+          loc, castedType, input, init, maps, iteratorTypes,
+          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+            Value castRes =
+                b.create(nestedLoc, castOp->getName().getIdentifier(), args[0],
+                         elementType)
+                    ->getResult(0);
+            b.create<linalg::YieldOp>(nestedLoc, castRes);
+          },
+          attrs)
+      .getResult(0);
 }
 
 } // namespace GlobalOptimization

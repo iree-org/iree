@@ -128,7 +128,7 @@ func.func @batch_vecmat_f16f32f32_dynamic(%arg0 : tensor<3x?xf16>, %arg1 : tenso
 
 // -----
 
-func.func @vecmat_bf16bf16f32_casted_dynamic(%arg0 : tensor<?xbf16>, %arg1 : tensor<?x?xbf16>,
+func.func @vecmat_bf16bf16f32_casted_dynamic(%arg0 : tensor<?xbf16>, %arg1 : tensor<?x?xf32>,
     %arg2 : tensor<?xf32>) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
   %dim = tensor.dim %arg0, %c0 : tensor<?xbf16>
@@ -142,29 +142,33 @@ func.func @vecmat_bf16bf16f32_casted_dynamic(%arg0 : tensor<?xbf16>, %arg1 : ten
     %2 = arith.extf %in : bf16 to f32
     linalg.yield %2 : f32
   } -> tensor<?xf32>
-  %casted1 = arith.extf %arg1 : tensor<?x?xbf16> to tensor<?x?xf32>
-  %1 = linalg.vecmat ins(%casted0, %casted1 : tensor<?xf32>, tensor<?x?xf32>)
+  %1 = linalg.vecmat ins(%casted0, %arg1 : tensor<?xf32>, tensor<?x?xf32>)
       outs(%arg2 : tensor<?xf32>) -> tensor<?xf32>
   return %1 : tensor<?xf32>
 }
+//  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //      CHECK:  func @vecmat_bf16bf16f32_casted_dynamic(
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<?xbf16>, %[[ARG1:.+]]: tensor<?x?xbf16>, %[[ARG2:.+]]: tensor<?xf32>
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<?xbf16>, %[[ARG1:.+]]: tensor<?x?xf32>, %[[ARG2:.+]]: tensor<?xf32>
+//  CHECK-DAG:  %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:  %[[EXPANDED_IN:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1]] : tensor<?xbf16> into tensor<1x?xbf16>
+//  CHECK-DAG:  %[[DIM0:.+]] = tensor.dim %[[EXPANDED_IN]], %[[C1]] : tensor<1x?xbf16>
+//      CHECK:  %[[INIT_CASTED0:.+]] = tensor.empty(%[[DIM0]]) : tensor<1x?xf32>
+//      CHECK:  %[[CASTED0:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP0]]], iterator_types = ["parallel", "parallel"]} ins(%[[EXPANDED_IN]] : tensor<1x?xbf16>) outs(%[[INIT_CASTED0]] : tensor<1x?xf32>) {
+// CHECK-NEXT:     ^bb0(%[[CAST_ARG_IN:.+]]: bf16, %[[CAST_ARG_OUT:.+]]: f32):
+// CHECK-NEXT:     %[[CAST_OP:.+]] = arith.extf %[[CAST_ARG_IN]] : bf16 to f32
+// CHECK-NEXT:     linalg.yield %[[CAST_OP]] : f32
 //  CHECK-DAG:  %[[EXPANDED_OUT:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
-//  CHECK-DAG:  %[[CASTED0:.+]] = arith.extf %[[EXPANDED_IN]] : tensor<1x?xbf16> to tensor<1x?xf32>
-//  CHECK-DAG:  %[[CASTED1:.+]] = arith.extf %[[ARG1]] : tensor<?x?xbf16> to tensor<?x?xf32>
-//  CHECK-DAG:  %[[MATMUL:.+]] = linalg.matmul ins(%[[CASTED0]], %[[CASTED1]] : tensor<1x?xf32>, tensor<?x?xf32>) outs(%[[EXPANDED_OUT]] : tensor<1x?xf32>)
+//  CHECK-DAG:  %[[MATMUL:.+]] = linalg.matmul ins(%[[CASTED0]], %[[ARG1]] : tensor<1x?xf32>, tensor<?x?xf32>) outs(%[[EXPANDED_OUT]] : tensor<1x?xf32>)
 //  CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MATMUL]] {{\[}}[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
 //      CHECK:  return %[[COLLAPSED]]
 
 // -----
 
-func.func @matvec_i8i8i32_casted_dynamic(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?xi8>,
+func.func @matvec_i8i8i32_casted_dynamic(%arg0 : tensor<?x?xi32>, %arg1 : tensor<?xi8>,
     %arg2 : tensor<?xi32>) -> tensor<?xi32> {
   %c0 = arith.constant 0 : index
   %dim = tensor.dim %arg1, %c0 : tensor<?xi8>
   %0 = tensor.empty(%dim) : tensor<?xi32>
-  %casted0 = arith.extui %arg0 : tensor<?x?xi8> to tensor<?x?xi32>
   %casted1 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, 
                                               affine_map<(d0) -> (d0)>], 
                              iterator_types = ["parallel"]} 
@@ -174,19 +178,28 @@ func.func @matvec_i8i8i32_casted_dynamic(%arg0 : tensor<?x?xi8>, %arg1 : tensor<
     %2 = arith.extsi %in : i8 to i32
     linalg.yield %2 : i32
   } -> tensor<?xi32>
-  %1 = linalg.matvec ins(%casted0, %casted1 : tensor<?x?xi32>, tensor<?xi32>)
+  %1 = linalg.matvec ins(%arg0, %casted1 : tensor<?x?xi32>, tensor<?xi32>)
       outs(%arg2 : tensor<?xi32>) -> tensor<?xi32>
   return %1 : tensor<?xi32>
 }
+
+//  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //      CHECK:  func @matvec_i8i8i32_casted_dynamic(
-// CHECK-SAME:  %[[ARG0:.+]]: tensor<?x?xi8>, %[[ARG1:.+]]: tensor<?xi8>, %[[ARG2:.+]]: tensor<?xi32>
+// CHECK-SAME:  %[[ARG0:.+]]: tensor<?x?xi32>, %[[ARG1:.+]]: tensor<?xi8>, %[[ARG2:.+]]: tensor<?xi32>
+//  CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:  %[[EXPANDED_IN:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1]] : tensor<?xi8> into tensor<?x1xi8>
+//  CHECK-DAG:  %[[DIM0:.+]] = tensor.dim %[[EXPANDED_IN]], %[[C0]] : tensor<?x1xi8>
+//      CHECK:  %[[INIT_CASTED1:.+]] = tensor.empty(%[[DIM0]]) : tensor<?x1xi32>
+//      CHECK:  %[[CASTED1:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP0]]], iterator_types = ["parallel", "parallel"]} ins(%[[EXPANDED_IN]] : tensor<?x1xi8>) outs(%[[INIT_CASTED1]] : tensor<?x1xi32>) {
+// CHECK-NEXT:     ^bb0(%[[CAST_ARG_IN:.+]]: i8, %[[CAST_ARG_OUT:.+]]: i32):
+// CHECK-NEXT:     %[[CAST_OP:.+]] = arith.extsi %[[CAST_ARG_IN]] : i8 to i32
+// CHECK-NEXT:     linalg.yield %[[CAST_OP]] : i32
 //  CHECK-DAG:  %[[EXPANDED_OUT:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1]] : tensor<?xi32> into tensor<?x1xi32>
-//  CHECK-DAG:  %[[CASTED0:.+]] = arith.extui %[[ARG0]] : tensor<?x?xi8> to tensor<?x?xi32>
-//  CHECK-DAG:  %[[CASTED1:.+]] = arith.extsi %[[EXPANDED_IN]] : tensor<?x1xi8> to tensor<?x1xi32>
-//  CHECK-DAG:  %[[MATMUL:.+]] = linalg.matmul ins(%[[CASTED0]], %[[CASTED1]] : tensor<?x?xi32>, tensor<?x1xi32>) outs(%[[EXPANDED_OUT]] : tensor<?x1xi32>)
+//  CHECK-DAG:  %[[MATMUL:.+]] = linalg.matmul ins(%[[ARG0]], %[[CASTED1]] : tensor<?x?xi32>, tensor<?x1xi32>) outs(%[[EXPANDED_OUT]] : tensor<?x1xi32>)
 //  CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MATMUL]] {{\[}}[0, 1]] : tensor<?x1xi32> into tensor<?xi32>
 //      CHECK:  return %[[COLLAPSED]]
+
+// -----
 
 func.func @batch_vecmat_casted_f16f32f32_dynamic(%arg0 : tensor<3x?xf16>, %arg1 : tensor<3x?x?xf32>,
     %arg2 : tensor<3x?xf32>) -> tensor<3x?xf32> {
@@ -207,10 +220,17 @@ func.func @batch_vecmat_casted_f16f32f32_dynamic(%arg0 : tensor<3x?xf16>, %arg1 
   return %1 : tensor<3x?xf32>
 }
 
+//  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 //      CHECK:  func @batch_vecmat_casted_f16f32f32_dynamic(
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<3x?xf16>, %[[ARG1:.+]]: tensor<3x?x?xf32>, %[[ARG2:.+]]: tensor<3x?xf32>
 //  CHECK-DAG:  %[[EXPANDED_IN:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1], [2]] : tensor<3x?xf16> into tensor<3x1x?xf16>
-//  CHECK-DAG:  %[[CASTED0:.+]] = arith.extf %[[EXPANDED_IN]] : tensor<3x1x?xf16> to tensor<3x1x?xf32>
+//  CHECK-DAG:  %[[C2:.+]] = arith.constant 2 : index
+//  CHECK-DAG:  %[[DIM0:.+]] = tensor.dim %[[EXPANDED_IN]], %[[C2]] : tensor<3x1x?xf16>
+//      CHECK:  %[[INIT_CASTED0:.+]] = tensor.empty(%[[DIM0]]) : tensor<3x1x?xf32>
+//      CHECK:  %[[CASTED0:.+]] = linalg.generic {indexing_maps = [#[[MAP0]], #[[MAP0]]], iterator_types = ["parallel", "parallel", "parallel"]} ins(%[[EXPANDED_IN]] : tensor<3x1x?xf16>) outs(%[[INIT_CASTED0]] : tensor<3x1x?xf32>) {
+// CHECK-NEXT:     ^bb0(%[[CAST_ARG_IN:.+]]: f16, %[[CAST_ARG_OUT:.+]]: f32):
+// CHECK-NEXT:     %[[CAST_OP:.+]] = arith.extf %[[CAST_ARG_IN]] : f16 to f32
+// CHECK-NEXT:     linalg.yield %[[CAST_OP]] : f32
 //  CHECK-DAG:  %[[EXPANDED_OUT:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2]] : tensor<3x?xf32> into tensor<3x1x?xf32>
 //  CHECK-DAG:  %[[MATMUL:.+]] = linalg.batch_matmul ins(%[[CASTED0]], %[[ARG1]] : tensor<3x1x?xf32>, tensor<3x?x?xf32>) outs(%[[EXPANDED_OUT]] : tensor<3x1x?xf32>)
 //  CHECK-DAG:  %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MATMUL]] {{\[}}[0, 1], [2]] : tensor<3x1x?xf32> into tensor<3x?xf32>

@@ -164,8 +164,9 @@ static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
   SmallVector<utils::IteratorType> iteratorTypes(castedType.getRank(),
                                                  utils::IteratorType::parallel);
   auto genericOp = castOp->getParentOfType<linalg::GenericOp>();
-  NamedAttrList castAttrs =
-      genericOp ? genericOp->getAttrs() : castOp->getAttrs();
+  NamedAttrList castAttrs = genericOp
+                                ? linalg::getPrunedAttributeList(genericOp)
+                                : castOp->getAttrs();
   return builder
       .create<linalg::GenericOp>(
           loc, castedType, encoded, init, maps, iteratorTypes,
