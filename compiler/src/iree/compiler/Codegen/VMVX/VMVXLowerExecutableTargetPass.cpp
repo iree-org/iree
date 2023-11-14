@@ -94,7 +94,7 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
       addVMVXDefaultPassPipeline(executableLoweringPipeline, enableUKernels);
       break;
     default:
-      moduleOp.emitOpError("Unsupported pipeline on CPU target.");
+      moduleOp.emitOpError("Unsupported pipeline on VMVX target.");
       return signalPassFailure();
     }
   }
