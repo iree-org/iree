@@ -161,10 +161,6 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
 /// Transform dialect-based common.
 void addTransformDialectPasses(OpPassManager &passManager);
 
-/// Populates the passes to lower to tiled/distributed/bufferized ops,
-/// suitable for library call dispatch and lowering to loops.
-void addVMVXDefaultPassPipeline(OpPassManager &passManager,
-                                bool enableMicrokernels);
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(

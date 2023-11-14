@@ -48,6 +48,7 @@ iree_cc_library(
     "Passes.cpp"
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
+    "VMVXLowerExecutableTargetPass.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
@@ -69,6 +70,7 @@ iree_cc_library(
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
