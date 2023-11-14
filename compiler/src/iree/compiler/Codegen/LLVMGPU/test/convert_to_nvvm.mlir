@@ -396,3 +396,33 @@ hal.executable @shared_memory_lowering_index {
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
+
+// -----
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @masked_load_store {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export @masked_load_store layout(#pipeline_layout)
+    builtin.module {
+      func.func @masked_load_store() {
+        %c0 = arith.constant 0 : index
+        %idx = gpu.thread_id x
+        %pass_thru = arith.constant dense<0.000000e+00> : vector<1xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<64xf32, #gpu.address_space<global>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<64xf32, #gpu.address_space<global>>
+        %mask = vector.create_mask %idx : vector<1xi1>
+        %ld = vector.maskedload %0[%idx], %mask, %pass_thru : memref<64xf32, #gpu.address_space<global>>, vector<1xi1>, vector<1xf32> into vector<1xf32>
+        vector.maskedstore %1[%idx], %mask, %ld : memref<64xf32, #gpu.address_space<global>>, vector<1xi1>, vector<1xf32>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: llvm.func @masked_load_store
+//       CHECK:   %[[MASK_BIT:.+]] = llvm.icmp "sgt" {{.*}} : vector<1xi64>
+//       CHECK:   llvm.intr.masked.load %{{.*}}, %[[MASK_BIT]]
+//       CHECK:   llvm.intr.masked.store %{{.*}}, %[[MASK_BIT]]
