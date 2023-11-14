@@ -9,7 +9,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/VMVX/PassDetail.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -60,9 +59,8 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   addTileAndDistributePasses(passManager);
 
   if (enableUKernels) {
-    // TODO(hanchung): Move the pass to Codegen/Common/CPU/.
     passManager.nest<ModuleOp>().addPass(
-        createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
 
   // Tensor-level micro-kernel optimizations.

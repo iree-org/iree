@@ -42,6 +42,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "CPULowerToUKernels.cpp"
     "CPUMaterializeEncodingPass.cpp"
     "Passes.cpp"
   DEPS

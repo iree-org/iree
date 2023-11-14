@@ -522,7 +522,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createDecomposeBatchMmt4DOpsPass());
     nestedModulePM.addPass(
-        createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   } else {
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
         static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));

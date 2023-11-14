@@ -45,6 +45,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "CommonCPUPasses",
     srcs = [
+        "CPULowerToUKernels.cpp",
         "CPUMaterializeEncodingPass.cpp",
         "Passes.cpp",
     ],

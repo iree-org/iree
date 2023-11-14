@@ -60,12 +60,6 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
                      SmallVector<int64_t> tileSizes,
                      SmallVector<bool> tileScalableFlags);
 
-// If the `genericOp` is element-wise with identity maps, and has only a
-// CastOpInterface op, return the CastOpInterface op of the body. Otherwise,
-// return std::nullopt.
-std::optional<CastOpInterface>
-getCastOpOfElementWiseCast(linalg::GenericOp genericOp);
-
 } // namespace iree_compiler
 } // namespace mlir
 

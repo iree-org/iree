@@ -4,18 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iree/compiler/Codegen/Utils/Utils.h>
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/builtins/ukernel/exported_bits.h"
+#include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
-#include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
-#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -28,11 +28,36 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Returns the CastOpInterface op of the body, if
+//   - the `genericOp` is element-wise with identity maps, and
+//   - it has only a  CastOpInterface op.
+// Returns std::nullopt, otherwise.
+static std::optional<CastOpInterface>
+getCastOpOfElementWiseCast(linalg::GenericOp genericOp) {
+  if (!genericOp || genericOp.getNumDpsInputs() != 1 ||
+      genericOp.getNumDpsInits() != 1 ||
+      genericOp.getBody()->getOperations().size() != 2 ||
+      !isElementwise(genericOp)) {
+    return std::nullopt;
+  }
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+  auto castOp = yieldOp->getOperand(0).getDefiningOp<CastOpInterface>();
+  if (!castOp) {
+    return std::nullopt;
+  }
+  Value castIn = castOp->getOperand(0);
+  if (castIn.isa<BlockArgument>() &&
+      castIn.cast<BlockArgument>().getArgNumber() != 0) {
+    return std::nullopt;
+  }
+  return castOp;
+}
+
 namespace {
-class LLVMCPULowerToUKernelsPass
-    : public LLVMCPULowerToUKernelsBase<LLVMCPULowerToUKernelsPass> {
+class CPULowerToUKernelsPass
+    : public CPULowerToUKernelsBase<CPULowerToUKernelsPass> {
 public:
-  LLVMCPULowerToUKernelsPass(bool skipIntermediateRoundings)
+  CPULowerToUKernelsPass(bool skipIntermediateRoundings)
       : skipIntermediateRoundings(skipIntermediateRoundings) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -545,7 +570,7 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
 
 } // namespace
 
-void LLVMCPULowerToUKernelsPass::runOnOperation() {
+void CPULowerToUKernelsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   // Enabling a lowering of an op to a microkernel is a trade-off between the
@@ -585,9 +610,8 @@ void LLVMCPULowerToUKernelsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<>>
-createLLVMCPULowerToUKernelsPass(bool skipIntermediateRoundings) {
-  return std::make_unique<LLVMCPULowerToUKernelsPass>(
-      skipIntermediateRoundings);
+createCPULowerToUKernelsPass(bool skipIntermediateRoundings) {
+  return std::make_unique<CPULowerToUKernelsPass>(skipIntermediateRoundings);
 }
 
 } // namespace iree_compiler

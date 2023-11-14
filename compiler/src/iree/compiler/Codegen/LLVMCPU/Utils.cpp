@@ -131,26 +131,5 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
   }
 }
 
-std::optional<CastOpInterface>
-getCastOpOfElementWiseCast(linalg::GenericOp genericOp) {
-  if (!genericOp || genericOp.getNumDpsInputs() != 1 ||
-      genericOp.getNumDpsInits() != 1 ||
-      genericOp.getBody()->getOperations().size() != 2 ||
-      !isElementwise(genericOp)) {
-    return std::nullopt;
-  }
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-  auto castOp = yieldOp->getOperand(0).getDefiningOp<CastOpInterface>();
-  if (!castOp) {
-    return std::nullopt;
-  }
-  Value castIn = castOp->getOperand(0);
-  if (castIn.isa<BlockArgument>() &&
-      castIn.cast<BlockArgument>().getArgNumber() != 0) {
-    return std::nullopt;
-  }
-  return castOp;
-}
-
 } // namespace iree_compiler
 } // namespace mlir
