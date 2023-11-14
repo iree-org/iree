@@ -43,6 +43,10 @@
 #define DEBUG_TYPE "iree-llvm-cpu-target"
 using llvm::dbgs;
 
+// Deprecated: use iree-llvmcpu-enable-ukernels instead.
+//
+// If set to `true`, has the same effect as --iree-llvmcpu-enable-ukernels=all.
+//
 // TODO(ravishankarm): This is redundant w.r.t `iree-vmvx-enable-microkernels`
 // flag. Fold these into either a single flag, or not have the flag at all.
 static llvm::cl::opt<bool> clEnableCPUMicrokernels(
@@ -50,6 +54,13 @@ static llvm::cl::opt<bool> clEnableCPUMicrokernels(
     llvm::cl::desc(
         "Enables microkernel lowering for llvmcpu backend (experimental)"),
     llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clEnableCPUUkernels(
+    "iree-llvmcpu-enable-ukernels",
+    llvm::cl::desc("Enables microkernels in the llvmcpu backend. May be "
+                   "`default`, `none`, `all`, or a comma-separated list of "
+                   "specific unprefixed microkernels to enable, e.g. `mmt4d`."),
+    llvm::cl::init("default"));
 
 static llvm::cl::opt<bool> clLinkCPUUKernelBitcode(
     "iree-llvmcpu-link-ukernel-bitcode",
@@ -142,24 +153,6 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
   std::memcpy(baseFile.data() + baseFileSize + debugFileSize, &footer,
               sizeof(footer));
   return success();
-}
-
-/// Helper method to check if the variant op has a `ukernel` attribute
-/// in its `hal.executable.target`. If so, load the ukernel library
-/// for that target and link.
-// Note: This is duplicate of a similar function in Codegen/. For
-// now duplicating this to avoid false linking issues. Eventually
-// presence of this attribute in the `hal.executable.target` should
-// drive everything.
-static bool hasMicrokernel(IREE::HAL::ExecutableVariantOp variantOp) {
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
-  if (!targetAttr)
-    return false;
-  auto config = targetAttr.getConfiguration();
-  if (!config)
-    return false;
-  auto attr = config.getAs<BoolAttr>("ukernels");
-  return attr && attr.getValue();
 }
 
 class LLVMCPUTargetBackend final : public TargetBackend {
@@ -515,7 +508,7 @@ public:
       std::unordered_set<std::string> ukernelFunctions;
 
       // Link in ukernel bitcode.
-      if (hasMicrokernel(variantOp)) {
+      if (hasUkernel(variantOp.getTarget())) {
         auto setAlwaysInline = [&](llvm::Module &module) {
           for (auto &func : module.getFunctionList()) {
             func.addFnAttr(llvm::Attribute::AlwaysInline);
@@ -949,9 +942,12 @@ private:
     configAttrs.emplace_back(b.getStringAttr("native_vector_size"),
                              b.getIndexAttr(addlConfig.vectorSize));
 
+    std::string enableUkernels = clEnableCPUMicrokernels.getValue()
+                                     ? "all"
+                                     : clEnableCPUUkernels.getValue();
     // Check if microkernels are to be enabled.
     configAttrs.emplace_back(b.getStringAttr("ukernels"),
-                             b.getBoolAttr(clEnableCPUMicrokernels));
+                             b.getStringAttr(enableUkernels));
 
     return IREE::HAL::ExecutableTargetAttr::get(
         context, StringAttr::get(context, "llvm-cpu"),
