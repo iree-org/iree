@@ -49,40 +49,17 @@ public:
 
 void VMVXLowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
-  if (!moduleOp) {
-    getOperation()->emitError(
-        "Expected a variantOp root with an inner ModuleOp");
+
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+      getIdenticalTranslationInfo(variantOp);
+  if (!translationInfo) {
+    variantOp.emitOpError(
+        "unhandled compilation of entry point functions with different "
+        "translation info");
     return signalPassFailure();
   }
 
-  OpPassManager executableLoweringPipeline(
-      IREE::HAL::ExecutableVariantOp::getOperationName());
-
-  // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same translation info. This should already be
-  // verified when the strategies are set, but we still need to retrieve the
-  // correct translation info.
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : exportOps) {
-    auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(exportOp)) {
-      if (translationInfo) {
-        if (currTranslationInfo != translationInfo.value()) {
-          moduleOp.emitOpError(
-              "unhandled compilation of entry point functions with different "
-              "translation info");
-          return signalPassFailure();
-        }
-      } else {
-        translationInfo = currTranslationInfo;
-      }
-    }
-  }
-
+  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
   if (translationInfo.has_value()) {
     auto target = variantOp.getTarget();
     bool enableUKernels = hasUkernel(target);
@@ -91,15 +68,15 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
     case IREE::Codegen::DispatchLoweringPassPipeline::None:
       return;
     case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-      addVMVXDefaultPassPipeline(executableLoweringPipeline, enableUKernels);
+      addVMVXDefaultPassPipeline(pipeline, enableUKernels);
       break;
     default:
-      moduleOp.emitOpError("Unsupported pipeline on VMVX target.");
+      variantOp.emitOpError("Unsupported pipeline on VMVX target.");
       return signalPassFailure();
     }
   }
 
-  if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
+  if (failed(runPipeline(pipeline, variantOp))) {
     return signalPassFailure();
   }
 }
