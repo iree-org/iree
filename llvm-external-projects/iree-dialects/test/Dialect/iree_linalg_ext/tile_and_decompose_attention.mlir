@@ -7,6 +7,8 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
   return %1 : tensor<1x1024x64xf32>
 }
 
+// TILING-DAG:  #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// TILING-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
 // TILING-LABEL: @attention
 // TILING-SAME: (%[[QUERY:.+]]: tensor<1x1024x64xf32>, %[[KEY:.+]]: tensor<1x1024x64xf32>, %[[VALUE:.+]]: tensor<1x1024x64xf32>)
 // TILING:        %[[D0:.+]] = tensor.empty() : tensor<1x1024x64xf32>
@@ -34,8 +36,17 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // TILING-SAME:                                           -> tensor<1024x64xf32>, tensor<1024xf32>, tensor<1024xf32>
 // TILING:          scf.yield %[[TILED_ATTENTION]]#0, %[[TILED_ATTENTION]]#1, %[[TILED_ATTENTION]]#2 : tensor<1024x64xf32>, tensor<1024xf32>, tensor<1024xf32>
 // TILING:        }
-// TILING:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D6]]#[[D0:.+]] into %[[D0]][0, 0, 0] [1, 1024, 64] [1,
-// TILING-SAME:     1, 1] : tensor<1024x64xf32> into tensor<1x1024x64xf32>
+// TILING:        %[[D7:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP]]], iterator_types = ["parallel",
+// TILING-SAME:     "parallel"]} ins(%[[D6]]#2 : tensor<1024xf32>) outs(%[[D6]]#0 : tensor<1024x64xf32>)
+// TILING-SAME:     {
+// TILING:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
+// TILING-DAG:      %[[CST_1:.+]] = arith.constant 1.000000e+00 : f32
+// TILING:          %[[D8:.+]] = arith.divf %[[CST_1]], %[[IN]] : f32
+// TILING:          %[[D9:.+]] = arith.mulf %[[D8]], %[[OUT]] : f32
+// TILING:          linalg.yield %[[D9]] : f32
+// TILING:        } -> tensor<1024x64xf32>
+// TILING:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D7]] into %[[D0]][0, 0, 0] [1, 1024, 64] [1, 1, 1] :
+// TILING-SAME:    tensor<1024x64xf32> into tensor<1x1024x64xf32>
 // TILING:        return %[[INSERTED_SLICE]] : tensor<1x1024x64xf32>
 // TILING:      }
 
@@ -86,8 +97,8 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // CHECK:          %[[D13:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
 // CHECK-SAME:       ins(%[[D11]] : tensor<1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
-// CHECK:            %[[D18]] = arith.subf %[[OUT]], %[[IN]] : f32
-// CHECK:            %[[D19]] = math.exp2 %[[D18]] : f32
+// CHECK:            %[[D18:.+]] = arith.subf %[[OUT]], %[[IN]] : f32
+// CHECK:            %[[D19:.+]] = math.exp2 %[[D18]] : f32
 // CHECK:            linalg.yield %[[D19]] : f32
 // CHECK:          } -> tensor<1024xf32>
 // CHECK:          %[[D14:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
@@ -117,8 +128,8 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // CHECK-SAME:     {
 // CHECK:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK-DAG:      %[[CST_1:.+]] = arith.constant 1.000000e+00 : f32
-// CHECK:          %[[D8]] = arith.divf %[[CST_1]], %[[IN]] : f32
-// CHECK:          %[[D9]] = arith.mulf %[[D8]], %[[OUT]] : f32
+// CHECK:          %[[D8:.+]] = arith.divf %[[CST_1]], %[[IN]] : f32
+// CHECK:          %[[D9:.+]] = arith.mulf %[[D8]], %[[OUT]] : f32
 // CHECK:          linalg.yield %[[D9]] : f32
 // CHECK:        } -> tensor<1024x64xf32>
 // CHECK:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D7]] into %[[D0]][0, 0, 0] [1, 1024, 64] [1, 1, 1] :
@@ -164,8 +175,16 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // TILING-SAME:                      -> tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>
 // TILING:          scf.yield %[[TILED_ATTENTION]]#0, %[[TILED_ATTENTION]]#1, %[[TILED_ATTENTION]]#2 : tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>
 // TILING:        }
-// TILING:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D6]]#[[D0:.+]] into %[[D0]][0, 0, 0] [1, %[[DIM]],
-// TILING-SAME:     %[[DIM_0]]] [1, 1, 1] : tensor<?x?xf32> into tensor<?x?x?xf32>
+// TILING:        %[[D7:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP]]], iterator_types = ["parallel",
+// TILING-SAME:     "parallel"]} ins(%[[D6]]#[[D2:.+]] : tensor<?xf32>) outs(%[[D6]]#[[D0:.+]] : tensor<?x?xf32>) {
+// TILING:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
+// TILING-DAG:      %[[CST_3:.+]] = arith.constant 1.000000e+00 : f32
+// TILING:          %[[D8:.+]] = arith.divf %[[CST_3]], %[[IN]] : f32
+// TILING:          %[[D9:.+]] = arith.mulf %[[D8]], %[[OUT]] : f32
+// TILING:          linalg.yield %[[D9]] : f32
+// TILING:        } -> tensor<?x?xf32>
+// TILING:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D7]] into %[[D0]][0, 0, 0] [1, %[[DIM]], %[[DIM_0]]]
+// TILING-SAME:     [1, 1, 1] : tensor<?x?xf32> into tensor<?x?x?xf32>
 // TILING:        return %[[INSERTED_SLICE]] : tensor<?x?x?xf32>
 // TILING:      }
 
@@ -210,14 +229,14 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // CHECK:            linalg.yield %[[D18]] : f32
 // CHECK:          } -> tensor<?xf32>
 // CHECK:          %[[D12:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP]]], iterator_types = ["parallel",
-// CHECK-SAME:       "parallel"]} ins(%[[D11]] : tensor<?xf32>) outs(%[[D10]] : tensor<?x?xf32>) {
+// CHECK-SAME:       "parallel"]} ins(%[[D10]] : tensor<?xf32>) outs(%[[D9]] : tensor<?x?xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D18]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D19:.+]] = math.exp2 %[[D18]] : f32
 // CHECK:            linalg.yield %[[D19]] : f32
 // CHECK:          } -> tensor<?x?xf32>
 // CHECK:          %[[D13:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// CHECK-SAME:       ins(%[[D11]] : tensor<?xf32>) outs(%[[ARG8]] : tensor<?xf32>) {
+// CHECK-SAME:       ins(%[[D10]] : tensor<?xf32>) outs(%[[ARG8]] : tensor<?xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D18]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D19]] = math.exp2 %[[D18]] : f32
@@ -243,14 +262,14 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // CHECK:          } -> tensor<?x?xf32>
 // CHECK:          %[[D17:.+]] = linalg.matmul ins(%[[D12]], %[[EXTRACTED_SLICE_3]] : tensor<?x?xf32>, tensor<?x?xf32>)
 // CHECK-SAME:       outs(%[[D16]] : tensor<?x?xf32>) -> tensor<?x?xf32>
-// CHECK:          scf.yield %[[D17]], %[[D11]], %[[D15]] : tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>
+// CHECK:          scf.yield %[[D17]], %[[D10]], %[[D15]] : tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>
 // CHECK:        }
 // CHECK:        %[[D7:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP]]], iterator_types = ["parallel",
 // CHECK-SAME:     "parallel"]} ins(%[[D6]]#[[D2:.+]] : tensor<?xf32>) outs(%[[D6]]#[[D0:.+]] : tensor<?x?xf32>) {
 // CHECK:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK-DAG:      %[[CST_3:.+]] = arith.constant 1.000000e+00 : f32
-// CHECK:          %[[D8]] = arith.divf %[[CST_3]], %[[IN]] : f32
-// CHECK:          %[[D9]] = arith.mulf %[[D8]], %[[OUT]] : f32
+// CHECK:          %[[D8:.+]] = arith.divf %[[CST_3]], %[[IN]] : f32
+// CHECK:          %[[D9:.+]] = arith.mulf %[[D8]], %[[OUT]] : f32
 // CHECK:          linalg.yield %[[D9]] : f32
 // CHECK:        } -> tensor<?x?xf32>
 // CHECK:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D7]] into %[[D0]][0, 0, 0] [1, %[[DIM]], %[[DIM_0]]]
@@ -296,14 +315,22 @@ func.func @attention(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>,
 // TILING-SAME:                                           -> tensor<1024x64xf32>, tensor<1024xf32>, tensor<1024xf32>
 // TILING:          scf.yield %[[TILED_ATTENTION]]#0, %[[TILED_ATTENTION]]#1, %[[TILED_ATTENTION]]#2 : tensor<1024x64xf32>, tensor<1024xf32>, tensor<1024xf32>
 // TILING:        }
-// TILING:        %[[D7:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel",
-// TILING-SAME:     "parallel"]} ins(%[[D6]]#[[D0:.+]] : tensor<1024x64xf32>) outs(%[[EXTRACTED_SLICE]] :
-// TILING-SAME:     tensor<1024x64xf16>) {
+// TILING:        %[[D7:.+]] = linalg.generic {indexing_maps = [#[[MAP1]], #[[MAP]]], iterator_types = ["parallel",
+// TILING-SAME:     "parallel"]} ins(%[[D6]]#[[D2:.+]] : tensor<1024xf32>) outs(%[[D6]]#[[D0:.+]] : tensor<1024x64xf32>)
+// TILING-SAME:     {
+// TILING:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
+// TILING-DAG:      %[[CST_1:.+]] = arith.constant 1.000000e+00 : f32
+// TILING:          %[[D9:.+]] = arith.divf %[[CST_1]], %[[IN]] : f32
+// TILING:          %[[D10:.+]] = arith.mulf %[[D9]], %[[OUT]] : f32
+// TILING:          linalg.yield %[[D10]] : f32
+// TILING:        } -> tensor<1024x64xf32>
+// TILING:        %[[D8:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP]]], iterator_types = ["parallel",
+// TILING-SAME:     "parallel"]} ins(%[[D7]] : tensor<1024x64xf32>) outs(%[[EXTRACTED_SLICE]] : tensor<1024x64xf16>) {
 // TILING:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f16):
-// TILING:          %[[D8:.+]] = arith.truncf %[[IN]] : f32 to f16
-// TILING:          linalg.yield %[[D8]] : f16
+// TILING:          %[[D9]] = arith.truncf %[[IN]] : f32 to f16
+// TILING:          linalg.yield %[[D9]] : f16
 // TILING:        } -> tensor<1024x64xf16>
-// TILING:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D7]] into %[[D0]][0, 0, 0] [1, 1024, 64] [1, 1, 1] :
+// TILING:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[D8]] into %[[D0]][0, 0, 0] [1, 1024, 64] [1, 1, 1] :
 // TILING-SAME:     tensor<1024x64xf16> into tensor<1x1024x64xf16>
 // TILING:        return %[[INSERTED_SLICE]] : tensor<1x1024x64xf16>
 // TILING:      }
