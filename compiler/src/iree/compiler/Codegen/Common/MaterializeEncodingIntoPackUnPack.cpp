@@ -23,7 +23,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "runtime/src/iree/builtins/ukernel/exported_bits.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -282,7 +281,7 @@ chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
 
 MaterializeEncodingValueFn
 getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isVMVXBackend(targetAttr) && hasMicrokernels(targetAttr)) {
+  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
     return chooseDynamicEncodingInfoVMVXMicrokernels;
   }
   return {};

@@ -148,9 +148,39 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
 }
 
-bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto enableMicrokernels = getConfigBoolAttr(targetAttr, "ukernels");
-  return enableMicrokernels && enableMicrokernels->getValue();
+bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
+                StringRef ukernelName) {
+  auto enabledUkernels = getConfigStringAttr(targetAttr, "ukernels");
+  if (!enabledUkernels) {
+    return false;
+  }
+  StringRef enabledUkernelsStr = enabledUkernels->getValue();
+  // Resolve `default`.
+  if (enabledUkernelsStr == "default") {
+    // Current defaults implemented here. Could depend on targetAttr.
+    enabledUkernelsStr = "none";
+  }
+  // Resolve `none`.
+  if (enabledUkernelsStr == "none") {
+    return false;
+  }
+  // Resolve `all`.
+  if (enabledUkernelsStr == "all") {
+    return true;
+  }
+  // If `ukernelName` is empty, the question is "are ukernels enabled at all?"
+  // At this point, we already know that enabledUkernelsStr != "none".
+  if (ukernelName.empty()) {
+    return !enabledUkernelsStr.empty();
+  }
+  while (!enabledUkernelsStr.empty()) {
+    auto split = enabledUkernelsStr.split(',');
+    if (split.first == ukernelName) {
+      return true;
+    }
+    enabledUkernelsStr = split.second;
+  }
+  return false;
 }
 
 std::optional<StringRef>

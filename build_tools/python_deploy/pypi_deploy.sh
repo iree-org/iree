@@ -6,8 +6,18 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# For deploying an IREE release to PyPI. You will need the account password,
-# which Googlers can access at http://go/iree-pypi-password.
+# For deploying to PyPI, you will need to have credentials set up.
+# Googlers can access the shared releasing account "google-iree-pypi-deploy"
+# at http://go/iree-pypi-password
+#
+# Typical usage is to use keyring or create a ~/.pypirc file with:
+#
+#   [pypi]
+#   username = __token__
+#   password = <<API TOKEN>>
+#
+# You must have `gh` installed and authenticated (run `gh auth`).
+#
 # Usage:
 # ./pypi_deploy.sh candidate-20220930.282
 
@@ -53,7 +63,7 @@ function download_wheels() {
 }
 
 function upload_wheels() {
-  twine upload --verbose -u google-iree-pypi-deploy *
+  twine upload --verbose *
 }
 
 

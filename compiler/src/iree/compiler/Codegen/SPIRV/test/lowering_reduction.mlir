@@ -303,3 +303,106 @@ hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_
 //         CHECK:      vector.transfer_write
 //         CHECK:    }
 //         CHECK:    return
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer, ReadOnly>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
+hal.executable private @dynamic_softmax {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.6,
+        [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, GroupNonUniformShuffle],
+        [SPV_KHR_16bit_storage]>, api=Vulkan, Unknown:DiscreteGPU, #spirv.resource_limits<
+          max_compute_shared_memory_size = 65536,
+          max_compute_workgroup_invocations = 1024,
+          max_compute_workgroup_size = [1024, 1024, 1024],
+          subgroup_size = 64>>
+    }>) {
+    hal.executable.export public @dynamic_softmax ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @dynamic_softmax() {
+        %c32_i64 = arith.constant 32 : i64
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32 
+        %2 = arith.extui %0 : i32 to i64
+        %3 = arith.extui %1 : i32 to i64
+        %4 = arith.shli %3, %c32_i64 : i64 
+        %5 = arith.ori %2, %4 : i64
+        %6 = arith.index_castui %5 : i64 to index
+        %7 = flow.dispatch.workload.ordinal %6, 0 : index
+        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%7}
+        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
+        %10 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%7} -> tensor<32x?xf16>
+        %11 = tensor.empty(%7) : tensor<32x?xf16> 
+        %12 = linalg.softmax dimension(1) ins(%10 : tensor<32x?xf16>) outs(%11 : tensor<32x?xf16>) -> tensor<32x?xf16>
+        flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : tensor<32x?xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @dynamic_softmax
+// CHECK-DAG:     %[[ADD_PAD:.+]] = arith.constant dense<0.000000e+00> : vector<1xf16>
+// CHECK-DAG:     %[[MIN_F16:.+]] = arith.constant dense<0xFC00> : vector<1xf16>
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:     %[[C0_F16:.+]] = arith.constant 0.000000e+00 : f16
+
+// CHECK:         %[[DIM_LBITS:.+]] = hal.interface.constant.load[0] : i32
+// CHECK:         %[[DIM_UBITS:.+]] = hal.interface.constant.load[1] : i32
+// CHECK:         %[[EXTL:.+]] = arith.extui %[[DIM_LBITS]] : i32 to i64
+// CHECK:         %[[EXTU:.+]] = arith.extui %[[DIM_UBITS]] : i32 to i64
+// CHECK:         %[[SHIFTU:.+]] = arith.shli %[[EXTU]], %{{.*}} : i64
+// CHECK:         %[[COMBINE:.+]] = arith.ori %[[EXTL]], %[[SHIFTU]] : i64
+// CHECK:         %[[DYNAMIC_SIZE:.+]] = arith.index_castui %[[COMBINE]] : i64 to index
+
+// Do the first local reduction.
+// CHECK:         vector.transfer_write %[[MIN_F16]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
+// CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
+// CHECK:           %[[MASK:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
+// CHECK:           %[[ACC:.+]] = vector.transfer_read %{{.*}}, %cst_3, %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
+// CHECK:           %[[NEW:.+]] = vector.transfer_read %{{.*}}, %cst_3, %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
+// CHECK:           %[[MAX:.+]] = arith.maximumf %[[NEW]], %[[ACC]] : vector<1xf16>
+// CHECK:           vector.transfer_write %[[MAX]], %{{.*}}, %[[MASK]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
+// CHECK:           gpu.barrier
+
+// Finish the first reduction.
+// CHECK:         vector.transfer_read {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
+// CHECK-COUNT-6: gpu.shuffle  xor {{.*}} : i32
+
+// Do the elementwise scaling and second local reduction.
+// CHECK:         vector.transfer_write %[[ADD_PAD]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
+// CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
+// CHECK:           %[[MASK2:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
+// CHECK:           vector.transfer_read %{{.*}}, %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
+// CHECK:           vector.transfer_read %{{.*}}, %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
+// CHECK:           arith.subf
+// CHECK:           math.exp
+// CHECK:           arith.addf
+// CHECK:           vector.transfer_write %{{.*}}, %[[MASK2]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
+// CHECK:           gpu.barrier
+
+// Finish the second reduction.
+// CHECK-COUNT-6: gpu.shuffle  xor {{.*}} : i32
+
+// Store the result back to global memory in a loop, recomputing the
+// elementwise part.
+// CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
+// CHECK:           %[[MASK3:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
+// CHECK:           vector.transfer_read {{.*}} %[[MASK3]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
+// CHECK:           arith.subf
+// CHECK:           math.exp
+// CHECK:           arith.divf
+// CHECK:           vector.transfer_write {{.*}} %[[MASK3]] {{.*}} : vector<1xf16>, memref<32x?xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK:         }

@@ -65,7 +65,6 @@ iree_cc_library(
     MLIRTensorTransforms
     MLIRTransforms
     MLIRVectorDialect
-    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect

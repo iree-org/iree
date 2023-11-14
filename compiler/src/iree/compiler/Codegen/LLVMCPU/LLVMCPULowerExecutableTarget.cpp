@@ -193,7 +193,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           isX86(target) || isRISCV(target) ||
           (isAArch64(target) && hasAnySVEFeature(target));
 
-      bool enableMicrokernels = hasMicrokernels(target);
+      bool enableMicrokernels = hasUkernel(target);
       bool enableAArch64SSVE = isAArch64(target) && hasAnySVEFeature(target) &&
                                hasSMEFeature(target);
       switch (translationInfo.value().getDispatchLoweringPassPipeline()) {

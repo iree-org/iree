@@ -571,6 +571,9 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   addCPUBufferizePasses(nestedModulePM);
 
   {
+    // Fold unit dims before vector lowering.
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createOptimizeVectorTransferPass(/*flatten=*/false));
     LLVMCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
     nestedModulePM.addNestedPass<func::FuncOp>(

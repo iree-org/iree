@@ -51,10 +51,10 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
 #ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TOSA
           "  =tosa          - Legalize from TOSA ops.\n"
 #endif  // IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TOSA
-#ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_TORCH_IREE
+#ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TORCH
           "  =tm_tensor     - Legalize a subset of Torch input ops.\n"
           "  =torch         - Legalize from the 'torch' dialect.\n"
-#endif  // IREE_COMPILER_PLUGIN_HAVE_STATIC_TORCH_IREE
+#endif  // IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TORCH
           "  =*             - An extensible input type defined in a plugin."
           // clang-format on
           ),

@@ -37,7 +37,7 @@ using IREE::HAL::ExecutableTargetAttr;
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
 enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
-  if (hasMicrokernels(target)) {
+  if (hasUkernel(target)) {
     // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
     // does not support batch_matmul atm.
     if (user == EncodingUser::BATCH_MATMUL) {
@@ -403,7 +403,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
     return a == IntegerAttr() ? 0 : a.getInt();
   };
   int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
-  int64_t matmulNarrowN = hasMicrokernels(targetAttr)
+  int64_t matmulNarrowN = hasUkernel(targetAttr, "mmt4d")
                               ? 0
                               : getIntOrZero(encoding.getMatmulNarrow_N());
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,

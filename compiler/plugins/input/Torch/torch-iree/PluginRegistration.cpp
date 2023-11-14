@@ -102,8 +102,8 @@ struct TorchSession
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(::mlir::iree_compiler::TorchOptions);
 
-extern "C" bool iree_register_compiler_plugin_torch_iree(
+extern "C" bool iree_register_compiler_plugin_input_torch(
     mlir::iree_compiler::PluginRegistrar *registrar) {
-  registrar->registerPlugin<::mlir::iree_compiler::TorchSession>("torch_iree");
+  registrar->registerPlugin<::mlir::iree_compiler::TorchSession>("input_torch");
   return true;
 }
