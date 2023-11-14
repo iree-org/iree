@@ -40,7 +40,7 @@ createVMVXLowerExecutableTargetPass();
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.
 void addVMVXDefaultPassPipeline(OpPassManager &passManager,
-                                bool enableMicrokernels);
+                                bool enableUKernels);
 
 //----------------------------------------------------------------------------//
 // VMVX Linking Passes and Pipelines

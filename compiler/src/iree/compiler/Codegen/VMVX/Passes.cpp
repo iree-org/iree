@@ -30,10 +30,10 @@ static llvm::cl::opt<bool> clSkipIntermediateRoundings(
         "is slow."),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clEnableMicrokernelsDecomposeLinalgGeneric(
-    "iree-vmvx-enable-microkernels-decompose-linalg-generic",
+static llvm::cl::opt<bool> clEnableUKernelsDecomposeLinalgGeneric(
+    "iree-vmvx-enable-ukernels-decompose-linalg-generic",
     llvm::cl::desc("Enables decomposition of linalg.generic ops when "
-                   "microkernels are enabled (experimental)"),
+                   "ukernels are enabled (experimental)"),
     llvm::cl::init(true));
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
@@ -56,10 +56,10 @@ static void addTileAndDistributePasses(OpPassManager &pm) {
 }
 
 void addVMVXDefaultPassPipeline(OpPassManager &passManager,
-                                bool enableMicrokernels) {
+                                bool enableUKernels) {
   addTileAndDistributePasses(passManager);
 
-  if (enableMicrokernels) {
+  if (enableUKernels) {
     // TODO(hanchung): Move the pass to Codegen/Common/CPU/.
     passManager.nest<ModuleOp>().addPass(
         createLLVMCPULowerToUKernelsPass(clSkipIntermediateRoundings));
@@ -68,7 +68,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   // Tensor-level micro-kernel optimizations.
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
-  if (enableMicrokernels && clEnableMicrokernelsDecomposeLinalgGeneric) {
+  if (enableUKernels && clEnableUKernelsDecomposeLinalgGeneric) {
     passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
         createDecomposeLinalgGenericPass());
   }
@@ -82,7 +82,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
       createRemoveSingleIterationLoopPass());
 
   // Convert buffer-level microkernels.
-  if (enableMicrokernels) {
+  if (enableUKernels) {
     nestedModulePM.addPass(createLowerUKernelOpsToCallsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
         createVMVXLowerLinalgMicrokernelsPass());

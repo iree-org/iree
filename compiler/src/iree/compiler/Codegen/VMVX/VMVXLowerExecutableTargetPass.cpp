@@ -85,14 +85,13 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
 
   if (translationInfo.has_value()) {
     auto target = variantOp.getTarget();
-    bool enableMicrokernels = hasMicrokernels(target);
+    bool enableUKernels = hasUkernel(target);
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
     // No pipleline specified, nothing to do.
     case IREE::Codegen::DispatchLoweringPassPipeline::None:
       return;
     case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-      addVMVXDefaultPassPipeline(executableLoweringPipeline,
-                                 enableMicrokernels);
+      addVMVXDefaultPassPipeline(executableLoweringPipeline, enableUKernels);
       break;
     default:
       moduleOp.emitOpError("Unsupported pipeline on CPU target.");
