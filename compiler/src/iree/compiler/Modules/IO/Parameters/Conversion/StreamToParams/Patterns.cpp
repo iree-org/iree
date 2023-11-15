@@ -76,12 +76,14 @@ struct ParameterReadOpPattern
     Value signalFence = getOrCreateSignalFence(
         loc, device, readOp.getResultTimepoint(), rewriter);
 
-    // Queue operation.
-    rewriter.create<IREE::IO::Parameters::ReadOp>(
+    // Queue operation (a read is just a gather with a single span).
+    rewriter.create<IREE::IO::Parameters::GatherOp>(
         loc, device, queueAffinity, waitFence, signalFence,
-        adaptor.getSourceScopeAttr(), adaptor.getSourceKeyAttr(),
-        adaptor.getSourceOffset(), adaptor.getTarget(),
-        adaptor.getTargetOffset(), adaptor.getTargetLength());
+        adaptor.getSourceScopeAttr(),
+        rewriter.getArrayAttr(adaptor.getSourceKeyAttr()),
+        ValueRange{adaptor.getSourceOffset()}, adaptor.getTarget(),
+        ValueRange{adaptor.getTargetOffset()},
+        ValueRange{adaptor.getTargetLength()});
 
     rewriter.replaceOp(readOp, {signalFence});
     return success();
@@ -98,18 +100,19 @@ struct ParameterWriteOpPattern
     auto [device, queueAffinity] =
         lookupDeviceAndQueueAffinityFor(writeOp, rewriter);
 
-    // Gather wait/signal fence, which are optional.
+    // Scatter wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
     Value signalFence = getOrCreateSignalFence(
         loc, device, writeOp.getResultTimepoint(), rewriter);
 
-    // Queue operation.
-    rewriter.create<IREE::IO::Parameters::WriteOp>(
+    // Queue operation (a write is just a scatter with a single span).
+    rewriter.create<IREE::IO::Parameters::ScatterOp>(
         loc, device, queueAffinity, waitFence, signalFence, adaptor.getSource(),
-        adaptor.getSourceOffset(), adaptor.getTargetScopeAttr(),
-        adaptor.getTargetKeyAttr(), adaptor.getTargetOffset(),
-        adaptor.getSourceLength());
+        ValueRange{adaptor.getSourceOffset()},
+        ValueRange{adaptor.getSourceLength()}, adaptor.getTargetScopeAttr(),
+        rewriter.getArrayAttr(adaptor.getTargetKeyAttr()),
+        ValueRange{adaptor.getTargetOffset()});
 
     rewriter.replaceOp(writeOp, {signalFence});
     return success();
