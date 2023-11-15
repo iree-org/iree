@@ -81,7 +81,7 @@ def main(args):
         "VM.md": "compiler/src/iree/compiler/Dialect/VM/IR",
         "VMVX.md": "compiler/src/iree/compiler/Dialect/VMVX/IR",
     }
-    base_url = "https://github.com/openxla/iree/blob/main/"
+    base_url = "https://github.com/openxla/iree/tree/main/"
     for file in files:
         filename = pathlib.Path(file).name
         relative_path = dialect_sources_map.get(filename, None)
