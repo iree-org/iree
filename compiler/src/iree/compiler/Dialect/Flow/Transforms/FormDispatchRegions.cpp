@@ -329,18 +329,20 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
   return true;
 }
 
-/// Method to check if the op with have compatible indexing map on
-/// outer-parallel loops. Currently it means the map needs to be identity on the
-/// those dimensions, ignoring its reduction dimensions.
+// Method to check if the op with have compatible indexing map on outer-parallel
+// loops. Currently it means the map needs to be identity on the those
+// dimensions, ignoring its reduction dimensions.
 static bool hasCompatibleOuterParallelLoops(
     TilingInterface tileOp, AffineMap indexingMap,
     const llvm::SmallBitVector &rootOuterParallelLoops) {
-  if (!indexingMap.isProjectedPermutation())
+  if (!indexingMap.isProjectedPermutation()) {
     return false;
+  }
 
   llvm::SmallBitVector parallelLoops = getOuterParallelLoops(tileOp);
-  if (!matchIteratorTypes(rootOuterParallelLoops, parallelLoops))
+  if (!matchIteratorTypes(rootOuterParallelLoops, parallelLoops)) {
     return false;
+  }
 
   /// Project out the non-parallel dimensions.
   llvm::SmallBitVector projectedDims(rootOuterParallelLoops);
@@ -350,8 +352,8 @@ static bool hasCompatibleOuterParallelLoops(
   return isIdentityMapWithZeros(projectedMap);
 }
 
-/// Method to check if two `linalg.generic` op with producer-consumer
-/// relationship through `operand` have compatible outer-parallel loops.
+// Method to check if two `linalg.generic` op with producer-consumer
+// relationship through `operand` have compatible outer-parallel loops.
 static bool hasCompatibleOuterParallelLoops(
     OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
   auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
