@@ -145,8 +145,12 @@ options, passes, or pipelines.
 
 !!! info ""
 
-    This snippet shows the general layout of the API. For working examples, see
-    the samples below.
+    These snippets show the general layout of the API. For working examples,
+    see the [samples below](#samples).
+
+#### Compiler session API
+
+To build a custom tool using the compiler API:
 
 ```cmake
 # CMakeLists.txt
@@ -192,13 +196,172 @@ int main(int argc, char** argv) {
 }
 ```
 
+#### Compiler plugins - input dialects
+
+Plugins can add support for input dialects to the compiler. Examples of in-tree
+input dialects are Torch, TOSA, and StableHLO. To add a custom input conversion
+with a plugin:
+
+```cmake
+# CMakeLists.txt
+
+iree_compiler_register_plugin(
+  PLUGIN_ID
+    input_demo
+  TARGET
+    ::input_registration
+)
+
+iree_cc_library(
+  NAME
+    input_registration
+  SRCS
+    "InputPluginRegistration.cpp"
+  DEPS
+    iree::compiler::PluginAPI
+)
+```
+
+```c++
+// InputPluginRegistration.cpp
+
+#include "iree/compiler/PluginAPI/Client.h"
+
+namespace mlir::iree_compiler {
+namespace {
+
+struct InputDemoOptions {
+  bool demoOption = false;
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("Demo Input");
+    binder.opt<bool>(
+        "iree-input-demo-option", demoOption,
+        llvm::cl::cat(category),
+        llvm::cl::desc("Some command-line option"));
+  }
+};
+
+struct InputDemoSession
+    : public PluginSession<InputDemoSession, InputDemoOptions,
+                           PluginActivationPolicy::DefaultActivated> {
+
+  static void registerPasses() {
+    // Register any passes used by this plugin here.
+  }
+
+  void onRegisterDialects(DialectRegistry &registry) override {
+    // Register any dialects used by this plugin here.
+  }
+
+  bool extendCustomInputConversionPassPipeline(
+      OpPassManager &passManager, std::string_view typeMnemonic) override {
+    if (typeMnemonic == "demo") {
+      buildDemoPassPipeline(passManager, options);
+      return true;
+    }
+    return false;
+  }
+
+  void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
+    typeMnemonics.insert("demo");
+  }
+
+  void populateDetectedCustomInputConversionTypes(
+      ModuleOp &module, StringSet<> &typeMnemonics) override {
+    if (moduleContainsDemoOps(module))
+      typeMnemonics.insert("demo");
+  }
+};
+
+} // namespace
+} // namespace mlir::iree_compiler
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(::mlir::iree_compiler::InputDemoOptions);
+
+extern "C" bool iree_register_compiler_plugin_input_demo(
+    mlir::iree_compiler::PluginRegistrar *registrar) {
+  registrar->registerPlugin<InputDemoSession>("input_demo");
+  return true;
+}
+```
+
+#### Compiler plugins - HAL target backends
+
+Plugins can add HAL target backends to the compiler. Examples of in-tree target
+backends are `vulkan`, `cuda`, and `llvm-cpu`. To add a custom HAL target
+backend with a plugin:
+
+```cmake
+# CMakeLists.txt
+
+iree_compiler_register_plugin(
+  PLUGIN_ID
+    hal_target_demo
+  TARGET
+    ::hal_target_registration
+)
+
+iree_cc_library(
+  NAME
+    hal_target_registration
+  SRCS
+    "TargetPluginRegistration.cpp"
+  DEPS
+    iree::compiler::PluginAPI
+)
+```
+
+```c++
+// TargetPluginRegistration.cpp
+
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/PluginAPI/Client.h"
+
+namespace mlir::iree_compiler {
+namespace {
+
+struct TargetDemoOptions {
+  bool demoOption = false;
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("Target Demo");
+    binder.opt<bool>(
+        "iree-target-demo-option", demoOption,
+        llvm::cl::cat(category),
+        llvm::cl::desc("Some command-line option"));
+  }
+};
+
+struct TargetDemoSession
+    : public PluginSession<TargetDemoSession, TargetDemoOptions,
+                           PluginActivationPolicy::DefaultActivated> {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+    targets.add("demo", [&]() {
+      return std::make_shared<DemoTargetBackend>(options);
+    });
+  }
+};
+
+} // namespace
+} // namespace mlir::iree_compiler
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(::mlir::iree_compiler::TargetDemoOptions);
+
+extern "C" bool iree_register_compiler_plugin_input_demo(
+    mlir::iree_compiler::PluginRegistrar *registrar) {
+  registrar->registerPlugin<TargetDemoSession>("hal_target_demo");
+  return true;
+}
+```
+
 #### Samples
 
 | Project | Source | Description |
-| ------- |------- | ----------- |
-[iree-org/iree-template-compiler-cmake](https://github.com/iree-org/iree-template-compiler-cmake/) | [`hello_compiler.c`](https://github.com/iree-org/iree-template-compiler-cmake/blob/main/hello_compiler/hello_compiler.c) | Compiler application template
-[openxla/openxla-pjrt-plugin](https://github.com/openxla/openxla-pjrt-plugin/) | [`iree_compiler.cc`](https://github.com/openxla/openxla-pjrt-plugin/blob/main/iree/integrations/pjrt/common/iree_compiler.cc) | JIT for TensorFlow + JAX to IREE
-[openxla/iree](https://github.com/openxla/iree/) | [`samples/compiler_plugins/`](https://github.com/openxla/iree/tree/main/samples/compiler_plugins) | In-tree demos of compiler plugins
+| ------- | ------ | ----------- |
+[iree-org/iree-template-compiler-cmake](https://github.com/iree-org/iree-template-compiler-cmake/) |[`hello_compiler.c`](https://github.com/iree-org/iree-template-compiler-cmake/blob/main/hello_compiler/hello_compiler.c) | Compiler application template
+[openxla/iree](https://github.com/openxla/iree/) | [`integrations/pjrt/.../iree_compiler.cc`](https://github.com/openxla/iree/blob/main/integrations/pjrt/src/iree_pjrt/common/iree_compiler.cc) | JIT for TensorFlow + JAX to IREE
+[openxla/iree](https://github.com/openxla/iree/) | [`compiler/plugins`](https://github.com/openxla/iree/tree/main/compiler/plugins) | In-tree supported compiler plugins
+[openxla/iree](https://github.com/openxla/iree/) | [`samples/compiler_plugins/`](https://github.com/openxla/iree/tree/main/samples/compiler_plugins) | In-tree sample compiler plugins
+[nod-ai/iree-amd-aie](https://github.com/nod-ai/iree-amd-aie/) | [`plugins/.../iree-amd-aie`](https://github.com/nod-ai/iree-amd-aie/tree/main/compiler/plugins/target/AMD-AIE/iree-amd-aie) | Early-phase plugins for interfacing with AMD AIE accelerators
 
 ## Runtime API
 
