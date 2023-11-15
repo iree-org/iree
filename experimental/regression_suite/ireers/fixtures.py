@@ -42,6 +42,7 @@ def iree_compile(source: Artifact, compiled_variant: str, flags: Sequence[str]):
         sep = "\n  "
         print("**************************************************************")
         print(f"Compiling {source} -> {vmfb_artifact} with flags:")
+        print("::group::Compiling")
         print(f"  {sep.join(flags)}")
         start_time = time.time()
         subprocess.check_call(
@@ -54,8 +55,10 @@ def iree_compile(source: Artifact, compiled_variant: str, flags: Sequence[str]):
             + IREE_COMPILE_QOL_FLAGS
             + flags,
             cwd=str(source.group.directory),
+            stderr=subprocess.STDOUT,
         )
         run_time = time.time() - start_time
+        print("::endgroup::")
         print(f"Compilation succeeded in {run_time}s")
         print("**************************************************************")
 
