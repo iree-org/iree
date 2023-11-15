@@ -25,7 +25,7 @@
 // clang-format off
 
 EXPORT_FN("gather", iree_io_parameters_module_gather, rIrrrrrrr, v)
-EXPORT_FN("load", iree_io_parameters_module_load, rIrrrrIIiiI, r)
+EXPORT_FN("load", iree_io_parameters_module_load, rIrrrIiirrr, r)
 EXPORT_FN("scatter", iree_io_parameters_module_scatter, rIrrrrrrr, v)
 
 // clang-format on

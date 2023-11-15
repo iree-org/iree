@@ -159,6 +159,8 @@ static iree_status_t iree_hal_file_cache_insert_unsafe(
   entry->file = file;
   iree_hal_file_retain(entry->file);
 
+  file_cache->entries[file_cache->entry_count++] = entry;
+
   return iree_ok_status();
 }
 

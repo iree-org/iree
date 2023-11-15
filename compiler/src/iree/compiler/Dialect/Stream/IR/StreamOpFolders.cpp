@@ -993,43 +993,51 @@ void ResourceSubviewOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
-struct FoldParameterLoadTargetSubview
+struct FoldParameterLoadTargetSubviews
     : public OpRewritePattern<ParameterLoadOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ParameterLoadOp op,
                                 PatternRewriter &rewriter) const override {
-    auto loadResult = op.getResult();
-    if (!loadResult.hasOneUse())
-      return failure();
-    Operation *user = *loadResult.getUsers().begin();
-
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(op);
     bool needsUpdate = false;
 
-    auto newSourceOffset = llvm::cast<Value>(op.getSourceOffset());
-    auto newResultSize = op.getResultSize();
-    if (auto subviewOp = dyn_cast<IREE::Stream::ResourceSubviewOp>(user)) {
-      auto viewSourceOffset = subviewOp.getSourceOffset();
-      auto viewResultSize = subviewOp.getResultSize();
-      if (IREE::Util::tryMoveProducerBefore(viewSourceOffset, op) &&
-          IREE::Util::tryMoveProducerBefore(viewResultSize, op)) {
-        newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-            subviewOp.getLoc(), newSourceOffset,
-            rewriter.createOrFold<mlir::arith::IndexCastOp>(
-                subviewOp.getLoc(), rewriter.getI64Type(), viewSourceOffset));
-        newResultSize = viewResultSize;
-        rewriter.replaceAllUsesWith(subviewOp.getResult(), op.getResult());
-        needsUpdate = true;
+    SmallVector<Value> newSourceOffsets;
+    SmallVector<Value> newResultSizes;
+    size_t resultCount = op.getResults().size();
+    newSourceOffsets.reserve(resultCount);
+    newResultSizes.reserve(resultCount);
+
+    for (auto [loadResult, newSourceOffset, newResultSize] : llvm::zip_equal(
+             op.getResults(), op.getSourceOffsets(), op.getResultSizes())) {
+      if (loadResult.hasOneUse()) {
+        Operation *user = *loadResult.getUsers().begin();
+        if (auto subviewOp = dyn_cast<IREE::Stream::ResourceSubviewOp>(user)) {
+          auto viewSourceOffset = subviewOp.getSourceOffset();
+          auto viewResultSize = subviewOp.getResultSize();
+          if (IREE::Util::tryMoveProducerBefore(viewSourceOffset, op) &&
+              IREE::Util::tryMoveProducerBefore(viewResultSize, op)) {
+            newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+                subviewOp.getLoc(), newSourceOffset,
+                rewriter.createOrFold<mlir::arith::IndexCastOp>(
+                    subviewOp.getLoc(), rewriter.getI64Type(),
+                    viewSourceOffset));
+            newResultSize = viewResultSize;
+            rewriter.replaceAllUsesWith(subviewOp.getResult(), loadResult);
+            needsUpdate = true;
+          }
+        }
       }
+      newSourceOffsets.push_back(newSourceOffset);
+      newResultSizes.push_back(newResultSize);
     }
 
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate)
       return failure();
     rewriter.updateRootInPlace(op, [&]() {
-      op.getSourceOffsetMutable().assign(newSourceOffset);
-      op.getResultSizeMutable().assign(newResultSize);
+      op.getSourceOffsetsMutable().assign(newSourceOffsets);
+      op.getResultSizesMutable().assign(newResultSizes);
     });
     return success();
   }
@@ -1040,7 +1048,7 @@ struct FoldParameterLoadTargetSubview
 void ParameterLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
   results.insert<ElideUnusedOp<ParameterLoadOp>>(context);
-  results.insert<FoldParameterLoadTargetSubview>(context);
+  results.insert<FoldParameterLoadTargetSubviews>(context);
   results.insert<ElideImmediateTimepointWait<ParameterLoadOp>>(context);
 }
 
