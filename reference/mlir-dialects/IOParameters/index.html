@@ -1592,22 +1592,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#io_parametersread-ioparametersreadop" class="md-nav__link">
-    io_parameters.read (IO::Parameters::ReadOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#io_parametersscatter-ioparametersscatterop" class="md-nav__link">
     io_parameters.scatter (IO::Parameters::ScatterOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#io_parameterswrite-ioparameterswriteop" class="md-nav__link">
-    io_parameters.write (IO::Parameters::WriteOp)
   </a>
   
 </li>
@@ -3309,22 +3295,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#io_parametersread-ioparametersreadop" class="md-nav__link">
-    io_parameters.read (IO::Parameters::ReadOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#io_parametersscatter-ioparametersscatterop" class="md-nav__link">
     io_parameters.scatter (IO::Parameters::ScatterOp)
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#io_parameterswrite-ioparameterswriteop" class="md-nav__link">
-    io_parameters.write (IO::Parameters::WriteOp)
   </a>
   
 </li>
@@ -3394,9 +3366,7 @@ the mapping and use it to repack files/defrag memory in the future.</p>
 <li><a href="#parameter-io-ops">Parameter I/O ops</a><ul>
 <li><a href="#io_parametersgather-ioparametersgatherop">io_parameters.gather (IO::Parameters::GatherOp)</a></li>
 <li><a href="#io_parametersload-ioparametersloadop">io_parameters.load (IO::Parameters::LoadOp)</a></li>
-<li><a href="#io_parametersread-ioparametersreadop">io_parameters.read (IO::Parameters::ReadOp)</a></li>
 <li><a href="#io_parametersscatter-ioparametersscatterop">io_parameters.scatter (IO::Parameters::ScatterOp)</a></li>
-<li><a href="#io_parameterswrite-ioparameterswriteop">io_parameters.write (IO::Parameters::WriteOp)</a></li>
 </ul>
 </li>
 </ul>
@@ -3554,72 +3524,6 @@ parameter origin or result in a copy as if an allocate + read had been used.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="io_parametersread-ioparametersreadop"><code>io_parameters.read</code> (IO::Parameters::ReadOp)<a class="headerlink" href="#io_parametersread-ioparametersreadop" title="Permanent link">link</a></h4>
-<p><em>Reads a parameter from a parameter scope</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `io_parameters.read` `&lt;` $device `:` type($device) `&gt;`
-              `affinity` `(` $queue_affinity `)`
-              `wait` `(` $wait_fence `)`
-              `signal` `(` $signal_fence `)`
-              `source` `(` custom&lt;ParameterReference&gt;($source_scope, $source_key) `)`
-              `` `[` $source_offset `]`
-              `target` `(` $target_buffer `:` type($target_buffer)  `)`
-              `` `[` $target_offset `]`
-              `length` `(` $length `)`
-              attr-dict-with-keyword
-</code></pre></div>
-<p>Asynchronously reads a parameter from an external parameter provider into
-the provided target buffer range.</p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-</table>
-
-<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>device</code></td>
-<td>device</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>queue_affinity</code></td>
-<td>64-bit signless integer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>wait_fence</code></td>
-<td>fence</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>signal_fence</code></td>
-<td>fence</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>source_offset</code></td>
-<td>64-bit signless integer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>target_buffer</code></td>
-<td>buffer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>target_offset</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>length</code></td>
-<td>index</td>
-</tr>
-</tbody>
-</table>
 <h4 id="io_parametersscatter-ioparametersscatterop"><code>io_parameters.scatter</code> (IO::Parameters::ScatterOp)<a class="headerlink" href="#io_parametersscatter-ioparametersscatterop" title="Permanent link">link</a></h4>
 <p><em>Scatters multiple parameters to a parameter scope</em></p>
 <p>Syntax:</p>
@@ -3639,14 +3543,14 @@ into one or more parameters. This is equivalent to one write per parameter
 but allows implementations that can batch operations to do so without
 additional overhead.</p>
 <p>Traits: AttrSizedOperandSegments</p>
-<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>target_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
 </table>
 
-<h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -3686,72 +3590,6 @@ additional overhead.</p>
 <tr>
 <td style="text-align: center;"><code>target_offsets</code></td>
 <td>variadic of 64-bit signless integer</td>
-</tr>
-</tbody>
-</table>
-<h4 id="io_parameterswrite-ioparameterswriteop"><code>io_parameters.write</code> (IO::Parameters::WriteOp)<a class="headerlink" href="#io_parameterswrite-ioparameterswriteop" title="Permanent link">link</a></h4>
-<p><em>Writes a parameter into a parameter scope</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `io_parameters.write` `&lt;` $device `:` type($device) `&gt;`
-              `affinity` `(` $queue_affinity `)`
-              `wait` `(` $wait_fence `)`
-              `signal` `(` $signal_fence `)`
-              `source` `(` $source_buffer `:` type($source_buffer)  `)`
-              `` `[` $source_offset `]`
-              `target` `(` custom&lt;ParameterReference&gt;($target_scope, $target_key) `)`
-              `` `[` $target_offset `]`
-              `length` `(` $length `)`
-              attr-dict-with-keyword
-</code></pre></div>
-<p>Asynchronously writes a parameter to an external parameter provider from
-the provided source buffer range.</p>
-<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
-<table>
-<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>target_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>target_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-</table>
-
-<h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>device</code></td>
-<td>device</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>queue_affinity</code></td>
-<td>64-bit signless integer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>wait_fence</code></td>
-<td>fence</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>signal_fence</code></td>
-<td>fence</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>source_buffer</code></td>
-<td>buffer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>source_offset</code></td>
-<td>index</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>target_offset</code></td>
-<td>64-bit signless integer</td>
-</tr>
-<tr>
-<td style="text-align: center;"><code>length</code></td>
-<td>index</td>
 </tr>
 </tbody>
 </table>
