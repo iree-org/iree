@@ -268,8 +268,12 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       }
       return {};
     };
-    Type lhsElemType = getElemType(origLhs);
-    Type rhsElemType = getElemType(origRhs);
+    std::optional<CastOpInterface> maybeLhsCastOp = getDefiningCastOp(origLhs);
+    std::optional<CastOpInterface> maybeRhsCastOp = getDefiningCastOp(origRhs);
+    Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
+                                      : getElemType(origLhs);
+    Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()
+                                      : getElemType(origRhs);
     Type outElemType = getElemType(origOut);
 
     if (!lhsElemType || !rhsElemType || !outElemType) {
@@ -280,13 +284,17 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     MatmulNarrowSizes narrowSizes =
         getMatmulNarrowSizes(origOut.getType().cast<ShapedType>());
     Location loc = matmulOp.getLoc();
-    TypeRange operandTypes = matmulOp->getOperandTypes();
-    Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
-                                         IREE::LinalgExt::EncodingRole::LHS,
-                                         operandTypes, narrowSizes);
-    Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
-                                         IREE::LinalgExt::EncodingRole::RHS,
-                                         operandTypes, narrowSizes);
+    SmallVector<Type> operandTypes(matmulOp->getOperandTypes());
+    operandTypes[0] =
+        cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
+    operandTypes[1] =
+        cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
+    Value encodedLhs = padAndSetEncoding(
+        rewriter, loc, origLhs, user, IREE::LinalgExt::EncodingRole::LHS,
+        operandTypes, narrowSizes, maybeLhsCastOp);
+    Value encodedRhs = padAndSetEncoding(
+        rewriter, loc, origRhs, user, IREE::LinalgExt::EncodingRole::RHS,
+        operandTypes, narrowSizes, maybeRhsCastOp);
     Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
                                          IREE::LinalgExt::EncodingRole::RESULT,
                                          operandTypes, narrowSizes);
