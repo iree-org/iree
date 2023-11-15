@@ -55,7 +55,8 @@ def iree_compile(source: Artifact, compiled_variant: str, flags: Sequence[str]):
             + IREE_COMPILE_QOL_FLAGS
             + flags,
             cwd=str(source.group.directory),
-            stdout=subprocess.STDERR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
         )
         run_time = time.time() - start_time
         print("::endgroup::")
