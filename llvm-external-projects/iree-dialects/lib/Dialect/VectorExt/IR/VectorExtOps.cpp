@@ -16,25 +16,32 @@ namespace IREE = mlir::iree_compiler::IREE;
 // LayoutConflictResolutionOp
 //===----------------------------------------------------------------------===//
 
-// Validate that the desired layout has the same shape as the input.
-LogicalResult LayoutConflictResolutionOp::verify() {
-  Operation *op = getOperation();
-  LayoutAttr layout = getDesiredLayout();
-  ArrayRef<int64_t> inputShape =
-      cast<VectorType>(getInput().getType()).getShape();
+LogicalResult validateLayout(Operation *op, StringRef label, LayoutAttr layout,
+                             ArrayRef<int64_t> inputShape) {
   for (auto perDimLayout : llvm::enumerate(layout.getLayouts())) {
     ArrayRef<int64_t> shape = perDimLayout.value().getShapes();
     int64_t computedShape =
         std::reduce(shape.begin(), shape.end(), 1, std::multiplies<int64_t>());
     int64_t expectedShape = inputShape[perDimLayout.index()];
     if (computedShape != expectedShape) {
-      return op->emitError("The layout shape does not match the input shape. "
+      return op->emitError("The " + label +
+                           " layout shape does not match the input shape. "
                            "Expected shape to be ")
              << std::to_string(expectedShape) << ", got "
              << std::to_string(computedShape);
     }
   }
   return success();
+}
+
+// Validate that the desired layout has the same shape as the input.
+LogicalResult LayoutConflictResolutionOp::verify() {
+  Operation *op = getOperation();
+  ArrayRef<int64_t> inputShape =
+      cast<VectorType>(getInput().getType()).getShape();
+  if (succeeded(validateLayout(op, "source", getSourceLayout(), inputShape)))
+    return validateLayout(op, "desired", getDesiredLayout(), inputShape);
+  return failure();
 }
 
 // clang-format off

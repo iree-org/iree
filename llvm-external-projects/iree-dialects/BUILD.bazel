@@ -32,6 +32,7 @@ filegroup(
         "include/iree-dialects/Dialect/Input/*.td",
         "include/iree-dialects/Dialect/LinalgExt/IR/*.td",
         "include/iree-dialects/Dialect/LinalgExt/Passes/*.td",
+        "include/iree-dialects/Dialect/VectorExt/IR/*.td",
     ]),
 )
 
@@ -42,6 +43,7 @@ td_library(
         "include/iree-dialects/Dialect/LinalgExt/IR/*.td",
         "include/iree-dialects/Dialect/LinalgExt/Passes/*.td",
         "include/iree-dialects/Dialect/LinalgTransform/*.td",
+        "include/iree-dialects/Dialect/VectorExt/IR/*.td",
         "python/iree/compiler/dialects/*.td",
     ]),
     includes = ["include"],
@@ -691,6 +693,8 @@ cc_library(
     includes = ["include"],
     deps = [
         ":IREEVectorExtIncGen",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
     ],
 )
 

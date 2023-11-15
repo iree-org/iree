@@ -30,6 +30,7 @@ def IREEVectorExt_LayoutConflictResolutionOp : IREEVectorExt_PureOp<"layout_conf
   }];
   let arguments = (ins
     AnyVector:$input,
+    LayoutAttr:$sourceLayout,
     LayoutAttr:$desiredLayout
   );
   let results = (outs
