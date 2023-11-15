@@ -105,33 +105,19 @@ void LLVMGPUSelectLoweringStrategyPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same pipeline.
-  // TODO(ravishankarm): This is strange that this is not enforced
-  // structurally, but something to address later on. For now this restriction
-  // is fine.
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : exportOps) {
-    auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(exportOp)) {
-      if (translationInfo) {
-        if (currTranslationInfo != translationInfo.value()) {
-          moduleOp.emitOpError(
-              "unhandled compilation of entry point functions with different "
-              "translation info");
-        }
-      } else {
-        translationInfo = currTranslationInfo;
-      }
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+      getIdenticalTranslationInfo(variantOp);
+  if (!translationInfo) {
+    moduleOp.emitOpError(
+        "unhandled compilation of entry point functions with different "
+        "translation info");
+    return signalPassFailure();
+  }
 
-      // Verify the properties of each entry point based on the target
-      // pipeline.
-      if (failed(verifyEntryPoint(moduleOp, currTranslationInfo, exportOp))) {
-        return signalPassFailure();
-      }
+  // Verify the properties of each entry point based on the target pipeline.
+  for (auto exportOp : variantOp.getExportOps()) {
+    if (failed(verifyEntryPoint(moduleOp, translationInfo.value(), exportOp))) {
+      return signalPassFailure();
     }
   }
 }
