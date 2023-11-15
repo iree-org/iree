@@ -146,39 +146,12 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
 static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
                                CastOpInterface castOp,
                                IREE::LinalgExt::EncodingAttr encodingAttr) {
-  auto encodedType = cast<RankedTensorType>(encoded.getType());
-  auto castResultElemType = getElementTypeOrSelf(castOp->getResultTypes()[0]);
-  auto castedType = RankedTensorType::get(encodedType.getShape(),
-                                          castResultElemType, encodingAttr);
-  assert(encodedType.getElementType() ==
-             getElementTypeOrSelf(castOp->getOperandTypes()[0]) &&
-         "Expected encoded element type to be the same as the cast input "
-         "element type");
-  SmallVector<OpFoldResult> inputMixedSizes =
-      tensor::getMixedSizes(builder, loc, encoded);
-  Value init = builder.create<tensor::EmptyOp>(
-      loc, inputMixedSizes, castResultElemType, encodingAttr);
-  SmallVector<AffineMap> maps(
-      2, AffineMap::getMultiDimIdentityMap(castedType.getRank(),
-                                           builder.getContext()));
-  SmallVector<utils::IteratorType> iteratorTypes(castedType.getRank(),
-                                                 utils::IteratorType::parallel);
   auto genericOp = castOp->getParentOfType<linalg::GenericOp>();
   NamedAttrList castAttrs = genericOp
                                 ? linalg::getPrunedAttributeList(genericOp)
                                 : castOp->getAttrs();
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, encoded, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                b.create(nestedLoc, castOp->getName().getIdentifier(), args[0],
-                         castResultElemType)
-                    ->getResult(0);
-            b.create<linalg::YieldOp>(nestedLoc, castRes);
-          },
-          castAttrs)
-      ->getResult(0);
+  return createGenericElementwiseCastOp(builder, loc, encoded, castOp,
+                                        castAttrs, encodingAttr);
 }
 
 static Value

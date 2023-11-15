@@ -53,14 +53,11 @@ std::optional<Type> getCastElemType(Value input) {
   return castSrcElemType;
 }
 
-FailureOr<Value>
-createGenericElementwiseCastOp(OpBuilder &builder, Location loc, Value input,
-                               CastOpInterface castOp,
-                               ArrayRef<NamedAttribute> attrs) {
-  auto inputType = dyn_cast<RankedTensorType>(input.getType());
-  if (!inputType) {
-    return failure();
-  }
+Value createGenericElementwiseCastOp(
+    OpBuilder &builder, Location loc, Value input, CastOpInterface castOp,
+    ArrayRef<NamedAttribute> attrs,
+    std::optional<IREE::LinalgExt::EncodingAttr> encoding) {
+  auto inputType = cast<RankedTensorType>(input.getType());
   SmallVector<AffineMap> maps(
       2, AffineMap::getMultiDimIdentityMap(inputType.getRank(),
                                            builder.getContext()));
@@ -71,7 +68,10 @@ createGenericElementwiseCastOp(OpBuilder &builder, Location loc, Value input,
   SmallVector<OpFoldResult> inputMixedSizes =
       tensor::getMixedSizes(builder, loc, input);
   Value init =
-      builder.create<tensor::EmptyOp>(loc, inputMixedSizes, elementType);
+      encoding
+          ? builder.create<tensor::EmptyOp>(loc, inputMixedSizes, elementType,
+                                            *encoding)
+          : builder.create<tensor::EmptyOp>(loc, inputMixedSizes, elementType);
   return builder
       .create<linalg::GenericOp>(
           loc, castedType, input, init, maps, iteratorTypes,

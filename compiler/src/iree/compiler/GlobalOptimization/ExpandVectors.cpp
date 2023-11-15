@@ -112,8 +112,7 @@ struct ExpandVectors
                                     ? linalg::getPrunedAttributeList(genericOp)
                                     : castOp.value()->getAttrs();
       expandedIn = createGenericElementwiseCastOp(rewriter, loc, expandedIn,
-                                                  castOp.value(), castAttrs)
-                       .value();
+                                                  castOp.value(), castAttrs);
     } else {
       expandedIn =
           rewriter

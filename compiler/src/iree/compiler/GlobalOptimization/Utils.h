@@ -7,7 +7,7 @@
 #define IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_
 
 #include <optional>
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 namespace mlir {
 class Type;
@@ -33,12 +33,11 @@ std::optional<CastOpInterface> getDefiningCastOp(Value input);
 std::optional<Type> getCastElemType(Value input);
 
 /// Create an elementwise identity map linalg::GenericOp that casts the `input`
-/// with the same cast operation as the passed CastOpInterface `castOp`. If the
-/// input type is not a RankedTensorType, return failure.
-FailureOr<Value> createGenericElementwiseCastOp(OpBuilder &builder,
-                                                Location loc, Value input,
-                                                CastOpInterface castOp,
-                                                ArrayRef<NamedAttribute> attrs);
+/// with the same cast operation as the passed CastOpInterface `castOp`.
+Value createGenericElementwiseCastOp(
+    OpBuilder &builder, Location loc, Value input, CastOpInterface castOp,
+    ArrayRef<NamedAttribute> attrs,
+    std::optional<IREE::LinalgExt::EncodingAttr> encoding = std::nullopt);
 
 } // namespace GlobalOptimization
 } // namespace iree_compiler
