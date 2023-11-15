@@ -68,19 +68,18 @@ def main(args):
     # Add explicit custom_edit_url links as these markdown files were generated
     # from other source files.
     dialect_sources_map = {
-        "Check.md": "compiler/src/iree/compiler/Modules/Check/IR/CheckOps.td",
-        "Flow.md": "compiler/src/iree/compiler/Dialect/Flow/IR/FlowOps.td",
-        "HAL.md": "compiler/src/iree/compiler/Dialect/HAL/IR/HALOps.td",
-        "HALInline.md": "compiler/src/iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.td",
-        "HALLoader.md": "compiler/src/iree/compiler/Modules/HAL/Loader/IR/HALLoaderOps.td",
-        "IOParameters.md": "compiler/src/iree/compiler/Modules/IO/Parameters/IR/IOParametersOps.td",
-        "IREEInput.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/Input/InputOps.td",
-        "IREELinalgExt.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.td",
-        "LinalgTransformOps.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.td",
-        "Stream.md": "compiler/src/iree/compiler/Dialect/Stream/IR/StreamOps.td",
-        "Util.md": "compiler/src/iree/compiler/Dialect/Util/IR/UtilOps.td",
-        "VM.md": "compiler/src/iree/compiler/Dialect/VM/IR/VMOps.td",
-        "VMVX.md": "compiler/src/iree/compiler/Dialect/VMVX/IR/VMVXOps.td",
+        "Check.md": "compiler/src/iree/compiler/Modules/Check/IR",
+        "Flow.md": "compiler/src/iree/compiler/Dialect/Flow/IR",
+        "HAL.md": "compiler/src/iree/compiler/Dialect/HAL/IR",
+        "HALInline.md": "compiler/src/iree/compiler/Modules/HAL/Inline/IR",
+        "HALLoader.md": "compiler/src/iree/compiler/Modules/HAL/Loader/IR",
+        "IOParameters.md": "compiler/src/iree/compiler/Modules/IO/Parameters/IR",
+        "IREEInput.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/Input",
+        "IREELinalgExt.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/LinalgExt/IR",
+        "Stream.md": "compiler/src/iree/compiler/Dialect/Stream/IR",
+        "Util.md": "compiler/src/iree/compiler/Dialect/Util/IR",
+        "VM.md": "compiler/src/iree/compiler/Dialect/VM/IR",
+        "VMVX.md": "compiler/src/iree/compiler/Dialect/VMVX/IR",
     }
     base_url = "https://github.com/openxla/iree/blob/main/"
     for file in files:
