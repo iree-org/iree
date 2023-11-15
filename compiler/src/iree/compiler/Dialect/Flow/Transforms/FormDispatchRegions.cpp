@@ -329,6 +329,9 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
   return true;
 }
 
+/// Method to check if the op with have compatible indexing map on
+/// outer-parallel loops. Currently it means the map needs to be identity on the
+/// those dimensions, ignoring its reduction dimensions.
 static bool hasCompatibleOuterParallelLoops(
     TilingInterface tileOp, AffineMap indexingMap,
     const llvm::SmallBitVector &rootOuterParallelLoops) {
