@@ -186,19 +186,15 @@ function build_wheel() {
 }
 
 function build_iree_runtime() {
-  echo "::group::build_iree_runtime"
   # We install the needed build deps below for the tools.
   IREE_RUNTIME_BUILD_TRACY=ON IREE_RUNTIME_BUILD_TRACY_TOOLS=ON \
   IREE_EXTERNAL_HAL_DRIVERS="rocm" \
   build_wheel runtime/
-  echo "::endgroup::"
 }
 
 function build_iree_compiler() {
-  echo "::group::build_iree_compiler"
   IREE_TARGET_BACKEND_ROCM=ON IREE_ENABLE_LLD=ON \
   build_wheel compiler/
-  echo "::endgroup::"
 }
 
 function run_audit_wheel() {

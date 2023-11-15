@@ -52,6 +52,5 @@ jobs:
         run: |
           source $VENV_DIR/bin/activate
           pytest \
-            -o log_cli=true \
             -s -m "plat_host_cpu and presubmit" \
             experimental/regression_suite

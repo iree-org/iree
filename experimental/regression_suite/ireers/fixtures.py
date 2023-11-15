@@ -20,7 +20,7 @@ from .artifacts import (
 
 IREE_COMPILE_QOL_FLAGS = [
     "--mlir-timing",
-    "--mlir-timing-display=tree",
+    "--mlir-timing-display=list",
     "--iree-consteval-jit-debug",
 ]
 
@@ -43,7 +43,6 @@ def iree_compile(source: Artifact, compiled_variant: str, flags: Sequence[str]):
         print("**************************************************************")
         print(f"Compiling {source} -> {vmfb_artifact} with flags:")
         print(f"  {sep.join(flags)}")
-        print("::group::Compiling")
         start_time = time.time()
         subprocess.check_call(
             [
@@ -55,11 +54,8 @@ def iree_compile(source: Artifact, compiled_variant: str, flags: Sequence[str]):
             + IREE_COMPILE_QOL_FLAGS
             + flags,
             cwd=str(source.group.directory),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
         )
         run_time = time.time() - start_time
-        print("::endgroup::")
         print(f"Compilation succeeded in {run_time}s")
         print("**************************************************************")
 
