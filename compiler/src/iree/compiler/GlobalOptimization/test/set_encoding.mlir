@@ -672,7 +672,7 @@ func.func @preset_compilation_info(
 
 // -----
 
-func.func @batch_matmul_casted_i8i8i32(%arg0 : tensor<64x100x250xi8>, %arg1 : tensor<64x250x500xi8>,
+func.func @batch_matmul_casted_ui8i8i32(%arg0 : tensor<64x100x250xi8>, %arg1 : tensor<64x250x500xi8>,
       %arg2 : tensor<64x100x500xi32>) -> tensor<64x100x500xi32> {
   %0 = tensor.empty() : tensor<64x250x500xi32>
   %casted0 = arith.extui %arg0 : tensor<64x100x250xi8> to tensor<64x100x250xi32>
@@ -695,7 +695,7 @@ func.func @batch_matmul_casted_i8i8i32(%arg0 : tensor<64x100x250xi8>, %arg1 : te
 //  CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0 + 64)>
 //  CHECK-DAG: #[[MAP4:.+]] = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0 + 500)>
 //  CHECK-DAG: #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-//      CHECK: func @batch_matmul_casted_i8i8i32(
+//      CHECK: func @batch_matmul_casted_ui8i8i32(
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<64x100x250xi8>
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<64x250x500xi8>
 // CHECK-SAME:     %[[ARG2:.+]]: tensor<64x100x500xi32>
@@ -755,3 +755,26 @@ func.func @batch_matmul_casted_i8i8i32(%arg0 : tensor<64x100x250xi8>, %arg1 : te
 //      CHECK:   %[[RESULT_PADDED:.+]] = iree_linalg_ext.unset_encoding %[[BATCH_MATMUL]]
 //      CHECK:   %[[RESULT:.+]] = tensor.extract_slice %[[RESULT_PADDED]][0, 0, 0] [64, 100, 500] [1, 1, 1]
 //      CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @matmul_casted_ui8i8i32(%arg0 : tensor<100x250xi8>, %arg1 : tensor<250x500xi8>,
+      %arg2 : tensor<100x500xi32>) -> tensor<100x500xi32> {
+  %0 = tensor.empty() : tensor<250x500xi32>
+  %casted0 = arith.extui %arg0 : tensor<100x250xi8> to tensor<100x250xi32>
+  %casted1 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                              affine_map<(d0, d1) -> (d0, d1)>],
+                              iterator_types = ["parallel", "parallel"]}
+                              ins(%arg1 : tensor<250x500xi8>)
+                              outs(%0 : tensor<250x500xi32>) {
+  ^bb0(%in: i8, %out: i32):
+      %2 = arith.extsi %in : i8 to i32
+      linalg.yield %2 : i32
+  } -> tensor<250x500xi32>
+  %1 = linalg.matmul ins(%casted0, %casted1 : tensor<100x250xi32>, tensor<250x500xi32>)
+      outs(%arg2 : tensor<100x500xi32>) -> tensor<100x500xi32>
+  return %1 : tensor<100x500xi32>
+}
+
+//      CHECK: func @matmul_casted_ui8i8i32(
+//      CHECK: element_types = [ui8

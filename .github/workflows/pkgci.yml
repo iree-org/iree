@@ -24,23 +24,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  setup:
+    uses: ./.github/workflows/setup.yml
+
   build_packages:
     name: Build Packages
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_packages')
     uses: ./.github/workflows/pkgci_build_packages.yml
     with:
       package_version: 0.dev1
 
   regression_test_cpu:
     name: Regression Test CPU
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_cpu')
     uses: ./.github/workflows/pkgci_regression_test_cpu.yml
-    needs: [build_packages]
 
   regression_test_amdgpu_vulkan:
     name: Regression Test AMDGPU-Vulkan
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_vulkan')
     uses: ./.github/workflows/pkgci_regression_test_amdgpu_vulkan.yml
-    needs: [build_packages]
 
   regression_test_amdgpu_rocm:
     name: Regression Test AMDGPU-ROCm
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_rocm')
     uses: ./.github/workflows/pkgci_regression_test_amdgpu_rocm.yml
-    needs: [build_packages]
