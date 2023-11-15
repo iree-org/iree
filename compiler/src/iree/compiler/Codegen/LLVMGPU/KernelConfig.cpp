@@ -1226,7 +1226,13 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     if (!rootOperation) {
-      // No root operation found. Allow it to pass through without a config.
+      // No root operation found, set it to default.
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          funcOp.getContext(),
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault);
+      if (failed(setTranslationInfo(funcOp, translationInfo))) {
+        return failure();
+      }
       continue;
     }
 
