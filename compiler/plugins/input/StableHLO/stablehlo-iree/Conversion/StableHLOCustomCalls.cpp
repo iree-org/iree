@@ -30,7 +30,7 @@
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_LEGALIZESTABLEHLOCUSTOMCALLS
-#include "iree/compiler/InputConversion/StableHLO/Passes.h.inc"
+#include "stablehlo-iree/Conversion/Passes.h.inc"
 
 namespace {
 
