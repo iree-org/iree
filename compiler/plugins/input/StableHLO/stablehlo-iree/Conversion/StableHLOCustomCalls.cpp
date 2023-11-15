@@ -84,7 +84,8 @@ static Value collapseBackDims(Value v, int64_t ndims, ImplicitLocOpBuilder b) {
   }
 
   for (int64_t i = rank - ndims; i < rank; i++) {
-    dims.back() *= vTy.getDimSize(i);
+    if (!dims.empty())
+      dims.back() *= vTy.getDimSize(i);
     if (!reass.empty())
       reass.back().push_back(i);
   }
@@ -92,6 +93,7 @@ static Value collapseBackDims(Value v, int64_t ndims, ImplicitLocOpBuilder b) {
   auto newTy = RankedTensorType::get(dims, vTy.getElementType());
   return b.create<tensor::CollapseShapeOp>(newTy, v, reass);
 }
+
 static Value expandDim(Value v, int64_t dim, ArrayRef<int64_t> sizes,
                        ImplicitLocOpBuilder b) {
   auto vTy = cast<ShapedType>(v.getType());
