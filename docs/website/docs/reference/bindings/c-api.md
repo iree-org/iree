@@ -346,7 +346,7 @@ struct TargetDemoSession
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(::mlir::iree_compiler::TargetDemoOptions);
 
-extern "C" bool iree_register_compiler_plugin_input_demo(
+extern "C" bool iree_register_compiler_plugin_hal_target_demo(
     mlir::iree_compiler::PluginRegistrar *registrar) {
   registrar->registerPlugin<TargetDemoSession>("hal_target_demo");
   return true;
