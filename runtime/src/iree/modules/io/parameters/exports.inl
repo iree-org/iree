@@ -26,8 +26,6 @@
 
 EXPORT_FN("gather", iree_io_parameters_module_gather, rIrrrrrrr, v)
 EXPORT_FN("load", iree_io_parameters_module_load, rIrrrrIIiiI, r)
-EXPORT_FN("read", iree_io_parameters_module_read, rIrrrrIrII, v)
 EXPORT_FN("scatter", iree_io_parameters_module_scatter, rIrrrrrrr, v)
-EXPORT_FN("write", iree_io_parameters_module_write, rIrrrrIrII, v)
 
 // clang-format on

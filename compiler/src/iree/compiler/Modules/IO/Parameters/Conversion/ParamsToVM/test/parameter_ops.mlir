@@ -35,40 +35,6 @@ func.func @parameterLoadNoScope(%device: !hal.device, %queue_affinity: i64, %wai
 
 // -----
 
-// CHECK-LABEL: @parameterRead
-// CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[QUEUE_AFFINITY:.+]]: i64, %[[WAIT:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL:.+]]: !vm.ref<!hal.fence>, %[[TARGET_BUFFER:.+]]: !vm.ref<!hal.buffer>)
-func.func @parameterRead(%device: !hal.device, %queue_affinity: i64, %wait: !hal.fence, %signal: !hal.fence, %target_buffer: !hal.buffer) {
-  %c50_i64 = arith.constant 50 : i64
-  %c100 = arith.constant 100 : index
-  %c200 = arith.constant 200 : index
-  // CHECK-DAG: %[[SCOPE:.+]] = vm.rodata.inline {{.+}} = "scope"
-  // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline {{.+}} = "key"
-  // CHECK: vm.call @io_parameters.read
-  // CHECK-SAME: (%[[DEVICE]], %[[QUEUE_AFFINITY]], %[[WAIT]], %[[SIGNAL]],
-  // CHECK-SAME:  %[[SCOPE]], %[[KEY]], %c50, %[[TARGET_BUFFER]], %c100, %c200)
-  io_parameters.read<%device : !hal.device> affinity(%queue_affinity) wait(%wait) signal(%signal) source("scope"::"key")[%c50_i64] target(%target_buffer : !hal.buffer)[%c100] length(%c200)
-  return
-}
-
-// -----
-
-// CHECK-LABEL: @parameterWrite
-// CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[QUEUE_AFFINITY:.+]]: i64, %[[WAIT:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL:.+]]: !vm.ref<!hal.fence>, %[[SOURCE_BUFFER:.+]]: !vm.ref<!hal.buffer>)
-func.func @parameterWrite(%device: !hal.device, %queue_affinity: i64, %wait: !hal.fence, %signal: !hal.fence, %source_buffer: !hal.buffer) {
-  %c50_i64 = arith.constant 50 : i64
-  %c100 = arith.constant 100 : index
-  %c200 = arith.constant 200 : index
-  // CHECK-DAG: %[[SCOPE:.+]] = vm.rodata.inline {{.+}} = "scope"
-  // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline {{.+}} = "key"
-  // CHECK: vm.call @io_parameters.write
-  // CHECK-SAME: (%[[DEVICE]], %[[QUEUE_AFFINITY]], %[[WAIT]], %[[SIGNAL]],
-  // CHECK-SAME:  %[[SCOPE]], %[[KEY]], %c50, %[[SOURCE_BUFFER]], %c100, %c200
-  io_parameters.write<%device : !hal.device> affinity(%queue_affinity) wait(%wait) signal(%signal) source(%source_buffer : !hal.buffer)[%c100] target("scope"::"key")[%c50_i64] length(%c200)
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @parameterGather
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[QUEUE_AFFINITY:.+]]: i64, %[[WAIT:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL:.+]]: !vm.ref<!hal.fence>, %[[TARGET_BUFFER:.+]]: !vm.ref<!hal.buffer>)
 func.func @parameterGather(%device: !hal.device, %queue_affinity: i64, %wait: !hal.fence, %signal: !hal.fence, %target_buffer: !hal.buffer) {

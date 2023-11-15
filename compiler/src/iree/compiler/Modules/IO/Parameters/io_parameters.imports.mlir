@@ -14,32 +14,6 @@ vm.import private @load(
   %length : i64
 ) -> !vm.ref<!hal.buffer>
 
-vm.import private @read(
-  %device : !vm.ref<!hal.device>,
-  %queue_affinity : i64,
-  %wait_fence : !vm.ref<!hal.fence>,
-  %signal_fence : !vm.ref<!hal.fence>,
-  %source_scope : !vm.buffer,
-  %source_key : !vm.buffer,
-  %source_offset : i64,
-  %target_buffer : !vm.ref<!hal.buffer>,
-  %target_offset : i64,
-  %length : i64
-)
-
-vm.import private @write(
-  %device : !vm.ref<!hal.device>,
-  %queue_affinity : i64,
-  %wait_fence : !vm.ref<!hal.fence>,
-  %signal_fence : !vm.ref<!hal.fence>,
-  %target_scope : !vm.buffer,
-  %target_key : !vm.buffer,
-  %target_offset : i64,
-  %source_buffer : !vm.ref<!hal.buffer>,
-  %source_offset : i64,
-  %length : i64
-)
-
 vm.import private @gather(
   %device : !vm.ref<!hal.device>,
   %queue_affinity : i64,
