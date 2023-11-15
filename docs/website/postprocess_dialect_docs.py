@@ -18,6 +18,7 @@ Usage (typically invoked by generate_extra_files.sh, edits files in-place):
 
 import argparse
 import fileinput
+import os
 import pathlib
 import re
 
@@ -64,7 +65,40 @@ def main(args):
 
             print(line, end="")
 
-    # TODO(scotttodd): replace [TOC] with \n[TOC] as needed (transform ops)
+    # Add explicit custom_edit_url links as these markdown files were generated
+    # from other source files.
+    dialect_sources_map = {
+        "Check.md": "compiler/src/iree/compiler/Modules/Check/IR/CheckOps.td",
+        "Flow.md": "compiler/src/iree/compiler/Dialect/Flow/IR/FlowOps.td",
+        "HAL.md": "compiler/src/iree/compiler/Dialect/HAL/IR/HALOps.td",
+        "HALInline.md": "compiler/src/iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.td",
+        "HALLoader.md": "compiler/src/iree/compiler/Modules/HAL/Loader/IR/HALLoaderOps.td",
+        "IOParameters.md": "compiler/src/iree/compiler/Modules/IO/Parameters/IR/IOParametersOps.td",
+        "IREEInput.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/Input/InputOps.td",
+        "IREELinalgExt.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.td",
+        "LinalgTransformOps.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.td",
+        "Stream.md": "compiler/src/iree/compiler/Dialect/Stream/IR/StreamOps.td",
+        "Util.md": "compiler/src/iree/compiler/Dialect/Util/IR/UtilOps.td",
+        "VM.md": "compiler/src/iree/compiler/Dialect/VM/IR/VMOps.td",
+        "VMVX.md": "compiler/src/iree/compiler/Dialect/VMVX/IR/VMVXOps.td",
+    }
+    base_url = "https://github.com/openxla/iree/blob/main/"
+    for file in files:
+        filename = pathlib.Path(file).name
+        relative_path = dialect_sources_map.get(filename, None)
+        if not relative_path:
+            print("Warning: missing dialect source path for '%s'" % filename)
+            continue
+
+        full_url = base_url + relative_path
+        with open(file, "r+") as f:
+            content = f.read()
+            f.seek(0, 0)
+            frontmatter = f"""---
+custom_edit_url: {full_url}
+---
+"""
+            f.write(frontmatter + os.linesep + content)
 
 
 def parse_arguments():

@@ -206,6 +206,11 @@ nav:
       - "Blog":
           - "community/blog/index.md"
       - "community/tags.md"
+
+# https://www.mkdocs.org/user-guide/configuration/#hooks
+hooks:
+  - custom_edit_url.py
+
 plugins:
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-a-blog/
   - blog:
