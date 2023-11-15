@@ -432,7 +432,7 @@ struct CholeskyRewriter final : OpRewritePattern<mlir::stablehlo::CholeskyOp> {
                            Value sqrt = bb.create<math::SqrtOp>(loc, args[0]);
                            Value div =
                                bb.create<arith::DivFOp>(loc, args[1], sqrt);
-                           return bb.create<linalg::YieldOp>(loc, div);
+                           bb.create<linalg::YieldOp>(loc, div);
                          })
                         .getResult(0);
 
@@ -511,7 +511,7 @@ struct CholeskyRewriter final : OpRewritePattern<mlir::stablehlo::CholeskyOp> {
                                    {colTy.getShape().back(), 1}, b);
                Value insert =
                    insertSlice(args[0], generic, {col}, {rank - 1}, b);
-               return b.create<scf::YieldOp>(insert);
+               b.create<scf::YieldOp>(insert);
              })
             .getResult(0);
 
