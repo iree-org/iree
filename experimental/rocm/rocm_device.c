@@ -10,16 +10,19 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "experimental/rocm/api.h"
 #include "experimental/rocm/context_wrapper.h"
 #include "experimental/rocm/direct_command_buffer.h"
 #include "experimental/rocm/dynamic_symbols.h"
 #include "experimental/rocm/event_semaphore.h"
+#include "experimental/rocm/graph_command_buffer.h"
 #include "experimental/rocm/nop_executable_cache.h"
 #include "experimental/rocm/pipeline_layout.h"
 #include "experimental/rocm/rocm_allocator.h"
 #include "experimental/rocm/rocm_event.h"
 #include "experimental/rocm/status_util.h"
 #include "experimental/rocm/tracing.h"
+#include "hip/hip_runtime_api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/file_transfer.h"
@@ -41,6 +44,9 @@ typedef struct iree_hal_rocm_device_t {
   // to ensure the symbols remains valid.
   iree_hal_driver_t* driver;
 
+  // Parameters used to control device behavior.
+  iree_hal_rocm_device_params_t params;
+
   hipDevice_t device;
 
   // TODO: support multiple streams.
@@ -51,6 +57,10 @@ typedef struct iree_hal_rocm_device_t {
 
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
+
+  // Cache of the direct stream command buffer initialized when in stream mode.
+  // TODO: have one cached per stream once there are multiple streams.
+  iree_hal_command_buffer_t* stream_command_buffer;
 } iree_hal_rocm_device_t;
 
 static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable;
@@ -61,10 +71,20 @@ static iree_hal_rocm_device_t* iree_hal_rocm_device_cast(
   return (iree_hal_rocm_device_t*)base_value;
 }
 
+IREE_API_EXPORT void iree_hal_rocm_device_params_initialize(
+    iree_hal_rocm_device_params_t* out_params) {
+  memset(out_params, 0, sizeof(*out_params));
+  out_params->arena_block_size = 32 * 1024;
+  out_params->command_buffer_mode = IREE_HAL_ROCM_COMMAND_BUFFER_MODE_GRAPH;
+  out_params->stream_tracing = false;
+}
+
 static void iree_hal_rocm_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_command_buffer_release(device->stream_command_buffer);
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
@@ -76,6 +96,8 @@ static void iree_hal_rocm_device_destroy(iree_hal_device_t* base_device) {
   ROCM_IGNORE_ERROR(device->context_wrapper.syms,
                     hipStreamDestroy(device->stream));
 
+  iree_arena_block_pool_deinitialize(&device->block_pool);
+
   // Finally, destroy the device.
   iree_hal_driver_release(device->driver);
 
@@ -86,9 +108,9 @@ static void iree_hal_rocm_device_destroy(iree_hal_device_t* base_device) {
 
 static iree_status_t iree_hal_rocm_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
-    hipDevice_t rocm_device, hipStream_t stream, hipCtx_t context,
-    iree_hal_rocm_dynamic_symbols_t* syms, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_hal_rocm_device_params_t* params, hipDevice_t rocm_device,
+    hipStream_t stream, hipCtx_t context, iree_hal_rocm_dynamic_symbols_t* syms,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   iree_hal_rocm_device_t* device = NULL;
   iree_host_size_t total_size = sizeof(*device) + identifier.size;
   IREE_RETURN_IF_ERROR(
@@ -100,16 +122,22 @@ static iree_status_t iree_hal_rocm_device_create_internal(
   uint8_t* buffer_ptr = (uint8_t*)device + sizeof(*device);
   buffer_ptr += iree_string_view_append_to_buffer(
       identifier, &device->identifier, (char*)buffer_ptr);
+  device->params = *params;
   device->device = rocm_device;
   device->stream = stream;
   device->context_wrapper.rocm_context = context;
   device->context_wrapper.rocm_device = rocm_device;
   device->context_wrapper.host_allocator = host_allocator;
+  iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
+                                   &device->block_pool);
   device->context_wrapper.syms = syms;
   // Enable tracing for the (currently only) stream - no-op if disabled.
-  iree_status_t status = iree_hal_rocm_tracing_context_allocate(
-      &device->context_wrapper, device->identifier, stream, &device->block_pool,
-      host_allocator, &device->tracing_context);
+  iree_status_t status = iree_ok_status();
+  if (device->params.stream_tracing) {
+    status = iree_hal_rocm_tracing_context_allocate(
+        &device->context_wrapper, device->identifier, stream,
+        &device->block_pool, host_allocator, &device->tracing_context);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_rocm_allocator_create(&device->context_wrapper,
                                             &device->device_allocator);
@@ -122,12 +150,12 @@ static iree_status_t iree_hal_rocm_device_create_internal(
   return status;
 }
 
-iree_status_t iree_hal_rocm_device_create(iree_hal_driver_t* driver,
-                                          iree_string_view_t identifier,
-                                          iree_hal_rocm_dynamic_symbols_t* syms,
-                                          hipDevice_t device,
-                                          iree_allocator_t host_allocator,
-                                          iree_hal_device_t** out_device) {
+iree_status_t iree_hal_rocm_device_create(
+    iree_hal_driver_t* driver, iree_string_view_t identifier,
+    const iree_hal_rocm_device_params_t* params,
+    iree_hal_rocm_dynamic_symbols_t* syms, hipDevice_t device,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+  IREE_ASSERT_ARGUMENT(params);
   IREE_TRACE_ZONE_BEGIN(z0);
   hipCtx_t context;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -141,8 +169,8 @@ iree_status_t iree_hal_rocm_device_create(iree_hal_driver_t* driver,
       syms, hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_rocm_device_create_internal(driver, identifier, device,
-                                                  stream, context, syms,
+    status = iree_hal_rocm_device_create_internal(driver, identifier, params,
+                                                  device, stream, context, syms,
                                                   host_allocator, out_device);
   }
   if (!iree_status_is_ok(status)) {
@@ -229,10 +257,21 @@ static iree_status_t iree_hal_rocm_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
-  return iree_hal_rocm_direct_command_buffer_create(
-      base_device, &device->context_wrapper, device->tracing_context, mode,
-      command_categories, queue_affinity, binding_capacity, &device->block_pool,
-      out_command_buffer);
+  switch (device->params.command_buffer_mode) {
+    case IREE_HAL_ROCM_COMMAND_BUFFER_MODE_DIRECT:
+      return iree_hal_rocm_direct_command_buffer_create(
+          base_device, &device->context_wrapper, device->tracing_context, mode,
+          command_categories, queue_affinity, binding_capacity,
+          &device->block_pool, out_command_buffer);
+    case IREE_HAL_ROCM_COMMAND_BUFFER_MODE_GRAPH:
+      return iree_hal_rocm_graph_command_buffer_create(
+          base_device, &device->context_wrapper, mode, command_categories,
+          queue_affinity, binding_capacity, &device->block_pool,
+          out_command_buffer);
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid command buffer mode");
+  }
 }
 
 static iree_status_t iree_hal_rocm_device_create_descriptor_set_layout(
@@ -384,8 +423,26 @@ static iree_status_t iree_hal_rocm_device_queue_execute(
   // synchronizes after every submit.
   // TODO(raikonenfnu): currently run on default/null stream, when cmd buffer
   // stream work with device->stream, we'll change
+  for (iree_host_size_t i = 0; i < command_buffer_count; i++) {
+    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
+    if (iree_hal_rocm_graph_command_buffer_isa(command_buffer)) {
+      hipGraphExec_t exec =
+          iree_hal_rocm_graph_command_buffer_handle(command_buffers[i]);
+      ROCM_RETURN_IF_ERROR(device->context_wrapper.syms,
+                           hipGraphLaunch(exec, device->stream),
+                           "hipGraphLaunch");
+    } else {
+      IREE_TRACE_ZONE_BEGIN_NAMED(z0, "hipStreamSynchronize");
+      ROCM_RETURN_IF_ERROR(device->context_wrapper.syms,
+                           hipStreamSynchronize(0), "hipStreamSynchronize");
+      iree_hal_rocm_tracing_context_collect(device->tracing_context);
+      IREE_TRACE_ZONE_END(z0);
+      return iree_ok_status();
+    } 
+  }
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "hipStreamSynchronize");
-  ROCM_RETURN_IF_ERROR(device->context_wrapper.syms, hipStreamSynchronize(0),
+  ROCM_RETURN_IF_ERROR(device->context_wrapper.syms,
+                       hipStreamSynchronize(device->stream),
                        "hipStreamSynchronize");
   iree_hal_rocm_tracing_context_collect(device->tracing_context);
   IREE_TRACE_ZONE_END(z0);

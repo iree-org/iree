@@ -51,6 +51,8 @@ iree_cc_library(
     "rocm_event.h"
     "event_semaphore.c"
     "event_semaphore.h"
+    "graph_command_buffer.c"
+    "graph_command_buffer.h"
     "direct_command_buffer.c"
     "direct_command_buffer.h"
     "native_executable.c"
@@ -76,8 +78,10 @@ iree_cc_library(
     iree::base::internal::synchronization
     iree::hal
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::collective_batch
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
+    iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::rocm_executable_def_c_fbs
   COPTS

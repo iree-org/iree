@@ -11,6 +11,19 @@
 
 #include "experimental/rocm/api.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/flags.h"
+
+// Force using ROCM streams until we support command buffer caching to avoid the
+// overhead of graph creation.
+IREE_FLAG(
+  bool, rocm_use_streams, false,
+  "Use ROCM streams for executing command buffers (instead of graphs).");
+
+IREE_FLAG(
+  bool, rocm_tracing, true,
+  "Enables tracing of stream events when Tracy instrumentation is enabled.\n"
+  "Severely impacts benchmark timings and should only be used when\n"
+  "analyzing dispatch timings.");
 
 static iree_status_t iree_hal_rocm_driver_factory_enumerate(
     void *self, iree_host_size_t *out_driver_info_count,
@@ -36,10 +49,18 @@ static iree_status_t iree_hal_rocm_driver_factory_try_create(
                             (int)driver_name.size, driver_name.data);
   }
   IREE_TRACE_ZONE_BEGIN(z0);
+
+    iree_hal_rocm_device_params_t default_params;
+  iree_hal_rocm_device_params_initialize(&default_params);
+  if (FLAG_rocm_use_streams) {
+    default_params.command_buffer_mode =
+        IREE_HAL_ROCM_COMMAND_BUFFER_MODE_STREAM;
+  }
+  default_params.stream_tracing = FLAG_rocm_tracing;
   iree_hal_rocm_driver_options_t driver_options;
   iree_hal_rocm_driver_options_initialize(&driver_options);
   iree_status_t status = iree_hal_rocm_driver_create(
-      driver_name, &driver_options, host_allocator, out_driver);
+      driver_name, &default_params, &driver_options, host_allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
