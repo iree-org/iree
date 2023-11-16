@@ -163,6 +163,7 @@ nav:
           - "Public dialects":
               - IREEInput: "reference/mlir-dialects/IREEInput.md"
               - IREELinalgExt: "reference/mlir-dialects/IREELinalgExt.md"
+              - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
       - "Other topics":
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"

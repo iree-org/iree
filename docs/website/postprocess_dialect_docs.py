@@ -76,6 +76,7 @@ def main(args):
         "IOParameters.md": "compiler/src/iree/compiler/Modules/IO/Parameters/IR",
         "IREEInput.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/Input",
         "IREELinalgExt.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/LinalgExt/IR",
+        "IREEVectorExt.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/VectorExt/IR",
         "Stream.md": "compiler/src/iree/compiler/Dialect/Stream/IR",
         "Util.md": "compiler/src/iree/compiler/Dialect/Util/IR",
         "VM.md": "compiler/src/iree/compiler/Dialect/VM/IR",
