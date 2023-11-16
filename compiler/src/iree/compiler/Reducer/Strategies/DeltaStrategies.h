@@ -12,11 +12,11 @@
 namespace mlir::iree_compiler::Reducer {
 
 void reduceLinalgOnTensorsDelta(ChunkManager &chunker, WorkItem &workItem);
-void reduceFlowDispatchOperandToResultDelta(ChunkManager &chunker,
-                                            WorkItem &workItem);
+void reduceOperandToResultDelta(ChunkManager &chunker, WorkItem &workItem);
 void reduceFlowDispatchResultBySplatDelta(ChunkManager &chunker,
                                           WorkItem &workItem);
 void reduceOptimizationBarriersDelta(ChunkManager &chunker, WorkItem &workItem);
+void reduceArithOperandToResultDelta(ChunkManager &chunker, WorkItem &workItem);
 
 } // namespace mlir::iree_compiler::Reducer
 

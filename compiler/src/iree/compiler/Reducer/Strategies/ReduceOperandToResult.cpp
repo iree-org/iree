@@ -19,16 +19,16 @@ using namespace mlir;
 using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::Reducer;
 
-void mlir::iree_compiler::Reducer::reduceFlowDispatchOperandToResultDelta(
+void mlir::iree_compiler::Reducer::reduceOperandToResultDelta(
     ChunkManager &chunker, WorkItem &workItem) {
   ModuleOp module = workItem.getModule();
 
   // Create an result to operand map.
   SmallVector<std::pair<Value, Value>> resultToOperand;
-  module.walk([&](IREE::Flow::DispatchOp dispatchOp) {
+  module.walk([&](Operation *op) {
     // Check if there is a result with the same type as the operand.
-    for (auto result : dispatchOp.getResults()) {
-      for (auto operand : dispatchOp.getOperands()) {
+    for (auto result : op->getResults()) {
+      for (auto operand : op->getOperands()) {
         if (operand.getType() == result.getType() &&
             !chunker.shouldFeatureBeKept()) {
           resultToOperand.push_back({result, operand});
@@ -42,13 +42,20 @@ void mlir::iree_compiler::Reducer::reduceFlowDispatchOperandToResultDelta(
     return;
   }
 
-  // Replace all dispatch ops with the chosen operand.
+  // Sort the vector according to type, to reduce better.
+  std::sort(resultToOperand.begin(), resultToOperand.end(),
+            [](std::pair<Value, Value> &left, std::pair<Value, Value> &right) {
+              return hash_value(left.first.getType()) <
+                     hash_value(right.first.getType());
+            });
+
+  // Replace all ops with the chosen operand.
   for (auto [result, operand] : resultToOperand) {
     result.replaceAllUsesWith(operand);
   }
 
   PassManager pm(module.getContext());
-  // Dead code eliminate the dispatch ops.
+  // Dead code eliminate the ops.
   pm.addPass(createCSEPass());
   // Dead code eliminate the weights.
   pm.addPass(createSymbolDCEPass());
