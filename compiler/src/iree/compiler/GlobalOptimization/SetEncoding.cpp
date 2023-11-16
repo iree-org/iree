@@ -95,8 +95,9 @@ struct MatmulNarrowSizes {
 // Returns the minimum of static sizes of the M-dimension in the types of the
 // LHS and/or the Output operand of a matmul, whichever is static.
 static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType) {
-  int64_t M = outType.getDimSize(0);
-  int64_t N = outType.getDimSize(1);
+  int64_t M = outType.getDimSize(outType.getRank() - 2);
+  int64_t N = outType.getDimSize(outType.getRank() - 1);
+
   MatmulNarrowSizes narrow;
   // Threshold below which a M/N size is considered "narrow", making it
   // eligible for a narrow tile size during materialization. This value should
