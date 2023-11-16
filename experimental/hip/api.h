@@ -36,8 +36,7 @@ IREE_API_EXPORT void iree_hal_hip_driver_options_initialize(
 //
 // |out_driver| must be released by the caller (see iree_hal_driver_release).
 IREE_API_EXPORT iree_status_t iree_hal_hip_driver_create(
-    iree_string_view_t identifier,
-    const iree_hal_hip_driver_options_t* options,
+    iree_string_view_t identifier, const iree_hal_hip_driver_options_t* options,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver);
 
 #ifdef __cplusplus

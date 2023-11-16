@@ -29,13 +29,14 @@ static const char* iree_hal_hip_dylib_names[] = {
 // Resolves all HIP dynamic symbols in `dynamic_symbol_tables.h`
 static iree_status_t iree_hal_hip_dynamic_symbols_resolve_all(
     iree_hal_hip_dynamic_symbols_t* syms) {
-#define IREE_HIP_PFN_DECL(hip_symbol_name, ...)                  \
-  {                                                              \
-    static const char* name = #hip_symbol_name;                  \
-    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(     \
-        syms->dylib, name, (void**)&syms->hip_symbol_name));     \
+#define IREE_HIP_PFN_DECL(hip_symbol_name, ...)              \
+  {                                                          \
+    static const char* name = #hip_symbol_name;              \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol( \
+        syms->dylib, name, (void**)&syms->hip_symbol_name)); \
   }
-#define IREE_HIP_PFN_STR_DECL(hip_symbol_name, ...) IREE_HIP_PFN_DECL(hip_symbol_name, ...)
+#define IREE_HIP_PFN_STR_DECL(hip_symbol_name, ...) \
+  IREE_HIP_PFN_DECL(hip_symbol_name, ...)
 #include "experimental/hip/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef IREE_HIP_PFN_DECL
 #undef IREE_HIP_PFN_STR_DECL
@@ -43,8 +44,7 @@ static iree_status_t iree_hal_hip_dynamic_symbols_resolve_all(
 }
 
 iree_status_t iree_hal_hip_dynamic_symbols_initialize(
-    iree_allocator_t host_allocator,
-    iree_hal_hip_dynamic_symbols_t* out_syms) {
+    iree_allocator_t host_allocator, iree_hal_hip_dynamic_symbols_t* out_syms) {
   IREE_ASSERT_ARGUMENT(out_syms);
   IREE_TRACE_ZONE_BEGIN(z0);
 

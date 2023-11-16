@@ -17,8 +17,8 @@ extern "C" {
 
 // iree_dynamic_library_t allows dynamically loading a subset of HIP driver API.
 // We load all the symbols in `dynamic_symbol_tables.h` and fail if any of the
-// symbol is not available. The functions signatures are matching the declarations
-// in `hip_runtime_api.h`.
+// symbol is not available. The functions signatures are matching the
+// declarations in `hip_runtime_api.h`.
 
 //===----------------------------------------------------------------------===//
 // HIP dynamic symbols
@@ -43,8 +43,7 @@ typedef struct iree_hal_hip_dynamic_symbols_t {
 // iree_hal_hip_dynamic_symbols_deinitialize must be used to release the
 // library resources.
 iree_status_t iree_hal_hip_dynamic_symbols_initialize(
-    iree_allocator_t host_allocator,
-    iree_hal_hip_dynamic_symbols_t* out_syms);
+    iree_allocator_t host_allocator, iree_hal_hip_dynamic_symbols_t* out_syms);
 
 // Deinitializes |syms| by unloading the backing library. All function pointers
 // will be invalidated. They _may_ still work if there are other reasons the
