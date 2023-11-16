@@ -164,6 +164,10 @@ struct HouseholderReflectorRewriter final
     auto tauTy = cast<ShapedType>(tau.getType());
     auto rank = matrixTy.getRank();
 
+    if (isa<ComplexType>(matrixTy.getElementType())) {
+      return rewriter.notifyMatchFailure(op, "complex types not supported");
+    }
+
     if (rank < 2) {
       return rewriter.notifyMatchFailure(op, "requires minimum rank 2 matrix");
     }
