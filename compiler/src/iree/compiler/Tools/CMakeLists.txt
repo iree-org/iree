@@ -53,6 +53,7 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
+    IREEVectorExtDialect
     MLIRIR
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms

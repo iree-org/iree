@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Async/IR/Async.h"
@@ -59,6 +60,7 @@ int main(int argc, char **argv) {
       // Local dialects
       mlir::iree_compiler::IREE::Input::IREEInputDialect,
       mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
+      mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect,
       // Upstream dialects
       mlir::async::AsyncDialect,
       mlir::arith::ArithDialect,

@@ -32,6 +32,7 @@ filegroup(
         "include/iree-dialects/Dialect/Input/*.td",
         "include/iree-dialects/Dialect/LinalgExt/IR/*.td",
         "include/iree-dialects/Dialect/LinalgExt/Passes/*.td",
+        "include/iree-dialects/Dialect/VectorExt/IR/*.td",
     ]),
 )
 
@@ -42,6 +43,7 @@ td_library(
         "include/iree-dialects/Dialect/LinalgExt/IR/*.td",
         "include/iree-dialects/Dialect/LinalgExt/Passes/*.td",
         "include/iree-dialects/Dialect/LinalgTransform/*.td",
+        "include/iree-dialects/Dialect/VectorExt/IR/*.td",
         "python/iree/compiler/dialects/*.td",
     ]),
     includes = ["include"],
@@ -619,6 +621,84 @@ cc_library(
 )
 
 ################################################################################
+# IREEVectorExt Dialect
+################################################################################
+
+gentbl_cc_library(
+    name = "IREEVectorExtIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            [
+                "--dialect=iree_vector_ext",
+                "--gen-dialect-decls",
+            ],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h.inc",
+        ),
+        (
+            [
+                "--dialect=iree_vector_ext",
+                "--gen-dialect-defs",
+            ],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.cpp.inc",
+        ),
+        (
+            ["--gen-attrdef-decls"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.cpp.inc",
+        ),
+        (
+            ["--gen-enum-decls"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtEnums.cpp.inc",
+        ),
+        (
+            ["--gen-op-decls"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtOps.cpp.inc",
+        ),
+        (
+            ["--gen-typedef-decls"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtTypes.h.inc",
+        ),
+        (
+            ["--gen-typedef-defs"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtTypes.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/VectorExt/IR/VectorExtOps.td",
+    deps = [
+        ":TdFiles",
+    ],
+)
+
+cc_library(
+    name = "IREEVectorExtDialect",
+    srcs = glob([
+        "lib/Dialect/VectorExt/IR/*.cpp",
+    ]),
+    hdrs = glob([
+        "include/iree-dialects/Dialect/VectorExt/IR/*.h",
+    ]),
+    includes = ["include"],
+    deps = [
+        ":IREEVectorExtIncGen",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+################################################################################
 # CAPI
 ################################################################################
 
@@ -681,6 +761,7 @@ cc_binary(
         ":IREELinalgExtTransformOps",
         ":IREELinalgTransformDialect",
         ":IREELinalgTransformDialectPasses",
+        ":IREEVectorExtDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
