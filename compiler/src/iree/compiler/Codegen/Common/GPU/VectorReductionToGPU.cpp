@@ -173,6 +173,31 @@ class WarpOpBarrier : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
   }
 };
 
+/// Returns a matching GPU reduction operations.
+static std::optional<gpu::AllReduceOperation>
+combiningKindToAllReduce(vector::CombiningKind kind) {
+  using gpu::AllReduceOperation;
+  using vector::CombiningKind;
+
+  switch (kind) {
+  case CombiningKind::ADD:
+    return AllReduceOperation::ADD;
+  case CombiningKind::AND:
+    return AllReduceOperation::AND;
+  case CombiningKind::MUL:
+    return AllReduceOperation::MUL;
+  case CombiningKind::OR:
+    return AllReduceOperation::OR;
+  case CombiningKind::XOR:
+    return AllReduceOperation::XOR;
+  // Currently, the min/max reductions are not well-defined in the gpu dialect.
+  // See https://github.com/llvm/llvm-project/issues/72354.
+  default:
+    return std::nullopt;
+  }
+  llvm_unreachable("unhandled");
+}
+
 static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
                                        Value val, Value srcIdx,
                                        int64_t warpSz) {
@@ -193,8 +218,10 @@ class VectorReductionToGPUPass
     : public VectorReductionToGPUBase<VectorReductionToGPUPass> {
 public:
   explicit VectorReductionToGPUPass(
+      bool expandSubgroupReduction,
       std::function<int(func::FuncOp)> getWarpSize)
-      : getWarpSize(getWarpSize) {}
+      : expandSubgroupReduction(expandSubgroupReduction),
+        getWarpSize(getWarpSize) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
@@ -204,6 +231,8 @@ public:
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     MLIRContext *ctx = &getContext();
+
+    debugPrint(funcOp, "after step #0: before vector reduction to gpu");
 
     // 1. Pre-process multiDimReductions.
     // TODO: Remove once MultiDimReduce is supported by distribute patterns.
@@ -255,22 +284,23 @@ public:
     // distribution.
     {
       int warpSize = this->getWarpSize ? this->getWarpSize(funcOp) : 32;
-      auto groupReductionFn = [&](Location loc, OpBuilder &builder, Value input,
-                                  vector::CombiningKind kind, uint32_t size) {
-        return emitGPUGroupReduction(loc, builder, input, kind, size, warpSize);
+      auto groupReductionFn = [=](Location loc, OpBuilder &builder, Value input,
+                                  vector::CombiningKind kind,
+                                  uint32_t size) -> Value {
+        return emitGPUGroupReduction(loc, builder, input, kind, size, warpSize,
+                                     expandSubgroupReduction);
       };
       auto distributionFn = [](Value val) {
-        AffineMap map = AffineMap::get(val.getContext());
         auto vecType = llvm::dyn_cast<VectorType>(val.getType());
         if (!vecType)
-          return map;
+          return AffineMap::get(val.getContext());
         // Create a map (d0, d1) -> (d1) to distribute along the inner
         // dimension. Once we support n-d distribution we can add more
         // complex cases.
         int64_t vecRank = vecType.getRank();
         OpBuilder builder(val.getContext());
-        map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
-        return map;
+        return AffineMap::get(vecRank, 0,
+                              builder.getAffineDimExpr(vecRank - 1));
       };
       RewritePatternSet patterns(ctx);
       vector::populatePropagateWarpVectorDistributionPatterns(
@@ -297,10 +327,11 @@ public:
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    debugPrint(funcOp, "after step #5: lowering remaing ops");
+    debugPrint(funcOp, "after step #5: lowering remaining ops");
   }
 
 private:
+  bool expandSubgroupReduction;
   std::function<int(func::FuncOp)> getWarpSize;
 };
 
@@ -308,8 +339,10 @@ private:
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
+    bool expandSubgroupReduction,
     std::function<int(func::FuncOp)> getWarpSize) {
-  return std::make_unique<VectorReductionToGPUPass>(getWarpSize);
+  return std::make_unique<VectorReductionToGPUPass>(expandSubgroupReduction,
+                                                    getWarpSize);
 }
 
 } // namespace iree_compiler

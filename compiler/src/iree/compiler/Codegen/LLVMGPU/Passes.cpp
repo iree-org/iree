@@ -428,7 +428,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
 
   // vector -> simt gpu + vector
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertVectorReductionToGPUPass());
+      createConvertVectorReductionToGPUPass(/*expandSubgroupReduction=*/true));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }

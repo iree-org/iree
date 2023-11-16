@@ -333,17 +333,17 @@ hal.executable private @dynamic_softmax {
         %c32_i64 = arith.constant 32 : i64
         %c0 = arith.constant 0 : index
         %0 = hal.interface.constant.load[0] : i32
-        %1 = hal.interface.constant.load[1] : i32 
+        %1 = hal.interface.constant.load[1] : i32
         %2 = arith.extui %0 : i32 to i64
         %3 = arith.extui %1 : i32 to i64
-        %4 = arith.shli %3, %c32_i64 : i64 
+        %4 = arith.shli %3, %c32_i64 : i64
         %5 = arith.ori %2, %4 : i64
         %6 = arith.index_castui %5 : i64 to index
         %7 = flow.dispatch.workload.ordinal %6, 0 : index
         %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%7}
         %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
         %10 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%7} -> tensor<32x?xf16>
-        %11 = tensor.empty(%7) : tensor<32x?xf16> 
+        %11 = tensor.empty(%7) : tensor<32x?xf16>
         %12 = linalg.softmax dimension(1) ins(%10 : tensor<32x?xf16>) outs(%11 : tensor<32x?xf16>) -> tensor<32x?xf16>
         flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : tensor<32x?xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
         return
@@ -371,8 +371,8 @@ hal.executable private @dynamic_softmax {
 // CHECK:         vector.transfer_write %[[MIN_F16]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
 // CHECK:           %[[MASK:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
-// CHECK:           %[[ACC:.+]] = vector.transfer_read %{{.*}}, %cst_3, %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
-// CHECK:           %[[NEW:.+]] = vector.transfer_read %{{.*}}, %cst_3, %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
+// CHECK-DAG:       %[[ACC:.+]] = vector.transfer_read %{{.*}}, %cst_2, %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
+// CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %cst_2, %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
 // CHECK:           %[[MAX:.+]] = arith.maximumf %[[NEW]], %[[ACC]] : vector<1xf16>
 // CHECK:           vector.transfer_write %[[MAX]], %{{.*}}, %[[MASK]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:           gpu.barrier
@@ -394,7 +394,7 @@ hal.executable private @dynamic_softmax {
 // CHECK:           gpu.barrier
 
 // Finish the second reduction.
-// CHECK-COUNT-6: gpu.shuffle  xor {{.*}} : i32
+// CHECK:         gpu.subgroup_reduce add {{.*}} : (f16) -> f16
 
 // Store the result back to global memory in a loop, recomputing the
 // elementwise part.
