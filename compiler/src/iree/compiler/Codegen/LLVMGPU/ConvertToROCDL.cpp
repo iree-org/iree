@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "mlir/Conversion/AMDGPUToROCDL/AMDGPUToROCDL.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
@@ -22,7 +23,9 @@
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -36,6 +39,49 @@ namespace iree_compiler {
 
 namespace {
 
+static StringRef getTargetArch(func::FuncOp entryPoint) {
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+    if (auto config = targetAttr.getConfiguration()) {
+      if (auto attr = config.getAs<StringAttr>("target_arch")) {
+        return attr.getValue();
+      }
+    }
+  }
+  return "";
+}
+
+static StringRef getChipset(ModuleOp m) {
+  for (func::FuncOp funcOp : m.getOps<func::FuncOp>()) {
+    if (isEntryPoint(funcOp)) {
+      return getTargetArch(funcOp);
+    }
+  }
+  return "";
+}
+
+// Transform gpu.barrier -> amdgpu.lds_barrier
+// IREE code generation currently only ever needs to synchronize for
+// LDS operations. This conversion is to make the barrier operations
+// LDS specific because the gpu.barrier contains global memory
+// operations as well.
+struct ReplaceGPUBarrierWithLDSBarrier
+    : public OpRewritePattern<gpu::BarrierOp> {
+  using OpRewritePattern<gpu::BarrierOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(gpu::BarrierOp op,
+                                PatternRewriter &rewriter) const override {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.replaceOpWithNewOp<amdgpu::LDSBarrierOp>(op);
+    return success();
+  }
+};
+
+void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
+  patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
+}
+
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding ROCDL equivalent.
 ///
@@ -43,7 +89,8 @@ namespace {
 /// code.
 struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LLVM::LLVMDialect, ROCDL::ROCDLDialect>();
+    registry.insert<LLVM::LLVMDialect, ROCDL::ROCDLDialect,
+                    amdgpu::AMDGPUDialect, gpu::GPUDialect>();
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
@@ -71,6 +118,7 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      populateConvertGPUToAMDGPUPatterns(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
@@ -120,6 +168,10 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
+      StringRef chipset = getChipset(m);
+      FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
+      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
+                                              *maybeChipset);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
                                            gpu::amd::Runtime::Unknown);

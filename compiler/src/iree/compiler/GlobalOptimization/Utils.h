@@ -7,26 +7,37 @@
 #define IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_
 
 #include <optional>
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 namespace mlir {
 class Type;
 class Value;
 class CastOpInterface;
+class OpBuilder;
+class Location;
+class NamedAttribute;
 
 namespace iree_compiler {
 namespace GlobalOptimization {
 
-// If the producer is a CastOpInterface, or a linalg::GenericOp that performs
-// only a CastOpInterface on its input, return the CastOpInterface op.
-// Otherwise, return std::nullopt.
-//
-// **Note: If the CastOpInterface has been generalized, the return Operation
-//         is the body CastOpInterface op, not the linalg::GenericOp.
+/// If the producer is a CastOpInterface, or a linalg::GenericOp that performs
+/// only a CastOpInterface on its input, return the CastOpInterface op.
+/// Otherwise, return std::nullopt.
+///
+/// **Note: If the CastOpInterface has been generalized, the return Operation
+///         is the body CastOpInterface op, not the linalg::GenericOp.
 std::optional<CastOpInterface> getDefiningCastOp(Value input);
 
-// Returns the source element type of the defining CastOpInterface of `input`,
-// if there is one. Otherwise return std::nullopt.
+/// Returns the source element type of the defining CastOpInterface of `input`,
+/// if there is one. Otherwise return std::nullopt.
 std::optional<Type> getCastElemType(Value input);
+
+/// Create an elementwise identity map linalg::GenericOp that casts the `input`
+/// with the same cast operation as the passed CastOpInterface `castOp`.
+Value createGenericElementwiseCastOp(
+    OpBuilder &builder, Location loc, Value input, CastOpInterface castOp,
+    ArrayRef<NamedAttribute> attrs,
+    std::optional<IREE::LinalgExt::EncodingAttr> encoding = std::nullopt);
 
 } // namespace GlobalOptimization
 } // namespace iree_compiler

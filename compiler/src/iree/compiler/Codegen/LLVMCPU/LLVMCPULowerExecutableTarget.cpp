@@ -145,127 +145,99 @@ static TilingConfig getTilingConfigForPipeline(ModuleOp moduleOp) {
 
 void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
-  if (!moduleOp) {
-    getOperation()->emitError(
-        "Expected a variantOp root with an inner ModuleOp");
-    return signalPassFailure();
-  }
-
-  OpPassManager executableLoweringPipeline(
-      IREE::HAL::ExecutableVariantOp::getOperationName());
+  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
 
   if (!useLoweringPipeline.empty()) {
-    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
+    OpPassManager &nestedModulePM = pipeline.nest<ModuleOp>();
     if (failed(parsePassPipeline(sanitizePipelineString(useLoweringPipeline),
                                  nestedModulePM))) {
       return signalPassFailure();
     }
   } else {
-    // There might be multiple entry points in the module. Currently, all of
-    // them need to have the same translation info. This should already be
-    // verified when the strategies are set, but we still need to retrieve the
-    // correct translation info.
-    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-        getAllEntryPoints(moduleOp);
-    std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-    for (auto &it : exportOps) {
-      auto exportOp = it.second;
-      if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-              getTranslationInfo(exportOp)) {
-        if (translationInfo) {
-          if (currTranslationInfo != translationInfo.value()) {
-            moduleOp.emitOpError(
-                "unhandled compilation of entry point functions with different "
-                "translation info");
-            return signalPassFailure();
-          }
-        } else {
-          translationInfo = currTranslationInfo;
-        }
-      }
+    std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+        getIdenticalTranslationInfo(variantOp);
+    if (!translationInfo) {
+      variantOp.emitOpError(
+          "unhandled compilation of entry point functions with different "
+          "translation info");
+      return signalPassFailure();
     }
 
-    if (translationInfo.has_value()) {
-      auto target = variantOp.getTarget();
-      bool lowerToAVX2 = hasAVX2Feature(target);
-      bool enableVectorMasking =
-          isX86(target) || isRISCV(target) ||
-          (isAArch64(target) && hasAnySVEFeature(target));
+    ModuleOp moduleOp = variantOp.getInnerModule();
+    auto target = variantOp.getTarget();
+    bool lowerToAVX2 = hasAVX2Feature(target);
+    bool enableVectorMasking = isX86(target) || isRISCV(target) ||
+                               (isAArch64(target) && hasAnySVEFeature(target));
 
-      bool enableMicrokernels = hasUkernel(target);
-      bool enableAArch64SSVE = isAArch64(target) && hasAnySVEFeature(target) &&
-                               hasSMEFeature(target);
-      switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-      // No pipleline specified, nothing to do.
-      case IREE::Codegen::DispatchLoweringPassPipeline::None:
-        return;
-      case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
-        addCPUDefaultPassPipeline(executableLoweringPipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          CPUBufferOpsTileAndVectorize: {
-        TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-        addCPUBufferOpsTileAndVectorizePipeline(
-            executableLoweringPipeline, tilingConfig, enableVectorMasking,
-            enableAArch64SSVE);
-        break;
-      }
-      case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
-        TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-        addMultiTilingExpertPassPipeline(
-            executableLoweringPipeline, tilingConfig,
-            /*enablePeeling=*/false, enableVectorMasking, lowerToAVX2);
-        break;
-      }
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          CPUDoubleTilingPadExpert: {
-        TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-        addDoubleTilingPadExpertPassPipeline(executableLoweringPipeline,
-                                             tilingConfig, enableVectorMasking);
-        break;
-      }
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          CPUDoubleTilingPeelingExpert: {
-        TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-        addMultiTilingExpertPassPipeline(
-            executableLoweringPipeline, tilingConfig,
-            /*enablePeeling=*/true, enableVectorMasking, lowerToAVX2,
-            enableAArch64SSVE);
-        break;
-      }
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          CPUConvTileAndDecomposeExpert: {
-        TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-        addConvTileAndDecomposeExpertPassPipeline(
-            executableLoweringPipeline, tilingConfig, enableVectorMasking,
-            enableAArch64SSVE);
-        break;
-      }
-      case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
-        TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-        addMmt4dTilingExpertPassPipeline(executableLoweringPipeline,
-                                         tilingConfig, enableMicrokernels);
-        break;
-      }
-      case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
-        TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-        addCPUDataTilingPipeline(executableLoweringPipeline, tilingConfig,
-                                 enableVectorMasking);
-        break;
-      }
-      // Transform-dialect pipelines.
-      case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
-        addTransformDialectPasses(executableLoweringPipeline);
-        break;
-      default:
-        moduleOp.emitOpError("Unsupported pipeline on CPU target.");
-        return signalPassFailure();
-      }
+    bool enableMicrokernels = hasUkernel(target);
+    bool enableAArch64SSVE =
+        isAArch64(target) && hasAnySVEFeature(target) && hasSMEFeature(target);
+    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+    // No pipleline specified, nothing to do.
+    case IREE::Codegen::DispatchLoweringPassPipeline::None:
+      return;
+    case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
+      addCPUDefaultPassPipeline(pipeline);
+      break;
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        CPUBufferOpsTileAndVectorize: {
+      TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+      addCPUBufferOpsTileAndVectorizePipeline(
+          pipeline, tilingConfig, enableVectorMasking, enableAArch64SSVE);
+      break;
+    }
+    case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
+      TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+      addMultiTilingExpertPassPipeline(pipeline, tilingConfig,
+                                       /*enablePeeling=*/false,
+                                       enableVectorMasking, lowerToAVX2);
+      break;
+    }
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        CPUDoubleTilingPadExpert: {
+      TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+      addDoubleTilingPadExpertPassPipeline(pipeline, tilingConfig,
+                                           enableVectorMasking);
+      break;
+    }
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        CPUDoubleTilingPeelingExpert: {
+      TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+      addMultiTilingExpertPassPipeline(pipeline, tilingConfig,
+                                       /*enablePeeling=*/true,
+                                       enableVectorMasking, lowerToAVX2,
+                                       enableAArch64SSVE);
+      break;
+    }
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        CPUConvTileAndDecomposeExpert: {
+      TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+      addConvTileAndDecomposeExpertPassPipeline(
+          pipeline, tilingConfig, enableVectorMasking, enableAArch64SSVE);
+      break;
+    }
+    case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
+      TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+      addMmt4dTilingExpertPassPipeline(pipeline, tilingConfig,
+                                       enableMicrokernels);
+      break;
+    }
+    case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
+      TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+      addCPUDataTilingPipeline(pipeline, tilingConfig, enableVectorMasking);
+      break;
+    }
+    // Transform-dialect pipelines.
+    case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
+      addTransformDialectPasses(pipeline);
+      break;
+    default:
+      moduleOp.emitOpError("Unsupported pipeline on CPU target.");
+      return signalPassFailure();
     }
   }
 
-  if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
+  if (failed(runPipeline(pipeline, variantOp))) {
     return signalPassFailure();
   }
 }

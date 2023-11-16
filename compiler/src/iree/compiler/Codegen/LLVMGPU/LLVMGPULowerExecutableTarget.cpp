@@ -66,81 +66,61 @@ public:
 
 void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
-  OpPassManager executableLoweringPipeline(
-      IREE::HAL::ExecutableVariantOp::getOperationName());
 
-  // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same pipeline. This should have been verified during
-  // strategy selection, but we still need to retrieve the translation info
-  // here.
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : exportOps) {
-    auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(exportOp)) {
-      if (translationInfo) {
-        if (currTranslationInfo != translationInfo.value()) {
-          moduleOp.emitOpError(
-              "unhandled compilation of entry point functions with different "
-              "translation info");
-        }
-      } else {
-        translationInfo = currTranslationInfo;
-      }
-    }
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+      getIdenticalTranslationInfo(variantOp);
+  if (!translationInfo) {
+    variantOp.emitOpError(
+        "unhandled compilation of entry point functions with different "
+        "translation info");
+    return signalPassFailure();
   }
 
-  if (translationInfo.has_value()) {
-    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
-      addGPUDefaultPassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
-      addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize:
-      addGPUVectorizationPassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-      addGPUMatmulSimtPassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
-      addGPUMatmulTensorCorePassPipeline(
-          executableLoweringPipeline,
-          translationInfo.value().getSoftwarePipelineDepth());
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        LLVMGPUMatmulTensorCoreMmaSync:
-      addGPUMatmulTensorCoreMmaSyncPassPipeline(
-          executableLoweringPipeline,
-          translationInfo.value().getSoftwarePipelineDepth());
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
-      addGPUTransposePassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
-      addGPUWarpReductionPassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack:
-      addGPUPackUnPackPasses(executableLoweringPipeline);
-      break;
-    // Transform-dialect pipelines.
-    case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
-      addGPUTransformDialectPasses(executableLoweringPipeline);
-      break;
-    // no pipeline specified, nothing to do.
-    case IREE::Codegen::DispatchLoweringPassPipeline::None:
-      return;
-    default:
-      variantOp.emitOpError("Unsupported pipeline on GPU target.");
-      return signalPassFailure();
-    }
+  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
+  switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
+    addGPUDefaultPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
+    addGPUSimpleDistributePassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize:
+    addGPUVectorizationPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
+    addGPUMatmulSimtPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
+    addGPUMatmulTensorCorePassPipeline(
+        pipeline, translationInfo.value().getSoftwarePipelineDepth());
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::
+      LLVMGPUMatmulTensorCoreMmaSync:
+    addGPUMatmulTensorCoreMmaSyncPassPipeline(
+        pipeline, translationInfo.value().getSoftwarePipelineDepth());
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
+    addGPUTransposePassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
+    addGPUWarpReductionPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack:
+    addGPUPackUnPackPasses(pipeline);
+    break;
+  // Transform-dialect pipelines.
+  case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
+    addGPUTransformDialectPasses(pipeline);
+    break;
+  // no pipeline specified, nothing to do.
+  case IREE::Codegen::DispatchLoweringPassPipeline::None:
+    return;
+  default:
+    variantOp.emitOpError("Unsupported pipeline on GPU target.");
+    return signalPassFailure();
   }
 
-  if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
+  if (failed(runPipeline(pipeline, variantOp))) {
     return signalPassFailure();
   }
 }

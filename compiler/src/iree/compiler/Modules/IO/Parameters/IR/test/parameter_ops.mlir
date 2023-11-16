@@ -27,5 +27,3 @@ func.func @parameterLoad(%device: !hal.device, %wait: !hal.fence, %signal: !hal.
       : !hal.buffer{%length}
   return
 }
-
-// -----

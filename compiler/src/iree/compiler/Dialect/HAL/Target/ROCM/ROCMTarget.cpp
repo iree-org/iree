@@ -22,6 +22,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
@@ -85,6 +86,7 @@ public:
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerROCDLDialectTranslation(registry);
     registry.insert<IREE::Codegen::IREECodegenDialect>();
+    registry.insert<amdgpu::AMDGPUDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr
@@ -320,6 +322,7 @@ void registerROCMTargetBackends() {
         LLVMInitializeAMDGPUTarget();
         LLVMInitializeAMDGPUTargetMC();
         LLVMInitializeAMDGPUTargetInfo();
+        LLVMInitializeAMDGPUAsmParser();
         LLVMInitializeAMDGPUAsmPrinter();
         return std::make_shared<ROCMTargetBackend>();
       });
