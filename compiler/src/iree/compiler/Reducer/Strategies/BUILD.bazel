@@ -15,9 +15,9 @@ package(
 iree_compiler_cc_library(
     name = "DeltaStrategies",
     srcs = [
-        "ReduceOperandToResult.cpp",
         "ReduceFlowDispatchResultBySplat.cpp",
         "ReduceLinalgOnTensorsDelta.cpp",
+        "ReduceOperandToResult.cpp",
         "ReduceOptimizationBarriersDelta.cpp",
     ],
     hdrs = [
