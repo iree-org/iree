@@ -341,6 +341,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/reference/mlir-dialects/IREEVectorExt/</loc>
+         <lastmod>2023-11-16</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/reference/mlir-dialects/Stream/</loc>
          <lastmod>2023-11-16</lastmod>
          <changefreq>daily</changefreq>
@@ -357,11 +362,6 @@
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-dialects/VMVX/</loc>
-         <lastmod>2023-11-16</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
-         <loc>https://iree.dev/reference/mlir-dialects/VectorExtOps/</loc>
          <lastmod>2023-11-16</lastmod>
          <changefreq>daily</changefreq>
     </url>
