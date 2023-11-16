@@ -778,3 +778,33 @@ func.func @matmul_casted_ui8i8i32(%arg0 : tensor<100x250xi8>, %arg1 : tensor<250
 
 //      CHECK: func @matmul_casted_ui8i8i32(
 //      CHECK: element_types = [ui8
+
+// -----
+
+func.func @matmul_f32f32f32_narrow_M(%arg0 : tensor<2x250xf32>, %arg1 : tensor<250x500xf32>,
+    %arg2 : tensor<2x500xf32>) -> tensor<2x500xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<2x250xf32>, tensor<250x500xf32>)
+      outs(%arg2 : tensor<2x500xf32>) -> tensor<2x500xf32>
+  return %0 : tensor<2x500xf32>
+}
+
+//      CHECK: func @matmul_f32f32f32_narrow_M(
+//      CHECK:  iree_linalg_ext.upper_bound_tile_size tensor<2x250xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], matmul_narrow_M = 2 : index>>
+//      CHECK:  iree_linalg_ext.upper_bound_tile_size tensor<250x500xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], matmul_narrow_M = 2 : index>>
+//      CHECK:  iree_linalg_ext.upper_bound_tile_size tensor<2x500xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], matmul_narrow_M = 2 : index>>
+//      CHECK:   linalg.matmul
+
+// -----
+
+func.func @batch_matmul_f32f32f32_narrow_MN(%arg0 : tensor<64x4x250xf32>, %arg1 : tensor<64x250x2xf32>,
+    %arg2 : tensor<64x4x2xf32>) -> tensor<64x4x2xf32> {
+  %0 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<64x4x250xf32>, tensor<64x250x2xf32>)
+      outs(%arg2 : tensor<64x4x2xf32>) -> tensor<64x4x2xf32>
+  return %0 : tensor<64x4x2xf32>
+}
+
+//      CHECK: func @batch_matmul_f32f32f32_narrow_MN(
+//      CHECK:   iree_linalg_ext.upper_bound_tile_size tensor<64x4x250xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], matmul_narrow_M = 4 : index, matmul_narrow_N = 2 : index>> 
+//      CHECK:   iree_linalg_ext.upper_bound_tile_size tensor<64x250x2xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], matmul_narrow_M = 4 : index, matmul_narrow_N = 2 : index>>
+//      CHECK:   iree_linalg_ext.upper_bound_tile_size tensor<64x4x2xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], matmul_narrow_M = 4 : index, matmul_narrow_N = 2 : index>> 
+//      CHECK:   linalg.batch_matmul
