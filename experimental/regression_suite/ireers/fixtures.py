@@ -20,7 +20,7 @@ from .artifacts import (
 
 IREE_COMPILE_QOL_FLAGS = [
     "--mlir-timing",
-    "--mlir-timing-display=tree",
+    "--mlir-timing-display=list",
     "--iree-consteval-jit-debug",
 ]
 
