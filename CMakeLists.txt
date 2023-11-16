@@ -927,24 +927,6 @@ if(IREE_TARGET_BACKEND_METAL_SPIRV)
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
 endif()
 
-if(IREE_TARGET_BACKEND_WEBGPU)
-  # Tint is needed to compile SPIR-V into WGSL source code.
-  # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
-
-  # NOTE: these can be synced by referencing one of these repositories:
-  #   * https://dawn.googlesource.com/dawn/
-  #   * https://dawn.googlesource.com/tint/
-  #   * https://chromium.googlesource.com/vulkan-deps/+/refs/heads/main/DEPS
-  # or they can be updated independently
-  set(IREE_TINT_TAG         "fdb8787e9c1b79770bd98a8faf37fbe48a3077a4")  # 2023-03-06
-  set(IREE_SPIRV_TOOLS_TAG  "43b8886490eb6af81fc61e0ff071c51a922af864")  # 2023-08-11
-
-  iree_set_spirv_headers_cmake_options()
-  add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
-  add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
-  add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
-endif()
-
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------

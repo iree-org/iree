@@ -4,7 +4,25 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_add_all_subdirs()
+# Tint is needed to compile SPIR-V into WGSL source code.
+# Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
+#
+# NOTE: these can be synced by referencing one of these repositories:
+#   * https://dawn.googlesource.com/dawn/
+#   * https://dawn.googlesource.com/tint/
+#   * https://chromium.googlesource.com/vulkan-deps/+/refs/heads/main/DEPS
+# or they can be updated independently
+set(IREE_TINT_TAG          "fdb8787e9c1b79770bd98a8faf37fbe48a3077a4")  # 2023-03-06
+set(IREE_SPIRV_HEADERS_TAG "b730938c033ede3572b660ab019b438509ba24d9")  # 2023-08-10
+set(IREE_SPIRV_TOOLS_TAG   "43b8886490eb6af81fc61e0ff071c51a922af864")  # 2023-08-11
+message(STATUS "Configuring WebGPU target deps (SPIRV-Headers, SPIRV-Tools, Tint)")
+list(APPEND CMAKE_MESSAGE_INDENT "  ")
+add_subdirectory(spirv-headers EXCLUDE_FROM_ALL)
+add_subdirectory(spirv-tools EXCLUDE_FROM_ALL)
+add_subdirectory(tint EXCLUDE_FROM_ALL)
+list(POP_BACK CMAKE_MESSAGE_INDENT)
+
+add_subdirectory(test)
 
 iree_compiler_register_plugin(
   PLUGIN_ID
