@@ -26,11 +26,6 @@ macro(iree_set_googletest_cmake_options)
   set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 endmacro()
 
-macro(iree_set_spirv_headers_cmake_options)
-  set(SPIRV_HEADERS_SKIP_EXAMPLES ON CACHE BOOL "" FORCE)
-  set(SPIRV_HEADERS_SKIP_INSTALL ON CACHE BOOL "" FORCE)
-endmacro()
-
 macro(iree_set_spirv_cross_cmake_options)
   set(SPIRV_CROSS_ENABLE_MSL ON CACHE BOOL "" FORCE)
   set(SPIRV_CROSS_ENABLE_GLSL ON CACHE BOOL "" FORCE) # Required to enable MSL

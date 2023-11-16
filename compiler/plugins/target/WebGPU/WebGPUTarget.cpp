@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/WebGPU/WebGPUTarget.h"
-
+#include "./SPIRVToWGSL.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/compiler/Dialect/HAL/Target/WebGPU/SPIRVToWGSL.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/wgsl_executable_def_builder.h"
 #include "llvm/Support/CommandLine.h"
@@ -31,18 +30,19 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-WebGPUTargetOptions getWebGPUTargetOptionsFromFlags() {
-  static llvm::cl::opt<bool> clDebugSymbols(
-      "iree-webgpu-debug-symbols",
-      llvm::cl::desc(
-          "Include debug information like variable names in outputs"),
-      llvm::cl::init(true));
+namespace {
 
-  WebGPUTargetOptions targetOptions;
-  targetOptions.debugSymbols = clDebugSymbols;
+struct WebGPUOptions {
+  bool debugSymbols = true;
 
-  return targetOptions;
-}
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("WebGPU HAL Target");
+    binder.opt<bool>(
+        "iree-webgpu-debug-symbols", debugSymbols, llvm::cl::cat(category),
+        llvm::cl::desc(
+            "Include debug information like variable names in outputs."));
+  }
+};
 
 // TODO(scotttodd): provide a proper target environment for WebGPU.
 static spirv::TargetEnvAttr getWebGPUTargetEnv(MLIRContext *context) {
@@ -58,8 +58,7 @@ static spirv::TargetEnvAttr getWebGPUTargetEnv(MLIRContext *context) {
 
 class WebGPUTargetBackend : public TargetBackend {
 public:
-  WebGPUTargetBackend(WebGPUTargetOptions options)
-      : options_(std::move(options)) {}
+  WebGPUTargetBackend(WebGPUOptions options) : options_(std::move(options)) {}
 
   // NOTE: we could vary this based on the options such as 'webgpu-v2'.
   std::string name() const override { return "webgpu"; }
@@ -284,22 +283,36 @@ private:
         configAttr);
   }
 
-  WebGPUTargetOptions options_;
+  WebGPUOptions options_;
 };
 
-void registerWebGPUTargetBackends(
-    std::function<WebGPUTargetOptions()> queryOptions) {
-  getWebGPUTargetOptionsFromFlags();
-  auto backendFactory = [=]() {
-    return std::make_shared<WebGPUTargetBackend>(queryOptions());
-  };
-  // #hal.device.target<"webgpu", ...
-  static TargetBackendRegistration registration0("webgpu", backendFactory);
-  // #hal.executable.target<"webgpu-wgsl", ...
-  static TargetBackendRegistration registration1("webgpu-wgsl", backendFactory);
-}
+struct WebGPUSession
+    : public PluginSession<WebGPUSession, WebGPUOptions,
+                           PluginActivationPolicy::DefaultActivated> {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+    auto backendFactory = [=]() {
+      return std::make_shared<WebGPUTargetBackend>(options);
+    };
+    // #hal.device.target<"webgpu", ...
+    targets.add("webgpu", backendFactory);
+    // #hal.executable.target<"webgpu-wgsl", ...
+    targets.add("webgpu-wgsl", backendFactory);
+  }
+};
+
+} // namespace
 
 } // namespace HAL
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::IREE::HAL::WebGPUOptions);
+
+extern "C" bool iree_register_compiler_plugin_hal_target_webgpu(
+    mlir::iree_compiler::PluginRegistrar *registrar) {
+  registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::WebGPUSession>(
+      "hal_target_webgpu");
+  return true;
+}

@@ -19,3 +19,7 @@ endif()
 if(IREE_TARGET_BACKEND_CUDA)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/CUDA target/CUDA)
 endif()
+
+if(IREE_TARGET_BACKEND_WEBGPU)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/WebGPU target/WebGPU)
+endif()
