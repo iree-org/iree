@@ -113,10 +113,6 @@ static LogicalResult setConfigForKernel(func::FuncOp entryPointFn) {
     return failure();
   }
 
-  if (failed(adjustTileSizesForUnPackOp(entryPointFn, rootOperation))) {
-    return failure();
-  }
-
   return success();
 }
 

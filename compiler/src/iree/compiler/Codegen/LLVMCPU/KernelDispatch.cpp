@@ -2171,6 +2171,73 @@ adjustTileSizesForPackOp(func::FuncOp entryPointFn, tensor::PackOp packOp,
   return success();
 }
 
+/// Adjusts the tile sizes (carried by `rootOp`) to be aligned with
+/// tensor.unpack inner tile sizes, if there are tensor.unpack producers. If the
+/// tile sizes are not aligned, a stack buffer is needed because of
+/// tensor.unpack tiling implementations.
+static LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
+                                                Operation *rootOp) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
+  if (!linalgOp)
+    return success();
+
+  auto loweringConfig = getLoweringConfig(linalgOp);
+  TileSizesListType tileSizesList = loweringConfig.getTileSizeVals();
+
+  bool foundUnPackOp = false;
+  SmallVector<int64_t> alignedSizes(linalgOp.getNumLoops(), 1);
+  for (OpOperand *opOperand : linalgOp.getDpsInputOperands()) {
+    auto unpackOp = opOperand->get().getDefiningOp<tensor::UnPackOp>();
+    if (!unpackOp)
+      continue;
+
+    foundUnPackOp = true;
+    auto idxMap = linalgOp.getMatchingIndexingMap(opOperand);
+    LLVM_DEBUG(KD_DBGS() << "Find unpack op candidate: " << unpackOp << "\n"
+                         << "The corresponding indexing map is: " << idxMap
+                         << "\n");
+
+    SmallVector<int64_t> innerTiles = unpackOp.getStaticTiles();
+    ArrayRef<int64_t> dimPos = unpackOp.getInnerDimsPos();
+    for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+      if (ShapedType::isDynamic(size))
+        continue;
+      auto dimExpr = dyn_cast<AffineDimExpr>(idxMap.getResult(pos));
+      if (!dimExpr)
+        return failure();
+      int mappedPos = dimExpr.getPosition();
+      alignedSizes[mappedPos] = std::lcm(alignedSizes[mappedPos], size);
+    }
+  }
+
+  if (!foundUnPackOp)
+    return success();
+
+  LLVM_DEBUG(
+      KD_DBGS() << "The tile sizes for each dimension should be aligned to "
+                << alignedSizes);
+
+  // Fixup for making tileSizes be multiple of inner_tile_sizes.
+  for (SmallVectorImpl<int64_t> &tileSizes : tileSizesList) {
+    for (auto idx : llvm::seq<int64_t>(0, tileSizes.size())) {
+      if (tileSizes[idx] == 0)
+        continue;
+      tileSizes[idx] = llvm::alignTo(tileSizes[idx], alignedSizes[idx]);
+    }
+  }
+
+  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
+  if (pipeline == DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert) {
+    LLVM_DEBUG(KD_DBGS() << "unpack fusion does not work with peeling, falling "
+                            "back to non-peeling path");
+    pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+  }
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, rootOp, tileSizesList,
+      loweringConfig.getScalableTileFlagVals(), pipeline);
+}
+
 /// Get tile sizes for the generic op and fill into the parallel vector tile
 /// sizes if the tile size on a dimension is missing. Also get the tile sizes on
 /// the reduction dimensions. This makes sure there is a tile size set for each

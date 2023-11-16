@@ -20,13 +20,6 @@ namespace iree_compiler {
 /// to the end of the function is the root op.
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 
-/// Adjusts the tile sizes (carried by `rootOp`) to be aligned with
-/// tensor.unpack inner tile sizes, if there are tensor.unpack producers. If the
-/// tile sizes are not aligned, a stack buffer is needed because of
-/// tensor.unpack tiling implementations.
-LogicalResult adjustTileSizesForUnPackOp(func::FuncOp entryPointFn,
-                                         Operation *rootOp);
-
 } // namespace iree_compiler
 } // namespace mlir
 
