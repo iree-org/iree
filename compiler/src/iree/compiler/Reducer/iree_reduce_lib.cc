@@ -29,7 +29,7 @@ Operation *mlir::iree_compiler::Reducer::ireeRunReducingStrategies(
         "and check the return code.");
   }
 
-  delta.runDeltaPass(reduceFlowDispatchOperandToResultDelta,
+  delta.runDeltaPass(reduceOperandToResultDelta,
                      "Dispatch operand to result delta");
   delta.runDeltaPass(reduceFlowDispatchResultBySplatDelta,
                      "Dispatch result to splat delta");
