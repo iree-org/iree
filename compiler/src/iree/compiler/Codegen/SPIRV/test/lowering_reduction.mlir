@@ -371,8 +371,8 @@ hal.executable private @dynamic_softmax {
 // CHECK:         vector.transfer_write %[[MIN_F16]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
 // CHECK:           %[[MASK:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
-// CHECK-DAG:       %[[ACC:.+]] = vector.transfer_read %{{.*}}, %cst_2, %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
-// CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %cst_2, %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
+// CHECK-DAG:       %[[ACC:.+]] = vector.transfer_read %{{.*}}, %[[C0_F16]], %[[MASK]] {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
+// CHECK-DAG:       %[[NEW:.+]] = vector.transfer_read %{{.*}}, %[[C0_F16]], %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>
 // CHECK:           %[[MAX:.+]] = arith.maximumf %[[NEW]], %[[ACC]] : vector<1xf16>
 // CHECK:           vector.transfer_write %[[MAX]], %{{.*}}, %[[MASK]] {{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
 // CHECK:           gpu.barrier

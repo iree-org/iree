@@ -173,31 +173,6 @@ class WarpOpBarrier : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
   }
 };
 
-/// Returns a matching GPU reduction operations.
-static std::optional<gpu::AllReduceOperation>
-combiningKindToAllReduce(vector::CombiningKind kind) {
-  using gpu::AllReduceOperation;
-  using vector::CombiningKind;
-
-  switch (kind) {
-  case CombiningKind::ADD:
-    return AllReduceOperation::ADD;
-  case CombiningKind::AND:
-    return AllReduceOperation::AND;
-  case CombiningKind::MUL:
-    return AllReduceOperation::MUL;
-  case CombiningKind::OR:
-    return AllReduceOperation::OR;
-  case CombiningKind::XOR:
-    return AllReduceOperation::XOR;
-  // Currently, the min/max reductions are not well-defined in the gpu dialect.
-  // See https://github.com/llvm/llvm-project/issues/72354.
-  default:
-    return std::nullopt;
-  }
-  llvm_unreachable("unhandled");
-}
-
 static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
                                        Value val, Value srcIdx,
                                        int64_t warpSz) {

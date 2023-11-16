@@ -534,10 +534,11 @@ combiningKindToAllReduce(vector::CombiningKind kind) {
   case CombiningKind::XOR:
     return AllReduceOperation::XOR;
   // Currently, the min/max reductions are not well-defined in the gpu dialect.
+  // See https://github.com/llvm/llvm-project/issues/72354.
   default:
-    return std::nullopt;
+    break;
   }
-  llvm_unreachable("unhandled");
+  return std::nullopt;
 }
 
 /// Emit reduction across a group for a given input.
