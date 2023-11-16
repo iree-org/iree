@@ -113,6 +113,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 // If nullptr, warp size 32 will be used.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
+    bool expandSubgroupReduction = true,
     std::function<int(func::FuncOp)> getWarpSize = nullptr);
 
 /// Pass to specialize workgroup distribution loops
