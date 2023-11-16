@@ -45,13 +45,14 @@ IREE_HIP_PFN_DECL(hipMemsetAsync, void *, int, size_t, hipStream_t)
 IREE_HIP_PFN_DECL(hipMemsetD8Async, void *, char, size_t, hipStream_t)
 IREE_HIP_PFN_DECL(hipMemsetD16Async, void *, short, size_t, hipStream_t)
 IREE_HIP_PFN_DECL(hipMemsetD32Async, void *, int, size_t, hipStream_t)
-IREE_HIP_PFN_DECL(hipModuleGetFunction, hipFunction_t *, hipModule_t, const char *)
-IREE_HIP_PFN_DECL(hipModuleLaunchKernel, hipFunction_t, unsigned int, unsigned int,
+IREE_HIP_PFN_DECL(hipModuleGetFunction, hipFunction_t *, hipModule_t,
+                  const char *)
+IREE_HIP_PFN_DECL(hipModuleLaunchKernel, hipFunction_t, unsigned int,
                   unsigned int, unsigned int, unsigned int, unsigned int,
-                  unsigned int, hipStream_t, void **, void **)
+                  unsigned int, unsigned int, hipStream_t, void **, void **)
 IREE_HIP_PFN_DECL(hipModuleLoadData, hipModule_t *, const void *)
-IREE_HIP_PFN_DECL(hipModuleLoadDataEx, hipModule_t *, const void *, unsigned int,
-                  hipJitOption *, void **)
+IREE_HIP_PFN_DECL(hipModuleLoadDataEx, hipModule_t *, const void *,
+                  unsigned int, hipJitOption *, void **)
 IREE_HIP_PFN_DECL(hipModuleUnload, hipModule_t)
 IREE_HIP_PFN_DECL(hipStreamCreateWithFlags, hipStream_t *, unsigned int)
 IREE_HIP_PFN_DECL(hipStreamDestroy, hipStream_t)
