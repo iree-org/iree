@@ -92,7 +92,7 @@ iree_check_single_backend_test_suite(
 )
 
 WINOGRAD_CONV_SRCS = [
-  "conv2d.mlir",
+    "conv2d.mlir",
 ]
 
 iree_check_single_backend_test_suite(
