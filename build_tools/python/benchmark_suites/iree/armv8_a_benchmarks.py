@@ -10,7 +10,7 @@ from typing import List
 from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.device_specs import device_collections
+from e2e_test_framework.device_specs import pixel_6_pro_specs
 from e2e_test_framework.models import tflite_models, tf_models
 
 
@@ -38,12 +38,14 @@ class Android_ARMv8_A_Benchmarks(object):
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DEFAULTS,
         tags=["default-flags"],
         compile_targets=[ARMV8_A_CPU_TARGET],
+        extra_flags=["--iree-llvmcpu-target-cpu=cortex-x1"],
     )
     DATA_TILING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D,
         tags=["experimental-flags", "data-tiling", "ukernel"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
+            "--iree-llvmcpu-target-cpu=cortex-x1",
             "--iree-opt-data-tiling",
             "--iree-llvmcpu-enable-ukernels=all",
         ],
@@ -53,9 +55,9 @@ class Android_ARMv8_A_Benchmarks(object):
         tags=["experimental-flags", "data-tiling", "ukernel", "dotprod"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
+            "--iree-llvmcpu-target-cpu=cortex-x1",
             "--iree-opt-data-tiling",
             "--iree-llvmcpu-enable-ukernels=all",
-            "--iree-llvmcpu-target-cpu-features=+dotprod",
         ],
     )
 
@@ -93,13 +95,7 @@ class Android_ARMv8_A_Benchmarks(object):
             for model in self.QUANT_MODELS
         ]
 
-        big_cores_devices = (
-            device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-                architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-                host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-                tags=["big-cores"],
-            )
-        )
+        big_cores_devices = [pixel_6_pro_specs.BIG_CORES]
         run_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=default_gen_confings,
             module_execution_configs=local_sync_execution_configs

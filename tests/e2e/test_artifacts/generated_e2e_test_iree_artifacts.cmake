@@ -1077,6 +1077,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
   FRIENDLY_NAME "DeepLabV3_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags]"
   PUBLIC
 )
@@ -1089,6 +1090,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags]"
   PUBLIC
 )
@@ -1101,6 +1103,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
   FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags]"
   PUBLIC
 )
@@ -1113,6 +1116,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags]"
   PUBLIC
 )
@@ -1125,6 +1129,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
   FRIENDLY_NAME "MobileBertSquad_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags]"
   PUBLIC
 )
@@ -1137,6 +1142,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
   FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags]"
   PUBLIC
 )
@@ -1149,6 +1155,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "DeepLabV3_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
@@ -1163,6 +1170,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
@@ -1177,6 +1185,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
@@ -1191,6 +1200,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
@@ -1205,9 +1215,9 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
   FRIENDLY_NAME "MobileBertSquad_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel,dotprod]"
   PUBLIC
 )
@@ -1220,9 +1230,9 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
   FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel,dotprod]"
   PUBLIC
 )
@@ -2685,6 +2695,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2701,6 +2712,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2717,6 +2729,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2733,6 +2746,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2749,6 +2763,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2765,6 +2780,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2781,6 +2797,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
@@ -2799,6 +2816,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
@@ -2817,6 +2835,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
@@ -2835,6 +2854,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
@@ -2853,9 +2873,9 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2872,9 +2892,9 @@ iree_bytecode_module(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-llvmcpu-target-cpu=cortex-x1"
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
