@@ -32,9 +32,9 @@ vm.module @my_module {
   vm.func @const_ref_zero() {
     // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
-    // CHECK-NEXT: %[[SIZE:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> !emitc.opaque<"iree_host_size_t">
-    // CHECK-NEXT: emitc.call "memset"(%[[REFPTR]], %[[SIZE]]) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> ()
-    // CHECK-NEXT: emitc.call "iree_vm_ref_release"(%[[REFPTR]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> ()
+    // CHECK-NEXT: %[[SIZE:.+]] = emitc.call_opaque "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> !emitc.opaque<"iree_host_size_t">
+    // CHECK-NEXT: emitc.call_opaque "memset"(%[[REFPTR]], %[[SIZE]]) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> ()
+    // CHECK-NEXT: emitc.call_opaque "iree_vm_ref_release"(%[[REFPTR]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> ()
     %null = vm.const.ref.zero : !vm.ref<?>
     vm.return
   }

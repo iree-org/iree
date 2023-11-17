@@ -17,7 +17,7 @@ vm.module @my_module {
     // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     %size = vm.list.size %list : (!vm.list<i32>) -> i32
-    // CHECK: %[[SIZE:.+]] = emitc.call "iree_vm_list_size"(%{{.+}})
+    // CHECK: %[[SIZE:.+]] = emitc.call_opaque "iree_vm_list_size"(%{{.+}})
     %size_dno = util.optimization_barrier %size : i32
     // CHECK: util.optimization_barrier %[[SIZE]] : i32
     vm.return

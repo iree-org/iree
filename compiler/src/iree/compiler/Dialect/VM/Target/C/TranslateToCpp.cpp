@@ -156,13 +156,13 @@ static LogicalResult printOperation(CppEmitter &emitter, mlir::func::CallOp call
   return success();
 }
 
-static LogicalResult printOperation(CppEmitter &emitter, emitc::CallOp callOp) {
+static LogicalResult printOperation(CppEmitter &emitter, emitc::CallOpaqueOp callOpaqueOp) {
   raw_ostream &os = emitter.ostream();
-  Operation &op = *callOp.getOperation();
+  Operation &op = *callOpaqueOp.getOperation();
 
   if (failed(emitter.emitAssignPrefix(op)))
     return failure();
-  os << callOp.getCallee();
+  os << callOpaqueOp.getCallee();
 
   auto emitArgs = [&](Attribute attr) -> LogicalResult {
     if (auto t = llvm::dyn_cast<IntegerAttr>(attr)) {
@@ -184,9 +184,9 @@ static LogicalResult printOperation(CppEmitter &emitter, emitc::CallOp callOp) {
     return success();
   };
 
-  if (callOp.getTemplateArgs()) {
+  if (callOpaqueOp.getTemplateArgs()) {
     os << "<";
-    if (failed(interleaveCommaWithError(*callOp.getTemplateArgs(), os, emitArgs)))
+    if (failed(interleaveCommaWithError(*callOpaqueOp.getTemplateArgs(), os, emitArgs)))
       return failure();
     os << ">";
   }
@@ -194,7 +194,7 @@ static LogicalResult printOperation(CppEmitter &emitter, emitc::CallOp callOp) {
   os << "(";
 
   LogicalResult emittedArgs =
-      callOp.getArgs() ? interleaveCommaWithError(*callOp.getArgs(), os, emitArgs)
+      callOpaqueOp.getArgs() ? interleaveCommaWithError(*callOpaqueOp.getArgs(), os, emitArgs)
                     : emitter.emitOperands(op);
   if (failed(emittedArgs))
     return failure();
@@ -752,7 +752,7 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
   LogicalResult status =
       llvm::TypeSwitch<Operation *, LogicalResult>(&op)
           // EmitC ops.
-          .Case<emitc::ApplyOp, emitc::CallOp, emitc::CastOp, emitc::ConstantOp,
+          .Case<emitc::ApplyOp, emitc::CallOpaqueOp, emitc::CastOp, emitc::ConstantOp,
                 emitc::IncludeOp, emitc::VariableOp>(
               [&](auto op) { return printOperation(*this, op); })
           // SCF ops.
