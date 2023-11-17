@@ -7,7 +7,7 @@ on:
   # Uncomment `pull_request` below to test your PR on SHARK.
   # Results will be uploaded to gs://shark-benchmark-artifacts.
   # See the workflow's `SHARK -> generate_report` log output for exact results URL.
-  # pull_request:
+  pull_request:
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
