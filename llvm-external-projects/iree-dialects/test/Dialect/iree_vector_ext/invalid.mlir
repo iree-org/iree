@@ -1,7 +1,7 @@
 // RUN: iree-dialects-opt --split-input-file --verify-diagnostics %s
 
-#row_layout1 = #iree_vector_ext.per_dim_layout<"BatchX"<"LaneX"<"VecY", 1>, 1>, 1>
-#col_layout1 = #iree_vector_ext.per_dim_layout<"BatchY"<"LaneY"<"VecX", 4>, 2>, 4>
+#row_layout1 = #iree_vector_ext.per_dim_layout<[BATCHX, LANEX, VECTORY], [1, 1, 1]>
+#col_layout1 = #iree_vector_ext.per_dim_layout<[BATCHY, LANEY, VECTORX], [4, 2, 4]>
 #layout1 = #iree_vector_ext.layout<#row_layout1, #col_layout1>
 #layout2 = #iree_vector_ext.layout<#col_layout1, #col_layout1>
 func.func @invalid_desired_layout(%lhs: memref<32x32xf16>, %rhs: memref<32x32xf16>) -> vector<32x32xf16> {
@@ -15,8 +15,8 @@ func.func @invalid_desired_layout(%lhs: memref<32x32xf16>, %rhs: memref<32x32xf1
 
 // -----
 
-#row_layout1 = #iree_vector_ext.per_dim_layout<"BatchX"<"LaneX"<"VecY", 1>, 1>, 1>
-#col_layout1 = #iree_vector_ext.per_dim_layout<"BatchY"<"LaneY"<"VecX", 4>, 2>, 4>
+#row_layout1 = #iree_vector_ext.per_dim_layout<[BATCHX, LANEX, VECTORY], [1, 1, 1]>
+#col_layout1 = #iree_vector_ext.per_dim_layout<[BATCHY, LANEY, VECTORX], [4, 2, 4]>
 #layout1 = #iree_vector_ext.layout<#row_layout1, #col_layout1>
 #layout2 = #iree_vector_ext.layout<#col_layout1, #col_layout1>
 func.func @invalid_source_layout(%lhs: memref<32x32xf16>, %rhs: memref<32x32xf16>) -> vector<32x32xf16> {
