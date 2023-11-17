@@ -33,3 +33,48 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {target_arch = "gf
 
 //   CHECK-LABEL:  func.func @softmax
 // CHECK-COUNT-20: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}}
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer, ReadOnly>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
+hal.executable private @dynamic_softmax {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>) {
+    hal.executable.export public @dynamic_softmax ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @dynamic_softmax() {
+        %c32_i64 = arith.constant 32 : i64
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = arith.extui %0 : i32 to i64
+        %3 = arith.extui %1 : i32 to i64
+        %4 = arith.shli %3, %c32_i64 : i64
+        %5 = arith.ori %2, %4 : i64
+        %6 = arith.index_castui %5 : i64 to index
+        %7 = flow.dispatch.workload.ordinal %6, 0 : index
+        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%7}
+        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
+        %10 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%7} -> tensor<32x?xf16>
+        %11 = tensor.empty(%7) : tensor<32x?xf16>
+        %12 = linalg.softmax dimension(1) ins(%10 : tensor<32x?xf16>) outs(%11 : tensor<32x?xf16>) -> tensor<32x?xf16>
+        flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : tensor<32x?xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
+        return
+      }
+    }
+  }
+}
+
+// Finer details of this lowering are captured by the spirv pipeline test. Just
+// verify that warp reduction triggers.
+// CHECK-LABEL: func.func @dynamic_softmax
+// CHECK-COUNT-10: gpu.shuffle  xor {{.*}} : i32

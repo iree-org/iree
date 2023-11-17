@@ -394,6 +394,8 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   // Linalg -> vector
   {
     GenericVectorizationPassOptions options;
+    options.enableVectorMasking = true;
+    options.useConfiguredVectorSizes = false;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
