@@ -6,13 +6,12 @@
 
 #include "iree/task/queue.h"
 
-#include <thread>
-
+#include "iree/base/internal/threading.h"
 #include "iree/testing/gtest.h"
 
 // Like iree_task_queue_try_steal but retries until success.
 // This is used in this test as iree_task_queue_try_steal may (rarely) fail even
-// in simple tests that don't look particularly contended, see #15488.
+// in simple single-threaded tests, see #15488.
 static iree_task_t* iree_task_queue_try_steal_until_success(
     iree_task_queue_t* source_queue, iree_task_queue_t* target_queue,
     iree_host_size_t max_tasks) {
@@ -22,7 +21,7 @@ static iree_task_t* iree_task_queue_try_steal_until_success(
     if (task) {
       return task;
     }
-    std::this_thread::yield();
+    iree_thread_yield();
   }
 }
 
