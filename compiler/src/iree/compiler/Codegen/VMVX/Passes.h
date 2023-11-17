@@ -32,6 +32,10 @@ std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createVMVXMaterializeEncodingPass();
 
+/// Pass to select a lowering strategy for a hal.executable.variant operation.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createVMVXSelectLoweringStrategyPass();
+
 /// Pass to lower the module an hal.executable.variant operation to external
 /// dialect.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
