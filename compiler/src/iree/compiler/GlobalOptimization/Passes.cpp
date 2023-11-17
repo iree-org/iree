@@ -24,6 +24,11 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
+    "iree-global-opt-enable-fuse-silu-horizontal-matmul",
+    llvm::cl::desc(
+        "Enables fusing specifically structured matmuls (experimental)."),
+    llvm::cl::init(false));
 
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
@@ -84,6 +89,8 @@ void buildGlobalOptimizationPassPipeline(
       // this pass both before unit dim folding + consteval, as well as after.
       .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
+                         createFuseSiluHorizontalMatmulPass)
       .addPass([&]() {
         return createFuseDequantizationMatmulPass(
             clEnableQuantizedMatmulReassociation);

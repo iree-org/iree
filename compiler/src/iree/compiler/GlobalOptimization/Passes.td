@@ -54,6 +54,12 @@ def FuseDequantizationMatmul:
   ];
 }
 
+def FuseSiluHorizontalMatmul:
+    InterfacePass<"iree-global-opt-fuse-silu-horizontal-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Fuse matmul ops and silu linalg.generic op";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseSiluHorizontalMatmulPass()";
+}
+
 def GeneralizeLinalgNamedOps :
     InterfacePass<"iree-global-opt-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert some Linalg named ops into linalg.generics";

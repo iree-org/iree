@@ -288,18 +288,21 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
   // Also exclude the case of matvec, which has only one non-unit parallel dim.
   // They should go down different pipelines.
-  int nonUnitParallelDimCount = 0;
+  // Currently dynamic dimensions are tiled with size=1 in codegen.
+  int staticNonUnitParallelDimCount = 0;
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
   for (auto mDim : contractionDims->m) {
-    nonUnitParallelDimCount += bounds[mDim] != 1;
+    staticNonUnitParallelDimCount +=
+        bounds[mDim] != 1 && !ShapedType::isDynamic(bounds[mDim]);
   }
   for (auto nDim : contractionDims->n) {
-    nonUnitParallelDimCount += bounds[nDim] != 1;
+    staticNonUnitParallelDimCount +=
+        bounds[nDim] != 1 && !ShapedType::isDynamic(bounds[nDim]);
   }
-  if (nonUnitParallelDimCount <= 1)
+  if (staticNonUnitParallelDimCount <= 1)
     return failure();
 
   // Don't consider operations that don't have a broadcast, those should go

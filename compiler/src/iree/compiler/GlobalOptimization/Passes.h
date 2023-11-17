@@ -70,6 +70,10 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseDequantizationMatmulPass(
     bool enableQuantizedMatmulReassociation = false);
 
+// A pass to fuse two matmul ops and a linalg.generic Silu op
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFuseSiluHorizontalMatmulPass();
+
 // Create a pass that generalizes some named Linalg ops into `linalg.generic`
 // operations since the IREE compiler can handle that better.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
