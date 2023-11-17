@@ -130,11 +130,12 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
 
   echo "*** Running main project ctests that do not use the Vulkan driver (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) *******"
   echo "------------------"
-  ctest \
-    --timeout 900 \
-    --output-on-failure \
-    --no-tests=error \
-    --label-exclude "${label_exclude_regex}|${vulkan_label_regex}"
+  ASAN_OPTIONS=check_initialization_order=true \
+    ctest \
+      --timeout 900 \
+      --output-on-failure \
+      --no-tests=error \
+      --label-exclude "${label_exclude_regex}|${vulkan_label_regex}"
 
   echo "*** Running llvm-external-projects tests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
   echo "------------------"
@@ -145,7 +146,7 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
     echo "------------------"
     # Disable LeakSanitizer (LSAN) because of a history of issues with Swiftshader
     # (#5716, #8489, #11203).
-    ASAN_OPTIONS=detect_leaks=0 \
+    ASAN_OPTIONS=detect_leaks=0:check_initialization_order=true \
       ctest \
         --timeout 900 \
         --output-on-failure \
