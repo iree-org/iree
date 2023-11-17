@@ -329,8 +329,31 @@ matchIteratorTypes(const llvm::SmallBitVector &rootOuterParallelLoop,
   return true;
 }
 
-/// Method to check if two `linalg.generic` op with producer-consumer
-/// relationship through `operand` have compatible outer-parallel loops.
+// Method to check if the op with have compatible indexing map on outer-parallel
+// loops. Currently it means the map needs to be identity on the those
+// dimensions, ignoring its reduction dimensions.
+static bool hasCompatibleOuterParallelLoops(
+    TilingInterface tileOp, AffineMap indexingMap,
+    const llvm::SmallBitVector &rootOuterParallelLoops) {
+  if (!indexingMap.isProjectedPermutation()) {
+    return false;
+  }
+
+  llvm::SmallBitVector parallelLoops = getOuterParallelLoops(tileOp);
+  if (!matchIteratorTypes(rootOuterParallelLoops, parallelLoops)) {
+    return false;
+  }
+
+  /// Project out the non-parallel dimensions.
+  llvm::SmallBitVector projectedDims(rootOuterParallelLoops);
+  projectedDims.flip();
+  projectedDims.resize(tileOp.getLoopIteratorTypes().size(), true);
+  auto projectedMap = getProjectedMap(indexingMap, projectedDims);
+  return isIdentityMapWithZeros(projectedMap);
+}
+
+// Method to check if two `linalg.generic` op with producer-consumer
+// relationship through `operand` have compatible outer-parallel loops.
 static bool hasCompatibleOuterParallelLoops(
     OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
   auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
@@ -338,38 +361,16 @@ static bool hasCompatibleOuterParallelLoops(
   if (!producer || !consumer)
     return false;
 
-  llvm::SmallBitVector producerParallelLoops =
-      getOuterParallelLoops(cast<TilingInterface>(producer.getOperation()));
-  llvm::SmallBitVector consumerParallelLoops =
-      getOuterParallelLoops(cast<TilingInterface>(consumer.getOperation()));
-
-  if (!matchIteratorTypes(rootOuterParallelLoops, producerParallelLoops) ||
-      !matchIteratorTypes(rootOuterParallelLoops, consumerParallelLoops)) {
-    return false;
-  }
-
   auto producerIndexingMap = producer.getIndexingMapMatchingResult(
       llvm::cast<OpResult>(operand.get()));
   auto consumerIndexingMap = consumer.getMatchingIndexingMap(&operand);
-  if (!producerIndexingMap.isProjectedPermutation() ||
-      !consumerIndexingMap.isProjectedPermutation()) {
-    return false;
-  }
 
-  /// Project out the non-parallel dimensions.
-  llvm::SmallBitVector producerProjectedDims(rootOuterParallelLoops);
-  producerProjectedDims.flip();
-  auto projectedProducerMap =
-      getProjectedMap(producerIndexingMap, producerProjectedDims);
-
-  llvm::SmallBitVector consumerProjectedDims(rootOuterParallelLoops);
-  consumerProjectedDims.flip();
-  consumerProjectedDims.resize(consumer.getNumLoops(), true);
-  auto projectedConsumerMap =
-      getProjectedMap(consumerIndexingMap, consumerProjectedDims);
-
-  return isIdentityMapWithZeros(projectedProducerMap) &&
-         isIdentityMapWithZeros(projectedConsumerMap);
+  return hasCompatibleOuterParallelLoops(
+             cast<TilingInterface>(producer.getOperation()),
+             producerIndexingMap, rootOuterParallelLoops) &&
+         hasCompatibleOuterParallelLoops(
+             cast<TilingInterface>(consumer.getOperation()),
+             consumerIndexingMap, rootOuterParallelLoops);
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
@@ -502,7 +503,18 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   }
 
   if (isPackLikeOp(consumer)) {
-    return isa<linalg::LinalgOp, tensor::PadOp>(producer);
+    return TypeSwitch<Operation *, bool>(producer)
+        .Case<tensor::PadOp>([&](auto padOp) { return true; })
+        .Case<linalg::LinalgOp>([&](auto linalgOp) {
+          auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
+              llvm::cast<OpResult>(fusedOperand.get()));
+          // Make sure the producer op has an identitiy result indexing map. As
+          // CPU backend currently can't handle tranpose between fused ops.
+          return hasCompatibleOuterParallelLoops(
+              cast<TilingInterface>(linalgOp.getOperation()),
+              producerIndexingMap, rootOuterParallelLoops);
+        })
+        .Default([](Operation *) { return false; });
   }
 
   // By default, padding should be fused with producers. It is hard to square
@@ -624,19 +636,25 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   if (isPackLikeOp(consumer)) {
-    if (auto linalgProducerOp = dyn_cast<linalg::LinalgOp>(producer)) {
-      if (auto packOp = dyn_cast<tensor::PackOp>(consumer)) {
-        // TODO(#12746): fusion of pack with dynamic inner tile size
-        // causes an error in backend. Disable for now.
-        if (!packOp.getInnerTiles().empty()) {
-          return false;
-        }
-      }
-      return linalg::isElementwise(linalgProducerOp) &&
-             linalgProducerOp.getNumLoops() ==
-                 getSourceTypeOfPackLikeOp(consumer).getRank();
-    }
-    return isa<tensor::PadOp>(producer);
+    return TypeSwitch<Operation *, bool>(producer)
+        .Case<tensor::PadOp>([&](auto padOp) { return true; })
+        .Case<linalg::LinalgOp>([&](auto linalgOp) {
+          if (auto packOp = dyn_cast<tensor::PackOp>(consumer)) {
+            // TODO(#12746): fusion of pack with dynamic inner tile size
+            // causes an error in backend. Disable for now.
+            if (!packOp.getInnerTiles().empty()) {
+              return false;
+            }
+          }
+          auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
+              llvm::cast<OpResult>(operand.get()));
+          // Make sure the producer op has an identitiy result indexing map. As
+          // CPU backend currently can't handle tranpose between fused ops.
+          return hasCompatibleOuterParallelLoops(
+              cast<TilingInterface>(linalgOp.getOperation()),
+              producerIndexingMap, rootOuterParallelLoops);
+        })
+        .Default([](Operation *) { return false; });
   }
 
   if (!isa<linalg::LinalgOp>(consumer) || !isa<linalg::LinalgOp>(producer)) {
