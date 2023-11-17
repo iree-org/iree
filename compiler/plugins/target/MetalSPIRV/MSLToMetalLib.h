@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_MSLTOMETALLIB_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_MSLTOMETALLIB_H_
 
-#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalTargetPlatform.h"
+#include "./MetalTargetPlatform.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/MemoryBuffer.h"
 
