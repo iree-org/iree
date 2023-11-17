@@ -212,6 +212,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-comment"
     "-Wno-format-zero-length"
     "-Wno-uninitialized"
+    "-Wno-overloaded-virtual"  # gcc reports more warnings than clang
     # Technically UB but needed for intrusive ptrs
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-invalid-offsetof>
     $<$<COMPILE_LANGUAGE:C>:-Wno-pointer-sign>
