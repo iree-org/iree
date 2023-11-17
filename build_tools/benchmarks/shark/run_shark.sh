@@ -65,7 +65,7 @@ rm -rf ./shark_tmp
 rm -rf ~/.local/shark_tank
 
 declare -a args=(
-  --benchmark
+  --benchmark="native"
   --update_tank
   --maxfail=500
   -k "${BENCHMARK_REGEX}"
@@ -94,7 +94,7 @@ rm -rf ./shark_tmp
 rm -rf ~/.local/shark_tank
 
 # Run with IREE.
-PYTHON=python3.11 VENV_DIR=iree.venv BENCHMARK=1 IMPORTER=1 USE_IREE=1 ./setup_venv.sh
+PYTHON=python3.11 VENV_DIR=iree.venv USE_IREE=1 ./setup_venv.sh
 source iree.venv/bin/activate
 
 export IREE_VERSION=$(pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g")
