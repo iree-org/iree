@@ -72,7 +72,7 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue) {
 }
 
 LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
-                            IREE::VM::EmitCTypeConverter &typeConverter,
+                            const IREE::VM::EmitCTypeConverter &typeConverter,
                             SmallVector<BlockArgument> &blockArgsToRemove) {
   auto ctx = funcOp.getContext();
   auto loc = funcOp.getLoc();
@@ -143,24 +143,13 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   SmallVector<Location> locs(outputTypes.size(), loc);
   entryBlock.addArguments(outputTypes, locs);
 
-  auto vmAnalysis = typeConverter.lookupAnalysis(funcOp);
-  if (failed(vmAnalysis)) {
-    return funcOp.emitError() << "parent func op not found in cache.";
-  }
+  typeConverter.analysis.move(newFuncOp, funcOp);
 
-  typeConverter.analysisCache.insert(std::make_pair(
-      newFuncOp.getOperation(), std::move(vmAnalysis.value().get())));
+  auto &funcAnalysis = typeConverter.analysis.lookupFunction(newFuncOp);
 
-  // vmAnalysis gets invalidated, reset it
-  vmAnalysis = typeConverter.lookupAnalysis(newFuncOp);
-  if (failed(vmAnalysis)) {
-    return funcOp.emitError()
-           << "newly created mlir::func::FuncOp not found in cache.";
-  }
-
-  // Add constant ops for local refs
-  const int numRefArgs = vmAnalysis.value().get().getNumRefArguments();
-  const int numLocalRefs = vmAnalysis.value().get().getNumLocalRefs();
+  // Add variable ops for local refs
+  const int numRefArgs = funcAnalysis.getNumRefArguments();
+  const int numLocalRefs = funcAnalysis.getNumLocalRefs();
 
   builder.setInsertionPointToStart(&entryBlock);
 
@@ -174,7 +163,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
     // Cache local refs so that we can release them before a return operation.
     // Here we rely on the fact that the register allocation maps arguments in
     // the first slots.
-    vmAnalysis.value().get().cacheLocalRef(i + numRefArgs, refPtrOp);
+    funcAnalysis.cacheLocalRef(i + numRefArgs, refPtrOp);
 
     if (failed(clearStruct(builder, refPtr))) {
       return failure();
@@ -246,7 +235,7 @@ buildVariadicFunctionName(IREE::VM::ModuleOp &moduleOp,
 
 std::optional<Value>
 createVmTypeDefPtr(ConversionPatternRewriter &rewriter, Location loc,
-                   const IREE::VM::EmitCTypeConverter &typeConverter,
+                   const IREE::VM::ModuleAnalysis &moduleAnalysis,
                    IREE::VM::ModuleOp moduleOp, BlockArgument moduleArg,
                    Type elementType) {
   auto ctx = rewriter.getContext();
@@ -288,7 +277,7 @@ createVmTypeDefPtr(ConversionPatternRewriter &rewriter, Location loc,
 
     Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
     Type typeRefArrayType = emitc::PointerType::get(typeRefType);
-    std::optional<size_t> typeIndex = typeConverter.lookupType(objType);
+    std::optional<size_t> typeIndex = moduleAnalysis.lookupType(objType);
     if (!typeIndex.has_value()) {
       moduleOp.emitError("type index lookup failed");
       return std::nullopt;
@@ -385,14 +374,12 @@ LogicalResult retainOrMoveRefs(OpBuilder &builder, Location location,
 /// Releases refs which are local to the function as well as ref arguments.
 void releaseRefs(OpBuilder &builder, Location location,
                  mlir::func::FuncOp funcOp,
-                 IREE::VM::EmitCTypeConverter &typeConverter) {
+                 IREE::VM::ModuleAnalysis &moduleAnalysis) {
   auto ctx = builder.getContext();
 
-  auto vmAnalysis = typeConverter.lookupAnalysis(funcOp);
-  assert(succeeded(vmAnalysis));
+  auto &funcAnalysis = moduleAnalysis.lookupFunction(funcOp);
 
-  auto &localRefs = vmAnalysis.value().get().localRefs();
-  for (auto pair : localRefs) {
+  for (auto pair : funcAnalysis.localRefs()) {
     Operation *op = pair.second;
 
     assert(isa<emitc::ApplyOp>(op));
@@ -408,8 +395,7 @@ void releaseRefs(OpBuilder &builder, Location location,
   for (auto arg : funcOp.getArguments()) {
     if (arg.getType() ==
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
-      if (vmAnalysis.value().get().getNumRefArguments() <=
-          refArgumentsReleased++) {
+      if (funcAnalysis.getNumRefArguments() <= refArgumentsReleased++) {
         break;
       }
       emitc_builders::ireeVmRefRelease(builder, location, arg);
@@ -471,13 +457,13 @@ emitc::CallOpaqueOp failableCall(
 emitc::CallOpaqueOp returnIfError(OpBuilder &builder, Location location,
                                   StringAttr callee, ArrayAttr args,
                                   ArrayRef<Value> operands,
-                                  IREE::VM::EmitCTypeConverter &typeConverter) {
+                                  IREE::VM::ModuleAnalysis &moduleAnalysis) {
   auto blockBuilder = [&builder, &location,
-                       &typeConverter](emitc::CallOpaqueOp &callOp) {
+                       &moduleAnalysis](emitc::CallOpaqueOp &callOp) {
     Block *block = builder.getBlock();
     mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
 
-    releaseRefs(builder, location, funcOp, typeConverter);
+    releaseRefs(builder, location, funcOp, moduleAnalysis);
 
     builder.create<mlir::func::ReturnOp>(location, callOp.getResult(0));
   };
@@ -491,15 +477,15 @@ emitc::CallOpaqueOp returnIfError(OpBuilder &builder, Location location,
 emitc::CallOpaqueOp
 failContainerNull(OpBuilder &builder, Location location, Type type,
                   StringAttr callee, ArrayAttr args, ArrayRef<Value> operands,
-                  IREE::VM::EmitCTypeConverter &typeConverter) {
+                  IREE::VM::ModuleAnalysis &moduleAnalysis) {
   auto blockBuilder = [&builder, &location,
-                       &typeConverter](emitc::CallOpaqueOp &callOp) {
+                       &moduleAnalysis](emitc::CallOpaqueOp &callOp) {
     auto ctx = builder.getContext();
 
     Block *block = builder.getBlock();
     mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
 
-    releaseRefs(builder, location, funcOp, typeConverter);
+    releaseRefs(builder, location, funcOp, moduleAnalysis);
 
     auto statusOp = builder.create<emitc::CallOpaqueOp>(
         /*location=*/location,
@@ -569,13 +555,13 @@ mlir::func::CallOp failableCall(
 mlir::func::CallOp returnIfError(OpBuilder &builder, Location location,
                                  mlir::func::FuncOp &callee,
                                  ArrayRef<Value> operands,
-                                 IREE::VM::EmitCTypeConverter &typeConverter) {
+                                 IREE::VM::ModuleAnalysis &moduleAnalysis) {
   auto blockBuilder = [&builder, &location,
-                       &typeConverter](mlir::func::CallOp &callOp) {
+                       &moduleAnalysis](mlir::func::CallOp &callOp) {
     Block *block = builder.getBlock();
     mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
 
-    releaseRefs(builder, location, funcOp, typeConverter);
+    releaseRefs(builder, location, funcOp, moduleAnalysis);
 
     builder.create<mlir::func::ReturnOp>(location, callOp.getResult(0));
   };
@@ -585,7 +571,7 @@ mlir::func::CallOp returnIfError(OpBuilder &builder, Location location,
 }
 
 LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
-                                 IREE::VM::EmitCTypeConverter &typeConverter) {
+                                 IREE::VM::ModuleAnalysis &moduleAnalysis) {
   auto ctx = moduleOp.getContext();
   auto loc = moduleOp.getLoc();
 
@@ -607,8 +593,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_destroy", funcType);
 
-    typeConverter.analysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis()));
+    moduleAnalysis.addDummy(funcOp);
 
     attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
@@ -661,8 +646,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_alloc_state", funcType);
 
-    typeConverter.analysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis()));
+    moduleAnalysis.addDummy(funcOp);
 
     attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
@@ -696,7 +680,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
                   {}, {allocatorArg, stateSize, voidPtr.getResult()},
-                  /*typeConverter=*/typeConverter);
+                  moduleAnalysis);
 
     emitc_builders::memset(builder, loc, state, 0, stateSize);
 
@@ -842,8 +826,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_free_state", funcType);
 
-    typeConverter.analysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis()));
+    moduleAnalysis.addDummy(funcOp);
 
     attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
@@ -942,8 +925,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_resolve_import", funcType);
 
-    typeConverter.analysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis()));
+    moduleAnalysis.addDummy(funcOp);
 
     attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
@@ -1021,8 +1003,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_create", funcType);
 
-    typeConverter.analysisCache.insert(
-        std::make_pair(funcOp.getOperation(), VMAnalysis()));
+    moduleAnalysis.addDummy(funcOp);
 
     // This function needs an iree_vm_native_module_descriptor_t that is emitted
     // by the CModuleTarget at the moment. So we add a marker to this function
@@ -1062,7 +1043,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
                   {}, {allocatorArg, moduleSize, voidPtr.getResult()},
-                  /*typeConverter=*/typeConverter);
+                  moduleAnalysis);
 
     emitc_builders::memset(builder, loc, module, 0, moduleSize);
 
@@ -1070,7 +1051,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                                           /*memberName=*/"allocator",
                                           /*operand=*/module,
                                           /*value=*/allocatorArg);
-    auto &typeTable = typeConverter.typeTable;
+    auto &typeTable = moduleAnalysis.typeTable;
     attachAttribute(moduleOp, "vm.num_types",
                     builder.getI32IntegerAttr(typeTable.size()));
     if (!typeTable.empty()) {
@@ -1082,7 +1063,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
       std::string listType = "!vm.list";
       for (auto [index, typeDef] : llvm::enumerate(typeTable)) {
         std::string typeName = typeDef.full_name;
-        typeConverter.mapType(typeDef.type, index);
+        moduleAnalysis.mapType(typeDef.type, index);
         std::string listPrefix = typeName.substr(0, listType.size());
         if (listType == listPrefix) {
           typeName = listPrefix;
@@ -1227,6 +1208,12 @@ public:
   EmitCConversionPattern(const TypeConverter &typeConverter,
                          MLIRContext *context, PatternBenefit benefit = 1)
       : OpConversionPattern<OpTy>(typeConverter, context, benefit) {}
+
+protected:
+  IREE::VM::ModuleAnalysis &getModuleAnalysis() const {
+    return this->template getTypeConverter<IREE::VM::EmitCTypeConverter>()
+        ->analysis;
+  }
 };
 
 // Convert vm operations to emitc calls. The resultiong call has the ops
@@ -1336,18 +1323,10 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
     auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
 
-    IREE::VM::EmitCTypeConverter *typeConverter =
-        const_cast<IREE::VM::EmitCTypeConverter *>(
-            getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      funcOp.emitError() << "func op not found in cache.";
-      return failure();
-    }
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
 
     std::string newFuncName = (funcOp.getName() + "_export_shim").str();
 
@@ -1375,10 +1354,9 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
     auto newFuncOp =
         rewriter.create<mlir::func::FuncOp>(loc, newFuncName, newFuncType);
 
-    FunctionType functionType = vmAnalysis.value().get().getFunctionType();
+    FunctionType functionType = funcAnalysis.getFunctionType();
 
-    typeConverter->analysisCache.insert(
-        std::make_pair(newFuncOp.getOperation(), VMAnalysis(functionType)));
+    getModuleAnalysis().add(newFuncOp, functionType);
 
     attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
     attachAttribute(newFuncOp, "vm.calling_convention",
@@ -1456,7 +1434,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
         operands.push_back(result);
       }
 
-      returnIfError(rewriter, loc, funcOp, operands, *typeConverter);
+      returnIfError(rewriter, loc, funcOp, operands, getModuleAnalysis());
 
       auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
@@ -1506,18 +1484,10 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
                                   mlir::func::FuncOp &newFuncOp) const {
     auto loc = exportOp.getLoc();
 
-    IREE::VM::EmitCTypeConverter *typeConverter =
-        const_cast<IREE::VM::EmitCTypeConverter *>(
-            getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      funcOp.emitError() << "func op not found in cache.";
-      return failure();
-    }
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
 
     auto generateStructFields = [this](ArrayRef<Type> types, StringRef prefix)
         -> FailureOr<SmallVector<emitc_builders::StructField>> {
@@ -1525,7 +1495,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
 
       for (auto pair : llvm::enumerate(types)) {
         emitc::OpaqueType cType =
-            getTypeConverter<const IREE::VM::EmitCTypeConverter>()
+            getTypeConverter<IREE::VM::EmitCTypeConverter>()
                 ->convertTypeAsCType(pair.value());
 
         if (!cType) {
@@ -1556,7 +1526,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
                                        /*fields=*/fields);
     };
 
-    FunctionType funcType = vmAnalysis.value().get().getFunctionType();
+    FunctionType funcType = funcAnalysis.getFunctionType();
 
     GeneratedStruct argumentStruct;
     GeneratedStruct resultStruct;
@@ -1657,20 +1627,12 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
       return success();
     }
 
-    IREE::VM::EmitCTypeConverter *typeConverter =
-        const_cast<IREE::VM::EmitCTypeConverter *>(
-            getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      funcOp.emitError() << "func op not found in cache.";
-      return failure();
-    }
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
 
-    FunctionType funcType = vmAnalysis.value().get().getFunctionType();
+    FunctionType funcType = funcAnalysis.getFunctionType();
 
     for (const auto &input : llvm::enumerate(funcType.getInputs())) {
       assert(argumentStruct.value.has_value());
@@ -1723,20 +1685,14 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
       return success();
     }
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
+    const auto typeConverter = getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
     mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      funcOp.emitError() << "func op not found in cache.";
-      return failure();
-    }
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
 
-    FunctionType funcType = vmAnalysis.value().get().getFunctionType();
+    FunctionType funcType = funcAnalysis.getFunctionType();
 
     for (const auto &result : llvm::enumerate(funcType.getResults())) {
       assert(resultStruct.value.has_value());
@@ -1845,7 +1801,7 @@ private:
 
       mlir::func::FuncOp funcOp =
           cast<mlir::func::FuncOp>(failureBlock->getParentOp());
-      releaseRefs(builder, location, funcOp, typeConverter);
+      releaseRefs(builder, location, funcOp, typeConverter.analysis);
 
       auto statusOp = builder.create<emitc::CallOpaqueOp>(
           /*location=*/location,
@@ -1894,8 +1850,7 @@ private:
     auto newFuncOp = builder.create<mlir::func::FuncOp>(
         loc, newFuncName.value(), newFuncType.value());
 
-    typeConverter.analysisCache.insert(std::make_pair(
-        newFuncOp.getOperation(), VMAnalysis(importOp.getFunctionType())));
+    typeConverter.analysis.add(newFuncOp, importOp.getFunctionType());
 
     attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
@@ -2271,7 +2226,7 @@ private:
                            builder.getIndexAttr(2),
                        }),
         /*operands=*/ArrayRef<Value>{importModule, stack, call},
-        /*typeConverter=*/typeConverter);
+        typeConverter.analysis);
 
     return success();
   }
@@ -2391,11 +2346,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     returnIfError(
         /*rewriter=*/rewriter, /*location=*/loc, /*callee=*/funcOp,
-        /*operands=*/updatedOperands,
-        /*typeConverter=*/
-        *const_cast<IREE::VM::EmitCTypeConverter *>(
-            this->template getTypeConverter<
-                const IREE::VM::EmitCTypeConverter>()));
+        /*operands=*/updatedOperands, this->getModuleAnalysis());
 
     updateResultUses(op, rewriter, resultOperands);
 
@@ -2465,9 +2416,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     }
 
     returnIfError(rewriter, loc, callee, updatedOperands,
-                  *const_cast<IREE::VM::EmitCTypeConverter *>(
-                      this->template getTypeConverter<
-                          const IREE::VM::EmitCTypeConverter>()));
+                  this->getModuleAnalysis());
 
     updateResultUses(op, rewriter, resultOperands);
 
@@ -2483,9 +2432,6 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     auto loc = op->getLoc();
 
     OperandRange operands = op->getOperands();
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
 
     int operandIndex = 0;
     int numInputs =
@@ -2534,14 +2480,10 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     // parameter to the call.
     for (OpResult result : op->getResults()) {
       if (llvm::isa<IREE::VM::RefType>(result.getType())) {
-        std::optional<Value> ref = typeConverter->materializeRef(result);
+        Value ref = this->getModuleAnalysis().lookupRef(result);
 
-        if (!ref.has_value()) {
-          return op->emitError() << "local ref not found";
-        }
-
-        resultOperands.push_back(ref.value());
-        updatedOperands.push_back(ref.value());
+        resultOperands.push_back(ref);
+        updatedOperands.push_back(ref);
       } else {
         Value resultValue =
             emitc_builders::allocateVariable(rewriter, loc, result.getType());
@@ -2558,21 +2500,13 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
                                  Location loc) const {
     auto ctx = builder.getContext();
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     assert(operand.getType() != emitc::PointerType::get(emitc::OpaqueType::get(
                                     ctx, "iree_vm_ref_t")));
     if (!llvm::isa<IREE::VM::RefType>(operand.getType())) {
       return operand;
     }
 
-    std::optional<Value> operandRef = typeConverter->materializeRef(operand);
-
-    if (!operandRef.has_value()) {
-      return emitError(loc) << "local ref not found";
-    }
+    Value operandRef = this->getModuleAnalysis().lookupRef(operand);
 
     auto refOp = builder.create<emitc::VariableOp>(
         /*location=*/loc,
@@ -2592,7 +2526,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{operandRef.value(), refPtr});
+        ArrayRef<Value>{operandRef, refPtr});
 
     return refPtr;
   }
@@ -2619,31 +2553,21 @@ private:
     auto funcOp =
         cmpOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
+    const auto typeConverter =
+        this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
+    auto analysis = this->getModuleAnalysis().lookupFunction(funcOp);
+    if (failed(analysis)) {
       return cmpOp.emitError() << "parent func op not found in cache.";
     }
 
     bool moveLhs =
-        vmAnalysis.value().get().isMove(cmpOp.getLhs(), cmpOp.getOperation());
+        analysis.value().get().isMove(cmpOp.getLhs(), cmpOp.getOperation());
     bool moveRhs =
-        vmAnalysis.value().get().isMove(cmpOp.getRhs(), cmpOp.getOperation());
+        analysis.value().get().isMove(cmpOp.getRhs(), cmpOp.getOperation());
 
-    std::optional<Value> refLhs = typeConverter->materializeRef(cmpOp.getLhs());
-
-    if (!refLhs.has_value()) {
-      return cmpOp.emitError() << "local ref not found";
-    }
-
-    std::optional<Value> refRhs = typeConverter->materializeRef(cmpOp.getRhs());
-
-    if (!refRhs.has_value()) {
-      return cmpOp.emitError() << "local ref not found";
-    }
+    Value refLhs = this->getModuleAnalysis().lookupRef(cmpOp.getLhs());
+    Value refRhs = this->getModuleAnalysis().lookupRef(cmpOp.getRhs());
 
     rewriter.replaceOpWithNewOp<emitc::CallOpaqueOp>(
         /*op=*/cmpOp,
@@ -2651,16 +2575,16 @@ private:
         /*callee=*/StringAttr::get(ctx, funcName),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refLhs.value(), refRhs.value()});
+        /*operands=*/ArrayRef<Value>{refLhs, refRhs});
 
     if (moveLhs) {
-      emitc_builders::ireeVmRefRelease(rewriter, loc, refLhs.value());
+      emitc_builders::ireeVmRefRelease(rewriter, loc, refLhs);
     }
 
     // NOTE: If lhs and rhs alias we call release twice on the same
     // argument.
     if (moveRhs) {
-      emitc_builders::ireeVmRefRelease(rewriter, loc, refRhs.value());
+      emitc_builders::ireeVmRefRelease(rewriter, loc, refRhs);
     }
 
     return success();
@@ -2682,24 +2606,11 @@ class CompareRefNotZeroOpConversion
 
     auto funcOp = cmpOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
 
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      return cmpOp.emitError() << "parent func op not found in cache.";
-    }
+    bool move = funcAnalysis.isMove(cmpOp.getOperand(), cmpOp.getOperation());
 
-    bool move = vmAnalysis.value().get().isMove(cmpOp.getOperand(),
-                                                cmpOp.getOperation());
-
-    std::optional<Value> ref =
-        typeConverter->materializeRef(cmpOp.getOperand());
-
-    if (!ref.has_value()) {
-      return cmpOp.emitError() << "local ref not found";
-    }
+    Value ref = getModuleAnalysis().lookupRef(cmpOp.getOperand());
 
     rewriter.replaceOpWithNewOp<emitc::CallOpaqueOp>(
         /*op=*/cmpOp,
@@ -2707,10 +2618,10 @@ class CompareRefNotZeroOpConversion
         /*callee=*/StringAttr::get(ctx, "vm_cmp_nz_ref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{ref.value()});
+        /*operands=*/ArrayRef<Value>{ref});
 
     if (move) {
-      emitc_builders::ireeVmRefRelease(rewriter, loc, ref.value());
+      emitc_builders::ireeVmRefRelease(rewriter, loc, ref);
     }
 
     return success();
@@ -2759,20 +2670,11 @@ class ConstRefZeroOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     auto loc = constRefZeroOp.getLoc();
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
+    Value ref = getModuleAnalysis().lookupRef(constRefZeroOp.getResult());
 
-    std::optional<Value> ref =
-        typeConverter->materializeRef(constRefZeroOp.getResult());
+    emitc_builders::ireeVmRefRelease(rewriter, loc, ref);
 
-    if (!ref.has_value()) {
-      return constRefZeroOp.emitError() << "local ref not found";
-    }
-
-    emitc_builders::ireeVmRefRelease(rewriter, loc, ref.value());
-
-    rewriter.replaceOp(constRefZeroOp, ref.value());
+    rewriter.replaceOp(constRefZeroOp, ref);
 
     return success();
   }
@@ -2828,16 +2730,7 @@ class ConstRefRodataOpConversion
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    IREE::VM::EmitCTypeConverter *typeConverter =
-        const_cast<IREE::VM::EmitCTypeConverter *>(
-            getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
-    std::optional<Value> ref =
-        typeConverter->materializeRef(constRefRodataOp.getResult());
-
-    if (!ref.has_value()) {
-      return constRefRodataOp.emitError() << "local ref not found";
-    }
+    Value ref = getModuleAnalysis().lookupRef(constRefRodataOp.getResult());
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -2845,10 +2738,10 @@ class ConstRefRodataOpConversion
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_wrap_retain"),
         /*args=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{byteBufferPtrOp, typeIdOp.getResult(0), ref.value()},
-        /*typeConverter=*/*typeConverter);
+        ArrayRef<Value>{byteBufferPtrOp, typeIdOp.getResult(0), ref},
+        getModuleAnalysis());
 
-    rewriter.replaceOp(constRefRodataOp, ref.value());
+    rewriter.replaceOp(constRefRodataOp, ref);
 
     return success();
   }
@@ -2886,17 +2779,6 @@ class BranchOpConversion : public EmitCConversionPattern<IREE::VM::BranchOp> {
       return success();
     }
 
-    auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
-
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      return op->emitError() << "parent func op not found in cache.";
-    }
-
     Block *destDispatch;
     {
       OpBuilder::InsertionGuard guard(rewriter);
@@ -2912,19 +2794,10 @@ class BranchOpConversion : public EmitCConversionPattern<IREE::VM::BranchOp> {
         assert(operand.getType().isa<IREE::VM::RefType>());
         assert(blockArg.getType().isa<IREE::VM::RefType>());
 
-        std::optional<Value> operandRef =
-            typeConverter->materializeRef(operand);
-        std::optional<Value> blockArgRef =
-            typeConverter->materializeRef(blockArg);
+        Value operandRef = getModuleAnalysis().lookupRef(operand);
+        Value blockArgRef = getModuleAnalysis().lookupRef(blockArg);
 
-        if (!operandRef.has_value()) {
-          return op.emitError() << "local ref not found";
-        }
-        if (!blockArgRef.has_value()) {
-          return op.emitError() << "local ref not found";
-        }
-
-        refMapping.map(operandRef.value(), blockArgRef.value());
+        refMapping.map(operandRef, blockArgRef);
       }
       if (failed(retainOrMoveRefs(rewriter, loc, refMapping,
                                   /*isMove=*/false))) {
@@ -3007,17 +2880,6 @@ class CondBranchOpConversion
       return success();
     }
 
-    auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
-
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      return op->emitError() << "parent func op not found in cache.";
-    }
-
     Block *trueDestDispatch;
     {
       OpBuilder::InsertionGuard guard(rewriter);
@@ -3093,9 +2955,6 @@ class ReturnOpConversion : public EmitCConversionPattern<IREE::VM::ReturnOp> {
     auto loc = op.getLoc();
 
     auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
 
     // The result variables are the last N arguments of the function.
     unsigned int firstOutputArgumentIndex =
@@ -3114,13 +2973,9 @@ class ReturnOpConversion : public EmitCConversionPattern<IREE::VM::ReturnOp> {
                emitc::PointerType::get(
                    emitc::OpaqueType::get(ctx, "iree_vm_ref_t")));
 
-        std::optional<Value> operandRef =
-            typeConverter->materializeRef(operand);
+        Value operandRef = getModuleAnalysis().lookupRef(operand);
 
-        if (!operandRef.has_value()) {
-          return op->emitError() << "local ref not found";
-        }
-        refMapping.map(operandRef.value(), resultArgument);
+        refMapping.map(operandRef, resultArgument);
       } else {
         rewriter.create<emitc::CallOpaqueOp>(
             /*location=*/loc,
@@ -3135,7 +2990,7 @@ class ReturnOpConversion : public EmitCConversionPattern<IREE::VM::ReturnOp> {
     if (failed(retainOrMoveRefs(rewriter, loc, refMapping, /*isMove=*/true))) {
       return op.emitError() << "moving of multiple refs failed";
     }
-    releaseRefs(rewriter, loc, funcOp, *typeConverter);
+    releaseRefs(rewriter, loc, funcOp, getModuleAnalysis());
 
     auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
@@ -3231,12 +3086,8 @@ class FailOpConversion : public EmitCConversionPattern<IREE::VM::FailOp> {
           rewriter.createBlock(parentRegion, parentRegion->end());
 
       auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
-      IREE::VM::EmitCTypeConverter *typeConverter =
-          const_cast<IREE::VM::EmitCTypeConverter *>(
-              this->template getTypeConverter<
-                  const IREE::VM::EmitCTypeConverter>());
 
-      releaseRefs(rewriter, loc, funcOp, *typeConverter);
+      releaseRefs(rewriter, loc, funcOp, getModuleAnalysis());
 
       auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
@@ -3248,12 +3099,8 @@ class FailOpConversion : public EmitCConversionPattern<IREE::VM::FailOp> {
       failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
 
       auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
-      IREE::VM::EmitCTypeConverter *typeConverter =
-          const_cast<IREE::VM::EmitCTypeConverter *>(
-              this->template getTypeConverter<
-                  const IREE::VM::EmitCTypeConverter>());
 
-      releaseRefs(rewriter, loc, funcOp, *typeConverter);
+      releaseRefs(rewriter, loc, funcOp, getModuleAnalysis());
 
       std::string messageStr = std::string("\"") +
                                op.getMessage().value_or("").str() +
@@ -3399,22 +3246,12 @@ class GlobalLoadStoreRefOpConversion : public EmitCConversionPattern<OpTy> {
     auto globalOrdinal = globalOp.getOrdinal()->getZExtValue();
 
     auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
 
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      return op->emitError() << "parent func op not found in cache.";
-    }
+    auto &funcAnalysis = this->getModuleAnalysis().lookupFunction(funcOp);
 
     Value localValue = isLoad ? op->getResult(0) : op->getOperand(0);
 
-    std::optional<Value> localRef = typeConverter->materializeRef(localValue);
-
-    if (!localRef.has_value()) {
-      return op->emitError() << "local ref not found";
-    }
+    Value localRef = this->getModuleAnalysis().lookupRef(localValue);
 
     const BlockArgument stateArg =
         funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
@@ -3440,8 +3277,8 @@ class GlobalLoadStoreRefOpConversion : public EmitCConversionPattern<OpTy> {
     Type elementType = localValue.getType();
 
     auto elementTypePtr =
-        createVmTypeDefPtr(rewriter, op->getLoc(), *typeConverter, moduleOp,
-                           moduleArg, elementType);
+        createVmTypeDefPtr(rewriter, op->getLoc(), this->getModuleAnalysis(),
+                           moduleOp, moduleArg, elementType);
 
     if (!elementTypePtr.has_value()) {
       return op->emitError() << "generating iree_vm_type_def_t* failed";
@@ -3457,10 +3294,10 @@ class GlobalLoadStoreRefOpConversion : public EmitCConversionPattern<OpTy> {
                 /*operands=*/ArrayRef<Value>{elementTypePtr.value()})
             .getResult(0);
 
-    Value srcRef = isLoad ? stateRef : localRef.value();
-    Value destRef = isLoad ? localRef.value() : stateRef;
+    Value srcRef = isLoad ? stateRef : localRef;
+    Value destRef = isLoad ? localRef : stateRef;
 
-    bool move = vmAnalysis.value().get().isMove(localValue, op);
+    bool move = funcAnalysis.isMove(localValue, op);
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -3471,10 +3308,10 @@ class GlobalLoadStoreRefOpConversion : public EmitCConversionPattern<OpTy> {
                        {rewriter.getBoolAttr(move), rewriter.getIndexAttr(0),
                         rewriter.getIndexAttr(1), rewriter.getIndexAttr(2)}),
         /*operands=*/ArrayRef<Value>{srcRef, typedefAsRef, destRef},
-        /*typeConverter=*/*typeConverter);
+        this->getModuleAnalysis());
 
     if (isLoad) {
-      rewriter.replaceOp(op, localRef.value());
+      rewriter.replaceOp(op, localRef);
     } else {
       rewriter.eraseOp(op);
     }
@@ -3562,10 +3399,6 @@ private:
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     SmallVector<Value> unwrappedOperands;
     for (const auto &operand : llvm::enumerate(adaptor.getOperands())) {
       if (refArgumentIndices.contains(operand.index())) {
@@ -3606,8 +3439,7 @@ private:
             emitc::PointerType::get(emitc::OpaqueType::get(ctx, vmType)),
             /*callee=*/StringAttr::get(ctx, vmDerefCallee),
             /*args=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{refValue},
-            /*typeConverter=*/*typeConverter);
+            /*operands=*/ArrayRef<Value>{refValue}, this->getModuleAnalysis());
         unwrappedOperands.push_back(derefOp.getResult(0));
       } else {
         unwrappedOperands.push_back(operand.value());
@@ -3627,7 +3459,7 @@ private:
           /*callee=*/StringAttr::get(ctx, funcName),
           /*args=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>(unwrappedOperands),
-          /*typeConverter=*/*typeConverter);
+          this->getModuleAnalysis());
 
       updateResultUses(op.getOperation(), rewriter, resultOperands);
 
@@ -3663,20 +3495,12 @@ private:
                                   SmallVector<Value> &results) const {
     auto loc = op->getLoc();
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     for (OpResult result : op->getResults()) {
       if (llvm::isa<IREE::VM::RefType>(result.getType())) {
-        std::optional<Value> ref = typeConverter->materializeRef(result);
+        Value ref = this->getModuleAnalysis().lookupRef(result);
 
-        if (!ref.has_value()) {
-          return op->emitError() << "local ref not found";
-        }
-
-        results.push_back(ref.value());
-        operands.push_back(ref.value());
+        results.push_back(ref);
+        operands.push_back(ref);
       } else {
         Type type = result.getType();
         Value resultValue = emitc_builders::allocateVariable(
@@ -3737,10 +3561,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     auto funcOp =
         op.getOperation()->template getParentOfType<mlir::func::FuncOp>();
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     const BlockArgument stateArg =
         funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
 
@@ -3763,13 +3583,9 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
         /*callee=*/StringAttr::get(ctx, cNames.value().constructor),
         /*args=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{operands.value()},
-        /*typeConverter=*/*typeConverter);
+        this->getModuleAnalysis());
 
-    auto ref = typeConverter->materializeRef(op.getResult());
-
-    if (!ref.has_value()) {
-      return op.emitError() << "local ref not found";
-    }
+    Value ref = this->getModuleAnalysis().lookupRef(op.getResult());
 
     Value refType =
         rewriter
@@ -3787,10 +3603,10 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
         /*location=*/loc,
         /*callee=*/StringAttr::get(ctx, "iree_vm_ref_wrap_assign"),
         /*args=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{container, refType, ref.value()},
-        /*typeConverter=*/*typeConverter);
+        /*operands=*/ArrayRef<Value>{container, refType, ref},
+        this->getModuleAnalysis());
 
-    rewriter.replaceOp(op, ref.value());
+    rewriter.replaceOp(op, ref);
 
     return success();
   }
@@ -3824,16 +3640,14 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
               Value containerPtr, Value allocator) const {
     SmallVector<Value> result;
 
-    const IREE::VM::EmitCTypeConverter *typeConverter =
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>();
     auto moduleOp = op.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
     auto parentFuncOp =
         op.getOperation()->getParentOfType<mlir::func::FuncOp>();
     const BlockArgument moduleArg =
         parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE);
     auto elementTypePtr =
-        createVmTypeDefPtr(rewriter, op.getLoc(), *typeConverter, moduleOp,
-                           moduleArg, elementType);
+        createVmTypeDefPtr(rewriter, op.getLoc(), this->getModuleAnalysis(),
+                           moduleOp, moduleArg, elementType);
 
     if (!elementTypePtr.has_value()) {
       return std::nullopt;
@@ -3905,21 +3719,17 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value refPtr = adaptor.getOperands()[0];
     Value refValue = emitc_builders::contentsOf(rewriter, loc, refPtr);
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
-    Value source = failContainerNull(
-                       /*rewriter=*/rewriter,
-                       /*location=*/loc,
-                       /*type=*/
-                       emitc::PointerType::get(
-                           emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
-                       /*callee=*/StringAttr::get(ctx, "iree_vm_buffer_deref"),
-                       /*args=*/ArrayAttr{},
-                       /*operands=*/ArrayRef<Value>{refValue},
-                       /*typeConverter=*/*typeConverter)
-                       .getResult(0);
+    Value source =
+        failContainerNull(
+            /*rewriter=*/rewriter,
+            /*location=*/loc,
+            /*type=*/
+            emitc::PointerType::get(
+                emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
+            /*callee=*/StringAttr::get(ctx, "iree_vm_buffer_deref"),
+            /*args=*/ArrayAttr{},
+            /*operands=*/ArrayRef<Value>{refValue}, this->getModuleAnalysis())
+            .getResult(0);
 
     Value offset = adaptor.getOperands()[1];
     Value length = adaptor.getOperands()[2];
@@ -3979,10 +3789,6 @@ class ListGetOpConversion : public EmitCConversionPattern<OpTy> {
     Value refValue =
         emitc_builders::contentsOf(rewriter, loc, adaptor.getOperands()[0]);
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     auto listDerefOp = failContainerNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
@@ -3990,8 +3796,7 @@ class ListGetOpConversion : public EmitCConversionPattern<OpTy> {
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refValue},
-        /*typeConverter=*/*typeConverter);
+        /*operands=*/ArrayRef<Value>{refValue}, this->getModuleAnalysis());
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -4003,7 +3808,7 @@ class ListGetOpConversion : public EmitCConversionPattern<OpTy> {
                              rewriter.getIndexAttr(2)}),
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), getOp.getIndex(), valuePtr},
-        /*typeConverter=*/*typeConverter);
+        this->getModuleAnalysis());
 
     rewriter.replaceOpWithNewOp<emitc::CallOpaqueOp>(
         /*op=*/getOp,
@@ -4031,10 +3836,6 @@ class ListGetRefOpConversion
     Value listRefValue =
         emitc_builders::contentsOf(rewriter, loc, adaptor.getOperands()[0]);
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     auto listDerefOp = failContainerNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
@@ -4042,14 +3843,9 @@ class ListGetRefOpConversion
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{listRefValue},
-        /*typeConverter=*/*typeConverter);
+        /*operands=*/ArrayRef<Value>{listRefValue}, getModuleAnalysis());
 
-    auto ref = typeConverter->materializeRef(getOp.getResult());
-
-    if (!ref.has_value()) {
-      return getOp.emitError() << "local ref not found";
-    }
+    Value ref = getModuleAnalysis().lookupRef(getOp.getResult());
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -4057,9 +3853,8 @@ class ListGetRefOpConversion
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_get_ref_retain"),
         /*args=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{listDerefOp.getResult(0), getOp.getIndex(),
-                        ref.value()},
-        /*typeConverter=*/*typeConverter);
+        ArrayRef<Value>{listDerefOp.getResult(0), getOp.getIndex(), ref},
+        getModuleAnalysis());
 
     auto moduleOp = getOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
     auto parentFuncOp =
@@ -4070,8 +3865,8 @@ class ListGetRefOpConversion
     Type elementType = getOp.getResult().getType();
 
     auto elementTypePtr =
-        createVmTypeDefPtr(rewriter, getOp.getLoc(), *typeConverter, moduleOp,
-                           moduleArg, elementType);
+        createVmTypeDefPtr(rewriter, getOp.getLoc(), getModuleAnalysis(),
+                           moduleOp, moduleArg, elementType);
 
     if (!elementTypePtr.has_value()) {
       return getOp.emitError() << "generating iree_vm_type_def_t* failed";
@@ -4088,7 +3883,7 @@ class ListGetRefOpConversion
           rewriter, loc,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t"),
           /*memberName=*/"type",
-          /*operand=*/ref.value());
+          /*operand=*/ref);
 
       // IREE_VM_REF_TYPE_NULL
       auto refTypeNull =
@@ -4158,7 +3953,7 @@ class ListGetRefOpConversion
       Region *parentRegion = condBlock->getParent();
       failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
 
-      emitc_builders::ireeVmRefRelease(rewriter, loc, ref.value());
+      emitc_builders::ireeVmRefRelease(rewriter, loc, ref);
 
       rewriter.create<mlir::cf::BranchOp>(loc, continuationBlock);
     }
@@ -4167,7 +3962,7 @@ class ListGetRefOpConversion
     rewriter.create<IREE::VM::CondBranchOp>(loc, invalidType, failureBlock,
                                             continuationBlock);
 
-    rewriter.replaceOp(getOp, ref.value());
+    rewriter.replaceOp(getOp, ref);
 
     return success();
   }
@@ -4210,10 +4005,6 @@ class ListSetOpConversion : public EmitCConversionPattern<OpTy> {
     Value refValue =
         emitc_builders::contentsOf(rewriter, loc, adaptor.getOperands()[0]);
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     auto listDerefOp = failContainerNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
@@ -4221,8 +4012,7 @@ class ListSetOpConversion : public EmitCConversionPattern<OpTy> {
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refValue},
-        /*typeConverter=*/*typeConverter);
+        /*operands=*/ArrayRef<Value>{refValue}, this->getModuleAnalysis());
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -4231,7 +4021,7 @@ class ListSetOpConversion : public EmitCConversionPattern<OpTy> {
         /*args=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), setOp.getIndex(), valuePtr},
-        /*typeConverter=*/*typeConverter);
+        this->getModuleAnalysis());
 
     rewriter.eraseOp(setOp);
 
@@ -4253,10 +4043,6 @@ class ListSetRefOpConversion
     Value refValue =
         emitc_builders::contentsOf(rewriter, loc, adaptor.getOperands()[0]);
 
-    IREE::VM::EmitCTypeConverter *typeConverter = const_cast<
-        IREE::VM::EmitCTypeConverter *>(
-        this->template getTypeConverter<const IREE::VM::EmitCTypeConverter>());
-
     auto listDerefOp = failContainerNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
@@ -4264,17 +4050,13 @@ class ListSetRefOpConversion
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{refValue},
-        /*typeConverter=*/*typeConverter);
+        /*operands=*/ArrayRef<Value>{refValue}, getModuleAnalysis());
 
     auto funcOp = setOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
 
-    auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
-    if (failed(vmAnalysis)) {
-      return setOp.emitError() << "parent func op not found in cache.";
-    }
-    bool move =
-        vmAnalysis.value().get().isMove(setOp.getValue(), setOp.getOperation());
+    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
+
+    bool move = funcAnalysis.isMove(setOp.getValue(), setOp.getOperation());
 
     StringRef callee =
         move ? "iree_vm_list_set_ref_move" : "iree_vm_list_set_ref_retain";
@@ -4287,7 +4069,7 @@ class ListSetRefOpConversion
         /*operands=*/
         ArrayRef<Value>{listDerefOp.getResult(0), setOp.getIndex(),
                         adaptor.getValue()},
-        /*typeConverter=*/*typeConverter);
+        getModuleAnalysis());
 
     rewriter.eraseOp(setOp);
 
@@ -4594,8 +4376,7 @@ public:
     IREE::VM::ModuleOp module = getOperation();
 
     ConversionTarget target(getContext());
-    EmitCTypeConverter typeConverter;
-    typeConverter.cacheTypeTable(module);
+    EmitCTypeConverter typeConverter(module);
 
     // Convert vm.func ops to std.func with the calling convention used by
     // EmitC. We convert these upfront to make sure vm.call ops always
@@ -4604,10 +4385,6 @@ public:
     SmallVector<IREE::VM::FuncOp> funcsToRemove;
     SmallVector<BlockArgument> blockArgsToRemove;
     for (auto funcOp : module.getOps<IREE::VM::FuncOp>()) {
-      Operation *op = funcOp.getOperation();
-      typeConverter.analysisCache.insert(
-          std::make_pair(op, VMAnalysis(funcOp)));
-
       if (failed(convertFuncOp(funcOp, typeConverter, blockArgsToRemove))) {
         return signalPassFailure();
       }
@@ -4619,7 +4396,7 @@ public:
     }
 
     // Generate func ops that implement the C API.
-    if (failed(createAPIFunctions(module, typeConverter))) {
+    if (failed(createAPIFunctions(module, typeConverter.analysis))) {
       return signalPassFailure();
     }
 
