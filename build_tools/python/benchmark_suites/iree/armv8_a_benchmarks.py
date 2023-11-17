@@ -34,18 +34,20 @@ class Android_ARMv8_A_Benchmarks(object):
         target_abi=iree_definitions.TargetABI.LINUX_ANDROID29,
     )
 
+    PIXEL_6_CPU_FEATURES = "+fp-armv8,+lse,+neon,+crc,+crypto,+dotprod"
+
     DEFAULT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DEFAULTS,
         tags=["default-flags"],
         compile_targets=[ARMV8_A_CPU_TARGET],
-        extra_flags=["--iree-llvmcpu-target-cpu=cortex-x1"],
+        extra_flags=[f"--iree-llvmcpu-target-cpu-features={PIXEL_6_CPU_FEATURES}"],
     )
     DATA_TILING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_MMT4D,
         tags=["experimental-flags", "data-tiling", "ukernel"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
-            "--iree-llvmcpu-target-cpu=cortex-x1",
+            f"--iree-llvmcpu-target-cpu-features={PIXEL_6_CPU_FEATURES}",
             "--iree-opt-data-tiling",
             "--iree-llvmcpu-enable-ukernels=all",
         ],
@@ -55,7 +57,7 @@ class Android_ARMv8_A_Benchmarks(object):
         tags=["experimental-flags", "data-tiling", "ukernel", "dotprod"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
-            "--iree-llvmcpu-target-cpu=cortex-x1",
+            f"--iree-llvmcpu-target-cpu-features={PIXEL_6_CPU_FEATURES}",
             "--iree-opt-data-tiling",
             "--iree-llvmcpu-enable-ukernels=all",
         ],
