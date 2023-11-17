@@ -83,11 +83,29 @@ RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type);
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
 
+/// Returns the integer contained in an IntegerAttr, or zero if it has none.
+bool getIntOrZero(IntegerAttr a);
+
 /// Returns true if encoding user is one of matmul encodings.
 bool isMatmulEncodingUser(IREE::LinalgExt::EncodingUser user);
 
-/// Returns if encoding user is one of batch matmul encodings.
+/// Returns true if encoding user is one of batch matmul encodings.
 bool isBatchMatmulEncodingUser(IREE::LinalgExt::EncodingUser user);
+
+/// Returns true if the encoding is a vecmat.
+bool isVecmatEncoding(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns true if the encoding is a matvec.
+bool isMatvecEncoding(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns true if the encoding is a batch_vecmat.
+bool isBatchVecmatEncoding(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns true if the encoding is a batch_matvec.
+bool isBatchMatvecEncoding(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns true if the encoded type is a vector.
+bool isVectorEncoding(int64_t rank, IREE::LinalgExt::EncodingUser user);
 
 struct TileMxNxK {
   int64_t M = 1;
@@ -96,8 +114,7 @@ struct TileMxNxK {
 };
 
 MaterializeEncodingInfo
-getEncodingInfoForMatmul(IREE::LinalgExt::EncodingUser user,
-                         IREE::LinalgExt::EncodingRole role,
+getEncodingInfoForMatmul(IREE::LinalgExt::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
 
 MaterializeEncodingValueFn

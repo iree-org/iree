@@ -95,7 +95,7 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.dataTiling) {
     mainPassManager.addPass(createLiftGenericToTransposeBatchMatmulPass());
     // Expand all vectors in vecmat/matvec ops into matrices for tiling.
-    mainPassManager.addPass(createExpandVectorsPass());
+    // mainPassManager.addPass(createExpandVectorsPass());
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
