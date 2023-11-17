@@ -149,9 +149,15 @@ iree_task_t* iree_task_queue_flush_from_lifo_slist(
 iree_task_t* iree_task_queue_pop_front(iree_task_queue_t* queue);
 
 // Tries to steal up to |max_tasks| from the back of the queue.
-// Returns NULL if no tasks are available and otherwise up to |max_tasks| tasks
-// that were at the tail of the |source_queue| will be moved to the
-// |target_queue| and the first of the stolen tasks is returned.
+//
+// On success, up to |max_tasks| tasks that were at the tail of the
+// |source_queue| will be moved to the |target_queue| and the first of the
+// stolen tasks is returned.
+//
+// On failure, NULL is returned.
+//
+// This function is allowed to fail spuriously, i.e. even if there are
+// tasks to steal.
 //
 // It's expected this is not called from the queue's owning worker, though it's
 // valid to do so.
