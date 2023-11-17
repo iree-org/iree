@@ -1045,7 +1045,7 @@ def Util_HoistableType : TypeInterface<"HoistableTypeInterface"> {
         inside the initializer and immediately before storing the global.
       }],
       /*retTy=*/"mlir::Value",
-      /*methodName=*/"setPreferredStorageType",
+      /*methodName=*/"encodeStorageType",
       /*args=*/(ins
         "OpBuilder &":$builder,
         "Location":$loc,
@@ -1063,7 +1063,7 @@ def Util_HoistableType : TypeInterface<"HoistableTypeInterface"> {
         the global back to the original type.
       }],
       /*retTy=*/"mlir::Value",
-      /*methodName=*/"unsetPreferredStorageType",
+      /*methodName=*/"decodeStorageType",
       /*args=*/(ins
         "OpBuilder &":$builder,
         "Location":$loc,

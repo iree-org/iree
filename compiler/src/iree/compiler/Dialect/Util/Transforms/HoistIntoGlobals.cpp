@@ -126,8 +126,8 @@ public:
       // Call user hook to cast back to the original type.
       if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
               originalValue.getType())) {
-        load = hoistableType.unsetPreferredStorageType(
-            builder, load.getLoc(), originalValue.getType(), load);
+        load = hoistableType.decodeStorageType(builder, load.getLoc(),
+                                               originalValue.getType(), load);
       }
       if (load.getType() != originalValue.getType()) {
         getOperation().emitError()
@@ -251,7 +251,7 @@ public:
                         << clonedResult << "\n");
       // Cast to the preferred global storage type.
       if (hoistableType) {
-        clonedResult = hoistableType.setPreferredStorageType(
+        clonedResult = hoistableType.encodeStorageType(
             builder, clonedResult.getLoc(), globalType, clonedResult);
       }
       if (clonedResult.getType() != globalType) {

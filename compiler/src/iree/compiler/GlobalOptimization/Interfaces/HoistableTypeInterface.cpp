@@ -67,17 +67,16 @@ struct HoistableTensorTypeInterface
     return RankedTensorType::get({numElements * elementBitWidth / 8},
                                  Builder(type.getContext()).getIntegerType(8));
   }
-  static Value setPreferredStorageType(OpBuilder &builder, Location loc,
-                                       Type storageType, Value init) {
+  static Value encodeStorageType(OpBuilder &builder, Location loc,
+                                 Type storageType, Value init) {
     auto storageTensorType = dyn_cast<RankedTensorType>(storageType);
     if (!storageTensorType) {
       return init;
     }
     return bitcastToStaticTypeImpl(builder, loc, storageTensorType, init);
   }
-  static Value unsetPreferredStorageType(OpBuilder &builder, Location loc,
-                                         Type originalType,
-                                         Value loadedGlobal) {
+  static Value decodeStorageType(OpBuilder &builder, Location loc,
+                                 Type originalType, Value loadedGlobal) {
     auto originalTensorType = dyn_cast<RankedTensorType>(originalType);
     if (!originalTensorType) {
       return loadedGlobal;
