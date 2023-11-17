@@ -4,13 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
+#include "./MetalSPIRVTarget.h"
 
+#include "./MSLToMetalLib.h"
+#include "./MetalTargetPlatform.h"
+#include "./SPIRVToMSL.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MSLToMetalLib.h"
-#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/SPIRVToMSL.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/metal_executable_def_builder.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -31,21 +33,30 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-llvm::cl::opt<MetalTargetPlatform> clTargetPlatform(
-    "iree-metal-target-platform", llvm::cl::desc("Apple platform to target"),
-    llvm::cl::values(
-        clEnumValN(MetalTargetPlatform::macOS, "macos", "macOS platform"),
-        clEnumValN(MetalTargetPlatform::iOS, "ios", "iOS platform"),
-        clEnumValN(MetalTargetPlatform::iOSSimulator, "ios-simulator",
-                   "iOS simulator platform")),
-    llvm::cl::init(MetalTargetPlatform::macOS));
+struct MetalSPIRVOptions {
+  MetalTargetPlatform clTargetPlatform;
+  bool clCompileToMetalLib;
 
-static llvm::cl::opt<bool> clCompileToMetalLib(
-    "iree-metal-compile-to-metallib",
-    llvm::cl::desc(
-        "Compile to .metallib and embed in IREE deployable flatbuffer if true; "
-        "otherwise stop at and embed MSL source code"),
-    llvm::cl::init(true));
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("MetalSPIRV HAL Target");
+    binder.opt<MetalTargetPlatform>(
+        "iree-metal-target-platform", clTargetPlatform, llvm::cl::cat(category),
+        llvm::cl::desc("Apple platform to target"),
+        llvm::cl::values(
+            clEnumValN(MetalTargetPlatform::macOS, "macos", "macOS platform"),
+            clEnumValN(MetalTargetPlatform::iOS, "ios", "iOS platform"),
+            clEnumValN(MetalTargetPlatform::iOSSimulator, "ios-simulator",
+                       "iOS simulator platform")),
+        llvm::cl::init(MetalTargetPlatform::macOS));
+    binder.opt<bool>(
+        "iree-metal-compile-to-metallib", clCompileToMetalLib,
+        llvm::cl::cat(category),
+        llvm::cl::desc("Compile to .metallib and embed in IREE deployable "
+                       "flatbuffer if true; "
+                       "otherwise stop at and embed MSL source code"),
+        llvm::cl::init(true));
+  }
+};
 
 static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
   using spirv::Capability;
@@ -103,7 +114,8 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
 
 class MetalSPIRVTargetBackend : public TargetBackend {
 public:
-  MetalSPIRVTargetBackend() = default;
+  MetalSPIRVTargetBackend(MetalSPIRVOptions options)
+      : options_(std::move(options)) {}
 
   // NOTE: we could vary this based on the options such as 'metal-v2'.
   std::string name() const override { return "metal"; }
@@ -188,7 +200,8 @@ public:
       // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
       ArrayRef spvData(spvBinary.data(), spvBinary.size());
       std::optional<std::pair<MetalShader, std::string>> msl =
-          crossCompileSPIRVToMSL(clTargetPlatform, spvData, entryPoint);
+          crossCompileSPIRVToMSL(options_.clTargetPlatform, spvData,
+                                 entryPoint);
       if (!msl) {
         return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";
@@ -208,7 +221,7 @@ public:
 
     // 3. Compile MSL to MTLLibrary.
     SmallVector<std::unique_ptr<llvm::MemoryBuffer>> metalLibs;
-    if (clCompileToMetalLib) {
+    if (options_.clCompileToMetalLib) {
       // We need to use offline Metal shader compilers.
       // TODO(#14048): The toolchain can also exist on other platforms. Probe
       // the PATH instead.
@@ -216,8 +229,8 @@ public:
       if (hostTriple.isMacOSX()) {
         for (auto [shader, entryPoint] :
              llvm::zip(mslShaders, mslEntryPointNames)) {
-          std::unique_ptr<llvm::MemoryBuffer> lib =
-              compileMSLToMetalLib(clTargetPlatform, shader.source, entryPoint);
+          std::unique_ptr<llvm::MemoryBuffer> lib = compileMSLToMetalLib(
+              options_.clTargetPlatform, shader.source, entryPoint);
           if (!lib) {
             return variantOp.emitError()
                    << "failed to compile to MTLLibrary from MSL:\n\n"
@@ -300,19 +313,35 @@ private:
         context, b.getStringAttr("metal"), b.getStringAttr("metal-msl-fb"),
         configAttr);
   }
+
+  MetalSPIRVOptions options_;
 };
 
-void registerMetalSPIRVTargetBackends() {
-  auto backendFactory = [=]() {
-    return std::make_shared<MetalSPIRVTargetBackend>();
-  };
-  // #hal.device.target<"metal", ...
-  static TargetBackendRegistration registration0("metal", backendFactory);
-  // #hal.executable.target<"metal-spirv", ...
-  static TargetBackendRegistration registration1("metal-spirv", backendFactory);
-}
+struct MetalSPIRVSession
+    : public PluginSession<MetalSPIRVSession, MetalSPIRVOptions,
+                           PluginActivationPolicy::DefaultActivated> {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+    auto backendFactory = [=]() {
+      return std::make_shared<MetalSPIRVTargetBackend>(options);
+    };
+    // #hal.device.target<"metal", ...
+    targets.add("metal", backendFactory);
+    // #hal.executable.target<"metal-spirv", ...
+    targets.add("metal-spirv", backendFactory);
+  }
+};
 
 } // namespace HAL
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
+
+extern "C" bool iree_register_compiler_plugin_hal_target_metal_spirv(
+    mlir::iree_compiler::PluginRegistrar *registrar) {
+  registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::MetalSPIRVSession>(
+      "hal_target_metal_spirv");
+  return true;
+}
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::IREE::HAL::MetalSPIRVOptions);

@@ -11,7 +11,7 @@
 #include <optional>
 #include <string>
 
-#include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalTargetPlatform.h"
+#include "./MetalTargetPlatform.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Support/LLVM.h"
