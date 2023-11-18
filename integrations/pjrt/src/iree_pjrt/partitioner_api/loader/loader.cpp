@@ -57,14 +57,15 @@ DlHandle loadLibrary(const char *libraryPath) {
   return lib;
 }
 void *lookupLibrarySymbol(DlHandle lib, const char *symbol) {
-  return dlsym(lib, symbol);
+  //note: on macOS, dlsym already prepends CDECL_SYMBOL_PREFIX _
+  return dlsym(lib, symbol); 
 }
 }  // namespace
 #endif
 
 // Some operating systems have a prefix for cdecl exported symbols.
 #if __APPLE__
-#define OPENXLA_PARTITIONER_CDECL_SYMBOL_PREFIX "_"
+#define OPENXLA_PARTITIONER_CDECL_SYMBOL_PREFIX ""
 #else
 #define OPENXLA_PARTITIONER_CDECL_SYMBOL_PREFIX ""
 #endif
