@@ -3659,9 +3659,9 @@ explanation for these variables.</p>
 <p>Bazel runs tests in a sandbox and environment variables must be passed through
 to the test runner. Consider putting environment setup in a <code>user.bazelrc</code> to
 save typing. For example:</p>
-<div class="highlight"><pre><span></span><code>test --test_env=&quot;LD_LIBRARY_PATH=/absolute/path/to/vulkan/sdk/x86_64/lib/&quot;
-test --test_env=&quot;LD_PRELOAD=libvulkan.so.1&quot;
-test --test_env=&quot;VK_LAYER_PATH=/absolute/path/to/additional/layers/:$VK_LAYER_PATH&quot;
+<div class="highlight"><pre><span></span><code><span class="n">test</span> <span class="o">--</span><span class="n">test_env</span><span class="o">=</span><span class="s2">&quot;LD_LIBRARY_PATH=/absolute/path/to/vulkan/sdk/x86_64/lib/&quot;</span>
+<span class="n">test</span> <span class="o">--</span><span class="n">test_env</span><span class="o">=</span><span class="s2">&quot;LD_PRELOAD=libvulkan.so.1&quot;</span>
+<span class="n">test</span> <span class="o">--</span><span class="n">test_env</span><span class="o">=</span><span class="s2">&quot;VK_LAYER_PATH=/absolute/path/to/additional/layers/:$VK_LAYER_PATH&quot;</span>
 </code></pre></div>
 <h3 id="ssh-on-linux-and-x-forwarding">SSH on Linux and X forwarding<a class="headerlink" href="#ssh-on-linux-and-x-forwarding" title="Permanent link">link</a></h3>
 <p>Physical devices enumerated on NVIDIA drivers can be affected by the <code>DISPLAY</code>
