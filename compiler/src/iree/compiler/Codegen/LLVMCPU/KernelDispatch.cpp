@@ -1008,8 +1008,8 @@ static void getDefaultMatmulVectorSizes(
 
   // Specialisation for SVE.
   if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr)) {
-    // Mark middle dimensions as scalable, so sizes are (8, [32], 16).
-    sizes.append({8, 32, 16});
+    // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
+    sizes.append({8, 16, 1});
     scalableSizeFlags.append({false, true, false});
     return;
   }
