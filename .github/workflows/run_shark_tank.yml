@@ -68,7 +68,7 @@ jobs:
 
   benchmark_cpu:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'benchmark_cpu')
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -96,7 +96,7 @@ jobs:
 
   benchmark_cuda:
     needs: setup
-    if: needs.setup.outputs.should-run == 'true'
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'benchmark_cuda')
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
