@@ -1302,7 +1302,6 @@ class FuncOpConversion : public EmitCConversionPattern<mlir::func::FuncOp> {
                   ConversionPatternRewriter &rewriter) const override {
     TypeConverter::SignatureConversion signatureConverter(
         funcOp.getFunctionType().getNumInputs());
-    TypeConverter typeConverter;
     for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
       Type convertedType =
           getTypeConverter()->convertType(arg.value().getType());
@@ -1691,6 +1690,13 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
                                  emitc::OpaqueAttr::get(ctx, memberName)}),
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{value});
+        rewriter.create<emitc::CallOp>(
+            /*location=*/memberPtr.getLoc(),
+            /*type=*/TypeRange{},
+            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain_inplace"),
+            /*args=*/ArrayAttr{},
+            /*templateArgs=*/ArrayAttr{},
+            /*operands=*/ArrayRef<Value>{memberPtr.getResult(0)});
         argumentStruct.callArguments.push_back(memberPtr.getResult(0));
       } else {
         Type memberType = input.value();
