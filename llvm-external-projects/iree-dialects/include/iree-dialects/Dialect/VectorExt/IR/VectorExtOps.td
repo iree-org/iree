@@ -8,6 +8,7 @@
 #define IREE_DIALECT_VECTOREXT_OPS
 
 include "iree-dialects/Dialect/VectorExt/IR/VectorExtBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Base class.
@@ -21,7 +22,8 @@ class IREEVectorExt_PureOp<string mnemonic, list<Trait> traits = []> :
 // Layout ops.
 //===----------------------------------------------------------------------===//
 
-def IREEVectorExt_LayoutConflictResolutionOp : IREEVectorExt_PureOp<"layout_conflict_resolution"> {
+def IREEVectorExt_LayoutConflictResolutionOp : 
+  IREEVectorExt_PureOp<"layout_conflict_resolution", [Pure]> {
   let summary = "Layout Conflict Resolution operator";
   let description = [{
     The layout conflict resolution operator takes a vector and a
@@ -30,8 +32,8 @@ def IREEVectorExt_LayoutConflictResolutionOp : IREEVectorExt_PureOp<"layout_conf
   }];
   let arguments = (ins
     AnyVector:$input,
-    LayoutAttr:$sourceLayout,
-    LayoutAttr:$desiredLayout
+    LayoutAttr:$source_layout,
+    LayoutAttr:$desired_layout
   );
   let results = (outs
     AnyVector:$output
