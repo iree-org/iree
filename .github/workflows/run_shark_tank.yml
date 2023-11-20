@@ -125,7 +125,7 @@ jobs:
 
   generate_report:
     needs: [setup, benchmark_cpu, benchmark_cuda]
-    if: needs.setup.outputs.should-run == 'true'
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'generate_report')
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
