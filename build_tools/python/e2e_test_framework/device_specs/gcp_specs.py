@@ -13,6 +13,9 @@ GCP_C2_STANDARD_60 = common_definitions.DeviceSpec.build(
     device_name="c2-standard-60",
     host_environment=common_definitions.HostEnvironment.LINUX_X86_64,
     architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
+    device_parameters=common_definitions.DeviceParameters(
+        cpu_params=common_definitions.CPUParameters(numa_cpu_bind=0, numa_mem_bind=0)
+    ),
     tags=["cpu"],
 )
 

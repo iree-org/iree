@@ -123,8 +123,16 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             inputs_dir=inputs_dir,
         )
         cpu_params = run_config.target_device_spec.device_parameters.cpu_params
+        numactl_cmds = []
         if cpu_params:
-            raise ValueError("CPU pinning is not supported yet.")
+            if cpu_params.pinned_cores:
+                raise ValueError("CPU pinning is not supported yet.")
+            if cpu_params.numa_cpu_bind:
+                numactl_cmds.append(f"--cpunodebind={cpu_params.numa_mem_bind}")
+            if cpu_params.numa_mem_bind:
+                numactl_cmds.append(f"--membind={cpu_params.numa_mem_bind}")
+        if numactl_cmds:
+            cmds = ["numactl"] + numactl_cmds + cmds
         return cmds
 
     def __fetch_and_unpack_npy(self, uri: str, dest_dir: pathlib.Path) -> pathlib.Path:

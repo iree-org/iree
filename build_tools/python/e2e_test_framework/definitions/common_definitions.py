@@ -115,7 +115,9 @@ class CPUParameters:
     """Describes CPU related parameters."""
 
     # CPU cores to pin at, ordered from the slowest to the fastest.
-    pinned_cores: List[int]
+    pinned_cores: List[int] = dataclasses.field(default_factory=list)
+    numa_cpu_bind: Optional[int] = None
+    numa_mem_bind: Optional[int] = None
 
 
 @serialization.serializable
