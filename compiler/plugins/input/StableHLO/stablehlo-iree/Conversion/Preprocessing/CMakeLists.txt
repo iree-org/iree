@@ -76,6 +76,7 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
+    MLIRLinalgDialect
     MLIRMathDialect
     MLIRPass
     MLIRSCFDialect
