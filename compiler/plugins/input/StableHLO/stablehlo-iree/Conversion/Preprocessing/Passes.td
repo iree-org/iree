@@ -53,6 +53,11 @@ def LowerComplex :
   let summary = "Lowers complex operations into non-complex operations";
 }
 
+def LimitScatterBounds :
+    Pass<"iree-stablehlo-limit-scatter-bounds", "func::FuncOp"> {
+  let summary = "Forces scatters to be within bounds";
+}
+
 def UnfuseBatchNorm :
     Pass<"iree-stablehlo-preprocessing-unfuse-batch-norm", "func::FuncOp"> {
   let summary = "Materializes 'broadcast_dimensions' attributes";

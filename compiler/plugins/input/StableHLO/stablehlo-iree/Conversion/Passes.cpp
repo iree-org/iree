@@ -51,6 +51,10 @@ void buildStableHLOInputConversionPassPipelineImpl(
   }
 
   passManager.addPass(createStableHLOToStableHLOPreprocessing());
+
+  // TODO(suderman): Enable once scatter supports multiple targets:
+  //    passManager.addNestedPass<func::FuncOp>(createLimitScatterBounds());
+
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 
   // Various shape functions may have been materialized in the `shape.shape_of`
