@@ -65,7 +65,7 @@ func.func @limit_scatter(%arg0 : tensor<10x3x8xi32>, %arg1 : tensor<4x2xi32>, %a
   // CHECK: %[[SCATTER:.+]]:2 = "stablehlo.scatter"(%arg0, %[[SCATTER_BOUND]], %[[BOUND]]#0, %arg2, %[[BROADCAST]])
 
   // CHECK: ^bb0(%[[A0:.+]]: tensor<i32>, %[[A1:.+]]: tensor<i1>, %[[A2:.+]]: tensor<i32>, %[[A3:.+]]: tensor<i1>):
-  // CHECK:   %[[SEL:.+]] = arith.select %[[A3]], %[[A2]], %[[A0]]
+  // CHECK:   %[[SEL:.+]] = stablehlo.select %[[A3]], %[[A2]], %[[A0]]
   // CHECK:   stablehlo.return %[[SEL]], %[[A3]]
   %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ( {
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors

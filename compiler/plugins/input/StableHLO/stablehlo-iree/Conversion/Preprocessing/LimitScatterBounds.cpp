@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -129,11 +129,11 @@ LogicalResult replaceScatter(mlir::stablehlo::ScatterOp op) {
     llvm::SmallVector<AffineExpr> inExprs;
     llvm::SmallVector<AffineExpr> outExprs;
     llvm::SmallVector<int64_t> outShape;
-    for (int i = 0; i < inTy.getRank(); ++i) {
-      if (i < indexVectorDim) {
+    for (auto it : llvm::enumerate(inTy.getShape())) {
+      if (it.index() != indexVectorDim) {
         inExprs.push_back(b.getAffineDimExpr(outShape.size()));
         outExprs.push_back(b.getAffineDimExpr(outShape.size()));
-        outShape.push_back(inTy.getDimSize(i));
+        outShape.push_back(it.value());
       } else {
         // We need to do a reduction across the last dimension:
         inExprs.push_back(b.getAffineDimExpr(inTy.getRank() - 1));
@@ -169,7 +169,7 @@ LogicalResult replaceScatter(mlir::stablehlo::ScatterOp op) {
     }
 
     llvm::SmallVector<AffineExpr> inExprs;
-    for (int i = 0; i < isBatchDim.size(); i++) {
+    for (int i = 0, s = isBatchDim.size(); i < s; i++) {
       if (isBatchDim[i]) {
         inExprs.push_back(b.getAffineDimExpr(i));
       }
@@ -213,8 +213,8 @@ LogicalResult replaceScatter(mlir::stablehlo::ScatterOp op) {
       op.getIndicesAreSorted(), op.getUniqueIndices());
 
   // Replace the existing yield with conditional results and the boolean update:
-  for (int i = 0; i < op.getNumResults(); ++i) {
-    op.getResult(i).replaceAllUsesWith(scatter.getResult(i));
+  for (auto pair : llvm::zip(op.getResults(), scatter.getResults())) {
+    std::get<0>(pair).replaceAllUsesWith(std::get<1>(pair));
   }
 
   // Clone the region into the new scatter and insert the new boolean udpates:
@@ -237,10 +237,9 @@ LogicalResult replaceScatter(mlir::stablehlo::ScatterOp op) {
   Value argInbounds = dstRegion.front().getArguments().back();
   llvm::SmallVector<Value> terminatorOperands;
   for (int i = 0; i < terminator->getNumOperands(); ++i) {
-    auto newArg =
-        b.create<arith::SelectOp>(argInbounds, terminator->getOperand(i),
-                                  dstRegion.front().getArgument(i));
-
+    auto newArg = b.create<mlir::stablehlo::SelectOp>(
+        argInbounds, terminator->getOperand(i),
+        dstRegion.front().getArgument(i));
     terminatorOperands.push_back(newArg);
   }
 
