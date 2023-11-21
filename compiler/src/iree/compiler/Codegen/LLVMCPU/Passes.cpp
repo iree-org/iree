@@ -311,7 +311,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
   if (enableAArch64SSVE)
     nestedModulePM.addNestedPass<func::FuncOp>(
         mlir::arm_sme::createEnableArmStreamingPass(
-            mlir::arm_sme::ArmStreaming::Locally));
+            mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
@@ -436,7 +436,7 @@ void addMultiTilingExpertPassPipeline(
   if (enableAArch64SSVE)
     nestedModulePM.addNestedPass<func::FuncOp>(
         mlir::arm_sme::createEnableArmStreamingPass(
-            mlir::arm_sme::ArmStreaming::Locally));
+            mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
@@ -508,7 +508,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
   if (enableAArch64SSVE)
     nestedModulePM.addNestedPass<func::FuncOp>(
         mlir::arm_sme::createEnableArmStreamingPass(
-            mlir::arm_sme::ArmStreaming::Locally));
+            mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
