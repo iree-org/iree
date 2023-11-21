@@ -68,14 +68,14 @@ static llvm::cl::opt<int> clNarrowMatmulTileBytes(
         "traverse their wide matrix operand once, there is no reuse here and "
         "this doesn't have to be sized to fit in some CPU cache. This is more "
         "about distributing work to threads."),
-    llvm::cl::init(32 * 1024));
+    llvm::cl::init(64 * 1024));
 
 static llvm::cl::opt<int> clGeneralMatmulTileBytes(
     "iree-codegen-llvm-general-matmul-tile-bytes",
     llvm::cl::desc("target distribution tile size for matrix operands of "
                    "general matmuls, expressed in bytes. Currently only used "
                    "in data-tiled matmuls (mmt4d)."),
-    llvm::cl::init(32 * 1024));
+    llvm::cl::init(64 * 1024));
 
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
