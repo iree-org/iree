@@ -810,7 +810,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::LinalgExt::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op) || isGroupedDequantizationOp(&op)) {
+          isa<linalg::FillOp>(op) || isDequantizationLikeOp(&op)) {
         continue;
       }
 
