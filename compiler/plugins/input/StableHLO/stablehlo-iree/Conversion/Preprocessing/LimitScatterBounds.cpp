@@ -62,18 +62,21 @@ LogicalResult replaceScatter(mlir::stablehlo::ScatterOp op) {
 
   Value oneIdx = b.create<arith::ConstantIndexOp>(1);
 
-  // We subtract the width of the update for each index. For inserted dimensions this is 1.
+  // We subtract the width of the update for each index. For inserted dimensions
+  // this is 1.
   llvm::SmallVector<Value> windowBounds;
   {
     int j = 0;
     for (auto it : llvm::enumerate(isUpdatedWindowDim)) {
       Value dstSz = b.create<tensor::DimOp>(dest, it.index());
       if (!it.value()) {
-          windowBounds.push_back(b.create<arith::SubIOp>(b.getIndexType(), dstSz, oneIdx));
-          continue;
+        windowBounds.push_back(
+            b.create<arith::SubIOp>(b.getIndexType(), dstSz, oneIdx));
+        continue;
       }
 
-      windowBounds.push_back(b.create<arith::SubIOp>(b.getIndexType(), dstSz, updateWindowShape[j]));
+      windowBounds.push_back(b.create<arith::SubIOp>(b.getIndexType(), dstSz,
+                                                     updateWindowShape[j]));
       ++j;
     }
   }
@@ -81,37 +84,36 @@ LogicalResult replaceScatter(mlir::stablehlo::ScatterOp op) {
   // Reorder / select the dimensions to the index ordering:
   llvm::SmallVector<Value> reorderedBounds;
   for (auto dim : toOperandDims) {
-    reorderedBounds.push_back(b.create<arith::IndexCastOp>(
-        indicesETy, windowBounds[dim]));
+    reorderedBounds.push_back(
+        b.create<arith::IndexCastOp>(indicesETy, windowBounds[dim]));
   }
 
   // Combine the selected dimensions into a small vector for the bounds check:
   Value dimLimits = b.create<tensor::FromElementsOp>(reorderedBounds);
 
-
   Value bounded = b.create<tensor::EmptyOp>(indicesShape, indicesETy);
-  Value inbounds =
-      b.create<tensor::EmptyOp>(indicesShape, b.getI1Type());
+  Value inbounds = b.create<tensor::EmptyOp>(indicesShape, b.getI1Type());
   AffineMap boundedMap = b.getMultiDimIdentityMap(indicesTy.getRank());
 
-  llvm::SmallVector<AffineExpr> boundsExpr{b.getAffineDimExpr(indicesTy.getRank() - 1)};
+  llvm::SmallVector<AffineExpr> boundsExpr{
+      b.getAffineDimExpr(indicesTy.getRank() - 1)};
   AffineMap boundsMap =
-        AffineMap::get(indicesTy.getRank(), 0, boundsExpr, b.getContext());
+      AffineMap::get(indicesTy.getRank(), 0, boundsExpr, b.getContext());
 
   SmallVector<utils::IteratorType> indicesIter(indicesTy.getRank(),
                                                utils::IteratorType::parallel);
   auto applyLimits = b.create<linalg::GenericOp>(
       TypeRange{indicesTy, inbounds.getType()}, ValueRange{indices, dimLimits},
       ValueRange{bounded, inbounds},
-      ArrayRef<AffineMap>{boundedMap, boundsMap, boundedMap, boundedMap}, indicesIter,
-      [](OpBuilder &bb, Location loc, ValueRange args) {
+      ArrayRef<AffineMap>{boundedMap, boundsMap, boundedMap, boundedMap},
+      indicesIter, [](OpBuilder &bb, Location loc, ValueRange args) {
         ImplicitLocOpBuilder b(loc, bb);
         Value zero =
             b.create<arith::ConstantOp>(b.getZeroAttr(args[0].getType()));
         Value lower =
             b.create<arith::CmpIOp>(arith::CmpIPredicate::sge, args[0], zero);
-        Value upper =
-            b.create<arith::CmpIOp>(arith::CmpIPredicate::sle, args[0], args[1]);
+        Value upper = b.create<arith::CmpIOp>(arith::CmpIPredicate::sle,
+                                              args[0], args[1]);
         Value within = b.create<arith::AndIOp>(lower, upper);
         Value sel = b.create<arith::SelectOp>(within, args[0], zero);
         b.create<linalg::YieldOp>(ValueRange{sel, within});
