@@ -127,9 +127,9 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         if cpu_params:
             if cpu_params.pinned_cores:
                 raise ValueError("CPU pinning is not supported yet.")
-            if cpu_params.numa_cpu_bind:
+            if cpu_params.numa_cpu_bind is not None:
                 numactl_cmds.append(f"--cpunodebind={cpu_params.numa_mem_bind}")
-            if cpu_params.numa_mem_bind:
+            if cpu_params.numa_mem_bind is not None:
                 numactl_cmds.append(f"--membind={cpu_params.numa_mem_bind}")
         if numactl_cmds:
             cmds = ["numactl"] + numactl_cmds + cmds
