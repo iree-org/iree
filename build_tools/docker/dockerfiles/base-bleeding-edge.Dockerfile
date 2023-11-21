@@ -31,10 +31,11 @@ RUN apt-get update \
     wget \
     curl \
     gnupg2 \
-    lsb-release
+    lsb-release \
+    numactl
 
 # Install the latest supported compiler tools
-ARG LLVM_VERSION=17
+ARG LLVM_VERSION=18
 ENV CC /usr/bin/clang-${LLVM_VERSION}
 ENV CXX /usr/bin/clang++-${LLVM_VERSION}
 

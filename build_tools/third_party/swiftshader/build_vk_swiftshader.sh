@@ -47,7 +47,7 @@ set -e
 
 # This isn't an argument so that we can set the swiftshader commit in one place
 # for the whole project.
-SWIFTSHADER_COMMIT=32f9332d1d7aacbdba7c1aa5df894bb1890bb2cc
+SWIFTSHADER_COMMIT=50dbfc35468c1ffa037e3e90bc71327d16a5e0cc
 SWIFTSHADER_SRC_DIR="$(mktemp --directory --tmpdir swiftshader_src_XXXXXX)"
 SWIFTSHADER_BUILD_DIR="$(mktemp --directory --tmpdir swiftshader_build_XXXXXX)"
 CC=${CC:-clang}

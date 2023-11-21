@@ -63,7 +63,7 @@ jobs:
         target:
           - platform: "linux"
             arch: "x86_64"
-            docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418"
+            docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:d7e605e92bdfab48587cd058f55d278720224d884ce659088d0095234f5d83e3"
             # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
             tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-52b6af88"
