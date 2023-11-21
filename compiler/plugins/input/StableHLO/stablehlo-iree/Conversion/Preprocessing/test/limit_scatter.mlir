@@ -1,12 +1,12 @@
 // RUN: iree-opt --iree-stablehlo-limit-scatter-bounds --cse %s | FileCheck %s
 
-// CHECK: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
-// CHECK: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
-// CHECK: #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0)>
-// CHECK: #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0)>
+// CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
-// CHECK-LABEL: @limit_scatter
+// CHECK: @limit_scatter
 func.func @limit_scatter(%arg0 : tensor<10x3x8xi32>, %arg1 : tensor<4x2xi32>, %arg2 : tensor<4x2x8xi32>) -> tensor<10x3x8xi32> {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
