@@ -65,7 +65,7 @@ rm -rf ./shark_tmp
 rm -rf ~/.local/shark_tank
 
 declare -a args=(
-  --benchmark="native"
+  --benchmark="all"
   --update_tank
   --maxfail=500
   -k "${BENCHMARK_REGEX}"
@@ -76,7 +76,7 @@ if [[ ${DRIVER} == "cuda" ]]; then
 fi
 
 # Run with SHARK-Runtime.
-PYTHON=python3.11 VENV_DIR=shark.venv BENCHMARK=1 IMPORTER=1 ./setup_venv.sh
+PYTHON=python3.11 VENV_DIR=shark.venv IMPORTER=1 ./setup_venv.sh
 source shark.venv/bin/activate
 
 export SHARK_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
@@ -127,7 +127,7 @@ if [[ ! -z "${IREE_SOURCE_DIR}" ]]; then
   # Install Python bindings.
   pushd iree-build
   pip install -e compiler/
-  pip install -e runtime/
+  python -m pip install runtime/
   popd # iree-build
   popd # ${IREE_SOURCE_DIR}
 fi
