@@ -111,24 +111,8 @@ if [[ ! -z "${IREE_SOURCE_DIR}" ]]; then
   export IREE_VERSION="sha_$(git rev-parse --short=10 HEAD)"
 
   # We build using the same Python Virtual Environment as SHARK to ensure compatibility.
-  cmake -GNinja -B iree-build -S . \
-      -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-      -DIREE_ENABLE_ASSERTIONS=ON \
-      -DCMAKE_C_COMPILER=clang \
-      -DCMAKE_CXX_COMPILER=clang++ \
-      -DIREE_ENABLE_LLD=ON \
-      -DIREE_BUILD_PYTHON_BINDINGS=ON \
-      -DPython3_EXECUTABLE="$(which python)" \
-      -DIREE_HAL_DRIVER_CUDA=ON \
-      -DIREE_TARGET_BACKEND_CUDA=ON
-
-  cmake --build iree-build
-
-  # Install Python bindings.
-  pushd iree-build
   pip install -e compiler/
-  python -m pip install runtime/
-  popd # iree-build
+  pip install -e runtime/
   popd # ${IREE_SOURCE_DIR}
 fi
 
