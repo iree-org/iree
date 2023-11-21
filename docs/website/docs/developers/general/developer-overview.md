@@ -88,7 +88,7 @@ Here's an example of a small compiler pass running on a
 $ ../iree-build/tools/iree-opt \
   --split-input-file \
   --mlir-print-ir-before-all \
-  --iree-drop-compiler-hints \
+  --iree-util-drop-compiler-hints \
   $PWD/compiler/src/iree/compiler/Dialect/Util/Transforms/test/drop_compiler_hints.mlir
 ```
 
