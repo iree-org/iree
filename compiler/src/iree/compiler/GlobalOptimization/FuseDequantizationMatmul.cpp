@@ -20,6 +20,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-global-opt-fuse-dequantization-matmul"
+#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir {
 namespace iree_compiler {
@@ -473,8 +474,7 @@ Value QuantizedMatmulRewriter::generateGroupMaxGeneric() {
         Value max = b.create<arith::MaximumFOp>(nestedLoc, abs, args[1]);
         b.create<linalg::YieldOp>(nestedLoc, max);
       });
-  LLVM_DEBUG(llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                          << "groupMaxOp:   " << groupMaxOp << "\n");
+  LLVM_DEBUG(DBGS() << "groupMaxOp:   " << groupMaxOp << "\n");
   return groupMaxOp.getResult(0);
 }
 
@@ -498,8 +498,7 @@ Value QuantizedMatmulRewriter::generateScalesGeneric(Value groupMax) {
         Value scale = b.create<arith::DivFOp>(nestedLoc, args[0], cst);
         b.create<linalg::YieldOp>(nestedLoc, scale);
       });
-  LLVM_DEBUG(llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                          << "scalesOp:   " << scalesOp << "\n");
+  LLVM_DEBUG(DBGS() << "scalesOp:   " << scalesOp << "\n");
   return scalesOp.getResult(0);
 }
 
@@ -519,8 +518,7 @@ Value QuantizedMatmulRewriter::generateGroupSumsGeneric() {
         Value sum = b.create<arith::AddFOp>(nestedLoc, args[0], args[1]);
         b.create<linalg::YieldOp>(nestedLoc, sum);
       });
-  LLVM_DEBUG(llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                          << "groupSumsOp:   " << groupSumsOp << "\n");
+  LLVM_DEBUG(DBGS() << "groupSumsOp:   " << groupSumsOp << "\n");
   return groupSumsOp.getResult(0);
 }
 
@@ -557,8 +555,7 @@ SmallVector<Value> QuantizedMatmulRewriter::generateQuantizationGenerics() {
             b.create<arith::FPToSIOp>(nestedLoc, quantizedElementType, scaled);
         b.create<linalg::YieldOp>(nestedLoc, quant);
       });
-  LLVM_DEBUG(llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                          << "quantizeOp:   " << quantizeOp << "\n");
+  LLVM_DEBUG(DBGS() << "quantizeOp:   " << quantizeOp << "\n");
   Value newQuantizedInput = quantizeOp.getResult(0);
   SmallVector<Value> results{groupMax, scales, groupSums, newQuantizedInput};
   return results;
@@ -626,8 +623,7 @@ linalg::GenericOp QuantizedMatmulRewriter::generateQuantizedMatmulGeneric(
         }
         b.create<linalg::YieldOp>(nestedLoc, sum);
       });
-  LLVM_DEBUG(llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                          << "integerMatmulOp:   " << integerMatmulOp << "\n");
+  LLVM_DEBUG(DBGS() << "integerMatmulOp:   " << integerMatmulOp << "\n");
   return integerMatmulOp;
 }
 
@@ -713,9 +709,8 @@ QuantizedMatmulRewriter::generateReassociatedDequantizationGeneric(
         Value sum = b.create<arith::AddFOp>(loc, groupRes, args[5]);
         b.create<linalg::YieldOp>(loc, sum);
       });
-  LLVM_DEBUG(llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                          << "reassociatedDequantizationOp:   "
-                          << reassociatedDequantizationOp << "\n");
+  LLVM_DEBUG(DBGS() << "reassociatedDequantizationOp:   "
+                    << reassociatedDequantizationOp << "\n");
   return reassociatedDequantizationOp;
 }
 

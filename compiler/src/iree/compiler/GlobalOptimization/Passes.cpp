@@ -77,7 +77,8 @@ void buildGlobalOptimizationPassPipeline(
         return createFuseDequantizationMatmulPass(
             clEnableQuantizedMatmulReassociation);
       })
-      .addPass(createLiftGenericToTransposeBatchMatmulPass)
+      .addPredicatedPass(transformOptions.options.dataTiling,
+                         createLiftGenericToTransposeBatchMatmulPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
