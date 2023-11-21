@@ -43,7 +43,7 @@ jobs:
             build-family: linux-x86_64
             build-package: main-dist-linux
             experimental: false
-          - runs-on: [<todo>, os-family=Linux, runner-group=releaser]
+          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=releaser]
             build-family: linux-aarch64
             build-package: main-dist-linux
             experimental: true
@@ -51,7 +51,7 @@ jobs:
             build-family: linux-x86_64
             build-package: py-compiler-pkg
             experimental: false
-          - runs-on: [<todo>, os-family=Linux, runner-group=releaser]
+          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=releaser]
             build-family: linux-aarch64
             build-package: py-compiler-pkg
             experimental: true
@@ -59,7 +59,7 @@ jobs:
             build-family: linux-x86_64
             build-package: py-runtime-pkg
             experimental: false
-          - runs-on: [<todo>, os-family=Linux, runner-group=releaser]
+          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=releaser]
             build-family: linux-aarch64
             build-package: py-runtime-pkg
             experimental: true
