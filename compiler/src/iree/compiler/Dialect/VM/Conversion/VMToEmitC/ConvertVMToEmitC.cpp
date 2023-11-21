@@ -1690,7 +1690,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
                                  emitc::OpaqueAttr::get(ctx, memberName)}),
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{value});
-        rewriter.create<emitc::CallOp>(
+        rewriter.create<emitc::CallOpaqueOp>(
             /*location=*/memberPtr.getLoc(),
             /*type=*/TypeRange{},
             /*callee=*/StringAttr::get(ctx, "iree_vm_ref_retain_inplace"),
