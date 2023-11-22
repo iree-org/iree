@@ -19,9 +19,19 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
+#define DEBUG_TYPE "iree-codegen-optimize-vector-transfer"
+
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
+static void debugPrint(func::FuncOp funcOp, const char *message) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- " << message << " ---//\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+}
 
 // Pattern to canonialize tranpose where only one dimension is not unit
 // dimension. In this case the transpose is a no-op and should be simplified
@@ -61,6 +71,7 @@ struct OptimizeVectorTransferPass
       : flatten(flatten), dropUnitDims(dropUnitDims) {}
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
+    debugPrint(funcOp, "before optimize vector transfer");
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
@@ -77,6 +88,8 @@ struct OptimizeVectorTransferPass
       }
     }
 
+    debugPrint(funcOp, "after dropping leading unit dims");
+
     // Workaround, run loop invariant code motion before hoist redudant vector
     // transfer to workaround a bug upstream.
     // TODO(thomasraoux): Remove it once the fix is merged.
@@ -84,6 +97,8 @@ struct OptimizeVectorTransferPass
     linalg::hoistRedundantVectorTransfers(funcOp);
     IRRewriter rewriter(funcOp->getContext());
     vector::transferOpflowOpt(rewriter, funcOp);
+
+    debugPrint(funcOp, "after folding redundant vector transfers");
 
     // Move bitcast inwards from loop region boundaries to increase chances to
     // cancel them.
@@ -95,6 +110,8 @@ struct OptimizeVectorTransferPass
       }
     }
 
+    debugPrint(funcOp, "after bubbling vector bitcasts");
+
     // TODO(#14191): SPIR-V can't handle the vector.shape_cast created for
     // dropping unit dims so this option is disabled in SPIR-V pipeline.
     // This option should go away after all backend issues have been resolved.
@@ -104,6 +121,8 @@ struct OptimizeVectorTransferPass
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
+
+      debugPrint(funcOp, "after dropping vector transfer unit dims");
     }
 
     // Second stage of patterns to flatten transfer ops.
@@ -114,9 +133,11 @@ struct OptimizeVectorTransferPass
         return signalPassFailure();
       }
     }
+    debugPrint(funcOp, "after flattening vector transfers");
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
     memref::eraseDeadAllocAndStores(rewriter, funcOp);
+    debugPrint(funcOp, "after erasing unused allocs and stores");
   }
 
   LogicalResult initializeOptions(StringRef options) override {
