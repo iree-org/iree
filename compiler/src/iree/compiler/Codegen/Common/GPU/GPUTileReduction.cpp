@@ -20,7 +20,7 @@ namespace iree_compiler {
 
 namespace {
 
-static LogicalResult tileReduction(linalg::GenericOp op) {
+static LogicalResult tileReduction(linalg::LinalgOp op) {
   SmallVector<unsigned> dims;
   op.getReductionDims(dims);
   SmallVector<int64_t> tileSize = getTileSizes(op, 1);
@@ -44,7 +44,7 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   return success();
 }
 
-static LogicalResult tileFusedOps(linalg::GenericOp op) {
+static LogicalResult tileFusedOps(linalg::LinalgOp op) {
   IRRewriter rewriter(op.getContext());
   rewriter.setInsertionPoint(op);
   SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
@@ -68,14 +68,14 @@ struct GPUTileReductionPass
 
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
-    SmallVector<linalg::GenericOp> genericOps;
-    funcOp.walk([&](linalg::GenericOp op) { genericOps.push_back(op); });
-    for (linalg::GenericOp op : genericOps) {
+    SmallVector<linalg::LinalgOp> linalgOps;
+    funcOp.walk([&](linalg::LinalgOp op) { linalgOps.push_back(op); });
+    for (linalg::LinalgOp op : linalgOps) {
       if (op.getNumReductionLoops() > 0) {
         if (failed(tileReduction(op))) {
           return signalPassFailure();
         }
-      } else {
+      } else if (isa<linalg::GenericOp>(op)) {
         if (failed(tileFusedOps(op))) {
           return signalPassFailure();
         }
