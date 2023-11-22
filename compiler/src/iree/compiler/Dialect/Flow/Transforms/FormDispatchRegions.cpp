@@ -502,11 +502,6 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  // Always fuse dequant to consumer since it's not very useful by itself.
-  if (isGroupedDequantizationOp(producer)) {
-    return true;
-  }
-
   if (isPackLikeOp(consumer)) {
     return TypeSwitch<Operation *, bool>(producer)
         .Case<tensor::PadOp>([&](auto padOp) { return true; })
