@@ -169,14 +169,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
             clEnableFusePaddingIntoLinalgConsumerOps,
             clEnableFusePaddingIntoLinalgProducerOps});
       })
-      // Collapse dimensions of linalg Ops.
-      .addPass(createCollapseDimensionsPass)
       // Clone all producers into the dispatch region to perpare for being
       // isolated from above. This enables running additional transformations
       // afterwards that would need the full dispatch content but don't want to
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
       .addPass(createCloneProducersIntoDispatchRegionsPass)
+      // Collapse dimensions of linalg Ops.
+      .addPass(createCollapseDimensionsPass)
       // Form dispatch region into dispatch workgroups
       .addPass([&]() {
         return createFormDispatchWorkgroupsPass(
