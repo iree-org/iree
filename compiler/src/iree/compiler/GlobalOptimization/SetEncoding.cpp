@@ -119,8 +119,8 @@ struct MatmulNarrowSizes {
   std::optional<int64_t> M, N;
 };
 
-// Returns the minimum of static sizes of the M-dimension in the types of the
-// LHS and/or the Output operand of a matmul, whichever is static.
+// Returns the minimum of static sizes of the M/N-dimensions in the types of the
+// Ouput.
 static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
                                               ContractionOpType opType) {
   int64_t M, N;
