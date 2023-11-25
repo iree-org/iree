@@ -9,7 +9,6 @@
 
 #include "experimental/cuda2/cuda_dynamic_symbols.h"
 #include "iree/base/api.h"
-#include "iree/hal/api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,7 +52,6 @@ typedef struct iree_hal_cuda2_event_pool_t iree_hal_cuda2_event_pool_t;
 // Extra events requested beyond the capability are directly created and
 // destroyed without pooling.
 iree_status_t iree_hal_cuda2_event_pool_allocate(
-    iree_hal_device_t* owning_device,
     const iree_hal_cuda2_dynamic_symbols_t* symbols,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_cuda2_event_pool_t** out_event_pool);
