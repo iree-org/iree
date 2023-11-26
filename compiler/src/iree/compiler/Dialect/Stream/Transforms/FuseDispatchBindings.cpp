@@ -322,6 +322,25 @@ fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
   auto anyDispatchOp = dispatchOps.front();
   unsigned bindingCount = anyDispatchOp.getResources().size();
 
+  // Bail if we can't find an internal function reference to update.
+  auto funcOp = exportOp.lookupFunctionRef();
+  if (!funcOp)
+    return;
+
+  int64_t numBindingsOnFunc = 0;
+  for (auto arg : funcOp.front().getArguments()) {
+    if (llvm::isa<IREE::Stream::BindingType>(arg.getType())) {
+      numBindingsOnFunc++;
+    }
+  }
+  // Bail if the exported function does not have the same number of bindings
+  // as the dispatch. This could be because the executable already lowered the
+  // bindings, in which case we can no longer reliably fuse them. We could try
+  // to be clever and fuse a subset of bindings, but this typically only happens
+  // when the user is trying to do something custom.
+  if (numBindingsOnFunc != bindingCount)
+    return;
+
   auto configAttr = IREE::Stream::ResourceConfigAttr::lookup(exportOp);
   bool aliasMutableBindings = configAttr.getAliasMutableBindings();
 
@@ -396,8 +415,6 @@ fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
   // can do it for everything.
 
   // Update the executable function to use the new bindings.
-  auto funcOp = exportOp.lookupFunctionRef();
-  assert(funcOp && "entry func not found");
   updateExecutableSignature(executableOp, exportOp, funcOp, bindings);
 
   // Update each dispatch site to pass the new bindings and operands.
