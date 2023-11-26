@@ -296,6 +296,17 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     if (!exportOp)
       continue;
 
+    // If the function already contains workgroup id ops, infer that tiling +
+    // distribution has already occurred. This is in lieu of a formal attribute
+    // for specifying this. A user could write workgroup independent code
+    // (or code for a single workgroup) and this check would fail.
+    WalkResult res = funcOp.walk([&](IREE::HAL::InterfaceWorkgroupIDOp) {
+      return WalkResult::interrupt();
+    });
+    if (res.wasInterrupted()) {
+      continue;
+    }
+
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     SmallVector<int64_t> tileSizes, staticLoopRanges, interchange;
     SmallVector<unsigned> partitionableLoops;
