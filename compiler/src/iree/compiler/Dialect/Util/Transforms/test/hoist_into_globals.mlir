@@ -313,3 +313,22 @@ module @do_not_hoist_significant_size_increase_const_expr {
     return %2 : tensor<129xi8>
   }
 }
+
+// -----
+
+// The hoisting in this case is nested on the outer module, and the inner
+// module is a different logical program, so we shouldn't hoist to the outer
+// module.
+// CHECK-LABEL: @nested_program_const_expr
+// CHECK-NOT: util.global
+// CHECK-NOT: util.initializer
+module @nested_program_const_expr {
+  module {
+    func.func @main() -> (i32) {
+      %0 = arith.constant 0 : i32
+      %1 = arith.constant 1 : i32
+      %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> i32
+      return %2 : i32
+    }
+  }
+}
