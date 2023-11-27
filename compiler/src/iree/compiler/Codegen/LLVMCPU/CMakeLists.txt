@@ -93,6 +93,9 @@ iree_cc_library(
     MLIRArithTransforms
     MLIRArmNeon2dToIntr
     MLIRArmNeonDialect
+    MLIRArmSMEToLLVM
+    MLIRArmSMEToLLVMIRTranslation
+    MLIRArmSMEToSCF
     MLIRArmSMETransforms
     MLIRBufferizationDialect
     MLIRComplexToLLVM
