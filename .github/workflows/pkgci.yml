@@ -47,9 +47,8 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_vulkan')
     uses: ./.github/workflows/pkgci_regression_test_amdgpu_vulkan.yml
 
-  # Disabled while the build bot needs debugging.
-  # regression_test_amdgpu_rocm:
-  #   name: Regression Test AMDGPU-ROCm
-  #   needs: [setup, build_packages]
-  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_rocm')
-  #   uses: ./.github/workflows/pkgci_regression_test_amdgpu_rocm.yml
+  regression_test_amdgpu_rocm:
+    name: Regression Test AMDGPU-ROCm
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_rocm')
+    uses: ./.github/workflows/pkgci_regression_test_amdgpu_rocm.yml
