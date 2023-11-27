@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-spirv-generalize-named-ops %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-gpu-generalize-named-ops %s | FileCheck %s
 
 module {
   func.func @transpose_matmul(%arg0: tensor<1x4096xf32>, %arg1: tensor<32000x4096xf32>) -> tensor<1x32000xf32> {

@@ -58,12 +58,6 @@ def SPIRVEraseStorageBufferStaticShape :
   let constructor = "mlir::iree_compiler::createSPIRVEraseStorageBufferStaticShapePass()";
 }
 
-def SPIRVGeneralizeNamedOps :
-    Pass<"iree-spirv-generalize-named-ops", "func::FuncOp"> {
-  let summary = "Convert named Linalg ops to linalg.generic ops";
-  let constructor = "mlir::iree_compiler::createSPIRVGeneralizeNamedOpsPass()";
-}
-
 def SPIRVLowerExecutableTarget :
     Pass<"iree-spirv-lower-executable-target-pass",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
