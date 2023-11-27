@@ -143,12 +143,12 @@ options, passes, or pipelines.
 
 ### Usage
 
+#### Compiler session API
+
 !!! info ""
 
-    These snippets show the general layout of the API. For working examples,
-    see the [samples below](#samples).
-
-#### Compiler session API
+    This snippet shows the general layout of the API. For working examples, see
+    the [samples below](#samples).
 
 To build a custom tool using the compiler API:
 
@@ -194,6 +194,12 @@ int main(int argc, char** argv) {
 ```
 
 #### Compiler plugins
+
+!!! info ""
+
+    This snippet comes from the
+    [example compiler plugin](https://github.com/openxla/iree/tree/main/samples/compiler_plugins/example).
+    For other examples, see the [samples below](#samples).
 
 To add a compiler plugin that extends the compiler with custom options:
 
@@ -472,7 +478,7 @@ hardware devices like CPUs, GPUs and other accelerators.
 !!! info ""
 
     This snippet shows the general layout of the API. For working examples, see
-    the samples below.
+    the [samples below](#samples_1).
 
 ```cmake title="CMakeLists.txt"
 target_include_directories(${_NAME} SYSTEM PRIVATE ${_IREE_RUNTIME_ROOT})
