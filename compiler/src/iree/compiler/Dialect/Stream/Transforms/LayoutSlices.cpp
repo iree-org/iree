@@ -55,7 +55,7 @@ using Slice = IREE::Stream::ResourcePackOp::Slice;
 // aligned to the requirements of |resourceConfig|.
 static Value
 packStaticSlicesGreedily(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
-                         ArrayRef<Slice> slices,
+                         MutableArrayRef<Slice> slices,
                          IREE::Stream::ResourceConfigAttr resourceConfig,
                          IndexSet &indexSet, OpBuilder &builder) {
   int64_t offsetAlignment = resourceConfig.getMinBufferOffsetAlignment();
@@ -147,7 +147,7 @@ packStaticSlicesGreedily(IREE::Stream::ResourcePackOp packOp, Value baseOffset,
 // aligned to the requirements of |resourceConfig|.
 static Value
 packDynamicSlicesConservatively(IREE::Stream::ResourcePackOp packOp,
-                                Value baseOffset, ArrayRef<Slice> slices,
+                                Value baseOffset, MutableArrayRef<Slice> slices,
                                 IREE::Stream::ResourceConfigAttr resourceConfig,
                                 IndexSet &indexSet, OpBuilder &builder) {
   auto loc = packOp.getLoc();
@@ -156,7 +156,7 @@ packDynamicSlicesConservatively(IREE::Stream::ResourcePackOp packOp,
 
   // Bucket all slices by their size SSA value. We rely on shapes being
   // lowered to computed byte sizes and CSE to then dedupe the values for us.
-  llvm::MapVector<Value, SmallVector<const Slice *>> slicesBySize;
+  llvm::MapVector<Value, SmallVector<Slice *>> slicesBySize;
   for (auto &slice : slices) {
     slicesBySize[slice.dynamicSize].push_back(&slice);
   }

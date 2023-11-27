@@ -302,8 +302,7 @@ public:
         newMaps.push_back(map);
         continue;
       }
-      SmallVector<int64_t, 3> perm;
-      tranposeOp.getTransp(perm);
+      ArrayRef<int64_t> perm = tranposeOp.getPermutation();
       SmallVector<AffineExpr> exprs(perm.size());
       for (auto [remapIdx, remap] : llvm::enumerate(perm)) {
         exprs[remap] = map.getResult(remapIdx);
