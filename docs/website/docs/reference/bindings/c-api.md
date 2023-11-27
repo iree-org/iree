@@ -152,16 +152,13 @@ options, passes, or pipelines.
 
 To build a custom tool using the compiler API:
 
-```cmake
-# CMakeLists.txt
+```cmake title="CMakeLists.txt"
 set(_IREE_COMPILER_API "${_IREE_COMPILER_ROOT}/bindings/c/iree/compiler")
 target_include_directories(${_NAME} SYSTEM PRIVATE ${_IREE_COMPILER_API})
 target_link_libraries(${_NAME} iree_compiler_bindings_c_loader)
 ```
 
-```c
-// iree_compiler_demo.c
-
+```c title="iree_compiler_demo.c"
 #include <iree/compiler/embedding_api.h>
 #include <iree/compiler/loader.h>
 
@@ -196,161 +193,16 @@ int main(int argc, char** argv) {
 }
 ```
 
-#### Compiler plugins - input dialects
+#### Compiler plugins
 
-Plugins can add support for input dialects to the compiler. Examples of in-tree
-input dialects are Torch, TOSA, and StableHLO. To add a custom input conversion
-with a plugin:
+To add a compiler plugin that extends the compiler with custom options:
 
-```cmake
-# CMakeLists.txt
-
-iree_compiler_register_plugin(
-  PLUGIN_ID
-    input_demo
-  TARGET
-    ::input_registration
-)
-
-iree_cc_library(
-  NAME
-    input_registration
-  SRCS
-    "InputPluginRegistration.cpp"
-  DEPS
-    iree::compiler::PluginAPI
-)
+```cmake title="samples/compiler_plugins/example/CMakeLists.txt"
+--8<-- "samples/compiler_plugins/example/CMakeLists.txt:22:39"
 ```
 
-```c++
-// InputPluginRegistration.cpp
-
-#include "iree/compiler/PluginAPI/Client.h"
-
-namespace mlir::iree_compiler {
-namespace {
-
-struct InputDemoOptions {
-  bool demoOption = false;
-  void bindOptions(OptionsBinder &binder) {
-    static llvm::cl::OptionCategory category("Demo Input");
-    binder.opt<bool>(
-        "iree-input-demo-option", demoOption,
-        llvm::cl::cat(category),
-        llvm::cl::desc("Some command-line option"));
-  }
-};
-
-struct InputDemoSession
-    : public PluginSession<InputDemoSession, InputDemoOptions,
-                           PluginActivationPolicy::DefaultActivated> {
-
-  static void registerPasses() {
-    // Register any passes used by this plugin here.
-  }
-
-  void onRegisterDialects(DialectRegistry &registry) override {
-    // Register any dialects used by this plugin here.
-  }
-
-  bool extendCustomInputConversionPassPipeline(
-      OpPassManager &passManager, std::string_view typeMnemonic) override {
-    if (typeMnemonic == "demo") {
-      buildDemoPassPipeline(passManager, options);
-      return true;
-    }
-    return false;
-  }
-
-  void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
-    typeMnemonics.insert("demo");
-  }
-
-  void populateDetectedCustomInputConversionTypes(
-      ModuleOp &module, StringSet<> &typeMnemonics) override {
-    if (moduleContainsDemoOps(module))
-      typeMnemonics.insert("demo");
-  }
-};
-
-} // namespace
-} // namespace mlir::iree_compiler
-
-IREE_DEFINE_COMPILER_OPTION_FLAGS(::mlir::iree_compiler::InputDemoOptions);
-
-extern "C" bool iree_register_compiler_plugin_input_demo(
-    mlir::iree_compiler::PluginRegistrar *registrar) {
-  registrar->registerPlugin<InputDemoSession>("input_demo");
-  return true;
-}
-```
-
-#### Compiler plugins - HAL target backends
-
-Plugins can add HAL target backends to the compiler. Examples of in-tree target
-backends are `vulkan`, `cuda`, and `llvm-cpu`. To add a custom HAL target
-backend with a plugin:
-
-```cmake
-# CMakeLists.txt
-
-iree_compiler_register_plugin(
-  PLUGIN_ID
-    hal_target_demo
-  TARGET
-    ::hal_target_registration
-)
-
-iree_cc_library(
-  NAME
-    hal_target_registration
-  SRCS
-    "TargetPluginRegistration.cpp"
-  DEPS
-    iree::compiler::PluginAPI
-)
-```
-
-```c++
-// TargetPluginRegistration.cpp
-
-#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/compiler/PluginAPI/Client.h"
-
-namespace mlir::iree_compiler {
-namespace {
-
-struct TargetDemoOptions {
-  bool demoOption = false;
-  void bindOptions(OptionsBinder &binder) {
-    static llvm::cl::OptionCategory category("Target Demo");
-    binder.opt<bool>(
-        "iree-target-demo-option", demoOption,
-        llvm::cl::cat(category),
-        llvm::cl::desc("Some command-line option"));
-  }
-};
-
-struct TargetDemoSession
-    : public PluginSession<TargetDemoSession, TargetDemoOptions,
-                           PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
-    targets.add("demo", [&]() {
-      return std::make_shared<DemoTargetBackend>(options);
-    });
-  }
-};
-
-} // namespace
-} // namespace mlir::iree_compiler
-
-IREE_DEFINE_COMPILER_OPTION_FLAGS(::mlir::iree_compiler::TargetDemoOptions);
-
-extern "C" bool iree_register_compiler_plugin_hal_target_demo(
-    mlir::iree_compiler::PluginRegistrar *registrar) {
-  registrar->registerPlugin<TargetDemoSession>("hal_target_demo");
-  return true;
-}
+```c++ title="samples/compiler_plugins/example/src/PluginRegistration.cpp"
+--8<-- "samples/compiler_plugins/example/src/PluginRegistration.cpp:7"
 ```
 
 #### Samples
@@ -622,15 +474,12 @@ hardware devices like CPUs, GPUs and other accelerators.
     This snippet shows the general layout of the API. For working examples, see
     the samples below.
 
-```cmake
-# CMakeLists.txt
+```cmake title="CMakeLists.txt"
 target_include_directories(${_NAME} SYSTEM PRIVATE ${_IREE_RUNTIME_ROOT})
 target_link_libraries(${_NAME} iree_runtime_runtime)
 ```
 
-```c
-// iree_runtime_demo.c
-
+```c title="iree_runtime_demo.c"
 #include <iree/runtime/api.h>
 
 int main(int argc, char** argv) {

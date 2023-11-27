@@ -94,6 +94,11 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
+  # Support for embedding external files (e.g. source code samples) via snippets
+  # https://squidfunk.github.io/mkdocs-material/reference/code-blocks/#embedding-external-files
+  - pymdownx.snippets:
+      base_path: ["../../"]  # Use paths relative to the repository root
+      check_paths: true
   # Diagram support, see
   #   https://squidfunk.github.io/mkdocs-material/reference/diagrams/
   #   Docs  : https://mermaid.js.org/
