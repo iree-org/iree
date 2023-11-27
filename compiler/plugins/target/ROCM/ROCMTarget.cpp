@@ -4,13 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
-
-#include <mutex>
-
+#include "./ROCMTargetUtils.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
@@ -31,24 +29,30 @@
 #include "mlir/Target/LLVMIR/Dialect/ROCDL/ROCDLToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
-static llvm::cl::opt<std::string>
-    clROCMTargetChip("iree-rocm-target-chip",
-                     llvm::cl::desc("ROCm target Chip"),
-                     llvm::cl::init("gfx908"));
-
-static llvm::cl::opt<bool>
-    clROCMLinkBC("iree-rocm-link-bc",
-                 llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
-                 llvm::cl::init(false));
-
-static llvm::cl::opt<std::string> clROCMBitcodeDir(
-    "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
-    llvm::cl::init(mlir::iree_compiler::findPlatformLibDirectory("rocm")));
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+struct ROCMOptions {
+  std::string targetChip;
+  bool linkBitcode;
+  std::string bitcodeDirectory;
+
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("ROCM HAL Target");
+    binder.opt<std::string>(
+        "iree-rocm-target-chip", targetChip, llvm::cl::cat(category),
+        llvm::cl::desc("ROCm target Chip"), llvm::cl::init("gfx908"));
+    binder.opt<bool>("iree-rocm-link-bc", linkBitcode, llvm::cl::cat(category),
+                     llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
+                     llvm::cl::init(false));
+    binder.opt<std::string>(
+        "iree-rocm-bc-dir", bitcodeDirectory, llvm::cl::cat(category),
+        llvm::cl::desc("Directory of ROCM Bitcode"),
+        llvm::cl::init(mlir::iree_compiler::findPlatformLibDirectory("rocm")));
+  }
+};
 
 static std::string translateModuleToObj(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
@@ -77,8 +81,11 @@ static std::string translateModuleToISA(llvm::Module &module,
   }
   return targetISA;
 }
+
 class ROCMTargetBackend final : public TargetBackend {
 public:
+  ROCMTargetBackend(ROCMOptions options) : options_(std::move(options)) {}
+
   std::string name() const override { return "rocm"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -199,15 +206,14 @@ public:
     std::unique_ptr<llvm::TargetMachine> targetMachine;
     {
       llvm::Triple triple("amdgcn--amdhsa-amdgiz");
-      std::string targetChip = clROCMTargetChip;
       std::string error;
       const llvm::Target *target =
           llvm::TargetRegistry::lookupTarget("", triple, error);
       if (target == nullptr) {
         return variantOp.emitError() << "cannot initialize target triple";
       }
-      targetMachine.reset(
-          target->createTargetMachine(triple.str(), targetChip, {}, {}, {}));
+      targetMachine.reset(target->createTargetMachine(
+          triple.str(), options_.targetChip, {}, {}, {}));
       if (targetMachine == nullptr) {
         return variantOp.emitError() << "cannot initialize target machine";
       }
@@ -219,15 +225,15 @@ public:
     iree_hal_rocm_ExecutableDef_start_as_root(builder);
 
     // Link module to Device Library
-    std::string rocmBitcodeDir = clROCMBitcodeDir;
-    if (clROCMLinkBC) {
-      if (clROCMBitcodeDir.empty()) {
+    if (options_.linkBitcode) {
+      if (options_.bitcodeDirectory.empty()) {
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set --iree-rocm-bc-dir= "
                   "to an explicit location on your system.";
       }
-      linkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip, rocmBitcodeDir);
+      linkROCDLIfNecessary(llvmModule.get(), options_.targetChip,
+                           options_.bitcodeDirectory);
     }
 
     // Serialize hsaco kernel into the binary that we will embed in the
@@ -305,30 +311,44 @@ private:
       configItems.emplace_back(StringAttr::get(context, name), value);
     };
     // Set target arch
-    addConfig("target_arch", StringAttr::get(context, clROCMTargetChip));
+    addConfig("target_arch", StringAttr::get(context, options_.targetChip));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(
         context, b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
         configAttr);
   }
+
+  ROCMOptions options_;
 };
 
-void registerROCMTargetBackends() {
-  // #hal.device.target<"rocm", ...
-  // #hal.executable.target<"rocm", ...
-  static iree_compiler::IREE::HAL::TargetBackendRegistration registration(
-      "rocm", [=]() {
-        LLVMInitializeAMDGPUTarget();
-        LLVMInitializeAMDGPUTargetMC();
-        LLVMInitializeAMDGPUTargetInfo();
-        LLVMInitializeAMDGPUAsmParser();
-        LLVMInitializeAMDGPUAsmPrinter();
-        return std::make_shared<ROCMTargetBackend>();
-      });
-}
+struct ROCMSession
+    : public PluginSession<ROCMSession, ROCMOptions,
+                           PluginActivationPolicy::DefaultActivated> {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+    // #hal.device.target<"rocm", ...
+    // #hal.executable.target<"rocm", ...
+    targets.add("rocm", [&]() {
+      LLVMInitializeAMDGPUTarget();
+      LLVMInitializeAMDGPUTargetMC();
+      LLVMInitializeAMDGPUTargetInfo();
+      LLVMInitializeAMDGPUAsmParser();
+      LLVMInitializeAMDGPUAsmPrinter();
+      return std::make_shared<ROCMTargetBackend>(options);
+    });
+  }
+};
 
 } // namespace HAL
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
+
+extern "C" bool iree_register_compiler_plugin_hal_target_rocm(
+    mlir::iree_compiler::PluginRegistrar *registrar) {
+  registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::ROCMSession>(
+      "hal_target_rocm");
+  return true;
+}
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::IREE::HAL::ROCMOptions);
