@@ -31,6 +31,12 @@ def GPUDistributeSharedMemoryCopy :
   let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
 }
 
+def GPUGeneralizeNamedOps :
+    Pass<"iree-codegen-gpu-generalize-named-ops", "func::FuncOp"> {
+  let summary = "Convert named Linalg ops to linalg.generic ops";
+  let constructor = "mlir::iree_compiler::createGPUGeneralizeNamedOpsPass()";
+}
+
 def GPUMultiBuffering :
     Pass<"iree-codegen-gpu-multi-buffering", "func::FuncOp"> {
   let summary = "Pass to do multi buffering.";

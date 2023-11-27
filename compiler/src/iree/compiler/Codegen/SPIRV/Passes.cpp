@@ -662,8 +662,7 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 void buildSPIRVCodegenConfigurationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVGeneralizeNamedOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
   pm.addPass(createSPIRVSelectLoweringStrategyPass());
 }
 
