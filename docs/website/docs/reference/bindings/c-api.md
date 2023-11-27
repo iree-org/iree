@@ -139,11 +139,10 @@ An _output_ (`iree_compiler_output_t`) represents a compilation artifact.
 #### Plugins
 
 A _plugin_ extends the compiler with some combination of target backends,
-options, passes, or pipelines.
+options, passes, or pipelines. For documentation on compiler plugins, see
+[`compiler/PluginAPI/README.md`](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md).
 
 ### Usage
-
-#### Compiler session API
 
 !!! info ""
 
@@ -191,24 +190,6 @@ int main(int argc, char** argv) {
   ireeCompilerSessionDestroy(session);
   ireeCompilerGlobalShutdown();
 }
-```
-
-#### Compiler plugins
-
-!!! info ""
-
-    This snippet comes from the
-    [example compiler plugin](https://github.com/openxla/iree/tree/main/samples/compiler_plugins/example).
-    For other examples, see the [samples below](#samples).
-
-To add a compiler plugin that extends the compiler with custom options:
-
-```cmake title="samples/compiler_plugins/example/CMakeLists.txt"
---8<-- "samples/compiler_plugins/example/CMakeLists.txt:22:39"
-```
-
-```c++ title="samples/compiler_plugins/example/src/PluginRegistration.cpp"
---8<-- "samples/compiler_plugins/example/src/PluginRegistration.cpp:7"
 ```
 
 #### Samples
