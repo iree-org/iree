@@ -98,7 +98,7 @@ hal.executable private @matmul_tensors_sve  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 128, 0], [8, [32], 0], [0, 0, 16], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 128, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @matmul_tensors
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -127,19 +127,17 @@ hal.executable private @matmul_static_tensors_sve  {
       func.func @static_tensors_non_pow_two_sizes() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<15x14xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<14x9xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<15x9xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<14x7xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readwrite:tensor<15x7xf32>>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [15, 14], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<15x14xf32>> -> tensor<15x14xf32>
-        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [14, 9], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<14x9xf32>> -> tensor<14x9xf32>
-        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [15, 9], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<15x9xf32>> -> tensor<15x9xf32>
-        %6 = linalg.matmul ins(%3, %4 : tensor<15x14xf32>, tensor<14x9xf32>) outs(%5 : tensor<15x9xf32>) -> tensor<15x9xf32>
-        flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [15, 9], strides = [1, 1] : tensor<15x9xf32> -> !flow.dispatch.tensor<readwrite:tensor<15x9xf32>>
-        return
-      }
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [14, 7], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<14x7xf32>> -> tensor<14x7xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [15, 7], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<15x7xf32>> -> tensor<15x7xf32>
+        %6 = linalg.matmul ins(%3, %4 : tensor<15x14xf32>, tensor<14x7xf32>) outs(%5 : tensor<15x7xf32>) -> tensor<15x7xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [15, 7], strides = [1, 1] : tensor<15x7xf32> -> !flow.dispatch.tensor<readwrite:tensor<15x7xf32>> return }
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[5, 9, 0], [5, [16], 0], [0, 0, 14], [0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[5, 7, 0], [5, [8], 0], [0, 0, 1], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @static_tensors_non_pow_two_sizes
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
