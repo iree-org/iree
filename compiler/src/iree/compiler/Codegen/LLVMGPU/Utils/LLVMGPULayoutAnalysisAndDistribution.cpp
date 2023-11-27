@@ -301,8 +301,7 @@ static void propagateLayoutToReduceBroadcastTranspose(
   auto reductionDims =
       llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
   // Get the transpose permutation
-  SmallVector<int64_t> perm;
-  transposeOp.getTransp(perm);
+  ArrayRef<int64_t> perm = transposeOp.getPermutation();
   // Don't support dim-1 broadcasted dims
   llvm::SetVector<int64_t> dimOneBroadcastedDims =
       broadcastOp.computeBroadcastedUnitDims();

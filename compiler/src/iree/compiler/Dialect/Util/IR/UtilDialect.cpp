@@ -77,8 +77,7 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     op->erase();
   }
 
-  void handleTerminator(Operation *op,
-                        ArrayRef<Value> valuesToReplace) const final {
+  void handleTerminator(Operation *op, ValueRange valuesToReplace) const final {
     // util.initialize.return takes no args.
   }
 };

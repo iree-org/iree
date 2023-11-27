@@ -21,12 +21,6 @@ def TilingInterfaceTiling :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTilingInterfaceTilingPass()";
 }
 
-def MaterializeEncoding :
-    Pass<"iree-linalg-ext-materialize-encoding", "func::FuncOp"> {
-  let summary = "Test pass to materialize ops with tensor encoding into ops with explicit data movement";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createMaterializeEncodingPass()";
-}
-
 def PadContractionToBlockSize :
     Pass<"iree-linalg-pad-contraction-to-block-size", ""> {
   let summary = "Pads contraction (matmul) ops to next multiple of block size";

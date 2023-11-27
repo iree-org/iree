@@ -153,7 +153,6 @@ macro(iree_llvm_set_bundled_cmake_options)
 
   # Unconditionally enable some other cheap LLVM tooling.
   set(IREE_LLVM_LINK_TARGET llvm-link)
-  set(IREE_LLD_TARGET lld)
 
   # Unconditionally enable mlir.
   list(APPEND LLVM_ENABLE_PROJECTS mlir)

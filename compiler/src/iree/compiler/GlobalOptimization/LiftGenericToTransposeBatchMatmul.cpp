@@ -6,11 +6,13 @@
 
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/PatternMatch.h"
@@ -151,15 +153,12 @@ static FailureOr<Value> castTensor(Location loc, PatternRewriter &rewriter,
   if (inputType.getElementType() == outputType.getElementType()) {
     return input;
   }
-  auto castedType =
-      RankedTensorType::get(inputType.getShape(), outputType.getElementType());
   for (auto bodyOp : genericOp.getBody()->getOps<CastOpInterface>()) {
     Value castInput = bodyOp->getOperand(0);
     if (isBlockArgumentAtIndex(castInput, inputIdx)) {
-      return rewriter
-          .create(bodyOp->getLoc(), bodyOp->getName().getIdentifier(), input,
-                  castedType, bodyOp->getAttrs())
-          ->getResult(0);
+      return createGenericElementwiseCastOp(
+          rewriter, loc, input, bodyOp,
+          linalg::getPrunedAttributeList(genericOp));
     }
   }
   return failure();

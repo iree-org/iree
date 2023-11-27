@@ -317,6 +317,9 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
     IREE_THREAD_ANNOTATION_ATTRIBUTE(acquire_capability(mutex));
 
 // Tries to lock the |mutex| and returns true if the caller holds the lock.
+//
+// This function is allowed to fail spuriously, i.e. even if the lock isn't
+// held by another thread.
 bool iree_slim_mutex_try_lock(iree_slim_mutex_t* mutex)
     IREE_THREAD_ANNOTATION_ATTRIBUTE(try_acquire_capability(true, mutex));
 

@@ -9,12 +9,16 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+
+#include <optional>
 
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -512,13 +516,51 @@ static Value getCombiningIdentityValue(Location loc, OpBuilder &builder,
   return identity;
 }
 
+/// Return a matching GPU reduction operations.
+static std::optional<gpu::AllReduceOperation>
+combiningKindToAllReduce(vector::CombiningKind kind) {
+  using gpu::AllReduceOperation;
+  using vector::CombiningKind;
+
+  switch (kind) {
+  case CombiningKind::ADD:
+    return AllReduceOperation::ADD;
+  case CombiningKind::AND:
+    return AllReduceOperation::AND;
+  case CombiningKind::MUL:
+    return AllReduceOperation::MUL;
+  case CombiningKind::OR:
+    return AllReduceOperation::OR;
+  case CombiningKind::XOR:
+    return AllReduceOperation::XOR;
+  // Currently, the min/max reductions are not well-defined in the gpu dialect.
+  // See https://github.com/llvm/llvm-project/issues/72354.
+  default:
+    break;
+  }
+  return std::nullopt;
+}
+
 /// Emit reduction across a group for a given input.
 Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size,
-                            const int warpSize) {
+                            int warpSize, bool expandSubgroupReduce) {
   assert(
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
+
+  if (!expandSubgroupReduce && size == warpSize) {
+    if (auto gpuReduceKind = combiningKindToAllReduce(kind)) {
+      // Simple case -- emit `gpu.subgroup_reduce` directly.
+      Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
+      return builder.create<gpu::SubgroupReduceOp>(loc, laneVal,
+                                                   *gpuReduceKind);
+    }
+  }
+
+  // More-involved case -- generate `gpu.shuffle` ops over i32 values (using the
+  // butterfly shuffle algorithm).
+  //
   // First reduce on a single thread to get per lane reduction value.
   Value laneVal = reduceToSupportedWidth(loc, builder, input, kind);
   laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize);

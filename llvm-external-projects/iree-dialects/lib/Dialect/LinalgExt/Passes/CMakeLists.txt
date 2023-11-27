@@ -2,7 +2,6 @@ add_mlir_library(IREELinalgExtPasses
   ConvertConv2DToWinograd.cpp
   ConvertToLoops.cpp
   DecomposeSoftmax.cpp
-  MaterializeEncoding.cpp
   PadContractionToBlockSize.cpp
   Passes.cpp
   SplitReduction.cpp
@@ -16,7 +15,6 @@ add_mlir_library(IREELinalgExtPasses
   LINK_LIBS PUBLIC
   IREEInputDialect
   IREELinalgExtDialect
-  IREELinalgExtEncodingUtils
   IREELinalgExtUtils
   MLIRAffineDialect
   MLIRIR

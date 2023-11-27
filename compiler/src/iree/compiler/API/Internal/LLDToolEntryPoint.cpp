@@ -9,7 +9,11 @@
 // duplicate the flavor parsing and invoke the backend directly similar to
 // what the lldMain() does.
 
-#ifdef IREE_COMPILER_LLD_DISABLED
+#if defined(IREE_COMPILER_LLD_DISABLED) ||                                     \
+    (defined(IREE_COMPILER_LLD_ELF_DISABLED) &&                                \
+     defined(IREE_COMPILER_LLD_COFF_DISABLED) &&                               \
+     defined(IREE_COMPILER_LLD_MACHO_DISABLED) &&                              \
+     defined(IREE_COMPILER_LLD_WASM_DISABLED))
 #include <stdio.h>
 
 #include "iree/compiler/tool_entry_points_api.h"

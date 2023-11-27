@@ -188,7 +188,7 @@ static iree_status_t iree_vm_bytecode_external_enter(
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         uint16_t dst_reg = ref_reg++;
-        iree_vm_ref_move(
+        iree_vm_ref_retain(
             (iree_vm_ref_t*)p,
             &callee_registers.ref[dst_reg & IREE_REF_REGISTER_MASK]);
         p += sizeof(iree_vm_ref_t);

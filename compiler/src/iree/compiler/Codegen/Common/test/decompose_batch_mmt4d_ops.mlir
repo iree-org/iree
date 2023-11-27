@@ -88,3 +88,32 @@ func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1:
 // CHECK:        %[[MMT4D:.+]] = linalg.mmt4d ins(%[[GEN_LHS]], %[[GEN_RHS]] : tensor<10x32x8x1xi32>, tensor<80x32x4x1xi32>) outs(%[[FILL]] : tensor<10x80x8x4xi32>) -> tensor<10x80x8x4xi32>
 // CHECK:        %[[INS:.+]] = tensor.insert_slice %[[MMT4D]] into %[[OUT]][0, 0, 0, 0, 0] [1, 10, 80, 8, 4] [1, 1, 1, 1, 1] : tensor<10x80x8x4xi32> into tensor<1x10x80x8x4xi32>
 // CHECK:        return %[[INS]] : tensor<1x10x80x8x4xi32>
+
+// -----
+
+func.func @batch_mmt4d_with_fill_batch_dim(%arg0: tensor<12x10x32x8x1xf32>, %arg1: tensor<12x80x32x4x1xf32>, %arg2: tensor<12x10x80x8x4xf32>) -> tensor<12x10x80x8x4xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = linalg.fill ins(%cst : f32) outs(%arg2 : tensor<12x10x80x8x4xf32>) -> tensor<12x10x80x8x4xf32>
+  %1 = linalg.batch_mmt4d ins(%arg0, %arg1 : tensor<12x10x32x8x1xf32>, tensor<12x80x32x4x1xf32>) outs(%0 : tensor<12x10x80x8x4xf32>) -> tensor<12x10x80x8x4xf32>
+  return %1 : tensor<12x10x80x8x4xf32>
+}
+
+// CHECK:      func.func @batch_mmt4d_with_fill_batch_dim
+// CHECK-SAME:   %[[LHS:.+]]: tensor<12x10x32x8x1xf32>,
+// CHECK-SAME:   %[[RHS:.+]]: tensor<12x80x32x4x1xf32>,
+// CHECK-SAME:   %[[OUT:.+]]: tensor<12x10x80x8x4xf32>
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C12:.+]] = arith.constant 12 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK:        %[[TILED_RES:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[C12]] step %[[C1]] iter_args(%[[OUTPUT:.+]] = %[[OUT]]) -> (tensor<12x10x80x8x4xf32>) {
+// CHECK-DAG:      %[[EXT_OUT:.+]] = tensor.extract_slice %[[OUTPUT]][%[[IV]], 0, 0, 0, 0] [1, 10, 80, 8, 4] [1, 1, 1, 1, 1] : tensor<12x10x80x8x4xf32> to tensor<10x80x8x4xf32>
+// CHECK:          %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[EXT_OUT]] : tensor<10x80x8x4xf32>) -> tensor<10x80x8x4xf32>
+// CHECK-DAG:      %[[EXT_LHS:.+]] = tensor.extract_slice %[[LHS]][%[[IV]], 0, 0, 0, 0] [1, 10, 32, 8, 1] [1, 1, 1, 1, 1] : tensor<12x10x32x8x1xf32> to tensor<10x32x8x1xf32>
+// CHECK-DAG:      %[[EXT_RHS:.+]] = tensor.extract_slice %[[RHS]][%[[IV]], 0, 0, 0, 0] [1, 80, 32, 4, 1] [1, 1, 1, 1, 1] : tensor<12x80x32x4x1xf32> to tensor<80x32x4x1xf32>
+// CHECK:          %[[MMT4D:.+]] = linalg.mmt4d ins(%[[EXT_LHS]], %[[EXT_RHS]] : tensor<10x32x8x1xf32>, tensor<80x32x4x1xf32>) outs(%[[FILL]] : tensor<10x80x8x4xf32>) -> tensor<10x80x8x4xf32>
+// CHECK:          %[[INS:.+]] = tensor.insert_slice %[[MMT4D]] into %[[OUTPUT]][%[[IV]], 0, 0, 0, 0] [1, 10, 80, 8, 4] [1, 1, 1, 1, 1] : tensor<10x80x8x4xf32> into tensor<12x10x80x8x4xf32>
+// CHECK:          scf.yield %[[INS]] : tensor<12x10x80x8x4xf32>
+// CHECK:        }
+// CHECK:        return %[[TILED_RES]] : tensor<12x10x80x8x4xf32>
+

@@ -714,6 +714,18 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
 }
 
 //===----------------------------------------------------------------------===//
+// #util.uninitialized
+//===----------------------------------------------------------------------===//
+
+int64_t UninitializedAttr::getStorageSize() const {
+  if (auto shapedType = getType().dyn_cast<ShapedType>()) {
+    return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
+  } else {
+    return IREE::Util::getTypePhysicalStorageBitWidth(getType());
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // SizedStorageAttr implementations
 //===----------------------------------------------------------------------===//
 

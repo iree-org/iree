@@ -201,7 +201,7 @@ class CheckTest : public ::testing::Test {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_push_ref_move(inputs_.get(), &device_ref));
     for (auto& arg : args) {
-      iree_vm_ref_t arg_ref = iree_hal_buffer_view_move_ref(arg.get());
+      iree_vm_ref_t arg_ref = iree_hal_buffer_view_retain_ref(arg.get());
       IREE_RETURN_IF_ERROR(iree_vm_list_push_ref_move(inputs_.get(), &arg_ref));
     }
     return Invoke(function_name);

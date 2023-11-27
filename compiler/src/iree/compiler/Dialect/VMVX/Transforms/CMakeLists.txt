@@ -74,7 +74,6 @@ iree_cc_library(
     MLIRVectorToSCF
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
-    iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::VMVX

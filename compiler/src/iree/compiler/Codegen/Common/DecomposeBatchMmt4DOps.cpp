@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -117,8 +118,9 @@ struct ConvertBatchMmt4DtoMmt4DPattern
 struct DecomposeBatchMmt4DOpsPass
     : public DecomposeBatchMmt4DOpsBase<DecomposeBatchMmt4DOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, func::FuncDialect,
-                    arith::ArithDialect, tensor::TensorDialect>();
+    registry
+        .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
+                tensor::TensorDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override;
@@ -129,6 +131,39 @@ struct DecomposeBatchMmt4DOpsPass
 void DecomposeBatchMmt4DOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
+  Operation *errorOp = nullptr;
+  IRRewriter rewriter(ctx);
+
+  WalkResult result =
+      funcOp.walk([&](linalg::BatchMmt4DOp batchMmt4DOp) -> WalkResult {
+        auto out = batchMmt4DOp.getDpsInitOperand(0)->get();
+        auto outType = out.getType().cast<RankedTensorType>();
+        // Tile only non unit batch dimensions with tile size equals to 1.
+        if (outType.getShape()[0] <= 1) {
+          return WalkResult::advance();
+        }
+        SmallVector<int64_t> tileSizes = {1};
+        auto tilingInterfaceOp =
+            cast<TilingInterface>(batchMmt4DOp.getOperation());
+        auto options = scf::SCFTileAndFuseOptions().setTilingOptions(
+            scf::SCFTilingOptions().setTileSizes(
+                getAsIndexOpFoldResult(ctx, tileSizes)));
+        FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+            scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+                rewriter, tilingInterfaceOp, options);
+        if (failed(tileAndFuseResult)) {
+          errorOp = batchMmt4DOp;
+          return WalkResult::interrupt();
+        }
+        rewriter.replaceOp(
+            batchMmt4DOp,
+            tileAndFuseResult->replacements[batchMmt4DOp.getResult(0)]);
+        return WalkResult::advance();
+      });
+  if (result.wasInterrupted()) {
+    errorOp->emitOpError("failed to tile the batch dimension");
+    return signalPassFailure();
+  }
 
   // Convert linalg.batch_mmt4d with batch dim = 1 into linalg.mmt4d.
   RewritePatternSet patterns(ctx);

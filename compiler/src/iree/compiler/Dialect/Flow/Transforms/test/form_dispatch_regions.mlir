@@ -98,6 +98,44 @@ func.func @pack_fusion(%arg0 : tensor<?x?xf32>,
 
 // -----
 
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
+#map2 = affine_map<()[s0] -> (s0 ceildiv 8)>
+#map3 = affine_map<()[s0] -> (s0 ceildiv 32)>
+module {
+  func.func @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
+    %cst = arith.constant 0.000000e+00 : f32
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %dim = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+    %dim_0 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+    %0 = tensor.empty(%dim, %dim_0) : tensor<?x?xf32>
+    %1 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<?x?xf32>) outs(%0 : tensor<?x?xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+    } -> tensor<?x?xf32>
+    %2 = affine.apply #map2()[%dim]
+    %3 = affine.apply #map3()[%dim_0]
+    %4 = tensor.empty(%2, %3) : tensor<?x?x8x32xf32>
+    %pack = tensor.pack %1 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 32] into %4 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
+    return %pack : tensor<?x?x8x32xf32>
+  }
+}
+// No fusion as the CPU backend currently can't handle fusion with transpose
+// between ops.
+// CHECK-LABEL: func @tranpose_pack_fusion(
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.region
+//       CHECK:     %[[PACK:.+]] = tensor.pack %[[DISPATCH1]]
+//       CHECK:     flow.return %[[PACK]]
+//       CHECK:   return %[[DISPATCH2]]
+
+// -----
+
 func.func @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
     %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> {
   %cst = arith.constant 0.0 : f32

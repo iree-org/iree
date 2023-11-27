@@ -27,7 +27,7 @@
 using namespace mlir;
 using namespace mlir::iree_compiler;
 
-static constexpr unsigned cudaWarpSize = 32;
+static constexpr unsigned kCudaWarpSize = 32;
 static constexpr StringLiteral kCudaTarget = "cuda";
 static constexpr StringLiteral kRocmTarget = "rocm";
 namespace mlir {
@@ -395,7 +395,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
     // Special case for very small matrices.
-    if (sizeM * sizeN <= cudaWarpSize) {
+    if (sizeM * sizeN <= kCudaWarpSize) {
       return setMatmulConfig(
           sizeN, sizeM, 4, {sizeM, sizeN, 1}, softwarePipelineDepthSimt,
           IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
@@ -448,7 +448,7 @@ static LogicalResult setFftConfig(func::FuncOp entryPoint,
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   unsigned loopDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
-  SmallVector<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
+  SmallVector<int64_t, 3> workgroupSize = {kCudaWarpSize, 1, 1};
 
   // Tiling along partitioned loops with size 1.
   for (int64_t loopIndex : partitionedLoops) {
@@ -485,7 +485,7 @@ static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
   }
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps
-  std::array<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  std::array<int64_t, 3> workgroupSize = {2 * kCudaWarpSize, 1, 1};
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
   // Set all non-parallel loops to zero tile size.
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
@@ -531,7 +531,7 @@ getDefaultWorkgroupTileSizesForPackUnPack(TilingInterface op,
 static LogicalResult setPackConfig(func::FuncOp entryPoint,
                                    tensor::PackOp packOp) {
   SmallVector<int64_t> tileSizes = getDefaultWorkgroupTileSizesForPackUnPack(
-      cast<TilingInterface>(packOp.getOperation()), cudaWarpSize);
+      cast<TilingInterface>(packOp.getOperation()), kCudaWarpSize);
 
   // The default function aims to returns the number of workload per workgroup,
   // but it does not know that it is working on packed domain. We need to take
@@ -546,7 +546,7 @@ static LogicalResult setPackConfig(func::FuncOp entryPoint,
   }
 
   TileSizesListType tileSizesList = {tileSizes};
-  std::array<int64_t, 3> workgroupSizes = {cudaWarpSize, 1, 1};
+  std::array<int64_t, 3> workgroupSizes = {kCudaWarpSize, 1, 1};
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, packOp, tileSizesList,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack,
@@ -569,7 +569,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps
-  std::array<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  std::array<int64_t, 3> workgroupSize = {2 * kCudaWarpSize, 1, 1};
   unsigned vectorSize = 4;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
   // Set all non-parallel loops to zero tile size.
@@ -606,7 +606,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       int64_t problemSize = std::accumulate(
           shape.begin(), shape.end(), 1,
           [](const int64_t &a, const int64_t &b) { return a * b; });
-      if ((problemSize / (cudaWarpSize * vectorSize)) < 64) {
+      if ((problemSize / (kCudaWarpSize * vectorSize)) < 64) {
         vectorSize = 1;
         break;
       }
@@ -750,11 +750,19 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
 
   // Make sure reduction dimensions are static and innermost ones.
+  int64_t numDynamicReductionDims = 0;
   for (unsigned dim : reductionDims) {
-    if (ShapedType::isDynamic(bounds[dim]))
+    if (ShapedType::isDynamic(bounds[dim])) {
+      numDynamicReductionDims++;
+    }
+    if (dim < numParallelDims) {
       return failure();
-    if (dim < numParallelDims)
-      return failure();
+    }
+  }
+
+  // Distribution of multi-dim masked writes currently aren't fully supported.
+  if (numDynamicReductionDims > 1) {
+    return failure();
   }
 
   if (op.getRegionOutputArgs().size() != 1)
@@ -784,10 +792,36 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if (!foundSingleReductionOutput)
     return failure();
 
+  // Tile all the parallel dimension to 1.
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+
+  // Without any bounds on dynamic reduction dims, we need specialization to
+  // get peak performance. For now, just use the warp size.
+  if (numDynamicReductionDims) {
+    SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+    // TODO: Don't hard code this.
+    reductionTileSizes[reductionDims[0]] = kCudaWarpSize;
+    TileSizesListType tileSizes;
+    tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
+    tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+    std::array<int64_t, 3> workgroupSize = {kCudaWarpSize, 1, 1};
+    if (failed(setOpConfigAndEntryPointFnTranslation(
+            entryPoint, op, tileSizes,
+            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
+            workgroupSize))) {
+      return failure();
+    }
+    return success();
+  }
+
   int64_t reductionSize = 1;
   for (int64_t dim : reductionDims)
     reductionSize *= bounds[dim];
-  if (reductionSize % cudaWarpSize != 0)
+  if (reductionSize % kCudaWarpSize != 0)
     return failure();
 
   const Type elementType =
@@ -802,7 +836,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
 
   const unsigned largestLoadSizeInBits = 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
-  while ((reductionSize / vectorSize) % cudaWarpSize != 0)
+  while ((reductionSize / vectorSize) % kCudaWarpSize != 0)
     vectorSize /= 2;
 
   // Deduce the workgroup size we should use for reduction. Currently a
@@ -839,7 +873,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
   while (parallelSize && *parallelSize > parallelThreshold &&
-         (groupSize / 2) % cudaWarpSize == 0 &&
+         (groupSize / 2) % kCudaWarpSize == 0 &&
          reductionSize / (groupSize * vectorSize) < targetVectorCount) {
     // Use less subgroups per workgroup..
     groupSize /= 2;
@@ -851,29 +885,23 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   // First, do warp reductions along multiple subgroups.
   // Second, reduce results from multiple subgroups using single warp reduce.
   // The final warp reduce requires subgroup count <= subgroup size to work.
-  if ((groupSize / cudaWarpSize) > cudaWarpSize)
+  if ((groupSize / kCudaWarpSize) > kCudaWarpSize)
     return failure();
 
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
-  SmallVector<unsigned> partitionedLoops =
-      cast<PartitionableLoopsInterface>(op.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
-  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
-  // Tile all the parallel dimension to 1.
-  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
-  int64_t remaingGroupSize = groupSize;
+  int64_t remainingGroupSize = groupSize;
   for (int i = reductionDims.size() - 1; i >= 0; --i) {
     int64_t dim = reductionDims[i];
     int64_t bound = bounds[dim];
     if (i == reductionDims.size() - 1)
       bound /= vectorSize;
     APInt size = llvm::APIntOps::GreatestCommonDivisor(
-        {64, uint64_t(remaingGroupSize)}, {64, uint64_t(bound)});
+        {64, uint64_t(remainingGroupSize)}, {64, uint64_t(bound)});
     reductionTileSizes[dim] = size.getSExtValue();
     if (i == reductionDims.size() - 1)
       reductionTileSizes[dim] *= vectorSize;
-    remaingGroupSize /= size.getSExtValue();
+    remainingGroupSize /= size.getSExtValue();
   }
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
@@ -1226,7 +1254,13 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     if (!rootOperation) {
-      // No root operation found. Allow it to pass through without a config.
+      // No root operation found, set it to none.
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          funcOp.getContext(),
+          IREE::Codegen::DispatchLoweringPassPipeline::None);
+      if (failed(setTranslationInfo(funcOp, translationInfo))) {
+        return failure();
+      }
       continue;
     }
 

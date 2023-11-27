@@ -16,9 +16,9 @@ iree_cc_library(
   HDRS
     "DeltaStrategies.h"
   SRCS
-    "ReduceFlowDispatchOperandToResult.cpp"
     "ReduceFlowDispatchResultBySplat.cpp"
     "ReduceLinalgOnTensorsDelta.cpp"
+    "ReduceOperandToResult.cpp"
     "ReduceOptimizationBarriersDelta.cpp"
   DEPS
     LLVMSupport

@@ -280,7 +280,10 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
           awaitOp.setAffinityAttr(executeOp.getAffinityAttr());
         }
 
-        oldResult.replaceAllUsesWith(awaitOp.getResults().front());
+        // Explicitly copy the Value since it is marked as const.
+        Value toBeDeleted = oldResult;
+
+        toBeDeleted.replaceAllUsesWith(awaitOp.getResults().front());
         deadOps.insert(oldResult.getDefiningOp());
       }
 

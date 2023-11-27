@@ -92,7 +92,7 @@ IREE_FLAG_LIST(
     "\n"
     "Supported formats:\n"
     "- .irpa (IREE parameter archive)\n"
-    "- .gguf (https://github.com/ggerganov/ggml/blob/master/docs/gguf.md)"
+    "- .gguf (https://github.com/ggerganov/ggml/blob/master/docs/gguf.md)\n"
     "- .safetensors (https://github.com/huggingface/safetensors)");
 
 // Appends the parameter file located at |path| to |index|.

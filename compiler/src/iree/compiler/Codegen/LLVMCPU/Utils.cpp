@@ -55,51 +55,6 @@ bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+sme");
 }
 
-FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
-  Operation *rootOperation = nullptr;
-  for (auto op : llvm::reverse(computeOps)) {
-    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-      // Do not treat linalg ops that are all parallel as root operations in
-      // this sweep.
-      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops())
-        continue;
-
-      // All other linalg ops are root ops.
-      rootOperation = op;
-      break;
-    }
-
-    if (isa<TilingInterface>(op) &&
-        !isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
-      // All other operations that implement this interface are root ops.
-      rootOperation = op;
-      break;
-    }
-  }
-
-  if (!rootOperation) {
-    // Check for elementwise operations.
-    for (auto op : llvm::reverse(computeOps)) {
-      if (isa<linalg::LinalgOp>(op)) {
-        rootOperation = op;
-        break;
-      }
-    }
-  }
-
-  if (!rootOperation) {
-    // Check for pad/pack/unpack ops by themselves.
-    for (auto op : llvm::reverse(computeOps)) {
-      if (isa<tensor::PadOp, tensor::PackOp, tensor::UnPackOp>(op)) {
-        rootOperation = op;
-        break;
-      }
-    }
-  }
-
-  return rootOperation;
-}
-
 void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
                      SmallVector<int64_t> tileSizes,
                      SmallVector<bool> tileScalableFlags) {
@@ -129,27 +84,6 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
               });
         });
   }
-}
-
-std::optional<CastOpInterface>
-getCastOpOfElementWiseCast(linalg::GenericOp genericOp) {
-  if (!genericOp || genericOp.getNumDpsInputs() != 1 ||
-      genericOp.getNumDpsInits() != 1 ||
-      genericOp.getBody()->getOperations().size() != 2 ||
-      !isElementwise(genericOp)) {
-    return std::nullopt;
-  }
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-  auto castOp = yieldOp->getOperand(0).getDefiningOp<CastOpInterface>();
-  if (!castOp) {
-    return std::nullopt;
-  }
-  Value castIn = castOp->getOperand(0);
-  if (castIn.isa<BlockArgument>() &&
-      castIn.cast<BlockArgument>().getArgNumber() != 0) {
-    return std::nullopt;
-  }
-  return castOp;
 }
 
 } // namespace iree_compiler

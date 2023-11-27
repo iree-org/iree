@@ -82,66 +82,41 @@ verifyLoweringConfiguration(ModuleOp module,
 void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
-  if (!moduleOp) {
-    getOperation()->emitError(
-        "Expected a variantOp root with an inner ModuleOp");
-    return signalPassFailure();
-  }
 
   // Set the strategy with default heuristics.
   if (failed(initCPULaunchConfig(moduleOp))) {
     return signalPassFailure();
   }
 
-  // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same translation info.
-  // TODO(ravishankarm): This is strange that this is not enforced
-  // structurally, but something to address later on. The main issue is how
-  // to invoke separate dynamic pass pipelines on  entry point functions, when
-  // the passes might have module level changes. For now this restriction
-  // is fine.
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : exportOps) {
-    auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(exportOp)) {
-      if (translationInfo) {
-        if (currTranslationInfo != translationInfo.value()) {
-          moduleOp.emitOpError(
-              "unhandled compilation of entry point functions with different "
-              "translation info");
-          return signalPassFailure();
-        }
-      } else {
-        translationInfo = currTranslationInfo;
-      }
-    }
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+      getIdenticalTranslationInfo(variantOp);
+  if (!translationInfo) {
+    moduleOp.emitOpError(
+        "unhandled compilation of entry point functions with different "
+        "translation info");
+    return signalPassFailure();
   }
 
   // Verify the configuration.
-  if (translationInfo.has_value()) {
-    LogicalResult verificationStatus = success();
-    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
-    case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert:
-      verificationStatus = verifyLoweringConfiguration(
-          moduleOp, translationInfo.value(),
-          verifyDoubleTilingExpertPassPipelineConfig);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        CPUConvTileAndDecomposeExpert:
-      verificationStatus =
-          verifyLoweringConfiguration(moduleOp, translationInfo.value(),
-                                      verifyConvTileAndDecomposeExpertConfig);
-      break;
-    default:
-      break;
-    }
-    if (failed(verificationStatus)) {
-      return signalPassFailure();
-    }
+  LogicalResult verificationStatus = success();
+  switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+  case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
+  case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert:
+    verificationStatus =
+        verifyLoweringConfiguration(moduleOp, translationInfo.value(),
+                                    verifyDoubleTilingExpertPassPipelineConfig);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::
+      CPUConvTileAndDecomposeExpert:
+    verificationStatus =
+        verifyLoweringConfiguration(moduleOp, translationInfo.value(),
+                                    verifyConvTileAndDecomposeExpertConfig);
+    break;
+  default:
+    break;
+  }
+  if (failed(verificationStatus)) {
+    return signalPassFailure();
   }
 }
 

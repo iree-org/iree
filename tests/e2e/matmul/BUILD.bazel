@@ -91,7 +91,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     name = "e2e_matmul_dt_uk_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
     compiler_flags = [
         "--iree-opt-data-tiling",
-        "--iree-llvmcpu-enable-microkernels",
+        "--iree-llvmcpu-enable-ukernels=all",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [

@@ -1,0 +1,118 @@
+{
+    "version": 4,
+    "cmakeMinimumRequired": {
+      "major": 3,
+      "minor": 23,
+      "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "new-linux-dev",
+            "displayName": "(START HERE) Set up a new dev directory with recommended generator and layout",
+            "description": "Matches https://iree.dev/building-from-source/getting-started/#quickstart-clone-and-build",
+            "condition":{
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "inherits": [
+                "_new_dev"
+            ],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": {
+                    "type": "STRING",
+                    "value": "clang"
+                },
+                "CMAKE_CXX_COMPILER": {
+                    "type": "STRING",
+                    "value": "clang++"
+                },
+                "CMAKE_C_COMPILER_LAUNCHER": {
+                    "type": "STRING",
+                    "value": "ccache"
+                },
+                "CMAKE_CXX_COMPILER_LAUNCHER": {
+                    "type": "STRING",
+                    "value": "ccache"
+                },
+                "IREE_ENABLE_SPLIT_DWARF": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "IREE_ENABLE_THIN_ARCHIVES": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "IREE_ENABLE_LLD": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            }
+        },
+        {
+            "name": "new-macos-dev",
+            "displayName": "(START HERE) Set up a new dev directory with recommended generator and layout",
+            "description": "Matches https://iree.dev/building-from-source/getting-started/#quickstart-clone-and-build",
+            "inherits": [
+                "_new_dev"
+            ],
+            "condition":{
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "IREE_ENABLE_SPLIT_DWARF": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "CMAKE_C_COMPILER": {
+                    "type": "STRING",
+                    "value": "clang"
+                },
+                "CMAKE_CXX_COMPILER": {
+                    "type": "STRING",
+                    "value": "clang++"
+                },
+                "CMAKE_C_COMPILER_LAUNCHER": {
+                    "type": "STRING",
+                    "value": "ccache"
+                },
+                "CMAKE_CXX_COMPILER_LAUNCHER": {
+                    "type": "STRING",
+                    "value": "ccache"
+                },
+                "IREE_ENABLE_LLD": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            }
+        },
+        {
+            "name": "new-windows-dev",
+            "displayName": "(START HERE) Set up a new dev directory with recommended generator and layout",
+            "description": "Matches https://iree.dev/building-from-source/getting-started/#quickstart-clone-and-build",
+            "inherits": [
+                "_new_dev"
+            ],
+            "condition":{
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "_new_dev",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/../iree-build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "IREE_ENABLE_ASSERTIONS": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            }
+        }
+    ]
+}
